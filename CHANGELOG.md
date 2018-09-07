@@ -1,3 +1,7 @@
+v0.0.4
+----------
+ * remove contact fields for now
+
 v0.0.3
 ----------
  * tweak readme
