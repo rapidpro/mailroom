@@ -85,20 +85,22 @@ func StartFlow(ctx context.Context, mr *mailroom.Mailroom, assets *models.OrgAss
 	// queue any messages created
 	rc := mr.RedisPool.Get()
 	defer rc.Close()
-	for _, m := range dbSession.GetOutbox() {
-		err := courier.QueueMessage(rc, m)
+
+	outbox := dbSession.GetOutbox()
+	if len(outbox) > 0 {
+		err := courier.QueueMessages(rc, outbox)
 
 		// not being able to queue a message isn't the end of the world, log but don't return an error
 		if err != nil {
 			logrus.WithError(err).Error("error queuing message")
-			continue
 		}
 
-		// update the status of the message
-		err = models.MarkMessageQueued(ctx, mr.DB, m)
+		// update the status of the message in the db
+		// TODO: we should be able to do this all in one go really
+		// TODO: we should be queuing all messages in one insert
+		err = models.MarkMessagesQueued(ctx, mr.DB, outbox)
 		if err != nil {
 			logrus.WithError(err).Error("error marking message as queued")
-			continue
 		}
 	}
 

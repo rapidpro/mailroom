@@ -17,24 +17,26 @@ const (
 // TODO: use real TPS that channels have
 
 // QueueMessage queues a message to courier
-func QueueMessage(rc redis.Conn, m *models.Msg) error {
+func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 	now := time.Now()
 	epochMS := strconv.FormatFloat(float64(now.UnixNano()/int64(time.Microsecond))/float64(1000000), 'f', 6, 64)
-	priority := lowPriority
-	if m.HighPriority {
-		priority = highPriority
-	}
 
-	msgJSON, err := json.Marshal(m)
+	// TODO: figure out priority better
+	priority := lowPriority
+
+	msgJSON, err := json.Marshal(msgs)
 	if err != nil {
 		return err
 	}
 
 	// queue to courier
-	_, err = queueMsg.Do(rc, epochMS, "msgs", m.ChannelUUID, 10, priority, msgJSON)
+	// TODO: need to group by channel
+	_, err = queueMsg.Do(rc, epochMS, "msgs", msgs[0].ChannelUUID, 10, priority, msgJSON)
 	if err != nil {
-		m.QueuedOn = now
-		m.Status = models.StatusQueued
+		for _, m := range msgs {
+			m.QueuedOn = now
+			m.Status = models.StatusQueued
+		}
 	}
 
 	return err

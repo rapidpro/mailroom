@@ -137,13 +137,26 @@ const queueMsgSQL = `
 UPDATE 
 	msgs_msg
 SET 
-	status = :status, 
-	queued_on = :queued_on 
+	status = 'Q', 
+	queued_on = NOW(),
+	modified_on = NOW()
 WHERE
-	id = :id
+	id IN ($1)
 `
 
-func MarkMessageQueued(ctx context.Context, db *sqlx.DB, m *Msg) error {
-	_, err := db.NamedExecContext(ctx, queueMsgSQL, m)
+func MarkMessagesQueued(ctx context.Context, db *sqlx.DB, msgs []*Msg) error {
+	ids := make([]int, len(msgs))
+	for i, m := range msgs {
+		ids[i] = int(m.ID)
+	}
+
+	q, vs, err := sqlx.In(queueMsgSQL, ids)
+	if err != nil {
+		return err
+	}
+	q = db.Rebind(q)
+
+	// TODO: use real queued on
+	_, err = db.ExecContext(ctx, q, vs...)
 	return err
 }
