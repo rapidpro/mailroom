@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/gomodule/redigo/redis"
-	uuid "mod/github.com/satori/go.uuid@v1.2.0"
+	uuid "github.com/satori/go.uuid"
 )
 
 // allows queuing a task to celery (with a redis backend)
