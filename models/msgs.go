@@ -141,7 +141,7 @@ SET
 	queued_on = NOW(),
 	modified_on = NOW()
 WHERE
-	id IN ($1)
+	id IN (?)
 `
 
 func MarkMessagesQueued(ctx context.Context, db *sqlx.DB, msgs []*Msg) error {
