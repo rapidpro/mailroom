@@ -42,31 +42,6 @@ SELECT ROW_TO_JSON(t) FROM (
 				cu.id ASC
                 ) u
 		) as urns,
-		(SELECT JSONB_AGG(f.value)
-	   	FROM (
-			SELECT CASE
-			WHEN value ? 'ward'
-				THEN JSONB_BUILD_OBJECT('ward_keyword', (REGEXP_MATCHES(value ->> 'ward', '(.* > )?([^>]+)'))[2])
-				ELSE '{}' :: jsonb
-			END 
-			|| district_value.value AS value
-				FROM (
-					SELECT CASE
-					WHEN value ? 'district'
-						THEN jsonb_build_object('district_keyword', (regexp_matches(value ->> 'district', '(.* > )?([^>]+)'))[2])
-						ELSE '{}' :: jsonb
-					END || state_value.value as value
-						FROM (
-							SELECT CASE
-								WHEN value ? 'state'
-									THEN jsonb_build_object('state_keyword', (regexp_matches(value ->> 'state', '(.* > )?([^>]+)'))[2])
-								ELSE '{}' :: jsonb
-							END || jsonb_build_object('field', key) || value as value
-								FROM jsonb_each(contacts_contact.fields)
-						) state_value
-				) as district_value
-		) as f
-		) as fields,
 		(SELECT array_to_json(array_agg(g))
 	   	FROM (
 			SELECT
