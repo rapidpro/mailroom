@@ -10,6 +10,9 @@ import (
 	"github.com/nyaruka/ezconf"
 	"github.com/nyaruka/mailroom"
 	"github.com/sirupsen/logrus"
+
+	_ "github.com/nyaruka/mailroom/campaigns"
+	_ "github.com/nyaruka/mailroom/expirations"
 )
 
 var version = "Dev"

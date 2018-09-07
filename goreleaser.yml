@@ -1,0 +1,15 @@
+build:
+  main: ./cmd/mailroom/main.go
+  binary: courier
+  goos:
+    - windows
+    - darwin
+    - linux
+  goarch:
+    - amd64
+
+archive:
+  files:
+    - LICENSE
+    - README.md
+    - mailroom.toml

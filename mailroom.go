@@ -5,30 +5,55 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/mailroom/queue"
 	"github.com/sirupsen/logrus"
 )
 
+// InitFunction is a function that will be called when mailroom starts
+type InitFunction func(mr *Mailroom) error
+
+var initFunctions = make([]InitFunction, 0)
+
+// AddInitFunction adds an init function that will be called on startup
+func AddInitFunction(initFunc InitFunction) {
+	initFunctions = append(initFunctions, initFunc)
+}
+
+// TaskFunction is the function that will be called for a type of task
+type TaskFunction func(mr *Mailroom, task *queue.Task) error
+
+var taskFunctions = make(map[string]TaskFunction)
+
+// AddTaskFunction adds an task function that will be called for a type of task
+func AddTaskFunction(taskType string, taskFunc TaskFunction) {
+	taskFunctions[taskType] = taskFunc
+}
+
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	config    *Config
-	db        *sqlx.DB
-	redisPool *redis.Pool
-	quit      chan bool
-	ctx       context.Context
-	cancel    context.CancelFunc
+	Config    *Config
+	DB        *sqlx.DB
+	RedisPool *redis.Pool
+	Quit      chan bool
+	CTX       context.Context
+	Cancel    context.CancelFunc
+	WaitGroup sync.WaitGroup
+	foreman   *Foreman
 }
 
 // NewMailroom creates and returns a new mailroom instance
 func NewMailroom(config *Config) *Mailroom {
 	mr := &Mailroom{
-		config: config,
-		quit:   make(chan bool),
+		Config: config,
+		Quit:   make(chan bool),
 	}
-	mr.ctx, mr.cancel = context.WithCancel(context.Background())
+	mr.CTX, mr.Cancel = context.WithCancel(context.Background())
+	mr.foreman = NewForeman(mr, "events", 50)
 
 	return mr
 }
@@ -40,29 +65,29 @@ func (mr *Mailroom) Start() error {
 	})
 
 	// parse and test our db config
-	dbURL, err := url.Parse(mr.config.DB)
+	dbURL, err := url.Parse(mr.Config.DB)
 	if err != nil {
-		return fmt.Errorf("unable to parse DB URL '%s': %s", mr.config.DB, err)
+		return fmt.Errorf("unable to parse DB URL '%s': %s", mr.Config.DB, err)
 	}
 
 	if dbURL.Scheme != "postgres" {
-		return fmt.Errorf("invalid DB URL: '%s', only postgres is supported", mr.config.DB)
+		return fmt.Errorf("invalid DB URL: '%s', only postgres is supported", mr.Config.DB)
 	}
 
 	// build our db
-	db, err := sqlx.Open("postgres", mr.config.DB)
+	db, err := sqlx.Open("postgres", mr.Config.DB)
 	if err != nil {
-		return fmt.Errorf("unable to open DB with config: '%s': %s", mr.config.DB, err)
+		return fmt.Errorf("unable to open DB with config: '%s': %s", mr.Config.DB, err)
 	}
 
 	// configure our pool
-	mr.db = db
-	mr.db.SetMaxIdleConns(4)
-	mr.db.SetMaxOpenConns(16)
+	mr.DB = db
+	mr.DB.SetMaxIdleConns(4)
+	mr.DB.SetMaxOpenConns(16)
 
 	// try connecting
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	err = mr.db.PingContext(ctx)
+	err = mr.DB.PingContext(ctx)
 	cancel()
 	if err != nil {
 		log.Error("db not reachable")
@@ -71,9 +96,9 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// parse and test our redis config
-	redisURL, err := url.Parse(mr.config.Redis)
+	redisURL, err := url.Parse(mr.Config.Redis)
 	if err != nil {
-		return fmt.Errorf("unable to parse Redis URL '%s': %s", mr.config.Redis, err)
+		return fmt.Errorf("unable to parse Redis URL '%s': %s", mr.Config.Redis, err)
 	}
 
 	// create our pool
@@ -104,7 +129,7 @@ func (mr *Mailroom) Start() error {
 			return conn, err
 		},
 	}
-	mr.redisPool = redisPool
+	mr.RedisPool = redisPool
 
 	// test our redis connection
 	conn := redisPool.Get()
@@ -116,7 +141,12 @@ func (mr *Mailroom) Start() error {
 		log.Info("redis ok")
 	}
 
-	go startExpiring(mr)
+	for _, initFunc := range initFunctions {
+		initFunc(mr)
+	}
+
+	// init our foreman and start it
+	mr.foreman.Start()
 
 	logrus.Info("mailroom started")
 	return nil
@@ -125,8 +155,10 @@ func (mr *Mailroom) Start() error {
 // Stop stops the mailroom service
 func (mr *Mailroom) Stop() error {
 	logrus.Info("mailroom stopping")
-	close(mr.quit)
-	mr.cancel()
+	mr.foreman.Stop()
+	close(mr.Quit)
+	mr.Cancel()
+	mr.WaitGroup.Wait()
 	logrus.Info("mailroom stopped")
 	return nil
 }

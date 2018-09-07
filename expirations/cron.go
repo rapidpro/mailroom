@@ -1,4 +1,4 @@
-package mailroom
+package expirations
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/celery"
 	"github.com/nyaruka/mailroom/cron"
 	"github.com/sirupsen/logrus"
@@ -18,49 +19,18 @@ const (
 	continueTaskQueue = "celery"
 )
 
-func startExpiring(mr *Mailroom) {
-	// we run expiration every minute on the minute
-	for true {
-		wait := 61 - time.Now().Second()
-		select {
-		case <-mr.quit:
-			// we are exiting, break out of our loop so our goroutine can exit
-			break
+func init() {
+	// mailroom.AddInitFunction(StartExpirationCron)
+}
 
-		case <-time.After(time.Second * time.Duration(wait)):
-			rc := mr.redisPool.Get()
-
-			// try to insert our expiring lock to redis
-			lockValue := cron.MakeKey(10)
-			log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
-
-			locked, err := cron.GrabLock(rc, expirationLock, lockValue, 900)
-			if err != nil {
-				log.WithError(err).Error("error acquiring lock")
-				err := cron.ReleaseLock(rc, expirationLock, lockValue)
-				if err != nil {
-					log.WithError(err).Error("error releasing lock")
-				}
-				continue
-			}
-
-			if !locked {
-				log.Info("lock already present, sleeping")
-				continue
-			}
-
-			// ok, got the lock, go expire our runs
-			err = expireRuns(mr, rc, lockValue)
-			if err != nil {
-				err := cron.ReleaseLock(rc, expirationLock, lockValue)
-				if err != nil {
-					log.WithError(err).Error("error releasing lock")
-				}
-			}
-
-			rc.Close()
-		}
-	}
+// StartExpirationCron starts our cron job of expiring runs every minute
+func StartExpirationCron(mr *mailroom.Mailroom) error {
+	cron.StartMinuteCron(mr.Quit, mr.RedisPool, expirationLock,
+		func(rc redis.Conn, lockName string, lockValue string) error {
+			return expireRuns(mr, rc, lockName, lockValue)
+		},
+	)
+	return nil
 }
 
 const expiredRunQuery = `
@@ -95,15 +65,15 @@ func executeInQuery(ctx context.Context, db *sqlx.DB, query string, ids []int64)
 }
 
 // expireRuns expires all the runs that have an expiration in the past
-func expireRuns(mr *Mailroom, rc redis.Conn, lockValue string) error {
+func expireRuns(mr *mailroom.Mailroom, rc redis.Conn, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
 
 	// find all runs that need to be expired (we exclude IVR runs)
 	runIDs := []flowRunRef{}
-	ctx, cancel := context.WithTimeout(mr.ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*5)
 	defer cancel()
 
-	err := mr.db.SelectContext(ctx, &runIDs, expiredRunQuery)
+	err := mr.DB.SelectContext(ctx, &runIDs, expiredRunQuery)
 	if err != nil {
 		log.WithError(err).Error("error looking up runs to expire")
 		return err
@@ -127,14 +97,14 @@ func expireRuns(mr *Mailroom, rc redis.Conn, lockValue string) error {
 		// batch size or last element? expire the runs
 		if i == len(runIDs)-1 || len(batchIDs) == expireBatchSize {
 			// extend our timeout
-			err = cron.SetLockExpiraton(rc, expirationLock, lockValue, 400)
+			err = cron.ExtendLockExpiration(rc, lockName, lockValue, 60*6)
 			if err != nil {
 				log.WithError(err).Error("error setting lock expiration")
 				return err
 			}
 
 			// expiration shouldn't take more than a few minutes
-			ctx, cancel := context.WithTimeout(mr.ctx, time.Minute*5)
+			ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*5)
 			defer cancel()
 
 			// execute our query
@@ -144,8 +114,8 @@ func expireRuns(mr *Mailroom, rc redis.Conn, lockValue string) error {
 				log.WithError(err).Error("error binding expiration query")
 				return err
 			}
-			sql = mr.db.Rebind(sql)
-			_, err = mr.db.ExecContext(ctx, sql, params...)
+			sql = mr.DB.Rebind(sql)
+			_, err = mr.DB.ExecContext(ctx, sql, params...)
 			if err != nil {
 				log.WithField("runs", batchIDs).WithError(err).Error("error expiring batch of runs")
 				return err
@@ -166,12 +136,5 @@ func expireRuns(mr *Mailroom, rc redis.Conn, lockValue string) error {
 	}
 
 	log.WithField("elapsed", time.Since(start)).WithField("count", len(runIDs)).Info("expirations complete")
-
-	// set our lock to run again in a minute
-	wait := 60 - time.Now().Second()
-	err = cron.SetLockExpiraton(rc, expirationLock, lockValue, wait)
-	if err != nil {
-		log.WithError(err).Error("error setting lock expiration")
-	}
-	return err
+	return nil
 }

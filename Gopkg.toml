@@ -52,3 +52,19 @@
 [[constraint]]
   name = "github.com/gomodule/redigo"
   version = "2.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/nyaruka/goflow"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "1.2.2"
+
+[[constraint]]
+  name = "gopkg.in/guregu/null.v3"
+  version = "3.4.0"
+
+[[constraint]]
+  name = "github.com/nyaruka/gocommon"
+  version = "0.2.0"
