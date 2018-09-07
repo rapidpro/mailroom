@@ -1,3 +1,7 @@
+v0.0.3
+----------
+ * tweak readme
+
 v0.0.2
 ----------
  * fix binding
