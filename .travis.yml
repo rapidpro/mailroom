@@ -19,7 +19,7 @@ before_script:
 - psql -U postgres -d temba -f schema.sql
 
 script:
-- go test -p=1 -coverprofile=coverage.text -covermode=atomic github.com/nyaruka/temba/...
+- go test -p=1 -coverprofile=coverage.text -covermode=atomic github.com/nyaruka/mailroom/...
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
