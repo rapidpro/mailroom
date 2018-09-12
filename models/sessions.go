@@ -21,12 +21,12 @@ type SessionID float64
 type SessionStatus string
 
 type Session struct {
-	ID        SessionID     `db:"id"`
-	Status    SessionStatus `db:"status"`
-	Responded bool          `db:"responded"`
-	Output    string        `db:"output"`
-	ContactID ContactID     `db:"contact_id"`
-	OrgID     OrgID         `db:"org_id"`
+	ID        SessionID       `db:"id"`
+	Status    SessionStatus   `db:"status"`
+	Responded bool            `db:"responded"`
+	Output    string          `db:"output"`
+	ContactID flows.ContactID `db:"contact_id"`
+	OrgID     OrgID           `db:"org_id"`
 	CreatedOn time.Time
 
 	flowIDs map[flows.FlowUUID]FlowID
@@ -75,7 +75,7 @@ func CreateSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, s flows.Ses
 		Status:    sessionStatus,
 		Responded: false,
 		Output:    string(output),
-		ContactID: ContactID(s.Contact().ID()),
+		ContactID: s.Contact().ID(),
 		OrgID:     org.GetOrgID(),
 		CreatedOn: s.Runs()[0].CreatedOn(), // TODO: do something more sane here
 	}

@@ -40,14 +40,14 @@ func FireCampaignEvent(mr *mailroom.Mailroom, orgID models.OrgID, contactID mode
 	}
 
 	// TODO: get a lock for the contact so that nobody else is running the contact in a flow
-	contact, err := models.LoadContact(org, contactID)
+	contacts, err := models.LoadContacts(ctx, mr.DB, org, []models.ContactID{contactID})
 	if err != nil {
 		logrus.WithError(err).Error("error loading contact")
 		return nil, err
 	}
 
 	// create our trigger
-	trigger := triggers.NewCampaignTrigger(env, flow, contact, event, triggeredOn)
+	trigger := triggers.NewCampaignTrigger(env, flow, contacts[0], event, triggeredOn)
 	return StartFlow(ctx, mr, org, trigger)
 }
 
@@ -96,8 +96,6 @@ func StartFlow(ctx context.Context, mr *mailroom.Mailroom, assets *models.OrgAss
 		}
 
 		// update the status of the message in the db
-		// TODO: we should be able to do this all in one go really
-		// TODO: we should be queuing all messages in one insert
 		err = models.MarkMessagesQueued(ctx, mr.DB, outbox)
 		if err != nil {
 			logrus.WithError(err).Error("error marking message as queued")

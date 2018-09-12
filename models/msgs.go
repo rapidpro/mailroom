@@ -13,12 +13,10 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
-type MsgID int64
 type MsgDirection string
 type MsgStatus string
 type MsgVisibility string
 type MsgType string
-type ChannelID int
 type ConnectionID null.Int
 type ContactURNID int
 type TopUpID null.Int
@@ -31,7 +29,7 @@ const StatusPending = MsgStatus("P")
 // TODO: urn auth
 
 type Msg struct {
-	ID           MsgID             `db:"id"              json:"id"`
+	ID           flows.MsgID       `db:"id"              json:"id"`
 	UUID         flows.MsgUUID     `db:"uuid"            json:"uuid"`
 	Text         string            `db:"text"            json:"text"`
 	HighPriority bool              `db:"high_priority"   json:"high_priority"`
@@ -49,10 +47,10 @@ type Msg struct {
 	ExternalID   null.String       `db:"external_id"     json:"external_id"`
 	Attachments  []string          `db:"attachments"     json:"attachments"`
 	Metadata     null.String       `db:"metadata"        json:"metadata"`
-	ChannelID    ChannelID         `db:"channel_id"      json:"channel_id"`
+	ChannelID    flows.ChannelID   `db:"channel_id"      json:"channel_id"`
 	ChannelUUID  flows.ChannelUUID `                     json:"channel_uuid"`
 	ConnectionID ConnectionID      `db:"connection_id"`
-	ContactID    ContactID         `db:"contact_id"      json:"contact_id"`
+	ContactID    flows.ContactID   `db:"contact_id"      json:"contact_id"`
 	ContactURNID ContactURNID      `db:"contact_urn_id"  json:"contact_urn_id"`
 	URN          urns.URN          `                     json:"urn"`
 	OrgID        OrgID             `db:"org_id"          json:"org_id"`
@@ -68,7 +66,7 @@ msgs_msg(uuid, text, high_priority, created_on, modified_on, direction, status,
 RETURNING id, NOW()
 `
 
-func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, contactID ContactID, m *flows.MsgOut) (*Msg, error) {
+func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
 	_, _, query, _ := m.URN().ToParts()
 	parsedQuery, err := url.ParseQuery(query)
 	if err != nil {
@@ -83,7 +81,7 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, contact
 	}
 
 	// get the id of our active topup
-	topupID, err := org.GetActiveTopup()
+	topupID, err := loadActiveTopup(ctx, tx, org.GetOrgID())
 	if err != nil {
 		return nil, fmt.Errorf("unable to create msg, no active topup: %s", err)
 	}
@@ -106,11 +104,11 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, contact
 	// TODO: calculate real msg count
 
 	// set our channel id
-	channelID, err := org.GetChannelID(m.Channel().UUID)
+	channel, err := org.GetChannel(m.Channel().UUID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to find channel with UUID: %s", m.Channel().UUID)
 	}
-	msg.ChannelID = channelID
+	msg.ChannelID = channel.ID()
 	msg.ChannelUUID = m.Channel().UUID
 
 	// insert msg

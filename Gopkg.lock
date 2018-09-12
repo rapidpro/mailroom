@@ -89,6 +89,12 @@
   revision = "0dae4fefe7c0e190f7b5a78dac28a1c82cc8d849"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/juju/errors"
+  packages = ["."]
+  revision = "22422dad46e14561a0854ad42497a75af9b61909"
+
+[[projects]]
   name = "github.com/karlseguin/ccache"
   packages = ["."]
   revision = "a2d62155777b39595c825ed3824279e642a5db3c"
@@ -159,7 +165,7 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "4d7c74d852a6bb8ec73ee17c03f36b529ddff2bb"
+  revision = "7b426087a8bf381089ff025bb70a2f5da5025923"
 
 [[projects]]
   name = "github.com/nyaruka/phonenumbers"
@@ -244,6 +250,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9d1e4accd1ab69046141b08270eb77209eb20d5c1b83e99aeaa66cc1588685f6"
+  inputs-digest = "d27489903bbf5f9a5ade05971e8512b6712ac4f1a3f94783aed835c06de05f42"
   solver-name = "gps-cdcl"
   solver-version = 1

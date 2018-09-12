@@ -39,14 +39,14 @@ type FlowRun struct {
 	Path string `db:"path"`
 
 	// TODO: should this be a complex object that can read / write iself to the DB as JSON?
-	Events          string         `db:"events"`
-	CurrentNodeUUID flows.NodeUUID `db:"current_node_uuid"`
-	ContactID       int            `db:"contact_id"`
-	FlowID          FlowID         `db:"flow_id"`
-	OrgID           OrgID          `db:"org_id"`
-	ParentID        null.Int       `db:"parent_id"`
-	SessionID       SessionID      `db:"session_id"`
-	StartID         null.Int       `db:"start_id"`
+	Events          string          `db:"events"`
+	CurrentNodeUUID flows.NodeUUID  `db:"current_node_uuid"`
+	ContactID       flows.ContactID `db:"contact_id"`
+	FlowID          flows.FlowID    `db:"flow_id"`
+	OrgID           OrgID           `db:"org_id"`
+	ParentID        null.Int        `db:"parent_id"`
+	SessionID       SessionID       `db:"session_id"`
+	StartID         null.Int        `db:"start_id"`
 }
 
 type Step struct {
@@ -66,18 +66,13 @@ RETURNING id
 `
 
 func CreateRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error) {
-	flowID, err := org.GetFlowID(r.Flow().UUID())
-	if err != nil {
-		return nil, err
-	}
-
 	run := &FlowRun{
 		UUID:      r.UUID(),
 		CreatedOn: r.CreatedOn(),
 		ExitedOn:  r.ExitedOn(),
 		ExpiresOn: r.ExpiresOn(),
 		ContactID: r.Contact().ID(),
-		FlowID:    flowID,
+		FlowID:    r.Flow().ID(),
 		SessionID: session.ID,
 		StartID:   null.NewInt(0, false),
 		OrgID:     org.GetOrgID(),
