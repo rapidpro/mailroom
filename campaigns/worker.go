@@ -3,9 +3,11 @@ package campaigns
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/juju/errors"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
@@ -29,28 +31,24 @@ func init() {
 //   - saves the flow run and session resulting from our run
 func HandleCampaignEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 	log := logrus.WithField("comp", "campaign_worker").WithField("task", task.Task)
-	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute)
+	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*5)
 	defer cancel()
 
 	// decode our task body
 	if task.Type != campaignEventFireType {
-		err := fmt.Errorf("unknown event type passed to campaign worker: %s", task.Type)
-		log.WithError(err).Error("error handling event")
-		return err
+		return errors.Errorf("unknown event type passed to campaign worker: %s", task.Type)
 	}
-
 	eventTask := eventFireTask{}
 	err := json.Unmarshal(task.Task, &eventTask)
 	if err != nil {
-		log.WithError(err).Error("error unmarshalling task")
-		return err
+		return errors.Annotatef(err, "error unmarshalling event fire task: %s", string(task.Task))
 	}
 
 	// first grab our event, make sure it is still unfired
 	fire, err := loadEventFire(ctx, mr.DB, eventTask.FireID)
 	if err != nil {
-		log.WithError(err).Error("error loading event fire from db")
-		return err
+		// TODO: should we be removing this task as having been marked for execution (so it can retry?)
+		return errors.Annotatef(err, "error loading event fire from db: %d", eventTask.FireID)
 	}
 
 	// if it is already fired, that's ok, just exit
@@ -68,18 +66,72 @@ func HandleCampaignEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 		},
 	}
 
-	session, err := runner.FireCampaignEvent(mr, fire.OrgID, fire.ContactID, fire.FlowUUID, &event, fire.Scheduled)
+	session, err := runner.FireCampaignEvent(ctx, mr, fire.OrgID, fire.ContactID, fire.FlowUUID, &event, fire.Scheduled)
 	if err != nil {
-		log.WithError(err).Error("error firing campaign")
-		return err
+		// TODO: should we be removing this task as having been marked for execution (so it can retry?)
+		return errors.Annotatef(err, "error firing campaign event: %d", eventTask.FireID)
 	}
 
 	// it this flow started ok, then mark this campaign as fired
 	err = models.MarkCampaignEventFired(ctx, mr.DB, fire.FireID, session.CreatedOn)
 	if err != nil {
-		log.WithError(err).Error("error marking event fire as fired")
-		return err
+		return errors.Annotatef(err, "error marking event fire as fired: %d", fire.FireID)
 	}
 
 	return nil
 }
+
+// EventFire represents a single campaign event fire for an event and contact
+type EventFire struct {
+	FireID       int               `db:"fire_id"`
+	Scheduled    time.Time         `db:"scheduled"`
+	Fired        *time.Time        `db:"fired"`
+	ContactID    flows.ContactID   `db:"contact_id"`
+	ContactUUID  flows.ContactUUID `db:"contact_uuid"`
+	EventID      int64             `db:"event_id"`
+	EventUUID    string            `db:"event_uuid"`
+	CampaignID   int64             `db:"campaign_id"`
+	CampaignUUID string            `db:"campaign_uuid"`
+	CampaignName string            `db:"campaign_name"`
+	OrgID        models.OrgID      `db:"org_id"`
+	FlowUUID     flows.FlowUUID    `db:"flow_uuid"`
+}
+
+// loadsEventFire loads a single event fire along with the associated fields needed to run
+// the fire event.
+func loadEventFire(ctx context.Context, db *sqlx.DB, id int64) (*EventFire, error) {
+	fire := &EventFire{}
+	err := db.GetContext(ctx, fire, loadEventFireSQL, id)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading event fire: %d", id)
+	}
+	return fire, nil
+}
+
+const loadEventFireSQL = `
+SELECT 
+	ef.id as fire_id, 
+	ef.scheduled as scheduled, 
+	ef.fired as fired, 
+	c.id as contact_id, 
+	c.uuid as contact_uuid,
+	ce.id as event_id,
+	ce.uuid as event_uuid,
+	ca.id as campaign_id,
+	ca.uuid as campaign_uuid,
+	ca.name as campaign_name,
+	ca.org_id as org_id,
+	f.uuid as flow_uuid
+FROM 
+	campaigns_eventfire ef,
+	campaigns_campaignevent ce,
+	campaigns_campaign ca,
+	flows_flow f,
+	contacts_contact c
+WHERE 
+	ef.id = $1 AND
+	ef.contact_id = c.id AND
+	ce.id = ef.event_id AND 
+	ca.id = ce.campaign_id AND
+	f.id = ce.flow_id
+`

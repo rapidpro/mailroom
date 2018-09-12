@@ -49,8 +49,11 @@ SELECT ROW_TO_JSON(t) FROM (SELECT
 			cg.contactgroup_id as group_id
 		FROM 
 			contacts_contactgroup_contacts cg
+			LEFT JOIN contacts_contactgroup g ON cg.contactgroup_id = g.id
 		WHERE 
-			contact_id = contacts_contact.id
+			contact_id = contacts_contact.id AND
+			g.group_type = 'U' AND
+			g.is_active = TRUE
 	) g) as groups
 FROM 
 	contacts_contact
@@ -161,7 +164,7 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, o *OrgAssets, ids []flows.Co
 			values[field.Key()] = value
 		}
 
-		// TODO: load real timezone for contact
+		// TODO: load real timezone for contact (same as org)
 		// TODO: what do we do for stopped, blocked, inactive?
 
 		// ok, create our goflow contact now

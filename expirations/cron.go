@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/celery"
@@ -19,15 +18,17 @@ const (
 	continueTaskQueue = "celery"
 )
 
+// TODO: ideally this will never ship and we will handle expirations internally
+
 func init() {
 	// mailroom.AddInitFunction(StartExpirationCron)
 }
 
 // StartExpirationCron starts our cron job of expiring runs every minute
 func StartExpirationCron(mr *mailroom.Mailroom) error {
-	cron.StartMinuteCron(mr.Quit, mr.RedisPool, expirationLock,
-		func(rc redis.Conn, lockName string, lockValue string) error {
-			return expireRuns(mr, rc, lockName, lockValue)
+	cron.StartCron(mr.Quit, mr.RedisPool, expirationLock, time.Second*60,
+		func(lockName string, lockValue string) error {
+			return expireRuns(mr, lockName, lockValue)
 		},
 	)
 	return nil
@@ -65,8 +66,10 @@ func executeInQuery(ctx context.Context, db *sqlx.DB, query string, ids []int64)
 }
 
 // expireRuns expires all the runs that have an expiration in the past
-func expireRuns(mr *mailroom.Mailroom, rc redis.Conn, lockName string, lockValue string) error {
+func expireRuns(mr *mailroom.Mailroom, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
+	rc := mr.RedisPool.Get()
+	defer rc.Close()
 
 	// find all runs that need to be expired (we exclude IVR runs)
 	runIDs := []flowRunRef{}

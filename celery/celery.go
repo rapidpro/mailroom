@@ -12,24 +12,24 @@ import (
 // allows queuing a task to celery (with a redis backend)
 //
 // format to queue a new task to the queue named "handler" at normal priority is:
-// "lpush" "handler" "{\"body\": \"W1tdLCB7fSwgeyJjYWxsYmFja3MiOiBudWxsLCAiZXJyYmFja3MiOiBudWxsLCAiY2hhaW4iOiBudWxsLCAiY2hvcmQiOiBudWxsfV0=\",
-//	\"content-encoding\": \"utf-8\", \"content-type\": \"application/json\", \"headers\": {\"lang\": \"py\", \"task\": \"handle_event_task\",
-//  \"id\": \"efca7c4e-952e-430f-87f7-c01c4652ed54\", \"eta\": null, \"expires\": null, \"group\": null, \"retries\": 0, \"timelimit\": [180, 120],
-// \"root_id\": \"efca7c4e-952e-430f-87f7-c01c4652ed54\", \"parent_id\": null, \"argsrepr\": \"()\", \"kwargsrepr\": \"{}\",
-// \"origin\": \"gen12382@ip-172-31-43-31\"}, \"properties\": {\"correlation_id\": \"efca7c4e-952e-430f-87f7-c01c4652ed54\",
-// \"reply_to\": \"59ad710c-7d28-37c2-a730-89048c13f030\", \"delivery_mode\": 2, \"delivery_info\": {\"exchange\": \"\",
-// \"routing_key\": \"handler\"}, \"priority\": 0, \"body_encoding\": \"base64\", \"delivery_tag\": \"bf838430-d01c-4550-b0a1-a6a309a28017\"}}"
+// "lpush" "handler" "{"body": "W1tdLCB7fSwgeyJjYWxsYmFja3MiOiBudWxsLCAiZXJyYmFja3MiOiBudWxsLCAiY2hhaW4iOiBudWxsLCAiY2hvcmQiOiBudWxsfV0=",
+//	"content-encoding": "utf-8", "content-type": "application/json", "headers": {"lang": "py", "task": "handle_event_task",
+//  "id": "efca7c4e-952e-430f-87f7-c01c4652ed54", "eta": null, "expires": null, "group": null, "retries": 0, "timelimit": [180, 120],
+// "root_id": "efca7c4e-952e-430f-87f7-c01c4652ed54", "parent_id": null, "argsrepr": "()", "kwargsrepr": "{}",
+// "origin": "gen12382@ip-172-31-43-31"}, "properties": {"correlation_id": "efca7c4e-952e-430f-87f7-c01c4652ed54",
+// "reply_to": "59ad710c-7d28-37c2-a730-89048c13f030", "delivery_mode": 2, "delivery_info": {"exchange": "",
+// "routing_key": "handler"}, "priority": 0, "body_encoding": "base64", "delivery_tag": "bf838430-d01c-4550-b0a1-a6a309a28017"}}"
 //
 // multi
 // "zadd" "unacked_index" "1526928218.953298" "bf838430-d01c-4550-b0a1-a6a309a28017"
-// "hset" "unacked" "bf838430-d01c-4550-b0a1-a6a309a28017" "[{\"body\":
-//	\"W1tdLCB7fSwgeyJjYWxsYmFja3MiOiBudWxsLCAiZXJyYmFja3MiOiBudWxsLCAiY2hhaW4iOiBudWxsLCAiY2hvcmQiOiBudWxsfV0=\",
-// \"content-encoding\": \"utf-8\", \"content-type\": \"application/json\", \"headers\": {\"lang\": \"py\", \"task\": \"handle_event_task\",
-// \"id\": \"efca7c4e-952e-430f-87f7-c01c4652ed54\", \"eta\": null, \"expires\": null, \"group\": null, \"retries\": 0, \"timelimit\":
-// [180, 120], \"root_id\": \"efca7c4e-952e-430f-87f7-c01c4652ed54\", \"parent_id\": null, \"argsrepr\": \"()\", \"kwargsrepr\": \"{}\",
-// \"origin\": \"gen12382@ip-172-31-43-31\"}, \"properties\": {\"correlation_id\": \"efca7c4e-952e-430f-87f7-c01c4652ed54\",
-// \"reply_to\": \"59ad710c-7d28-37c2-a730-89048c13f030\", \"delivery_mode\": 2, \"delivery_info\": {\"exchange\": \"\", \"routing_key\": \"handler\"},
-// \"priority\": 0, \"body_encoding\": \"base64\", \"delivery_tag\": \"bf838430-d01c-4550-b0a1-a6a309a28017\"}}, \"\", \"handler\"]"
+// "hset" "unacked" "bf838430-d01c-4550-b0a1-a6a309a28017" "[{"body":
+//	"W1tdLCB7fSwgeyJjYWxsYmFja3MiOiBudWxsLCAiZXJyYmFja3MiOiBudWxsLCAiY2hhaW4iOiBudWxsLCAiY2hvcmQiOiBudWxsfV0=",
+// "content-encoding": "utf-8", "content-type": "application/json", "headers": {"lang": "py", "task": "handle_event_task",
+// "id": "efca7c4e-952e-430f-87f7-c01c4652ed54", "eta": null, "expires": null, "group": null, "retries": 0, "timelimit":
+// [180, 120], "root_id": "efca7c4e-952e-430f-87f7-c01c4652ed54", "parent_id": null, "argsrepr": "()", "kwargsrepr": "{}",
+// "origin": "gen12382@ip-172-31-43-31"}, "properties": {"correlation_id": "efca7c4e-952e-430f-87f7-c01c4652ed54",
+// "reply_to": "59ad710c-7d28-37c2-a730-89048c13f030", "delivery_mode": 2, "delivery_info": {"exchange": "", "routing_key": "handler"},
+// "priority": 0, "body_encoding": "base64", "delivery_tag": "bf838430-d01c-4550-b0a1-a6a309a28017"}}, "", "handler"]"
 // exec
 //
 //

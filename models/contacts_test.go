@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -16,8 +15,7 @@ import (
 
 func TestContacts(t *testing.T) {
 	ctx := context.Background()
-	db, err := sqlx.Open("postgres", "postgres://temba@localhost/temba?sslmode=disable")
-	assert.NoError(t, err)
+	db := Reset(t)
 	org := NewOrgAssets(ctx, db, 1)
 
 	contacts, err := LoadContacts(ctx, db, org, []flows.ContactID{42, 43, 80})

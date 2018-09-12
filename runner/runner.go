@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/courier"
@@ -21,11 +22,7 @@ var (
 )
 
 // FireCampaignEvent starts the flow for the passed in org, contact and flow
-func FireCampaignEvent(mr *mailroom.Mailroom, orgID models.OrgID, contactID models.ContactID, flowUUID flows.FlowUUID, event *triggers.CampaignEvent, triggeredOn time.Time) (*models.Session, error) {
-	// campaign fires shouldn't take longer than a minute
-	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute)
-	defer cancel()
-
+func FireCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID, contactID flows.ContactID, flowUUID flows.FlowUUID, event *triggers.CampaignEvent, triggeredOn time.Time) (*models.Session, error) {
 	// grab our org
 	org := models.NewOrgAssets(ctx, mr.DB, orgID)
 
@@ -35,20 +32,25 @@ func FireCampaignEvent(mr *mailroom.Mailroom, orgID models.OrgID, contactID mode
 	// try to load our flow
 	flow, err := org.GetFlow(flowUUID)
 	if err != nil {
-		logrus.WithError(err).Error("error loading flow")
-		return nil, err
+		return nil, errors.Annotatef(err, "error loading campaign flow: %s", flowUUID)
 	}
 
 	// TODO: get a lock for the contact so that nobody else is running the contact in a flow
-	contacts, err := models.LoadContacts(ctx, mr.DB, org, []models.ContactID{contactID})
+	contacts, err := models.LoadContacts(ctx, mr.DB, org, []flows.ContactID{contactID})
 	if err != nil {
-		logrus.WithError(err).Error("error loading contact")
-		return nil, err
+		return nil, errors.Annotatef(err, "err loading contact: %d", contactID)
 	}
 
 	// create our trigger
 	trigger := triggers.NewCampaignTrigger(env, flow, contacts[0], event, triggeredOn)
-	return StartFlow(ctx, mr, org, trigger)
+
+	// and start our flow
+	session, err := StartFlow(ctx, mr, org, trigger)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting flow for event: %s", event)
+	}
+
+	return session, nil
 }
 
 // StartFlow runs the passed in flow for the passed in contact
@@ -61,44 +63,44 @@ func StartFlow(ctx context.Context, mr *mailroom.Mailroom, assets *models.OrgAss
 	// start our flow
 	err := session.Start(trigger, nil)
 	if err != nil {
-		logrus.WithError(err).Error("error starting flow")
-		return nil, err
+		return nil, errors.Annotatef(err, "error starting flow: %s", trigger)
 	}
 
 	// write our session to the db
 	tx, err := mr.DB.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "error starting transaction")
 	}
 
-	dbSession, err := models.CreateSession(ctx, tx, assets, session)
+	dbSession, err := models.WriteSession(ctx, tx, assets, session)
 	if err != nil {
 		tx.Rollback()
-		return nil, err
+		return nil, errors.Annotatef(err, "error writing flow results for campaign: %s", trigger)
 	}
 	err = tx.Commit()
 	if err != nil {
 		tx.Rollback()
-		return nil, err
+		return nil, errors.Annotatef(err, "error committing flow result write: %s", trigger)
 	}
 
-	// queue any messages created
+	// queue any messages created to courier
 	rc := mr.RedisPool.Get()
 	defer rc.Close()
 
 	outbox := dbSession.GetOutbox()
 	if len(outbox) > 0 {
+		log := logrus.WithField("messages", dbSession.GetOutbox()).WithField("session", dbSession.ID)
 		err := courier.QueueMessages(rc, outbox)
 
 		// not being able to queue a message isn't the end of the world, log but don't return an error
 		if err != nil {
-			logrus.WithError(err).Error("error queuing message")
+			log.WithError(err).Error("error queuing message")
 		}
 
 		// update the status of the message in the db
 		err = models.MarkMessagesQueued(ctx, mr.DB, outbox)
 		if err != nil {
-			logrus.WithError(err).Error("error marking message as queued")
+			log.WithError(err).Error("error marking message as queued")
 		}
 	}
 
