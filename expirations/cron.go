@@ -100,7 +100,7 @@ func expireRuns(mr *mailroom.Mailroom, lockName string, lockValue string) error 
 		// batch size or last element? expire the runs
 		if i == len(runIDs)-1 || len(batchIDs) == expireBatchSize {
 			// extend our timeout
-			err = cron.ExtendLockExpiration(rc, lockName, lockValue, 60*6)
+			err = cron.ExtendLock(rc, lockName, lockValue, 60*6)
 			if err != nil {
 				log.WithError(err).Error("error setting lock expiration")
 				return err

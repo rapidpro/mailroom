@@ -43,7 +43,7 @@ func FireCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, orgID models.
 	}
 
 	// create our trigger
-	flowRef := flows.NewFlowReference(flow.UUID(), flow.Name())
+	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	trigger := triggers.NewCampaignTrigger(org.Env(), flowRef, contacts[0], event, triggeredOn)
 
 	// and start our flow
@@ -60,11 +60,17 @@ func StartFlow(ctx context.Context, mr *mailroom.Mailroom, org *models.OrgAssets
 	// create our session
 	// TODO: non default config for engine
 	// TODO: fancier http client?
-	assets := engine.NewSessionAssets(org)
-	session := engine.NewSession(org, engine.NewDefaultConfig(), httpClient)
+	assets, err := engine.NewSessionAssets(org)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error creating session assets for org: %d", org.OrgID())
+	}
+
+	session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
+
+	track := models.NewTrack(ctx, mr.DB, mr.RedisPool, org)
 
 	// start our flow
-	err := session.Start(trigger, nil)
+	err = session.Start(trigger, nil)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error starting flow: %s", trigger)
 	}
@@ -75,7 +81,7 @@ func StartFlow(ctx context.Context, mr *mailroom.Mailroom, org *models.OrgAssets
 		return nil, errors.Annotatef(err, "error starting transaction")
 	}
 
-	dbSession, err := models.WriteSession(ctx, tx, assets, session)
+	dbSession, err := models.WriteSession(ctx, tx, track, session)
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Annotatef(err, "error writing flow results for campaign: %s", trigger)

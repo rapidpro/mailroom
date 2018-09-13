@@ -5,57 +5,59 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
-	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	null "gopkg.in/guregu/null.v3"
 )
 
 type ChannelID int
 
-// Channel is the mailman struct that represents channels
+// Channel is the mailroom struct that represents channels
 type Channel struct {
-	id       ChannelID
-	uuid     assets.ChannelUUID
-	parent   *assets.ChannelReference
-	name     string
-	address  string
-	country  null.String
-	schemes  []string
-	roles    []assets.ChannelRole
-	prefixes []string
+	// inner struct for privacy and so we don't collide with method names
+	c struct {
+		ID            ChannelID                `json:"id"`
+		UUID          assets.ChannelUUID       `json:"uuid"`
+		Parent        *assets.ChannelReference `json:"parent"`
+		Name          string                   `json:"name"`
+		Address       string                   `json:"address"`
+		Country       null.String              `json:"country"`
+		Schemes       []string                 `json:"schemes"`
+		Roles         []assets.ChannelRole     `json:"roles"`
+		MatchPrefixes []string                 `json:"match_prefixes"`
+	}
 }
 
 // ID returns the id of this channel
-func (c *Channel) ID() ChannelID { return c.id }
+func (c *Channel) ID() ChannelID { return c.c.ID }
 
 // UUID returns the UUID of this channel
-func (c *Channel) UUID() assets.ChannelUUID { return c.uuid }
+func (c *Channel) UUID() assets.ChannelUUID { return c.c.UUID }
 
 // Name returns the name of this channel
-func (c *Channel) Name() string { return c.name }
+func (c *Channel) Name() string { return c.c.Name }
 
 // Address returns the name of this channel
-func (c *Channel) Address() string { return c.address }
+func (c *Channel) Address() string { return c.c.Address }
 
 // Country returns the contry code for this channel
-func (c *Channel) Country() string { return c.country.String }
+func (c *Channel) Country() string { return c.c.Country.String }
 
 // Schemes returns the schemes this channel supports
-func (c *Channel) Schemes() []string { return c.schemes }
+func (c *Channel) Schemes() []string { return c.c.Schemes }
 
 // Roles returns the roles this channel supports
-func (c *Channel) Roles() []assets.ChannelRole { return c.roles }
+func (c *Channel) Roles() []assets.ChannelRole { return c.c.Roles }
 
 // MatchPrefixes returns the prefixes we should also match when determining channel affinity
-func (c *Channel) MatchPrefixes() []string { return c.prefixes }
+func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
 
 // Parent returns the UUID of the parent channel to this channel
 // TODO: add support for parent channels
-func (c *Channel) Parent() *assets.ChannelReference { return c.parent }
+func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
 
 // loadChannels loads all the channels for the passed in org
 func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Channel, error) {
-	rows, err := db.Query(selectChannelsSQL, orgID)
+	rows, err := db.Queryx(selectChannelsSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying channels for org: %d", orgID)
 	}
@@ -64,22 +66,9 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 	channels := make([]assets.Channel, 0, 2)
 	for rows.Next() {
 		channel := &Channel{}
-		var roles []string
-		var parentName, parentUUID *string
-
-		err := rows.Scan(&channel.id, &channel.uuid, &parentUUID, &parentName, &channel.name, &channel.country, &channel.address, pq.Array(&channel.schemes), pq.Array(&roles))
+		err := readJSONRow(rows, &channel.c)
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning channel row")
-		}
-
-		// populate our roles
-		for _, r := range roles {
-			channel.roles = append(channel.roles, assets.ChannelRole(r))
-		}
-
-		// and our parent if present
-		if parentUUID != nil && parentName != nil {
-			channel.parent = assets.NewChannelReference(assets.ChannelUUID(*parentUUID), *parentName)
+			return nil, errors.Annotatef(err, "error unmarshalling channel")
 		}
 
 		channels = append(channels, channel)
@@ -89,15 +78,14 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 }
 
 const selectChannelsSQL = `
-SELECT
-	id,
-	uuid,
-	(SELECT uuid FROM channels_channel where id = parent_id) as parent_uuid,
-	(SELECT name FROM channels_channel where id = parent_id) as parent_name,
-	name,
-	country,
-	address,
-	schemes,
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	c.id as id,
+	c.uuid uuid,
+	(SELECT ROW_TO_JSON(p) FROM (SELECT uuid, name FROM channels_channel cc where cc.id = c.parent_id) p) as parent,
+	c.name as name,
+	c.country as country,
+	c.address as address,
+	c.schemes as schemes,
 	(SELECT ARRAY(
 		SELECT CASE r 
 		WHEN 'R' THEN 'receive' 
@@ -106,13 +94,15 @@ SELECT
 		WHEN 'A' THEN 'answer'
 		WHEN 'U' THEN 'ussd'
 		END 
-		FROM unnest(regexp_split_to_array(role,'')) as r)
-	) as roles
+		FROM unnest(regexp_split_to_array(c.role,'')) as r)
+	) as roles,
+	JSON_EXTRACT_PATH(c.config::json, 'matching_prefixes') as match_prefixes
 FROM 
-	channels_channel
+	channels_channel c
 WHERE 
-	org_id = $1 AND 
-	is_active = TRUE
+	c.org_id = $1 AND 
+	c.is_active = TRUE
 ORDER BY
-	created_on ASC
+	c.created_on ASC
+) r;
 `

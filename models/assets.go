@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -22,7 +23,6 @@ type OrgAssets struct {
 
 	flowCache     map[assets.FlowUUID]assets.Flow
 	flowCacheLock sync.RWMutex
-	flowUUIDMap   map[assets.FlowUUID]FlowID
 
 	channels       []assets.Channel
 	channelsByID   map[ChannelID]*Channel
@@ -36,7 +36,7 @@ type OrgAssets struct {
 	groupsByUUID map[assets.GroupUUID]*Group
 
 	labels    []assets.Label
-	locations *utils.LocationHierarchy
+	locations []assets.LocationHierarchy
 	resthooks []assets.Resthook
 }
 
@@ -60,11 +60,15 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		db:      db,
 		builtAt: time.Now(),
 
+		channelsByID:   make(map[ChannelID]*Channel),
 		channelsByUUID: make(map[assets.ChannelUUID]*Channel),
-		fieldsByUUID:   make(map[FieldUUID]*Field),
-		groupsByID:     make(map[GroupID]*Group),
-		groupsByUUID:   make(map[assets.GroupUUID]*Group),
-		flowCache:      make(map[assets.FlowUUID]assets.Flow),
+
+		fieldsByUUID: make(map[FieldUUID]*Field),
+
+		groupsByID:   make(map[GroupID]*Group),
+		groupsByUUID: make(map[assets.GroupUUID]*Group),
+
+		flowCache: make(map[assets.FlowUUID]assets.Flow),
 	}
 
 	// we load everything at once except for flows which are lazily loaded
@@ -92,6 +96,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 	for _, f := range a.fields {
 		field := f.(*Field)
 		a.fieldsByUUID[field.UUID()] = field
+		fmt.Printf("%s: %s\n", field.Name(), field.UUID())
 	}
 
 	a.groups, err = loadGroups(ctx, db, orgID)
@@ -187,7 +192,7 @@ func (a *OrgAssets) Labels() ([]assets.Label, error) {
 	return a.labels, nil
 }
 
-func (a *OrgAssets) Locations() (*utils.LocationHierarchy, error) {
+func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
 	return a.locations, nil
 }
 

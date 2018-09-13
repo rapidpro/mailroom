@@ -12,12 +12,12 @@ import (
 type Track struct {
 	ctx context.Context
 	db  *sqlx.DB
-	rp  redis.Pool
+	rp  *redis.Pool
 
 	org *OrgAssets
 }
 
-func NewTrack(ctx context.Context, db *sqlx.DB, rp redis.Pool, org *OrgAssets) *Track {
+func NewTrack(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *OrgAssets) *Track {
 	return &Track{
 		ctx: ctx,
 		db:  db,

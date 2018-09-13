@@ -6,34 +6,35 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
-	null "gopkg.in/guregu/null.v3"
 )
 
 type GroupID int
 
 // Group is our mailroom type for contact groups
 type Group struct {
-	id    GroupID
-	uuid  assets.GroupUUID
-	name  string
-	query string
+	g struct {
+		ID    GroupID          `json:"id"`
+		UUID  assets.GroupUUID `json:"uuid"`
+		Name  string           `json:"name"`
+		Query string           `json:"query"`
+	}
 }
 
 // ID returns the ID for this group
-func (g *Group) ID() GroupID { return g.id }
+func (g *Group) ID() GroupID { return g.g.ID }
 
 // UUID returns the uuid for this group
-func (g *Group) UUID() assets.GroupUUID { return g.uuid }
+func (g *Group) UUID() assets.GroupUUID { return g.g.UUID }
 
 // Name returns the name for this group
-func (g *Group) Name() string { return g.name }
+func (g *Group) Name() string { return g.g.Name }
 
 // Query returns the query string (if any) for this group
-func (g *Group) Query() string { return g.query }
+func (g *Group) Query() string { return g.g.Query }
 
 // loads the groups for the passed in org
 func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Group, error) {
-	rows, err := db.Query(selectGroupsSQL, orgID)
+	rows, err := db.Queryx(selectGroupsSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying groups for org: %d", orgID)
 	}
@@ -42,13 +43,10 @@ func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Gro
 	groups := make([]assets.Group, 0, 10)
 	for rows.Next() {
 		group := &Group{}
-		query := null.String{}
-
-		err := rows.Scan(&group.id, &group.uuid, &group.name, &query)
+		err = readJSONRow(rows, &group.g)
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning group row")
+			return nil, errors.Annotate(err, "error reading group row")
 		}
-		group.query = query.String
 
 		groups = append(groups, group)
 	}
@@ -57,7 +55,7 @@ func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Gro
 }
 
 const selectGroupsSQL = `
-SELECT
+SELECT ROW_TO_JSON(r) FROM (SELECT
 	id, 
 	uuid, 
 	name, 
@@ -70,4 +68,5 @@ WHERE
 	group_type = 'U'
 ORDER BY 
 	name ASC
+) r;
 `

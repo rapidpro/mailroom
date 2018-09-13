@@ -10,27 +10,29 @@ import (
 
 // Field is our mailroom type for contact field types
 type Field struct {
-	uuid      FieldUUID
-	key       string
-	name      string
-	fieldType assets.FieldType
+	f struct {
+		UUID      FieldUUID        `json:"uuid"`
+		Key       string           `json:"key"`
+		Name      string           `json:"name"`
+		FieldType assets.FieldType `json:"field_type"`
+	}
 }
 
 // UUID returns the UUID of this field
-func (f *Field) UUID() FieldUUID { return f.uuid }
+func (f *Field) UUID() FieldUUID { return f.f.UUID }
 
 // Key returns the key for this field
-func (f *Field) Key() string { return f.key }
+func (f *Field) Key() string { return f.f.Key }
 
 // Name returns the name for this field
-func (f *Field) Name() string { return f.name }
+func (f *Field) Name() string { return f.f.Name }
 
 // Type returns the value type for this field
-func (f *Field) Type() assets.FieldType { return f.fieldType }
+func (f *Field) Type() assets.FieldType { return f.f.FieldType }
 
 // loadFields loads the assets for the passed in db
 func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Field, error) {
-	rows, err := db.Query(selectFieldsSQL, orgID)
+	rows, err := db.Queryx(selectFieldsSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying fields for org: %d", orgID)
 	}
@@ -39,11 +41,10 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 	fields := make([]assets.Field, 0, 10)
 	for rows.Next() {
 		field := &Field{}
-		err := rows.Scan(&field.uuid, &field.key, &field.name, &field.fieldType)
+		err = readJSONRow(rows, &field.f)
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning field row")
+			return nil, errors.Annotate(err, "error reading field")
 		}
-
 		fields = append(fields, field)
 	}
 
@@ -51,7 +52,7 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 }
 
 const selectFieldsSQL = `
-SELECT 
+SELECT ROW_TO_JSON(f) FROM (SELECT
 	uuid,
 	key,
 	label as name,
@@ -62,7 +63,7 @@ SELECT
 		WHEN 'S' THEN 'state'
 		WHEN 'I' THEN 'district'
 		WHEN 'W' THEN 'ward'
-	END) value_type
+	END) as field_type
 FROM 
 	contacts_contactfield 
 WHERE 
@@ -70,5 +71,6 @@ WHERE
 	is_active = TRUE AND
 	field_type = 'U'
 ORDER BY
-    key ASC
+	key ASC
+) f;
 `

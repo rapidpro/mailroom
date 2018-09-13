@@ -5,7 +5,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
-	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 )
 
@@ -14,23 +13,25 @@ type ResthookID int64
 
 // Resthook is the mailroom type for resthooks
 type Resthook struct {
-	id          ResthookID
-	slug        string
-	subscribers []string
+	r struct {
+		ID          ResthookID `json:"id"`
+		Slug        string     `json:"slug"`
+		Subscribers []string   `json:"subscribers"`
+	}
 }
 
 // ID returns the ID of this resthook
-func (r *Resthook) ID() ResthookID { return r.id }
+func (r *Resthook) ID() ResthookID { return r.r.ID }
 
 // Slug returns the slug for this resthook
-func (r *Resthook) Slug() string { return r.slug }
+func (r *Resthook) Slug() string { return r.r.Slug }
 
 // Subscribers returns the subscribers for this resthook
-func (r *Resthook) Subscribers() []string { return r.subscribers }
+func (r *Resthook) Subscribers() []string { return r.r.Subscribers }
 
 // loads the resthooks for the passed in org
 func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Resthook, error) {
-	rows, err := db.Query(selectResthooksSQL, orgID)
+	rows, err := db.Queryx(selectResthooksSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying resthooks for org: %d", orgID)
 	}
@@ -39,8 +40,7 @@ func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	resthooks := make([]assets.Resthook, 0, 10)
 	for rows.Next() {
 		resthook := &Resthook{}
-
-		err := rows.Scan(&resthook.id, &resthook.slug, pq.Array(&resthook.subscribers))
+		err = readJSONRow(rows, &resthook.r)
 		if err != nil {
 			return nil, errors.Annotate(err, "error scanning resthook row")
 		}
@@ -52,7 +52,7 @@ func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 }
 
 const selectResthooksSQL = `
-SELECT
+SELECT ROW_TO_JSON(r) FROM (SELECT
 	id,
 	slug,
 	(SELECT ARRAY_AGG(u.target_url) FROM (
@@ -72,4 +72,5 @@ WHERE
 	r.org_id = $1 AND 
 	r.is_active = TRUE
 ORDER BY
-	r.slug ASC`
+	r.slug ASC
+) r;`

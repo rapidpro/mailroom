@@ -20,7 +20,7 @@ func TestLocations(t *testing.T) {
 	root, err := loadLocations(ctx, db, 1)
 	assert.NoError(t, err)
 
-	locations := root.FindByName("Nigeria", 0, nil)
+	locations := root[0].FindByName("Nigeria", 0, nil)
 
 	assert.Equal(t, 1, len(locations))
 	assert.Equal(t, "Nigeria", locations[0].Name())
@@ -39,7 +39,7 @@ func TestLocations(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		locations = root.FindByName(tc.Name, tc.Level, nigeria)
+		locations = root[0].FindByName(tc.Name, tc.Level, nigeria)
 		assert.Equal(t, 1, len(locations))
 		state := locations[0]
 

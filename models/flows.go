@@ -14,27 +14,29 @@ type FlowID int
 
 // Flow is the mailroom type for a flow
 type Flow struct {
-	id         FlowID
-	uuid       assets.FlowUUID
-	name       string
-	definition json.RawMessage
+	f struct {
+		ID         FlowID          `json:"id"`
+		UUID       assets.FlowUUID `json:"uuid"`
+		Name       string          `json:"name"`
+		Definition json.RawMessage `json:"definition"`
+	}
 }
 
 // ID returns the ID for this flow
-func (f *Flow) ID() FlowID { return f.id }
+func (f *Flow) ID() FlowID { return f.f.ID }
 
 // UUID returns the UUID for this flow
-func (f *Flow) UUID() assets.FlowUUID { return f.uuid }
+func (f *Flow) UUID() assets.FlowUUID { return f.f.UUID }
 
 // Name returns the name of this flow
-func (f *Flow) Name() string { return f.name }
+func (f *Flow) Name() string { return f.f.Name }
 
 // Definition returns the definition for this flow
-func (f *Flow) Definition() json.RawMessage { return f.definition }
+func (f *Flow) Definition() json.RawMessage { return f.f.Definition }
 
 // loads the flow with the passed in UUID
 func loadFlow(ctx context.Context, db *sqlx.DB, uuid assets.FlowUUID) (assets.Flow, error) {
-	flow := &Flow{uuid: uuid}
+	flow := &Flow{}
 
 	rows, err := db.Queryx(selectFlowSQL, uuid)
 	if err != nil {
@@ -47,14 +49,13 @@ func loadFlow(ctx context.Context, db *sqlx.DB, uuid assets.FlowUUID) (assets.Fl
 		return nil, nil
 	}
 
-	var oldDefinition string
-	err = rows.Scan(&flow.id, &flow.name, oldDefinition)
+	err = readJSONRow(rows, &flow.f)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error scanning flow with uuid: %s", uuid)
+		return nil, errors.Annotatef(err, "error reading flow definition uuid: %s", uuid)
 	}
 
 	// load it in from our json
-	legacyFlow, err := legacy.ReadLegacyFlow([]byte(oldDefinition))
+	legacyFlow, err := legacy.ReadLegacyFlow([]byte(flow.f.Definition))
 	if err != nil {
 		return nil, errors.Annotatef(err, "error reading flow into legacy format: %s", uuid)
 	}
@@ -66,7 +67,7 @@ func loadFlow(ctx context.Context, db *sqlx.DB, uuid assets.FlowUUID) (assets.Fl
 	}
 
 	// write this flow back out in our new format
-	flow.definition, err = json.Marshal(newFlow)
+	flow.f.Definition, err = json.Marshal(newFlow)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error mashalling migrated flow definition: %s", uuid)
 	}
@@ -75,8 +76,10 @@ func loadFlow(ctx context.Context, db *sqlx.DB, uuid assets.FlowUUID) (assets.Fl
 }
 
 const selectFlowSQL = `
-SELECT 
-	id, name,
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	f.id as id, 
+	f.uuid as uuid,
+	f.name as name,
 	fr.definition::jsonb || 
 	jsonb_build_object(
 		'flow_type', f.flow_type, 
@@ -97,5 +100,6 @@ WHERE
 	fr.is_active = TRUE AND
 	f.is_active = TRUE 
 ORDER BY 
-	revision DESC 
-LIMIT 1;`
+	fr.revision DESC 
+LIMIT 1
+) r;`

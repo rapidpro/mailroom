@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
 	"github.com/nyaruka/mailroom/marker"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/sirupsen/logrus"
 )
@@ -100,7 +101,7 @@ type eventFireTask struct {
 	FireID    int64           `db:"fire_id"       json:"fire_id"`
 	ContactID flows.ContactID `db:"contact_id"    json:"contact_id"`
 	EventID   int64           `db:"event_id"      json:"event_id"`
-	FlowID    flows.FlowID    `db:"flow_id"       json:"flow_id"`
+	FlowID    models.FlowID   `db:"flow_id"       json:"flow_id"`
 	OrgID     int             `db:"org_id"        json:"org_id"`
 	Scheduled time.Time       `db:"scheduled"     json:"scheduled"`
 }

@@ -16,57 +16,11 @@ import (
 
 type FieldUUID utils.UUID
 
-const selectContactsSQL = `
-SELECT ROW_TO_JSON(t) FROM (SELECT
-	id,
-	org_id,
-	uuid,
-	name,
-	language,
-	is_stopped,
-	is_blocked,
-	is_active,
-	created_on,
-	modified_on,
-	fields,
-	(SELECT ARRAY_AGG(u) FROM (
-		SELECT
-            cu.scheme as scheme,
-            cu.path as path,
-            cu.display as display,
-            cu.auth as auth,
-            cu.channel_id as channel_id
-		FROM 
-    		contacts_contacturn cu
-		WHERE 
-			contact_id = contacts_contact.id
-		ORDER BY
-			cu.priority DESC, 
-			cu.id ASC
-    ) u) as urns,
-	(SELECT ARRAY_AGG(g.group_id) FROM (
-		SELECT
-			cg.contactgroup_id as group_id
-		FROM 
-			contacts_contactgroup_contacts cg
-			LEFT JOIN contacts_contactgroup g ON cg.contactgroup_id = g.id
-		WHERE 
-			contact_id = contacts_contact.id AND
-			g.group_type = 'U' AND
-			g.is_active = TRUE
-	) g) as groups
-FROM 
-	contacts_contact
-WHERE 
-	id IN (?) AND
-	org_id = ?
-) t;
-`
-
 // LoadContacts loads a set of contacts for the passed in ids
 func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
 	// rebind our query for our IN clause
-	q, vs, err := sqlx.In(selectContactsSQL, ids, org.OrgID())
+	// TODO: should we be filtering by org here too?
+	q, vs, err := sqlx.In(selectContactsSQL, ids)
 	if err != nil {
 		return nil, errors.Annotate(err, "error rebinding contacts query")
 	}
@@ -145,12 +99,25 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 		for uuid, value := range env.Fields {
 			field := org.FieldByUUID(uuid)
 			if field == nil {
-				return nil, errors.Annotatef(err, "error loading field for uuid: %s", uuid)
+				return nil, errors.Errorf("error loading field for uuid: %s", uuid)
 			}
+
+			// parse our datetime if present
+			var dt *types.XDateTime
+			if value.Datetime != "" {
+				parsed, err := utils.DateFromString(org.Env(), value.Datetime)
+
+				// TODO: this means we are basically ignoring values we can't parse, is that ok?
+				if err == nil {
+					xdt := types.NewXDateTime(parsed)
+					dt = &xdt
+				}
+			}
+
 			value := flows.NewFieldValue(
 				flows.NewField(field),
 				value.Text,
-				value.Datetime,
+				dt,
 				value.Number,
 				value.State,
 				value.District,
@@ -160,7 +127,6 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 			values[field.Key()] = value
 		}
 
-		// TODO: load real timezone for contact (same as org)
 		// TODO: what do we do for stopped, blocked, inactive?
 
 		// ok, create our goflow contact now
@@ -169,7 +135,7 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 			env.ID,
 			env.Name,
 			env.Language,
-			time.UTC,
+			org.Env().Timezone(),
 			env.CreatedOn,
 			contactURNs,
 			flows.NewGroupList(groups),
@@ -183,7 +149,7 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 // utility struct for the value of a field
 type fieldValue struct {
 	Text     types.XText        `json:"text"`
-	Datetime *types.XDateTime   `json:"datetime,omitempty"`
+	Datetime string             `json:"datetime,omitempty"`
 	Number   *types.XNumber     `json:"number,omitempty"`
 	State    flows.LocationPath `json:"state,omitempty"`
 	District flows.LocationPath `json:"district,omitempty"`
@@ -211,3 +177,50 @@ type contactEnvelope struct {
 	ModifiedOn time.Time `json:"modified_on"`
 	CreatedOn  time.Time `json:"created_on"`
 }
+
+const selectContactsSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	id,
+	org_id,
+	uuid,
+	name,
+	language,
+	is_stopped,
+	is_blocked,
+	is_active,
+	created_on,
+	modified_on,
+	fields,
+	(SELECT ARRAY_AGG(u) FROM (
+		SELECT
+            cu.scheme as scheme,
+            cu.path as path,
+            cu.display as display,
+            cu.auth as auth,
+            cu.channel_id as channel_id
+		FROM 
+    		contacts_contacturn cu
+		WHERE 
+			contact_id = contacts_contact.id
+		ORDER BY
+			cu.priority DESC, 
+			cu.id ASC
+    ) u) as urns,
+	(SELECT ARRAY_AGG(g.group_id) FROM (
+		SELECT
+			cg.contactgroup_id as group_id
+		FROM 
+			contacts_contactgroup_contacts cg
+			LEFT JOIN contacts_contactgroup g ON cg.contactgroup_id = g.id
+		WHERE 
+			contact_id = contacts_contact.id AND
+			g.group_type = 'U' AND
+			g.is_active = TRUE
+	) g) as groups
+FROM 
+	contacts_contact
+WHERE 
+	id IN (?) AND
+	is_test = FALSE
+) r;
+`

@@ -7,18 +7,20 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/lib/pq"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/utils"
 )
 
 // Location is our mailroom type for administrative locations
+// TODO: convert to something less jank when we have real location constructors
 type Location struct {
-	id       int
-	level    int
-	parentID *int
-	osmID    string
-	name     string      `json:"name"`
-	aliases  []string    `json:"aliases"`
-	children []*Location `json:"children"`
+	id        int
+	level     int
+	parentID  *int
+	osmID     string
+	Name_     string      `json:"name"`
+	Aliases_  []string    `json:"aliases"`
+	Children_ []*Location `json:"children"`
 }
 
 // ID returns the database id for this location
@@ -31,16 +33,16 @@ func (l *Location) Level() int { return l.level }
 func (l *Location) OSMID() string { return l.osmID }
 
 // Name returns the name for this location
-func (l *Location) Name() string { return l.name }
+func (l *Location) Name() string { return l.Name_ }
 
 // Aliases returns the list of aliases for this location
-func (l *Location) Aliases() []string { return l.aliases }
+func (l *Location) Aliases() []string { return l.Aliases_ }
 
 // Children returns the list of children for this location
-func (l *Location) Children() []*Location { return l.children }
+func (l *Location) Children() []*Location { return l.Children_ }
 
 // loadLocations loads all the locations for this org returning the root node
-func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*utils.LocationHierarchy, error) {
+func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.LocationHierarchy, error) {
 	rows, err := db.Query(loadLocationsSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying locations for org: %d", orgID)
@@ -56,7 +58,7 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*utils.Lo
 	for rows.Next() {
 		location := &Location{}
 
-		err := rows.Scan(&location.id, &location.level, &location.osmID, &location.parentID, &location.name, pq.Array(&location.aliases))
+		err := rows.Scan(&location.id, &location.level, &location.osmID, &location.parentID, &location.Name_, pq.Array(&location.Aliases_))
 		if err != nil {
 			return nil, errors.Annotate(err, "error scanning location row")
 		}
@@ -78,7 +80,7 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*utils.Lo
 			if !found {
 				return nil, errors.Errorf("unable to find parent: %d for location: %d", *l.parentID, l.id)
 			}
-			parent.children = append(parent.children, l)
+			parent.Children_ = append(parent.Children_, l)
 		}
 	}
 
@@ -94,7 +96,7 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*utils.Lo
 		return nil, errors.Annotate(err, "error unmarshalling hierarchy")
 	}
 
-	return hierarchy, nil
+	return []assets.LocationHierarchy{hierarchy}, nil
 }
 
 // TODO: this is a bit bananas

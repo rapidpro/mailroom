@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
@@ -94,7 +95,7 @@ type EventFire struct {
 	CampaignUUID string            `db:"campaign_uuid"`
 	CampaignName string            `db:"campaign_name"`
 	OrgID        models.OrgID      `db:"org_id"`
-	FlowUUID     flows.FlowUUID    `db:"flow_uuid"`
+	FlowUUID     assets.FlowUUID   `db:"flow_uuid"`
 }
 
 // loadsEventFire loads a single event fire along with the associated fields needed to run
