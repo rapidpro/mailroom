@@ -29,7 +29,6 @@ var sessionStatusMap = map[flows.SessionStatus]SessionStatus{
 	flows.SessionStatusWaiting:   SessionStatusWaiting,
 }
 
-type FlowID int64
 type ExitType null.String
 
 var (
@@ -91,7 +90,7 @@ type FlowRun struct {
 
 	CurrentNodeUUID flows.NodeUUID  `db:"current_node_uuid"`
 	ContactID       flows.ContactID `db:"contact_id"`
-	FlowID          flows.FlowID    `db:"flow_id"`
+	FlowID          FlowID          `db:"flow_id"`
 	OrgID           OrgID           `db:"org_id"`
 	ParentID        null.Int        `db:"parent_id"`
 	SessionID       SessionID       `db:"session_id"`
@@ -115,7 +114,8 @@ RETURNING id
 
 // WriteSession writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func WriteSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, s flows.Session) (*Session, error) {
+func WriteSession(ctx context.Context, tx *sqlx.Tx, track *Track, s flows.Session) (*Session, error) {
+	org := track.Org()
 	output, err := json.Marshal(s)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error marshalling flow session")
@@ -138,7 +138,7 @@ func WriteSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, s flows.Sess
 		Responded: false, // TODO: populate once we are running real flows
 		Output:    string(output),
 		ContactID: s.Contact().ID(),
-		OrgID:     org.GetOrgID(),
+		OrgID:     org.OrgID(),
 		CreatedOn: s.Runs()[0].CreatedOn(),
 	}
 
@@ -155,7 +155,7 @@ func WriteSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, s flows.Sess
 
 	// now write all our runs
 	for _, r := range s.Runs() {
-		run, err := WriteRun(ctx, tx, org, session, r)
+		run, err := WriteRun(ctx, tx, track, session, r)
 		if err != nil {
 			return nil, errors.Annotatef(err, "error writing run: %s", run.UUID)
 		}
@@ -181,7 +181,9 @@ RETURNING id
 
 // WriteRun writes the passed in flow run to our database, also applying any events in those runs as
 // appropriate. (IE, writing db messages etc..)
-func WriteRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error) {
+func WriteRun(ctx context.Context, tx *sqlx.Tx, track *Track, session *Session, r flows.FlowRun) (*FlowRun, error) {
+	org := track.Org()
+
 	// no path is invalid
 	if len(r.Path()) < 1 {
 		return nil, errors.Errorf("run must have at least one path segment")
@@ -200,6 +202,11 @@ func WriteRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session
 		return nil, err
 	}
 
+	flow, err := org.Flow(r.Flow().UUID())
+	if err != nil {
+		return nil, errors.Annotatef(err, "unable to load flow with uuid: %s", r.Flow().UUID())
+	}
+
 	// create our run
 	run := &FlowRun{
 		UUID:            r.UUID(),
@@ -207,10 +214,10 @@ func WriteRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session
 		ExitedOn:        r.ExitedOn(),
 		ExpiresOn:       r.ExpiresOn(),
 		ContactID:       r.Contact().ID(),
-		FlowID:          r.Flow().ID(),
+		FlowID:          flow.(*Flow).ID(),
 		SessionID:       session.ID,
 		StartID:         null.NewInt(0, false),
-		OrgID:           org.GetOrgID(),
+		OrgID:           org.OrgID(),
 		Path:            string(pathJSON),
 		CurrentNodeUUID: path[len(path)-1].NodeUUID,
 	}
@@ -264,7 +271,7 @@ func WriteRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session
 
 	// now apply our events
 	for _, evt := range filteredEvents {
-		err := ApplyEvent(ctx, tx, org, session, run, evt)
+		err := ApplyEvent(ctx, tx, track, session, run, evt)
 		if err != nil {
 			return nil, errors.Annotatef(err, "error applying event: %s", evt)
 		}

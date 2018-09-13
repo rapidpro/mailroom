@@ -34,8 +34,9 @@ func TestResthooks(t *testing.T) {
 
 	assert.Equal(t, 2, len(resthooks))
 	for i, tc := range tcs {
-		assert.Equal(t, tc.ID, resthooks[i].ID())
-		assert.Equal(t, tc.Slug, resthooks[i].Slug())
-		assert.Equal(t, tc.Subscribers, resthooks[i].Subscribers())
+		resthook := resthooks[i].(*Resthook)
+		assert.Equal(t, tc.ID, resthook.ID())
+		assert.Equal(t, tc.Slug, resthook.Slug())
+		assert.Equal(t, tc.Subscribers, resthook.Subscribers())
 	}
 }

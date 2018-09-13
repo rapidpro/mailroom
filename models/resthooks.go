@@ -6,6 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/lib/pq"
+	"github.com/nyaruka/goflow/assets"
 )
 
 // ResthookID is our type for the database id of a resthook
@@ -28,14 +29,14 @@ func (r *Resthook) Slug() string { return r.slug }
 func (r *Resthook) Subscribers() []string { return r.subscribers }
 
 // loads the resthooks for the passed in org
-func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Resthook, error) {
+func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Resthook, error) {
 	rows, err := db.Query(selectResthooksSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying resthooks for org: %d", orgID)
 	}
 	defer rows.Close()
 
-	resthooks := make([]*Resthook, 0, 10)
+	resthooks := make([]assets.Resthook, 0, 10)
 	for rows.Next() {
 		resthook := &Resthook{}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	null "gopkg.in/guregu/null.v3"
 )
@@ -62,37 +63,37 @@ const (
 
 // Msg is our type for mailroom messages
 type Msg struct {
-	ID           flows.MsgID       `db:"id"              json:"id"`
-	UUID         flows.MsgUUID     `db:"uuid"            json:"uuid"`
-	Text         string            `db:"text"            json:"text"`
-	HighPriority bool              `db:"high_priority"   json:"high_priority"`
-	CreatedOn    time.Time         `db:"created_on"      json:"created_on"`
-	ModifiedOn   time.Time         `db:"modified_on"     json:"modified_on"`
-	SentOn       time.Time         `db:"sent_on"         json:"sent_on"`
-	QueuedOn     time.Time         `db:"queued_on"       json:"queued_on"`
-	Direction    MsgDirection      `db:"direction"       json:"direction"`
-	Status       MsgStatus         `db:"status"          json:"status"`
-	Visibility   MsgVisibility     `db:"visibility"      json:"visibility"`
-	MsgType      MsgType           `db:"msg_type"`
-	MsgCount     int               `db:"msg_count"       json:"tps_cost"`
-	ErrorCount   int               `db:"error_count"     json:"error_count"`
-	NextAttempt  time.Time         `db:"next_attempt"    json:"next_attempt"`
-	ExternalID   null.String       `db:"external_id"     json:"external_id"`
-	Attachments  pq.StringArray    `db:"attachments"     json:"attachments"`
-	Metadata     null.String       `db:"metadata"        json:"metadata"`
-	ChannelID    flows.ChannelID   `db:"channel_id"      json:"channel_id"`
-	ChannelUUID  flows.ChannelUUID `                     json:"channel_uuid"`
-	ConnectionID ConnectionID      `db:"connection_id"`
-	ContactID    flows.ContactID   `db:"contact_id"      json:"contact_id"`
-	ContactURNID ContactURNID      `db:"contact_urn_id"  json:"contact_urn_id"`
-	URN          urns.URN          `                     json:"urn"`
-	URNAuth      string            `                     json:"urn_auth,omitempty"`
-	OrgID        OrgID             `db:"org_id"          json:"org_id"`
-	TopUpID      TopUpID           `db:"topup_id"`
+	ID           flows.MsgID        `db:"id"              json:"id"`
+	UUID         flows.MsgUUID      `db:"uuid"            json:"uuid"`
+	Text         string             `db:"text"            json:"text"`
+	HighPriority bool               `db:"high_priority"   json:"high_priority"`
+	CreatedOn    time.Time          `db:"created_on"      json:"created_on"`
+	ModifiedOn   time.Time          `db:"modified_on"     json:"modified_on"`
+	SentOn       time.Time          `db:"sent_on"         json:"sent_on"`
+	QueuedOn     time.Time          `db:"queued_on"       json:"queued_on"`
+	Direction    MsgDirection       `db:"direction"       json:"direction"`
+	Status       MsgStatus          `db:"status"          json:"status"`
+	Visibility   MsgVisibility      `db:"visibility"      json:"visibility"`
+	MsgType      MsgType            `db:"msg_type"`
+	MsgCount     int                `db:"msg_count"       json:"tps_cost"`
+	ErrorCount   int                `db:"error_count"     json:"error_count"`
+	NextAttempt  time.Time          `db:"next_attempt"    json:"next_attempt"`
+	ExternalID   null.String        `db:"external_id"     json:"external_id"`
+	Attachments  pq.StringArray     `db:"attachments"     json:"attachments"`
+	Metadata     null.String        `db:"metadata"        json:"metadata"`
+	ChannelID    ChannelID          `db:"channel_id"      json:"channel_id"`
+	ChannelUUID  assets.ChannelUUID `                     json:"channel_uuid"`
+	ConnectionID ConnectionID       `db:"connection_id"`
+	ContactID    flows.ContactID    `db:"contact_id"      json:"contact_id"`
+	ContactURNID ContactURNID       `db:"contact_urn_id"  json:"contact_urn_id"`
+	URN          urns.URN           `                     json:"urn"`
+	URNAuth      string             `                     json:"urn_auth,omitempty"`
+	OrgID        OrgID              `db:"org_id"          json:"org_id"`
+	TopUpID      TopUpID            `db:"topup_id"`
 }
 
 // CreateOutgoingMsg creates an outgoing message for the passed in flow message
-func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channelID flows.ChannelID, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
+func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channelID ChannelID, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
 	_, _, query, _ := m.URN().ToParts()
 	parsedQuery, err := url.ParseQuery(query)
 	if err != nil {

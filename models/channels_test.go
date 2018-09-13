@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,23 +16,24 @@ func TestChannels(t *testing.T) {
 	assert.NoError(t, err)
 
 	tcs := []struct {
-		ID      flows.ChannelID
+		ID      ChannelID
 		Name    string
 		Address string
 		Schemes []string
-		Roles   []string
+		Roles   []assets.ChannelRole
 	}{
-		{flows.ChannelID(1), "Android", "1234", []string{"tel"}, []string{"send", "receive"}},
-		{flows.ChannelID(2), "Nexmo", "2345", []string{"tel"}, []string{"send", "receive"}},
-		{flows.ChannelID(3), "Twitter", "my_handle", []string{"twitter"}, []string{"send", "receive"}},
+		{ChannelID(1), "Android", "1234", []string{"tel"}, []assets.ChannelRole{"send", "receive"}},
+		{ChannelID(2), "Nexmo", "2345", []string{"tel"}, []assets.ChannelRole{"send", "receive"}},
+		{ChannelID(3), "Twitter", "my_handle", []string{"twitter"}, []assets.ChannelRole{"send", "receive"}},
 	}
 
 	assert.Equal(t, len(tcs), len(channels))
 	for i, tc := range tcs {
-		assert.Equal(t, tc.ID, channels[i].ID())
-		assert.Equal(t, tc.Name, channels[i].Name())
-		assert.Equal(t, tc.Address, channels[i].Address())
-		assert.Equal(t, tc.Roles, channels[i].Roles())
-		assert.Equal(t, tc.Schemes, channels[i].Schemes())
+		channel := channels[i].(*Channel)
+		assert.Equal(t, tc.ID, channel.ID())
+		assert.Equal(t, tc.Name, channel.Name())
+		assert.Equal(t, tc.Address, channel.Address())
+		assert.Equal(t, tc.Roles, channel.Roles())
+		assert.Equal(t, tc.Schemes, channel.Schemes())
 	}
 }

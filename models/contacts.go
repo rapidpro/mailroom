@@ -58,14 +58,15 @@ SELECT ROW_TO_JSON(t) FROM (SELECT
 FROM 
 	contacts_contact
 WHERE 
-	id IN (?)
+	id IN (?) AND
+	org_id = ?
 ) t;
 `
 
 // LoadContacts loads a set of contacts for the passed in ids
-func LoadContacts(ctx context.Context, db *sqlx.DB, o *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
+func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
 	// rebind our query for our IN clause
-	q, vs, err := sqlx.In(selectContactsSQL, ids)
+	q, vs, err := sqlx.In(selectContactsSQL, ids, org.OrgID())
 	if err != nil {
 		return nil, errors.Annotate(err, "error rebinding contacts query")
 	}
@@ -95,26 +96,20 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, o *OrgAssets, ids []flows.Co
 		// convert our group ids to real groups
 		groups := make([]*flows.Group, 0, len(env.Groups))
 		for _, g := range env.Groups {
-			group, err := o.GetGroupByID(g)
-			if err != nil {
-				return nil, errors.Annotatef(err, "error loading group: %d", g)
-			}
+			group := org.GroupByID(g)
 			if group != nil {
-				groups = append(groups, group)
+				groups = append(groups, flows.NewGroup(group))
 			}
 		}
 
 		// and our URNs to URN objects
 		contactURNs := make(flows.URNList, 0, len(env.URNs))
 		for _, u := range env.URNs {
-			var channel flows.Channel
+			var channel *Channel
 
 			// load any channel if present
-			if u.ChannelID != flows.ChannelID(0) {
-				channel, err = o.GetChannelByID(u.ChannelID)
-				if err != nil {
-					return nil, errors.Annotatef(err, "error loading channel: %d", u.ChannelID)
-				}
+			if u.ChannelID != ChannelID(0) {
+				channel = org.ChannelByID(u.ChannelID)
 			}
 
 			// we build our query from a combination of preferred channel and auth
@@ -132,27 +127,28 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, o *OrgAssets, ids []flows.Co
 				return nil, errors.Annotatef(err, "error loading contact, invalid urn: %s %s %s %s", u.Scheme, u.Path, query.Encode(), u.Display)
 			}
 
-			contactURNs = append(contactURNs, flows.NewContactURN(urn, channel))
+			// TODO: this should have a nicer constructor
+			contactURNs = append(contactURNs, flows.NewContactURN(urn, flows.NewChannel(channel)))
 		}
 
 		// first populate all the fields with empty fields
-		fields, err := o.GetFieldSet()
+		fields, err := org.Fields()
 		if err != nil {
 			return nil, errors.Annotatef(err, "error loading fields for org")
 		}
-		values := make(flows.FieldValues, len(fields.All()))
-		for _, f := range fields.All() {
-			values[f.Key()] = flows.NewEmptyFieldValue(f)
+		values := make(flows.FieldValues, len(fields))
+		for _, f := range fields {
+			values[f.Key()] = flows.NewEmptyFieldValue(flows.NewField(f))
 		}
 
 		// then populate those fields that are actually set
 		for uuid, value := range env.Fields {
-			field, err := o.GetFieldByUUID(uuid)
-			if err != nil {
+			field := org.FieldByUUID(uuid)
+			if field == nil {
 				return nil, errors.Annotatef(err, "error loading field for uuid: %s", uuid)
 			}
 			value := flows.NewFieldValue(
-				field,
+				flows.NewField(field),
 				value.Text,
 				value.Datetime,
 				value.Number,
@@ -204,13 +200,13 @@ type contactEnvelope struct {
 	IsBlocked bool                      `json:"is_blocked"`
 	IsActive  bool                      `json:"is_active"`
 	Fields    map[FieldUUID]*fieldValue `json:"fields"`
-	Groups    []flows.GroupID           `json:"groups"`
+	Groups    []GroupID                 `json:"groups"`
 	URNs      []struct {
-		Scheme    string          `json:"scheme"`
-		Path      string          `json:"path"`
-		Display   string          `json:"display"`
-		Auth      string          `json:"auth"`
-		ChannelID flows.ChannelID `json:"channel_id"`
+		Scheme    string    `json:"scheme"`
+		Path      string    `json:"path"`
+		Display   string    `json:"display"`
+		Auth      string    `json:"auth"`
+		ChannelID ChannelID `json:"channel_id"`
 	} `json:"urns"`
 	ModifiedOn time.Time `json:"modified_on"`
 	CreatedOn  time.Time `json:"created_on"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/nyaruka/goflow/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,29 +20,31 @@ func TestLocations(t *testing.T) {
 	root, err := loadLocations(ctx, db, 1)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "192787", root.OSMID())
-	assert.Equal(t, 0, root.Level())
-	assert.Equal(t, "Nigeria", root.Name())
-	assert.Equal(t, []string(nil), root.Aliases())
-	assert.Equal(t, 37, len(root.Children()))
+	locations := root.FindByName("Nigeria", 0, nil)
+
+	assert.Equal(t, 1, len(locations))
+	assert.Equal(t, "Nigeria", locations[0].Name())
+	assert.Equal(t, []string(nil), locations[0].Aliases())
+	assert.Equal(t, 37, len(locations[0].Children()))
+	nigeria := locations[0]
 
 	tcs := []struct {
-		OSMID       string
-		Level       int
 		Name        string
+		Level       utils.LocationLevel
 		Aliases     []string
 		NumChildren int
 	}{
-		{"3707368", 1, "Sokoto", []string{"Soko"}, 23},
-		{"3706956", 1, "Zamfara", nil, 14},
+		{"Sokoto", 1, []string{"Soko"}, 23},
+		{"Zamfara", 1, nil, 14},
 	}
 
-	states := root.Children()
-	for i, tc := range tcs {
-		assert.Equal(t, tc.OSMID, states[i].OSMID())
-		assert.Equal(t, tc.Level, states[i].Level())
-		assert.Equal(t, tc.Name, states[i].Name())
-		assert.Equal(t, tc.Aliases, states[i].Aliases())
-		assert.Equal(t, tc.NumChildren, len(states[i].Children()))
+	for _, tc := range tcs {
+		locations = root.FindByName(tc.Name, tc.Level, nigeria)
+		assert.Equal(t, 1, len(locations))
+		state := locations[0]
+
+		assert.Equal(t, tc.Name, state.Name())
+		assert.Equal(t, tc.Aliases, state.Aliases())
+		assert.Equal(t, tc.NumChildren, len(state.Children()))
 	}
 }

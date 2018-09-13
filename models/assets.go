@@ -2,241 +2,195 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
-	"github.com/nyaruka/goflow/legacy"
-	"github.com/nyaruka/goflow/utils"
-	"github.com/sirupsen/logrus"
-
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/juju/errors"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/utils"
 )
 
-type OrgID int
-
-// OrgAssets is the set of assets for an organization. These are loaded lazily from the database as asked for.
-// OrgAssets are thread safe and can be shared across goroutines.
-// OrgAssets implement the flows.SessionAssets interface.
 type OrgAssets struct {
-	ctx   context.Context
-	db    *sqlx.DB
+	ctx     context.Context
+	db      *sqlx.DB
+	builtAt time.Time
+
 	orgID OrgID
-	env   utils.Environment
 
-	channels     *flows.ChannelSet
-	channelsByID map[flows.ChannelID]flows.Channel
-	channelOnce  sync.Once
+	env utils.Environment
 
-	fields       *flows.FieldSet
-	fieldsByUUID map[FieldUUID]*flows.Field
-	fieldsLock   sync.RWMutex
+	flowCache     map[assets.FlowUUID]assets.Flow
+	flowCacheLock sync.RWMutex
+	flowUUIDMap   map[assets.FlowUUID]FlowID
 
-	groups     *flows.GroupSet
-	groupsByID map[flows.GroupID]*flows.Group
-	groupOnce  sync.Once
+	channels       []assets.Channel
+	channelsByID   map[ChannelID]*Channel
+	channelsByUUID map[assets.ChannelUUID]*Channel
 
-	labels     *flows.LabelSet
-	labelsLock sync.RWMutex
+	fields       []assets.Field
+	fieldsByUUID map[FieldUUID]*Field
 
-	resthooks     *flows.ResthookSet
-	resthooksLock sync.RWMutex
+	groups       []assets.Group
+	groupsByID   map[GroupID]*Group
+	groupsByUUID map[assets.GroupUUID]*Group
 
-	flows     map[flows.FlowUUID]flows.Flow
-	flowIDs   map[flows.FlowUUID]FlowID
-	flowsLock sync.RWMutex
-
-	// TODO: implement locations
-	locations     *flows.LocationHierarchySet
-	locationsLock sync.RWMutex
+	labels    []assets.Label
+	locations *utils.LocationHierarchy
+	resthooks []assets.Resthook
 }
 
-func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) *OrgAssets {
-	return &OrgAssets{
-		ctx:   ctx,
-		db:    db,
-		orgID: orgID,
-		env:   utils.NewDefaultEnvironment(),
+var sourceCache = make(map[OrgID]*OrgAssets)
+var sourceCacheLock = sync.RWMutex{}
 
-		flows: make(map[flows.FlowUUID]flows.Flow),
+func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
+	// do we have a recent cache?
+	sourceCacheLock.RLock()
+	cached, found := sourceCache[orgID]
+	sourceCacheLock.RUnlock()
+
+	// if we found a source built in the last five seconds, use it
+	if found && time.Since(cached.builtAt) < time.Second*5 {
+		return cached, nil
 	}
-}
 
-func (o *OrgAssets) GetOrgID() OrgID {
-	return o.orgID
-}
+	// otherwire, we build one from scratch
+	a := &OrgAssets{
+		ctx:     ctx,
+		db:      db,
+		builtAt: time.Now(),
 
-func (o *OrgAssets) GetChannelByID(id flows.ChannelID) (flows.Channel, error) {
-	_, err := o.GetChannelSet()
+		channelsByUUID: make(map[assets.ChannelUUID]*Channel),
+		fieldsByUUID:   make(map[FieldUUID]*Field),
+		groupsByID:     make(map[GroupID]*Group),
+		groupsByUUID:   make(map[assets.GroupUUID]*Group),
+		flowCache:      make(map[assets.FlowUUID]assets.Flow),
+	}
+
+	// we load everything at once except for flows which are lazily loaded
+	var err error
+
+	a.env, err = loadOrg(ctx, db, orgID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "error loading environment for org %d", orgID)
 	}
-	channel, found := o.channelsByID[id]
-	if !found {
-		return nil, fmt.Errorf("no channel found with ID: %d", id)
-	}
-	return channel, nil
-}
 
-func (o *OrgAssets) GetChannel(uuid flows.ChannelUUID) (flows.Channel, error) {
-	cs, err := o.GetChannelSet()
+	a.channels, err = loadChannels(ctx, db, orgID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "error loading channel assets for org %d", orgID)
+	}
+	for _, c := range a.channels {
+		channel := c.(*Channel)
+		a.channelsByID[channel.ID()] = channel
+		a.channelsByUUID[channel.UUID()] = channel
 	}
 
-	return cs.FindByUUID(uuid), nil
-}
-
-func (o *OrgAssets) GetChannelSet() (*flows.ChannelSet, error) {
-	return o.channels, nil
-}
-
-func (o *OrgAssets) GetFieldByUUID(uuid FieldUUID) (*flows.Field, error) {
-	_, err := o.GetFieldSet()
+	a.fields, err = loadFields(ctx, db, orgID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "error loading field assets for org %d", orgID)
 	}
-	field, found := o.fieldsByUUID[uuid]
-	if !found {
-		return nil, nil
+	for _, f := range a.fields {
+		field := f.(*Field)
+		a.fieldsByUUID[field.UUID()] = field
 	}
 
-	return field, nil
-}
-
-func (o *OrgAssets) GetField(key string) (*flows.Field, error) {
-	fs, err := o.GetFieldSet()
+	a.groups, err = loadGroups(ctx, db, orgID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "error loading group assets for org %d", orgID)
 	}
-	return fs.FindByKey(key), nil
+	for _, g := range a.groups {
+		group := g.(*Group)
+		a.groupsByID[group.ID()] = group
+		a.groupsByUUID[group.UUID()] = group
+	}
+
+	a.labels, err = loadLabels(ctx, db, orgID)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading group labels for org %d", orgID)
+	}
+
+	a.locations, err = loadLocations(ctx, db, orgID)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading group locations for org %d", orgID)
+	}
+
+	a.resthooks, err = loadResthooks(ctx, db, orgID)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading resthooks for org %d", orgID)
+	}
+
+	sourceCacheLock.Lock()
+	sourceCache[orgID] = a
+	sourceCacheLock.Unlock()
+
+	return a, nil
 }
 
-func (o *OrgAssets) GetFieldSet() (*flows.FieldSet, error) {
-	return o.fields, nil
+func (a *OrgAssets) OrgID() OrgID { return a.orgID }
+
+func (a *OrgAssets) Env() utils.Environment { return a.env }
+
+func (a *OrgAssets) Channels() ([]assets.Channel, error) {
+	return a.channels, nil
 }
 
-func (o *OrgAssets) GetFlow(uuid flows.FlowUUID) (flows.Flow, error) {
-	o.flowsLock.RLock()
-	flow, found := o.flows[uuid]
-	o.flowsLock.RUnlock()
+func (a *OrgAssets) ChannelByUUID(channelUUID assets.ChannelUUID) *Channel {
+	return a.channelsByUUID[channelUUID]
+}
+
+func (a *OrgAssets) ChannelByID(channelID ChannelID) *Channel {
+	return a.channelsByID[channelID]
+}
+
+func (a *OrgAssets) Fields() ([]assets.Field, error) {
+	return a.fields, nil
+}
+
+func (a *OrgAssets) FieldByUUID(fieldUUID FieldUUID) *Field {
+	return a.fieldsByUUID[fieldUUID]
+}
+
+func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
+	a.flowCacheLock.RLock()
+	flow, found := a.flowCache[flowUUID]
+	a.flowCacheLock.RUnlock()
+
 	if found {
 		return flow, nil
 	}
 
-	flow, err := o.loadFlow(uuid)
+	flow, err := loadFlow(a.ctx, a.db, flowUUID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "error loading flow: %s", flowUUID)
 	}
-	o.flowsLock.Lock()
-	o.flows[uuid] = flow
-	o.flowsLock.Unlock()
+
+	a.flowCacheLock.Lock()
+	a.flowCache[flowUUID] = flow
+	a.flowCacheLock.Unlock()
 
 	return flow, nil
 }
 
-func (o *OrgAssets) GetFlowID(uuid flows.FlowUUID) (FlowID, error) {
-	o.flowsLock.RLock()
-	flowID, found := o.flowIDs[uuid]
-	o.flowsLock.RUnlock()
-	if !found {
-		return -1, fmt.Errorf("no flow known with uuid: %s", uuid)
-	}
-	return flowID, nil
+func (a *OrgAssets) Groups() ([]assets.Group, error) {
+	return a.groups, nil
 }
 
-func (o *OrgAssets) GetGroupByID(id flows.GroupID) (*flows.Group, error) {
-	_, err := o.GetGroupSet()
-	if err != nil {
-		return nil, err
-	}
-	group, found := o.groupsByID[id]
-	if !found {
-		return nil, fmt.Errorf("no group found with id: %d", id)
-	}
-	return group, nil
+func (a *OrgAssets) GroupByID(groupID GroupID) *Group {
+	return a.groupsByID[groupID]
 }
 
-func (o *OrgAssets) GetGroup(uuid flows.GroupUUID) (*flows.Group, error) {
-	gs, err := o.GetGroupSet()
-	if err != nil {
-		return nil, err
-	}
-	return gs.FindByUUID(uuid), nil
+func (a *OrgAssets) GroupByUUID(groupUUID assets.GroupUUID) *Group {
+	return a.groupsByUUID[groupUUID]
 }
 
-func (o *OrgAssets) GetGroupSet() (*flows.GroupSet, error) {
-	return o.groups, nil
+func (a *OrgAssets) Labels() ([]assets.Label, error) {
+	return a.labels, nil
 }
 
-func (o *OrgAssets) GetLabel(uuid flows.LabelUUID) (*flows.Label, error) {
-	ls, err := o.GetLabelSet()
-	if err != nil {
-		return nil, err
-	}
-	return ls.FindByUUID(uuid), nil
+func (a *OrgAssets) Locations() (*utils.LocationHierarchy, error) {
+	return a.locations, nil
 }
 
-func (o *OrgAssets) GetLabelSet() (*flows.LabelSet, error) {
-	return o.labels, nil
-}
-
-func (o *OrgAssets) HasLocations() bool {
-	return false
-}
-
-func (o *OrgAssets) GetLocationHierarchySet() (*flows.LocationHierarchySet, error) {
-	return nil, nil
-}
-
-func (o *OrgAssets) GetResthookSet() (*flows.ResthookSet, error) {
-	return o.resthooks, nil
-}
-
-const selectFlowSQL = `
-SELECT 
-	fr.definition::jsonb || 
-	jsonb_build_object(
-		'flow_type', f.flow_type, 
-		'metadata', jsonb_build_object(
-			'uuid', f.uuid, 
-			'id', f.id,
-			'name', f.name, 
-			'revision', fr.revision, 
-			'expires', f.expires_after_minutes
-		)
-	) as definition
-FROM 
-	flows_flowrevision fr, 
-	flows_flow f 
-WHERE 
-	f.uuid = $1 AND 
-	fr.flow_id = f.id AND 
-	fr.is_active = TRUE AND
-	f.is_active = TRUE 
-ORDER BY 
-	revision DESC LIMIT 1;`
-
-// loads the flow with the passed in UUID
-func (o *OrgAssets) loadFlow(uuid flows.FlowUUID) (flows.Flow, error) {
-	ctx, cancel := context.WithTimeout(o.ctx, time.Second*15)
-	defer cancel()
-
-	var definition string
-	err := o.db.GetContext(ctx, &definition, selectFlowSQL, uuid)
-	if err != nil {
-		return nil, err
-	}
-
-	// load it in from our json
-	legacyFlow, err := legacy.ReadLegacyFlow([]byte(definition))
-	if err != nil {
-		logrus.WithField("definition", definition).WithError(err).Error("error loading flow")
-		return nil, err
-	}
-
-	// migrate forwards returning our final flow definition
-	flow, err := legacyFlow.Migrate(false, false)
-	return flow, err
+func (a *OrgAssets) Resthooks() ([]assets.Resthook, error) {
+	return a.resthooks, nil
 }

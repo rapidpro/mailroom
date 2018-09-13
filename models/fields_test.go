@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,20 +18,20 @@ func TestFields(t *testing.T) {
 	tcs := []struct {
 		Key       string
 		Name      string
-		ValueType flows.FieldValueType
+		ValueType assets.FieldType
 	}{
-		{"age", "Age", flows.FieldValueTypeNumber},
-		{"district", "District", flows.FieldValueTypeDistrict},
-		{"gender", "Gender", flows.FieldValueTypeText},
-		{"joined", "Joined On", flows.FieldValueTypeDatetime},
-		{"state", "State", flows.FieldValueTypeState},
-		{"ward", "Ward", flows.FieldValueTypeWard},
+		{"age", "Age", assets.FieldTypeNumber},
+		{"district", "District", assets.FieldTypeDistrict},
+		{"gender", "Gender", assets.FieldTypeText},
+		{"joined", "Joined On", assets.FieldTypeDatetime},
+		{"state", "State", assets.FieldTypeState},
+		{"ward", "Ward", assets.FieldTypeWard},
 	}
 
 	assert.Equal(t, 6, len(fields))
 	for i, tc := range tcs {
 		assert.Equal(t, tc.Key, fields[i].Key())
 		assert.Equal(t, tc.Name, fields[i].Name())
-		assert.Equal(t, tc.ValueType, fields[i].ValueType())
+		assert.Equal(t, tc.ValueType, fields[i].Type())
 	}
 }

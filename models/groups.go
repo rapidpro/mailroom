@@ -5,23 +5,25 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/assets"
 	null "gopkg.in/guregu/null.v3"
 )
 
+type GroupID int
+
 // Group is our mailroom type for contact groups
 type Group struct {
-	id    flows.GroupID
-	uuid  flows.GroupUUID
+	id    GroupID
+	uuid  assets.GroupUUID
 	name  string
 	query string
 }
 
 // ID returns the ID for this group
-func (g *Group) ID() flows.GroupID { return g.id }
+func (g *Group) ID() GroupID { return g.id }
 
 // UUID returns the uuid for this group
-func (g *Group) UUID() flows.GroupUUID { return g.uuid }
+func (g *Group) UUID() assets.GroupUUID { return g.uuid }
 
 // Name returns the name for this group
 func (g *Group) Name() string { return g.name }
@@ -30,14 +32,14 @@ func (g *Group) Name() string { return g.name }
 func (g *Group) Query() string { return g.query }
 
 // loads the groups for the passed in org
-func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Group, error) {
+func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Group, error) {
 	rows, err := db.Query(selectGroupsSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying groups for org: %d", orgID)
 	}
 	defer rows.Close()
 
-	groups := make([]*Group, 0, 10)
+	groups := make([]assets.Group, 0, 10)
 	for rows.Next() {
 		group := &Group{}
 		query := null.String{}

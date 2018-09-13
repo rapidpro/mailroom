@@ -95,12 +95,6 @@
   revision = "22422dad46e14561a0854ad42497a75af9b61909"
 
 [[projects]]
-  name = "github.com/karlseguin/ccache"
-  packages = ["."]
-  revision = "a2d62155777b39595c825ed3824279e642a5db3c"
-  version = "v2.0.2"
-
-[[projects]]
   name = "github.com/lib/pq"
   packages = [
     ".",
@@ -141,6 +135,7 @@
   name = "github.com/nyaruka/goflow"
   packages = [
     "assets",
+    "assets/rest/types",
     "contactql",
     "contactql/gen",
     "excellent",
@@ -165,7 +160,7 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "7b426087a8bf381089ff025bb70a2f5da5025923"
+  revision = "bd050b020a552b98f68d7288acff96e51d4e147a"
 
 [[projects]]
   name = "github.com/nyaruka/phonenumbers"
@@ -250,6 +245,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d27489903bbf5f9a5ade05971e8512b6712ac4f1a3f94783aed835c06de05f42"
+  inputs-digest = "4291e785aaec2cd577d650ae982a4fedae546f78b41b16cb1940beb642f0039b"
   solver-name = "gps-cdcl"
   solver-version = 1

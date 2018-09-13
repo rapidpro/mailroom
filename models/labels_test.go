@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nyaruka/goflow/flows"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,16 +15,17 @@ func TestLabels(t *testing.T) {
 	assert.NoError(t, err)
 
 	tcs := []struct {
-		ID   flows.LabelID
+		ID   LabelID
 		Name string
 	}{
-		{flows.LabelID(9), "Building"},
-		{flows.LabelID(8), "Driving"},
+		{LabelID(9), "Building"},
+		{LabelID(8), "Driving"},
 	}
 
 	assert.Equal(t, 10, len(labels))
 	for i, tc := range tcs {
-		assert.Equal(t, tc.ID, labels[i].ID())
-		assert.Equal(t, tc.Name, labels[i].Name())
+		label := labels[i].(*Label)
+		assert.Equal(t, tc.ID, label.ID())
+		assert.Equal(t, tc.Name, label.Name())
 	}
 }

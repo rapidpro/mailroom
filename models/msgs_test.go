@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/stretchr/testify/assert"
@@ -16,12 +17,12 @@ func TestMsgs(t *testing.T) {
 	db := Reset(t)
 
 	orgID := OrgID(1)
-	chanID := flows.ChannelID(2)
-	chanUUID := flows.ChannelUUID(utils.UUID("c534272e-817d-4a78-a70c-f21df34407f8"))
+	chanID := ChannelID(2)
+	chanUUID := assets.ChannelUUID(utils.UUID("c534272e-817d-4a78-a70c-f21df34407f8"))
 
 	tcs := []struct {
-		ChannelUUID  flows.ChannelUUID
-		ChannelID    flows.ChannelID
+		ChannelUUID  assets.ChannelUUID
+		ChannelID    ChannelID
 		Text         string
 		ContactID    flows.ContactID
 		URN          urns.URN
@@ -43,7 +44,7 @@ func TestMsgs(t *testing.T) {
 		tx, err := db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		flowMsg := flows.NewMsgOut(tc.URN, flows.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies)
+		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies)
 		msg, err := CreateOutgoingMsg(ctx, tx, orgID, tc.ChannelID, tc.ContactID, flowMsg)
 		if err == nil {
 			assert.Equal(t, orgID, msg.OrgID)

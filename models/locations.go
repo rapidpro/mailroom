@@ -2,11 +2,12 @@ package models
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/lib/pq"
+	"github.com/nyaruka/goflow/utils"
 )
 
 // Location is our mailroom type for administrative locations
@@ -15,9 +16,9 @@ type Location struct {
 	level    int
 	parentID *int
 	osmID    string
-	name     string
-	aliases  []string
-	children []*Location
+	name     string      `json:"name"`
+	aliases  []string    `json:"aliases"`
+	children []*Location `json:"children"`
 }
 
 // ID returns the database id for this location
@@ -39,7 +40,7 @@ func (l *Location) Aliases() []string { return l.aliases }
 func (l *Location) Children() []*Location { return l.children }
 
 // loadLocations loads all the locations for this org returning the root node
-func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Location, error) {
+func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*utils.LocationHierarchy, error) {
 	rows, err := db.Query(loadLocationsSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying locations for org: %d", orgID)
@@ -50,6 +51,8 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Location
 	locationMap := make(map[int]*Location)
 	locations := make([]*Location, 0, 10)
 	var root *Location
+	maxLevel := 0
+
 	for rows.Next() {
 		location := &Location{}
 
@@ -59,6 +62,9 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Location
 		}
 		locationMap[location.id] = location
 		locations = append(locations, location)
+		if location.level > maxLevel {
+			maxLevel = location.level
+		}
 
 		if location.parentID == nil {
 			root = location
@@ -70,13 +76,25 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Location
 		if l.parentID != nil {
 			parent, found := locationMap[*l.parentID]
 			if !found {
-				return nil, fmt.Errorf("unable to find parent: %d for location: %d", *l.parentID, l.id)
+				return nil, errors.Errorf("unable to find parent: %d for location: %d", *l.parentID, l.id)
 			}
 			parent.children = append(parent.children, l)
 		}
 	}
 
-	return root, nil
+	// ok, encode to json
+	locationJSON, err := json.Marshal(root)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error marshalling json hierarchy")
+	}
+
+	// then read it in
+	hierarchy, err := utils.ReadLocationHierarchy(locationJSON)
+	if err != nil {
+		return nil, errors.Annotate(err, "error unmarshalling hierarchy")
+	}
+
+	return hierarchy, nil
 }
 
 // TODO: this is a bit bananas

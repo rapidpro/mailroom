@@ -10,7 +10,9 @@ import (
 	"github.com/nyaruka/goflow/utils"
 )
 
-// Org is mailroom's type for RapidPro orgs. It also implements the utils.Environment interface for GoFlow
+type OrgID int
+
+// Environment is mailroom's type for RapidPro orgs. It also implements the utils.Environment interface for GoFlow
 type Org struct {
 	id  OrgID
 	env utils.Environment

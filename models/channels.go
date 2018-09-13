@@ -6,24 +6,30 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/lib/pq"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/assets"
+	null "gopkg.in/guregu/null.v3"
 )
+
+type ChannelID int
 
 // Channel is the mailman struct that represents channels
 type Channel struct {
-	id      flows.ChannelID
-	uuid    flows.ChannelUUID
-	name    string
-	address string
-	schemes []string
-	roles   []string
+	id       ChannelID
+	uuid     assets.ChannelUUID
+	parent   *assets.ChannelReference
+	name     string
+	address  string
+	country  null.String
+	schemes  []string
+	roles    []assets.ChannelRole
+	prefixes []string
 }
 
 // ID returns the id of this channel
-func (c *Channel) ID() flows.ChannelID { return c.id }
+func (c *Channel) ID() ChannelID { return c.id }
 
 // UUID returns the UUID of this channel
-func (c *Channel) UUID() flows.ChannelUUID { return c.uuid }
+func (c *Channel) UUID() assets.ChannelUUID { return c.uuid }
 
 // Name returns the name of this channel
 func (c *Channel) Name() string { return c.name }
@@ -31,27 +37,49 @@ func (c *Channel) Name() string { return c.name }
 // Address returns the name of this channel
 func (c *Channel) Address() string { return c.address }
 
+// Country returns the contry code for this channel
+func (c *Channel) Country() string { return c.country.String }
+
 // Schemes returns the schemes this channel supports
 func (c *Channel) Schemes() []string { return c.schemes }
 
 // Roles returns the roles this channel supports
-func (c *Channel) Roles() []string { return c.roles }
+func (c *Channel) Roles() []assets.ChannelRole { return c.roles }
+
+// MatchPrefixes returns the prefixes we should also match when determining channel affinity
+func (c *Channel) MatchPrefixes() []string { return c.prefixes }
+
+// Parent returns the UUID of the parent channel to this channel
+// TODO: add support for parent channels
+func (c *Channel) Parent() *assets.ChannelReference { return c.parent }
 
 // loadChannels loads all the channels for the passed in org
-func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Channel, error) {
+func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Channel, error) {
 	rows, err := db.Query(selectChannelsSQL, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error querying channels for org: %d", orgID)
 	}
 	defer rows.Close()
 
-	channels := make([]*Channel, 0, 2)
+	channels := make([]assets.Channel, 0, 2)
 	for rows.Next() {
 		channel := &Channel{}
+		var roles []string
+		var parentName, parentUUID *string
 
-		err := rows.Scan(&channel.id, &channel.uuid, &channel.name, &channel.address, pq.Array(&channel.schemes), pq.Array(&channel.roles))
+		err := rows.Scan(&channel.id, &channel.uuid, &parentUUID, &parentName, &channel.name, &channel.country, &channel.address, pq.Array(&channel.schemes), pq.Array(&roles))
 		if err != nil {
 			return nil, errors.Annotate(err, "error scanning channel row")
+		}
+
+		// populate our roles
+		for _, r := range roles {
+			channel.roles = append(channel.roles, assets.ChannelRole(r))
+		}
+
+		// and our parent if present
+		if parentUUID != nil && parentName != nil {
+			channel.parent = assets.NewChannelReference(assets.ChannelUUID(*parentUUID), *parentName)
 		}
 
 		channels = append(channels, channel)
@@ -64,7 +92,10 @@ const selectChannelsSQL = `
 SELECT
 	id,
 	uuid,
+	(SELECT uuid FROM channels_channel where id = parent_id) as parent_uuid,
+	(SELECT name FROM channels_channel where id = parent_id) as parent_name,
 	name,
+	country,
 	address,
 	schemes,
 	(SELECT ARRAY(
@@ -78,7 +109,7 @@ SELECT
 		FROM unnest(regexp_split_to_array(role,'')) as r)
 	) as roles
 FROM 
-	channels_channel 
+	channels_channel
 WHERE 
 	org_id = $1 AND 
 	is_active = TRUE

@@ -16,7 +16,8 @@ import (
 func TestContacts(t *testing.T) {
 	ctx := context.Background()
 	db := Reset(t)
-	org := NewOrgAssets(ctx, db, 1)
+	org, err := NewOrgAssets(ctx, db, 1)
+	assert.NoError(t, err)
 
 	contacts, err := LoadContacts(ctx, db, org, []flows.ContactID{42, 43, 80})
 	assert.NoError(t, err)
