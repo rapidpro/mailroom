@@ -102,22 +102,10 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 				return nil, errors.Errorf("error loading field for uuid: %s", uuid)
 			}
 
-			// parse our datetime if present
-			var dt *types.XDateTime
-			if value.Datetime != "" {
-				parsed, err := utils.DateFromString(org.Env(), value.Datetime)
-
-				// TODO: this means we are basically ignoring values we can't parse, is that ok?
-				if err == nil {
-					xdt := types.NewXDateTime(parsed)
-					dt = &xdt
-				}
-			}
-
 			value := flows.NewFieldValue(
 				flows.NewField(field),
 				value.Text,
-				dt,
+				value.Datetime,
 				value.Number,
 				value.State,
 				value.District,
@@ -149,7 +137,7 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 // utility struct for the value of a field
 type fieldValue struct {
 	Text     types.XText        `json:"text"`
-	Datetime string             `json:"datetime,omitempty"`
+	Datetime *types.XDateTime   `json:"datetime,omitempty"`
 	Number   *types.XNumber     `json:"number,omitempty"`
 	State    flows.LocationPath `json:"state,omitempty"`
 	District flows.LocationPath `json:"district,omitempty"`

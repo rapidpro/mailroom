@@ -3,10 +3,10 @@ package models
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
@@ -38,7 +38,7 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, types.NewXNumber(decimal.RequireFromString("30")), contacts[1].Fields()["age"].TypedValue())
 
 		assert.Equal(t, "Cathy Roberts", contacts[2].Name())
-		time, _ := utils.DateFromString(org.env, "2017-12-11T04:36:31.016000+01:00")
+		time, _ := time.Parse("2006-01-02T15:04:05-0700", "2017-12-11T04:36:31.016000+01:00")
 		assert.Equal(t, types.NewXDateTime(time), contacts[2].Fields()["joined"].TypedValue())
 	}
 }
