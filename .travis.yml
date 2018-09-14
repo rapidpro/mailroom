@@ -13,7 +13,7 @@ services:
 - redis-server
 
 before_script:
-- psql -U postgres -c "CREATE USER temba WITH PASSWORD 'temba';"
+- psql -U postgres -c "CREATE USER temba;"
 - psql -U postgres -c "ALTER ROLE temba WITH SUPERUSER;"
 - psql -U postgres -c "CREATE DATABASE temba;"
 

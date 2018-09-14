@@ -33,10 +33,10 @@ func TestMain(m *testing.M) {
 //   % pg_dump -F c temba > temba.dump
 func reset() {
 	// restore our db using pg_restore
-	cmd := exec.Command("pg_restore", "-d", "temba", "-c", "temba.dump")
-	err := cmd.Run()
+	cmd := exec.Command("pg_restore", "-d", "temba", "-c", "-U", "temba", "temba.dump")
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		panic(fmt.Sprintf("error restoring database: %s", err))
+		panic(fmt.Sprintf("error restoring database: %s: %s", err, string(output)))
 	}
 }
 
