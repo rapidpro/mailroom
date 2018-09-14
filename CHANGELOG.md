@@ -1,3 +1,7 @@
+v0.0.7
+----------
+ * fire crons one second after the minute, fix multiple contact fires
+
 v0.0.6
 ----------
  * update goreleaser
