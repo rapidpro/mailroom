@@ -1,3 +1,7 @@
+v0.0.5
+----------
+ * full support for simple flows
+
 v0.0.4
 ----------
  * remove contact fields for now
