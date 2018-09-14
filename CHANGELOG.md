@@ -1,3 +1,7 @@
+v0.0.6
+----------
+ * update goreleaser
+
 v0.0.5
 ----------
  * full support for simple flows
