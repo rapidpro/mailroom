@@ -160,13 +160,19 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "bd050b020a552b98f68d7288acff96e51d4e147a"
+  revision = "fdadda8fef7afd18a0b13e2c5b1f9e7489bb41d1"
 
 [[projects]]
   name = "github.com/nyaruka/phonenumbers"
   packages = ["."]
   revision = "06e7b8a14ab9cb646e98cd7d7f5bbd70679e5ebc"
   version = "v1.0.27"
+
+[[projects]]
+  name = "github.com/patrickmn/go-cache"
+  packages = ["."]
+  revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
+  version = "v2.1.0"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -245,6 +251,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4291e785aaec2cd577d650ae982a4fedae546f78b41b16cb1940beb642f0039b"
+  inputs-digest = "a6ab6912234ed11ab54c9a68952d599ccfed1d4ad500c607bbb9fdeef7d1401f"
   solver-name = "gps-cdcl"
   solver-version = 1

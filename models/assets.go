@@ -35,21 +35,27 @@ type OrgAssets struct {
 	groupsByUUID map[assets.GroupUUID]*Group
 
 	labels    []assets.Label
-	locations []assets.LocationHierarchy
 	resthooks []assets.Resthook
+
+	locations        []assets.LocationHierarchy
+	locationsBuiltAt time.Time
 }
 
 var sourceCache = make(map[OrgID]*OrgAssets)
 var sourceCacheLock = sync.RWMutex{}
 
-func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
+const cacheTimeout = time.Second * 5
+const locationCacheTimeout = time.Hour
+
+// GetOrgAssets creates or gets org assets for the passed in org
+func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
 	// do we have a recent cache?
 	sourceCacheLock.RLock()
 	cached, found := sourceCache[orgID]
 	sourceCacheLock.RUnlock()
 
 	// if we found a source built in the last five seconds, use it
-	if found && time.Since(cached.builtAt) < time.Second*5 {
+	if found && time.Since(cached.builtAt) < cacheTimeout {
 		return cached, nil
 	}
 
@@ -58,6 +64,8 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		ctx:     ctx,
 		db:      db,
 		builtAt: time.Now(),
+
+		orgID: orgID,
 
 		channelsByID:   make(map[ChannelID]*Channel),
 		channelsByUUID: make(map[assets.ChannelUUID]*Channel),
@@ -112,14 +120,21 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		return nil, errors.Annotatef(err, "error loading group labels for org %d", orgID)
 	}
 
-	a.locations, err = loadLocations(ctx, db, orgID)
-	if err != nil {
-		return nil, errors.Annotatef(err, "error loading group locations for org %d", orgID)
-	}
-
 	a.resthooks, err = loadResthooks(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading resthooks for org %d", orgID)
+	}
+
+	// cache locations for an hour
+	if cached != nil && time.Since(cached.locationsBuiltAt) < locationCacheTimeout {
+		a.locations = cached.locations
+		a.locationsBuiltAt = cached.locationsBuiltAt
+	} else {
+		a.locations, err = loadLocations(ctx, db, orgID)
+		a.locationsBuiltAt = time.Now()
+		if err != nil {
+			return nil, errors.Annotatef(err, "error loading group locations for org %d", orgID)
+		}
 	}
 
 	sourceCacheLock.Lock()

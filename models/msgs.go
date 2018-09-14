@@ -47,15 +47,15 @@ type TopUpID null.Int
 type MsgStatus string
 
 const (
-	StatusInitializing = MsgStatus("I")
-	StatusPending      = MsgStatus("P")
-	StatusQueued       = MsgStatus("Q")
-	StatusWired        = MsgStatus("W")
-	StatusSent         = MsgStatus("S")
-	StatusHandled      = MsgStatus("H")
-	StatusErrored      = MsgStatus("E")
-	StatusFailed       = MsgStatus("F")
-	StatusResent       = MsgStatus("R")
+	MsgStatusInitializing = MsgStatus("I")
+	MsgStatusPending      = MsgStatus("P")
+	MsgStatusQueued       = MsgStatus("Q")
+	MsgStatusWired        = MsgStatus("W")
+	MsgStatusSent         = MsgStatus("S")
+	MsgStatusHandled      = MsgStatus("H")
+	MsgStatusErrored      = MsgStatus("E")
+	MsgStatusFailed       = MsgStatus("F")
+	MsgStatusResent       = MsgStatus("R")
 )
 
 // TODO: response_to_id, response_to_external_id
@@ -90,10 +90,16 @@ type Msg struct {
 	URNAuth      string             `                     json:"urn_auth,omitempty"`
 	OrgID        OrgID              `db:"org_id"          json:"org_id"`
 	TopUpID      TopUpID            `db:"topup_id"`
+
+	channel *Channel
 }
 
-// CreateOutgoingMsg creates an outgoing message for the passed in flow message
-func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channelID ChannelID, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
+// Channel returns the db channel object for this channel
+func (m *Msg) Channel() *Channel { return m.channel }
+
+// CreateOutgoingMsg creates an outgoing message for the passed in flow message. Note
+// that this message is created in a queued state!
+func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channel *Channel, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
 	_, _, query, _ := m.URN().ToParts()
 	parsedQuery, err := url.ParseQuery(query)
 	if err != nil {
@@ -113,17 +119,12 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channelID 
 		return nil, errors.Annotatef(err, "error getting active topup for msg")
 	}
 
-	// for now it is an error to try to create a msg without a channel
-	if m.Channel() == nil {
-		return nil, errors.Errorf("attempt to create a msg without a channel")
-	}
-
 	msg := &Msg{
 		UUID:         m.UUID(),
 		Text:         m.Text(),
 		HighPriority: true,
 		Direction:    DirectionOut,
-		Status:       StatusPending,
+		Status:       MsgStatusQueued,
 		Visibility:   VisibilityVisible,
 		MsgType:      TypeFlow,
 		ContactID:    contactID,
@@ -131,8 +132,10 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channelID 
 		URN:          m.URN(),
 		OrgID:        orgID,
 		TopUpID:      topupID,
-		ChannelID:    channelID,
-		ChannelUUID:  m.Channel().UUID,
+
+		channel:     channel,
+		ChannelID:   channel.ID(),
+		ChannelUUID: channel.UUID(),
 	}
 
 	// if we have attachments, add them
@@ -178,6 +181,7 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channelID 
 	// populate our insert time
 	msg.CreatedOn = insertTime
 	msg.ModifiedOn = insertTime
+	msg.QueuedOn = insertTime
 
 	// return it
 	return msg, nil
@@ -185,43 +189,52 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channelID 
 
 const insertMsgSQL = `
 INSERT INTO
-msgs_msg(uuid, text, high_priority, created_on, modified_on, direction, status, attachments, metadata,
+msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, 
 		 contact_id, contact_urn_id, org_id, topup_id)
-  VALUES(:uuid, :text, :high_priority, NOW(), NOW(), :direction, :status, :attachments, :metadata,
+  VALUES(:uuid, :text, :high_priority, now(), now(), now(), :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, 
 		 :contact_id, :contact_urn_id, :org_id, :topup_id)
-RETURNING id, NOW()
+RETURNING id, now()
 `
+
+// MarkMessagesPending marks the passed in messages as pending
+func MarkMessagesPending(ctx context.Context, db *sqlx.DB, msgs []*Msg) error {
+	return updateMessageStatus(ctx, db, msgs, MsgStatusPending)
+}
 
 // MarkMessagesQueued marks the passed in messages as queued
 func MarkMessagesQueued(ctx context.Context, db *sqlx.DB, msgs []*Msg) error {
+	return updateMessageStatus(ctx, db, msgs, MsgStatusQueued)
+}
+
+// MarkMessagesQueued marks the passed in messages as queued
+func updateMessageStatus(ctx context.Context, db *sqlx.DB, msgs []*Msg, status MsgStatus) error {
 	ids := make([]int, len(msgs))
 	for i, m := range msgs {
 		ids[i] = int(m.ID)
 	}
 
-	q, vs, err := sqlx.In(queueMsgSQL, ids)
+	q, vs, err := sqlx.In(updateMsgStatusSQL, ids, status)
 	if err != nil {
-		return errors.Annotate(err, "error preparing query for queuing messages")
+		return errors.Annotate(err, "error preparing query for updating message status")
 	}
 	q = db.Rebind(q)
 
 	// TODO: use real queued on instead of now()
 	_, err = db.ExecContext(ctx, q, vs...)
 	if err != nil {
-		return errors.Annotate(err, "error marking message as queued")
+		return errors.Annotate(err, "error updating message status")
 	}
 
 	return nil
 }
 
-const queueMsgSQL = `
+const updateMsgStatusSQL = `
 UPDATE 
 	msgs_msg
 SET 
-	status = 'Q', 
-	queued_on = NOW(),
+	status = $1, 
 	modified_on = NOW()
 WHERE
 	id IN (?)

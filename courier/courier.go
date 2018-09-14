@@ -7,39 +7,75 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 )
 
 const (
-	highPriority = 1
-	lowPriority  = 0
+	highPriority    = 1
+	defaultPriority = 0
 )
 
-// TODO: use real TPS that channels have
-
-// QueueMessage queues a message to courier
+// QueueMessages queues a message to courier
 func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+
 	now := time.Now()
 	epochMS := strconv.FormatFloat(float64(now.UnixNano()/int64(time.Microsecond))/float64(1000000), 'f', 6, 64)
 
 	// TODO: figure out priority better
-	priority := lowPriority
+	priority := defaultPriority
 
-	msgJSON, err := json.Marshal(msgs)
-	if err != nil {
-		return err
-	}
+	// we batch msgs by channel uuid
+	batch := make([]*models.Msg, 0, len(msgs))
+	currentChannel := msgs[0].Channel()
 
-	// queue to courier
-	// TODO: need to group by channel
-	_, err = queueMsg.Do(rc, epochMS, "msgs", msgs[0].ChannelUUID, 10, priority, msgJSON)
-	if err != nil {
-		for _, m := range msgs {
-			m.QueuedOn = now
-			m.Status = models.StatusQueued
+	for _, msg := range msgs {
+		// no channel, continue
+		if msg.ChannelUUID == "" {
+			continue
+		}
+
+		// nil channel object but have channel UUID? that's an error
+		if msg.Channel() == nil {
+			return errors.Errorf("msg passed in without channel set")
+		}
+
+		// same channel? add to batch
+		if msg.Channel() == currentChannel {
+			batch = append(batch, msg)
+		}
+
+		// different channel? queue it up
+		if msg.Channel() != currentChannel {
+			batchJSON, err := json.Marshal(batch)
+			if err != nil {
+				return err
+			}
+			_, err = queueMsg.Do(rc, epochMS, "msgs", currentChannel.UUID(), currentChannel.TPS(), priority, batchJSON)
+			if err != nil {
+				return err
+			}
+
+			currentChannel = msg.Channel()
+			batch = []*models.Msg{msg}
 		}
 	}
 
-	return err
+	// any remaining in our batch, queue it up
+	if len(batch) > 0 {
+		batchJSON, err := json.Marshal(batch)
+		if err != nil {
+			return err
+		}
+		_, err = queueMsg.Do(rc, epochMS, "msgs", currentChannel.UUID(), currentChannel.TPS(), priority, batchJSON)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 var queueMsg = redis.NewScript(6, `

@@ -107,6 +107,20 @@ func NewGroupList(groups []*Group) *GroupList {
 	return &GroupList{groups: groups}
 }
 
+// NewGroupListFromAssets creates a new group list
+func NewGroupListFromAssets(a SessionAssets, groupAssets []assets.Group) (*GroupList, error) {
+	groups := make([]*Group, len(groupAssets))
+	var err error
+
+	for g, asset := range groupAssets {
+		groups[g], err = a.Groups().Get(asset.UUID())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &GroupList{groups: groups}, nil
+}
+
 // Clone returns a clone of this group list
 func (l *GroupList) clone() *GroupList {
 	groups := make([]*Group, len(l.groups))

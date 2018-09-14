@@ -11,6 +11,10 @@ import (
 
 type ChannelID int
 
+type ChannelType string
+
+const ChannelTypeAndroid = ChannelType("A")
+
 // Channel is the mailroom struct that represents channels
 type Channel struct {
 	// inner struct for privacy and so we don't collide with method names
@@ -20,6 +24,8 @@ type Channel struct {
 		Parent        *assets.ChannelReference `json:"parent"`
 		Name          string                   `json:"name"`
 		Address       string                   `json:"address"`
+		ChannelType   ChannelType              `json:"channel_type"`
+		TPS           int                      `json:"tps"`
 		Country       null.String              `json:"country"`
 		Schemes       []string                 `json:"schemes"`
 		Roles         []assets.ChannelRole     `json:"roles"`
@@ -35,6 +41,12 @@ func (c *Channel) UUID() assets.ChannelUUID { return c.c.UUID }
 
 // Name returns the name of this channel
 func (c *Channel) Name() string { return c.c.Name }
+
+// Type returns the channel type for this channel
+func (c *Channel) Type() ChannelType { return c.c.ChannelType }
+
+// TPS returns the max number of transactions per second this channel supports
+func (c *Channel) TPS() int { return c.c.TPS }
 
 // Address returns the name of this channel
 func (c *Channel) Address() string { return c.c.Address }
@@ -80,9 +92,11 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 const selectChannelsSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
-	c.uuid uuid,
+	c.uuid as uuid,
 	(SELECT ROW_TO_JSON(p) FROM (SELECT uuid, name FROM channels_channel cc where cc.id = c.parent_id) p) as parent,
 	c.name as name,
+	c.channel_type as channel_type,
+	COALESCE(c.tps, 10) as tps,
 	c.country as country,
 	c.address as address,
 	c.schemes as schemes,

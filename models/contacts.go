@@ -3,12 +3,14 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -17,7 +19,7 @@ import (
 type FieldUUID utils.UUID
 
 // LoadContacts loads a set of contacts for the passed in ids
-func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
+func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets, org *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
 	// rebind our query for our IN clause
 	// TODO: should we be filtering by org here too?
 	q, vs, err := sqlx.In(selectContactsSQL, ids)
@@ -48,16 +50,16 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 		}
 
 		// convert our group ids to real groups
-		groups := make([]*flows.Group, 0, len(env.Groups))
+		groups := make([]assets.Group, 0, len(env.Groups))
 		for _, g := range env.Groups {
 			group := org.GroupByID(g)
 			if group != nil {
-				groups = append(groups, flows.NewGroup(group))
+				groups = append(groups, group)
 			}
 		}
 
 		// and our URNs to URN objects
-		contactURNs := make(flows.URNList, 0, len(env.URNs))
+		contactURNs := make([]urns.URN, 0, len(env.URNs))
 		for _, u := range env.URNs {
 			var channel *Channel
 
@@ -67,7 +69,9 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 			}
 
 			// we build our query from a combination of preferred channel and auth
-			query := url.Values{}
+			query := url.Values{
+				"id": []string{fmt.Sprintf("%d", u.ID)},
+			}
 			if channel != nil {
 				query["channel"] = []string{string(channel.UUID())}
 			}
@@ -80,30 +84,18 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 			if err != nil {
 				return nil, errors.Annotatef(err, "error loading contact, invalid urn: %s %s %s %s", u.Scheme, u.Path, query.Encode(), u.Display)
 			}
-
-			// TODO: this should have a nicer constructor
-			contactURNs = append(contactURNs, flows.NewContactURN(urn, flows.NewChannel(channel)))
+			contactURNs = append(contactURNs, urn)
 		}
 
-		// first populate all the fields with empty fields
-		fields, err := org.Fields()
-		if err != nil {
-			return nil, errors.Annotatef(err, "error loading fields for org")
-		}
-		values := make(flows.FieldValues, len(fields))
-		for _, f := range fields {
-			values[f.Key()] = flows.NewEmptyFieldValue(flows.NewField(f))
-		}
-
-		// then populate those fields that are actually set
+		// populate those fields that are actually set
+		values := make(map[assets.Field]*flows.Value, len(env.Fields))
 		for uuid, value := range env.Fields {
 			field := org.FieldByUUID(uuid)
 			if field == nil {
 				return nil, errors.Errorf("error loading field for uuid: %s", uuid)
 			}
 
-			value := flows.NewFieldValue(
-				flows.NewField(field),
+			value := flows.NewValue(
 				value.Text,
 				value.Datetime,
 				value.Number,
@@ -112,13 +104,14 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 				value.Ward,
 			)
 
-			values[field.Key()] = value
+			values[field] = value
 		}
 
 		// TODO: what do we do for stopped, blocked, inactive?
 
 		// ok, create our goflow contact now
-		contact := flows.NewContact(
+		contact, err := flows.NewContactFromAssets(
+			session,
 			env.UUID,
 			env.ID,
 			env.Name,
@@ -126,9 +119,13 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 			org.Env().Timezone(),
 			env.CreatedOn,
 			contactURNs,
-			flows.NewGroupList(groups),
+			groups,
 			values,
 		)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error creating flow contact")
+		}
+
 		contacts = append(contacts, contact)
 	}
 	return contacts, nil
@@ -156,6 +153,7 @@ type contactEnvelope struct {
 	Fields    map[FieldUUID]*fieldValue `json:"fields"`
 	Groups    []GroupID                 `json:"groups"`
 	URNs      []struct {
+		ID        int       `json:"id"`
 		Scheme    string    `json:"scheme"`
 		Path      string    `json:"path"`
 		Display   string    `json:"display"`
@@ -181,6 +179,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	fields,
 	(SELECT ARRAY_AGG(u) FROM (
 		SELECT
+			cu.id as id,
             cu.scheme as scheme,
             cu.path as path,
             cu.display as display,

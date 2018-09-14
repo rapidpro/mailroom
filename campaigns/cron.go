@@ -2,12 +2,13 @@ package campaigns
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
 	"github.com/nyaruka/mailroom/marker"
@@ -30,7 +31,7 @@ func init() {
 func StartCampaignCron(mr *mailroom.Mailroom) error {
 	cron.StartCron(mr.Quit, mr.RedisPool, campaignsLock, time.Second*60,
 		func(lockName string, lockValue string) error {
-			return fireCampaignEvents(mr, lockName, lockValue)
+			return fireCampaignEvents(mr.CTX, mr.DB, mr.RedisPool, lockName, lockValue)
 		},
 	)
 
@@ -38,92 +39,144 @@ func StartCampaignCron(mr *mailroom.Mailroom) error {
 }
 
 // fireCampaignEvents looks for all expired campaign event fires and queues them to be started
-func fireCampaignEvents(mr *mailroom.Mailroom, lockName string, lockValue string) error {
+func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "campaign_events").WithField("lock", lockValue)
 	start := time.Now()
 
 	// find all events that need to be fired
-	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	rows, err := mr.DB.QueryxContext(ctx, expiredEventsQuery)
-	if err == sql.ErrNoRows {
-		log.WithField("elapsed", time.Since(start)).Info("no events to fire")
-		return nil
-	}
-
+	rows, err := db.QueryxContext(ctx, expiredEventsQuery)
 	if err != nil {
 		return errors.Annotatef(err, "error loading expired campaign events")
 	}
 	defer rows.Close()
 
-	rc := mr.RedisPool.Get()
+	rc := rp.Get()
 	defer rc.Close()
 
+	queued := 0
+	queueTask := func(task *eventFireTask) error {
+		if task.EventID == 0 {
+			return nil
+		}
+
+		err = queue.AddTask(rc, eventQueue, campaignEventFireType, fmt.Sprintf("%d", task.OrgID), task, queue.DefaultPriority)
+		if err != nil {
+			return errors.Annotate(err, "error queuing task")
+		}
+
+		// mark each of these fires as queued
+		for _, id := range task.FireIDs {
+			err = marker.AddTask(rc, campaignsLock, fmt.Sprintf("%d", id))
+			if err != nil {
+				return errors.Annotate(err, "error marking event as queued")
+			}
+		}
+		log.WithField("task", fmt.Sprintf("%vvv", task)).WithField("fire_count", len(task.FireIDs)).Debug("added event fire task")
+		queued += len(task.FireIDs)
+
+		return nil
+	}
+
 	// while we have rows
+	task := &eventFireTask{}
 	for rows.Next() {
-		event := &eventFireTask{}
-		err := rows.StructScan(event)
+		row := &eventFireRow{}
+		err := rows.StructScan(row)
 		if err != nil {
 			return errors.Annotatef(err, "error reading event fire row")
 		}
 
-		log = log.WithField("task", event)
-
 		// check whether this event has already been queued to fire
-		taskID := fmt.Sprintf("%d", event.FireID)
+		taskID := fmt.Sprintf("%d", row.FireID)
 		dupe, err := marker.HasTask(rc, campaignsLock, taskID)
 		if err != nil {
 			return errors.Annotate(err, "error checking task lock")
 		}
 
-		if !dupe {
-			err = queue.AddTask(rc, eventQueue, campaignEventFireType, fmt.Sprintf("%d", event.OrgID), event, queue.DefaultPriority)
-			if err != nil {
-				return errors.Annotate(err, "error queuing task")
-			}
+		// this has already been queued, move on
+		if dupe {
+			continue
+		}
 
-			err = marker.AddTask(rc, campaignsLock, taskID)
-			if err != nil {
-				return errors.Annotate(err, "error marking task as queued")
-			}
-			log.Debug("added task")
-		} else {
-			log.Debug("ignoring task, already queued")
+		// if this is the same event as our current task, add it there
+		if row.EventID == task.EventID {
+			task.FireIDs = append(task.FireIDs, row.FireID)
+			continue
+		}
+
+		// different task, queue up our current task
+		err = queueTask(task)
+		if err != nil {
+			return errors.Annotatef(err, "error queueing task")
+		}
+
+		// and create a new one based on this row
+		task = &eventFireTask{
+			FireIDs:      []int64{row.FireID},
+			EventID:      row.EventID,
+			EventUUID:    row.EventUUID,
+			FlowUUID:     row.FlowUUID,
+			CampaignUUID: row.CampaignUUID,
+			CampaignName: row.CampaignName,
+			OrgID:        row.OrgID,
 		}
 	}
 
-	log.WithField("elapsed", time.Since(start)).Info("campaign fires complete")
+	// queue our last task
+	err = queueTask(task)
+	if err != nil {
+		return errors.Annotatef(err, "error queueing task")
+	}
+
+	log.WithField("elapsed", time.Since(start)).WithField("queued", queued).Info("campaign event fire queuing complete")
 	return nil
 }
 
 type eventFireTask struct {
-	FireID    int64           `db:"fire_id"       json:"fire_id"`
-	ContactID flows.ContactID `db:"contact_id"    json:"contact_id"`
-	EventID   int64           `db:"event_id"      json:"event_id"`
-	FlowID    models.FlowID   `db:"flow_id"       json:"flow_id"`
-	OrgID     int             `db:"org_id"        json:"org_id"`
-	Scheduled time.Time       `db:"scheduled"     json:"scheduled"`
+	FireIDs      []int64         `json:"fire_ids"`
+	EventID      int64           `json:"event_id"`
+	EventUUID    string          `json:"event_uuid"`
+	FlowUUID     assets.FlowUUID `json:"flow_uuid"`
+	CampaignUUID string          `json:"campaign_uuid"`
+	CampaignName string          `json:"campaign_name"`
+	OrgID        models.OrgID    `json:"org_id"`
+}
+
+type eventFireRow struct {
+	FireID       int64           `db:"fire_id"`
+	EventID      int64           `db:"event_id"`
+	EventUUID    string          `db:"event_uuid"`
+	FlowUUID     assets.FlowUUID `db:"flow_uuid"`
+	CampaignUUID string          `db:"campaign_uuid"`
+	CampaignName string          `db:"campaign_name"`
+	OrgID        models.OrgID    `db:"org_id"`
 }
 
 const expiredEventsQuery = `
 SELECT
-	ef.id as fire_id, 
-	ef.contact_id as contact_id, 
-	ef.event_id as event_id,
-	f.id as flow_id,
-	f.org_id as org_id,
-	ef.scheduled as scheduled 	
+    ef.id as fire_id,
+    ef.event_id as event_id,
+    ce.uuid as event_uuid,
+	f.uuid as flow_uuid,
+	c.uuid as campaign_uuid,
+    c.name as campaign_name,
+    f.org_id as org_id
 FROM
-	campaigns_eventfire ef, 
-	campaigns_campaignevent ce,
-	flows_flow f
+    campaigns_eventfire ef,
+    campaigns_campaignevent ce,
+    campaigns_campaign c,
+    flows_flow f
 WHERE
-	ef.fired IS NULL AND ef.scheduled < NOW() AND
-	ce.id = ef.event_id AND
-	f.id = ce.flow_id AND f.is_system = TRUE AND f.flow_server_enabled = TRUE
+    ef.fired IS NULL AND ef.scheduled < NOW() AND
+    ce.id = ef.event_id AND
+    f.id = ce.flow_id AND f.is_system = TRUE AND f.flow_server_enabled = TRUE AND
+    ce.campaign_id = c.id
 ORDER BY
-	scheduled ASC
+    scheduled ASC,
+    ef.event_id ASC
 LIMIT
-	500
+    25000;
 `

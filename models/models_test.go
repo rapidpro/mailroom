@@ -22,7 +22,7 @@ import (
 
 // Custom entry point so we can reset our database
 func TestMain(m *testing.M) {
-	reset()
+	resetDB()
 	os.Exit(m.Run())
 }
 
@@ -39,10 +39,10 @@ func mustExec(command string, args ...string) {
 	}
 }
 
-func reset() {
-	mustExec("dropdb", "temba")
-	mustExec("createdb", "temba")
-	mustExec("pg_restore", "-d", "temba", "temba.dump")
+func resetDB() {
+	db := sqlx.MustOpen("postgres", "postgres://temba@localhost/temba?sslmode=disable")
+	db.MustExec("drop owned by temba cascade")
+	mustExec("pg_restore", "-d", "temba", "../temba.dump")
 }
 
 func getDB() *sqlx.DB {
@@ -100,7 +100,7 @@ func TestContacts(t *testing.T) {
 	ctx := context.Background()
 	db := getDB()
 
-	org, err := NewOrgAssets(ctx, db, 1)
+	org, err := GetOrgAssets(ctx, db, 1)
 	assert.NoError(t, err)
 
 	contacts, err := LoadContacts(ctx, db, org, []flows.ContactID{42, 43, 80})
@@ -188,12 +188,15 @@ func TestMsgs(t *testing.T) {
 	db := getDB()
 
 	orgID := OrgID(1)
-	chanID := ChannelID(2)
+	channels, err := loadChannels(ctx, db, orgID)
+	assert.NoError(t, err)
+
+	channel := channels[1].(*Channel)
 	chanUUID := assets.ChannelUUID(utils.UUID("c534272e-817d-4a78-a70c-f21df34407f8"))
 
 	tcs := []struct {
 		ChannelUUID  assets.ChannelUUID
-		ChannelID    ChannelID
+		Channel      *Channel
 		Text         string
 		ContactID    flows.ContactID
 		URN          urns.URN
@@ -203,11 +206,11 @@ func TestMsgs(t *testing.T) {
 		Metadata     null.String
 		HasErr       bool
 	}{
-		{chanUUID, chanID, "missing urn id", flows.ContactID(42), urns.URN("tel:+250700000001"), ContactURNID(0),
+		{chanUUID, channel, "missing urn id", flows.ContactID(42), urns.URN("tel:+250700000001"), ContactURNID(0),
 			nil, nil, null.NewString("", false), true},
-		{chanUUID, chanID, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), ContactURNID(42),
+		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), ContactURNID(42),
 			nil, []string{"yes", "no"}, null.NewString(`{"quick_replies":["yes","no"]}`, true), false},
-		{chanUUID, chanID, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), ContactURNID(42),
+		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), ContactURNID(42),
 			flows.AttachmentList([]flows.Attachment{flows.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, null.NewString("", false), false},
 	}
 
@@ -216,12 +219,12 @@ func TestMsgs(t *testing.T) {
 		assert.NoError(t, err)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies)
-		msg, err := CreateOutgoingMsg(ctx, tx, orgID, tc.ChannelID, tc.ContactID, flowMsg)
+		msg, err := CreateOutgoingMsg(ctx, tx, orgID, tc.Channel, tc.ContactID, flowMsg)
 		if err == nil {
 			assert.Equal(t, orgID, msg.OrgID)
 			assert.Equal(t, tc.Text, msg.Text)
 			assert.Equal(t, tc.ContactID, msg.ContactID)
-			assert.Equal(t, tc.ChannelID, msg.ChannelID)
+			assert.Equal(t, tc.Channel, msg.Channel())
 			assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID)
 			assert.Equal(t, tc.URN, msg.URN)
 			assert.Equal(t, tc.ContactURNID, msg.ContactURNID)
