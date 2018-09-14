@@ -157,7 +157,7 @@ func WriteSession(ctx context.Context, tx *sqlx.Tx, track *Track, s flows.Sessio
 	for _, r := range s.Runs() {
 		run, err := WriteRun(ctx, tx, track, session, r)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error writing run: %s", r.UUID)
+			return nil, errors.Annotatef(err, "error writing run: %s", r.UUID())
 		}
 
 		// save the run to our session

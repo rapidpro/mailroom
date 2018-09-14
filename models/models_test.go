@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -103,14 +104,17 @@ func TestContacts(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, 1)
 	assert.NoError(t, err)
 
-	contacts, err := LoadContacts(ctx, db, org, []flows.ContactID{42, 43, 80})
+	session, err := engine.NewSessionAssets(org)
+	assert.NoError(t, err)
+
+	contacts, err := LoadContacts(ctx, db, session, org, []flows.ContactID{42, 43, 80})
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(contacts))
 
 	if len(contacts) == 3 {
 		assert.Equal(t, "Cathy Quincy", contacts[0].Name())
 		assert.Equal(t, len(contacts[0].URNs()), 1)
-		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+250700000001")
+		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+250700000001?id=42")
 
 		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto"), contacts[0].Fields()["state"].TypedValue())
 		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto > Yabo > Kilgori"), contacts[0].Fields()["ward"].TypedValue())

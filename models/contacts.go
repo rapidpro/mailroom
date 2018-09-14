@@ -87,24 +87,32 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets,
 			contactURNs = append(contactURNs, urn)
 		}
 
-		// populate those fields that are actually set
-		values := make(map[assets.Field]*flows.Value, len(env.Fields))
-		for uuid, value := range env.Fields {
-			field := org.FieldByUUID(uuid)
-			if field == nil {
-				return nil, errors.Errorf("error loading field for uuid: %s", uuid)
+		// grab all our org fields
+		orgFields, err := org.Fields()
+		if err != nil {
+			return nil, errors.Annotatef(err, "error loading org fields")
+		}
+
+		// populate all values, either with nil or the real value
+		values := make(map[assets.Field]*flows.Value, len(orgFields))
+		for _, f := range orgFields {
+			field := f.(*Field)
+			cv, found := env.Fields[field.UUID()]
+
+			if found {
+				value := flows.NewValue(
+					cv.Text,
+					cv.Datetime,
+					cv.Number,
+					cv.State,
+					cv.District,
+					cv.Ward,
+				)
+				values[field] = value
+			} else {
+				value := flows.Value{}
+				values[field] = &value
 			}
-
-			value := flows.NewValue(
-				value.Text,
-				value.Datetime,
-				value.Number,
-				value.State,
-				value.District,
-				value.Ward,
-			)
-
-			values[field] = value
 		}
 
 		// TODO: what do we do for stopped, blocked, inactive?
