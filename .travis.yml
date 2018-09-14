@@ -4,10 +4,11 @@ addons:
   apt:
     packages:
       - redis-server
+      - postgresql-9.6-postgis-2.3
   postgresql: '9.6'
 
 go:
-- "1.10"
+- "1.11"
 
 services:
 - redis-server
