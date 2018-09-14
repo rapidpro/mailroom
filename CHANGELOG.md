@@ -1,3 +1,7 @@
+v0.0.8
+----------
+ * clear queuing if there is an error starting task
+
 v0.0.7
 ----------
  * fire crons one second after the minute, fix multiple contact fires
