@@ -1,3 +1,7 @@
+v0.0.9
+----------
+ * deal with no locations for org
+
 v0.0.8
 ----------
  * clear queuing if there is an error starting task
