@@ -135,7 +135,7 @@ func nextFire(last time.Time, interval time.Duration) time.Time {
 		normalizedInterval := interval - ((time.Duration(last.Second()) * time.Second) % interval)
 		return last.Add(normalizedInterval)
 	} else if interval == time.Minute {
-		seconds := time.Duration(60 - last.Second())
+		seconds := time.Duration(60-last.Second()) + 1
 		return last.Add(seconds * time.Second)
 	} else {
 		// no special treatment for other things

@@ -98,16 +98,20 @@ func queueExpiredEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ta
 
 	// TODO: optimize into a single query
 	for _, session := range sessions {
-		fire := contactMap[session.ContactID]
+		fire, found := contactMap[session.ContactID]
 
 		// it this flow started ok, then mark this campaign as fired
-		err = models.MarkCampaignEventFired(ctx, db, fire.FireID, session.CreatedOn)
-		if err != nil {
-			return errors.Annotatef(err, "error marking event fire as fired: %d", fire.FireID)
-		}
+		if found {
+			err = models.MarkCampaignEventFired(ctx, db, fire.FireID, session.CreatedOn)
+			if err != nil {
+				return errors.Annotatef(err, "error marking event fire as fired: %d", fire.FireID)
+			}
 
-		// delete this contact from our map
-		delete(contactMap, session.ContactID)
+			// delete this contact from our map
+			delete(contactMap, session.ContactID)
+		} else {
+			log.WithField("contact_id", session.ContactID).Errorf("unable to find session for contact id")
+		}
 	}
 
 	// what remains in our contact map are fires that failed for some reason, umark these

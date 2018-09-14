@@ -62,7 +62,7 @@ func FireCampaignEvent(
 	for _, contact := range contacts {
 		// create our trigger
 		flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
-		trigger := triggers.NewCampaignTrigger(org.Env(), flowRef, contacts[0], event, time.Now())
+		trigger := triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, time.Now())
 
 		// and start our flow
 		session, err := StartFlow(ctx, db, rp, org, sessionAssets, trigger)
