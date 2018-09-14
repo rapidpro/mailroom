@@ -62,8 +62,7 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 		if err != nil {
 			return nil, errors.Annotate(err, "error scanning location row")
 		}
-		locationMap[location.id] = location
-		locations = append(locations, location)
+
 		if location.level > maxLevel {
 			maxLevel = location.level
 		}
@@ -71,6 +70,14 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 		if location.parentID == nil {
 			root = location
 		}
+
+		locationMap[location.id] = location
+		locations = append(locations, location)
+	}
+
+	// no locations? no hierarchy
+	if len(locations) == 0 {
+		return []assets.LocationHierarchy{}, nil
 	}
 
 	// now we make another pass and associate all children
@@ -93,7 +100,7 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	// then read it in
 	hierarchy, err := utils.ReadLocationHierarchy(locationJSON)
 	if err != nil {
-		return nil, errors.Annotate(err, "error unmarshalling hierarchy")
+		return nil, errors.Annotatef(err, "error unmarshalling hierarchy: %s", string(locationJSON))
 	}
 
 	return []assets.LocationHierarchy{hierarchy}, nil
