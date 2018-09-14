@@ -91,10 +91,6 @@ func queueExpiredEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ta
 	}
 
 	sessions, err := runner.FireCampaignEvent(ctx, db, rp, eventTask.OrgID, contactIDs, eventTask.FlowUUID, &event)
-	if err != nil {
-		// TODO: should we be removing this task as having been marked for execution (so it can retry?)
-		return errors.Annotatef(err, "error firing campaign events: %d", eventTask.FireIDs)
-	}
 
 	// TODO: optimize into a single query
 	for _, session := range sessions {
@@ -121,6 +117,10 @@ func queueExpiredEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ta
 			marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", failed.FireID))
 		}
 		rc.Close()
+	}
+
+	if err != nil {
+		return errors.Annotatef(err, "error firing campaign events: %d", eventTask.FireIDs)
 	}
 
 	return nil
