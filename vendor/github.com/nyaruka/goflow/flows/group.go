@@ -113,8 +113,7 @@ func NewGroupListFromAssets(a SessionAssets, groupAssets []assets.Group) (*Group
 	var err error
 
 	for g, asset := range groupAssets {
-		groups[g], err = a.Groups().Get(asset.UUID())
-		if err != nil {
+		if groups[g], err = a.Groups().Get(asset.UUID()); err != nil {
 			return nil, err
 		}
 	}
