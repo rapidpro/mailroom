@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -96,7 +95,6 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 	for _, f := range a.fields {
 		field := f.(*Field)
 		a.fieldsByUUID[field.UUID()] = field
-		fmt.Printf("%s: %s\n", field.Name(), field.UUID())
 	}
 
 	a.groups, err = loadGroups(ctx, db, orgID)
