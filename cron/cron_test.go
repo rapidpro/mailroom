@@ -5,25 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCron(t *testing.T) {
-	rp := &redis.Pool{
-		Dial: func() (redis.Conn, error) {
-			conn, err := redis.Dial("tcp", "localhost:6379")
-			if err != nil {
-				return nil, err
-			}
-			_, err = conn.Do("SELECT", 0)
-			return conn, err
-		},
-	}
-
-	rc := rp.Get()
+	testsuite.ResetRP()
+	rp := testsuite.RP()
+	rc := testsuite.RC()
 	defer rc.Close()
-	rc.Do("del", "test_lock")
 
 	mutex := sync.RWMutex{}
 	fired := 0

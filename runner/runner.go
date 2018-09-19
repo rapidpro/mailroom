@@ -113,9 +113,9 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	rc := rp.Get()
 	defer rc.Close()
 
-	outbox := dbSession.GetOutbox()
+	outbox := dbSession.Outbox()
 	if len(outbox) > 0 {
-		log := logrus.WithField("messages", dbSession.GetOutbox()).WithField("session", dbSession.ID)
+		log := logrus.WithField("messages", dbSession.Outbox()).WithField("session", dbSession.ID)
 		err := courier.QueueMessages(rc, outbox)
 
 		// not being able to queue a message isn't the end of the world, log but don't return an error

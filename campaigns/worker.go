@@ -23,16 +23,15 @@ func init() {
 	mailroom.AddTaskFunction(campaignEventFireType, HandleCampaignEvent)
 }
 
-// HandleCampaignEvent is called by mailroom when a campaign event task is ready to be
-// processed.
+// HandleCampaignEvent is called by mailroom when a campaign event task is ready to be processed.
 func HandleCampaignEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*5)
 	defer cancel()
 
-	return queueExpiredEventFires(ctx, mr.DB, mr.RedisPool, task)
+	return fireEventFires(ctx, mr.DB, mr.RedisPool, task)
 }
 
-// queueExpiredEventFires handles expired campaign events
+// fireEventFires handles expired campaign events
 // For each event:
 //   - loads the event to fire
 //   - loads the org asset for that event
@@ -41,7 +40,7 @@ func HandleCampaignEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 //   - creates the trigger for that event
 //   - runs the flow that is to be started through our engine
 //   - saves the flow run and session resulting from our run
-func queueExpiredEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
+func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
 	log := logrus.WithField("comp", "campaign_worker").WithField("task", string(task.Task))
 
 	// decode our task body
@@ -56,9 +55,7 @@ func queueExpiredEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ta
 
 	// grab all the fires for this event
 	fires, err := loadEventFires(ctx, db, eventTask.FireIDs)
-
-	// no fires returned
-	if len(fires) == 0 {
+	if err != nil {
 		// unmark all these fires as fires so they can retry
 		rc := rp.Get()
 		for _, id := range eventTask.FireIDs {
@@ -67,9 +64,11 @@ func queueExpiredEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ta
 		rc.Close()
 
 		// if we had an error, return that
-		if err != nil {
-			return errors.Annotatef(err, "error loading event fire from db: %v", eventTask.FireIDs)
-		}
+		return errors.Annotatef(err, "error loading event fire from db: %v", eventTask.FireIDs)
+	}
+
+	// no fires returned
+	if len(fires) == 0 {
 		log.Info("events already fired, ignoring")
 		return nil
 	}

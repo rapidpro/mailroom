@@ -2,58 +2,30 @@ package celery
 
 import (
 	"encoding/json"
-	"log"
 	"testing"
-	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/mailroom/testsuite"
 )
 
-func getPool() *redis.Pool {
-	redisPool := &redis.Pool{
-		Wait:        true,              // makes callers wait for a connection
-		MaxActive:   5,                 // only open this many concurrent connections at once
-		MaxIdle:     2,                 // only keep up to 2 idle
-		IdleTimeout: 240 * time.Second, // how long to wait before reaping a connection
-		Dial: func() (redis.Conn, error) {
-			conn, err := redis.Dial("tcp", "localhost:6379")
-			if err != nil {
-				return nil, err
-			}
-			_, err = conn.Do("SELECT", 0)
-			return conn, err
-		},
-	}
-	conn := redisPool.Get()
-	defer conn.Close()
-
-	_, err := conn.Do("FLUSHDB")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return redisPool
-}
 func TestQueue(t *testing.T) {
-	pool := getPool()
-	defer pool.Close()
-
-	conn := pool.Get()
-	defer conn.Close()
+	testsuite.ResetRP()
+	rc := testsuite.RC()
+	defer rc.Close()
 
 	// queue to our handler queue
-	conn.Send("multi")
-	err := QueueTask(conn, "handler", "handle_event_task", []int64{})
+	rc.Send("multi")
+	err := QueueTask(rc, "handler", "handle_event_task", []int64{})
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = conn.Do("exec")
+	_, err = rc.Do("exec")
 	if err != nil {
 		t.Error(err)
 	}
 
 	// check whether things look right
-	taskJSON, err := redis.String(conn.Do("LPOP", "handler"))
+	taskJSON, err := redis.String(rc.Do("LPOP", "handler"))
 	if err != nil {
 		t.Errorf("should have value in handler queue: %s", err)
 	}

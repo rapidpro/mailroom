@@ -62,20 +62,31 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 			return nil
 		}
 
-		err = queue.AddTask(rc, eventQueue, campaignEventFireType, fmt.Sprintf("%d", task.OrgID), task, queue.DefaultPriority)
-		if err != nil {
-			return errors.Annotate(err, "error queuing task")
-		}
-
-		// mark each of these fires as queued
-		for _, id := range task.FireIDs {
-			err = marker.AddTask(rc, campaignsLock, fmt.Sprintf("%d", id))
-			if err != nil {
-				return errors.Annotate(err, "error marking event as queued")
+		// TODO: should have a max group size for these (IE, 100 events at a time)
+		fireIDs := task.FireIDs
+		for len(fireIDs) > 0 {
+			batchSize := 100
+			if batchSize > len(fireIDs) {
+				batchSize = len(fireIDs)
 			}
+			task.FireIDs = fireIDs[:batchSize]
+			fireIDs = fireIDs[batchSize:]
+
+			err = queue.AddTask(rc, eventQueue, campaignEventFireType, fmt.Sprintf("%d", task.OrgID), task, queue.DefaultPriority)
+			if err != nil {
+				return errors.Annotate(err, "error queuing task")
+			}
+
+			// mark each of these fires as queued
+			for _, id := range task.FireIDs {
+				err = marker.AddTask(rc, campaignsLock, fmt.Sprintf("%d", id))
+				if err != nil {
+					return errors.Annotate(err, "error marking event as queued")
+				}
+			}
+			log.WithField("task", fmt.Sprintf("%vvv", task)).WithField("fire_count", len(task.FireIDs)).Debug("added event fire task")
+			queued += len(task.FireIDs)
 		}
-		log.WithField("task", fmt.Sprintf("%vvv", task)).WithField("fire_count", len(task.FireIDs)).Debug("added event fire task")
-		queued += len(task.FireIDs)
 
 		return nil
 	}
@@ -170,12 +181,12 @@ FROM
     campaigns_campaign c,
     flows_flow f
 WHERE
-    ef.fired IS NULL AND ef.scheduled < NOW() AND
+    ef.fired IS NULL AND ef.scheduled <= NOW() AND
     ce.id = ef.event_id AND
     f.id = ce.flow_id AND f.is_system = TRUE AND f.flow_server_enabled = TRUE AND
     ce.campaign_id = c.id
 ORDER BY
-    scheduled ASC,
+    DATE_TRUNC('minute', scheduled) ASC,
     ef.event_id ASC
 LIMIT
     25000;

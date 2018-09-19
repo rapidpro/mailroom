@@ -57,3 +57,13 @@ func RemoveTask(rc redis.Conn, taskGroup string, taskID string) error {
 	}
 	return nil
 }
+
+// ClearTasks removes all tasks for the passed in group (mostly useful in unit testing)
+func ClearTasks(rc redis.Conn, taskGroup string) error {
+	todayKey := fmt.Sprintf(keyPattern, taskGroup, time.Now().UTC().Format("2006_01_02"))
+	yesterdayKey := fmt.Sprintf(keyPattern, taskGroup, time.Now().Add(time.Hour*-24).UTC().Format("2006_01_02"))
+	rc.Send("del", todayKey)
+	rc.Send("del", yesterdayKey)
+	_, err := rc.Do("")
+	return err
+}

@@ -3,7 +3,7 @@ package marker
 import (
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,8 +25,8 @@ func TestMarker(t *testing.T) {
 		{"1", "1", "absent"},
 	}
 
-	rc, err := redis.Dial("tcp", "localhost:6379")
-	assert.NoError(t, err)
+	testsuite.ResetRP()
+	rc := testsuite.RC()
 
 	for i, tc := range tcs {
 		if tc.Action == "absent" {

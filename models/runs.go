@@ -61,8 +61,8 @@ func (s *Session) AddOutboxMsg(m *Msg) {
 	s.outbox = append(s.outbox, m)
 }
 
-// GetOutbox returns the outbox for this session
-func (s *Session) GetOutbox() []*Msg {
+// Outbox returns the outbox for this session
+func (s *Session) Outbox() []*Msg {
 	return s.outbox
 }
 
