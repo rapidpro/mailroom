@@ -1,3 +1,9 @@
+v0.0.10
+----------
+ * use bulk inserts for all sessions / runs / messages
+ * use same redis caching of topups as rapidpro
+ * more tests, updated temba.dump, add testsuite package
+
 v0.0.9
 ----------
  * deal with no locations for org
