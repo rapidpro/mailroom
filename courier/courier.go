@@ -24,7 +24,6 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 	now := time.Now()
 	epochMS := strconv.FormatFloat(float64(now.UnixNano()/int64(time.Microsecond))/float64(1000000), 'f', 6, 64)
 
-	// TODO: figure out priority better
 	priority := defaultPriority
 
 	// we batch msgs by channel uuid
@@ -60,6 +59,11 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 
 			currentChannel = msg.Channel()
 			batch = []*models.Msg{msg}
+
+			priority = defaultPriority
+			if msg.HighPriority {
+				priority = highPriority
+			}
 		}
 	}
 

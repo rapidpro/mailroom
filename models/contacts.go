@@ -216,6 +216,7 @@ FROM
 	contacts_contact
 WHERE 
 	id IN (?) AND
-	is_test = FALSE
+	is_test = FALSE AND
+	is_active = TRUE
 ) r;
 `

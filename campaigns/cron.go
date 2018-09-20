@@ -21,6 +21,7 @@ const (
 	eventQueue            = "events"
 	campaignsLock         = "campaign_event"
 	campaignEventFireType = "campaign_event_fire"
+	maxBatchSize          = 100
 )
 
 func init() {
@@ -62,10 +63,9 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 			return nil
 		}
 
-		// TODO: should have a max group size for these (IE, 100 events at a time)
 		fireIDs := task.FireIDs
 		for len(fireIDs) > 0 {
-			batchSize := 100
+			batchSize := maxBatchSize
 			if batchSize > len(fireIDs) {
 				batchSize = len(fireIDs)
 			}

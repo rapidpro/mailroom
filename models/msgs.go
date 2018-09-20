@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/lib/pq"
@@ -42,7 +43,6 @@ const (
 
 type ConnectionID null.Int
 type ContactURNID int
-type TopUpID null.Int
 
 type MsgStatus string
 
@@ -59,7 +59,6 @@ const (
 )
 
 // TODO: response_to_id, response_to_external_id
-// TODO: real tps_cost
 
 // Msg is our type for mailroom messages
 type Msg struct {
@@ -89,7 +88,7 @@ type Msg struct {
 	URN          urns.URN           `                     json:"urn"`
 	URNAuth      string             `                     json:"urn_auth,omitempty"`
 	OrgID        OrgID              `db:"org_id"          json:"org_id"`
-	TopUpID      TopUpID            `db:"topup_id"`
+	TopUpID      TopupID            `db:"topup_id"`
 
 	channel *Channel
 }
@@ -99,7 +98,7 @@ func (m *Msg) Channel() *Channel { return m.channel }
 
 // CreateOutgoingMsg creates an outgoing message for the passed in flow message. Note
 // that this message is created in a queued state!
-func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channel *Channel, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
+func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgID, channel *Channel, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
 	_, _, query, _ := m.URN().ToParts()
 	parsedQuery, err := url.ParseQuery(query)
 	if err != nil {
@@ -114,7 +113,9 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, orgID OrgID, channel *C
 	}
 
 	// get the id of our active topup
-	topupID, err := loadActiveTopup(ctx, tx, orgID)
+	rc := rp.Get()
+	topupID, err := decrementOrgCredits(ctx, tx, rc, orgID)
+	rc.Close()
 	if err != nil {
 		return nil, errors.Annotatef(err, "error getting active topup for msg")
 	}
@@ -221,7 +222,6 @@ func updateMessageStatus(ctx context.Context, db *sqlx.DB, msgs []*Msg, status M
 	}
 	q = db.Rebind(q)
 
-	// TODO: use real queued on instead of now()
 	_, err = db.ExecContext(ctx, q, vs...)
 	if err != nil {
 		return errors.Annotate(err, "error updating message status")

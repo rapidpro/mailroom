@@ -35,7 +35,7 @@ func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, track *Track, sessio
 		return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
 	}
 
-	msg, err := CreateOutgoingMsg(ctx, tx, track.Org().OrgID(), channel, session.ContactID, &event.Msg)
+	msg, err := CreateOutgoingMsg(ctx, tx, track.rp, track.Org().OrgID(), channel, session.ContactID, &event.Msg)
 	if err != nil {
 		return errors.Annotatef(err, "error creating outgoing message to %s", event.Msg.URN())
 	}

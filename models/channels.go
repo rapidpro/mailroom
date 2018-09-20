@@ -64,7 +64,6 @@ func (c *Channel) Roles() []assets.ChannelRole { return c.c.Roles }
 func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
 
 // Parent returns the UUID of the parent channel to this channel
-// TODO: add support for parent channels
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
 
 // loadChannels loads all the channels for the passed in org
