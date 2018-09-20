@@ -56,82 +56,115 @@ func FireCampaignEvent(
 		return nil, errors.Annotatef(err, "err loading contacts: %v", contactIDs)
 	}
 
-	sessions := make([]*models.Session, 0, len(contacts))
-
-	// for each of our contacts
+	// build our triggers
+	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
+	ts := make([]flows.Trigger, 0, len(contacts))
+	now := time.Now()
 	for _, contact := range contacts {
-		// create our trigger
-		flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
-		trigger := triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, time.Now())
+		ts = append(ts, triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, now))
+	}
 
-		// and start our flow
-		session, err := StartFlow(ctx, db, rp, org, sessionAssets, trigger)
-		if err != nil {
-			logrus.WithField("contact_id", contact.ID()).WithError(err).Errorf("error starting flow for event: %s", event)
-			continue
-		}
-
-		sessions = append(sessions, session)
+	// start our contacts
+	sessions, err := StartFlow(ctx, db, rp, org, sessionAssets, ts)
+	if err != nil {
+		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
 	}
 
 	return sessions, nil
 }
 
 // StartFlow runs the passed in flow for the passed in contact
-func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets, trigger flows.Trigger) (*models.Session, error) {
-	// create the session for this flow and run
-	session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
+func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets, tgs []flows.Trigger) ([]*models.Session, error) {
 	track := models.NewTrack(ctx, db, rp, org)
 
-	// start our flow
-	err := session.Start(trigger, nil)
-	if err != nil {
-		return nil, errors.Annotatef(err, "error starting flow: %s", trigger)
+	// for each trigger start the flow
+	sessions := make([]flows.Session, 0, len(tgs))
+	for _, trigger := range tgs {
+		// create the session for this flow and run
+		session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
+
+		// start our flow
+		err := session.Start(trigger, nil)
+		if err != nil {
+			logrus.WithField("contact_id", trigger.Contact().ID()).WithError(err).Errorf("error starting flow: %s", trigger.Flow().UUID)
+			continue
+		}
+
+		sessions = append(sessions, session)
 	}
 
-	// we write our session in a single transaction
+	// we write our sessions and all their objects
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error starting transaction")
 	}
 
 	// write our session to the db
-	dbSession, err := models.WriteSession(ctx, tx, track, session)
+	dbSessions, err := models.WriteSessions(ctx, tx, track, sessions)
 	if err != nil {
-		tx.Rollback()
-		return nil, errors.Annotatef(err, "error writing flow results for campaign: %s", trigger)
+		return nil, errors.Annotatef(err, "error writing sessions")
 	}
 
-	// commit it at once, this will create our messages
+	// commit it at once
 	err = tx.Commit()
+
+	// this was an error and this was a single session being committed, no use retrying
+	if err != nil && len(sessions) == 1 {
+		logrus.WithField("contact_id", sessions[0].Contact().ID()).WithError(err).Errorf("error writing session to db")
+		return nil, errors.Annotatef(err, "error committing session")
+	}
+
+	// otherwise, it may have been just one session that killed us, retry them one at a time
 	if err != nil {
 		tx.Rollback()
-		return nil, errors.Annotatef(err, "error committing flow result write: %s", trigger)
+
+		// we failed writing our sessions in one go, try one at a time
+		tx, err := db.BeginTxx(ctx, nil)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error starting transaction for retry")
+		}
+		for _, session := range sessions {
+			dbSession, err := models.WriteSessions(ctx, tx, track, []flows.Session{session})
+			if err != nil {
+				logrus.WithField("contact_id", session.Contact().ID()).WithError(err).Errorf("error writing session to db")
+				continue
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				logrus.WithField("contact_id", session.Contact().ID()).WithError(err).Errorf("error comitting session to db")
+				continue
+			}
+
+			dbSessions = append(dbSessions, dbSession[0])
+		}
 	}
 
 	// queue any messages created to courier
 	rc := rp.Get()
 	defer rc.Close()
 
-	outbox := dbSession.Outbox()
-	if len(outbox) > 0 {
-		log := logrus.WithField("messages", dbSession.Outbox()).WithField("session", dbSession.ID)
-		err := courier.QueueMessages(rc, outbox)
+	for _, dbSession := range dbSessions {
+		outbox := dbSession.Outbox()
+		if len(outbox) > 0 {
+			log := logrus.WithField("messages", dbSession.Outbox()).WithField("session", dbSession.ID)
+			err := courier.QueueMessages(rc, outbox)
 
-		// not being able to queue a message isn't the end of the world, log but don't return an error
-		if err != nil {
-			log.WithError(err).Error("error queuing message")
-
-			// in the case of errors we do want to change the messages back to pending however so they
-			// get queued later. (for the common case messages are only inserted and queued, without a status update)
-			err = models.MarkMessagesPending(ctx, db, outbox)
+			// not being able to queue a message isn't the end of the world, log but don't return an error
 			if err != nil {
-				log.WithError(err).Error("error marking message as pending")
+				log.WithError(err).Error("error queuing message")
+
+				// in the case of errors we do want to change the messages back to pending however so they
+				// get queued later. (for the common case messages are only inserted and queued, without a status update)
+				err = models.MarkMessagesPending(ctx, db, outbox)
+				if err != nil {
+					log.WithError(err).Error("error marking message as pending")
+				}
 			}
 		}
 	}
 
-	return dbSession, nil
+	return dbSessions, nil
 }
 
 func getSessionAssets(org *models.OrgAssets) (flows.SessionAssets, error) {

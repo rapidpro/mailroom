@@ -105,17 +105,9 @@ type Step struct {
 	ExitUUID  flows.ExitUUID `json:"exit_uuid,omitempty"`
 }
 
-const insertSessionSQL = `
-INSERT INTO
-flows_flowsession(status, responded, output, contact_id, org_id)
-           VALUES(:status, :responded, :output, :contact_id, :org_id)
-RETURNING id
-`
-
-// WriteSession writes the passed in session to our database, writes any runs that need to be created
-// as well as appying any events created in the session
-func WriteSession(ctx context.Context, tx *sqlx.Tx, track *Track, s flows.Session) (*Session, error) {
-	org := track.Org()
+// newSession a session objects from the passed in flow session. It does NOT
+// commit said session to the database.
+func newSession(orgID OrgID, s flows.Session) (*Session, error) {
 	output, err := json.Marshal(s)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error marshalling flow session")
@@ -138,36 +130,78 @@ func WriteSession(ctx context.Context, tx *sqlx.Tx, track *Track, s flows.Sessio
 		Responded: false, // TODO: populate once we are running real flows
 		Output:    string(output),
 		ContactID: s.Contact().ID(),
-		OrgID:     org.OrgID(),
+		OrgID:     orgID,
 		CreatedOn: s.Runs()[0].CreatedOn(),
 	}
 
-	rows, err := tx.NamedQuery(insertSessionSQL, session)
-	if err != nil {
-		return nil, errors.Annotatef(err, "error inserting flow session")
-	}
-	rows.Next()
-	err = rows.Scan(&session.ID)
-	rows.Close()
-	if err != nil {
-		return nil, errors.Annotate(err, "error scanning for session id")
-	}
+	return session, nil
+}
 
-	// now write all our runs
-	for _, r := range s.Runs() {
-		run, err := WriteRun(ctx, tx, track, session, r)
+const insertSessionSQL = `
+INSERT INTO
+flows_flowsession(status, responded, output, contact_id, org_id)
+           VALUES(:status, :responded, :output, :contact_id, :org_id)
+RETURNING id
+`
+
+// WriteSessions writes the passed in session to our database, writes any runs that need to be created
+// as well as appying any events created in the session
+func WriteSessions(ctx context.Context, tx *sqlx.Tx, track *Track, ss []flows.Session) ([]*Session, error) {
+	orgID := track.Org().OrgID()
+
+	// create all our session objects
+	sessions := make([]*Session, 0, len(ss))
+	sessionsI := make([]interface{}, 0, len(ss))
+	for _, s := range ss {
+		session, err := newSession(orgID, s)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error writing run: %s", r.UUID())
+			return nil, errors.Annotatef(err, "error creating session objects")
 		}
+		sessions = append(sessions, session)
+		sessionsI = append(sessionsI, session)
+	}
 
-		// save the run to our session
-		session.runs = append(session.runs, run)
+	// insert them all
+	err := bulkInsert(ctx, tx, insertSessionSQL, sessionsI)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error inserting sessions")
+	}
 
-		// apply any events
+	// now build up our runs
+	runs := make([]interface{}, 0, len(ss))
+	for i := range sessions {
+		s := ss[i]
+		session := sessions[i]
+		for _, r := range s.Runs() {
+			run, err := newRun(ctx, tx, track, session, r)
+			if err != nil {
+				return nil, errors.Annotatef(err, "error creating run: %s", r.UUID())
+			}
+
+			// save the run to our session
+			session.runs = append(session.runs, run)
+
+			// add to our list of runs we have to apply
+			runs = append(runs, run)
+		}
+	}
+
+	// insert all runs
+	err = bulkInsert(ctx, tx, insertRunSQL, runs)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error writing runs")
+	}
+
+	// insert all our messages
+	rc := track.rp.Get()
+	err = insertSessionMessages(ctx, tx, rc, orgID, sessions)
+	rc.Close()
+	if err != nil {
+		return nil, err
 	}
 
 	// return our session
-	return session, nil
+	return sessions, nil
 }
 
 const insertRunSQL = `
@@ -179,9 +213,9 @@ flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, ex
 RETURNING id
 `
 
-// WriteRun writes the passed in flow run to our database, also applying any events in those runs as
+// newRun writes the passed in flow run to our database, also applying any events in those runs as
 // appropriate. (IE, writing db messages etc..)
-func WriteRun(ctx context.Context, tx *sqlx.Tx, track *Track, session *Session, r flows.FlowRun) (*FlowRun, error) {
+func newRun(ctx context.Context, tx *sqlx.Tx, track *Track, session *Session, r flows.FlowRun) (*FlowRun, error) {
 	org := track.Org()
 
 	// no path is invalid
@@ -257,19 +291,7 @@ func WriteRun(ctx context.Context, tx *sqlx.Tx, track *Track, session *Session, 
 	// TODO: set responded (always false for now)
 	// TODO: set parent id (always null for now)
 
-	// ok, insert our run
-	rows, err := tx.NamedQuery(insertRunSQL, run)
-	if err != nil {
-		return nil, errors.Annotatef(err, "error inserting new run: %s", run.UUID)
-	}
-	rows.Next()
-	err = rows.Scan(&run.ID)
-	if err != nil {
-		return nil, errors.Annotatef(err, "error reading run id for run %s", run.UUID)
-	}
-	rows.Close()
-
-	// now apply our events
+	// apply our events
 	for _, evt := range filteredEvents {
 		err := ApplyEvent(ctx, tx, track, session, run, evt)
 		if err != nil {

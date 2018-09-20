@@ -96,9 +96,9 @@ type Msg struct {
 // Channel returns the db channel object for this channel
 func (m *Msg) Channel() *Channel { return m.channel }
 
-// CreateOutgoingMsg creates an outgoing message for the passed in flow message. Note
+// newOutgoingMsg creates an outgoing message for the passed in flow message. Note
 // that this message is created in a queued state!
-func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgID, channel *Channel, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
+func newOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgID, channel *Channel, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
 	_, _, query, _ := m.URN().ToParts()
 	parsedQuery, err := url.ParseQuery(query)
 	if err != nil {
@@ -110,14 +110,6 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID O
 	urnID, err := strconv.Atoi(idQuery)
 	if urnID == 0 {
 		return nil, errors.Annotatef(err, "unable to create msg for URN, has no id: %s", m.URN())
-	}
-
-	// get the id of our active topup
-	rc := rp.Get()
-	topupID, err := decrementOrgCredits(ctx, tx, rc, orgID)
-	rc.Close()
-	if err != nil {
-		return nil, errors.Annotatef(err, "error getting active topup for msg")
 	}
 
 	msg := &Msg{
@@ -132,7 +124,7 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID O
 		ContactURNID: ContactURNID(urnID),
 		URN:          m.URN(),
 		OrgID:        orgID,
-		TopUpID:      topupID,
+		TopUpID:      NilTopupID,
 
 		channel:     channel,
 		ChannelID:   channel.ID(),
@@ -165,26 +157,6 @@ func CreateOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID O
 	}
 
 	// TODO: calculate real msg count
-
-	// insert msg
-	rows, err := tx.NamedQuery(insertMsgSQL, msg)
-	if err != nil {
-		return nil, errors.Annotate(err, "error inserting new outgoing message")
-	}
-	rows.Next()
-	var insertTime time.Time
-	err = rows.Scan(&msg.ID, &insertTime)
-	if err != nil {
-		return nil, errors.Annotate(err, "error scanning msg id during creation")
-	}
-	rows.Close()
-
-	// populate our insert time
-	msg.CreatedOn = insertTime
-	msg.ModifiedOn = insertTime
-	msg.QueuedOn = insertTime
-
-	// return it
 	return msg, nil
 }
 
@@ -196,8 +168,45 @@ msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, directio
   VALUES(:uuid, :text, :high_priority, now(), now(), now(), :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, 
 		 :contact_id, :contact_urn_id, :org_id, :topup_id)
-RETURNING id, now()
+RETURNING 
+	id as id, 
+	now() as created_on,
+	now() as modified_on,
+	now() as queued_on
 `
+
+// insertSessionMessages takes care of inserting all the messages in the passed in sessions assigning topups
+// to them as needed.
+func insertSessionMessages(ctx context.Context, tx *sqlx.Tx, rc redis.Conn, orgID OrgID, sessions []*Session) error {
+	// build all the messages that need inserting
+	msgs := make([]interface{}, 0, len(sessions))
+	for _, s := range sessions {
+		for _, m := range s.Outbox() {
+			msgs = append(msgs, m)
+		}
+	}
+
+	// find the topup we will assign
+	topup, err := decrementOrgCredits(ctx, tx, rc, orgID, len(msgs))
+	if err != nil {
+		return errors.Annotatef(err, "error finding active topup")
+	}
+
+	// if we have an active topup, assign it to our messages
+	if topup != NilTopupID {
+		for _, m := range msgs {
+			m.(*Msg).TopUpID = topup
+		}
+	}
+
+	// insert all our messages
+	err = bulkInsert(ctx, tx, insertMsgSQL, msgs)
+	if err != nil {
+		return errors.Annotatef(err, "error writing messages")
+	}
+
+	return nil
+}
 
 // MarkMessagesPending marks the passed in messages as pending
 func MarkMessagesPending(ctx context.Context, db *sqlx.DB, msgs []*Msg) error {

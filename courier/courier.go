@@ -30,6 +30,21 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 	batch := make([]*models.Msg, 0, len(msgs))
 	currentChannel := msgs[0].Channel()
 
+	// commits our batch to redis
+	commitBatch := func() error {
+		if len(batch) > 0 {
+			batchJSON, err := json.Marshal(batch)
+			if err != nil {
+				return err
+			}
+			_, err = queueMsg.Do(rc, epochMS, "msgs", currentChannel.UUID(), currentChannel.TPS(), priority, batchJSON)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	for _, msg := range msgs {
 		// no channel, continue
 		if msg.ChannelUUID == "" {
@@ -41,6 +56,11 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 			return errors.Errorf("msg passed in without channel set")
 		}
 
+		// android channel? ignore
+		if msg.Channel().Type() == models.ChannelTypeAndroid {
+			continue
+		}
+
 		// same channel? add to batch
 		if msg.Channel() == currentChannel {
 			batch = append(batch, msg)
@@ -48,11 +68,7 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 
 		// different channel? queue it up
 		if msg.Channel() != currentChannel {
-			batchJSON, err := json.Marshal(batch)
-			if err != nil {
-				return err
-			}
-			_, err = queueMsg.Do(rc, epochMS, "msgs", currentChannel.UUID(), currentChannel.TPS(), priority, batchJSON)
+			err := commitBatch()
 			if err != nil {
 				return err
 			}
@@ -68,18 +84,7 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 	}
 
 	// any remaining in our batch, queue it up
-	if len(batch) > 0 {
-		batchJSON, err := json.Marshal(batch)
-		if err != nil {
-			return err
-		}
-		_, err = queueMsg.Do(rc, epochMS, "msgs", currentChannel.UUID(), currentChannel.TPS(), priority, batchJSON)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return commitBatch()
 }
 
 var queueMsg = redis.NewScript(6, `

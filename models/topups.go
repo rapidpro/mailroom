@@ -25,9 +25,9 @@ const (
 	redisCreditsRemainingKey = `org:%d:cache:credits_remaining:%d`
 )
 
-func decrementOrgCredits(ctx context.Context, db sqlx.Queryer, rc redis.Conn, orgID OrgID) (TopupID, error) {
+func decrementOrgCredits(ctx context.Context, db sqlx.Queryer, rc redis.Conn, orgID OrgID, amount int) (TopupID, error) {
 	// no matter what we decrement our org credit
-	topups, err := redis.Ints(decrementCreditLua.Do(rc, orgID, 1))
+	topups, err := redis.Ints(decrementCreditLua.Do(rc, orgID, amount))
 	if err != nil {
 		return NilTopupID, err
 	}
@@ -50,9 +50,9 @@ func decrementOrgCredits(ctx context.Context, db sqlx.Queryer, rc redis.Conn, or
 
 	// got one? then cache it
 	expireSeconds := -int(time.Since(topup.Expiration) / time.Second)
-	if expireSeconds > 0 && topup.Remaining > 0 {
+	if expireSeconds > 0 && topup.Remaining-amount > 0 {
 		rc.Send("SETEX", fmt.Sprintf(redisActiveTopupKey, orgID), expireSeconds, topup.ID.Int64)
-		_, err := rc.Do("SETEX", fmt.Sprintf(redisCreditsRemainingKey, orgID, topup.ID.Int64), expireSeconds, topup.Remaining-1)
+		_, err := rc.Do("SETEX", fmt.Sprintf(redisCreditsRemainingKey, orgID, topup.ID.Int64), expireSeconds, topup.Remaining-amount)
 		if err != nil {
 			// an error here isn't the end of the world, log it and move on
 			logrus.WithError(err).Errorf("error setting active topup in redis for org: %d", orgID)

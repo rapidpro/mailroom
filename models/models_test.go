@@ -192,13 +192,19 @@ func TestMsgs(t *testing.T) {
 			flows.AttachmentList([]flows.Attachment{flows.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, null.NewString("", false), false},
 	}
 
+	now := time.Now()
+	time.Sleep(time.Millisecond * 10)
+
 	for _, tc := range tcs {
 		tx, err := db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies)
-		msg, err := CreateOutgoingMsg(ctx, tx, rp, orgID, tc.Channel, tc.ContactID, flowMsg)
+		msg, err := newOutgoingMsg(ctx, tx, rp, orgID, tc.Channel, tc.ContactID, flowMsg)
+
 		if err == nil {
+			err = bulkInsert(ctx, tx, insertMsgSQL, []interface{}{msg})
+			assert.NoError(t, err)
 			assert.Equal(t, orgID, msg.OrgID)
 			assert.Equal(t, tc.Text, msg.Text)
 			assert.Equal(t, tc.ContactID, msg.ContactID)
@@ -207,8 +213,10 @@ func TestMsgs(t *testing.T) {
 			assert.Equal(t, tc.URN, msg.URN)
 			assert.Equal(t, tc.ContactURNID, msg.ContactURNID)
 			assert.Equal(t, tc.Metadata, msg.Metadata)
-			assert.True(t, msg.TopUpID.Valid)
 			assert.True(t, msg.ID > 0)
+			assert.True(t, msg.QueuedOn.After(now))
+			assert.True(t, msg.CreatedOn.After(now))
+			assert.True(t, msg.ModifiedOn.After(now))
 		} else {
 			if !tc.HasErr {
 				assert.Fail(t, "unexpected error: %s", err.Error())
@@ -335,7 +343,7 @@ func TestTopups(t *testing.T) {
 	}
 
 	for _, tc := range tc2s {
-		topup, err := decrementOrgCredits(ctx, tx, rc, tc.OrgID)
+		topup, err := decrementOrgCredits(ctx, tx, rc, tc.OrgID, 1)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.TopupID, topup)
 		tx.MustExec(`INSERT INTO orgs_topupcredits(is_squashed, used, topup_id) VALUES(TRUE, 1, $1)`, tc.OrgID)
