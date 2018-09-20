@@ -33,7 +33,22 @@ func TestCampaignStarts(t *testing.T) {
 		},
 	}
 
-	sessions, err := FireCampaignEvent(ctx, db, rp, models.OrgID(1), []flows.ContactID{42, 43}, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
+	contacts := []flows.ContactID{42, 43}
+	sessions, err := FireCampaignEvent(ctx, db, rp, models.OrgID(1), contacts, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
+
+	models.AssertContactSessionsPresent(t, db, contacts,
+		`AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+	)
+	models.AssertContactRunsPresent(t, db, contacts, models.FlowID(31),
+		`AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
+		 AND current_node_uuid = 'b003fd70-aafd-4ccc-bdb5-4f70e870cd64'
+		 AND session_id IS NOT NULL`,
+	)
+	models.AssertContactMessagesPresent(t, db, contacts,
+		`AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
+		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = 2`,
+	)
 }

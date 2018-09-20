@@ -93,7 +93,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		sessions = append(sessions, session)
 	}
 
-	// we write our sessions and all their objects
+	// we write our sessions and all their objects in a single transaction
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error starting transaction")
