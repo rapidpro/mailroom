@@ -92,6 +92,7 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 	sessions, err := runner.FireCampaignEvent(ctx, db, rp, eventTask.OrgID, contactIDs, eventTask.FlowUUID, &event)
 
 	// TODO: optimize into a single query
+	start := time.Now()
 	for _, session := range sessions {
 		fire, found := contactMap[session.ContactID]
 
@@ -108,6 +109,7 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 			log.WithField("contact_id", session.ContactID).Errorf("unable to find session for contact id")
 		}
 	}
+	log.WithField("elapsed", time.Since(start)).Info("event fires marked as complete")
 
 	// what remains in our contact map are fires that failed for some reason, umark these
 	if len(contactMap) > 0 {

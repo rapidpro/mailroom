@@ -82,8 +82,13 @@ func FireCampaignEvent(
 
 // StartFlow runs the passed in flow for the passed in contact
 func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets, tgs []flows.Trigger) ([]*models.Session, error) {
+	if len(tgs) == 0 {
+		return nil, nil
+	}
+
 	track := models.NewTrack(ctx, db, rp, org)
 	start := time.Now()
+	log := logrus.WithField("flow_name", tgs[0].Flow().Name).WithField("flow_uuid", tgs[0].Flow().UUID)
 
 	// for each trigger start the flow
 	sessions := make([]flows.Session, 0, len(tgs))
@@ -92,12 +97,14 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
 
 		// start our flow
+		log := logrus.WithField("contact_uuid", trigger.Contact().UUID())
 		start := time.Now()
 		err := session.Start(trigger, nil)
 		if err != nil {
-			logrus.WithField("contact_id", trigger.Contact().ID()).WithError(err).Errorf("error starting flow: %s", trigger.Flow().UUID)
+			log.WithError(err).Errorf("error starting flow")
 			continue
 		}
+		log.WithField("elapsed", time.Since(start)).Info("flow engine start")
 		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
@@ -177,6 +184,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	// figure out both average and total for total execution and commit time for our flows
 	librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start))/float64(time.Second))
 	librato.Gauge("mr.flow_start_count", float64(len(dbSessions)))
+	log.WithField("elapsed", time.Since(start)).WithField("count", len(dbSessions)).Info("flows started, sessions created")
 
 	return dbSessions, nil
 }
