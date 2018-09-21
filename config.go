@@ -8,6 +8,9 @@ type Config struct {
 	MaxWorkers int    `help:"the maximum number of go routines that will be used to handle events"`
 	Version    string `help:"the version of this mailroom install"`
 	LogLevel   string `help:"the logging level courier should use"`
+
+	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
+	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
 }
 
 // NewConfig returns a new default configuration object

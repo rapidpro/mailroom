@@ -152,6 +152,23 @@ func (w *Worker) Stop() {
 
 func (w *Worker) handleTask(task *queue.Task) {
 	log := logrus.WithField("comp", "sender").WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.Group)
+
+	defer func() {
+		// catch any panics and recover
+		panicLog := recover()
+		if panicLog != nil {
+			log.Errorf("panic handling task: %s", panicLog)
+		}
+
+		// mark our task as complete
+		rc := w.foreman.mr.RedisPool.Get()
+		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.Group)
+		if err != nil {
+			log.WithError(err)
+		}
+		rc.Close()
+	}()
+
 	log.Info("starting handling of task")
 	start := time.Now()
 
@@ -165,14 +182,5 @@ func (w *Worker) handleTask(task *queue.Task) {
 		log.Error("unable to find function for task type")
 	}
 
-	rc := w.foreman.mr.RedisPool.Get()
-	defer rc.Close()
-
-	// mark our task as completed
-	err := queue.MarkTaskComplete(rc, w.foreman.queue, task.Group)
-	if err != nil {
-		log.WithError(err)
-		return
-	}
 	log.WithField("elapsed", time.Since(start)).Info("task complete")
 }

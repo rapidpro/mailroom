@@ -9,6 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
 	"github.com/nyaruka/mailroom/marker"
@@ -142,6 +143,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 		return errors.Annotatef(err, "error queueing task")
 	}
 
+	librato.Gauge("mr.campaign_event_queue", float64(time.Since(start)))
 	log.WithField("elapsed", time.Since(start)).WithField("queued", queued).Info("campaign event fire queuing complete")
 	return nil
 }

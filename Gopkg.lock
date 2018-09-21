@@ -163,6 +163,12 @@
   revision = "870e4f678029683d86cd05bb6828125a9495876b"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/nyaruka/librato"
+  packages = ["."]
+  revision = "cacc769357b85e728935b017fa2074d356e9dc8b"
+
+[[projects]]
   name = "github.com/nyaruka/phonenumbers"
   packages = ["."]
   revision = "06e7b8a14ab9cb646e98cd7d7f5bbd70679e5ebc"
@@ -251,6 +257,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8bb95173ca8dae6ef0e9755039caee2892c7aefba33a56d906f2ee5082961ea3"
+  inputs-digest = "cd3da3dd964720b769ca4a9d33324f48a38601a8013e8898318cbd0cb2fb1d8c"
   solver-name = "gps-cdcl"
   solver-version = 1

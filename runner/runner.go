@@ -10,6 +10,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
 	cache "github.com/patrickmn/go-cache"
@@ -31,6 +32,8 @@ func FireCampaignEvent(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
 	orgID models.OrgID, contactIDs []flows.ContactID, flowUUID assets.FlowUUID,
 	event *triggers.CampaignEvent) ([]*models.Session, error) {
+
+	start := time.Now()
 
 	// create our org assets
 	org, err := models.GetOrgAssets(ctx, db, orgID)
@@ -70,12 +73,19 @@ func FireCampaignEvent(
 		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
 	}
 
+	// log both our total and average
+	librato.Gauge("mr.campaign_event_batch", float64(time.Since(start)))
+	if len(sessions) > 0 {
+		librato.Gauge("mr.campaign_event_avg", float64(time.Since(start))/float64(len(sessions)))
+	}
+
 	return sessions, nil
 }
 
 // StartFlow runs the passed in flow for the passed in contact
 func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets, tgs []flows.Trigger) ([]*models.Session, error) {
 	track := models.NewTrack(ctx, db, rp, org)
+	start := time.Now()
 
 	// for each trigger start the flow
 	sessions := make([]flows.Session, 0, len(tgs))
@@ -84,11 +94,13 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
 
 		// start our flow
+		start := time.Now()
 		err := session.Start(trigger, nil)
 		if err != nil {
 			logrus.WithField("contact_id", trigger.Contact().ID()).WithError(err).Errorf("error starting flow: %s", trigger.Flow().UUID)
 			continue
 		}
+		librato.Gauge("mr.flow_start_execution", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
 	}
@@ -162,6 +174,12 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 				}
 			}
 		}
+	}
+
+	// figure out both average and total for total execution and commit time for our flows
+	librato.Gauge("mr.flow_start_batch", float64(time.Since(start)))
+	if len(dbSessions) > 0 {
+		librato.Gauge("mr.flow_start_avg", float64(time.Since(start))/float64(len(dbSessions)))
 	}
 
 	return dbSessions, nil

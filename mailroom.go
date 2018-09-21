@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/sirupsen/logrus"
 )
@@ -42,15 +44,16 @@ type Mailroom struct {
 	Quit      chan bool
 	CTX       context.Context
 	Cancel    context.CancelFunc
-	WaitGroup sync.WaitGroup
+	WaitGroup *sync.WaitGroup
 	foreman   *Foreman
 }
 
 // NewMailroom creates and returns a new mailroom instance
 func NewMailroom(config *Config) *Mailroom {
 	mr := &Mailroom{
-		Config: config,
-		Quit:   make(chan bool),
+		Config:    config,
+		Quit:      make(chan bool),
+		WaitGroup: &sync.WaitGroup{},
 	}
 	mr.CTX, mr.Cancel = context.WithCancel(context.Background())
 	mr.foreman = NewForeman(mr, "events", 50)
@@ -145,6 +148,13 @@ func (mr *Mailroom) Start() error {
 		initFunc(mr)
 	}
 
+	// if we have a librato token, configure it
+	if mr.Config.LibratoToken != "" {
+		host, _ := os.Hostname()
+		librato.Configure(mr.Config.LibratoUsername, mr.Config.LibratoToken, host, time.Second*5, mr.WaitGroup)
+		librato.Start()
+	}
+
 	// init our foreman and start it
 	mr.foreman.Start()
 
@@ -156,6 +166,7 @@ func (mr *Mailroom) Start() error {
 func (mr *Mailroom) Stop() error {
 	logrus.Info("mailroom stopping")
 	mr.foreman.Stop()
+	librato.Stop()
 	close(mr.Quit)
 	mr.Cancel()
 	mr.WaitGroup.Wait()

@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 )
@@ -49,8 +50,8 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 					break
 				}
 
-				// ok, got the lock, go expire our runs
-				err = cronFunc(lockName, lockValue)
+				// ok, got the lock, run our cron function
+				err = fireCron(cronFunc, lockName, lockValue)
 				if err != nil {
 					log.WithError(err).Error("error while running cron")
 				}
@@ -72,6 +73,21 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 			}
 		}
 	}()
+}
+
+// fireCron is just a wrapper around the cron function we will call for the purposes of
+// catching and logging panics
+func fireCron(cronFunc Function, lockName string, lockValue string) error {
+	log := log.WithField("lockValue", lockValue).WithField("func", cronFunc)
+	defer func() {
+		// catch any panics and recover
+		panicLog := recover()
+		if panicLog != nil {
+			log.Errorf("panic running cron: %s", panicLog)
+		}
+	}()
+
+	return cronFunc(lockName, lockValue)
 }
 
 // GrabLock grabs the passed in lock from redis in an atomic operation. It returns
