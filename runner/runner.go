@@ -74,7 +74,7 @@ func FireCampaignEvent(
 	}
 
 	// log both our total and average
-	librato.Gauge("mr.campaign_event_elapsed", float64(time.Since(start)/time.Second))
+	librato.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
 	librato.Gauge("mr.campaign_event_count", float64(len(sessions)))
 
 	return sessions, nil
@@ -175,7 +175,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	}
 
 	// figure out both average and total for total execution and commit time for our flows
-	librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)/time.Second))
+	librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start))/float64(time.Second))
 	librato.Gauge("mr.flow_start_count", float64(len(dbSessions)))
 
 	return dbSessions, nil
