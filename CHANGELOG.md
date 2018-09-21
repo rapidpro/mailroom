@@ -1,3 +1,9 @@
+v0.0.11
+----------
+ * add librato library
+ * add librato logging, catch panics in cron and workers
+ * better testing of end state of runner
+
 v0.0.10
 ----------
  * use bulk inserts for all sessions / runs / messages
