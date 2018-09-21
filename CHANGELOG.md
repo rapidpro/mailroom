@@ -1,3 +1,7 @@
+v0.0.14
+----------
+ * more logging of event fires
+
 v0.0.13
 ----------
  * better elapsed units
