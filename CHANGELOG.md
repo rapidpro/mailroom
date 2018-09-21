@@ -1,3 +1,7 @@
+v0.0.13
+----------
+ * better elapsed units
+
 v0.0.12
 ----------
  * tweak librato event names
