@@ -97,7 +97,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
 
 		// start our flow
-		log := logrus.WithField("contact_uuid", trigger.Contact().UUID())
+		log := log.WithField("contact_uuid", trigger.Contact().UUID())
 		start := time.Now()
 		err := session.Start(trigger, nil)
 		if err != nil {
@@ -127,7 +127,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 
 	// this was an error and this was a single session being committed, no use retrying
 	if err != nil && len(sessions) == 1 {
-		logrus.WithField("contact_id", sessions[0].Contact().ID()).WithError(err).Errorf("error writing session to db")
+		log.WithField("contact_uuid", sessions[0].Contact().UUID()).WithError(err).Errorf("error writing session to db")
 		return nil, errors.Annotatef(err, "error committing session")
 	}
 
@@ -143,13 +143,13 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		for _, session := range sessions {
 			dbSession, err := models.WriteSessions(ctx, tx, track, []flows.Session{session})
 			if err != nil {
-				logrus.WithField("contact_id", session.Contact().ID()).WithError(err).Errorf("error writing session to db")
+				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")
 				continue
 			}
 
 			err = tx.Commit()
 			if err != nil {
-				logrus.WithField("contact_id", session.Contact().ID()).WithError(err).Errorf("error comitting session to db")
+				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error comitting session to db")
 				continue
 			}
 
@@ -164,7 +164,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	for _, dbSession := range dbSessions {
 		outbox := dbSession.Outbox()
 		if len(outbox) > 0 {
-			log := logrus.WithField("messages", dbSession.Outbox()).WithField("session", dbSession.ID)
+			log := log.WithField("messages", dbSession.Outbox()).WithField("session", dbSession.ID)
 			err := courier.QueueMessages(rc, outbox)
 
 			// not being able to queue a message isn't the end of the world, log but don't return an error
