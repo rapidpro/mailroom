@@ -74,10 +74,8 @@ func FireCampaignEvent(
 	}
 
 	// log both our total and average
-	librato.Gauge("mr.campaign_event_batch", float64(time.Since(start)))
-	if len(sessions) > 0 {
-		librato.Gauge("mr.campaign_event_avg", float64(time.Since(start))/float64(len(sessions)))
-	}
+	librato.Gauge("mr.campaign_event_elapsed", float64(time.Since(start)/time.Second))
+	librato.Gauge("mr.campaign_event_count", float64(len(sessions)))
 
 	return sessions, nil
 }
@@ -100,7 +98,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 			logrus.WithField("contact_id", trigger.Contact().ID()).WithError(err).Errorf("error starting flow: %s", trigger.Flow().UUID)
 			continue
 		}
-		librato.Gauge("mr.flow_start_execution", float64(time.Since(start)))
+		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
 	}
@@ -177,10 +175,8 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	}
 
 	// figure out both average and total for total execution and commit time for our flows
-	librato.Gauge("mr.flow_start_batch", float64(time.Since(start)))
-	if len(dbSessions) > 0 {
-		librato.Gauge("mr.flow_start_avg", float64(time.Since(start))/float64(len(dbSessions)))
-	}
+	librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)/time.Second))
+	librato.Gauge("mr.flow_start_count", float64(len(dbSessions)))
 
 	return dbSessions, nil
 }

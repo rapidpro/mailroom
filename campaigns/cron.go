@@ -143,7 +143,8 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 		return errors.Annotatef(err, "error queueing task")
 	}
 
-	librato.Gauge("mr.campaign_event_queue", float64(time.Since(start)))
+	librato.Gauge("mr.campaign_event_cron_elapsed", float64(time.Since(start)/time.Second))
+	librato.Gauge("mr.campaign_event_cron_count", float64(queued))
 	log.WithField("elapsed", time.Since(start)).WithField("queued", queued).Info("campaign event fire queuing complete")
 	return nil
 }
