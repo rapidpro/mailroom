@@ -76,7 +76,7 @@ SELECT id, ROW_TO_JSON(o) FROM (SELECT
 	'tt:mm' as time_format,
 	timezone,
 	(SELECT CASE is_anon
-		WHEN TRUE THEN 'urn'
+		WHEN TRUE THEN 'urns'
 		WHEN FALSE THEN 'none'
 	END) redaction_policy,
 	(SELECT 
