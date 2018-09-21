@@ -1,3 +1,7 @@
+v0.0.15
+----------
+ * better logging
+
 v0.0.14
 ----------
  * more logging of event fires
