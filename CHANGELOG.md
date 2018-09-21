@@ -1,3 +1,7 @@
+v0.0.16
+----------
+ * correct redaction policy for urns
+
 v0.0.15
 ----------
  * better logging
