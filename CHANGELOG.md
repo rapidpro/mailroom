@@ -1,3 +1,7 @@
+v0.0.12
+----------
+ * tweak librato event names
+
 v0.0.11
 ----------
  * add librato library
