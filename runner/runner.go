@@ -11,7 +11,6 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
-	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
@@ -86,7 +85,6 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		return nil, nil
 	}
 
-	track := models.NewTrack(ctx, db, rp, org)
 	start := time.Now()
 	log := logrus.WithField("flow_name", tgs[0].Flow().Name).WithField("flow_uuid", tgs[0].Flow().UUID)
 
@@ -117,7 +115,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	}
 
 	// write our session to the db
-	dbSessions, err := models.WriteSessions(ctx, tx, track, sessions)
+	dbSessions, err := models.WriteSessions(ctx, tx, rp, org, sessions)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error writing sessions")
 	}
@@ -136,19 +134,22 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		tx.Rollback()
 
 		// we failed writing our sessions in one go, try one at a time
-		tx, err := db.BeginTxx(ctx, nil)
-		if err != nil {
-			return nil, errors.Annotatef(err, "error starting transaction for retry")
-		}
 		for _, session := range sessions {
-			dbSession, err := models.WriteSessions(ctx, tx, track, []flows.Session{session})
+			tx, err := db.BeginTxx(ctx, nil)
 			if err != nil {
+				return nil, errors.Annotatef(err, "error starting transaction for retry")
+			}
+
+			dbSession, err := models.WriteSessions(ctx, tx, rp, org, []flows.Session{session})
+			if err != nil {
+				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")
 				continue
 			}
 
 			err = tx.Commit()
 			if err != nil {
+				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error comitting session to db")
 				continue
 			}
@@ -157,26 +158,42 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		}
 	}
 
-	// queue any messages created to courier
-	rc := rp.Get()
-	defer rc.Close()
+	// now take care of any post-commit hooks
+	tx, err = db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting transaction for post commit hooks")
+	}
 
-	for _, dbSession := range dbSessions {
-		outbox := dbSession.Outbox()
-		if len(outbox) > 0 {
-			log := log.WithField("messages", dbSession.Outbox()).WithField("session", dbSession.ID)
-			err := courier.QueueMessages(rc, outbox)
+	err = models.ApplyPostEventHooks(ctx, tx, rp, org.OrgID(), dbSessions)
+	if err == nil {
+		err = tx.Commit()
+	}
+	if err != nil {
+		tx.Rollback()
 
-			// not being able to queue a message isn't the end of the world, log but don't return an error
+		// we failed with our post commit hooks, try one at a time, logging those errors
+		for _, session := range dbSessions {
+			log = log.WithField("contact_uuid", session.ContactUUID())
+
+			tx, err := db.BeginTxx(ctx, nil)
 			if err != nil {
-				log.WithError(err).Error("error queuing message")
+				tx.Rollback()
+				log.WithError(err).Error("error starting transaction to retry post commits")
+				continue
+			}
 
-				// in the case of errors we do want to change the messages back to pending however so they
-				// get queued later. (for the common case messages are only inserted and queued, without a status update)
-				err = models.MarkMessagesPending(ctx, db, outbox)
-				if err != nil {
-					log.WithError(err).Error("error marking message as pending")
-				}
+			err = models.ApplyPostEventHooks(ctx, tx, rp, org.OrgID(), []*models.Session{session})
+			if err != nil {
+				tx.Rollback()
+				log.WithError(err).Errorf("error applying post commit hook")
+				continue
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				log.WithError(err).Errorf("error comitting post commit hook")
+				continue
 			}
 		}
 	}

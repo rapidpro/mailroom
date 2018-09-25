@@ -200,10 +200,10 @@ func TestMsgs(t *testing.T) {
 		assert.NoError(t, err)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies)
-		msg, err := newOutgoingMsg(ctx, tx, rp, orgID, tc.Channel, tc.ContactID, flowMsg)
+		msg, err := NewOutgoingMsg(ctx, tx, rp, orgID, tc.Channel, tc.ContactID, flowMsg, now)
 
 		if err == nil {
-			err = bulkInsert(ctx, tx, insertMsgSQL, []interface{}{msg})
+			err = BulkInsert(ctx, tx, InsertMsgSQL, []interface{}{msg})
 			assert.NoError(t, err)
 			assert.Equal(t, orgID, msg.OrgID)
 			assert.Equal(t, tc.Text, msg.Text)
@@ -213,9 +213,9 @@ func TestMsgs(t *testing.T) {
 			assert.Equal(t, tc.URN, msg.URN)
 			assert.Equal(t, tc.ContactURNID, msg.ContactURNID)
 			assert.Equal(t, tc.Metadata, msg.Metadata)
+			assert.Equal(t, now, msg.CreatedOn)
 			assert.True(t, msg.ID > 0)
 			assert.True(t, msg.QueuedOn.After(now))
-			assert.True(t, msg.CreatedOn.After(now))
 			assert.True(t, msg.ModifiedOn.After(now))
 		} else {
 			if !tc.HasErr {
@@ -343,7 +343,7 @@ func TestTopups(t *testing.T) {
 	}
 
 	for _, tc := range tc2s {
-		topup, err := decrementOrgCredits(ctx, tx, rc, tc.OrgID, 1)
+		topup, err := DecrementOrgCredits(ctx, tx, rc, tc.OrgID, 1)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.TopupID, topup)
 		tx.MustExec(`INSERT INTO orgs_topupcredits(is_squashed, used, topup_id) VALUES(TRUE, 1, $1)`, tc.OrgID)

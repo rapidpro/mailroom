@@ -8,15 +8,22 @@ import (
 	"github.com/nyaruka/goflow/assets"
 )
 
+// FieldID is our type for the database field ID
+type FieldID int
+
 // Field is our mailroom type for contact field types
 type Field struct {
 	f struct {
+		ID        FieldID          `json:"id"`
 		UUID      FieldUUID        `json:"uuid"`
 		Key       string           `json:"key"`
 		Name      string           `json:"name"`
 		FieldType assets.FieldType `json:"field_type"`
 	}
 }
+
+// ID returns the ID of this field
+func (f *Field) ID() FieldID { return f.f.ID }
 
 // UUID returns the UUID of this field
 func (f *Field) UUID() FieldUUID { return f.f.UUID }
@@ -53,6 +60,7 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 
 const selectFieldsSQL = `
 SELECT ROW_TO_JSON(f) FROM (SELECT
+	id,
 	uuid,
 	key,
 	label as name,

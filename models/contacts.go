@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 )
 
+type ContactID int64
 type FieldUUID utils.UUID
 
 // LoadContacts loads a set of contacts for the passed in ids
@@ -139,8 +140,8 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets,
 	return contacts, nil
 }
 
-// utility struct for the value of a field
-type fieldValue struct {
+// FieldValue is our utility struct for the value of a field
+type FieldValue struct {
 	Text     types.XText        `json:"text"`
 	Datetime *types.XDateTime   `json:"datetime,omitempty"`
 	Number   *types.XNumber     `json:"number,omitempty"`
@@ -158,7 +159,7 @@ type contactEnvelope struct {
 	IsStopped bool                      `json:"is_stopped"`
 	IsBlocked bool                      `json:"is_blocked"`
 	IsActive  bool                      `json:"is_active"`
-	Fields    map[FieldUUID]*fieldValue `json:"fields"`
+	Fields    map[FieldUUID]*FieldValue `json:"fields"`
 	Groups    []GroupID                 `json:"groups"`
 	URNs      []struct {
 		ID        int       `json:"id"`
