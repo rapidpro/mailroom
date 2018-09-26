@@ -14,6 +14,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+type SessionCommitHook func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, []*Session) error
+
 type SessionID int64
 type SessionStatus string
 
@@ -55,12 +57,12 @@ type Session struct {
 	CreatedOn time.Time
 
 	org       *OrgAssets
-	contactID ContactID
+	contactID flows.ContactID
 	contact   *flows.Contact
 	runs      []*FlowRun
 
-	preCommits  map[CommitHook][]interface{}
-	postCommits map[CommitHook][]interface{}
+	preCommits  map[EventCommitHook][]interface{}
+	postCommits map[EventCommitHook][]interface{}
 }
 
 // Org returns the org assets for this session
@@ -84,12 +86,12 @@ func (s *Session) Runs() []*FlowRun {
 }
 
 // AddPreCommitEvent adds a new event to be handled by a pre commit hook
-func (s *Session) AddPreCommitEvent(hook CommitHook, event interface{}) {
+func (s *Session) AddPreCommitEvent(hook EventCommitHook, event interface{}) {
 	s.preCommits[hook] = append(s.preCommits[hook], event)
 }
 
 // AddPostCommitEvent adds a new event to be handled by a post commit hook
-func (s *Session) AddPostCommitEvent(hook CommitHook, event interface{}) {
+func (s *Session) AddPostCommitEvent(hook EventCommitHook, event interface{}) {
 	s.postCommits[hook] = append(s.postCommits[hook], event)
 }
 
@@ -165,8 +167,8 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 
 		contact:     s.Contact(),
 		org:         org,
-		preCommits:  make(map[CommitHook][]interface{}),
-		postCommits: make(map[CommitHook][]interface{}),
+		preCommits:  make(map[EventCommitHook][]interface{}),
+		postCommits: make(map[EventCommitHook][]interface{}),
 	}
 
 	// now build up our runs
@@ -192,7 +194,7 @@ RETURNING id
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, ss []flows.Session) ([]*Session, error) {
+func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, ss []flows.Session, hook SessionCommitHook) ([]*Session, error) {
 	if len(ss) == 0 {
 		return nil, nil
 	}
@@ -215,7 +217,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 		return nil, errors.Annotatef(err, "error inserting sessions")
 	}
 
-	// for each session, apply the events to each run, gathering our list of runs in the process
+	// for each session associate our run with each
 	runs := make([]interface{}, 0, len(sessions))
 	for _, s := range sessions {
 		for _, r := range s.runs {
@@ -233,6 +235,15 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 		return nil, errors.Annotatef(err, "error writing runs")
 	}
 
+	// call our global commit hook if present
+	// TODO: can we move this below applying events (maybe changing that interface to not include sessions)
+	if hook != nil {
+		err = hook(ctx, tx, rp, org, sessions)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error calling commit hook: %v", hook)
+		}
+	}
+
 	// apply our all events for the session
 	for i := range ss {
 		for _, e := range ss[i].Events() {
@@ -244,7 +255,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// gather all our pre commit events, group them by hook
-	err = ApplyPreEventHooks(ctx, tx, rp, org.OrgID(), sessions)
+	err = ApplyPreEventHooks(ctx, tx, rp, org, sessions)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error applying pre commit hooks")
 	}

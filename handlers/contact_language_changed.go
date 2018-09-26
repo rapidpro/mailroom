@@ -21,7 +21,7 @@ type CommitContactLanguageChanges struct{}
 var commitContactLanguageChanges = &CommitContactLanguageChanges{}
 
 // Apply applies our contact language change before our commit
-func (h *CommitContactLanguageChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID models.OrgID, sessions map[*models.Session][]interface{}) error {
+func (h *CommitContactLanguageChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build up our list of pairs of contact id and language name
 	updates := make([]interface{}, 0, len(sessions))
 	for s, e := range sessions {

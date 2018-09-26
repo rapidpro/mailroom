@@ -54,7 +54,7 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 	}
 
 	// grab all the fires for this event
-	fires, err := loadEventFires(ctx, db, eventTask.FireIDs)
+	fires, err := models.LoadEventFires(ctx, db, eventTask.FireIDs)
 	if err != nil {
 		// unmark all these fires as fires so they can retry
 		rc := rp.Get()
@@ -82,34 +82,17 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 		},
 	}
 
-	contactMap := make(map[flows.ContactID]*EventFire)
-	contactIDs := make([]flows.ContactID, 0, len(fires))
+	contactMap := make(map[flows.ContactID]*models.EventFire)
 	for _, fire := range fires {
-		contactIDs = append(contactIDs, fire.ContactID)
 		contactMap[fire.ContactID] = fire
 	}
 
-	sessions, err := runner.FireCampaignEvent(ctx, db, rp, eventTask.OrgID, contactIDs, eventTask.FlowUUID, &event)
+	sessions, err := runner.FireCampaignEvent(ctx, db, rp, eventTask.OrgID, contactMap, eventTask.FlowUUID, &event)
 
-	// TODO: optimize into a single query
-	start := time.Now()
+	// remove all the contacts that were started
 	for _, session := range sessions {
-		fire, found := contactMap[session.ContactID]
-
-		// it this flow started ok, then mark this campaign as fired
-		if found {
-			err = models.MarkCampaignEventFired(ctx, db, fire.FireID, session.CreatedOn)
-			if err != nil {
-				return errors.Annotatef(err, "error marking event fire as fired: %d", fire.FireID)
-			}
-
-			// delete this contact from our map
-			delete(contactMap, session.ContactID)
-		} else {
-			log.WithField("contact_id", session.ContactID).Errorf("unable to find session for contact id")
-		}
+		delete(contactMap, session.ContactID)
 	}
-	log.WithField("elapsed", time.Since(start)).Info("event fires marked as complete")
 
 	// what remains in our contact map are fires that failed for some reason, umark these
 	if len(contactMap) > 0 {
@@ -126,48 +109,3 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 
 	return nil
 }
-
-// EventFire represents a single campaign event fire for an event and contact
-type EventFire struct {
-	FireID    int             `db:"fire_id"`
-	ContactID flows.ContactID `db:"contact_id"`
-	Fired     *time.Time      `db:"fired"`
-}
-
-// loadsEventFires loads all the event fires with the passed in ids
-func loadEventFires(ctx context.Context, db *sqlx.DB, ids []int64) ([]*EventFire, error) {
-	q, vs, err := sqlx.In(loadEventFireSQL, ids)
-	if err != nil {
-		return nil, errors.Annotate(err, "error rebinding campaign fire query")
-	}
-	q = db.Rebind(q)
-
-	rows, err := db.QueryxContext(ctx, q, vs...)
-	if err != nil {
-		return nil, errors.Annotate(err, "error querying event fires")
-	}
-	defer rows.Close()
-
-	fires := make([]*EventFire, 0, len(ids))
-	for rows.Next() {
-		fire := &EventFire{}
-		err := rows.StructScan(fire)
-		if err != nil {
-			return nil, errors.Annotate(err, "error scanning campaign fire")
-		}
-		fires = append(fires, fire)
-	}
-	return fires, nil
-}
-
-const loadEventFireSQL = `
-SELECT 
-	id as fire_id,
-	contact_id as contact_id,
-	fired as fired
-FROM 
-	campaigns_eventfire
-WHERE 
-	id IN(?) AND
-	fired IS NULL
-`

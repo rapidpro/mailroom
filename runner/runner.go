@@ -29,7 +29,7 @@ var (
 // FireCampaignEvent starts the flow for the passed in org, contact and flow
 func FireCampaignEvent(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
-	orgID models.OrgID, contactIDs []flows.ContactID, flowUUID assets.FlowUUID,
+	orgID models.OrgID, contactMap map[flows.ContactID]*models.EventFire, flowUUID assets.FlowUUID,
 	event *triggers.CampaignEvent) ([]*models.Session, error) {
 
 	start := time.Now()
@@ -52,6 +52,12 @@ func FireCampaignEvent(
 		return nil, errors.Annotatef(err, "err creating session assets for org: %d", org.OrgID())
 	}
 
+	// build our list of ids
+	contactIDs := make([]flows.ContactID, 0, len(contactMap))
+	for c := range contactMap {
+		contactIDs = append(contactIDs, c)
+	}
+
 	// load our contacts
 	contacts, err := models.LoadContacts(ctx, db, sessionAssets, org, contactIDs)
 	if err != nil {
@@ -66,8 +72,26 @@ func FireCampaignEvent(
 		ts = append(ts, triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, now))
 	}
 
+	// this is our pre commit callback for our sessions, we'll mark the event fires associated with the passed
+	// in sessions as complete in the same transaction
+	fired := time.Now()
+	updateEventFires := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+		// build up our list of event fire ids based on the session contact ids
+		fires := make([]*models.EventFire, 0, len(sessions))
+		for _, s := range sessions {
+			fire, found := contactMap[s.Contact().ID()]
+			if !found {
+				return errors.Errorf("unable to find associated event fire for contact %d", s.Contact().ID())
+			}
+			fires = append(fires, fire)
+		}
+
+		// bulk update those event fires
+		return models.MarkEventsFired(ctx, tx, fires, fired)
+	}
+
 	// start our contacts
-	sessions, err := StartFlow(ctx, db, rp, org, sessionAssets, ts)
+	sessions, err := StartFlow(ctx, db, rp, org, sessionAssets, ts, updateEventFires)
 	if err != nil {
 		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
 	}
@@ -80,7 +104,7 @@ func FireCampaignEvent(
 }
 
 // StartFlow runs the passed in flow for the passed in contact
-func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets, tgs []flows.Trigger) ([]*models.Session, error) {
+func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets, tgs []flows.Trigger, hook models.SessionCommitHook) ([]*models.Session, error) {
 	if len(tgs) == 0 {
 		return nil, nil
 	}
@@ -115,7 +139,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	}
 
 	// write our session to the db
-	dbSessions, err := models.WriteSessions(ctx, tx, rp, org, sessions)
+	dbSessions, err := models.WriteSessions(ctx, tx, rp, org, sessions, hook)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error writing sessions")
 	}
@@ -140,7 +164,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 				return nil, errors.Annotatef(err, "error starting transaction for retry")
 			}
 
-			dbSession, err := models.WriteSessions(ctx, tx, rp, org, []flows.Session{session})
+			dbSession, err := models.WriteSessions(ctx, tx, rp, org, []flows.Session{session}, hook)
 			if err != nil {
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")
@@ -164,7 +188,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		return nil, errors.Annotatef(err, "error starting transaction for post commit hooks")
 	}
 
-	err = models.ApplyPostEventHooks(ctx, tx, rp, org.OrgID(), dbSessions)
+	err = models.ApplyPostEventHooks(ctx, tx, rp, org, dbSessions)
 	if err == nil {
 		err = tx.Commit()
 	}
@@ -182,7 +206,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 				continue
 			}
 
-			err = models.ApplyPostEventHooks(ctx, tx, rp, org.OrgID(), []*models.Session{session})
+			err = models.ApplyPostEventHooks(ctx, tx, rp, org, []*models.Session{session})
 			if err != nil {
 				tx.Rollback()
 				log.WithError(err).Errorf("error applying post commit hook")

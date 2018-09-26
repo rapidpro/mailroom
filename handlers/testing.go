@@ -44,6 +44,9 @@ func RunEventTestCases(t *testing.T, tcs []EventTestCase) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
+	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
+	assert.NoError(t, err)
+
 	for i, tc := range tcs {
 		sessions, err := GetTestSessions()
 		assert.NoError(t, err)
@@ -72,7 +75,7 @@ func RunEventTestCases(t *testing.T, tcs []EventTestCase) {
 		}
 
 		// call our pre commit hooks
-		err = models.ApplyPreEventHooks(ctx, tx, rp, models.OrgID(1), sessions)
+		err = models.ApplyPreEventHooks(ctx, tx, rp, org, sessions)
 		if err != nil {
 			assert.NoError(t, err, "%d: error applying pre commit hooks")
 			tx.Rollback()
@@ -88,7 +91,7 @@ func RunEventTestCases(t *testing.T, tcs []EventTestCase) {
 		}
 
 		// and our post commit hooks
-		err = models.ApplyPostEventHooks(ctx, tx, rp, models.OrgID(1), sessions)
+		err = models.ApplyPostEventHooks(ctx, tx, rp, org, sessions)
 		if err != nil {
 			assert.NoError(t, err, "%d: error applying post commit hooks", i)
 			tx.Rollback()

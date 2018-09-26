@@ -21,7 +21,7 @@ type CommitContactNameChanges struct{}
 var commitContactNameChanges = &CommitContactNameChanges{}
 
 // commitContactNameChanges commits our contact name changes as a bulk update for the passed in map of sessions
-func (h *CommitContactNameChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID models.OrgID, sessions map[*models.Session][]interface{}) error {
+func (h *CommitContactNameChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build up our list of pairs of contact id and contact name
 	updates := make([]interface{}, 0, len(sessions))
 	for s, e := range sessions {

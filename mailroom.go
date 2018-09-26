@@ -57,7 +57,7 @@ func NewMailroom(config *Config) *Mailroom {
 		WaitGroup: &sync.WaitGroup{},
 	}
 	mr.CTX, mr.Cancel = context.WithCancel(context.Background())
-	mr.foreman = NewForeman(mr, "events", 50)
+	mr.foreman = NewForeman(mr, "batch", config.BatchWorkers)
 
 	return mr
 }
@@ -87,7 +87,7 @@ func (mr *Mailroom) Start() error {
 	// configure our pool
 	mr.DB = db
 	mr.DB.SetMaxIdleConns(4)
-	mr.DB.SetMaxOpenConns(16)
+	mr.DB.SetMaxOpenConns(8)
 
 	// try connecting
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -107,10 +107,10 @@ func (mr *Mailroom) Start() error {
 
 	// create our pool
 	redisPool := &redis.Pool{
-		Wait:        true,              // makes callers wait for a connection
-		MaxActive:   8,                 // only open this many concurrent connections at once
-		MaxIdle:     4,                 // only keep up to this many idle
-		IdleTimeout: 240 * time.Second, // how long to wait before reaping a connection
+		Wait:        true,                 // makes callers wait for a connection
+		MaxActive:   mr.Config.DBPoolSize, // only open this many concurrent connections at once
+		MaxIdle:     2,                    // only keep up to this many idle
+		IdleTimeout: 240 * time.Second,    // how long to wait before reaping a connection
 		Dial: func() (redis.Conn, error) {
 			conn, err := redis.Dial("tcp", fmt.Sprintf("%s", redisURL.Host))
 			if err != nil {
