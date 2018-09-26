@@ -186,7 +186,7 @@ FROM
 WHERE
     ef.fired IS NULL AND ef.scheduled <= NOW() AND
     ce.id = ef.event_id AND
-    f.id = ce.flow_id AND f.is_system = TRUE AND f.flow_server_enabled = TRUE AND
+    f.id = ce.flow_id AND f.flow_server_enabled = TRUE AND
     ce.campaign_id = c.id
 ORDER BY
     DATE_TRUNC('minute', scheduled) ASC,
