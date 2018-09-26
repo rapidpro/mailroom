@@ -1,3 +1,8 @@
+v0.0.17
+----------
+ * add support for group, field, name and language changes
+ * add support for recalculating campaign events
+
 v0.0.16
 ----------
  * correct redaction policy for urns
