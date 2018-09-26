@@ -8,8 +8,12 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 )
+
+// FireID is our id for our event fires
+type FireID int
 
 // CampaignID is our type for campaign ids
 type CampaignID int
@@ -91,6 +95,7 @@ type CampaignEvent struct {
 	campaign *Campaign
 }
 
+// UnmarshalJSON is our unmarshaller for json data
 func (e *CampaignEvent) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &e.e)
 }
@@ -226,16 +231,79 @@ WHERE
 ) r;
 `
 
-func MarkCampaignEventFired(ctx context.Context, db *sqlx.DB, fireID int, fired time.Time) error {
-	_, err := db.ExecContext(ctx, markEventFired, fireID, fired)
-	return err
+// MarkEventsFired sets the fired date on all the passed in event fires and updates the associated
+// rows in the database
+func MarkEventsFired(ctx context.Context, tx *sqlx.Tx, fires []*EventFire, fired time.Time) error {
+	// set fired on all our values
+	updates := make([]interface{}, 0, len(fires))
+	for _, f := range fires {
+		f.Fired = &fired
+		updates = append(updates, f)
+	}
+
+	return BulkInsert(ctx, tx, markEventsFired, updates)
 }
 
-const markEventFired = `
+const markEventsFired = `
 UPDATE 
-	campaigns_eventfire
-SET 
-	fired = $2
+	campaigns_eventfire f
+SET
+	fired = r.fired::timestamp with time zone
+FROM (
+	VALUES(:fire_id, :fired)
+) AS
+	r(fire_id, fired)
 WHERE
-	id = $1
+	f.id = r.fire_id::int
+`
+
+// EventFire represents a single campaign event fire for an event and contact
+type EventFire struct {
+	FireID    FireID          `db:"fire_id"`
+	EventID   CampaignEventID `db:"event_id"`
+	ContactID flows.ContactID `db:"contact_id"`
+	Scheduled time.Time       `db:"scheduled"`
+	Fired     *time.Time      `db:"fired"`
+}
+
+// LoadEventFires loads all the event fires with the passed in ids
+func LoadEventFires(ctx context.Context, db *sqlx.DB, ids []int64) ([]*EventFire, error) {
+	q, vs, err := sqlx.In(loadEventFireSQL, ids)
+	if err != nil {
+		return nil, errors.Annotate(err, "error rebinding campaign fire query")
+	}
+	q = db.Rebind(q)
+
+	rows, err := db.QueryxContext(ctx, q, vs...)
+	if err != nil {
+		return nil, errors.Annotate(err, "error querying event fires")
+	}
+	defer rows.Close()
+
+	fires := make([]*EventFire, 0, len(ids))
+	for rows.Next() {
+		fire := &EventFire{}
+		err := rows.StructScan(fire)
+		if err != nil {
+			return nil, errors.Annotate(err, "error scanning campaign fire")
+		}
+		fires = append(fires, fire)
+	}
+	return fires, nil
+}
+
+const loadEventFireSQL = `
+SELECT 
+	f.id as fire_id,
+	f.event_id as event_id,
+	f.contact_id as contact_id,
+	f.scheduled as scheduled,
+	f.fired as fired
+FROM 
+	campaigns_eventfire f
+	JOIN campaigns_campaignevent e ON f.event_id = e.id
+WHERE 
+	f.id IN(?) AND
+	f.fired IS NULL AND
+	e.is_active = TRUE
 `

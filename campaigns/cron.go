@@ -185,7 +185,8 @@ FROM
     flows_flow f
 WHERE
     ef.fired IS NULL AND ef.scheduled <= NOW() AND
-    ce.id = ef.event_id AND
+	ce.id = ef.event_id AND
+	ce.is_active = TRUE AND
     f.id = ce.flow_id AND f.flow_server_enabled = TRUE AND
     ce.campaign_id = c.id
 ORDER BY

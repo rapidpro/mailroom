@@ -22,7 +22,7 @@ type ContactGroupsChangedHook struct{}
 var contactGroupsChangedHook = &ContactGroupsChangedHook{}
 
 // Apply squashes and delete all our contact groups
-func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID models.OrgID, sessions map[*models.Session][]interface{}) error {
+func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build up our list of all adds and removes
 	adds := make([]interface{}, 0, len(sessions))
 	removes := make([]interface{}, 0, len(sessions))

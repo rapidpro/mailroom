@@ -3,6 +3,7 @@ package runner
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -34,8 +35,26 @@ func TestCampaignStarts(t *testing.T) {
 		},
 	}
 
+	// create our event fires
+	now := time.Now()
+	db.MustExec(`INSERT INTO campaigns_eventfire(contact_id, event_id, scheduled) VALUES(42,1, $1),(43,1, $1);`, now)
+
 	contacts := []flows.ContactID{42, 43}
-	sessions, err := FireCampaignEvent(ctx, db, rp, models.OrgID(1), contacts, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
+	contactFires := map[flows.ContactID]*models.EventFire{
+		42: &models.EventFire{
+			FireID:    1,
+			EventID:   1,
+			ContactID: 42,
+			Scheduled: now,
+		},
+		43: &models.EventFire{
+			FireID:    2,
+			EventID:   1,
+			ContactID: 43,
+			Scheduled: now,
+		},
+	}
+	sessions, err := FireCampaignEvent(ctx, db, rp, models.OrgID(1), contactFires, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
 
@@ -52,4 +71,10 @@ func TestCampaignStarts(t *testing.T) {
 		`AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
 		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = 2`,
 	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`, nil, 0)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN (42,43) AND event_id = 1`, nil, 2)
 }

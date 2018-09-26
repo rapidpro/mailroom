@@ -57,7 +57,7 @@ func NewMailroom(config *Config) *Mailroom {
 		WaitGroup: &sync.WaitGroup{},
 	}
 	mr.CTX, mr.Cancel = context.WithCancel(context.Background())
-	mr.foreman = NewForeman(mr, "events", 50)
+	mr.foreman = NewForeman(mr, "batch", config.BatchWorkers)
 
 	return mr
 }
@@ -87,7 +87,7 @@ func (mr *Mailroom) Start() error {
 	// configure our pool
 	mr.DB = db
 	mr.DB.SetMaxIdleConns(4)
-	mr.DB.SetMaxOpenConns(16)
+	mr.DB.SetMaxOpenConns(config.DBPoolSize)
 
 	// try connecting
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)

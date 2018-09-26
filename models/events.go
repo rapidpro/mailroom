@@ -9,15 +9,15 @@ import (
 	"github.com/nyaruka/goflow/flows"
 )
 
-// CommitHook defines a callback that will accept a certain type of events across session, either before or after committing
-type CommitHook interface {
-	Apply(context.Context, *sqlx.Tx, *redis.Pool, OrgID, map[*Session][]interface{}) error
+// EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
+type EventCommitHook interface {
+	Apply(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, map[*Session][]interface{}) error
 }
 
 // ApplyPreEventHooks runs through all the pre event hooks for the passed in sessions and applies their events
-func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgID, sessions []*Session) error {
+func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, sessions []*Session) error {
 	// gather all our hook events together across our sessions
-	preHooks := make(map[CommitHook]map[*Session][]interface{})
+	preHooks := make(map[EventCommitHook]map[*Session][]interface{})
 	for _, s := range sessions {
 		for hook, args := range s.preCommits {
 			sessionMap, found := preHooks[hook]
@@ -31,7 +31,7 @@ func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID 
 
 	// now fire each of our hooks
 	for hook, args := range preHooks {
-		err := hook.Apply(ctx, tx, rp, orgID, args)
+		err := hook.Apply(ctx, tx, rp, org, args)
 		if err != nil {
 			return errors.Annotatef(err, "error applying pre commit hook: %v", hook)
 		}
@@ -41,9 +41,9 @@ func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID 
 }
 
 // ApplyPostEventHooks runs through all the post event hooks for the passed in sessions and applies their events
-func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgID, sessions []*Session) error {
+func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, sessions []*Session) error {
 	// gather all our hook events together across our sessions
-	postHooks := make(map[CommitHook]map[*Session][]interface{})
+	postHooks := make(map[EventCommitHook]map[*Session][]interface{})
 	for _, s := range sessions {
 		for hook, args := range s.postCommits {
 			sessionMap, found := postHooks[hook]
@@ -57,7 +57,7 @@ func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID
 
 	// now fire each of our hooks
 	for hook, args := range postHooks {
-		err := hook.Apply(ctx, tx, rp, orgID, args)
+		err := hook.Apply(ctx, tx, rp, org, args)
 		if err != nil {
 			return errors.Annotatef(err, "error applying post commit hook: %v", hook)
 		}

@@ -24,7 +24,7 @@ type SendSessionMessages struct{}
 var sendSessionMessages = &SendSessionMessages{}
 
 // SendSessionMessages sends all non-android messages to courier
-func (h *SendSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID models.OrgID, sessions map[*models.Session][]interface{}) error {
+func (h *SendSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -61,7 +61,7 @@ type CommitSessionMessages struct{}
 var commitSessionMessages = &CommitSessionMessages{}
 
 // commitSessionMessages takes care of inserting all the messages in the passed in sessions assigning topups to them as needed.
-func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID models.OrgID, sessions map[*models.Session][]interface{}) error {
+func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build up a list of all the messages that need inserting
 	args := make([]interface{}, 0, len(sessions))
 	for _, ms := range sessions {
@@ -72,7 +72,7 @@ func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// find the topup we will assign
 	rc := rp.Get()
-	topup, err := models.DecrementOrgCredits(ctx, tx, rc, orgID, len(args))
+	topup, err := models.DecrementOrgCredits(ctx, tx, rc, org.OrgID(), len(args))
 	rc.Close()
 	if err != nil {
 		return errors.Annotatef(err, "error finding active topup")
