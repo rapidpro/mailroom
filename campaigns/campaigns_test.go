@@ -38,7 +38,7 @@ func TestCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// then actually work on the event
-	task, err := queue.PopNextTask(rc, eventQueue)
+	task, err := queue.PopNextTask(rc, batchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
