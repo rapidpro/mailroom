@@ -1,3 +1,7 @@
+v0.0.19
+----------
+ * add session commit hook, configurable number of threads
+
 v0.0.18
 ----------
  * enable mailroom campaigns on all flow_server_enabled flows
