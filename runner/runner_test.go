@@ -54,7 +54,7 @@ func TestCampaignStarts(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvent(ctx, db, rp, models.OrgID(1), contactFires, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
+	sessions, err := FireCampaignEvents(ctx, db, rp, models.OrgID(1), contactFires, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
 

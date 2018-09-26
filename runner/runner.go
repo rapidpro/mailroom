@@ -26,8 +26,8 @@ var (
 	assetCache = cache.New(5*time.Second, time.Minute)
 )
 
-// FireCampaignEvent starts the flow for the passed in org, contact and flow
-func FireCampaignEvent(
+// FireCampaignEvents starts the flow for the passed in org, contact and flow
+func FireCampaignEvents(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
 	orgID models.OrgID, contactMap map[flows.ContactID]*models.EventFire, flowUUID assets.FlowUUID,
 	event *triggers.CampaignEvent) ([]*models.Session, error) {
