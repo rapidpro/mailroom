@@ -1,3 +1,7 @@
+v0.0.18
+----------
+ * enable mailroom campaigns on all flow_server_enabled flows
+
 v0.0.17
 ----------
  * add support for group, field, name and language changes
