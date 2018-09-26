@@ -54,7 +54,7 @@ func extractValues(sql string) (string, error) {
 	return sql[startValues+6 : endValues+1], nil
 }
 
-func bulkInsert(ctx context.Context, tx *sqlx.Tx, sql string, vs []interface{}) error {
+func BulkInsert(ctx context.Context, tx *sqlx.Tx, sql string, vs []interface{}) error {
 	// no values, nothing to do
 	if len(vs) == 0 {
 		return nil
@@ -101,15 +101,17 @@ func bulkInsert(ctx context.Context, tx *sqlx.Tx, sql string, vs []interface{}) 
 	}
 	defer rows.Close()
 
-	// read in all our inserted rows, scanning in any values
-	for _, v := range vs {
-		if !rows.Next() {
-			return errors.Errorf("did not receive expected number of rows on insert")
-		}
+	// read in all our inserted rows, scanning in any values if we have a returning clause
+	if strings.Contains(strings.ToUpper(sql), "RETURNING") {
+		for _, v := range vs {
+			if !rows.Next() {
+				return errors.Errorf("did not receive expected number of rows on insert")
+			}
 
-		err = rows.StructScan(v)
-		if err != nil {
-			return errors.Annotate(err, "error scanning for insert id")
+			err = rows.StructScan(v)
+			if err != nil {
+				return errors.Annotate(err, "error scanning for insert id")
+			}
 		}
 	}
 

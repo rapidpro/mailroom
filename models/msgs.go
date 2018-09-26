@@ -96,9 +96,9 @@ type Msg struct {
 // Channel returns the db channel object for this channel
 func (m *Msg) Channel() *Channel { return m.channel }
 
-// newOutgoingMsg creates an outgoing message for the passed in flow message. Note
+// NewOutgoingMsg creates an outgoing message for the passed in flow message. Note
 // that this message is created in a queued state!
-func newOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgID, channel *Channel, contactID flows.ContactID, m *flows.MsgOut) (*Msg, error) {
+func NewOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgID, channel *Channel, contactID flows.ContactID, m *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	_, _, query, _ := m.URN().ToParts()
 	parsedQuery, err := url.ParseQuery(query)
 	if err != nil {
@@ -125,6 +125,7 @@ func newOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgI
 		URN:          m.URN(),
 		OrgID:        orgID,
 		TopUpID:      NilTopupID,
+		CreatedOn:    createdOn,
 
 		channel:     channel,
 		ChannelID:   channel.ID(),
@@ -160,66 +161,32 @@ func newOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgI
 	return msg, nil
 }
 
-const insertMsgSQL = `
+const InsertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, 
 		 contact_id, contact_urn_id, org_id, topup_id)
-  VALUES(:uuid, :text, :high_priority, now(), now(), now(), :direction, :status, :attachments, :metadata,
+  VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, 
 		 :contact_id, :contact_urn_id, :org_id, :topup_id)
 RETURNING 
 	id as id, 
-	now() as created_on,
 	now() as modified_on,
 	now() as queued_on
 `
 
-// insertSessionMessages takes care of inserting all the messages in the passed in sessions assigning topups
-// to them as needed.
-func insertSessionMessages(ctx context.Context, tx *sqlx.Tx, rc redis.Conn, orgID OrgID, sessions []*Session) error {
-	// build all the messages that need inserting
-	msgs := make([]interface{}, 0, len(sessions))
-	for _, s := range sessions {
-		for _, m := range s.Outbox() {
-			msgs = append(msgs, m)
-		}
-	}
-
-	// find the topup we will assign
-	topup, err := decrementOrgCredits(ctx, tx, rc, orgID, len(msgs))
-	if err != nil {
-		return errors.Annotatef(err, "error finding active topup")
-	}
-
-	// if we have an active topup, assign it to our messages
-	if topup != NilTopupID {
-		for _, m := range msgs {
-			m.(*Msg).TopUpID = topup
-		}
-	}
-
-	// insert all our messages
-	err = bulkInsert(ctx, tx, insertMsgSQL, msgs)
-	if err != nil {
-		return errors.Annotatef(err, "error writing messages")
-	}
-
-	return nil
-}
-
 // MarkMessagesPending marks the passed in messages as pending
-func MarkMessagesPending(ctx context.Context, db *sqlx.DB, msgs []*Msg) error {
-	return updateMessageStatus(ctx, db, msgs, MsgStatusPending)
+func MarkMessagesPending(ctx context.Context, tx *sqlx.Tx, msgs []*Msg) error {
+	return updateMessageStatus(ctx, tx, msgs, MsgStatusPending)
 }
 
 // MarkMessagesQueued marks the passed in messages as queued
-func MarkMessagesQueued(ctx context.Context, db *sqlx.DB, msgs []*Msg) error {
-	return updateMessageStatus(ctx, db, msgs, MsgStatusQueued)
+func MarkMessagesQueued(ctx context.Context, tx *sqlx.Tx, msgs []*Msg) error {
+	return updateMessageStatus(ctx, tx, msgs, MsgStatusQueued)
 }
 
 // MarkMessagesQueued marks the passed in messages as queued
-func updateMessageStatus(ctx context.Context, db *sqlx.DB, msgs []*Msg, status MsgStatus) error {
+func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status MsgStatus) error {
 	ids := make([]int, len(msgs))
 	for i, m := range msgs {
 		ids[i] = int(m.ID)
@@ -229,9 +196,9 @@ func updateMessageStatus(ctx context.Context, db *sqlx.DB, msgs []*Msg, status M
 	if err != nil {
 		return errors.Annotate(err, "error preparing query for updating message status")
 	}
-	q = db.Rebind(q)
+	q = tx.Rebind(q)
 
-	_, err = db.ExecContext(ctx, q, vs...)
+	_, err = tx.ExecContext(ctx, q, vs...)
 	if err != nil {
 		return errors.Annotate(err, "error updating message status")
 	}

@@ -89,7 +89,7 @@ func (l *LabelReference) UnmarshalJSON(data []byte) error {
 
 		// if it starts with @ then it's an expression
 		if strings.HasPrefix(nameExpression, "@") {
-			nameExpression, _ = expressions.MigrateTemplate(nameExpression, expressions.ExtraAsFunction, false)
+			nameExpression, _ = expressions.MigrateTemplate(nameExpression, false)
 		}
 
 		l.Name = nameExpression
@@ -139,7 +139,7 @@ func (g *GroupReference) UnmarshalJSON(data []byte) error {
 
 		// if it starts with @ then it's an expression
 		if strings.HasPrefix(nameExpression, "@") {
-			nameExpression, _ = expressions.MigrateTemplate(nameExpression, expressions.ExtraAsFunction, false)
+			nameExpression, _ = expressions.MigrateTemplate(nameExpression, false)
 		}
 
 		g.Name = nameExpression
@@ -250,7 +250,7 @@ type stringTest struct {
 }
 
 type numericTest struct {
-	Test DecimalString `json:"test"`
+	Test StringOrNumber `json:"test"`
 }
 
 type betweenTest struct {
@@ -281,7 +281,7 @@ var flowTypeMapping = map[string]flows.FlowType{
 func addTranslationMap(baseLanguage utils.Language, localization flows.Localization, mapped Translations, uuid utils.UUID, property string) string {
 	var inBaseLanguage string
 	for language, item := range mapped {
-		expression, _ := expressions.MigrateTemplate(item, expressions.ExtraAsFunction, false)
+		expression, _ := expressions.MigrateTemplate(item, false)
 		if language != baseLanguage && language != "base" {
 			localization.AddItemTranslation(language, uuid, property, []string{expression})
 		} else {
@@ -297,7 +297,7 @@ func addTranslationMultiMap(baseLanguage utils.Language, localization flows.Loca
 	for language, items := range mapped {
 		templates := make([]string, len(items))
 		for i := range items {
-			expression, _ := expressions.MigrateTemplate(items[i], expressions.ExtraAsFunction, false)
+			expression, _ := expressions.MigrateTemplate(items[i], false)
 			templates[i] = expression
 		}
 		if language != baseLanguage {
@@ -356,7 +356,6 @@ var testTypeMappings = map[string]string{
 	"state":                "has_state",
 	"timeout":              "has_wait_timed_out",
 	"ward":                 "has_ward",
-	"webhook_status":       "has_webhook_status",
 	"airtime_status":       "has_airtime_status",
 }
 
@@ -381,11 +380,11 @@ func migrateAction(baseLanguage utils.Language, a Action, localization flows.Loc
 			return nil, err
 		}
 
-		migratedSubject, _ := expressions.MigrateTemplate(a.Subject, expressions.ExtraAsFunction, false)
-		migratedBody, _ := expressions.MigrateTemplate(msg, expressions.ExtraAsFunction, false)
+		migratedSubject, _ := expressions.MigrateTemplate(a.Subject, false)
+		migratedBody, _ := expressions.MigrateTemplate(msg, false)
 		migratedEmails := make([]string, len(a.Emails))
 		for e, email := range a.Emails {
-			migratedEmails[e], _ = expressions.MigrateTemplate(email, expressions.ExtraAsFunction, false)
+			migratedEmails[e], _ = expressions.MigrateTemplate(email, false)
 		}
 
 		return &actions.SendEmailAction{
@@ -425,7 +424,7 @@ func migrateAction(baseLanguage utils.Language, a Action, localization flows.Loc
 			if variable.ID == "@new_contact" {
 				createContact = true
 			} else {
-				migratedVar, _ := expressions.MigrateTemplate(variable.ID, expressions.ExtraAsFunction, false)
+				migratedVar, _ := expressions.MigrateTemplate(variable.ID, false)
 				variables = append(variables, migratedVar)
 			}
 		}
@@ -495,7 +494,7 @@ func migrateAction(baseLanguage utils.Language, a Action, localization flows.Loc
 		}
 		variables := make([]string, 0, len(a.Variables))
 		for _, variable := range a.Variables {
-			migratedVar, _ := expressions.MigrateTemplate(variable.ID, expressions.ExtraAsFunction, false)
+			migratedVar, _ := expressions.MigrateTemplate(variable.ID, false)
 			variables = append(variables, migratedVar)
 		}
 
@@ -531,7 +530,7 @@ func migrateAction(baseLanguage utils.Language, a Action, localization flows.Loc
 			BaseAction: actions.NewBaseAction(a.UUID),
 		}, nil
 	case "save":
-		migratedValue, _ := expressions.MigrateTemplate(a.Value, expressions.ExtraAsFunction, false)
+		migratedValue, _ := expressions.MigrateTemplate(a.Value, false)
 
 		// flows now have different action for name changing
 		if a.Field == "name" || a.Field == "first_name" {
@@ -568,7 +567,7 @@ func migrateAction(baseLanguage utils.Language, a Action, localization flows.Loc
 			BaseAction: actions.NewBaseAction(a.UUID),
 		}, nil
 	case "api":
-		migratedURL, _ := expressions.MigrateTemplate(a.Webhook, expressions.ExtraAsFunction, false)
+		migratedURL, _ := expressions.MigrateTemplate(a.Webhook, false)
 
 		headers := make(map[string]string, len(a.WebhookHeaders))
 		body := ""
@@ -636,7 +635,7 @@ func migrateRuleSet(lang utils.Language, r RuleSet, localization flows.Localizat
 		uiType = UINodeTypeSplitBySubflow
 
 	case "webhook":
-		migratedURL, _ := expressions.MigrateTemplate(config.Webhook, expressions.ExtraAsFunction, false)
+		migratedURL, _ := expressions.MigrateTemplate(config.Webhook, false)
 		headers := make(map[string]string, len(config.WebhookHeaders))
 		body := ""
 		method := strings.ToUpper(config.WebhookAction)
@@ -650,7 +649,7 @@ func migrateRuleSet(lang utils.Language, r RuleSet, localization flows.Localizat
 		}
 
 		for _, header := range config.WebhookHeaders {
-			headers[header.Name], _ = expressions.MigrateTemplate(header.Value, expressions.ExtraAsFunction, false)
+			headers[header.Name], _ = expressions.MigrateTemplate(header.Value, false)
 		}
 
 		newActions = []flows.Action{
@@ -660,11 +659,12 @@ func migrateRuleSet(lang utils.Language, r RuleSet, localization flows.Localizat
 				Method:     method,
 				Headers:    headers,
 				Body:       body,
+				ResultName: resultName,
 			},
 		}
 
-		// webhook rulesets operate on the webhook call
-		router = routers.NewSwitchRouter(defaultExit, "@run.webhook", cases, resultName)
+		// webhook rulesets operate on the webhook status, saved as category
+		router = routers.NewSwitchRouter(defaultExit, fmt.Sprintf("@results.%s.category", utils.Snakify(resultName)), cases, "")
 		uiType = UINodeTypeSplitByWebhook
 
 	case "resthook":
@@ -672,16 +672,29 @@ func migrateRuleSet(lang utils.Language, r RuleSet, localization flows.Localizat
 			&actions.CallResthookAction{
 				BaseAction: actions.NewBaseAction(flows.ActionUUID(utils.NewUUID())),
 				Resthook:   config.Resthook,
+				ResultName: resultName,
 			},
 		}
 
-		// webhook rulesets operate on the webhook call
-		router = routers.NewSwitchRouter(defaultExit, "@run.webhook", cases, resultName)
+		// resthook rulesets operate on the webhook status, saved as category
+		router = routers.NewSwitchRouter(defaultExit, fmt.Sprintf("@results.%s.category", utils.Snakify(resultName)), cases, "")
+		uiType = UINodeTypeSplitByResthook
 
 	case "form_field":
-		operand, _ := expressions.MigrateTemplate(r.Operand, expressions.ExtraAsFunction, false)
+		operand, _ := expressions.MigrateTemplate(r.Operand, false)
 		operand = fmt.Sprintf("@(field(%s, %d, \"%s\"))", operand[1:], config.FieldIndex, config.FieldDelimiter)
 		router = routers.NewSwitchRouter(defaultExit, operand, cases, resultName)
+
+		lastDot := strings.LastIndex(r.Operand, ".")
+		if lastDot > -1 {
+			fieldKey := r.Operand[lastDot+1:]
+			uiNodeConfig = flows.UINodeConfig{
+				"operand":   map[string]string{"id": fieldKey},
+				"delimiter": config.FieldDelimiter,
+				"index":     config.FieldIndex,
+			}
+		}
+
 		uiType = UINodeTypeSplitByRunResultDelimited
 
 	case "group":
@@ -719,8 +732,7 @@ func migrateRuleSet(lang utils.Language, r RuleSet, localization flows.Localizat
 			if lastDot > -1 {
 				fieldKey := r.Operand[lastDot+1:]
 				uiNodeConfig = flows.UINodeConfig{
-					"type": "result",
-					"id":   fieldKey,
+					"operand": map[string]string{"id": fieldKey},
 				}
 			}
 		case "contact_field":
@@ -731,19 +743,25 @@ func migrateRuleSet(lang utils.Language, r RuleSet, localization flows.Localizat
 				fieldKey := r.Operand[lastDot+1:]
 				if fieldKey == "name" {
 					uiNodeConfig = flows.UINodeConfig{
-						"type": "property",
-						"id":   "name",
-						"name": "Name",
+						"operand": map[string]string{
+							"type": "property",
+							"id":   "name",
+							"name": "Name",
+						},
 					}
 				} else if urns.IsValidScheme(fieldKey) {
 					uiNodeConfig = flows.UINodeConfig{
-						"type": "scheme",
-						"id":   fieldKey,
+						"operand": map[string]string{
+							"type": "scheme",
+							"id":   fieldKey,
+						},
 					}
 				} else {
 					uiNodeConfig = flows.UINodeConfig{
-						"type": "field",
-						"id":   fieldKey,
+						"operand": map[string]string{
+							"type": "field",
+							"id":   fieldKey,
+						},
 					}
 				}
 			}
@@ -753,9 +771,9 @@ func migrateRuleSet(lang utils.Language, r RuleSet, localization flows.Localizat
 			uiType = UINodeTypeSplitByExpression
 		}
 
-		operand, _ := expressions.MigrateTemplate(r.Operand, expressions.ExtraAsFunction, defaultToSelf)
+		operand, _ := expressions.MigrateTemplate(r.Operand, defaultToSelf)
 		if operand == "" {
-			operand = "@run.input"
+			operand = "@input"
 		}
 
 		router = routers.NewSwitchRouter(defaultExit, operand, cases, resultName)
@@ -788,6 +806,8 @@ func migrateRuleSet(lang utils.Language, r RuleSet, localization flows.Localizat
 				Amounts:    currencyAmounts,
 			},
 		}
+
+		uiType = UINodeTypeSplitByAirtime
 
 		router = routers.NewSwitchRouter(defaultExit, "@run", cases, resultName)
 
@@ -848,21 +868,6 @@ func migrateRules(baseLanguage utils.Language, r RuleSet, localization flows.Loc
 		cases = append(cases, kase)
 	}
 
-	// for webhook rulesets we need to add an additional case/error pair for connection errors
-	if r.Type == "webhook" || r.Type == "resthook" {
-		connectionErrorCategory := "Connection Error"
-		connectionErrorExit := definition.NewExit(flows.ExitUUID(utils.NewUUID()), exits[1].DestinationNodeUUID(), connectionErrorCategory)
-
-		cases = append(cases, routers.Case{
-			UUID:        utils.UUID(utils.NewUUID()),
-			Type:        "has_webhook_status",
-			Arguments:   []string{"connection_error"},
-			OmitOperand: false,
-			ExitUUID:    connectionErrorExit.UUID(),
-		})
-		exits = append(exits, connectionErrorExit)
-	}
-
 	return cases, exits, defaultExitUUID, nil
 }
 
@@ -885,7 +890,7 @@ func migrateRule(baseLanguage utils.Language, r Rule, exit flows.Exit, localizat
 	case "eq", "gt", "gte", "lt", "lte":
 		test := numericTest{}
 		err = json.Unmarshal(r.Test.Data, &test)
-		migratedTest, err := expressions.MigrateTemplate(string(test.Test), expressions.ExtraAsFunction, false)
+		migratedTest, err := expressions.MigrateTemplate(string(test.Test), false)
 		if err != nil {
 			return routers.Case{}, err
 		}
@@ -894,11 +899,11 @@ func migrateRule(baseLanguage utils.Language, r Rule, exit flows.Exit, localizat
 	case "between":
 		test := betweenTest{}
 		err = json.Unmarshal(r.Test.Data, &test)
-		migratedMin, err := expressions.MigrateTemplate(test.Min, expressions.ExtraAsFunction, false)
+		migratedMin, err := expressions.MigrateTemplate(test.Min, false)
 		if err != nil {
 			return routers.Case{}, err
 		}
-		migratedMax, err := expressions.MigrateTemplate(test.Max, expressions.ExtraAsFunction, false)
+		migratedMax, err := expressions.MigrateTemplate(test.Max, false)
 		if err != nil {
 			return routers.Case{}, err
 		}
@@ -931,12 +936,13 @@ func migrateRule(baseLanguage utils.Language, r Rule, exit flows.Exit, localizat
 		arguments = []string{test.ExitType}
 
 	case "webhook_status":
+		newType = "is_text_eq"
 		test := webhookTest{}
 		err = json.Unmarshal(r.Test.Data, &test)
 		if test.Status == "success" {
-			arguments = []string{"success"}
+			arguments = []string{"Success"}
 		} else {
-			arguments = []string{"response_error"}
+			arguments = []string{"Failure"}
 		}
 
 	case "airtime_status":
@@ -951,7 +957,7 @@ func migrateRule(baseLanguage utils.Language, r Rule, exit flows.Exit, localizat
 	case "district":
 		test := stringTest{}
 		err = json.Unmarshal(r.Test.Data, &test)
-		migratedState, err := expressions.MigrateTemplate(test.Test, expressions.ExtraAsFunction, false)
+		migratedState, err := expressions.MigrateTemplate(test.Test, false)
 		if err != nil {
 			return routers.Case{}, err
 		}
@@ -960,11 +966,11 @@ func migrateRule(baseLanguage utils.Language, r Rule, exit flows.Exit, localizat
 	case "ward":
 		test := wardTest{}
 		err = json.Unmarshal(r.Test.Data, &test)
-		migratedDistrict, err := expressions.MigrateTemplate(test.District, expressions.ExtraAsFunction, false)
+		migratedDistrict, err := expressions.MigrateTemplate(test.District, false)
 		if err != nil {
 			return routers.Case{}, err
 		}
-		migratedState, err := expressions.MigrateTemplate(test.State, expressions.ExtraAsFunction, false)
+		migratedState, err := expressions.MigrateTemplate(test.State, false)
 		if err != nil {
 			return routers.Case{}, err
 		}
@@ -1015,12 +1021,13 @@ func (f *Flow) Migrate(collapseExits bool, includeUI bool) (flows.Flow, error) {
 	nodes := make([]flows.Node, numNodes)
 	nodeUI := make(map[flows.NodeUUID]flows.UINodeDetails, numNodes)
 
-	for i := range f.ActionSets {
-		node, err := migateActionSet(f.BaseLanguage, f.ActionSets[i], localization)
+	for i, actionSet := range f.ActionSets {
+		node, err := migateActionSet(f.BaseLanguage, actionSet, localization)
 		if err != nil {
-			return nil, fmt.Errorf("error migrating action_set[uuid=%s]: %s", f.ActionSets[i].UUID, err)
+			return nil, fmt.Errorf("error migrating action_set[uuid=%s]: %s", actionSet.UUID, err)
 		}
 		nodes[i] = node
+		nodeUI[node.UUID()] = definition.NewUINodeDetails(actionSet.X, actionSet.Y, UINodeTypeActionSet, nil)
 	}
 
 	for i, ruleSet := range f.RuleSets {
@@ -1049,11 +1056,7 @@ func (f *Flow) Migrate(collapseExits bool, includeUI bool) (flows.Flow, error) {
 		ui = definition.NewUI()
 
 		for _, actionSet := range f.ActionSets {
-			var nodeType flows.UINodeType
-			var nodeConfig flows.UINodeConfig
-
-			details := definition.NewUINodeDetails(actionSet.X, actionSet.Y, nodeType, nodeConfig)
-			ui.AddNode(actionSet.UUID, details)
+			ui.AddNode(actionSet.UUID, nodeUI[actionSet.UUID])
 		}
 		for _, ruleSet := range f.RuleSets {
 			ui.AddNode(ruleSet.UUID, nodeUI[ruleSet.UUID])

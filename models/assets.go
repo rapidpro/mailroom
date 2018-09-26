@@ -9,6 +9,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type OrgAssets struct {
@@ -27,8 +28,13 @@ type OrgAssets struct {
 	channelsByID   map[ChannelID]*Channel
 	channelsByUUID map[assets.ChannelUUID]*Channel
 
+	campaigns             []*Campaign
+	campaignEventsByField map[FieldID][]*CampaignEvent
+	campaignsByGroup      map[GroupID][]*Campaign
+
 	fields       []assets.Field
 	fieldsByUUID map[FieldUUID]*Field
+	fieldsByKey  map[string]*Field
 
 	groups       []assets.Group
 	groupsByID   map[GroupID]*Group
@@ -71,9 +77,13 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		channelsByUUID: make(map[assets.ChannelUUID]*Channel),
 
 		fieldsByUUID: make(map[FieldUUID]*Field),
+		fieldsByKey:  make(map[string]*Field),
 
 		groupsByID:   make(map[GroupID]*Group),
 		groupsByUUID: make(map[assets.GroupUUID]*Group),
+
+		campaignEventsByField: make(map[FieldID][]*CampaignEvent),
+		campaignsByGroup:      make(map[GroupID][]*Campaign),
 
 		flowCache: make(map[assets.FlowUUID]assets.Flow),
 	}
@@ -103,6 +113,7 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 	for _, f := range a.fields {
 		field := f.(*Field)
 		a.fieldsByUUID[field.UUID()] = field
+		a.fieldsByKey[field.Key()] = field
 	}
 
 	a.groups, err = loadGroups(ctx, db, orgID)
@@ -123,6 +134,18 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 	a.resthooks, err = loadResthooks(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading resthooks for org %d", orgID)
+	}
+
+	a.campaigns, err = loadCampaigns(ctx, db, orgID)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading campaigns for org %d", orgID)
+	}
+	for _, c := range a.campaigns {
+		a.campaignsByGroup[c.GroupID()] = append(a.campaignsByGroup[c.GroupID()], c)
+		for _, e := range c.Events() {
+			a.campaignEventsByField[e.RelativeToID()] = append(a.campaignEventsByField[e.RelativeToID()], e)
+			logrus.WithField("field_id", e.RelativeToID()).Debug("adding campaign event")
+		}
 	}
 
 	// cache locations for an hour
@@ -168,6 +191,10 @@ func (a *OrgAssets) FieldByUUID(fieldUUID FieldUUID) *Field {
 	return a.fieldsByUUID[fieldUUID]
 }
 
+func (a *OrgAssets) FieldByKey(key string) *Field {
+	return a.fieldsByKey[key]
+}
+
 func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 	a.flowCacheLock.RLock()
 	flow, found := a.flowCache[flowUUID]
@@ -187,6 +214,18 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 	a.flowCacheLock.Unlock()
 
 	return flow, nil
+}
+
+func (a *OrgAssets) Campaigns() []*Campaign {
+	return a.campaigns
+}
+
+func (a *OrgAssets) CampaignByGroupID(groupID GroupID) []*Campaign {
+	return a.campaignsByGroup[groupID]
+}
+
+func (a *OrgAssets) CampaignEventsByFieldID(fieldID FieldID) []*CampaignEvent {
+	return a.campaignEventsByField[fieldID]
 }
 
 func (a *OrgAssets) Groups() ([]assets.Group, error) {

@@ -25,7 +25,6 @@ type flowRun struct {
 	contact *flows.Contact
 
 	context types.XValue
-	webhook *flows.WebhookCall
 	input   flows.Input
 	parent  flows.FlowRun
 
@@ -116,23 +115,21 @@ func (r *flowRun) Ancestors() []flows.FlowRun {
 func (r *flowRun) Input() flows.Input         { return r.input }
 func (r *flowRun) SetInput(input flows.Input) { r.input = input }
 
-func (r *flowRun) ApplyEvent(s flows.Step, action flows.Action, event flows.Event) error {
-	if err := event.Apply(r); err != nil {
-		return fmt.Errorf("unable to apply event[type=%s]: %s", event.Type(), err)
-	}
-
+func (r *flowRun) AddEvent(s flows.Step, action flows.Action, event flows.Event) {
 	if s != nil {
 		event.SetStepUUID(s.UUID())
 		r.events = append(r.events, event)
 	}
 
-	if !event.FromCaller() {
+	// only add this event to the session's event log if it didn't come from the caller
+	_, isCaller := event.(flows.CallerEvent)
+	if !isCaller {
 		r.Session().LogEvent(event)
 	}
 
 	if log.GetLevel() >= log.DebugLevel {
 		var origin string
-		if event.FromCaller() {
+		if isCaller {
 			origin = "caller"
 		} else {
 			origin = "engine"
@@ -141,16 +138,15 @@ func (r *flowRun) ApplyEvent(s flows.Step, action flows.Action, event flows.Even
 		eventJSON, _ := json.Marshal(eventEnvelope)
 		log.WithField("event_type", event.Type()).WithField("payload", string(eventJSON)).WithField("run", r.UUID()).Debugf("%s event applied", origin)
 	}
-
-	return nil
 }
 
 func (r *flowRun) AddError(step flows.Step, action flows.Action, err error) {
-	r.ApplyEvent(step, action, events.NewErrorEvent(err))
+	r.AddEvent(step, action, events.NewErrorEvent(err))
 }
 
 func (r *flowRun) AddFatalError(step flows.Step, action flows.Action, err error) {
-	r.ApplyEvent(step, action, events.NewFatalErrorEvent(err))
+	r.Exit(flows.RunStatusErrored)
+	r.AddEvent(step, action, events.NewFatalErrorEvent(err))
 }
 
 func (r *flowRun) Path() []flows.Step { return r.path }
@@ -176,9 +172,6 @@ func (r *flowRun) PathLocation() (flows.Step, flows.Node, error) {
 
 	return step, node, nil
 }
-
-func (r *flowRun) Webhook() *flows.WebhookCall      { return r.webhook }
-func (r *flowRun) SetWebhook(rr *flows.WebhookCall) { r.webhook = rr }
 
 func (r *flowRun) CreatedOn() time.Time  { return r.createdOn }
 func (r *flowRun) ExpiresOn() *time.Time { return r.expiresOn }
@@ -259,8 +252,6 @@ func (r *flowRun) Resolve(env utils.Environment, key string) types.XValue {
 		return r.Flow()
 	case "input":
 		return r.Input()
-	case "webhook":
-		return r.Webhook()
 	case "status":
 		return types.NewXText(string(r.Status()))
 	case "results":
@@ -288,7 +279,7 @@ func (r *flowRun) Reduce(env utils.Environment) types.XPrimitive {
 }
 
 func (r *flowRun) ToXJSON(env utils.Environment) types.XText {
-	return types.ResolveKeys(env, r, "uuid", "contact", "flow", "input", "webhook", "status", "results", "created_on", "exited_on").ToXJSON(env)
+	return types.ResolveKeys(env, r, "uuid", "contact", "flow", "input", "status", "results", "created_on", "exited_on").ToXJSON(env)
 }
 
 func (r *flowRun) Snapshot() flows.RunSummary {
@@ -335,7 +326,6 @@ func ReadRun(session flows.Session, data json.RawMessage) (flows.FlowRun, error)
 	r.contact = session.Contact()
 	r.uuid = envelope.UUID
 	r.status = envelope.Status
-	r.webhook = envelope.Webhook
 	r.createdOn = envelope.CreatedOn
 	r.expiresOn = envelope.ExpiresOn
 	r.exitedOn = envelope.ExitedOn
@@ -397,7 +387,6 @@ func (r *flowRun) MarshalJSON() ([]byte, error) {
 	re.ExpiresOn = r.expiresOn
 	re.ExitedOn = r.exitedOn
 	re.Results = r.results
-	re.Webhook = r.webhook
 
 	if r.parent != nil {
 		re.ParentUUID = r.parent.UUID()

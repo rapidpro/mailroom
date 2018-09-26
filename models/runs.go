@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -52,18 +54,43 @@ type Session struct {
 	OrgID     OrgID           `db:"org_id"`
 	CreatedOn time.Time
 
-	runs   []*FlowRun
-	outbox []*Msg
+	org       *OrgAssets
+	contactID ContactID
+	contact   *flows.Contact
+	runs      []*FlowRun
+
+	preCommits  map[CommitHook][]interface{}
+	postCommits map[CommitHook][]interface{}
 }
 
-// AddOutboxMsg adds a message to the outbox for this session
-func (s *Session) AddOutboxMsg(m *Msg) {
-	s.outbox = append(s.outbox, m)
+// Org returns the org assets for this session
+func (s *Session) Org() *OrgAssets {
+	return s.org
 }
 
-// Outbox returns the outbox for this session
-func (s *Session) Outbox() []*Msg {
-	return s.outbox
+// ContactUUID returns the UUID of our contact
+func (s *Session) ContactUUID() flows.ContactUUID {
+	return s.contact.UUID()
+}
+
+// Contact returns the contact for this session
+func (s *Session) Contact() *flows.Contact {
+	return s.contact
+}
+
+// Runs returns our flow run
+func (s *Session) Runs() []*FlowRun {
+	return s.runs
+}
+
+// AddPreCommitEvent adds a new event to be handled by a pre commit hook
+func (s *Session) AddPreCommitEvent(hook CommitHook, event interface{}) {
+	s.preCommits[hook] = append(s.preCommits[hook], event)
+}
+
+// AddPostCommitEvent adds a new event to be handled by a post commit hook
+func (s *Session) AddPostCommitEvent(hook CommitHook, event interface{}) {
+	s.postCommits[hook] = append(s.postCommits[hook], event)
 }
 
 // FlowRun is the mailroom type for a FlowRun
@@ -95,6 +122,9 @@ type FlowRun struct {
 	ParentID        null.Int        `db:"parent_id"`
 	SessionID       SessionID       `db:"session_id"`
 	StartID         null.Int        `db:"start_id"`
+
+	// we keep a reference to model run as well
+	run flows.FlowRun
 }
 
 // Step represents a single step in a run, this struct is used for serialization to the steps
@@ -105,9 +135,9 @@ type Step struct {
 	ExitUUID  flows.ExitUUID `json:"exit_uuid,omitempty"`
 }
 
-// newSession a session objects from the passed in flow session. It does NOT
+// NewSession a session objects from the passed in flow session. It does NOT
 // commit said session to the database.
-func newSession(orgID OrgID, s flows.Session) (*Session, error) {
+func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 	output, err := json.Marshal(s)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error marshalling flow session")
@@ -130,8 +160,24 @@ func newSession(orgID OrgID, s flows.Session) (*Session, error) {
 		Responded: false, // TODO: populate once we are running real flows
 		Output:    string(output),
 		ContactID: s.Contact().ID(),
-		OrgID:     orgID,
+		OrgID:     org.OrgID(),
 		CreatedOn: s.Runs()[0].CreatedOn(),
+
+		contact:     s.Contact(),
+		org:         org,
+		preCommits:  make(map[CommitHook][]interface{}),
+		postCommits: make(map[CommitHook][]interface{}),
+	}
+
+	// now build up our runs
+	for _, r := range s.Runs() {
+		run, err := newRun(session, r)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error creating run: %s", r.UUID())
+		}
+
+		// save the run to our session
+		session.runs = append(session.runs, run)
 	}
 
 	return session, nil
@@ -146,14 +192,16 @@ RETURNING id
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func WriteSessions(ctx context.Context, tx *sqlx.Tx, track *Track, ss []flows.Session) ([]*Session, error) {
-	orgID := track.Org().OrgID()
+func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, ss []flows.Session) ([]*Session, error) {
+	if len(ss) == 0 {
+		return nil, nil
+	}
 
 	// create all our session objects
 	sessions := make([]*Session, 0, len(ss))
 	sessionsI := make([]interface{}, 0, len(ss))
 	for _, s := range ss {
-		session, err := newSession(orgID, s)
+		session, err := NewSession(org, s)
 		if err != nil {
 			return nil, errors.Annotatef(err, "error creating session objects")
 		}
@@ -162,42 +210,43 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, track *Track, ss []flows.Se
 	}
 
 	// insert them all
-	err := bulkInsert(ctx, tx, insertSessionSQL, sessionsI)
+	err := BulkInsert(ctx, tx, insertSessionSQL, sessionsI)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error inserting sessions")
 	}
 
-	// now build up our runs
-	runs := make([]interface{}, 0, len(ss))
-	for i := range sessions {
-		s := ss[i]
-		session := sessions[i]
-		for _, r := range s.Runs() {
-			run, err := newRun(ctx, tx, track, session, r)
-			if err != nil {
-				return nil, errors.Annotatef(err, "error creating run: %s", r.UUID())
-			}
+	// for each session, apply the events to each run, gathering our list of runs in the process
+	runs := make([]interface{}, 0, len(sessions))
+	for _, s := range sessions {
+		for _, r := range s.runs {
+			runs = append(runs, r)
 
-			// save the run to our session
-			session.runs = append(session.runs, run)
-
-			// add to our list of runs we have to apply
-			runs = append(runs, run)
+			// set our session id now that it is written
+			r.SessionID = s.ID
 		}
 	}
 
 	// insert all runs
-	err = bulkInsert(ctx, tx, insertRunSQL, runs)
+	logrus.WithField("runs", runs).Debug("runs")
+	err = BulkInsert(ctx, tx, insertRunSQL, runs)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error writing runs")
 	}
 
-	// insert all our messages
-	rc := track.rp.Get()
-	err = insertSessionMessages(ctx, tx, rc, orgID, sessions)
-	rc.Close()
+	// apply our all events for the session
+	for i := range ss {
+		for _, e := range ss[i].Events() {
+			err := ApplyEvent(ctx, tx, rp, sessions[i], e)
+			if err != nil {
+				return nil, errors.Annotatef(err, "error applying event: %v", e)
+			}
+		}
+	}
+
+	// gather all our pre commit events, group them by hook
+	err = ApplyPreEventHooks(ctx, tx, rp, org.OrgID(), sessions)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "error applying pre commit hooks")
 	}
 
 	// return our session
@@ -215,8 +264,8 @@ RETURNING id
 
 // newRun writes the passed in flow run to our database, also applying any events in those runs as
 // appropriate. (IE, writing db messages etc..)
-func newRun(ctx context.Context, tx *sqlx.Tx, track *Track, session *Session, r flows.FlowRun) (*FlowRun, error) {
-	org := track.Org()
+func newRun(session *Session, r flows.FlowRun) (*FlowRun, error) {
+	org := session.Org()
 
 	// no path is invalid
 	if len(r.Path()) < 1 {
@@ -254,6 +303,7 @@ func newRun(ctx context.Context, tx *sqlx.Tx, track *Track, session *Session, r 
 		OrgID:           org.OrgID(),
 		Path:            string(pathJSON),
 		CurrentNodeUUID: path[len(path)-1].NodeUUID,
+		run:             r,
 	}
 
 	// set our exit type if we exited
@@ -281,7 +331,7 @@ func newRun(ctx context.Context, tx *sqlx.Tx, track *Track, session *Session, r 
 	}
 	run.Events = string(eventJSON)
 
-	// write our resulets out
+	// write our results out
 	resultsJSON, err := json.Marshal(r.Results())
 	if err != nil {
 		return nil, errors.Annotatef(err, "error marshalling results for run: %s", run.UUID)
@@ -290,14 +340,5 @@ func newRun(ctx context.Context, tx *sqlx.Tx, track *Track, session *Session, r 
 
 	// TODO: set responded (always false for now)
 	// TODO: set parent id (always null for now)
-
-	// apply our events
-	for _, evt := range filteredEvents {
-		err := ApplyEvent(ctx, tx, track, session, run, evt)
-		if err != nil {
-			return nil, errors.Annotatef(err, "error applying event: %s", evt)
-		}
-	}
-
 	return run, nil
 }

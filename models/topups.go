@@ -25,7 +25,7 @@ const (
 	redisCreditsRemainingKey = `org:%d:cache:credits_remaining:%d`
 )
 
-func decrementOrgCredits(ctx context.Context, db sqlx.Queryer, rc redis.Conn, orgID OrgID, amount int) (TopupID, error) {
+func DecrementOrgCredits(ctx context.Context, db sqlx.Queryer, rc redis.Conn, orgID OrgID, amount int) (TopupID, error) {
 	// no matter what we decrement our org credit
 	topups, err := redis.Ints(decrementCreditLua.Do(rc, orgID, amount))
 	if err != nil {

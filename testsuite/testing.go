@@ -4,13 +4,20 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"testing"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
 )
 
 // Reset clears out both our database and redis DB
 func Reset() {
+	// change to debug logging
+	logrus.SetLevel(logrus.DebugLevel)
+
 	ResetDB()
 	ResetRP()
 }
@@ -80,4 +87,11 @@ func mustExec(command string, args ...string) {
 	if err != nil {
 		panic(fmt.Sprintf("error restoring database: %s: %s", err, string(output)))
 	}
+}
+
+func AssertQueryCount(t *testing.T, db *sqlx.DB, sql string, args []interface{}, count int, errMsg ...interface{}) {
+	var c int
+	err := db.Get(&c, sql, args...)
+	assert.NoError(t, err)
+	assert.Equal(t, count, c, errMsg...)
 }
