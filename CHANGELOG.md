@@ -1,3 +1,7 @@
+v0.0.21
+----------
+ * correct queue names
+
 v0.0.20
 ----------
  * proper config options
