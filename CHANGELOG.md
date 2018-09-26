@@ -1,3 +1,7 @@
+v0.0.20
+----------
+ * proper config options
+
 v0.0.19
 ----------
  * add session commit hook, configurable number of threads
