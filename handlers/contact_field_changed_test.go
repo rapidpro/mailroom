@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
@@ -24,19 +25,19 @@ func TestContactFieldChanged(t *testing.T) {
 		EventTestCase{
 			Events: ContactEventMap{
 				Cathy: []flows.Event{
-					events.NewContactFieldChangedEvent(gender, "Male"),
-					events.NewContactFieldChangedEvent(gender, "Female"),
-					events.NewContactFieldChangedEvent(age, ""),
+					events.NewContactFieldChangedEvent(gender, &flows.Value{Text: types.NewXText("Male")}),
+					events.NewContactFieldChangedEvent(gender, &flows.Value{Text: types.NewXText("Female")}),
+					events.NewContactFieldChangedEvent(age, &flows.Value{}),
 				},
 				Evan: []flows.Event{
-					events.NewContactFieldChangedEvent(gender, "Male"),
-					events.NewContactFieldChangedEvent(gender, ""),
+					events.NewContactFieldChangedEvent(gender, &flows.Value{Text: types.NewXText("Male")}),
+					events.NewContactFieldChangedEvent(gender, &flows.Value{}),
 				},
 				Bob: []flows.Event{
-					events.NewContactFieldChangedEvent(gender, ""),
-					events.NewContactFieldChangedEvent(gender, "Male"),
-					events.NewContactFieldChangedEvent(age, "Old"),
-					events.NewContactFieldChangedEvent(unknown, "unknown"),
+					events.NewContactFieldChangedEvent(gender, &flows.Value{}),
+					events.NewContactFieldChangedEvent(gender, &flows.Value{Text: types.NewXText("Male")}),
+					events.NewContactFieldChangedEvent(age, &flows.Value{Text: types.NewXText("Old")}),
+					events.NewContactFieldChangedEvent(unknown, &flows.Value{Text: types.NewXText("unknown")}),
 				},
 			},
 			Assertions: []SQLAssertion{

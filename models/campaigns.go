@@ -103,7 +103,7 @@ func (e *CampaignEvent) ScheduleForTime(tz *time.Location, now time.Time, start 
 	// round to next minute, floored at 0 s/ns if we aren't already at 0
 	scheduled := start
 	if start.Second() > 0 || start.Nanosecond() > 0 {
-		scheduled = start.Add(time.Second * 59).Round(time.Minute)
+		scheduled = start.Add(time.Second * 60).Truncate(time.Minute)
 	}
 
 	// create our offset

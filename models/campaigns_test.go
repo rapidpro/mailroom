@@ -39,8 +39,8 @@ func TestCampaignSchedule(t *testing.T) {
 		{2, OffsetMinute, NilDeliveryHour, eastern, time.Now(), time.Date(2029, 1, 1, 2, 58, 0, 0, eastern),
 			false, time.Date(2029, 1, 1, 3, 0, 0, 0, eastern), time.Minute * 2},
 
-		{2, OffsetMinute, NilDeliveryHour, eastern, time.Now(), time.Date(2029, 1, 1, 2, 57, 32, 35, eastern),
-			false, time.Date(2029, 1, 1, 3, 0, 0, 0, eastern), time.Minute * 2},
+		{2, OffsetMinute, NilDeliveryHour, eastern, time.Now(), time.Date(2029, 1, 1, 2, 57, 32, 0, eastern),
+			false, time.Date(2029, 1, 1, 3, 0, 0, 0, eastern), time.Minute*2 + time.Second*28},
 
 		{-2, OffsetHour, NilDeliveryHour, eastern, time.Now(), time.Date(2029, 1, 2, 1, 58, 0, 0, eastern),
 			false, time.Date(2029, 1, 1, 23, 58, 0, 0, eastern), time.Hour * -2},

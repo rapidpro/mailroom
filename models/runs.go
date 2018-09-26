@@ -10,6 +10,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -215,7 +216,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// for each session, apply the events to each run, gathering our list of runs in the process
-	runs := make([]interface{}, len(sessions))
+	runs := make([]interface{}, 0, len(sessions))
 	for _, s := range sessions {
 		for _, r := range s.runs {
 			runs = append(runs, r)
@@ -226,6 +227,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// insert all runs
+	logrus.WithField("runs", runs).Debug("runs")
 	err = BulkInsert(ctx, tx, insertRunSQL, runs)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error writing runs")

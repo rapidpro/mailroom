@@ -13,8 +13,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHandler(events.TypeContactGroupsRemoved, handleContactGroupsRemoved)
-	models.RegisterEventHandler(events.TypeContactGroupsAdded, handleContactGroupsAdded)
+	models.RegisterEventHandler(events.TypeContactGroupsChanged, handleContactGroupsChanged)
 }
 
 // ContactGroupsChangedHook is our hook for all group changes
@@ -71,16 +70,17 @@ func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	return nil
 }
 
-// handleContactGroupsRemoved is called when a group is removed from a contact
-func handleContactGroupsRemoved(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *models.Session, e flows.Event) error {
-	event := e.(*events.ContactGroupsRemovedEvent)
+// handleContactGroupsChanged is called when a group is added or removed from our contact
+func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *models.Session, e flows.Event) error {
+	event := e.(*events.ContactGroupsChangedEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"groups":       event.Groups,
+		"contact_uuid":   session.ContactUUID(),
+		"groups_removed": event.GroupsRemoved,
+		"groups_added":   event.GroupsAdded,
 	}).Debug("removing contact from groups")
 
 	// remove each of our groups
-	for _, g := range event.Groups {
+	for _, g := range event.GroupsRemoved {
 		// look up our group id
 		group := session.Org().GroupByUUID(g.UUID)
 		if group == nil {
@@ -101,19 +101,8 @@ func handleContactGroupsRemoved(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
 	}
 
-	return nil
-}
-
-// handleContactGroupsAdded is called when a group is added to a contact
-func handleContactGroupsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *models.Session, e flows.Event) error {
-	event := e.(*events.ContactGroupsAddedEvent)
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"groups":       event.Groups,
-	}).Debug("adding contact to groups")
-
 	// add each of our groups
-	for _, g := range event.Groups {
+	for _, g := range event.GroupsAdded {
 		// look up our group id
 		group := session.Org().GroupByUUID(g.UUID)
 		if group == nil {

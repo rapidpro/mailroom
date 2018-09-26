@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
@@ -22,16 +23,29 @@ func TestCampaigns(t *testing.T) {
 	testsuite.DB().MustExec("insert into contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2);", Cathy, doctorsID)
 	testsuite.DB().MustExec("insert into contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2);", Bob, doctorsID)
 
+	// init their values
+	testsuite.DB().MustExec(
+		`update contacts_contact set fields = fields - '8c1c1256-78d6-4a5b-9f1c-1761d5728251'
+		WHERE id = $1`, Cathy)
+
+	testsuite.DB().MustExec(
+		`update contacts_contact set fields = fields ||
+		'{"8c1c1256-78d6-4a5b-9f1c-1761d5728251": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
+		WHERE id = $1`, Bob)
+
 	tcs := []EventTestCase{
 		EventTestCase{
 			Events: ContactEventMap{
 				Cathy: []flows.Event{
-					events.NewContactFieldChangedEvent(joined, "2029-09-15T12:00:00+00:00"),
-					events.NewContactFieldChangedEvent(joined, ""),
+					events.NewContactFieldChangedEvent(joined, &flows.Value{Text: types.NewXText("2029-09-15T12:00:00+00:00")}),
+					events.NewContactFieldChangedEvent(joined, &flows.Value{}),
 				},
 				Bob: []flows.Event{
-					events.NewContactFieldChangedEvent(joined, "2029-09-15T12:00:00+00:00"),
-					events.NewContactFieldChangedEvent(joined, "2029-09-15T15:00:00+00:00"),
+					events.NewContactFieldChangedEvent(joined, &flows.Value{Text: types.NewXText("2029-09-15T12:00:00+00:00")}),
+					events.NewContactFieldChangedEvent(joined, &flows.Value{Text: types.NewXText("2029-09-15T12:00:00+00:00")}),
+				},
+				Evan: []flows.Event{
+					events.NewContactFieldChangedEvent(joined, &flows.Value{Text: types.NewXText("2029-09-15T12:00:00+00:00")}),
 				},
 			},
 			Assertions: []SQLAssertion{
@@ -44,6 +58,11 @@ func TestCampaigns(t *testing.T) {
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{Bob},
 					Count: 2,
+				},
+				SQLAssertion{
+					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
+					Args:  []interface{}{Evan},
+					Count: 0,
 				},
 			},
 		},

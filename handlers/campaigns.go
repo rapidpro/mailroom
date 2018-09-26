@@ -120,12 +120,15 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 			}
 
 			// get the typed value
-			start, isTime := value.TypedValue().(*types.XDateTime)
+			typed := value.TypedValue()
+			start, isTime := typed.(types.XDateTime)
 
 			// nil or not a date? move on
-			if start == nil || !isTime {
+			if !isTime {
 				continue
 			}
+
+			logrus.WithField("start", start).Debug("calculating offset")
 
 			// calculate our next fire
 			scheduled, err := ce.ScheduleForTime(tz, now, start.Native())

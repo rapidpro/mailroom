@@ -28,7 +28,7 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 	fieldUpdates := make([]interface{}, 0, len(sessions))
 	fieldDeletes := make([]interface{}, 0)
 	for session, es := range sessions {
-		updates := make(map[models.FieldUUID]*FieldValue, len(es))
+		updates := make(map[models.FieldUUID]*flows.Value, len(es))
 		for _, e := range es {
 			event := e.(*events.ContactFieldChangedEvent)
 			field := session.Org().FieldByKey(event.Field.Key)
@@ -41,14 +41,12 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 				continue
 			}
 
-			updates[field.UUID()] = &FieldValue{
-				Text: event.Value,
-			}
+			updates[field.UUID()] = event.Value
 		}
 
 		// trim out deletes, adding to our list of global deletes
 		for k, v := range updates {
-			if v.Text == "" {
+			if v == nil || v.Text.Native() == "" {
 				delete(updates, k)
 				fieldDeletes = append(fieldDeletes, &FieldDelete{
 					ContactID: session.ContactID,

@@ -23,16 +23,16 @@ func TestContactGroupsChanged(t *testing.T) {
 		EventTestCase{
 			Events: ContactEventMap{
 				Cathy: []flows.Event{
-					events.NewContactGroupsAddedEvent([]*assets.GroupReference{doctors}),
-					events.NewContactGroupsAddedEvent([]*assets.GroupReference{doctors}),
-					events.NewContactGroupsRemovedEvent([]*assets.GroupReference{doctors}),
-					events.NewContactGroupsAddedEvent([]*assets.GroupReference{teachers}),
+					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{doctors}},
+					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{doctors}},
+					&events.ContactGroupsChangedEvent{GroupsRemoved: []*assets.GroupReference{doctors}},
+					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{teachers}},
 				},
 				Evan: []flows.Event{
-					events.NewContactGroupsRemovedEvent([]*assets.GroupReference{doctors}),
-					events.NewContactGroupsAddedEvent([]*assets.GroupReference{teachers}),
-					events.NewContactGroupsRemovedEvent([]*assets.GroupReference{unknown}),
-					events.NewContactGroupsAddedEvent([]*assets.GroupReference{unknown}),
+					&events.ContactGroupsChangedEvent{GroupsRemoved: []*assets.GroupReference{doctors}},
+					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{teachers}},
+					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{unknown}},
+					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{unknown}},
 				},
 			},
 			Assertions: []SQLAssertion{

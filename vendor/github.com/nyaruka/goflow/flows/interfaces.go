@@ -48,7 +48,7 @@ type FlowType string
 type UINodeType string
 
 // UINodeConfig contains config unique to its type
-type UINodeConfig map[string]string
+type UINodeConfig map[string]interface{}
 
 // Sticky is a migrated note
 type Sticky map[string]interface{}
@@ -195,7 +195,7 @@ type Wait interface {
 	TimeoutOn() *time.Time
 
 	Begin(FlowRun, Step)
-	CanResume([]Event) bool
+	CanResume([]CallerEvent) bool
 }
 
 // Localization provide a way to get the translations for a specific language
@@ -264,20 +264,19 @@ const (
 
 // Event describes a state change
 type Event interface {
-	CreatedOn() time.Time
+	utils.Typed
 
+	CreatedOn() time.Time
 	StepUUID() StepUUID
 	SetStepUUID(StepUUID)
+}
 
-	FromCaller() bool
-	SetFromCaller(bool)
+// CallerEvent is an event we can receive from our caller
+type CallerEvent interface {
+	Event
 
-	AllowedOrigin() EventOrigin
 	Validate(SessionAssets) error
-
 	Apply(FlowRun) error
-
-	utils.Typed
 }
 
 // EventLog is the log of events the caller must apply after each call
@@ -302,10 +301,10 @@ type EventLog interface {
 //
 // Examples:
 //
-//   @run.input -> Hi there\nhttp://s3.amazon.com/bucket/test.jpg\nhttp://s3.amazon.com/bucket/test.mp3
-//   @run.input.type -> msg
-//   @run.input.text -> Hi there
-//   @run.input.attachments -> ["http://s3.amazon.com/bucket/test.jpg","http://s3.amazon.com/bucket/test.mp3"]
+//   @input -> Hi there\nhttp://s3.amazon.com/bucket/test.jpg\nhttp://s3.amazon.com/bucket/test.mp3
+//   @input.type -> msg
+//   @input.text -> Hi there
+//   @input.attachments -> ["http://s3.amazon.com/bucket/test.jpg","http://s3.amazon.com/bucket/test.mp3"]
 //   @(json(run.input)) -> {"attachments":[{"content_type":"image/jpeg","url":"http://s3.amazon.com/bucket/test.jpg"},{"content_type":"audio/mp3","url":"http://s3.amazon.com/bucket/test.mp3"}],"channel":{"address":"+12345671111","name":"My Android Phone","uuid":"57f1078f-88aa-46f4-a59a-948a5739c03d"},"created_on":"2000-01-01T00:00:00.000000Z","text":"Hi there","type":"msg","urn":{"display":"","path":"+12065551212","scheme":"tel"},"uuid":"9bf91c2b-ce58-4cef-aacc-281e03f69ab5"}
 //
 // @context input
@@ -352,8 +351,8 @@ type Session interface {
 	Wait() Wait
 	FlowOnStack(assets.FlowUUID) bool
 
-	Start(Trigger, []Event) error
-	Resume([]Event) error
+	Start(Trigger, []CallerEvent) error
+	Resume([]CallerEvent) error
 	Runs() []FlowRun
 	GetRun(RunUUID) (FlowRun, error)
 	GetCurrentChild(FlowRun) FlowRun
@@ -393,8 +392,7 @@ type RunEnvironment interface {
 //  * `contact` the [contact](#context:contact) of the flow run
 //  * `input` the [input](#context:input) of the current run
 //  * `results` the results that have been saved for this run
-//  * `results.[snaked_result_name]` the value of the specific result, e.g. `run.results.age`
-//  * `webhook` the last [webhook](#context:webhook) call made in the current run
+//  * `results.[snaked_result_name]` the value of the specific result, e.g. `results.age`
 //
 // Examples:
 //
@@ -410,14 +408,12 @@ type FlowRun interface {
 	Session() Session
 	Context() types.XValue
 	Input() Input
-	Webhook() *WebhookCall
 
 	SetContact(*Contact)
 	SetInput(Input)
 	SetStatus(RunStatus)
-	SetWebhook(*WebhookCall)
 
-	ApplyEvent(Step, Action, Event) error
+	AddEvent(Step, Action, Event)
 	AddError(Step, Action, error)
 	AddFatalError(Step, Action, error)
 
