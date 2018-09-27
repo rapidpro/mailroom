@@ -86,7 +86,8 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets,
 			// create our URN
 			urn, err := urns.NewURNFromParts(u.Scheme, u.Path, query.Encode(), u.Display)
 			if err != nil {
-				return nil, errors.Annotatef(err, "error loading contact, invalid urn: %s %s %s %s", u.Scheme, u.Path, query.Encode(), u.Display)
+				logrus.WithField("urn", u.Path).WithField("scheme", u.Scheme).Error("invalid URN, ignoring")
+				continue
 			}
 			contactURNs = append(contactURNs, urn)
 		}
