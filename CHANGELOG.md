@@ -1,3 +1,7 @@
+v0.0.22
+----------
+ * fix for empty query case, better logging, json env
+
 v0.0.21
 ----------
  * correct queue names
