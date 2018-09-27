@@ -1,3 +1,7 @@
+v0.0.23
+----------
+ * more better logging
+
 v0.0.22
 ----------
  * fix for empty query case, better logging, json env
