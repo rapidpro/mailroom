@@ -1,3 +1,7 @@
+v0.0.24
+----------
+ * ignore (but log) invalid contact urns
+
 v0.0.23
 ----------
  * more better logging
