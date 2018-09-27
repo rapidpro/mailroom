@@ -241,7 +241,7 @@ func MarkEventsFired(ctx context.Context, tx *sqlx.Tx, fires []*EventFire, fired
 		updates = append(updates, f)
 	}
 
-	return BulkInsert(ctx, tx, markEventsFired, updates)
+	return BulkSQL(ctx, "mark events fired", tx, markEventsFired, updates)
 }
 
 const markEventsFired = `

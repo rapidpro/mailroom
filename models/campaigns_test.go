@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCampaignSchedule(t *testing.T) {
+func testCampaignSchedule(t *testing.T) {
 	eastern, _ := time.LoadLocation("US/Eastern")
 	nilDate := time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
 

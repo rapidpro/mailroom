@@ -9,7 +9,6 @@ import (
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/sirupsen/logrus"
 )
 
 type OrgAssets struct {
@@ -144,7 +143,6 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		a.campaignsByGroup[c.GroupID()] = append(a.campaignsByGroup[c.GroupID()], c)
 		for _, e := range c.Events() {
 			a.campaignEventsByField[e.RelativeToID()] = append(a.campaignEventsByField[e.RelativeToID()], e)
-			logrus.WithField("field_id", e.RelativeToID()).Debug("adding campaign event")
 		}
 	}
 

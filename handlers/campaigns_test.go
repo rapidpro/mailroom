@@ -11,7 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 )
 
-func TestCampaigns(t *testing.T) {
+func testCampaigns(t *testing.T) {
 	testsuite.Reset()
 
 	//	joinedUUID := models.FieldUUID("8c1c1256-78d6-4a5b-9f1c-1761d5728251")

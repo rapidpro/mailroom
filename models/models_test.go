@@ -203,7 +203,7 @@ func TestMsgs(t *testing.T) {
 		msg, err := NewOutgoingMsg(ctx, tx, rp, orgID, tc.Channel, tc.ContactID, flowMsg, now)
 
 		if err == nil {
-			err = BulkInsert(ctx, tx, InsertMsgSQL, []interface{}{msg})
+			err = BulkSQL(ctx, "insert msgs sq", tx, InsertMsgSQL, []interface{}{msg})
 			assert.NoError(t, err)
 			assert.Equal(t, orgID, msg.OrgID)
 			assert.Equal(t, tc.Text, msg.Text)

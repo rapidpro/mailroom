@@ -70,7 +70,7 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 
 	// first apply our deletes
 	if len(fieldDeletes) > 0 {
-		err := models.BulkInsert(ctx, tx, deleteContactFieldsSQL, fieldDeletes)
+		err := models.BulkSQL(ctx, "deleting contact field values", tx, deleteContactFieldsSQL, fieldDeletes)
 		if err != nil {
 			return errors.Annotatef(err, "error deleting contact fields")
 		}
@@ -78,7 +78,7 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 
 	// then our updates
 	if len(fieldUpdates) > 0 {
-		err := models.BulkInsert(ctx, tx, updateContactFieldsSQL, fieldUpdates)
+		err := models.BulkSQL(ctx, "updating contact field values", tx, updateContactFieldsSQL, fieldUpdates)
 		if err != nil {
 			return errors.Annotatef(err, "error updating contact fields")
 		}
@@ -92,15 +92,14 @@ func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 	event := e.(*events.ContactFieldChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
+		"session_id":   session.ID,
 		"field_key":    event.Field.Key,
 		"value":        event.Value,
 	}).Debug("contact field changed")
 
 	// add our callback
 	session.AddPreCommitEvent(contactFieldChangedHook, event)
-
-	logrus.WithField("adding campaign hook", event)
-	session.AddPreCommitEvent(updateCampaignEventsHook, event)
+	//session.AddPreCommitEvent(updateCampaignEventsHook, event)
 
 	return nil
 }

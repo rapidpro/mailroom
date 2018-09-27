@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func readJSONRow(rows *sqlx.Rows, destination interface{}) error {
@@ -54,11 +56,13 @@ func extractValues(sql string) (string, error) {
 	return sql[startValues+6 : endValues+1], nil
 }
 
-func BulkInsert(ctx context.Context, tx *sqlx.Tx, sql string, vs []interface{}) error {
+func BulkSQL(ctx context.Context, label string, tx *sqlx.Tx, sql string, vs []interface{}) error {
 	// no values, nothing to do
 	if len(vs) == 0 {
 		return nil
 	}
+
+	start := time.Now()
 
 	// this will be our SQL placeholders for values in our final query, built dynamically
 	values := strings.Builder{}
@@ -114,6 +118,8 @@ func BulkInsert(ctx context.Context, tx *sqlx.Tx, sql string, vs []interface{}) 
 			}
 		}
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("rows", len(vs)).Debugf("%s bulk insert complete", label)
 
 	return nil
 }

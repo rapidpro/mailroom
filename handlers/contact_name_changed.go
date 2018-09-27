@@ -20,7 +20,7 @@ type CommitContactNameChanges struct{}
 
 var commitContactNameChanges = &CommitContactNameChanges{}
 
-// commitContactNameChanges commits our contact name changes as a bulk update for the passed in map of sessions
+// Apply commits our contact name changes as a bulk update for the passed in map of sessions
 func (h *CommitContactNameChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build up our list of pairs of contact id and contact name
 	updates := make([]interface{}, 0, len(sessions))
@@ -31,7 +31,7 @@ func (h *CommitContactNameChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	}
 
 	// do our update
-	return models.BulkInsert(ctx, tx, updateContactNameSQL, updates)
+	return models.BulkSQL(ctx, "updating contact name", tx, updateContactNameSQL, updates)
 }
 
 // applyContactNameChanged changes the name of the contact
@@ -39,6 +39,7 @@ func applyContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, s
 	event := e.(*events.ContactNameChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
+		"session_id":   session.ID,
 		"name":         event.Name,
 	}).Debug("changing contact name")
 

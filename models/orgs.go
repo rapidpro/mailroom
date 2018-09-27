@@ -12,7 +12,7 @@ import (
 
 type OrgID int
 
-// Environment is mailroom's type for RapidPro orgs. It also implements the utils.Environment interface for GoFlow
+// Org is mailroom's type for RapidPro orgs. It also implements the utils.Environment interface for GoFlow
 type Org struct {
 	id  OrgID
 	env utils.Environment
@@ -41,6 +41,11 @@ func (o *Org) Now() time.Time { return o.env.Now() }
 
 // Extension returns the extension for this org
 func (o *Org) Extension(name string) json.RawMessage { return o.env.Extension(name) }
+
+// MarshalJSON is our custom marshaller so that our inner env get output
+func (o *Org) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.env)
+}
 
 // loadOrg loads the org for the passed in id, returning any error encountered
 func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {

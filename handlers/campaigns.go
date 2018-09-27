@@ -152,7 +152,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 	// first delete all our removed fires
 	if len(deletes) > 0 {
-		err := models.BulkInsert(ctx, tx, deleteUnfiredFires, deletes)
+		err := models.BulkSQL(ctx, "deleting unfired event fires", tx, deleteUnfiredFires, deletes)
 		if err != nil {
 			return errors.Annotatef(err, "error deleting unfired event fires")
 		}
@@ -160,7 +160,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 	// then insert our new ones
 	if len(inserts) > 0 {
-		err := models.BulkInsert(ctx, tx, insertFires, inserts)
+		err := models.BulkSQL(ctx, "inserting new event fires", tx, insertFires, inserts)
 		if err != nil {
 			return errors.Annotatef(err, "error inserting new event fires")
 		}

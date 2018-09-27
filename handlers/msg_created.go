@@ -86,7 +86,7 @@ func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// insert all our messages
-	err = models.BulkInsert(ctx, tx, models.InsertMsgSQL, args)
+	err = models.BulkSQL(ctx, "inserting msgs", tx, models.InsertMsgSQL, args)
 	if err != nil {
 		return errors.Annotatef(err, "error writing messages")
 	}
@@ -99,6 +99,7 @@ func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, sess
 	event := e.(*events.MsgCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
+		"session_id":   session.ID,
 		"text":         event.Msg.Text(),
 		"urn":          event.Msg.URN(),
 	}).Debug("creating message")

@@ -31,7 +31,7 @@ func (h *CommitContactLanguageChanges) Apply(ctx context.Context, tx *sqlx.Tx, r
 	}
 
 	// do our update
-	return models.BulkInsert(ctx, tx, updateContactLanguageSQL, updates)
+	return models.BulkSQL(ctx, "updating contact language", tx, updateContactLanguageSQL, updates)
 }
 
 // applyContactLanguageChanged is called when we process a contact language change
@@ -39,7 +39,8 @@ func applyContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 	event := e.(*events.ContactLanguageChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"name":         event.Language,
+		"session_id":   session.ID,
+		"language":     event.Language,
 	}).Debug("changing contact language")
 
 	session.AddPreCommitEvent(commitContactLanguageChanges, event)

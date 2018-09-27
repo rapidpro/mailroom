@@ -55,13 +55,13 @@ func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 	// do our updates
 	if len(adds) > 0 {
-		err := models.BulkInsert(ctx, tx, addContactsToGroupsSQL, adds)
+		err := models.BulkSQL(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, adds)
 		if err != nil {
 			return errors.Annotatef(err, "error adding contacts to groups")
 		}
 	}
 	if len(removes) > 0 {
-		err := models.BulkInsert(ctx, tx, removeContactsFromGroupsSQL, removes)
+		err := models.BulkSQL(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, removes)
 		if err != nil {
 			return errors.Annotatef(err, "error removing contacts from groups")
 		}
@@ -75,8 +75,9 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	event := e.(*events.ContactGroupsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":   session.ContactUUID(),
-		"groups_removed": event.GroupsRemoved,
-		"groups_added":   event.GroupsAdded,
+		"session_id":     session.ID,
+		"groups_removed": len(event.GroupsRemoved),
+		"groups_added":   len(event.GroupsAdded),
 	}).Debug("removing contact from groups")
 
 	// remove each of our groups
@@ -98,7 +99,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 		// add our add event
 		session.AddPreCommitEvent(contactGroupsChangedHook, hookEvent)
-		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
+		//session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
 	}
 
 	// add each of our groups
@@ -120,7 +121,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		}
 
 		session.AddPreCommitEvent(contactGroupsChangedHook, hookEvent)
-		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
+		//session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
 	}
 
 	return nil
