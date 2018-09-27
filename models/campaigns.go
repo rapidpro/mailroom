@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // FireID is our id for our event fires
@@ -268,6 +269,8 @@ type EventFire struct {
 
 // LoadEventFires loads all the event fires with the passed in ids
 func LoadEventFires(ctx context.Context, db *sqlx.DB, ids []int64) ([]*EventFire, error) {
+	start := time.Now()
+
 	q, vs, err := sqlx.In(loadEventFireSQL, ids)
 	if err != nil {
 		return nil, errors.Annotate(err, "error rebinding campaign fire query")
@@ -289,6 +292,9 @@ func LoadEventFires(ctx context.Context, db *sqlx.DB, ids []int64) ([]*EventFire
 		}
 		fires = append(fires, fire)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("count", len(fires)).Debug("event fires loaded")
+
 	return fires, nil
 }
 

@@ -145,7 +145,9 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	}
 
 	// commit it at once
+	commitStart := time.Now()
 	err = tx.Commit()
+	logrus.WithField("elapsed", time.Since(commitStart)).WithField("count", len(sessions)).Debug("sessions committed")
 
 	// this was an error and this was a single session being committed, no use retrying
 	if err != nil && len(sessions) == 1 {

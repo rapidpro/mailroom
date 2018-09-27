@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type ContactID int64
@@ -21,6 +22,8 @@ type FieldUUID utils.UUID
 
 // LoadContacts loads a set of contacts for the passed in ids
 func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets, org *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
+	start := time.Now()
+
 	// rebind our query for our IN clause
 	// TODO: should we be filtering by org here too?
 	q, vs, err := sqlx.In(selectContactsSQL, ids)
@@ -137,6 +140,9 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets,
 
 		contacts = append(contacts, contact)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("count", len(contacts)).Debug("loaded contacts")
+
 	return contacts, nil
 }
 

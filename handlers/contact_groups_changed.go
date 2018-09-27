@@ -78,7 +78,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		"session_id":     session.ID,
 		"groups_removed": len(event.GroupsRemoved),
 		"groups_added":   len(event.GroupsAdded),
-	}).Debug("removing contact from groups")
+	}).Debug("changing contact groups")
 
 	// remove each of our groups
 	for _, g := range event.GroupsRemoved {
