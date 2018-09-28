@@ -1,3 +1,7 @@
+v0.0.25
+----------
+ * optimize contact loading queries
+
 v0.0.24
 ----------
  * ignore (but log) invalid contact urns
