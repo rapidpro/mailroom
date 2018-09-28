@@ -80,7 +80,15 @@ func TestContacts(t *testing.T) {
 	session, err := engine.NewSessionAssets(org)
 	assert.NoError(t, err)
 
-	contacts, err := LoadContacts(ctx, db, session, org, []flows.ContactID{42, 43, 80})
+	db.MustExec(
+		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
+		VALUES(1, 80, 'whatsapp', '250788373373', 'whatsapp:250788373373', 100)`)
+
+	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = 43`)
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = 43`)
+	db.MustExec(`UPDATE contacts_contact SET is_active = FALSE WHERE id = 82`)
+
+	contacts, err := LoadContacts(ctx, db, session, org, []flows.ContactID{1, 42, 43, 80, 82})
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(contacts))
 
@@ -88,6 +96,7 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, "Cathy Quincy", contacts[0].Name())
 		assert.Equal(t, len(contacts[0].URNs()), 1)
 		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+250700000001?id=42")
+		assert.Equal(t, 5, contacts[0].Groups().Length())
 
 		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto"), contacts[0].Fields()["state"].TypedValue())
 		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto > Yabo > Kilgori"), contacts[0].Fields()["ward"].TypedValue())
@@ -96,9 +105,15 @@ func TestContacts(t *testing.T) {
 
 		assert.Equal(t, "Dave Jameson", contacts[1].Name())
 		assert.Equal(t, types.NewXNumber(decimal.RequireFromString("30")), contacts[1].Fields()["age"].TypedValue())
+		assert.Equal(t, 0, len(contacts[1].URNs()))
+		assert.Equal(t, 0, contacts[1].Groups().Length())
 
 		assert.Equal(t, "Cathy Roberts", contacts[2].Name())
 		assert.NotNil(t, contacts[2].Fields()["joined"].TypedValue())
+		assert.Equal(t, 2, len(contacts[2].URNs()))
+		assert.Equal(t, contacts[2].URNs()[0].String(), "whatsapp:250788373373?id=10044")
+		assert.Equal(t, contacts[2].URNs()[1].String(), "tel:+250700000039?id=82")
+		assert.Equal(t, 2, contacts[2].Groups().Length())
 	}
 }
 

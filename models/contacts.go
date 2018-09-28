@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/lib/pq"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/nyaruka/gocommon/urns"
@@ -24,15 +26,8 @@ type FieldUUID utils.UUID
 func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets, org *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
 	start := time.Now()
 
-	// rebind our query for our IN clause
-	// TODO: should we be filtering by org here too?
-	q, vs, err := sqlx.In(selectContactsSQL, ids)
-	if err != nil {
-		return nil, errors.Annotate(err, "error rebinding contacts query")
-	}
-	q = db.Rebind(q)
-
-	rows, err := db.QueryContext(ctx, q, vs...)
+	// TODO, should we be filtering by org here too?
+	rows, err := db.QueryContext(ctx, selectContactSQL, pq.Array(ids))
 	if err != nil {
 		return nil, errors.Annotate(err, "error selecting contacts")
 	}
@@ -180,7 +175,7 @@ type contactEnvelope struct {
 	CreatedOn  time.Time `json:"created_on"`
 }
 
-const selectContactsSQL = `
+const selectContactSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	id,
 	org_id,
@@ -193,37 +188,43 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	created_on,
 	modified_on,
 	fields,
-	(SELECT ARRAY_AGG(u) FROM (
-		SELECT
-			cu.id as id,
-            cu.scheme as scheme,
-            cu.path as path,
-            cu.display as display,
-            cu.auth as auth,
-            cu.channel_id as channel_id
-		FROM 
-    		contacts_contacturn cu
-		WHERE 
-			contact_id = contacts_contact.id
-		ORDER BY
-			cu.priority DESC, 
-			cu.id ASC
-    ) u) as urns,
-	(SELECT ARRAY_AGG(g.group_id) FROM (
-		SELECT
-			cg.contactgroup_id as group_id
-		FROM 
-			contacts_contactgroup_contacts cg
-			LEFT JOIN contacts_contactgroup g ON cg.contactgroup_id = g.id
-		WHERE 
-			contact_id = contacts_contact.id AND
-			g.group_type = 'U' AND
-			g.is_active = TRUE
-	) g) as groups
-FROM 
-	contacts_contact
+	g.groups AS groups,
+	u.urns AS urns
+FROM
+	contacts_contact c
+LEFT JOIN (
+	SELECT 
+		contact_id, 
+		ARRAY_AGG(contactgroup_id) AS groups 
+	FROM 
+		contacts_contactgroup_contacts g
+	WHERE
+		g.contact_id = ANY($1)		
+	GROUP BY 
+		contact_id
+) g ON c.id = g.contact_id
+LEFT JOIN (
+	SELECT 
+		contact_id, 
+		array_agg(
+			json_build_object(
+				'id', u.id, 
+				'scheme', u.scheme,
+				'path', path,
+				'display', display,
+            	'auth', auth,
+            	'channel_id', channel_id
+			) ORDER BY priority DESC, id ASC
+		) as urns 
+	FROM 
+		contacts_contacturn u 
+	WHERE
+		u.contact_id = ANY($1)
+	GROUP BY 
+		contact_id
+) u ON c.id = u.contact_id
 WHERE 
-	id IN (?) AND
+	c.id = ANY($1) AND
 	is_test = FALSE AND
 	is_active = TRUE
 ) r;
