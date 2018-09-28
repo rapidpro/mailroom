@@ -1,3 +1,7 @@
+v0.0.26
+----------
+ * fix tests
+
 v0.0.25
 ----------
  * optimize contact loading queries
