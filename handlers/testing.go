@@ -105,10 +105,6 @@ func RunEventTestCases(t *testing.T, tcs []EventTestCase) {
 	}
 }
 
-func buildTestFlows(tcs []*EventTestCase) ([]flows.Flow, error) {
-
-}
-
 func GetTestSessions() ([]*models.Session, error) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
