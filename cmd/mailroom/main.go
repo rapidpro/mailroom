@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/nyaruka/mailroom/campaigns"
 	_ "github.com/nyaruka/mailroom/expirations"
+	_ "github.com/nyaruka/mailroom/starts"
 )
 
 var version = "Dev"

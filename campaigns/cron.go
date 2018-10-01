@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	batchQueue            = "batch"
 	campaignsLock         = "campaign_event"
 	campaignEventFireType = "campaign_event_fire"
 	maxBatchSize          = 100
@@ -73,7 +72,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 			task.FireIDs = fireIDs[:batchSize]
 			fireIDs = fireIDs[batchSize:]
 
-			err = queue.AddTask(rc, batchQueue, campaignEventFireType, fmt.Sprintf("%d", task.OrgID), task, queue.DefaultPriority)
+			err = queue.AddTask(rc, mailroom.BatchQueue, campaignEventFireType, int(task.OrgID), task, queue.DefaultPriority)
 			if err != nil {
 				return errors.Annotate(err, "error queuing task")
 			}

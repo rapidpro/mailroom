@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
+	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -258,6 +259,30 @@ WHERE
 	f.id = r.fire_id::int
 `
 
+// DeleteEventFires deletes all event fires passed in (used when an event has been marked as inactive)
+func DeleteEventFires(ctx context.Context, db *sqlx.DB, fires []*EventFire) error {
+	// build our list of ids
+	ids := make([]FireID, 0, len(fires))
+	for _, f := range fires {
+		ids = append(ids, f.FireID)
+	}
+
+	_, err := db.ExecContext(ctx, deleteEventFires, pq.Array(ids))
+	if err != nil {
+		return errors.Annotatef(err, "error deleting fires for inactive event")
+	}
+
+	return nil
+}
+
+const deleteEventFires = `
+DELETE FROM 
+	campaigns_eventfire
+WHERE
+	id = ANY($1) AND
+	fired IS NULL
+`
+
 // EventFire represents a single campaign event fire for an event and contact
 type EventFire struct {
 	FireID    FireID          `db:"fire_id"`
@@ -307,9 +332,7 @@ SELECT
 	f.fired as fired
 FROM 
 	campaigns_eventfire f
-	JOIN campaigns_campaignevent e ON f.event_id = e.id
 WHERE 
 	f.id IN(?) AND
-	f.fired IS NULL AND
-	e.is_active = TRUE
+	f.fired IS NULL
 `

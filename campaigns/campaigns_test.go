@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/mailroom"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/queue"
@@ -38,7 +40,7 @@ func TestCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// then actually work on the event
-	task, err := queue.PopNextTask(rc, batchQueue)
+	task, err := queue.PopNextTask(rc, mailroom.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 

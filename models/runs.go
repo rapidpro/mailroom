@@ -8,8 +8,10 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
+	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -122,7 +124,7 @@ type FlowRun struct {
 	OrgID           OrgID           `db:"org_id"`
 	ParentID        null.Int        `db:"parent_id"`
 	SessionID       SessionID       `db:"session_id"`
-	StartID         null.Int        `db:"start_id"`
+	StartID         StartID         `db:"start_id"`
 
 	// we keep a reference to model run as well
 	run flows.FlowRun
@@ -210,6 +212,14 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 		sessionsI = append(sessionsI, session)
 	}
 
+	// call our global pre commit hook if present
+	if hook != nil {
+		err := hook(ctx, tx, rp, org, sessions)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error calling commit hook: %v", hook)
+		}
+	}
+
 	// insert them all
 	err := BulkSQL(ctx, "insert sessions", tx, insertSessionSQL, sessionsI)
 	if err != nil {
@@ -231,15 +241,6 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	err = BulkSQL(ctx, "insert runs", tx, insertRunSQL, runs)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error writing runs")
-	}
-
-	// call our global commit hook if present
-	// TODO: can we move this below applying events (maybe changing that interface to not include sessions)
-	if hook != nil {
-		err = hook(ctx, tx, rp, org, sessions)
-		if err != nil {
-			return nil, errors.Annotatef(err, "error calling commit hook: %v", hook)
-		}
 	}
 
 	// apply our all events for the session
@@ -308,7 +309,7 @@ func newRun(session *Session, r flows.FlowRun) (*FlowRun, error) {
 		ContactID:       r.Contact().ID(),
 		FlowID:          flow.(*Flow).ID(),
 		SessionID:       session.ID,
-		StartID:         null.NewInt(0, false),
+		StartID:         NilStartID,
 		OrgID:           org.OrgID(),
 		Path:            string(pathJSON),
 		CurrentNodeUUID: path[len(path)-1].NodeUUID,
@@ -351,3 +352,94 @@ func newRun(session *Session, r flows.FlowRun) (*FlowRun, error) {
 	// TODO: set parent id (always null for now)
 	return run, nil
 }
+
+// FindFlowStartedOverlap returns the list of contact ids which overlap with those passed in and which
+// have been in the flow passed in.
+func FindFlowStartedOverlap(ctx context.Context, db *sqlx.DB, flowID FlowID, contacts []flows.ContactID) ([]flows.ContactID, error) {
+	var overlap []flows.ContactID
+	err := db.SelectContext(ctx, &overlap, flowStartedOverlapSQL, pq.Array(contacts), flowID)
+	return overlap, err
+}
+
+// TODO: no perfect index, will probably use contact index flows_flowrun_contact_id_985792a9
+// could be slow in the cases of contacts having many distinct runs
+const flowStartedOverlapSQL = `
+SELECT
+	DISTINCT(contact_id)
+FROM
+	flows_flowrun
+WHERE
+	contact_id = ANY($1) AND
+	flow_id = $2
+`
+
+// FindActiveRunOverlap returns the list of contact ids which overlap with those passed in which are
+// active in any other flows.
+func FindActiveRunOverlap(ctx context.Context, db *sqlx.DB, contacts []flows.ContactID) ([]flows.ContactID, error) {
+	var overlap []flows.ContactID
+	err := db.SelectContext(ctx, &overlap, activeRunOverlapSQL, pq.Array(contacts))
+	return overlap, err
+}
+
+// should hit perfect index flows_flowrun_contact_flow_created_on_id_idx
+const activeRunOverlapSQL = `
+SELECT
+	DISTINCT(contact_id)
+FROM
+	flows_flowrun
+WHERE
+	contact_id = ANY($1) AND
+	is_active = TRUE
+`
+
+// InterruptContactRuns interrupts all runs and sesions that exist for the passed in list of contacts
+func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.ContactID) error {
+	if len(contactIDs) == 0 {
+		return nil
+	}
+
+	// TODO: hangup calls here?
+
+	// first interrupt our runs
+	start := time.Now()
+	res, err := tx.ExecContext(ctx, interruptContactRunsSQL, pq.Array(contactIDs))
+	if err != nil {
+		return errors.Annotatef(err, "error interrupting contact runs")
+	}
+	rows, _ := res.RowsAffected()
+	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("interrupted runs")
+
+	// then our sessions
+	start = time.Now()
+	res, err = tx.ExecContext(ctx, interruptContactSessionsSQL, pq.Array(contactIDs))
+	if err != nil {
+		return errors.Annotatef(err, "error interrupting contact sessions")
+	}
+	rows, _ = res.RowsAffected()
+	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("interrupted sessions")
+
+	return nil
+}
+
+const interruptContactRunsSQL = `
+UPDATE
+	flows_flowrun
+SET
+	is_active = FALSE,
+	exited_on = NOW(),
+	exit_type = 'I',
+	modified_on = NOW(),
+	child_context = NULL,
+	parent_context = NULL
+WHERE
+	id = ANY (SELECT id FROM flows_flowrun WHERE contact_id = ANY($1) AND is_active = TRUE)
+`
+
+const interruptContactSessionsSQL = `
+UPDATE
+	flows_flowsession
+SET
+	status = 'I'
+WHERE
+	id = ANY (SELECT id FROM flows_flowsession WHERE contact_id = ANY($1) AND status = 'W')
+`

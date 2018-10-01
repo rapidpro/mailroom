@@ -12,7 +12,7 @@ import (
 // Task is a utility struct for encoding a task
 type Task struct {
 	Type  string          `json:"type"`
-	Group string          `json:"group"`
+	OrgID int             `json:"org_id"`
 	Task  json.RawMessage `json:"task"`
 }
 
@@ -20,7 +20,7 @@ type Task struct {
 type Priority int
 
 const (
-	queuePattern  = "%s:%s"
+	queuePattern  = "%s:%d"
 	activePattern = "%s:active"
 
 	// DefaultPriority is the default priority for tasks
@@ -34,7 +34,7 @@ const (
 )
 
 // AddTask adds the passed in task to our queue for execution
-func AddTask(rc redis.Conn, queue string, taskType string, taskGroup string, task interface{}, priority Priority) error {
+func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task interface{}, priority Priority) error {
 	score := strconv.FormatFloat(float64(time.Now().UnixNano()/int64(time.Microsecond))/float64(1000000)+float64(priority), 'f', 6, 64)
 
 	taskBody, err := json.Marshal(task)
@@ -44,7 +44,7 @@ func AddTask(rc redis.Conn, queue string, taskType string, taskGroup string, tas
 
 	payload := Task{
 		Type:  taskType,
-		Group: taskGroup,
+		OrgID: orgID,
 		Task:  taskBody,
 	}
 	jsonPayload, err := json.Marshal(payload)
@@ -52,8 +52,8 @@ func AddTask(rc redis.Conn, queue string, taskType string, taskGroup string, tas
 		return err
 	}
 
-	rc.Send("zadd", fmt.Sprintf(queuePattern, queue, taskGroup), score, jsonPayload)
-	rc.Send("zincrby", fmt.Sprintf(activePattern, queue), 0, taskGroup)
+	rc.Send("zadd", fmt.Sprintf(queuePattern, queue, orgID), score, jsonPayload)
+	rc.Send("zincrby", fmt.Sprintf(activePattern, queue), 0, orgID)
 	_, err = rc.Do("")
 	return err
 }
@@ -124,7 +124,7 @@ var markComplete = redis.NewScript(2, `-- KEYS: [QueueName] [TaskGroup]
 
 // MarkTaskComplete marks the passed in task as complete. Callers must call this in order
 // to maintain fair workers across orgs
-func MarkTaskComplete(rc redis.Conn, queue string, taskGroup string) error {
-	_, err := markComplete.Do(rc, queue, taskGroup)
+func MarkTaskComplete(rc redis.Conn, queue string, orgID int) error {
+	_, err := markComplete.Do(rc, queue, strconv.FormatInt(int64(orgID), 10))
 	return err
 }

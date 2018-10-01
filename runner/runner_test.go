@@ -40,21 +40,21 @@ func TestCampaignStarts(t *testing.T) {
 	db.MustExec(`INSERT INTO campaigns_eventfire(contact_id, event_id, scheduled) VALUES(42,1, $1),(43,1, $1);`, now)
 
 	contacts := []flows.ContactID{42, 43}
-	contactFires := map[flows.ContactID]*models.EventFire{
-		42: &models.EventFire{
+	fires := []*models.EventFire{
+		&models.EventFire{
 			FireID:    1,
 			EventID:   1,
 			ContactID: 42,
 			Scheduled: now,
 		},
-		43: &models.EventFire{
+		&models.EventFire{
 			FireID:    2,
 			EventID:   1,
 			ContactID: 43,
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, models.OrgID(1), contactFires, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
+	sessions, err := FireCampaignEvents(ctx, db, rp, models.OrgID(1), fires, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
 

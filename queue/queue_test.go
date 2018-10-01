@@ -57,7 +57,7 @@ func TestQueues(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, task.Group, tc.TaskGroup, "%d: groups mismatch", i)
+			assert.Equal(t, task.OrgID, tc.TaskGroup, "%d: groups mismatch", i)
 			assert.Equal(t, task.Type, tc.TaskType, "%d: types mismatch", i)
 
 			var value string

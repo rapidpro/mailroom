@@ -33,7 +33,7 @@ func HasTask(rc redis.Conn, taskGroup string, taskID string) (bool, error) {
 	return found, nil
 }
 
-// AddTask adds the passed in task to redis
+// AddTask marks the passed in task
 func AddTask(rc redis.Conn, taskGroup string, taskID string) error {
 	dateKey := fmt.Sprintf(keyPattern, taskGroup, time.Now().UTC().Format("2006_01_02"))
 	rc.Send("sadd", dateKey, taskID)
