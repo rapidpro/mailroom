@@ -18,6 +18,11 @@ type StartID struct {
 // NilStartID is our constant for a nil start id
 var NilStartID = StartID{null.NewInt(0, false)}
 
+// NewStartID creates a new start id for the passed in int
+func NewStartID(id int) StartID {
+	return StartID{null.NewInt(int64(id), true)}
+}
+
 // MarkStartComplete sets the status for the passed in flow start
 func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error {
 	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C' WHERE id = $1", startID)
@@ -75,6 +80,18 @@ func (s *FlowStart) IncludeActive() bool           { return s.s.IncludeActive }
 
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
+
+func NewFlowStart(startID StartID, orgID OrgID, flowID FlowID, groupIDs []GroupID, contactIDs []flows.ContactID, restartParticipants bool, includeActive bool) *FlowStart {
+	s := &FlowStart{}
+	s.s.StartID = startID
+	s.s.OrgID = orgID
+	s.s.FlowID = flowID
+	s.s.GroupIDs = groupIDs
+	s.s.ContactIDs = contactIDs
+	s.s.RestartParticipants = restartParticipants
+	s.s.IncludeActive = includeActive
+	return s
+}
 
 func (s *FlowStart) CreateBatch(contactIDs []flows.ContactID) *FlowStartBatch {
 	b := &FlowStartBatch{}

@@ -266,9 +266,9 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 const insertRunSQL = `
 INSERT INTO
 flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, expires_on, responded, results, path, 
-	          events, current_node_uuid, contact_id, flow_id, org_id, session_id)
+	          events, current_node_uuid, contact_id, flow_id, org_id, session_id, start_id)
 	   VALUES(:uuid, :is_active, :created_on, NOW(), :exited_on, :exit_type, :expires_on, :responded, :results, :path,
-	          :events, :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id)
+	          :events, :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id, :start_id)
 RETURNING id
 `
 

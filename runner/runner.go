@@ -42,7 +42,10 @@ type StartOptions struct {
 type TriggerBuilder func(contact *flows.Contact) flows.Trigger
 
 // StartFlowBatch starts the flow for the passed in org, contacts and flow
-func StartFlowBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, batch *models.FlowStartBatch) ([]*models.Session, error) {
+func StartFlowBatch(
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
+	batch *models.FlowStartBatch) ([]*models.Session, error) {
+
 	start := time.Now()
 
 	// if this is our last start, no matter what try to set the start as complete as a last step
@@ -112,7 +115,8 @@ func StartFlowBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, batch *mod
 }
 
 // FireCampaignEvents starts the flow for the passed in org, contact and flow
-func FireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool,
+func FireCampaignEvents(
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
 	orgID models.OrgID, fires []*models.EventFire, flowUUID assets.FlowUUID,
 	event *triggers.CampaignEvent) ([]*models.Session, error) {
 
@@ -209,9 +213,11 @@ func FireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool,
 }
 
 // StartFlow runs the passed in flow for the passed in contact
-func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets,
+func StartFlow(
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets,
 	flow *models.Flow, contactIDs []flows.ContactID, options *StartOptions,
 	buildTrigger TriggerBuilder, hook models.SessionCommitHook) ([]*models.Session, error) {
+
 	if len(contactIDs) == 0 {
 		return nil, nil
 	}
@@ -251,6 +257,11 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 		}
 	}
 
+	// no contacts left? we are done
+	if len(includedContacts) == 0 {
+		return nil, nil
+	}
+
 	// build our session assets
 	assets, err := getSessionAssets(org)
 	if err != nil {
@@ -261,7 +272,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	contacts, err := models.LoadContacts(ctx, db, assets, org, includedContacts)
 
 	// ok, we've filtered our contacts, build our triggers
-	triggers := make([]flows.Trigger, 0, len(contactIDs))
+	triggers := make([]flows.Trigger, 0, len(includedContacts))
 	for _, c := range contacts {
 		triggers = append(triggers, buildTrigger(c))
 	}
@@ -297,6 +308,7 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 
 	// if we are interrupting contacts, then augment our hook to do so
 	if options.Interrupt {
+		parentHook := hook
 		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
 			// build the list of contacts being interrupted
 			interruptedContacts := make([]flows.ContactID, 0, len(sessions))
@@ -312,7 +324,12 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 			}
 
 			logrus.WithField("count", len(interruptedContacts)).WithField("elapsed", time.Since(start)).Debug("interrupted contacts in flows")
-			return nil
+
+			// if we have a hook from our original caller, call that too
+			if parentHook != nil {
+				err = parentHook(ctx, tx, rp, org, sessions)
+			}
+			return err
 		}
 	}
 
