@@ -18,28 +18,28 @@ func TestQueues(t *testing.T) {
 
 	tcs := []struct {
 		Queue     string
-		TaskGroup string
+		TaskGroup int
 		TaskType  string
 		Task      string
 		Priority  Priority
 	}{
-		{"test", "1", "campaign", "task1", DefaultPriority},
-		{"test", "1", "campaign", "task1", popPriority},
-		{"test", "1", "campaign", "", popPriority},
-		{"test", "1", "campaign", "task1", DefaultPriority},
-		{"test", "1", "campaign", "task2", DefaultPriority},
-		{"test", "2", "campaign", "task3", DefaultPriority},
-		{"test", "2", "campaign", "task4", DefaultPriority},
-		{"test", "1", "campaign", "task5", DefaultPriority},
-		{"test", "2", "campaign", "task6", DefaultPriority},
-		{"test", "1", "campaign", "task1", popPriority},
-		{"test", "2", "campaign", "task3", popPriority},
-		{"test", "1", "campaign", "task2", popPriority},
-		{"test", "2", "campaign", "task4", popPriority},
-		{"test", "2", "campaign", "", markCompletePriority},
-		{"test", "2", "campaign", "task6", popPriority},
-		{"test", "1", "campaign", "task5", popPriority},
-		{"test", "1", "campaign", "", popPriority},
+		{"test", 1, "campaign", "task1", DefaultPriority},
+		{"test", 1, "campaign", "task1", popPriority},
+		{"test", 1, "campaign", "", popPriority},
+		{"test", 1, "campaign", "task1", DefaultPriority},
+		{"test", 1, "campaign", "task2", DefaultPriority},
+		{"test", 2, "campaign", "task3", DefaultPriority},
+		{"test", 2, "campaign", "task4", DefaultPriority},
+		{"test", 1, "campaign", "task5", DefaultPriority},
+		{"test", 2, "campaign", "task6", DefaultPriority},
+		{"test", 1, "campaign", "task1", popPriority},
+		{"test", 2, "campaign", "task3", popPriority},
+		{"test", 1, "campaign", "task2", popPriority},
+		{"test", 2, "campaign", "task4", popPriority},
+		{"test", 2, "campaign", "", markCompletePriority},
+		{"test", 2, "campaign", "task6", popPriority},
+		{"test", 1, "campaign", "task5", popPriority},
+		{"test", 1, "campaign", "", popPriority},
 	}
 
 	for i, tc := range tcs {
