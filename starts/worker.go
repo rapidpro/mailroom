@@ -1,0 +1,126 @@
+package starts
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/juju/errors"
+	"github.com/lib/pq"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/runner"
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	startFlowType      = "start_flow"
+	startFlowBatchType = "start_flow_batch"
+	startBatchSize     = 100
+)
+
+func init() {
+	mailroom.AddTaskFunction(startFlowType, handleFlowStart)
+	mailroom.AddTaskFunction(startFlowBatchType, handleFlowStartBatch)
+}
+
+// handleFlowStart creates all the batches of contacts to start in a flow
+func handleFlowStart(mr *mailroom.Mailroom, task *queue.Task) error {
+	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*15)
+	defer cancel()
+
+	// decode our task body
+	if task.Type != startFlowType {
+		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
+	}
+	startTask := &models.FlowStart{}
+	err := json.Unmarshal(task.Task, startTask)
+	if err != nil {
+		return errors.Annotatef(err, "error unmarshalling flow start task: %s", string(task.Task))
+	}
+
+	return CreateFlowBatches(ctx, mr.DB, mr.RedisPool, startTask)
+}
+
+// CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
+func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *models.FlowStart) error {
+	// we are building a set of contact ids, start with the explicit ones
+	contactIDs := make(map[flows.ContactID]bool)
+	for _, id := range start.ContactIDs() {
+		contactIDs[id] = true
+	}
+
+	// now all the ids for our groups
+	rows, err := db.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.GroupIDs()))
+	if err != nil {
+		return errors.Annotatef(err, "error selecting contacts for groups")
+	}
+	defer rows.Close()
+
+	var contactID flows.ContactID
+	for rows.Next() {
+		err := rows.Scan(&contactID)
+		if err != nil {
+			return errors.Annotatef(err, "error scanning contact id")
+		}
+		contactIDs[contactID] = true
+	}
+
+	rc := rp.Get()
+	defer rc.Close()
+
+	// build up batches of contacts to start
+	contacts := make([]flows.ContactID, 0, 100)
+	for c := range contactIDs {
+		if len(contacts) == startBatchSize {
+			batch := start.CreateBatch(contacts)
+			err = queue.AddTask(rc, mailroom.BatchQueue, startFlowBatchType, int(start.OrgID()), batch, queue.DefaultPriority)
+			if err != nil {
+				// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
+				logrus.WithError(err).WithField("start_id", start.StartID).Error("error while queuing start")
+			}
+			contacts = make([]flows.ContactID, 0, 100)
+		}
+		contacts = append(contacts, c)
+	}
+
+	// queue our last batch
+	if len(contacts) > 0 {
+		batch := start.CreateBatch(contacts)
+		batch.SetIsLast(true)
+		err = queue.AddTask(rc, mailroom.BatchQueue, startFlowBatchType, int(start.OrgID()), batch, queue.DefaultPriority)
+		if err != nil {
+			logrus.WithError(err).WithField("start_id", start.StartID).Error("error while queuing start")
+		}
+	}
+
+	return nil
+}
+
+// HandleFlowStartBatch starts a batch of contacts in a flow
+func handleFlowStartBatch(mr *mailroom.Mailroom, task *queue.Task) error {
+	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*5)
+	defer cancel()
+
+	// decode our task body
+	if task.Type != startFlowBatchType {
+		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
+	}
+	startBatch := &models.FlowStartBatch{}
+	err := json.Unmarshal(task.Task, startBatch)
+	if err != nil {
+		return errors.Annotatef(err, "error unmarshalling flow start batch: %s", string(task.Task))
+	}
+
+	// start these contacts in our flow
+	_, err = runner.StartFlowBatch(ctx, mr.DB, mr.RedisPool, startBatch)
+	if err != nil {
+		return errors.Annotatef(err, "error starting flow batch")
+	}
+
+	return err
+}

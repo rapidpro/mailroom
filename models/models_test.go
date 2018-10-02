@@ -159,11 +159,8 @@ func TestFlows(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		f, err := loadFlow(ctx, db, tc.FlowUUID)
+		flow, err := loadFlowByUUID(ctx, db, tc.FlowUUID)
 		assert.NoError(t, err)
-
-		flow := f.(*Flow)
-
 		if tc.Found {
 			assert.Equal(t, tc.Name, flow.Name())
 			assert.Equal(t, tc.FlowID, flow.ID())

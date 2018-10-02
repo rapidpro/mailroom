@@ -26,13 +26,112 @@ var (
 	assetCache = cache.New(5*time.Second, time.Minute)
 )
 
+type StartOptions struct {
+	// RestartParticipants should be true if the flow start should restart participants already in this flow
+	RestartParticipants bool
+
+	// IncludeActive should be true if we want to interrupt people active in other flows (including this one)
+	IncludeActive bool
+
+	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
+	// (simple campaign events do not currently interrupt)
+	Interrupt bool
+}
+
+// TriggerBuilder defines the interface for building a trigger for the passed in contact
+type TriggerBuilder func(contact *flows.Contact) flows.Trigger
+
+// StartFlowBatch starts the flow for the passed in org, contacts and flow
+func StartFlowBatch(
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
+	batch *models.FlowStartBatch) ([]*models.Session, error) {
+
+	start := time.Now()
+
+	// if this is our last start, no matter what try to set the start as complete as a last step
+	if batch.IsLast() {
+		defer func() {
+			err := models.MarkStartComplete(ctx, db, batch.StartID())
+			if err != nil {
+				logrus.WithError(err).WithField("start_id", batch.StartID).Error("error marking start as complete")
+			}
+		}()
+	}
+
+	// create our org assets
+	org, err := models.GetOrgAssets(ctx, db, batch.OrgID())
+	if err != nil {
+		return nil, errors.Annotatef(err, "error creating assets for org: %d", batch.OrgID())
+	}
+
+	// try to load our flow
+	flow, err := org.FlowByID(batch.FlowID())
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading campaign flow: %d", batch.FlowID())
+	}
+
+	// flow is no longer active, skip
+	dbFlow := flow.(*models.Flow)
+	if dbFlow == nil || dbFlow.IsArchived() {
+		logrus.WithField("flow_uuid", flow.UUID()).Info("skipping flow start, flow no longer active or archived")
+		return nil, nil
+	}
+
+	// this will build our trigger for each contact started
+	now := time.Now()
+	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
+	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
+		return triggers.NewManualTrigger(org.Env(), contact, flowRef, nil, now)
+	}
+
+	// before committing our runs we want to set the start they are associated with
+	updateStartID := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+		// for each run in our sessions, set the start id
+		for _, s := range sessions {
+			for _, r := range s.Runs() {
+				r.StartID = batch.StartID()
+			}
+		}
+		return nil
+	}
+
+	// options for our flow start
+	options := &StartOptions{
+		RestartParticipants: batch.RestartParticipants(),
+		IncludeActive:       batch.IncludeActive(),
+		Interrupt:           true,
+	}
+
+	sessions, err := StartFlow(ctx, db, rp, org, dbFlow, batch.ContactIDs(), options, triggerBuilder, updateStartID)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting flow batch")
+	}
+
+	// log both our total and average
+	librato.Gauge("mr.flow_batch_start_elapsed", float64(time.Since(start))/float64(time.Second))
+	librato.Gauge("mr.flow_batch_start_count", float64(len(sessions)))
+
+	return sessions, nil
+}
+
 // FireCampaignEvents starts the flow for the passed in org, contact and flow
 func FireCampaignEvents(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
-	orgID models.OrgID, contactMap map[flows.ContactID]*models.EventFire, flowUUID assets.FlowUUID,
+	orgID models.OrgID, fires []*models.EventFire, flowUUID assets.FlowUUID,
 	event *triggers.CampaignEvent) ([]*models.Session, error) {
 
+	if len(fires) == 0 {
+		return nil, nil
+	}
+
 	start := time.Now()
+
+	contactIDs := make([]flows.ContactID, 0, len(fires))
+	fireMap := make(map[flows.ContactID]*models.EventFire, len(fires))
+	for _, f := range fires {
+		contactIDs = append(contactIDs, f.ContactID)
+		fireMap[f.ContactID] = f
+	}
 
 	// create our org assets
 	org, err := models.GetOrgAssets(ctx, db, orgID)
@@ -40,46 +139,51 @@ func FireCampaignEvents(
 		return nil, errors.Annotatef(err, "error creating assets for org: %d", orgID)
 	}
 
+	// find our actual event
+	dbEvent := org.CampaignEventByID(fires[0].EventID)
+
+	// no longer active? delete these event fires and return
+	if dbEvent == nil {
+		err := models.DeleteEventFires(ctx, db, fires)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error deleting events for already fired events")
+		}
+		return nil, nil
+	}
+
 	// try to load our flow
 	flow, err := org.Flow(flowUUID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading campaign flow: %s", flowUUID)
 	}
+	dbFlow := flow.(*models.Flow)
 
-	// create our assets
-	sessionAssets, err := getSessionAssets(org)
-	if err != nil {
-		return nil, errors.Annotatef(err, "err creating session assets for org: %d", org.OrgID())
+	// flow doesn't exist or is archived, skip
+	if dbFlow == nil || dbFlow.IsArchived() {
+		tx, _ := db.BeginTxx(ctx, nil)
+		err := models.MarkEventsFired(ctx, tx, fires, time.Now())
+		if err != nil {
+			tx.Rollback()
+			logrus.WithError(err).Error("error marking events as fired due to archived or inactive flow")
+		}
+		return nil, tx.Commit()
 	}
 
-	// build our list of ids
-	contactIDs := make([]flows.ContactID, 0, len(contactMap))
-	for c := range contactMap {
-		contactIDs = append(contactIDs, c)
-	}
-
-	// load our contacts
-	contacts, err := models.LoadContacts(ctx, db, sessionAssets, org, contactIDs)
-	if err != nil {
-		return nil, errors.Annotatef(err, "err loading contacts: %v", contactIDs)
-	}
-
-	// build our triggers
+	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
-	ts := make([]flows.Trigger, 0, len(contacts))
 	now := time.Now()
-	for _, contact := range contacts {
-		ts = append(ts, triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, now))
+	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
+		return triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, now)
 	}
 
-	// this is our pre commit callback for our sessions, we'll mark the event fires associated with the passed
-	// in sessions as complete in the same transaction
+	// this is our pre commit callback for our sessions, we'll mark the event fires associated
+	// with the passed in sessions as complete in the same transaction
 	fired := time.Now()
 	updateEventFires := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
 		// build up our list of event fire ids based on the session contact ids
 		fires := make([]*models.EventFire, 0, len(sessions))
 		for _, s := range sessions {
-			fire, found := contactMap[s.Contact().ID()]
+			fire, found := fireMap[s.Contact().ID()]
 			if !found {
 				return errors.Errorf("unable to find associated event fire for contact %d", s.Contact().ID())
 			}
@@ -91,7 +195,12 @@ func FireCampaignEvents(
 	}
 
 	// start our contacts
-	sessions, err := StartFlow(ctx, db, rp, org, sessionAssets, ts, updateEventFires)
+	options := &StartOptions{
+		IncludeActive:       true,
+		RestartParticipants: true,
+		Interrupt:           false,
+	}
+	sessions, err := StartFlow(ctx, db, rp, org, dbFlow, contactIDs, options, triggerBuilder, updateEventFires)
 	if err != nil {
 		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
 	}
@@ -104,17 +213,76 @@ func FireCampaignEvents(
 }
 
 // StartFlow runs the passed in flow for the passed in contact
-func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets, tgs []flows.Trigger, hook models.SessionCommitHook) ([]*models.Session, error) {
-	if len(tgs) == 0 {
+func StartFlow(
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets,
+	flow *models.Flow, contactIDs []flows.ContactID, options *StartOptions,
+	buildTrigger TriggerBuilder, hook models.SessionCommitHook) ([]*models.Session, error) {
+
+	if len(contactIDs) == 0 {
 		return nil, nil
 	}
 
+	// figures out which contacts need to be excluded if any
+	exclude := make(map[flows.ContactID]bool, 5)
+
+	// filter out anybody who has has a flow run in this flow if appropriate
+	if !options.RestartParticipants {
+		// find all participants that have been in this flow
+		started, err := models.FindFlowStartedOverlap(ctx, db, flow.ID(), contactIDs)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error finding others started flow: %d", flow.ID())
+		}
+		for _, c := range started {
+			exclude[c] = true
+		}
+	}
+
+	// filter out our list of contacts to only include those that should be started
+	if !options.IncludeActive {
+		// find all participants active in any flow
+		active, err := models.FindActiveRunOverlap(ctx, db, contactIDs)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error finding other active flow: %d", flow.ID())
+		}
+		for _, c := range active {
+			exclude[c] = true
+		}
+	}
+
+	// filter into our final list of contacts
+	includedContacts := make([]flows.ContactID, 0, len(contactIDs))
+	for _, c := range contactIDs {
+		if !exclude[c] {
+			includedContacts = append(includedContacts, c)
+		}
+	}
+
+	// no contacts left? we are done
+	if len(includedContacts) == 0 {
+		return nil, nil
+	}
+
+	// build our session assets
+	assets, err := getSessionAssets(org)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting flow, unable to load assets")
+	}
+
+	// load all our contacts
+	contacts, err := models.LoadContacts(ctx, db, assets, org, includedContacts)
+
+	// ok, we've filtered our contacts, build our triggers
+	triggers := make([]flows.Trigger, 0, len(includedContacts))
+	for _, c := range contacts {
+		triggers = append(triggers, buildTrigger(c))
+	}
+
 	start := time.Now()
-	log := logrus.WithField("flow_name", tgs[0].Flow().Name).WithField("flow_uuid", tgs[0].Flow().UUID)
+	log := logrus.WithField("flow_name", flow.Name()).WithField("flow_uuid", flow.UUID())
 
 	// for each trigger start the flow
-	sessions := make([]flows.Session, 0, len(tgs))
-	for _, trigger := range tgs {
+	sessions := make([]flows.Session, 0, len(triggers))
+	for _, trigger := range triggers {
 		// create the session for this flow and run
 		session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
 
@@ -136,6 +304,33 @@ func StartFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Org
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error starting transaction")
+	}
+
+	// if we are interrupting contacts, then augment our hook to do so
+	if options.Interrupt {
+		parentHook := hook
+		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+			// build the list of contacts being interrupted
+			interruptedContacts := make([]flows.ContactID, 0, len(sessions))
+			for _, s := range sessions {
+				interruptedContacts = append(interruptedContacts, s.ContactID)
+			}
+
+			// and interrupt them from all active runs
+			start := time.Now()
+			err := models.InterruptContactRuns(ctx, tx, interruptedContacts)
+			if err != nil {
+				return errors.Annotatef(err, "error interrupting contacts")
+			}
+
+			logrus.WithField("count", len(interruptedContacts)).WithField("elapsed", time.Since(start)).Debug("interrupted contacts in flows")
+
+			// if we have a hook from our original caller, call that too
+			if parentHook != nil {
+				err = parentHook(ctx, tx, rp, org, sessions)
+			}
+			return err
+		}
 	}
 
 	// write our session to the db

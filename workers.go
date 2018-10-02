@@ -151,7 +151,7 @@ func (w *Worker) Stop() {
 }
 
 func (w *Worker) handleTask(task *queue.Task) {
-	log := logrus.WithField("comp", "sender").WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.Group)
+	log := logrus.WithField("comp", "sender").WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.OrgID)
 
 	defer func() {
 		// catch any panics and recover
@@ -162,7 +162,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 
 		// mark our task as complete
 		rc := w.foreman.mr.RedisPool.Get()
-		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.Group)
+		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.OrgID)
 		if err != nil {
 			log.WithError(err)
 		}

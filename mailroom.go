@@ -37,6 +37,8 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 	taskFunctions[taskType] = taskFunc
 }
 
+const BatchQueue = "batch"
+
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
 	Config    *Config
@@ -57,7 +59,7 @@ func NewMailroom(config *Config) *Mailroom {
 		WaitGroup: &sync.WaitGroup{},
 	}
 	mr.CTX, mr.Cancel = context.WithCancel(context.Background())
-	mr.foreman = NewForeman(mr, "batch", config.BatchWorkers)
+	mr.foreman = NewForeman(mr, BatchQueue, config.BatchWorkers)
 
 	return mr
 }

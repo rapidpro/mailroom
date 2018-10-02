@@ -20,7 +20,8 @@ type OrgAssets struct {
 
 	env utils.Environment
 
-	flowCache     map[assets.FlowUUID]assets.Flow
+	flowByUUID    map[assets.FlowUUID]assets.Flow
+	flowByID      map[FlowID]assets.Flow
 	flowCacheLock sync.RWMutex
 
 	channels       []assets.Channel
@@ -29,6 +30,7 @@ type OrgAssets struct {
 
 	campaigns             []*Campaign
 	campaignEventsByField map[FieldID][]*CampaignEvent
+	campaignEventsByID    map[CampaignEventID]*CampaignEvent
 	campaignsByGroup      map[GroupID][]*Campaign
 
 	fields       []assets.Field
@@ -82,9 +84,11 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		groupsByUUID: make(map[assets.GroupUUID]*Group),
 
 		campaignEventsByField: make(map[FieldID][]*CampaignEvent),
+		campaignEventsByID:    make(map[CampaignEventID]*CampaignEvent),
 		campaignsByGroup:      make(map[GroupID][]*Campaign),
 
-		flowCache: make(map[assets.FlowUUID]assets.Flow),
+		flowByUUID: make(map[assets.FlowUUID]assets.Flow),
+		flowByID:   make(map[FlowID]assets.Flow),
 	}
 
 	// we load everything at once except for flows which are lazily loaded
@@ -143,6 +147,7 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		a.campaignsByGroup[c.GroupID()] = append(a.campaignsByGroup[c.GroupID()], c)
 		for _, e := range c.Events() {
 			a.campaignEventsByField[e.RelativeToID()] = append(a.campaignEventsByField[e.RelativeToID()], e)
+			a.campaignEventsByID[e.ID()] = e
 		}
 	}
 
@@ -195,23 +200,46 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 
 func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 	a.flowCacheLock.RLock()
-	flow, found := a.flowCache[flowUUID]
+	flow, found := a.flowByUUID[flowUUID]
 	a.flowCacheLock.RUnlock()
 
 	if found {
 		return flow, nil
 	}
 
-	flow, err := loadFlow(a.ctx, a.db, flowUUID)
+	dbFlow, err := loadFlowByUUID(a.ctx, a.db, flowUUID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading flow: %s", flowUUID)
 	}
 
 	a.flowCacheLock.Lock()
-	a.flowCache[flowUUID] = flow
+	a.flowByID[dbFlow.ID()] = dbFlow
+	a.flowByUUID[dbFlow.UUID()] = dbFlow
 	a.flowCacheLock.Unlock()
 
-	return flow, nil
+	return dbFlow, nil
+}
+
+func (a *OrgAssets) FlowByID(flowID FlowID) (assets.Flow, error) {
+	a.flowCacheLock.RLock()
+	flow, found := a.flowByID[flowID]
+	a.flowCacheLock.RUnlock()
+
+	if found {
+		return flow, nil
+	}
+
+	dbFlow, err := loadFlowByID(a.ctx, a.db, flowID)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading flow: %d", flowID)
+	}
+
+	a.flowCacheLock.Lock()
+	a.flowByID[dbFlow.ID()] = dbFlow
+	a.flowByUUID[dbFlow.UUID()] = dbFlow
+	a.flowCacheLock.Unlock()
+
+	return dbFlow, nil
 }
 
 func (a *OrgAssets) Campaigns() []*Campaign {
@@ -224,6 +252,10 @@ func (a *OrgAssets) CampaignByGroupID(groupID GroupID) []*Campaign {
 
 func (a *OrgAssets) CampaignEventsByFieldID(fieldID FieldID) []*CampaignEvent {
 	return a.campaignEventsByField[fieldID]
+}
+
+func (a *OrgAssets) CampaignEventByID(eventID CampaignEventID) *CampaignEvent {
+	return a.campaignEventsByID[eventID]
 }
 
 func (a *OrgAssets) Groups() ([]assets.Group, error) {
