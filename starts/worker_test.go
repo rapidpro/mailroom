@@ -49,16 +49,17 @@ func TestStarts(t *testing.T) {
 		ContactIDs          []flows.ContactID
 		RestartParticipants bool
 		IncludeActive       bool
+		ContactCount        int
 		BatchCount          int
 		TotalCount          int
 	}{
-		{models.FlowID(31), []models.GroupID{36}, nil, false, false, 6, 520},
-		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{1318}, false, false, 6, 0},
-		{models.FlowID(31), nil, []flows.ContactID{1318}, true, true, 1, 1},
-		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{51}, false, false, 6, 1},
-		{models.FlowID(31), nil, []flows.ContactID{51}, false, false, 1, 0},
-		{models.FlowID(31), nil, []flows.ContactID{51}, false, true, 1, 0},
-		{models.FlowID(31), nil, []flows.ContactID{51}, true, true, 1, 1},
+		{models.FlowID(31), []models.GroupID{36}, nil, false, false, 525, 6, 520},
+		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{1318}, false, false, 525, 6, 0},
+		{models.FlowID(31), nil, []flows.ContactID{1318}, true, true, 1, 1, 1},
+		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{51}, false, false, 526, 6, 1},
+		{models.FlowID(31), nil, []flows.ContactID{51}, false, false, 1, 1, 0},
+		{models.FlowID(31), nil, []flows.ContactID{51}, false, true, 1, 1, 0},
+		{models.FlowID(31), nil, []flows.ContactID{51}, true, true, 1, 1, 1},
 	}
 
 	for i, tc := range tcs {
@@ -102,7 +103,7 @@ func TestStarts(t *testing.T) {
 			[]interface{}{tc.FlowID, startID}, tc.TotalCount, "%d: unexpected total run count", i)
 
 		// flow start should be complete
-		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart where status = 'C' AND id = $1`,
-			[]interface{}{startID}, 1, "%d: start status not set to complete", i)
+		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart where status = 'C' AND id = $1 AND contact_count = $2`,
+			[]interface{}{startID, tc.ContactCount}, 1, "%d: start status not set to complete", i)
 	}
 }

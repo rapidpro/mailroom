@@ -32,6 +32,16 @@ func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error 
 	return nil
 }
 
+// MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
+func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contactCount int) error {
+	_, err := db.Exec("UPDATE flows_flowstart SET status = 'S', contact_count = $2 WHERE id = $1", startID, contactCount)
+	if err != nil {
+		return errors.Annotatef(err, "error setting start as started")
+	}
+	return nil
+
+}
+
 // FlowStartBatch represents a single flow batch that needs to be started
 type FlowStartBatch struct {
 	b struct {

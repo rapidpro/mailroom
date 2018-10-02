@@ -98,6 +98,12 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 		}
 	}
 
+	// mark our start as started
+	err = models.MarkStartStarted(ctx, db, start.StartID(), len(contactIDs))
+	if err != nil {
+		return errors.Annotatef(err, "error marking start as started")
+	}
+
 	return nil
 }
 
