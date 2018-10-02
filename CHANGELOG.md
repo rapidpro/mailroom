@@ -1,3 +1,7 @@
+v0.0.29
+----------
+ * remove use of models.ContactID, updated modified_on for contacts that change groups
+
 v0.0.28
 ----------
  * set status of start to starting after queuing subtasks, update contact count
