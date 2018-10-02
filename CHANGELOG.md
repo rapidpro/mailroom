@@ -1,3 +1,7 @@
+v0.0.28
+----------
+ * set status of start to starting after queuing subtasks, update contact count
+
 v0.0.27
 ----------
  * allow flows to be started through mailroom
