@@ -1,3 +1,7 @@
+v0.0.27
+----------
+ * allow flows to be started through mailroom
+
 v0.0.26
 ----------
  * fix tests
