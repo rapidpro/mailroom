@@ -6,6 +6,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
+	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
@@ -26,6 +27,7 @@ func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	// build up our list of all adds and removes
 	adds := make([]interface{}, 0, len(sessions))
 	removes := make([]interface{}, 0, len(sessions))
+	changed := make(map[flows.ContactID]bool, len(sessions))
 
 	// we remove from our groups at once, build up our list
 	for _, events := range sessions {
@@ -46,24 +48,35 @@ func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 		for _, add := range seenAdds {
 			adds = append(adds, add)
+			changed[add.ContactID] = true
 		}
 
 		for _, remove := range seenRemoves {
 			removes = append(removes, remove)
+			changed[remove.ContactID] = true
 		}
 	}
 
 	// do our updates
-	if len(adds) > 0 {
-		err := models.BulkSQL(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, adds)
-		if err != nil {
-			return errors.Annotatef(err, "error adding contacts to groups")
-		}
+	err := models.BulkSQL(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, adds)
+	if err != nil {
+		return errors.Annotatef(err, "error adding contacts to groups")
 	}
-	if len(removes) > 0 {
-		err := models.BulkSQL(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, removes)
+
+	err = models.BulkSQL(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, removes)
+	if err != nil {
+		return errors.Annotatef(err, "error removing contacts from groups")
+	}
+
+	// build the list of all contact ids changed, we'll update modified_on for them
+	changedIDs := make([]flows.ContactID, 0, len(changed))
+	for c := range changed {
+		changedIDs = append(changedIDs, c)
+	}
+	if len(changedIDs) > 0 {
+		_, err = tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(changedIDs))
 		if err != nil {
-			return errors.Annotatef(err, "error removing contacts from groups")
+			return errors.Annotatef(err, "error updating contacts modified_on")
 		}
 	}
 
@@ -86,14 +99,14 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		group := session.Org().GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
-				"contact_uuid": models.ContactID(session.Contact().ID()),
+				"contact_uuid": session.ContactUUID(),
 				"group_uuid":   g.UUID,
 			}).Warn("unable to find group to remove, skipping")
 			continue
 		}
 
 		hookEvent := &GroupRemove{
-			models.ContactID(session.Contact().ID()),
+			session.Contact().ID(),
 			group.ID(),
 		}
 
@@ -108,7 +121,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		group := session.Org().GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
-				"contact_uuid": models.ContactID(session.Contact().ID()),
+				"contact_uuid": session.ContactUUID(),
 				"group_uuid":   g.UUID,
 			}).Warn("unable to find group to add, skipping")
 			continue
@@ -116,7 +129,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 		// add our add event
 		hookEvent := &GroupAdd{
-			models.ContactID(session.Contact().ID()),
+			session.Contact().ID(),
 			group.ID(),
 		}
 
@@ -129,8 +142,8 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 // GroupRemove is our struct to track group removals
 type GroupRemove struct {
-	ContactID models.ContactID `db:"contact_id"`
-	GroupID   models.GroupID   `db:"group_id"`
+	ContactID flows.ContactID `db:"contact_id"`
+	GroupID   models.GroupID  `db:"group_id"`
 }
 
 const removeContactsFromGroupsSQL = `
@@ -151,15 +164,15 @@ IN (
 
 // GroupAdd is our struct to track a final group additions
 type GroupAdd struct {
-	ContactID models.ContactID `db:"contact_id"`
-	GroupID   models.GroupID   `db:"group_id"`
+	ContactID flows.ContactID `db:"contact_id"`
+	GroupID   models.GroupID  `db:"group_id"`
 }
 
 const addContactsToGroupsSQL = `
-	INSERT INTO 
-		contacts_contactgroup_contacts
-		(contact_id, contactgroup_id)
-	VALUES(:contact_id, :group_id)
-	ON CONFLICT
-		DO NOTHING
+INSERT INTO 
+	contacts_contactgroup_contacts
+	(contact_id, contactgroup_id)
+VALUES(:contact_id, :group_id)
+ON CONFLICT
+	DO NOTHING
 `

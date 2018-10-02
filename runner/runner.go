@@ -317,13 +317,10 @@ func StartFlow(
 			}
 
 			// and interrupt them from all active runs
-			start := time.Now()
 			err := models.InterruptContactRuns(ctx, tx, interruptedContacts)
 			if err != nil {
 				return errors.Annotatef(err, "error interrupting contacts")
 			}
-
-			logrus.WithField("count", len(interruptedContacts)).WithField("elapsed", time.Since(start)).Debug("interrupted contacts in flows")
 
 			// if we have a hook from our original caller, call that too
 			if parentHook != nil {

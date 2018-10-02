@@ -19,9 +19,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type ContactID int64
-type FieldUUID utils.UUID
-
 // LoadContacts loads a set of contacts for the passed in ids
 func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets, org *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
 	start := time.Now()

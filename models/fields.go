@@ -6,10 +6,14 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/utils"
 )
 
 // FieldID is our type for the database field ID
 type FieldID int
+
+// FieldUUID is our type for the UUID of a field
+type FieldUUID utils.UUID
 
 // Field is our mailroom type for contact field types
 type Field struct {
