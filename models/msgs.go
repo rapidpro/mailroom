@@ -17,6 +17,8 @@ import (
 	null "gopkg.in/guregu/null.v3"
 )
 
+type MsgID int64
+
 type MsgDirection string
 
 const (

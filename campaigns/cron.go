@@ -30,9 +30,9 @@ func init() {
 
 // StartCampaignCron starts our cron job of firing expired campaign events
 func StartCampaignCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RedisPool, campaignsLock, time.Second*60,
+	cron.StartCron(mr.Quit, mr.RP, campaignsLock, time.Second*60,
 		func(lockName string, lockValue string) error {
-			return fireCampaignEvents(mr.CTX, mr.DB, mr.RedisPool, lockName, lockValue)
+			return fireCampaignEvents(mr.CTX, mr.DB, mr.RP, lockName, lockValue)
 		},
 	)
 

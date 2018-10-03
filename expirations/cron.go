@@ -26,7 +26,7 @@ func init() {
 
 // StartExpirationCron starts our cron job of expiring runs every minute
 func StartExpirationCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RedisPool, expirationLock, time.Second*60,
+	cron.StartCron(mr.Quit, mr.RP, expirationLock, time.Second*60,
 		func(lockName string, lockValue string) error {
 			return expireRuns(mr, lockName, lockValue)
 		},
@@ -68,7 +68,7 @@ func executeInQuery(ctx context.Context, db *sqlx.DB, query string, ids []int64)
 // expireRuns expires all the runs that have an expiration in the past
 func expireRuns(mr *mailroom.Mailroom, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
-	rc := mr.RedisPool.Get()
+	rc := mr.RP.Get()
 	defer rc.Close()
 
 	// find all runs that need to be expired (we exclude IVR runs)

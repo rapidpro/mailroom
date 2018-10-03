@@ -88,9 +88,16 @@ func TestContacts(t *testing.T) {
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = 43`)
 	db.MustExec(`UPDATE contacts_contact SET is_active = FALSE WHERE id = 82`)
 
-	contacts, err := LoadContacts(ctx, db, session, org, []flows.ContactID{1, 42, 43, 80, 82})
+	modelContacts, err := LoadContacts(ctx, db, org, []flows.ContactID{1, 42, 43, 80, 82})
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(contacts))
+	assert.Equal(t, 3, len(modelContacts))
+
+	// convert to goflow contacts
+	contacts := make([]*flows.Contact, len(modelContacts))
+	for i := range modelContacts {
+		contacts[i], err = modelContacts[i].FlowContact(org, session)
+		assert.NoError(t, err)
+	}
 
 	if len(contacts) == 3 {
 		assert.Equal(t, "Cathy Quincy", contacts[0].Name())
@@ -101,7 +108,7 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto"), contacts[0].Fields()["state"].TypedValue())
 		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto > Yabo > Kilgori"), contacts[0].Fields()["ward"].TypedValue())
 		assert.Equal(t, types.NewXText("F"), contacts[0].Fields()["gender"].TypedValue())
-		assert.Equal(t, nil, contacts[0].Fields()["age"].TypedValue())
+		assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
 
 		assert.Equal(t, "Dave Jameson", contacts[1].Name())
 		assert.Equal(t, types.NewXNumber(decimal.RequireFromString("30")), contacts[1].Fields()["age"].TypedValue())

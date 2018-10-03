@@ -12,7 +12,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/librato"
-	_ "github.com/nyaruka/mailroom/handlers"
+	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/sirupsen/logrus"
 )
@@ -38,17 +38,19 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 }
 
 const BatchQueue = "batch"
+const HandlerQueue = "handler"
 
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	Config    *Config
-	DB        *sqlx.DB
-	RedisPool *redis.Pool
-	Quit      chan bool
-	CTX       context.Context
-	Cancel    context.CancelFunc
-	WaitGroup *sync.WaitGroup
-	foreman   *Foreman
+	Config         *Config
+	DB             *sqlx.DB
+	RP             *redis.Pool
+	Quit           chan bool
+	CTX            context.Context
+	Cancel         context.CancelFunc
+	WaitGroup      *sync.WaitGroup
+	batchForeman   *Foreman
+	handlerForeman *Foreman
 }
 
 // NewMailroom creates and returns a new mailroom instance
@@ -59,7 +61,8 @@ func NewMailroom(config *Config) *Mailroom {
 		WaitGroup: &sync.WaitGroup{},
 	}
 	mr.CTX, mr.Cancel = context.WithCancel(context.Background())
-	mr.foreman = NewForeman(mr, BatchQueue, config.BatchWorkers)
+	mr.batchForeman = NewForeman(mr, BatchQueue, config.BatchWorkers)
+	mr.handlerForeman = NewForeman(mr, HandlerQueue, config.HandlerWorkers)
 
 	return mr
 }
@@ -135,7 +138,7 @@ func (mr *Mailroom) Start() error {
 			return conn, err
 		},
 	}
-	mr.RedisPool = redisPool
+	mr.RP = redisPool
 
 	// test our redis connection
 	conn := redisPool.Get()
@@ -158,8 +161,9 @@ func (mr *Mailroom) Start() error {
 		librato.Start()
 	}
 
-	// init our foreman and start it
-	mr.foreman.Start()
+	// init our foremen and start it
+	mr.batchForeman.Start()
+	mr.handlerForeman.Start()
 
 	logrus.Info("mailroom started")
 	return nil
@@ -168,7 +172,8 @@ func (mr *Mailroom) Start() error {
 // Stop stops the mailroom service
 func (mr *Mailroom) Stop() error {
 	logrus.Info("mailroom stopping")
-	mr.foreman.Stop()
+	mr.batchForeman.Stop()
+	mr.handlerForeman.Stop()
 	librato.Stop()
 	close(mr.Quit)
 	mr.Cancel()

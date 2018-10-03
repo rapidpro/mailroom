@@ -269,12 +269,19 @@ func StartFlow(
 	}
 
 	// load all our contacts
-	contacts, err := models.LoadContacts(ctx, db, assets, org, includedContacts)
+	contacts, err := models.LoadContacts(ctx, db, org, includedContacts)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading contacts to start")
+	}
 
 	// ok, we've filtered our contacts, build our triggers
 	triggers := make([]flows.Trigger, 0, len(includedContacts))
 	for _, c := range contacts {
-		triggers = append(triggers, buildTrigger(c))
+		contact, err := c.FlowContact(org, assets)
+		if err != nil {
+			return nil, errors.Annotatef(err, "error creating flow contact")
+		}
+		triggers = append(triggers, buildTrigger(contact))
 	}
 
 	start := time.Now()

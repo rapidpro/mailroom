@@ -9,7 +9,8 @@ type Config struct {
 	Version    string `help:"the version of this mailroom install"`
 	LogLevel   string `help:"the logging level courier should use"`
 
-	BatchWorkers int `help:"the number of go routines that will be used to handle batch events"`
+	BatchWorkers   int `help:"the number of go routines that will be used to handle batch events"`
+	HandlerWorkers int `help:"the number of go routines that will be used to handle messages"`
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`

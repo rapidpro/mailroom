@@ -69,8 +69,8 @@ func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 // EventHandler defines a call for handling events that occur in a flow
 type EventHandler func(context.Context, *sqlx.Tx, *redis.Pool, *Session, flows.Event) error
 
-// RegisterEventHandler registers the passed in handler as being interested in the passed in type
-func RegisterEventHandler(eventType string, handler EventHandler) {
+// RegisterEventHook registers the passed in handler as being interested in the passed in type
+func RegisterEventHook(eventType string, handler EventHandler) {
 	// it's a bug if we try to register more than one handler for a type
 	_, found := eventHandlers[eventType]
 	if found {

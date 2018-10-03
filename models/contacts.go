@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"time"
@@ -20,43 +19,68 @@ import (
 )
 
 // LoadContacts loads a set of contacts for the passed in ids
-func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets, org *OrgAssets, ids []flows.ContactID) ([]*flows.Contact, error) {
+func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.ContactID) ([]*Contact, error) {
 	start := time.Now()
 
 	// TODO, should we be filtering by org here too?
-	rows, err := db.QueryContext(ctx, selectContactSQL, pq.Array(ids))
+	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids))
 	if err != nil {
 		return nil, errors.Annotate(err, "error selecting contacts")
 	}
 	defer rows.Close()
 
-	contacts := make([]*flows.Contact, 0, len(ids))
+	contacts := make([]*Contact, 0, len(ids))
 	for rows.Next() {
-		env := contactEnvelope{}
-		contactJSON := ""
-
-		err = rows.Scan(&contactJSON)
+		e := &contactEnvelope{}
+		err := readJSONRow(rows, e)
 		if err != nil {
 			return nil, errors.Annotate(err, "error scanning contact json")
 		}
 
-		err := json.Unmarshal([]byte(contactJSON), &env)
-		if err != nil {
-			return nil, errors.Annotatef(err, "error unmarshalling contact json: %s", contactJSON)
+		contact := &Contact{
+			id:         e.ID,
+			uuid:       e.UUID,
+			name:       e.Name,
+			language:   e.Language,
+			isStopped:  e.IsStopped,
+			isBlocked:  e.IsBlocked,
+			modifiedOn: e.ModifiedOn,
+			createdOn:  e.CreatedOn,
 		}
 
-		// convert our group ids to real groups
-		groups := make([]assets.Group, 0, len(env.Groups))
-		for _, g := range env.Groups {
+		// load our real groups
+		groups := make([]assets.Group, 0, len(e.GroupIDs))
+		for _, g := range e.GroupIDs {
 			group := org.GroupByID(g)
 			if group != nil {
 				groups = append(groups, group)
 			}
 		}
+		contact.groups = groups
 
-		// and our URNs to URN objects
-		contactURNs := make([]urns.URN, 0, len(env.URNs))
-		for _, u := range env.URNs {
+		// create our map of field values filtered by what we know exists
+		fields := make(map[string]*flows.Value)
+		orgFields, _ := org.Fields()
+		for _, f := range orgFields {
+			field := f.(*Field)
+			cv, found := e.Fields[field.UUID()]
+			if found {
+				value := flows.NewValue(
+					cv.Text,
+					cv.Datetime,
+					cv.Number,
+					cv.State,
+					cv.District,
+					cv.Ward,
+				)
+				fields[field.Key()] = value
+			}
+		}
+		contact.fields = fields
+
+		// finally build up our URN objects
+		contactURNs := make([]urns.URN, 0, len(e.URNs))
+		for _, u := range e.URNs {
 			var channel *Channel
 
 			// load any channel if present
@@ -83,53 +107,7 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets,
 			}
 			contactURNs = append(contactURNs, urn)
 		}
-
-		// grab all our org fields
-		orgFields, err := org.Fields()
-		if err != nil {
-			return nil, errors.Annotatef(err, "error loading org fields")
-		}
-
-		// populate all values, either with nil or the real value
-		values := make(map[assets.Field]*flows.Value, len(orgFields))
-		for _, f := range orgFields {
-			field := f.(*Field)
-			cv, found := env.Fields[field.UUID()]
-
-			if found {
-				value := flows.NewValue(
-					cv.Text,
-					cv.Datetime,
-					cv.Number,
-					cv.State,
-					cv.District,
-					cv.Ward,
-				)
-				values[field] = value
-			} else {
-				value := flows.Value{}
-				values[field] = &value
-			}
-		}
-
-		// TODO: what do we do for stopped, blocked, inactive?
-
-		// ok, create our goflow contact now
-		contact, err := flows.NewContactFromAssets(
-			session,
-			env.UUID,
-			env.ID,
-			env.Name,
-			env.Language,
-			org.Env().Timezone(),
-			env.CreatedOn,
-			contactURNs,
-			groups,
-			values,
-		)
-		if err != nil {
-			return nil, errors.Annotatef(err, "error creating flow contact")
-		}
+		contact.urns = contactURNs
 
 		contacts = append(contacts, contact)
 	}
@@ -139,8 +117,57 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, session flows.SessionAssets,
 	return contacts, nil
 }
 
-// FieldValue is our utility struct for the value of a field
-type FieldValue struct {
+// FlowContact converts our mailroom contact into a flow contact for use in the engine
+func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flows.Contact, error) {
+	// create our flow contact
+	contact, err := flows.NewContactFromAssets(
+		session,
+		c.uuid,
+		c.id,
+		c.name,
+		c.language,
+		org.Env().Timezone(),
+		c.createdOn,
+		c.urns,
+		c.groups,
+		c.fields,
+	)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error creating flow contact")
+	}
+
+	return contact, nil
+}
+
+// Contact is our mailroom struct that represents a contact
+type Contact struct {
+	id         flows.ContactID
+	uuid       flows.ContactUUID
+	name       string
+	language   utils.Language
+	isStopped  bool
+	isBlocked  bool
+	fields     map[string]*flows.Value
+	groups     []assets.Group
+	urns       []urns.URN
+	modifiedOn time.Time
+	createdOn  time.Time
+}
+
+func (c *Contact) ID() flows.ContactID             { return c.id }
+func (c *Contact) UUID() flows.ContactUUID         { return c.uuid }
+func (c *Contact) Name() string                    { return c.name }
+func (c *Contact) Language() utils.Language        { return c.language }
+func (c *Contact) IsStopped() bool                 { return c.isStopped }
+func (c *Contact) IsBlocked() bool                 { return c.isBlocked }
+func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
+func (c *Contact) Groups() []assets.Group          { return c.groups }
+func (c *Contact) URNs() []urns.URN                { return c.urns }
+func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
+func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
+
+// fieldValueEnvelope is our utility struct for the value of a field
+type fieldValueEnvelope struct {
 	Text     types.XText        `json:"text"`
 	Datetime *types.XDateTime   `json:"datetime,omitempty"`
 	Number   *types.XNumber     `json:"number,omitempty"`
@@ -149,17 +176,16 @@ type FieldValue struct {
 	Ward     flows.LocationPath `json:"ward,omitempty"`
 }
 
-// utility struct we use when reading contacts from SQL
+// contactEnvelope is our JSON structure for a contact as read from the database
 type contactEnvelope struct {
-	UUID      flows.ContactUUID         `json:"uuid"`
-	ID        flows.ContactID           `json:"id"`
-	Name      string                    `json:"name"`
-	Language  utils.Language            `json:"language"`
-	IsStopped bool                      `json:"is_stopped"`
-	IsBlocked bool                      `json:"is_blocked"`
-	IsActive  bool                      `json:"is_active"`
-	Fields    map[FieldUUID]*FieldValue `json:"fields"`
-	Groups    []GroupID                 `json:"groups"`
+	ID        flows.ContactID                   `json:"id"`
+	UUID      flows.ContactUUID                 `json:"uuid"`
+	Name      string                            `json:"name"`
+	Language  utils.Language                    `json:"language"`
+	IsStopped bool                              `json:"is_stopped"`
+	IsBlocked bool                              `json:"is_blocked"`
+	Fields    map[FieldUUID]*fieldValueEnvelope `json:"fields"`
+	GroupIDs  []GroupID                         `json:"group_ids"`
 	URNs      []struct {
 		ID        int       `json:"id"`
 		Scheme    string    `json:"scheme"`
@@ -185,7 +211,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	created_on,
 	modified_on,
 	fields,
-	g.groups AS groups,
+	g.groups AS group_ids,
 	u.urns AS urns
 FROM
 	contacts_contact c
@@ -225,4 +251,54 @@ WHERE
 	is_test = FALSE AND
 	is_active = TRUE
 ) r;
+`
+
+// StopContact stops the contact with the passed in id, removing them from all groups and setting
+// their state to stopped.
+func StopContact(ctx context.Context, tx *sqlx.Tx, orgID OrgID, contactID flows.ContactID) error {
+	// delete the contact from all groups
+	_, err := tx.ExecContext(ctx, deleteAllContactGroupsSQL, orgID, contactID)
+	if err != nil {
+		return errors.Annotatef(err, "error removing stopped contact from groups")
+	}
+
+	// remove the contact from any triggers
+	// TODO: this could leave a trigger with no contacts or groups
+	_, err = tx.ExecContext(ctx, deleteAllContactTriggersSQL, contactID)
+	if err != nil {
+		return errors.Annotatef(err, "error removing contact from triggers")
+	}
+
+	// mark as stopped
+	_, err = tx.ExecContext(ctx, markContactStoppedSQL, contactID)
+	if err != nil {
+		return errors.Annotatef(err, "error marking contact as stopped")
+	}
+
+	return nil
+}
+
+const deleteAllContactGroupsSQL = `
+DELETE FROM
+	contacts_contactgroup_contacts
+WHERE
+	contact_id = $2 AND
+	contactgroup_id = (SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type = 'U')
+`
+
+const deleteAllContactTriggersSQL = `
+DELETE FROM
+	triggers_trigger_contacts
+WHERE
+	contact_id = $1
+`
+
+const markContactStoppedSQL = `
+UPDATE
+	contacts_contact
+SET
+	is_stopped = TRUE,
+	modified_on = NOW()
+WHERE 
+	id = $1
 `

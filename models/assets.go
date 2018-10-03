@@ -43,6 +43,7 @@ type OrgAssets struct {
 
 	labels    []assets.Label
 	resthooks []assets.Resthook
+	triggers  []*Trigger
 
 	locations        []assets.LocationHierarchy
 	locationsBuiltAt time.Time
@@ -149,6 +150,11 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 			a.campaignEventsByField[e.RelativeToID()] = append(a.campaignEventsByField[e.RelativeToID()], e)
 			a.campaignEventsByID[e.ID()] = e
 		}
+	}
+
+	a.triggers, err = loadTriggers(ctx, db, orgID)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error loading triggers for org %d", orgID)
 	}
 
 	// cache locations for an hour
@@ -272,6 +278,10 @@ func (a *OrgAssets) GroupByUUID(groupUUID assets.GroupUUID) *Group {
 
 func (a *OrgAssets) Labels() ([]assets.Label, error) {
 	return a.labels, nil
+}
+
+func (a *OrgAssets) Triggers() []*Trigger {
+	return a.triggers
 }
 
 func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
