@@ -1,3 +1,7 @@
+v0.0.30
+----------
+ * ignore flow triggered events
+
 v0.0.29
 ----------
  * remove use of models.ContactID, updated modified_on for contacts that change groups
