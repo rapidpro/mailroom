@@ -1,3 +1,7 @@
+v0.0.31
+----------
+ * increase our rate of flushing to librato
+
 v0.0.30
 ----------
  * ignore flow triggered events
