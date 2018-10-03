@@ -20,6 +20,7 @@ func init() {
 	models.RegisterEventHandler(events.TypeWebhookCalled, NoopHandler)
 	models.RegisterEventHandler(events.TypeWaitTimedOut, NoopHandler)
 	models.RegisterEventHandler(events.TypeRunExpired, NoopHandler)
+	models.RegisterEventHandler(events.TypeFlowTriggered, NoopHandler)
 }
 
 // NoopHandler is our handler for events we ignore in a run
