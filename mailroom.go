@@ -154,7 +154,7 @@ func (mr *Mailroom) Start() error {
 	// if we have a librato token, configure it
 	if mr.Config.LibratoToken != "" {
 		host, _ := os.Hostname()
-		librato.Configure(mr.Config.LibratoUsername, mr.Config.LibratoToken, host, time.Second*5, mr.WaitGroup)
+		librato.Configure(mr.Config.LibratoUsername, mr.Config.LibratoToken, host, time.Second, mr.WaitGroup)
 		librato.Start()
 	}
 
