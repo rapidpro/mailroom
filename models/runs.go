@@ -186,6 +186,11 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 	return session, nil
 }
 
+// ActiveSessionForContact returns the active session for the passed in contact, if any
+func ActiveSessionForContact(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, contactID flows.ContactID) (*Session, error) {
+
+}
+
 const insertSessionSQL = `
 INSERT INTO
 flows_flowsession(status, responded, output, contact_id, org_id)

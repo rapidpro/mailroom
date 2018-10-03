@@ -8,6 +8,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
@@ -117,6 +118,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 
 	// TODO: handle new contact
 	// TODO: handle new message
+	// TODO: make this URN the highest priority URN
 
 	// contact has been deleted, ignore this message but mark it as handled
 	if len(contacts) == 0 {
@@ -139,10 +141,12 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 }
 
 type msgEvent struct {
-	OrgID     models.OrgID    `json:"org_id"`
-	ContactID flows.ContactID `json:"contact_id"`
-	MsgID     models.MsgID    `json:"msg_id"`
-	Text      string          `json:"text"`
+	OrgID     models.OrgID        `json:"org_id"`
+	ContactID flows.ContactID     `json:"contact_id"`
+	MsgID     models.MsgID        `json:"msg_id"`
+	URNID     models.ContactURNID `json:"urn_id"`
+	URN       urns.URN            `json:"urn"`
+	Text      string              `json:"text"`
 }
 
 type handleEventTask struct {
