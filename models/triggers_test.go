@@ -5,6 +5,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
@@ -44,19 +45,28 @@ func TestTriggers(t *testing.T) {
 	contacts, err := LoadContacts(ctx, db, org, contactIDs)
 	assert.NoError(t, err)
 
+	sa, err := engine.NewSessionAssets(org)
+	assert.NoError(t, err)
+
+	cathy, err := contacts[0].FlowContact(org, sa)
+	assert.NoError(t, err)
+
+	greg, err := contacts[1].FlowContact(org, sa)
+	assert.NoError(t, err)
+
 	tcs := []struct {
 		Text      string
-		Contact   *Contact
+		Contact   *flows.Contact
 		TriggerID TriggerID
 	}{
-		{"join", contacts[0], joinID},
-		{"join this", contacts[0], joinID},
-		{"resist", contacts[1], resistID},
-		{"resist", contacts[0], farmersID},
-		{"resist this", contacts[0], farmersAllID},
-		{"other", contacts[0], farmersAllID},
-		{"other", contacts[1], othersAllID},
-		{"", contacts[1], othersAllID},
+		{"join", cathy, joinID},
+		{"join this", cathy, joinID},
+		{"resist", greg, resistID},
+		{"resist", cathy, farmersID},
+		{"resist this", cathy, farmersAllID},
+		{"other", cathy, farmersAllID},
+		{"other", greg, othersAllID},
+		{"", greg, othersAllID},
 	}
 
 	for i, tc := range tcs {

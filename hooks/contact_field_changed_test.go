@@ -15,10 +15,10 @@ import (
 func TestContactFieldChanged(t *testing.T) {
 	testsuite.Reset()
 
-	genderUUID := models.FieldUUID("0d345143-1863-4688-93c9-e392c0e77954")
+	genderUUID := models.FieldUUID("021a43d1-112e-4f87-80b0-2ddb3c2f51b8")
 	gender := assets.NewFieldReference("gender", "Gender")
 
-	ageUUID := models.FieldUUID("042c13fe-e0b1-4426-9192-2681758c2619")
+	ageUUID := models.FieldUUID("a159130e-ea81-4fdf-8aef-7d40a77c6e74")
 	age := assets.NewFieldReference("age", "Age")
 
 	unknown := assets.NewFieldReference("unknown", "unknown ")

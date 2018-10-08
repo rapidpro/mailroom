@@ -7,8 +7,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
-	"github.com/nyaruka/goflow/excellent/types"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/sirupsen/logrus"
@@ -24,10 +22,10 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	logrus.WithField("sessions", sessions).Debug("getting campaign callback")
 
 	// these are all the events we need to delete unfired fires for
-	deletes := make([]interface{}, 0, 5)
+	deletes := make([]*models.FireDelete, 0, 5)
 
 	// these are all the new events we need to insert
-	inserts := make([]interface{}, 0, 5)
+	inserts := make([]*models.FireAdd, 0, 5)
 
 	for s, es := range sessions {
 		groupAdds := make(map[models.GroupID]bool)
@@ -37,11 +35,11 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 		for _, e := range es {
 			switch event := e.(type) {
 
-			case *GroupAdd:
+			case *models.GroupAdd:
 				groupAdds[event.GroupID] = true
 				delete(groupRemoves, event.GroupID)
 
-			case *GroupRemove:
+			case *models.GroupRemove:
 				groupRemoves[event.GroupID] = true
 				delete(groupAdds, event.GroupID)
 
@@ -86,7 +84,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 		// ok, create all our deletes
 		for e := range deleteEvents {
-			deletes = append(deletes, &FireDelete{
+			deletes = append(deletes, &models.FireDelete{
 				ContactID: s.ContactID,
 				EventID:   e,
 			})
@@ -105,34 +103,9 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 		tz := org.Env().Timezone()
 		now := time.Now()
 		for ce := range addEvents {
-			// we aren't part of the group, move on
-			if s.Contact().Groups().FindByUUID(ce.Campaign().GroupUUID()) == nil {
-				continue
-			}
-
-			// get our value for the event
-			value := s.Contact().Fields()[ce.RelativeToKey()]
-
-			// no value? move on
-			if value == nil {
-				continue
-			}
-
-			// get the typed value
-			typed := value.TypedValue()
-			start, isTime := typed.(types.XDateTime)
-
-			// nil or not a date? move on
-			if !isTime {
-				continue
-			}
-
-			logrus.WithField("start", start).Debug("calculating offset")
-
-			// calculate our next fire
-			scheduled, err := ce.ScheduleForTime(tz, now, start.Native())
+			scheduled, err := ce.ScheduleForContact(tz, now, s.Contact())
 			if err != nil {
-				return errors.Annotatef(err, "error calculating offset for start: %s and event: %d", start, ce.ID())
+				return errors.Annotatef(err, "error calculating offset")
 			}
 
 			// no scheduled date? move on
@@ -141,7 +114,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 			}
 
 			// ok we have a new fire date, add it to our list of fires to insert
-			inserts = append(inserts, &FireInsert{
+			inserts = append(inserts, &models.FireAdd{
 				ContactID: s.Contact().ID(),
 				EventID:   ce.ID(),
 				Scheduled: *scheduled,
@@ -150,54 +123,16 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	}
 
 	// first delete all our removed fires
-	if len(deletes) > 0 {
-		err := models.BulkSQL(ctx, "deleting unfired event fires", tx, deleteUnfiredFires, deletes)
-		if err != nil {
-			return errors.Annotatef(err, "error deleting unfired event fires")
-		}
+	err := models.DeleteUnfiredEventFires(ctx, tx, deletes)
+	if err != nil {
+		return errors.Annotatef(err, "error deleting unfired event fires")
 	}
 
 	// then insert our new ones
-	if len(inserts) > 0 {
-		err := models.BulkSQL(ctx, "inserting new event fires", tx, insertFires, inserts)
-		if err != nil {
-			return errors.Annotatef(err, "error inserting new event fires")
-		}
+	err = models.AddEventFires(ctx, tx, inserts)
+	if err != nil {
+		return errors.Annotatef(err, "error inserting new event fires")
 	}
 
 	return nil
-}
-
-const deleteUnfiredFires = `
-DELETE FROM
-	campaigns_eventfire
-WHERE 
-	id
-IN (
-	SELECT 
-		c.id 
-	FROM 
-		campaigns_eventfire c,
-		(VALUES(:contact_id, :event_id)) AS f(contact_id, event_id)
-	WHERE
-		c.contact_id = f.contact_id::int AND c.event_id = f.event_id::int AND c.fired IS NULL
-);
-`
-
-type FireDelete struct {
-	ContactID flows.ContactID        `db:"contact_id"`
-	EventID   models.CampaignEventID `db:"event_id"`
-}
-
-const insertFires = `
-	INSERT INTO 
-		campaigns_eventfire
-		(contact_id, event_id, scheduled)
-	VALUES(:contact_id, :event_id, :scheduled)
-`
-
-type FireInsert struct {
-	ContactID flows.ContactID        `db:"contact_id"`
-	EventID   models.CampaignEventID `db:"event_id"`
-	Scheduled time.Time              `db:"scheduled"`
 }

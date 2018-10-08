@@ -225,14 +225,14 @@ LIMIT 1
 
 const insertCompleteSessionSQL = `
 INSERT INTO
-flows_flowsession(status, responded, output, contact_id, org_id, :created_on, :ended_on)
+flows_flowsession(status, responded, output, contact_id, org_id, created_on, ended_on)
            VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), NOW())
 RETURNING id
 `
 
 const insertIncompleteSessionSQL = `
 INSERT INTO
-flows_flowsession(status, responded, output, contact_id, org_id, :created_on)
+flows_flowsession(status, responded, output, contact_id, org_id, created_on)
            VALUES(:status, :responded, :output, :contact_id, :org_id, NOW())
 RETURNING id
 `
@@ -343,7 +343,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 		}
 	}
 
-	// gather all our pre commit events, group them by hook
+	// gather all our pre commit events, group them by hook and apply them
 	err = ApplyPreEventHooks(ctx, tx, rp, org, []*Session{s})
 	if err != nil {
 		return errors.Annotatef(err, "error applying pre commit hooks")
@@ -362,6 +362,27 @@ SET
 	responded = :responded
 WHERE 
 	id = :id
+`
+
+const updateRunSQL = `
+UPDATE
+	flows_flowrun
+SET
+	is_active = r.name,
+	exit_type = r.exit_type,
+	exited_on = r.exited_on,
+	expires_on = r.expires_on,
+	responded = r.responded,
+	results = r.results,
+	path = r.path,
+	events = r.events,
+	current_node_uuid = r.current_node_uuid
+FROM (
+	VALUES(:id, :is_active, :exit_type, :exited_on, :expires_on, :responded, :results, :path, :events, :current_node_uuid)
+) AS
+	r(id, is_active, exit_type, exited_on, expires_on, responded, results, path, events, current_node_uuid)
+WHERE
+	c.id = r.id::int
 `
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created

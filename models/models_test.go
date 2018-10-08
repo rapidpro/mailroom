@@ -125,7 +125,6 @@ func TestFlows(t *testing.T) {
 func TestMsgs(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	rp := testsuite.RP()
 
 	orgID := OrgID(1)
 	channels, err := loadChannels(ctx, db, orgID)
@@ -140,17 +139,17 @@ func TestMsgs(t *testing.T) {
 		Text         string
 		ContactID    flows.ContactID
 		URN          urns.URN
-		ContactURNID ContactURNID
+		ContactURNID URNID
 		Attachments  flows.AttachmentList
 		QuickReplies []string
 		Metadata     null.String
 		HasErr       bool
 	}{
-		{chanUUID, channel, "missing urn id", flows.ContactID(42), urns.URN("tel:+250700000001"), ContactURNID(0),
+		{chanUUID, channel, "missing urn id", flows.ContactID(42), urns.URN("tel:+250700000001"), URNID(0),
 			nil, nil, null.NewString("", false), true},
-		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), ContactURNID(42),
+		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), URNID(42),
 			nil, []string{"yes", "no"}, null.NewString(`{"quick_replies":["yes","no"]}`, true), false},
-		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), ContactURNID(42),
+		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), URNID(42),
 			flows.AttachmentList([]flows.Attachment{flows.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, null.NewString("", false), false},
 	}
 
@@ -162,10 +161,10 @@ func TestMsgs(t *testing.T) {
 		assert.NoError(t, err)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies)
-		msg, err := NewOutgoingMsg(ctx, tx, rp, orgID, tc.Channel, tc.ContactID, flowMsg, now)
+		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now)
 
 		if err == nil {
-			err = BulkSQL(ctx, "insert msgs sq", tx, InsertMsgSQL, []interface{}{msg})
+			err = InsertMessages(ctx, tx, []*Msg{msg})
 			assert.NoError(t, err)
 			assert.Equal(t, orgID, msg.OrgID())
 			assert.Equal(t, tc.Text, msg.Text())
@@ -174,7 +173,7 @@ func TestMsgs(t *testing.T) {
 			assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
 			assert.Equal(t, tc.URN, msg.URN())
 			assert.Equal(t, tc.ContactURNID, msg.ContactURNID())
-			assert.Equal(t, tc.Metadata, msg.Metadata)
+			assert.Equal(t, tc.Metadata, msg.Metadata())
 			assert.Equal(t, now, msg.CreatedOn())
 			assert.True(t, msg.ID() > 0)
 			assert.True(t, msg.QueuedOn().After(now))

@@ -13,10 +13,9 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
-
-type MsgID int64
 
 type MsgDirection string
 
@@ -43,7 +42,6 @@ const (
 )
 
 type ConnectionID null.Int
-type ContactURNID int
 
 type MsgStatus string
 
@@ -86,7 +84,7 @@ type Msg struct {
 		ChannelUUID  assets.ChannelUUID `                     json:"channel_uuid"`
 		ConnectionID ConnectionID       `db:"connection_id"`
 		ContactID    flows.ContactID    `db:"contact_id"      json:"contact_id"`
-		ContactURNID ContactURNID       `db:"contact_urn_id"  json:"contact_urn_id"`
+		ContactURNID URNID              `db:"contact_urn_id"  json:"contact_urn_id"`
 		URN          urns.URN           `                     json:"urn"`
 		URNAuth      string             `                     json:"urn_auth,omitempty"`
 		OrgID        OrgID              `db:"org_id"          json:"org_id"`
@@ -121,7 +119,8 @@ func (m *Msg) URNAuth() string                 { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                    { return m.m.OrgID }
 func (m *Msg) TopupID() TopupID                { return m.m.TopupID }
 func (m *Msg) ContactID() flows.ContactID      { return m.m.ContactID }
-func (m *Msg) ContactURNID() ContactURNID      { return m.m.ContactURNID }
+func (m *Msg) ContactURNID() URNID             { return m.m.ContactURNID }
+func (m *Msg) SetTopup(topupID TopupID)        { m.m.TopupID = topupID }
 
 func (m *Msg) Attachments() []flows.Attachment {
 	attachments := make([]flows.Attachment, len(m.m.Attachments))
@@ -147,7 +146,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	}
 
 	msg := &Msg{}
-	m := msg.m
+	m := &msg.m
 	m.UUID = out.UUID()
 	m.Text = out.Text()
 	m.HighPriority = true
@@ -156,7 +155,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	m.Visibility = VisibilityVisible
 	m.MsgType = TypeFlow
 	m.ContactID = contactID
-	m.ContactURNID = ContactURNID(urnID)
+	m.ContactURNID = URNID(urnID)
 	m.URN = out.URN()
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
@@ -195,7 +194,18 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	return msg, nil
 }
 
-const InsertMsgSQL = `
+// InsertMessages inserts the passed in messages in a single query
+func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
+	is := make([]interface{}, len(msgs))
+	for i := range msgs {
+		is[i] = &msgs[i].m
+		logrus.WithField("msg_uuid", msgs[i].UUID()).Info("inserting message")
+	}
+
+	return BulkSQL(ctx, "insert messages", tx, insertMsgSQL, is)
+}
+
+const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, 
@@ -210,8 +220,8 @@ RETURNING
 `
 
 // UpdateMessage updates the passed in message status, visibility and msg type
-func UpdateMessage(ctx context.Context, tx *sqlx.Tx, msgID MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, topup TopupID) error {
-	_, err := tx.ExecContext(
+func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, topup TopupID) error {
+	_, err := tx.QueryxContext(
 		ctx,
 		`UPDATE 
 			msgs_msg 

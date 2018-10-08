@@ -6,6 +6,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 )
 
@@ -46,6 +48,14 @@ func (t *Trigger) Keyword() string          { return t.t.Keyword }
 func (t *Trigger) MatchType() MatchType     { return t.t.MatchType }
 func (t *Trigger) ChannelID() ChannelID     { return t.t.ChannelID }
 func (t *Trigger) GroupIDs() []GroupID      { return t.t.GroupIDs }
+func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
+	if t.t.MatchType == MatchFirst {
+		return triggers.KeywordMatchTypeFirstWord
+	} else {
+		return triggers.KeywordMatchTypeOnlyWord
+	}
+	return triggers.KeywordMatchType("")
+}
 
 func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, error) {
 	rows, err := db.Queryx(selectTriggersSQL, orgID)
@@ -70,11 +80,11 @@ func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, er
 // FindMatchingMsgTrigger returns the matching trigger (if any) for the passed in text and channel id
 // TODO: with a different structure this could probably be a lot faster.. IE, we could have a map
 // of list of triggers by keyword that is built when we load the triggers, then just evaluate against that.
-func FindMatchingMsgTrigger(org *OrgAssets, contact *Contact, text string) *Trigger {
+func FindMatchingMsgTrigger(org *OrgAssets, contact *flows.Contact, text string) *Trigger {
 	// build a set of the groups this contact is in
 	groupIDs := make(map[GroupID]bool, 10)
-	for _, g := range contact.Groups() {
-		groupIDs[g.(*Group).ID()] = true
+	for _, g := range contact.Groups().All() {
+		groupIDs[g.Asset().(*Group).ID()] = true
 	}
 
 	// determine our message keyword

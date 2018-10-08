@@ -144,7 +144,7 @@ func GetTestSessions() ([]*models.Session, error) {
 
 		// create our trigger
 		trigger := triggers.NewManualTrigger(org.Env(), flowContact, flowRef, nil, time.Now())
-		err = session.Start(trigger, nil)
+		err = session.Start(trigger)
 		if err != nil {
 			return nil, errors.Annotate(err, "error running test flow")
 		}

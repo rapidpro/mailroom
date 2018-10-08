@@ -64,7 +64,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	}
 
 	// write our updated session and runs
-	err = models.UpdateSession(ctx, tx, rp, org, session, fs)
+	err = session.WriteUpdatedSession(ctx, tx, rp, org, fs)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error updating session for resume")
 	}
@@ -94,6 +94,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	if err != nil {
 		return nil, errors.Annotatef(err, "error committing session changes on resume")
 	}
+	logrus.WithField("contact_uuid", resume.Contact().UUID()).WithField("elapsed", time.Since(start)).Info("resumed session")
 
 	return nil, nil
 }
@@ -159,7 +160,7 @@ func StartFlowBatch(
 		Interrupt:           true,
 	}
 
-	sessions, err := StartFlow(ctx, db, rp, org, dbFlow, batch.ContactIDs(), options, triggerBuilder, updateStartID)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, dbFlow, batch.ContactIDs(), options, triggerBuilder, updateStartID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error starting flow batch")
 	}
@@ -257,7 +258,7 @@ func FireCampaignEvents(
 		RestartParticipants: true,
 		Interrupt:           false,
 	}
-	sessions, err := StartFlow(ctx, db, rp, org, dbFlow, contactIDs, options, triggerBuilder, updateEventFires)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, dbFlow, contactIDs, options, triggerBuilder, updateEventFires)
 	if err != nil {
 		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
 	}
@@ -269,8 +270,8 @@ func FireCampaignEvents(
 	return sessions, nil
 }
 
-// StartFlow runs the passed in flow for the passed in contact
-func StartFlow(
+// StartFlowForContacts runs the passed in flow for the passed in contact
+func StartFlowForContacts(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets,
 	flow *models.Flow, contactIDs []flows.ContactID, options *StartOptions,
 	buildTrigger TriggerBuilder, hook models.SessionCommitHook) ([]*models.Session, error) {
@@ -486,4 +487,87 @@ func StartFlow(
 	log.WithField("elapsed", time.Since(start)).WithField("count", len(dbSessions)).Info("flows started, sessions created")
 
 	return dbSessions, nil
+}
+
+// StartFlowForContact runs the passed in flow for the passed in contact
+func StartFlowForContact(
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets,
+	trigger flows.Trigger, hook models.SessionCommitHook) (*models.Session, error) {
+
+	start := time.Now()
+	log := logrus.WithField("flow_name", trigger.Flow().Name).WithField("flow_uuid", trigger.Flow().UUID).WithField("contact_uuid", trigger.Contact().UUID)
+
+	// create the session for this flow and run
+	session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
+
+	// start our flow
+	err := session.Start(trigger)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting flow")
+	}
+	log.WithField("elapsed", time.Since(start)).Info("flow engine start")
+	librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
+
+	// we write our sessions and all their objects in a single transaction
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting transaction")
+	}
+
+	parentHook := hook
+	hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+		// build the list of contacts being interrupted
+		interruptedContacts := make([]flows.ContactID, 0, len(sessions))
+		for _, s := range sessions {
+			interruptedContacts = append(interruptedContacts, s.ContactID)
+		}
+
+		// and interrupt them from all active runs
+		err := models.InterruptContactRuns(ctx, tx, interruptedContacts)
+		if err != nil {
+			return errors.Annotatef(err, "error interrupting contacts")
+		}
+
+		// if we have a hook from our original caller, call that too
+		if parentHook != nil {
+			err = parentHook(ctx, tx, rp, org, sessions)
+		}
+		return err
+	}
+
+	// write our session to the db
+	dbSessions, err := models.WriteSessions(ctx, tx, rp, org, []flows.Session{session}, hook)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error writing session")
+	}
+
+	// commit it at once
+	commitStart := time.Now()
+	err = tx.Commit()
+	logrus.WithField("elapsed", time.Since(commitStart)).Debug("session committed")
+
+	// this was an error and this was a single session being committed, no use retrying
+	if err != nil {
+		log.WithError(err).Errorf("error writing session to db")
+		return nil, errors.Annotatef(err, "error committing session")
+	}
+
+	// now take care of any post-commit hooks
+	tx, err = db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting transaction for post commit hooks")
+	}
+
+	err = models.ApplyPostEventHooks(ctx, tx, rp, org, dbSessions)
+	if err == nil {
+		err = tx.Commit()
+	}
+	if err != nil {
+		tx.Rollback()
+		log.WithError(err).Error("error commiting post event hook")
+	}
+
+	// figure out both average and total for total execution and commit time for our flows
+	log.WithField("elapsed", time.Since(start)).Info("single flow started, session created")
+	return dbSessions[0], nil
 }

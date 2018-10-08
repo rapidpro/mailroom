@@ -64,7 +64,7 @@ func TestCampaignStarts(t *testing.T) {
 	models.AssertContactRunsPresent(t, db, contacts, models.FlowID(31),
 		`AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-		 AND current_node_uuid = 'b003fd70-aafd-4ccc-bdb5-4f70e870cd64'
+		 AND current_node_uuid = '038ea727-79b7-4917-adbe-178fa6a2c9a9'
 		 AND session_id IS NOT NULL`,
 	)
 	models.AssertContactMessagesPresent(t, db, contacts,

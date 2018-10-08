@@ -18,12 +18,12 @@ func init() {
 	models.RegisterEventHook(events.TypeMsgCreated, ApplyMsgCreatedEvent)
 }
 
-// our hook for sending session messages
+// SendSessionMessages is our hook for sending session messages
 type SendSessionMessages struct{}
 
 var sendSessionMessages = &SendSessionMessages{}
 
-// SendSessionMessages sends all non-android messages to courier
+// Apply sends all non-android messages to courier
 func (h *SendSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
@@ -55,24 +55,23 @@ func (h *SendSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 	return nil
 }
 
-// our hook for comitting session messages
+// CommitSessionMessages is our hook for comitting session messages
 type CommitSessionMessages struct{}
 
 var commitSessionMessages = &CommitSessionMessages{}
 
-// commitSessionMessages takes care of inserting all the messages in the passed in sessions assigning topups to them as needed.
+// Apply takes care of inserting all the messages in the passed in sessions assigning topups to them as needed.
 func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
-	// build up a list of all the messages that need inserting
-	args := make([]interface{}, 0, len(sessions))
-	for _, ms := range sessions {
-		for _, m := range ms {
-			args = append(args, m)
+	msgs := make([]*models.Msg, 0, len(sessions))
+	for _, s := range sessions {
+		for _, m := range s {
+			msgs = append(msgs, m.(*models.Msg))
 		}
 	}
 
 	// find the topup we will assign
 	rc := rp.Get()
-	topup, err := models.DecrementOrgCredits(ctx, tx, rc, org.OrgID(), len(args))
+	topup, err := models.DecrementOrgCredits(ctx, tx, rc, org.OrgID(), len(msgs))
 	rc.Close()
 	if err != nil {
 		return errors.Annotatef(err, "error finding active topup")
@@ -80,13 +79,13 @@ func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// if we have an active topup, assign it to our messages
 	if topup != models.NilTopupID {
-		for _, m := range args {
-			m.(*models.Msg).TopUpID = topup
+		for _, m := range msgs {
+			m.SetTopup(topup)
 		}
 	}
 
 	// insert all our messages
-	err = models.BulkSQL(ctx, "inserting msgs", tx, models.InsertMsgSQL, args)
+	err = models.InsertMessages(ctx, tx, msgs)
 	if err != nil {
 		return errors.Annotatef(err, "error writing messages")
 	}
@@ -110,7 +109,7 @@ func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 		return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
 	}
 
-	msg, err := models.NewOutgoingMsg(ctx, tx, rp, org.OrgID(), channel, session.ContactID, &event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, session.ContactID, &event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Annotatef(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
