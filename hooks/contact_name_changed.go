@@ -35,7 +35,7 @@ func (h *CommitContactNameChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 }
 
 // applyContactNameChanged changes the name of the contact
-func applyContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *models.Session, e flows.Event) error {
+func applyContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.ContactNameChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),

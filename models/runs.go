@@ -10,7 +10,9 @@ import (
 	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
@@ -49,26 +51,22 @@ var keptEvents = map[string]bool{
 
 // Session is the mailroom type for a FlowSession
 type Session struct {
-	ID        SessionID       `db:"id"`
-	Status    SessionStatus   `db:"status"`
-	Responded bool            `db:"responded"`
-	Output    string          `db:"output"`
-	ContactID flows.ContactID `db:"contact_id"`
-	OrgID     OrgID           `db:"org_id"`
-	CreatedOn time.Time
+	ID           SessionID       `db:"id"`
+	Status       SessionStatus   `db:"status"`
+	Responded    bool            `db:"responded"`
+	Output       string          `db:"output"`
+	ContactID    flows.ContactID `db:"contact_id"`
+	OrgID        OrgID           `db:"org_id"`
+	CreatedOn    time.Time       `db:"created_on"`
+	EndedOn      *time.Time      `db:"ended_on"`
+	ActiveFlowID *FlowID         `db:"active_flow_id"`
 
-	org       *OrgAssets
-	contactID flows.ContactID
-	contact   *flows.Contact
-	runs      []*FlowRun
+	contact *flows.Contact
+	runs    []*FlowRun
 
+	seenRuns    map[flows.RunUUID]time.Time
 	preCommits  map[EventCommitHook][]interface{}
 	postCommits map[EventCommitHook][]interface{}
-}
-
-// Org returns the org assets for this session
-func (s *Session) Org() *OrgAssets {
-	return s.org
 }
 
 // ContactUUID returns the UUID of our contact
@@ -167,14 +165,13 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 		CreatedOn: s.Runs()[0].CreatedOn(),
 
 		contact:     s.Contact(),
-		org:         org,
 		preCommits:  make(map[EventCommitHook][]interface{}),
 		postCommits: make(map[EventCommitHook][]interface{}),
 	}
 
 	// now build up our runs
 	for _, r := range s.Runs() {
-		run, err := newRun(session, r)
+		run, err := newRun(org, session, r)
 		if err != nil {
 			return nil, errors.Annotatef(err, "error creating run: %s", r.UUID())
 		}
@@ -187,15 +184,184 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 }
 
 // ActiveSessionForContact returns the active session for the passed in contact, if any
-func ActiveSessionForContact(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, contactID flows.ContactID) (*Session, error) {
+func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *flows.Contact) (*Session, error) {
+	rows, err := db.QueryxContext(ctx, selectLastSessionSQL, contact.ID())
+	if err != nil {
+		return nil, errors.Annotatef(err, "error selecting active session")
+	}
+	defer rows.Close()
 
+	// no rows? no sessions!
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	// scan in our session
+	session := &Session{
+		contact:     contact,
+		preCommits:  make(map[EventCommitHook][]interface{}),
+		postCommits: make(map[EventCommitHook][]interface{}),
+	}
+	err = rows.StructScan(session)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error scanning session")
+	}
+
+	return session, nil
 }
 
-const insertSessionSQL = `
+const selectLastSessionSQL = `
+SELECT 
+	id, status, responded, output, contact_id, org_id, created_on, ended_on 
+FROM 
+	flows_flow_session
+WHERE
+	contact_id = $1 AND
+	status = 'W'
+ORDER BY
+	created_on DESC
+LIMIT 1
+`
+
+const insertCompleteSessionSQL = `
 INSERT INTO
-flows_flowsession(status, responded, output, contact_id, org_id)
-           VALUES(:status, :responded, :output, :contact_id, :org_id)
+flows_flowsession(status, responded, output, contact_id, org_id, :created_on, :ended_on)
+           VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), NOW())
 RETURNING id
+`
+
+const insertIncompleteSessionSQL = `
+INSERT INTO
+flows_flowsession(status, responded, output, contact_id, org_id, :created_on)
+           VALUES(:status, :responded, :output, :contact_id, :org_id, NOW())
+RETURNING id
+`
+
+// FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
+func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment, client *utils.HTTPClient) (flows.Session, error) {
+	session, err := engine.ReadSession(sa, engine.NewDefaultConfig(), client, json.RawMessage(s.Output))
+	if err != nil {
+		return nil, errors.Annotatef(err, "unable to unmarshal session")
+	}
+
+	// walk through our session, populate seen runs
+	s.seenRuns = make(map[flows.RunUUID]time.Time, len(session.Runs()))
+	for _, r := range session.Runs() {
+		s.seenRuns[r.UUID()] = r.ModifiedOn()
+	}
+
+	return session, nil
+}
+
+// WriteUpdatedSession updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
+func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, fs flows.Session) error {
+	// make sure we have our seen runs
+	if s.seenRuns == nil {
+		return errors.Errorf("missing seen runs, cannot update session")
+	}
+
+	output, err := json.Marshal(fs)
+	if err != nil {
+		return errors.Annotatef(err, "error marshalling flow session")
+	}
+	s.Output = string(output)
+
+	// map our status over
+	status, found := sessionStatusMap[fs.Status()]
+	if !found {
+		return errors.Errorf("unknown session status: %s", fs.Status())
+	}
+	s.Status = status
+
+	// now build up our runs
+	for _, r := range fs.Runs() {
+		run, err := newRun(org, s, r)
+		if err != nil {
+			return errors.Annotatef(err, "error creating run: %s", r.UUID())
+		}
+
+		// save the run to our session
+		s.runs = append(s.runs, run)
+	}
+
+	// if we haven't already been marked as responded, walk our runs looking for an input
+	if !s.Responded {
+		for _, r := range fs.Runs() {
+			for _, e := range r.Events() {
+				if e.Type() == events.TypeMsgReceived {
+					s.Responded = true
+					break
+				}
+			}
+			if s.Responded {
+				break
+			}
+		}
+	}
+
+	// TODO: determine current flow
+
+	// TODO: write new session state to db
+	_, err = tx.NamedQuery(updateSessionSQL, s)
+	if err != nil {
+		return errors.Annotatef(err, "error updating session")
+	}
+
+	// figure out which runs are new and which are updated
+	updatedRuns := make([]interface{}, 0, 1)
+	newRuns := make([]interface{}, 0)
+	for _, r := range fs.Runs() {
+		modified, found := s.seenRuns[r.UUID()]
+		if !found {
+			newRuns = append(newRuns, r)
+			continue
+		}
+
+		if r.ModifiedOn().After(modified) {
+			updatedRuns = append(updatedRuns, r)
+			continue
+		}
+	}
+
+	// update all modified runs at once
+	err = BulkSQL(ctx, "update runs", tx, updateRunSQL, updatedRuns)
+	if err != nil {
+		return errors.Annotatef(err, "error updating runs")
+	}
+
+	// insert all new runs at once
+	err = BulkSQL(ctx, "insert runs", tx, insertRunSQL, newRuns)
+	if err != nil {
+		return errors.Annotatef(err, "error writing runs")
+	}
+
+	// apply all our events
+	for _, e := range fs.Events() {
+		err := ApplyEvent(ctx, tx, rp, org, s, e)
+		if err != nil {
+			return errors.Annotatef(err, "error applying event: %v", e)
+		}
+	}
+
+	// gather all our pre commit events, group them by hook
+	err = ApplyPreEventHooks(ctx, tx, rp, org, []*Session{s})
+	if err != nil {
+		return errors.Annotatef(err, "error applying pre commit hooks")
+	}
+
+	return nil
+}
+
+const updateSessionSQL = `
+UPDATE 
+	flows_flowsession
+SET 
+	output = :output, 
+	status = :status, 
+	ended_on = IF :status = 'W' THEN NULL ELSE NOW() END,
+	responded = :responded
+WHERE 
+	id = :id
 `
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
@@ -207,14 +373,20 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 
 	// create all our session objects
 	sessions := make([]*Session, 0, len(ss))
-	sessionsI := make([]interface{}, 0, len(ss))
+	completeSessionsI := make([]interface{}, 0, len(ss))
+	incompleteSessionsI := make([]interface{}, 0, len(ss))
 	for _, s := range ss {
 		session, err := NewSession(org, s)
 		if err != nil {
 			return nil, errors.Annotatef(err, "error creating session objects")
 		}
 		sessions = append(sessions, session)
-		sessionsI = append(sessionsI, session)
+
+		if session.Status == SessionStatusCompleted {
+			completeSessionsI = append(completeSessionsI, session)
+		} else {
+			incompleteSessionsI = append(incompleteSessionsI, session)
+		}
 	}
 
 	// call our global pre commit hook if present
@@ -225,10 +397,16 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 		}
 	}
 
-	// insert them all
-	err := BulkSQL(ctx, "insert sessions", tx, insertSessionSQL, sessionsI)
+	// insert our complete sessions first
+	err := BulkSQL(ctx, "insert completed sessions", tx, insertCompleteSessionSQL, completeSessionsI)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error inserting sessions")
+		return nil, errors.Annotatef(err, "error inserting completed sessions")
+	}
+
+	// insert them all
+	err = BulkSQL(ctx, "insert complete sessions", tx, insertIncompleteSessionSQL, incompleteSessionsI)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error inserting incomplete sessions")
 	}
 
 	// for each session associate our run with each
@@ -251,7 +429,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	// apply our all events for the session
 	for i := range ss {
 		for _, e := range ss[i].Events() {
-			err := ApplyEvent(ctx, tx, rp, sessions[i], e)
+			err := ApplyEvent(ctx, tx, rp, org, sessions[i], e)
 			if err != nil {
 				return nil, errors.Annotatef(err, "error applying event: %v", e)
 			}
@@ -279,9 +457,7 @@ RETURNING id
 
 // newRun writes the passed in flow run to our database, also applying any events in those runs as
 // appropriate. (IE, writing db messages etc..)
-func newRun(session *Session, r flows.FlowRun) (*FlowRun, error) {
-	org := session.Org()
-
+func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error) {
 	// no path is invalid
 	if len(r.Path()) < 1 {
 		return nil, errors.Errorf("run must have at least one path segment")

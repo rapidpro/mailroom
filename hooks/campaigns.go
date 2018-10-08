@@ -30,7 +30,6 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	inserts := make([]interface{}, 0, 5)
 
 	for s, es := range sessions {
-		org := s.Org()
 		groupAdds := make(map[models.GroupID]bool)
 		groupRemoves := make(map[models.GroupID]bool)
 		fieldChanges := make(map[*models.Field]bool)
@@ -47,7 +46,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 				delete(groupAdds, event.GroupID)
 
 			case *events.ContactFieldChangedEvent:
-				field := s.Org().FieldByKey(event.Field.Key)
+				field := org.FieldByKey(event.Field.Key)
 				if field == nil {
 					logrus.WithFields(logrus.Fields{
 						"field_key":  event.Field.Key,
@@ -68,7 +67,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 		// for every group that was removed, we need to remove all event fires for them
 		for g := range groupRemoves {
-			for _, c := range s.Org().CampaignByGroupID(g) {
+			for _, c := range org.CampaignByGroupID(g) {
 				for _, e := range c.Events() {
 					// TODO: filter by field value?
 					deleteEvents[e.ID()] = true
@@ -78,7 +77,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 		// for every field that was changed, we need to also remove event fires and recalculate
 		for f := range fieldChanges {
-			fieldEvents := s.Org().CampaignEventsByFieldID(f.ID())
+			fieldEvents := org.CampaignEventsByFieldID(f.ID())
 			for _, e := range fieldEvents {
 				deleteEvents[e.ID()] = true
 				addEvents[e] = true
@@ -103,7 +102,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 		}
 
 		// ok, for all the unique events we now calculate our fire date
-		tz := s.Org().Env().Timezone()
+		tz := org.Env().Timezone()
 		now := time.Now()
 		for ce := range addEvents {
 			// we aren't part of the group, move on

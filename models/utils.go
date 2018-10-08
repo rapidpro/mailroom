@@ -56,7 +56,12 @@ func extractValues(sql string) (string, error) {
 	return sql[startValues+6 : endValues+1], nil
 }
 
-func BulkSQL(ctx context.Context, label string, tx *sqlx.Tx, sql string, vs []interface{}) error {
+type Queryer interface {
+	Rebind(query string) string
+	QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error)
+}
+
+func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []interface{}) error {
 	// no values, nothing to do
 	if len(vs) == 0 {
 		return nil

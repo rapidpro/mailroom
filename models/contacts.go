@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/lib/pq"
@@ -17,6 +18,10 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/sirupsen/logrus"
 )
+
+type URNID int
+
+var NilURNID = URNID(0)
 
 // LoadContacts loads a set of contacts for the passed in ids
 func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.ContactID) ([]*Contact, error) {
@@ -90,10 +95,12 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 
 			// we build our query from a combination of preferred channel and auth
 			query := url.Values{
-				"id": []string{fmt.Sprintf("%d", u.ID)},
+				"id":       []string{fmt.Sprintf("%d", u.ID)},
+				"priority": []string{fmt.Sprintf("%d", u.Priority)},
 			}
 			if channel != nil {
 				query["channel"] = []string{string(channel.UUID())}
+				query["channel_id"] = []string{fmt.Sprintf("%d", channel.ID())}
 			}
 			if u.Auth != "" {
 				query["auth"] = []string{u.Auth}
@@ -137,6 +144,144 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 	}
 
 	return contact, nil
+}
+
+// Unstop sets the is_stopped attribute to false for this contact
+func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
+	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET is_stopped = FALSE, modified_on = NOW() WHERE id = $1`, c.id)
+	if err != nil {
+		return errors.Annotatef(err, "error unstopping contact")
+	}
+	c.isStopped = false
+	return nil
+}
+
+// UpdatePreferredURNAndChannel updates the URNs for the contact (if needbe) to have the passed in URN as top
+// priority with the passed in channel as the preferred channel
+func (c *Contact) UpdatePreferredURNAndChannel(ctx context.Context, db *sqlx.DB, urnID URNID, channel *Channel) error {
+	// no urns? no op
+	if len(c.urns) == 0 {
+		return errors.Errorf("can't set preferred URN on contact with no URNs")
+	}
+
+	// no channel, that's an error
+	if channel == nil {
+		return errors.Errorf("can't set preferred channel to a nil channel")
+	}
+
+	// whether this is a tel channel
+	isTelChannel := false
+	for _, s := range channel.Schemes() {
+		if s == urns.TelScheme {
+			isTelChannel = true
+			break
+		}
+	}
+
+	// if this isn't our highest priority URN, reorder our urn
+	changed := make([]urns.URN, 0, 1)
+	if URNID(getURNInt(c.urns[0], "id")) != urnID {
+		topPriority := getURNInt(c.urns[0], "priority") + 1
+		topURN := urns.NilURN
+		otherURNs := make([]urns.URN, 0, len(c.urns))
+		for _, u := range c.urns {
+			if URNID(getURNInt(u, "id")) == urnID {
+				u, err := updateURNChannelPriority(u, channel, topPriority)
+				if err != nil {
+					return errors.Annotatef(err, "unable to update URN: %s", u)
+				}
+				topURN = u
+				changed = append(changed, u)
+			} else {
+				otherURNs = append(otherURNs, u)
+			}
+		}
+		c.urns = append([]urns.URN{topURN}, otherURNs...)
+	}
+
+	// now do a pass to see if any of our tel URNs need to have their channel affinity changed
+	if isTelChannel {
+		for i, u := range c.urns {
+			if isTelChannel && u.Scheme() == urns.TelScheme {
+				u, err := updateURNChannelPriority(u, channel, getURNInt(u, "priority"))
+				if err != nil {
+					return errors.Annotatef(err, "unable to update URN: %s", u)
+				}
+				c.urns[i] = u
+				changed = append(changed, u)
+			}
+		}
+	}
+
+	// finally build up our list of updates
+	updates := make([]interface{}, 0, len(changed))
+	for _, u := range changed {
+		id := getURNInt(u, "id")
+		channelID := getURNInt(u, "channel_id")
+		priority := getURNInt(u, "priority")
+		if id == 0 || channelID == 0 {
+			return errors.Errorf("unable to read id or channel_id from URN: %s", u)
+		}
+		updates = append(updates, urnUpdate{URNID: URNID(id), ChannelID: ChannelID(channelID), Priority: priority})
+	}
+
+	// commit them
+	err := BulkSQL(ctx, "updating preferred URN", db, updateURNs, updates)
+	if err != nil {
+		return errors.Annotatef(err, "error committing urn update")
+	}
+
+	// TODO: if we did anything, update our modified_on as well
+	return nil
+}
+
+const updateURNs = `
+	UPDATE 
+		contacts_contacturn
+	SET
+		channel_id = r.channel_id::int,
+		priority = r.priority::int
+	FROM (
+		VALUES(:id, :channel_id, :priority)
+	) AS
+		r(id, channel_id, priority)
+	WHERE
+		contacts_contacturn.id = r.id::int
+`
+
+func getURNInt(urn urns.URN, key string) int {
+	_, _, query, _ := urn.ToParts()
+	parsedQuery, err := url.ParseQuery(query)
+	if err != nil {
+		return 0
+	}
+
+	value, _ := strconv.Atoi(parsedQuery.Get(key))
+	return value
+}
+
+func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urns.URN, error) {
+	scheme, path, query, display := urn.ToParts()
+	parsedQuery, err := url.ParseQuery(query)
+	if err != nil {
+		return urns.NilURN, errors.Errorf("error parsing query from URN: %s", urn)
+	}
+	parsedQuery["priority"] = []string{fmt.Sprintf("%d", priority)}
+	parsedQuery["channel"] = []string{string(channel.UUID())}
+	parsedQuery["channel_id"] = []string{fmt.Sprintf("%d", channel.ID())}
+
+	urn, err = urns.NewURNFromParts(scheme, path, parsedQuery.Encode(), display)
+	if err != nil {
+		return urns.NilURN, errors.Annotatef(err, "unable to create new urn")
+	}
+
+	return urn, nil
+}
+
+type urnUpdate struct {
+	URNID     URNID     `db:"id"`
+	ChannelID ChannelID `db:"channel_id"`
+	Priority  int       `db:"priority"`
 }
 
 // Contact is our mailroom struct that represents a contact
@@ -187,7 +332,8 @@ type contactEnvelope struct {
 	Fields    map[FieldUUID]*fieldValueEnvelope `json:"fields"`
 	GroupIDs  []GroupID                         `json:"group_ids"`
 	URNs      []struct {
-		ID        int       `json:"id"`
+		ID        URNID     `json:"id"`
+		Priority  int       `json:"priority"`
 		Scheme    string    `json:"scheme"`
 		Path      string    `json:"path"`
 		Display   string    `json:"display"`
@@ -236,7 +382,8 @@ LEFT JOIN (
 				'path', path,
 				'display', display,
             	'auth', auth,
-            	'channel_id', channel_id
+				'channel_id', channel_id,
+				'priority', priority
 			) ORDER BY priority DESC, id ASC
 		) as urns 
 	FROM 

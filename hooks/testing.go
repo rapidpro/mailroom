@@ -66,7 +66,7 @@ func RunEventTestCases(t *testing.T, tcs []EventTestCase) {
 		for c, events := range tc.Events {
 			session := contactMap[c]
 			for _, e := range events {
-				err := models.ApplyEvent(ctx, tx, rp, session, e)
+				err := models.ApplyEvent(ctx, tx, rp, org, session, e)
 				if err != nil {
 					assert.NoError(t, err, "%d: failed applying event", i)
 				}

@@ -152,6 +152,13 @@ func (c *Contact) Clone() *Contact {
 	}
 }
 
+// Equal returns true if this instance is equal to the given instance
+func (c *Contact) Equal(other *Contact) bool {
+	asJSON1, _ := json.Marshal(c)
+	asJSON2, _ := json.Marshal(other)
+	return string(asJSON1) == string(asJSON2)
+}
+
 // UUID returns the UUID of this contact
 func (c *Contact) UUID() ContactUUID { return c.uuid }
 
@@ -326,17 +333,17 @@ func (c *Contact) UpdatePreferredChannel(channel *Channel) {
 }
 
 // ReevaluateDynamicGroups reevaluates membership of all dynamic groups for this contact
-func (c *Contact) ReevaluateDynamicGroups(session Session) ([]*Group, []*Group, []error) {
+func (c *Contact) ReevaluateDynamicGroups(env utils.Environment, allGroups *GroupAssets) ([]*Group, []*Group, []error) {
 	added := make([]*Group, 0)
 	removed := make([]*Group, 0)
 	errors := make([]error, 0)
 
-	for _, group := range session.Assets().Groups().All() {
+	for _, group := range allGroups.All() {
 		if !group.IsDynamic() {
 			continue
 		}
 
-		qualifies, err := group.CheckDynamicMembership(session.Environment(), c)
+		qualifies, err := group.CheckDynamicMembership(env, c)
 		if err != nil {
 			errors = append(errors, err)
 		} else if qualifies {

@@ -2,7 +2,7 @@ package runner
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/models"
-	cache "github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/goflow/flows"
@@ -23,7 +22,6 @@ import (
 
 var (
 	httpClient = utils.NewHTTPClient("mailroom")
-	assetCache = cache.New(5*time.Second, time.Minute)
 )
 
 type StartOptions struct {
@@ -40,6 +38,65 @@ type StartOptions struct {
 
 // TriggerBuilder defines the interface for building a trigger for the passed in contact
 type TriggerBuilder func(contact *flows.Contact) flows.Trigger
+
+// ResumeFlow resumes the passed in session using the passed in session
+func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, sa flows.SessionAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
+	start := time.Now()
+
+	// build our flow session
+	fs, err := engine.ReadSession(sa, engine.NewDefaultConfig(), httpClient, json.RawMessage(session.Output))
+	if err != nil {
+		return nil, errors.Annotatef(err, "unable to create session from output")
+	}
+
+	// resume our session
+	err = fs.Resume(resume)
+
+	// had a problem resuming our flow? bail
+	if err != nil {
+		return nil, errors.Annotatef(err, "error resuming flow")
+	}
+
+	// write our updated session, applying any events in the process
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting transaction")
+	}
+
+	// write our updated session and runs
+	err = models.UpdateSession(ctx, tx, rp, org, session, fs)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error updating session for resume")
+	}
+
+	// call our commit hook before committing our session
+	if hook != nil {
+		hook(ctx, tx, rp, org, []*models.Session{session})
+	}
+
+	// commit at once
+	err = tx.Commit()
+	if err != nil {
+		return nil, errors.Annotatef(err, "error committing resumption of flow")
+	}
+
+	// now take care of any post-commit hooks
+	tx, err = db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error starting transaction for post commit hooks")
+	}
+
+	err = models.ApplyPostEventHooks(ctx, tx, rp, org, []*models.Session{session})
+	if err == nil {
+		err = tx.Commit()
+	}
+
+	if err != nil {
+		return nil, errors.Annotatef(err, "error committing session changes on resume")
+	}
+
+	return nil, nil
+}
 
 // StartFlowBatch starts the flow for the passed in org, contacts and flow
 func StartFlowBatch(
@@ -263,7 +320,7 @@ func StartFlow(
 	}
 
 	// build our session assets
-	assets, err := getSessionAssets(org)
+	assets, err := models.GetSessionAssets(org)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error starting flow, unable to load assets")
 	}
@@ -296,7 +353,7 @@ func StartFlow(
 		// start our flow
 		log := log.WithField("contact_uuid", trigger.Contact().UUID())
 		start := time.Now()
-		err := session.Start(trigger, nil)
+		err := session.Start(trigger)
 		if err != nil {
 			log.WithError(err).Errorf("error starting flow")
 			continue
@@ -429,20 +486,4 @@ func StartFlow(
 	log.WithField("elapsed", time.Since(start)).WithField("count", len(dbSessions)).Info("flows started, sessions created")
 
 	return dbSessions, nil
-}
-
-func getSessionAssets(org *models.OrgAssets) (flows.SessionAssets, error) {
-	key := fmt.Sprintf("%d", org.OrgID())
-	cached, found := assetCache.Get(key)
-	if found {
-		return cached.(flows.SessionAssets), nil
-	}
-
-	assets, err := engine.NewSessionAssets(org)
-	if err != nil {
-		return nil, err
-	}
-
-	assetCache.Set(key, assets, cache.DefaultExpiration)
-	return assets, nil
 }

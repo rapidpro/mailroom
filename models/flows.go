@@ -15,11 +15,12 @@ type FlowID int
 // Flow is the mailroom type for a flow
 type Flow struct {
 	f struct {
-		ID         FlowID          `json:"id"`
-		UUID       assets.FlowUUID `json:"uuid"`
-		Name       string          `json:"name"`
-		Definition json.RawMessage `json:"definition"`
-		IsArchived bool            `json:"is_archived"`
+		ID             FlowID          `json:"id"`
+		UUID           assets.FlowUUID `json:"uuid"`
+		Name           string          `json:"name"`
+		Definition     json.RawMessage `json:"definition"`
+		IsArchived     bool            `json:"is_archived"`
+		IgnoreTriggers bool            `json:"ignore_triggers"`
 	}
 }
 
@@ -37,6 +38,9 @@ func (f *Flow) Definition() json.RawMessage { return f.f.Definition }
 
 // IsArchived returns whether this flow is archived
 func (f *Flow) IsArchived() bool { return f.f.IsArchived }
+
+// IgnoreTriggers returns whether this flow ignores triggers
+func (f *Flow) IgnoreTriggers() bool { return f.f.IgnoreTriggers }
 
 func loadFlowByUUID(ctx context.Context, db *sqlx.DB, flowUUID assets.FlowUUID) (*Flow, error) {
 	return loadFlow(ctx, db, selectFlowByUUIDSQL, flowUUID)
@@ -93,6 +97,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	f.uuid as uuid,
 	f.name as name,
 	f.is_archived as is_archived,
+	f.ignore_triggers as ignore_triggers,
 	fr.definition::jsonb || 
 	jsonb_build_object(
 		'flow_type', f.flow_type, 

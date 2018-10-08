@@ -84,7 +84,7 @@ func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 }
 
 // handleContactGroupsChanged is called when a group is added or removed from our contact
-func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *models.Session, e flows.Event) error {
+func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.ContactGroupsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":   session.ContactUUID(),
@@ -96,7 +96,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	// remove each of our groups
 	for _, g := range event.GroupsRemoved {
 		// look up our group id
-		group := session.Org().GroupByUUID(g.UUID)
+		group := org.GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
 				"contact_uuid": session.ContactUUID(),
@@ -118,7 +118,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	// add each of our groups
 	for _, g := range event.GroupsAdded {
 		// look up our group id
-		group := session.Org().GroupByUUID(g.UUID)
+		group := org.GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
 				"contact_uuid": session.ContactUUID(),

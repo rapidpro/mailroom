@@ -7,13 +7,10 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
-	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	null "gopkg.in/guregu/null.v3"
 )
@@ -68,60 +65,6 @@ func TestChannels(t *testing.T) {
 		assert.Equal(t, tc.Parent, channel.Parent())
 	}
 
-}
-
-func TestContacts(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-
-	org, err := GetOrgAssets(ctx, db, 1)
-	assert.NoError(t, err)
-
-	session, err := engine.NewSessionAssets(org)
-	assert.NoError(t, err)
-
-	db.MustExec(
-		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-		VALUES(1, 80, 'whatsapp', '250788373373', 'whatsapp:250788373373', 100)`)
-
-	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = 43`)
-	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = 43`)
-	db.MustExec(`UPDATE contacts_contact SET is_active = FALSE WHERE id = 82`)
-
-	modelContacts, err := LoadContacts(ctx, db, org, []flows.ContactID{1, 42, 43, 80, 82})
-	assert.NoError(t, err)
-	assert.Equal(t, 3, len(modelContacts))
-
-	// convert to goflow contacts
-	contacts := make([]*flows.Contact, len(modelContacts))
-	for i := range modelContacts {
-		contacts[i], err = modelContacts[i].FlowContact(org, session)
-		assert.NoError(t, err)
-	}
-
-	if len(contacts) == 3 {
-		assert.Equal(t, "Cathy Quincy", contacts[0].Name())
-		assert.Equal(t, len(contacts[0].URNs()), 1)
-		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+250700000001?id=42")
-		assert.Equal(t, 5, contacts[0].Groups().Length())
-
-		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto"), contacts[0].Fields()["state"].TypedValue())
-		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto > Yabo > Kilgori"), contacts[0].Fields()["ward"].TypedValue())
-		assert.Equal(t, types.NewXText("F"), contacts[0].Fields()["gender"].TypedValue())
-		assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
-
-		assert.Equal(t, "Dave Jameson", contacts[1].Name())
-		assert.Equal(t, types.NewXNumber(decimal.RequireFromString("30")), contacts[1].Fields()["age"].TypedValue())
-		assert.Equal(t, 0, len(contacts[1].URNs()))
-		assert.Equal(t, 0, contacts[1].Groups().Length())
-
-		assert.Equal(t, "Cathy Roberts", contacts[2].Name())
-		assert.NotNil(t, contacts[2].Fields()["joined"].TypedValue())
-		assert.Equal(t, 2, len(contacts[2].URNs()))
-		assert.Equal(t, contacts[2].URNs()[0].String(), "whatsapp:250788373373?id=10044")
-		assert.Equal(t, contacts[2].URNs()[1].String(), "tel:+250700000039?id=82")
-		assert.Equal(t, 2, contacts[2].Groups().Length())
-	}
 }
 
 func TestFields(t *testing.T) {
@@ -224,18 +167,18 @@ func TestMsgs(t *testing.T) {
 		if err == nil {
 			err = BulkSQL(ctx, "insert msgs sq", tx, InsertMsgSQL, []interface{}{msg})
 			assert.NoError(t, err)
-			assert.Equal(t, orgID, msg.OrgID)
-			assert.Equal(t, tc.Text, msg.Text)
-			assert.Equal(t, tc.ContactID, msg.ContactID)
+			assert.Equal(t, orgID, msg.OrgID())
+			assert.Equal(t, tc.Text, msg.Text())
+			assert.Equal(t, tc.ContactID, msg.ContactID())
 			assert.Equal(t, tc.Channel, msg.Channel())
-			assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID)
-			assert.Equal(t, tc.URN, msg.URN)
-			assert.Equal(t, tc.ContactURNID, msg.ContactURNID)
+			assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
+			assert.Equal(t, tc.URN, msg.URN())
+			assert.Equal(t, tc.ContactURNID, msg.ContactURNID())
 			assert.Equal(t, tc.Metadata, msg.Metadata)
-			assert.Equal(t, now, msg.CreatedOn)
-			assert.True(t, msg.ID > 0)
-			assert.True(t, msg.QueuedOn.After(now))
-			assert.True(t, msg.ModifiedOn.After(now))
+			assert.Equal(t, now, msg.CreatedOn())
+			assert.True(t, msg.ID() > 0)
+			assert.True(t, msg.QueuedOn().After(now))
+			assert.True(t, msg.ModifiedOn().After(now))
 		} else {
 			if !tc.HasErr {
 				assert.Fail(t, "unexpected error: %s", err.Error())
@@ -266,11 +209,11 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, utils.RedactionPolicyNone, org.RedactionPolicy())
 	tz, _ := time.LoadLocation("Europe/Copenhagen")
 	assert.Equal(t, tz, org.Timezone())
-	assert.Equal(t, 0, len(org.Languages()))
+	assert.Equal(t, 0, len(org.AllowedLanguages()))
 
 	org, err = loadOrg(ctx, tx, 2)
 	assert.NoError(t, err)
-	assert.Equal(t, utils.LanguageList([]utils.Language{"eng", "fra"}), org.Languages())
+	assert.Equal(t, []utils.Language{"eng", "fra"}, org.AllowedLanguages())
 
 	_, err = loadOrg(ctx, tx, 99)
 	assert.Error(t, err)

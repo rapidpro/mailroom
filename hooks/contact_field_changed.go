@@ -31,7 +31,7 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 		updates := make(map[models.FieldUUID]*flows.Value, len(es))
 		for _, e := range es {
 			event := e.(*events.ContactFieldChangedEvent)
-			field := session.Org().FieldByKey(event.Field.Key)
+			field := org.FieldByKey(event.Field.Key)
 			if field == nil {
 				logrus.WithFields(logrus.Fields{
 					"field_key":  event.Field.Key,
@@ -88,7 +88,7 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 }
 
 // handleContactFieldChanged is called when a contact field changes
-func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *models.Session, e flows.Event) error {
+func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.ContactFieldChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),

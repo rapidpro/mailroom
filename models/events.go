@@ -67,7 +67,7 @@ func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 }
 
 // EventHandler defines a call for handling events that occur in a flow
-type EventHandler func(context.Context, *sqlx.Tx, *redis.Pool, *Session, flows.Event) error
+type EventHandler func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, *Session, flows.Event) error
 
 // RegisterEventHook registers the passed in handler as being interested in the passed in type
 func RegisterEventHook(eventType string, handler EventHandler) {
@@ -80,13 +80,13 @@ func RegisterEventHook(eventType string, handler EventHandler) {
 }
 
 // ApplyEvent applies the passed in event, IE, creates the db objects required etc..
-func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *Session, e flows.Event) error {
+func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
 	handler, found := eventHandlers[e.Type()]
 	if !found {
 		return errors.Errorf("unable to find handler for event type: %s", e.Type())
 	}
 
-	return handler(ctx, tx, rp, session, e)
+	return handler(ctx, tx, rp, org, session, e)
 }
 
 // our map of event type to internal handlers

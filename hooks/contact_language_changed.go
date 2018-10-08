@@ -35,7 +35,7 @@ func (h *CommitContactLanguageChanges) Apply(ctx context.Context, tx *sqlx.Tx, r
 }
 
 // applyContactLanguageChanged is called when we process a contact language change
-func applyContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *models.Session, e flows.Event) error {
+func applyContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.ContactLanguageChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),

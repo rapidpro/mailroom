@@ -2,15 +2,21 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/utils"
+	cache "github.com/patrickmn/go-cache"
 )
 
+// OrgAssets is our top level cache of all things contained in an org. It is used to build
+// SessionAssets for the engine but also used to cache campaigns and other org level attributes
 type OrgAssets struct {
 	ctx     context.Context
 	db      *sqlx.DB
@@ -49,8 +55,8 @@ type OrgAssets struct {
 	locationsBuiltAt time.Time
 }
 
-var sourceCache = make(map[OrgID]*OrgAssets)
-var sourceCacheLock = sync.RWMutex{}
+var orgCache = cache.New(time.Hour, time.Minute*5)
+var assetCache = cache.New(5*time.Second, time.Minute*5)
 
 const cacheTimeout = time.Second * 5
 const locationCacheTimeout = time.Hour
@@ -58,9 +64,12 @@ const locationCacheTimeout = time.Hour
 // GetOrgAssets creates or gets org assets for the passed in org
 func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
 	// do we have a recent cache?
-	sourceCacheLock.RLock()
-	cached, found := sourceCache[orgID]
-	sourceCacheLock.RUnlock()
+	key := fmt.Sprintf("%d", orgID)
+	var cached *OrgAssets
+	c, found := orgCache.Get(key)
+	if found {
+		cached = c.(*OrgAssets)
+	}
 
 	// if we found a source built in the last five seconds, use it
 	if found && time.Since(cached.builtAt) < cacheTimeout {
@@ -68,7 +77,7 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 	}
 
 	// otherwire, we build one from scratch
-	a := &OrgAssets{
+	o := &OrgAssets{
 		ctx:     ctx,
 		db:      db,
 		builtAt: time.Now(),
@@ -95,85 +104,83 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 	// we load everything at once except for flows which are lazily loaded
 	var err error
 
-	a.env, err = loadOrg(ctx, db, orgID)
+	o.env, err = loadOrg(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading environment for org %d", orgID)
 	}
 
-	a.channels, err = loadChannels(ctx, db, orgID)
+	o.channels, err = loadChannels(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading channel assets for org %d", orgID)
 	}
-	for _, c := range a.channels {
+	for _, c := range o.channels {
 		channel := c.(*Channel)
-		a.channelsByID[channel.ID()] = channel
-		a.channelsByUUID[channel.UUID()] = channel
+		o.channelsByID[channel.ID()] = channel
+		o.channelsByUUID[channel.UUID()] = channel
 	}
 
-	a.fields, err = loadFields(ctx, db, orgID)
+	o.fields, err = loadFields(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading field assets for org %d", orgID)
 	}
-	for _, f := range a.fields {
+	for _, f := range o.fields {
 		field := f.(*Field)
-		a.fieldsByUUID[field.UUID()] = field
-		a.fieldsByKey[field.Key()] = field
+		o.fieldsByUUID[field.UUID()] = field
+		o.fieldsByKey[field.Key()] = field
 	}
 
-	a.groups, err = loadGroups(ctx, db, orgID)
+	o.groups, err = loadGroups(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading group assets for org %d", orgID)
 	}
-	for _, g := range a.groups {
+	for _, g := range o.groups {
 		group := g.(*Group)
-		a.groupsByID[group.ID()] = group
-		a.groupsByUUID[group.UUID()] = group
+		o.groupsByID[group.ID()] = group
+		o.groupsByUUID[group.UUID()] = group
 	}
 
-	a.labels, err = loadLabels(ctx, db, orgID)
+	o.labels, err = loadLabels(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading group labels for org %d", orgID)
 	}
 
-	a.resthooks, err = loadResthooks(ctx, db, orgID)
+	o.resthooks, err = loadResthooks(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading resthooks for org %d", orgID)
 	}
 
-	a.campaigns, err = loadCampaigns(ctx, db, orgID)
+	o.campaigns, err = loadCampaigns(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading campaigns for org %d", orgID)
 	}
-	for _, c := range a.campaigns {
-		a.campaignsByGroup[c.GroupID()] = append(a.campaignsByGroup[c.GroupID()], c)
+	for _, c := range o.campaigns {
+		o.campaignsByGroup[c.GroupID()] = append(o.campaignsByGroup[c.GroupID()], c)
 		for _, e := range c.Events() {
-			a.campaignEventsByField[e.RelativeToID()] = append(a.campaignEventsByField[e.RelativeToID()], e)
-			a.campaignEventsByID[e.ID()] = e
+			o.campaignEventsByField[e.RelativeToID()] = append(o.campaignEventsByField[e.RelativeToID()], e)
+			o.campaignEventsByID[e.ID()] = e
 		}
 	}
 
-	a.triggers, err = loadTriggers(ctx, db, orgID)
+	o.triggers, err = loadTriggers(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading triggers for org %d", orgID)
 	}
 
 	// cache locations for an hour
 	if cached != nil && time.Since(cached.locationsBuiltAt) < locationCacheTimeout {
-		a.locations = cached.locations
-		a.locationsBuiltAt = cached.locationsBuiltAt
+		o.locations = cached.locations
+		o.locationsBuiltAt = cached.locationsBuiltAt
 	} else {
-		a.locations, err = loadLocations(ctx, db, orgID)
-		a.locationsBuiltAt = time.Now()
+		o.locations, err = loadLocations(ctx, db, orgID)
+		o.locationsBuiltAt = time.Now()
 		if err != nil {
 			return nil, errors.Annotatef(err, "error loading group locations for org %d", orgID)
 		}
 	}
 
-	sourceCacheLock.Lock()
-	sourceCache[orgID] = a
-	sourceCacheLock.Unlock()
-
-	return a, nil
+	// add this org to our cache
+	orgCache.Add(key, o, time.Minute)
+	return o, nil
 }
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
@@ -290,4 +297,21 @@ func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
 
 func (a *OrgAssets) Resthooks() ([]assets.Resthook, error) {
 	return a.resthooks, nil
+}
+
+// GetSessionAssets returns a goflow session assets object for the parred in org assets
+func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
+	key := fmt.Sprintf("%d", org.OrgID())
+	cached, found := assetCache.Get(key)
+	if found {
+		return cached.(flows.SessionAssets), nil
+	}
+
+	assets, err := engine.NewSessionAssets(org)
+	if err != nil {
+		return nil, err
+	}
+
+	assetCache.Set(key, assets, cache.DefaultExpiration)
+	return assets, nil
 }

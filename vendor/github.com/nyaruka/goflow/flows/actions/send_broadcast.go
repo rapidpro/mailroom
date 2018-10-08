@@ -51,20 +51,20 @@ func (a *SendBroadcastAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs this action
-func (a *SendBroadcastAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
-	urnList, contactRefs, groupRefs, err := a.resolveContactsAndGroups(run, step, a.URNs, a.Contacts, a.Groups, a.LegacyVars, log)
+func (a *SendBroadcastAction) Execute(run flows.FlowRun, step flows.Step) error {
+	urnList, contactRefs, groupRefs, err := a.resolveContactsAndGroups(run, step, a.URNs, a.Contacts, a.Groups, a.LegacyVars)
 	if err != nil {
 		return err
 	}
 
 	translations := make(map[utils.Language]*events.BroadcastTranslation)
-	languages := append(utils.LanguageList{run.Flow().Language()}, run.Flow().Localization().Languages()...)
+	languages := append([]utils.Language{run.Flow().Language()}, run.Flow().Localization().Languages()...)
 
 	// evaluate the broadcast in each language we have translations for
 	for _, language := range languages {
-		languages := utils.LanguageList{language, run.Flow().Language()}.RemoveDuplicates()
+		languages := []utils.Language{language, run.Flow().Language()}
 
-		evaluatedText, evaluatedAttachments, evaluatedQuickReplies := a.evaluateMessage(run, languages, a.Text, a.Attachments, a.QuickReplies, log)
+		evaluatedText, evaluatedAttachments, evaluatedQuickReplies := a.evaluateMessage(run, step, languages, a.Text, a.Attachments, a.QuickReplies)
 		translations[language] = &events.BroadcastTranslation{
 			Text:         evaluatedText,
 			Attachments:  evaluatedAttachments,
@@ -72,7 +72,7 @@ func (a *SendBroadcastAction) Execute(run flows.FlowRun, step flows.Step, log fl
 		}
 	}
 
-	a.log(events.NewBroadcastCreatedEvent(translations, run.Flow().Language(), urnList, contactRefs, groupRefs), log)
+	a.log(run, step, events.NewBroadcastCreatedEvent(translations, run.Flow().Language(), urnList, contactRefs, groupRefs))
 
 	return nil
 }

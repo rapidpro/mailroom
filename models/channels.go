@@ -11,6 +11,8 @@ import (
 
 type ChannelID int
 
+var NilChannelID = ChannelID(0)
+
 type ChannelType string
 
 const ChannelTypeAndroid = ChannelType("A")

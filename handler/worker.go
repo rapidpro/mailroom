@@ -116,37 +116,114 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 		return errors.Annotatef(err, "error loading contact")
 	}
 
-	// TODO: handle new contact
-	// TODO: handle new message
-	// TODO: make this URN the highest priority URN
-
 	// contact has been deleted, ignore this message but mark it as handled
 	if len(contacts) == 0 {
 		//TODO: models.MarkMessageHandled(ctx, db, org, )
 		return nil
 	}
 
-	contact := contacts[0]
+	// build session assets
+	sa, err := models.GetSessionAssets(org)
+	if err != nil {
+		return errors.Annotatef(err, "unable to load session assets")
+	}
+
+	modelContact := contacts[0]
+	contact, err := modelContact.FlowContact(org, sa)
+	if err != nil {
+		return errors.Annotatef(err, "error creating flow contact")
+	}
+
+	// find the topup for this message
+	topup, err := models.DecrementOrgCredits(ctx, db, rc, event.OrgID, 1)
+	if err != nil {
+		return errors.Annotatef(err, "error calculating topup for msg")
+	}
+
+	// load the channel for this message
+	channel := org.ChannelByID(event.ChannelID)
+
+	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
+	if channel == nil || modelContact.IsBlocked() {
+		err := models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.TypeInbox, topup)
+		if err != nil {
+			return errors.Annotatef(err, "error marking blocked or nil channel message as handled")
+		}
+		return nil
+	}
+
+	// TODO: stopped contact? they are unstopped if they send us an incoming message
+	newContact := event.IsNewContact
+	if modelContact.IsStopped() {
+		err := modelContact.Unstop(ctx, db)
+		if err != nil {
+			return errors.Annotatef(err, "error unstopping contact")
+		}
+
+		newContact = true
+	}
+
+	// if this is a new contact, we need to calculate dynamic groups and campaigns
+	if newContact {
+		// TODO: figure out any dynamic groups the contact is in
+		// TODO: figure out any campaigns the contact is in
+	}
+
+	// make sure this URN is our highest priority (this is usually a noop)
+	err := modelContact.UpdatePreferredURNAndChannel(ctx, db, event.URNID, channel)
+	if err != nil {
+		return errors.Annotatef(err, "error changing primary URN")
+	}
 
 	// find any matching triggers
-	models.FindMatchingMsgTrigger(org, contact, event.Text)
+	trigger := models.FindMatchingMsgTrigger(org, modelContact, event.Text)
 
 	// get any active session for this contact
-	//session := models.FindActiveSession(db, org, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, org, contact)
+	if err != nil {
+		return errors.Annotatef(err, "error loading active session for contact")
+	}
+
+	// we have a session and it has an active flow, check whether we should honor triggers
+	var flow *models.Flow
+	if session != nil && session.ActiveFlowID != nil {
+		assetFlow, err := org.FlowByID(*session.ActiveFlowID)
+		if err != nil {
+			return errors.Annotatef(err, "error loading flow for session")
+		}
+		flow = assetFlow.(*models.Flow)
+	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
+	if trigger != nil && (flow == nil || flow.IsArchived() || !flow.IgnoreTriggers()) {
+		// TODO: start them in the triggered flow, interrupting their current flow/session
+	}
 
-	// fire our trigger instead, starting them in the appropriate flow
+	// if there is a session, resume it
+	if flow != nil {
+		msg := flows.NewMsgIn(event.MsgUUID, event.MsgID, event.URN, channel, event.Text, event.Attachments)
+		runner.ResumeSessionWithMsg()
+	}
+
+	// this is a simple message, no session to resume and no trigger, stick it in our inbox
+	err := models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topup)
+	if err != nil {
+		return errors.Annotatef(err, "error marking message as handled")
+	}
 	return nil
 }
 
 type msgEvent struct {
-	OrgID     models.OrgID        `json:"org_id"`
-	ContactID flows.ContactID     `json:"contact_id"`
-	MsgID     models.MsgID        `json:"msg_id"`
-	URNID     models.ContactURNID `json:"urn_id"`
-	URN       urns.URN            `json:"urn"`
-	Text      string              `json:"text"`
+	OrgID        models.OrgID        `json:"org_id"`
+	ChannelID    models.ChannelID    `json:"channel_id"`
+	ContactID    flows.ContactID     `json:"contact_id"`
+	MsgID        models.MsgID        `json:"msg_id"`
+	MsgUUID      flows.MsgUUID       `json:"msg_uuid"`
+	URN          urns.URN            `json:"urn"`
+	URNID        models.ContactURNID `json:"urn_id"`
+	Text         string              `json:"text"`
+	Attachments  []flows.Attachment  `json:"attachments"`
+	IsNewContact bool                `json:"is_new_contact"`
 }
 
 type handleEventTask struct {

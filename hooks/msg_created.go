@@ -95,7 +95,7 @@ func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 }
 
 // ApplyMsgCreatedEvent creates the db msg for the passed in event
-func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, session *models.Session, e flows.Event) error {
+func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
@@ -105,12 +105,12 @@ func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, sess
 	}).Debug("creating message")
 
 	// get our channel
-	channel := session.Org().ChannelByUUID(event.Msg.Channel().UUID)
+	channel := org.ChannelByUUID(event.Msg.Channel().UUID)
 	if channel == nil {
 		return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
 	}
 
-	msg, err := models.NewOutgoingMsg(ctx, tx, rp, session.Org().OrgID(), channel, session.ContactID, &event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingMsg(ctx, tx, rp, org.OrgID(), channel, session.ContactID, &event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Annotatef(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
