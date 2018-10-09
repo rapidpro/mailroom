@@ -2,6 +2,7 @@ package models
 
 import (
 	"testing"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
@@ -37,6 +38,8 @@ func TestTriggers(t *testing.T) {
 	farmersID := insertTrigger(t, db, true, FlowID(3), KeywordTriggerType, "resist", MatchOnly, []GroupID{GroupID(32)})
 	farmersAllID := insertTrigger(t, db, true, FlowID(3), CatchallTriggerType, "", MatchOnly, []GroupID{GroupID(32)})
 	othersAllID := insertTrigger(t, db, true, FlowID(3), CatchallTriggerType, "", MatchOnly, nil)
+
+	time.Sleep(10 * time.Millisecond)
 
 	org, err := GetOrgAssets(ctx, db, OrgID(1))
 	assert.NoError(t, err)
