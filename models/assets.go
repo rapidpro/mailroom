@@ -239,13 +239,13 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 	return dbFlow, nil
 }
 
-func (a *OrgAssets) FlowByID(flowID FlowID) (assets.Flow, error) {
+func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 	a.flowCacheLock.RLock()
 	flow, found := a.flowByID[flowID]
 	a.flowCacheLock.RUnlock()
 
 	if found {
-		return flow, nil
+		return flow.(*Flow), nil
 	}
 
 	dbFlow, err := loadFlowByID(a.ctx, a.db, flowID)

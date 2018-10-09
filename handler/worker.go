@@ -20,13 +20,14 @@ import (
 )
 
 const (
-	contactEventType = "handle_event"
+	contactEventType         = "handle_event"
+	stopEventType            = "stop_event"
+	msgEventType             = "msg_event"
+	newConversationEventType = "new_conversation"
+	referralEventType        = "referral"
 
-	channelEventType = "channel_event"
-	stopEventType    = "stop_event"
 	expireEventType  = "expire_event"
 	timeoutEventType = "timeout_event"
-	msgEventType     = "msg_event"
 )
 
 func init() {
@@ -59,8 +60,23 @@ func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 
 	// hand off to the appropriate handler
 	switch contactEvent.Type {
-	case channelEventType:
-		return handleChannelEvent(mr.CTX, mr.DB, mr.RP, contactEvent)
+
+	case stopEventType:
+		evt := &stopEvent{}
+		err := json.Unmarshal(contactEvent.Task, evt)
+		if err != nil {
+			return errors.Annotatef(err, "error unmarshalling stop event")
+		}
+		return handleStopEvent(mr.CTX, mr.DB, mr.RP, evt)
+
+	case newConversationEventType, referralEventType:
+		evt := &channelEvent{}
+		err := json.Unmarshal(contactEvent.Task, evt)
+		if err != nil {
+			return errors.Annotatef(err, "error unmarshalling channel event")
+		}
+		return handleChannelEvent(mr.CTX, mr.DB, mr.RP, contactEvent.Type, evt)
+
 	case msgEventType:
 		msg := &msgEvent{}
 		err := json.Unmarshal(contactEvent.Task, msg)
@@ -68,19 +84,91 @@ func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 			return errors.Annotatef(err, "error unmarshalling msg event")
 		}
 		return handleMsgEvent(mr.CTX, mr.DB, mr.RP, msg)
-	case stopEventType:
-		stop := &stopEvent{}
-		err := json.Unmarshal(contactEvent.Task, stop)
-		if err != nil {
-			return errors.Annotatef(err, "error unmarshalling stop event")
-		}
-		return handleStopEvent(mr.CTX, mr.DB, mr.RP, stop)
+
 	default:
 		return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
 	}
 }
 
-func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *queue.Task) error {
+// handleChannelEvent is called for channel events
+func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *channelEvent) error {
+	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
+	if err != nil {
+		return errors.Annotatef(err, "error loading org")
+	}
+
+	// load the channel for this event
+	channel := org.ChannelByID(event.ChannelID)
+	if channel == nil {
+		return nil
+	}
+
+	// do we have associated trigger?
+	var trigger *models.Trigger
+	switch eventType {
+	case newConversationEventType:
+		trigger = models.FindMatchingNewConversationTrigger(org, channel)
+	case referralEventType:
+		trigger = models.FindMatchingReferralTrigger(org, channel, event.ReferralID)
+	default:
+		return errors.Errorf("unknown channel event type: %s", eventType)
+	}
+
+	// no trigger, noop, move on
+	if trigger == nil {
+		return nil
+	}
+
+	// ok, we have a trigger, load our contact
+	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{event.ContactID})
+	if err != nil {
+		return errors.Annotatef(err, "error loading contact")
+	}
+
+	// contact has been deleted or is blocked, ignore this event
+	if len(contacts) == 0 || contacts[0].IsBlocked() {
+		return nil
+	}
+
+	modelContact := contacts[0]
+
+	// build session assets
+	sa, err := models.GetSessionAssets(org)
+	if err != nil {
+		return errors.Annotatef(err, "unable to load session assets")
+	}
+
+	// build our flow contact
+	contact, err := modelContact.FlowContact(org, sa)
+	if err != nil {
+		return errors.Annotatef(err, "error creating flow contact")
+	}
+
+	if event.NewContact {
+		err = initiliazeNewContact(ctx, db, org, contact)
+		if err != nil {
+			return errors.Annotatef(err, "unable to initialize new contact")
+		}
+	}
+
+	// load our flow
+	flow, err := org.FlowByID(trigger.FlowID())
+	if err != nil {
+		return errors.Annotatef(err, "error loading flow for trigger")
+	}
+
+	// didn't find it? no longer active, return
+	if flow == nil || flow.IsArchived() {
+		return nil
+	}
+
+	// start them in the triggered flow, interrupting their current flow/session
+	// TODO: replace with a real channel trigger
+	channelTrigger := triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
+	_, err = runner.StartFlowForContact(ctx, db, rp, org, sa, channelTrigger, nil)
+	if err != nil {
+		return errors.Annotatef(err, "error starting flow for contact")
+	}
 	return nil
 }
 
@@ -100,11 +188,6 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *st
 		return errors.Annotatef(err, "unable to commit for contact stop")
 	}
 	return err
-}
-
-type stopEvent struct {
-	OrgID     models.OrgID    `json:"org_id"`
-	ContactID flows.ContactID `json:"contact_id"`
 }
 
 // handleMsgEvent is called when a new message arrives from a contact
@@ -182,88 +265,9 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 
 	// if this is a new contact, we need to calculate dynamic groups and campaigns
 	if newContact {
-		// TODO: perhaps this belongs on contact?
-		orgGroups, _ := org.Groups()
-		added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups))
-		if len(errs) > 0 {
-			return errors.Annotatef(errs[0], "error calculating dynamic groups")
-		}
-
-		// start a transaction to commit all our changes at once
-		tx, err := db.BeginTxx(ctx, nil)
+		err = initiliazeNewContact(ctx, db, org, contact)
 		if err != nil {
-			return errors.Annotatef(err, "unable to start transaction")
-		}
-		campaigns := make(map[models.CampaignID]*models.Campaign)
-
-		groupAdds := make([]*models.GroupAdd, 0, 1)
-		for _, a := range added {
-			group := org.GroupByUUID(a.UUID())
-			if group == nil {
-				return errors.Annotatef(err, "added to unknown group: %s", a.UUID())
-			}
-			groupAdds = append(groupAdds, &models.GroupAdd{
-				ContactID: contact.ID(),
-				GroupID:   group.ID(),
-			})
-
-			// add in any campaigns we may qualify for
-			for _, c := range org.CampaignByGroupID(group.ID()) {
-				campaigns[c.ID()] = c
-			}
-		}
-		err = models.AddContactsToGroups(ctx, tx, groupAdds)
-		if err != nil {
-			return errors.Annotatef(err, "error adding contact to groups")
-		}
-
-		groupRemoves := make([]*models.GroupRemove, 0, 1)
-		for _, r := range removed {
-			group := org.GroupByUUID(r.UUID())
-			if group == nil {
-				return errors.Annotatef(err, "removed from an unknown group: %s", r.UUID())
-			}
-			groupRemoves = append(groupRemoves, &models.GroupRemove{
-				ContactID: contact.ID(),
-				GroupID:   group.ID(),
-			})
-		}
-		err = models.RemoveContactsFromGroups(ctx, tx, groupRemoves)
-		if err != nil {
-			return errors.Annotatef(err, "error removing contact from group")
-		}
-
-		// for each campaign figure out if we need to be added to any events
-		fireAdds := make([]*models.FireAdd, 0, 2)
-		tz := org.Env().Timezone()
-		now := time.Now()
-		for _, c := range campaigns {
-			for _, ce := range c.Events() {
-				scheduled, err := ce.ScheduleForContact(tz, now, contact)
-				if err != nil {
-					return errors.Annotatef(err, "error calculating schedule for event: %d", ce.ID())
-				}
-
-				if scheduled != nil {
-					fireAdds = append(fireAdds, &models.FireAdd{
-						ContactID: contact.ID(),
-						EventID:   ce.ID(),
-						Scheduled: *scheduled,
-					})
-				}
-			}
-		}
-
-		// add any event adds
-		err = models.AddEventFires(ctx, tx, fireAdds)
-		if err != nil {
-			return errors.Annotatef(err, "unable to add new event fires for contact")
-		}
-
-		// ok, commit everything
-		err = tx.Commit()
-		if err != nil {
-			return errors.Annotatef(err, "unable to commit new contact updates")
+			return errors.Annotatef(err, "unable to initialize new contact")
 		}
 	}
 
@@ -279,17 +283,13 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 	// we have a session and it has an active flow, check whether we should honor triggers
 	var flow *models.Flow
 	if session != nil && session.ActiveFlowID != nil {
-		assetFlow, err := org.FlowByID(*session.ActiveFlowID)
+		flow, err = org.FlowByID(*session.ActiveFlowID)
 		if err != nil {
 			return errors.Annotatef(err, "error loading flow for session")
 		}
-		flow = assetFlow.(*models.Flow)
 	}
 
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.MsgID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
-
-	// TODO: how do we track the incoming message id / external_id for use in replies? seems like something we'd
-	// ideally want on the session.
 
 	// build our hook to mark our message as handled
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
@@ -308,31 +308,132 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if trigger != nil && (flow == nil || flow.IsArchived() || !flow.IgnoreTriggers()) {
-		// start them in the triggered flow, interrupting their current flow/session
-		match := &triggers.KeywordMatch{
-			Type:    trigger.KeywordMatchType(),
-			Keyword: trigger.Keyword(),
-		}
-		trigger := triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), nil, msgIn, match, time.Now())
-
-		_, err = runner.StartFlowForContact(ctx, db, rp, org, sa, trigger, hook)
+		// load our flow
+		flow, err := org.FlowByID(trigger.FlowID())
 		if err != nil {
-			return errors.Annotatef(err, "error starting flow for contact")
+			return errors.Annotatef(err, "error loading flow for trigger")
 		}
-		return nil
+
+		// trigger flow is still active, start it
+		if flow == nil || flow.IsArchived() {
+			// start them in the triggered flow, interrupting their current flow/session
+			match := &triggers.KeywordMatch{
+				Type:    trigger.KeywordMatchType(),
+				Keyword: trigger.Keyword(),
+			}
+			trigger := triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), nil, msgIn, match, time.Now())
+
+			_, err = runner.StartFlowForContact(ctx, db, rp, org, sa, trigger, hook)
+			if err != nil {
+				return errors.Annotatef(err, "error starting flow for contact")
+			}
+			return nil
+		}
 	}
 
 	// if there is a session, resume it
 	if flow != nil {
 		resume := resumes.NewMsgResume(org.Env(), contact, msgIn)
-		runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, hook)
+		_, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, hook)
+		if err != nil {
+			return errors.Annotatef(err, "error resuming flow for contact")
+		}
+		return nil
 	}
 
-	// this is a simple message, no session to resume and no trigger, stick it in our inbox
 	err = models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topup)
 	if err != nil {
 		return errors.Annotatef(err, "error marking message as handled")
 	}
+	return nil
+}
+
+// initializeNewContact initializes the passed in contact, making sure it is part of any dynamic groups it
+// should be as well as taking care of any campaign events.
+func initiliazeNewContact(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, contact *flows.Contact) error {
+	orgGroups, _ := org.Groups()
+	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups))
+	if len(errs) > 0 {
+		return errors.Annotatef(errs[0], "error calculating dynamic groups")
+	}
+
+	// start a transaction to commit all our changes at once
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return errors.Annotatef(err, "unable to start transaction")
+	}
+	campaigns := make(map[models.CampaignID]*models.Campaign)
+
+	groupAdds := make([]*models.GroupAdd, 0, 1)
+	for _, a := range added {
+		group := org.GroupByUUID(a.UUID())
+		if group == nil {
+			return errors.Annotatef(err, "added to unknown group: %s", a.UUID())
+		}
+		groupAdds = append(groupAdds, &models.GroupAdd{
+			ContactID: contact.ID(),
+			GroupID:   group.ID(),
+		})
+
+		// add in any campaigns we may qualify for
+		for _, c := range org.CampaignByGroupID(group.ID()) {
+			campaigns[c.ID()] = c
+		}
+	}
+	err = models.AddContactsToGroups(ctx, tx, groupAdds)
+	if err != nil {
+		return errors.Annotatef(err, "error adding contact to groups")
+	}
+
+	groupRemoves := make([]*models.GroupRemove, 0, 1)
+	for _, r := range removed {
+		group := org.GroupByUUID(r.UUID())
+		if group == nil {
+			return errors.Annotatef(err, "removed from an unknown group: %s", r.UUID())
+		}
+		groupRemoves = append(groupRemoves, &models.GroupRemove{
+			ContactID: contact.ID(),
+			GroupID:   group.ID(),
+		})
+	}
+	err = models.RemoveContactsFromGroups(ctx, tx, groupRemoves)
+	if err != nil {
+		return errors.Annotatef(err, "error removing contact from group")
+	}
+
+	// for each campaign figure out if we need to be added to any events
+	fireAdds := make([]*models.FireAdd, 0, 2)
+	tz := org.Env().Timezone()
+	now := time.Now()
+	for _, c := range campaigns {
+		for _, ce := range c.Events() {
+			scheduled, err := ce.ScheduleForContact(tz, now, contact)
+			if err != nil {
+				return errors.Annotatef(err, "error calculating schedule for event: %d", ce.ID())
+			}
+
+			if scheduled != nil {
+				fireAdds = append(fireAdds, &models.FireAdd{
+					ContactID: contact.ID(),
+					EventID:   ce.ID(),
+					Scheduled: *scheduled,
+				})
+			}
+		}
+	}
+
+	// add any event adds
+	err = models.AddEventFires(ctx, tx, fireAdds)
+	if err != nil {
+		return errors.Annotatef(err, "unable to add new event fires for contact")
+	}
+
+	// ok, commit everything
+	err = tx.Commit()
+	if err != nil {
+		return errors.Annotatef(err, "unable to commit new contact updates")
+	}
+
 	return nil
 }
 
@@ -350,6 +451,19 @@ type msgEvent struct {
 	NewContact    bool               `json:"new_contact"`
 }
 
+type stopEvent struct {
+	OrgID     models.OrgID    `json:"org_id"`
+	ContactID flows.ContactID `json:"contact_id"`
+}
+
 type handleEventTask struct {
 	ContactID flows.ContactID `json:"contact_id"`
+}
+
+type channelEvent struct {
+	OrgID      models.OrgID     `json:"org_id"`
+	ChannelID  models.ChannelID `json:"channel_id"`
+	ContactID  flows.ContactID  `json:"contact_id"`
+	ReferralID string           `json:"referrer_id"`
+	NewContact bool             `json:"new_contact"`
 }

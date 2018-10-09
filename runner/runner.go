@@ -129,17 +129,15 @@ func StartFlowBatch(
 	}
 
 	// flow is no longer active, skip
-	dbFlow := flow.(*models.Flow)
-	if dbFlow == nil || dbFlow.IsArchived() {
+	if flow == nil || flow.IsArchived() {
 		logrus.WithField("flow_uuid", flow.UUID()).Info("skipping flow start, flow no longer active or archived")
 		return nil, nil
 	}
 
 	// this will build our trigger for each contact started
 	now := time.Now()
-	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
-		return triggers.NewManualTrigger(org.Env(), contact, flowRef, nil, now)
+		return triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, now)
 	}
 
 	// before committing our runs we want to set the start they are associated with
@@ -160,7 +158,7 @@ func StartFlowBatch(
 		Interrupt:           true,
 	}
 
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, dbFlow, batch.ContactIDs(), options, triggerBuilder, updateStartID)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, batch.ContactIDs(), options, triggerBuilder, updateStartID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error starting flow batch")
 	}

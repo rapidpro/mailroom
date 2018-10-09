@@ -18,12 +18,12 @@ type MatchType string
 type TriggerID int
 
 const (
-	CatchallTriggerType        = "C"
-	KeywordTriggerType         = "K"
-	MissedCallTriggerType      = "M"
-	NewConversationTriggerType = "N"
-	ReferralTriggerType        = "R"
-	CallTriggerType            = "V"
+	CatchallTriggerType        = TriggerType("C")
+	KeywordTriggerType         = TriggerType("K")
+	MissedCallTriggerType      = TriggerType("M")
+	NewConversationTriggerType = TriggerType("N")
+	ReferralTriggerType        = TriggerType("R")
+	CallTriggerType            = TriggerType("V")
 
 	MatchFirst = "F"
 	MatchOnly  = "O"
@@ -38,15 +38,18 @@ type Trigger struct {
 		Keyword     string      `json:"keyword"`
 		MatchType   MatchType   `json:"match_type"`
 		ChannelID   ChannelID   `json:"channel_id"`
+		ReferrerID  string      `json:"referrer_id"`
 		GroupIDs    []GroupID   `json:"group_ids"`
 	}
 }
 
 func (t *Trigger) ID() TriggerID            { return t.t.ID }
+func (t *Trigger) FlowID() FlowID           { return t.t.FlowID }
 func (t *Trigger) TriggerType() TriggerType { return t.t.TriggerType }
 func (t *Trigger) Keyword() string          { return t.t.Keyword }
 func (t *Trigger) MatchType() MatchType     { return t.t.MatchType }
 func (t *Trigger) ChannelID() ChannelID     { return t.t.ChannelID }
+func (t *Trigger) ReferrerID() string       { return t.t.ReferrerID }
 func (t *Trigger) GroupIDs() []GroupID      { return t.t.GroupIDs }
 func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 	if t.t.MatchType == MatchFirst {
@@ -75,6 +78,45 @@ func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, er
 	}
 
 	return triggers, nil
+}
+
+// FindMatchingNewConversationTrigger returns the matching trigger for the passed in trigger type
+func FindMatchingNewConversationTrigger(org *OrgAssets, channel *Channel) *Trigger {
+	var match *Trigger
+	for _, t := range org.Triggers() {
+		if t.TriggerType() == NewConversationTriggerType {
+			if t.ChannelID() == channel.ID() {
+				return t
+			}
+			match = t
+		}
+	}
+
+	return match
+}
+
+// FindMatchingReferralTrigger returns the matching trigger for the passed in trigger type
+// Matches are based on referrer_id first (if present), then channel, then any referrer trigger
+func FindMatchingReferralTrigger(org *OrgAssets, channel *Channel, referrerID string) *Trigger {
+	var match *Trigger
+	for _, t := range org.Triggers() {
+		if t.TriggerType() == ReferralTriggerType {
+			// matches referrer id? that takes top precedence, return right away
+			if referrerID != "" && referrerID == t.ReferrerID() {
+				return t
+			}
+
+			// matches channel? that is a good match
+			if t.ChannelID() == channel.ID() {
+				match = t
+			} else if match == nil {
+				// otherwise if we haven't been set yet, pick that
+				match = t
+			}
+		}
+	}
+
+	return match
 }
 
 // FindMatchingMsgTrigger returns the matching trigger (if any) for the passed in text and channel id
@@ -166,6 +208,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.keyword as keyword,
 	t.match_type as match_type,
 	t.channel_id as channel_id,
+	COALESCE(t.referrer_id, '') as referrer_id,
 	ARRAY_REMOVE(ARRAY_AGG(g.contactgroup_id), NULL) as group_ids
 FROM 
 	triggers_trigger t
