@@ -61,6 +61,9 @@ type Session struct {
 	EndedOn      *time.Time      `db:"ended_on"`
 	ActiveFlowID *FlowID         `db:"active_flow_id"`
 
+	IncomingMsgID      null.Int
+	IncomingExternalID string
+
 	contact *flows.Contact
 	runs    []*FlowRun
 
@@ -92,6 +95,12 @@ func (s *Session) AddPreCommitEvent(hook EventCommitHook, event interface{}) {
 // AddPostCommitEvent adds a new event to be handled by a post commit hook
 func (s *Session) AddPostCommitEvent(hook EventCommitHook, event interface{}) {
 	s.postCommits[hook] = append(s.postCommits[hook], event)
+}
+
+// SetIncomingMsg set the incoming message that this session should be associated with in this sprint
+func (s *Session) SetIncomingMsg(id flows.MsgID, externalID string) {
+	s.IncomingMsgID = null.NewInt(int64(id), true)
+	s.IncomingExternalID = externalID
 }
 
 // FlowRun is the mailroom type for a FlowRun

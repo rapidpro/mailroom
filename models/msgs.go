@@ -62,33 +62,35 @@ const (
 // Msg is our type for mailroom messages
 type Msg struct {
 	m struct {
-		ID           flows.MsgID        `db:"id"              json:"id"`
-		UUID         flows.MsgUUID      `db:"uuid"            json:"uuid"`
-		Text         string             `db:"text"            json:"text"`
-		HighPriority bool               `db:"high_priority"   json:"high_priority"`
-		CreatedOn    time.Time          `db:"created_on"      json:"created_on"`
-		ModifiedOn   time.Time          `db:"modified_on"     json:"modified_on"`
-		SentOn       time.Time          `db:"sent_on"         json:"sent_on"`
-		QueuedOn     time.Time          `db:"queued_on"       json:"queued_on"`
-		Direction    MsgDirection       `db:"direction"       json:"direction"`
-		Status       MsgStatus          `db:"status"          json:"status"`
-		Visibility   MsgVisibility      `db:"visibility"      json:"visibility"`
-		MsgType      MsgType            `db:"msg_type"`
-		MsgCount     int                `db:"msg_count"       json:"tps_cost"`
-		ErrorCount   int                `db:"error_count"     json:"error_count"`
-		NextAttempt  time.Time          `db:"next_attempt"    json:"next_attempt"`
-		ExternalID   null.String        `db:"external_id"     json:"external_id"`
-		Attachments  pq.StringArray     `db:"attachments"     json:"attachments"`
-		Metadata     null.String        `db:"metadata"        json:"metadata"`
-		ChannelID    ChannelID          `db:"channel_id"      json:"channel_id"`
-		ChannelUUID  assets.ChannelUUID `                     json:"channel_uuid"`
-		ConnectionID ConnectionID       `db:"connection_id"`
-		ContactID    flows.ContactID    `db:"contact_id"      json:"contact_id"`
-		ContactURNID URNID              `db:"contact_urn_id"  json:"contact_urn_id"`
-		URN          urns.URN           `                     json:"urn"`
-		URNAuth      string             `                     json:"urn_auth,omitempty"`
-		OrgID        OrgID              `db:"org_id"          json:"org_id"`
-		TopupID      TopupID            `db:"topup_id"`
+		ID                   flows.MsgID        `db:"id"              json:"id"`
+		UUID                 flows.MsgUUID      `db:"uuid"            json:"uuid"`
+		Text                 string             `db:"text"            json:"text"`
+		HighPriority         bool               `db:"high_priority"   json:"high_priority"`
+		CreatedOn            time.Time          `db:"created_on"      json:"created_on"`
+		ModifiedOn           time.Time          `db:"modified_on"     json:"modified_on"`
+		SentOn               time.Time          `db:"sent_on"         json:"sent_on"`
+		QueuedOn             time.Time          `db:"queued_on"       json:"queued_on"`
+		Direction            MsgDirection       `db:"direction"       json:"direction"`
+		Status               MsgStatus          `db:"status"          json:"status"`
+		Visibility           MsgVisibility      `db:"visibility"      json:"visibility"`
+		MsgType              MsgType            `db:"msg_type"`
+		MsgCount             int                `db:"msg_count"       json:"tps_cost"`
+		ErrorCount           int                `db:"error_count"     json:"error_count"`
+		NextAttempt          time.Time          `db:"next_attempt"    json:"next_attempt"`
+		ExternalID           null.String        `db:"external_id"     json:"external_id"`
+		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
+		Metadata             null.String        `db:"metadata"        json:"metadata"`
+		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
+		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
+		ConnectionID         ConnectionID       `db:"connection_id"`
+		ContactID            flows.ContactID    `db:"contact_id"      json:"contact_id"`
+		ContactURNID         URNID              `db:"contact_urn_id"  json:"contact_urn_id"`
+		ResponseToID         null.Int           `db:"response_to_id"  json:"response_to_id"`
+		ResponseToExternalID string             `                     json:"response_to_external_id"`
+		URN                  urns.URN           `                     json:"urn"`
+		URNAuth              string             `                     json:"urn_auth,omitempty"`
+		OrgID                OrgID              `db:"org_id"          json:"org_id"`
+		TopupID              TopupID            `db:"topup_id"`
 	}
 
 	channel *Channel
@@ -128,6 +130,10 @@ func (m *Msg) Attachments() []flows.Attachment {
 		attachments[i] = flows.Attachment(m.m.Attachments[i])
 	}
 	return attachments
+}
+
+func (m *Msg) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.m)
 }
 
 // NewOutgoingMsg creates an outgoing message for the passed in flow message. Note that this message is created in a queued state!
@@ -194,6 +200,12 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	return msg, nil
 }
 
+// SetReplyTo set the incoming message that this session should be associated with in this sprint
+func (m *Msg) SetReplyTo(id null.Int, externalID string) {
+	m.m.ResponseToID = id
+	m.m.ResponseToExternalID = externalID
+}
+
 // InsertMessages inserts the passed in messages in a single query
 func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 	is := make([]interface{}, len(msgs))
@@ -208,10 +220,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, direction, status, attachments, metadata,
-		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, 
+		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, response_to_id,
 		 contact_id, contact_urn_id, org_id, topup_id)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :direction, :status, :attachments, :metadata,
-		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, 
+		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :response_to_id,
 		 :contact_id, :contact_urn_id, :org_id, :topup_id)
 RETURNING 
 	id as id, 

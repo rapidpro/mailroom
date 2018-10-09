@@ -27,7 +27,6 @@ var NilURNID = URNID(0)
 func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.ContactID) ([]*Contact, error) {
 	start := time.Now()
 
-	// TODO, should we be filtering by org here too?
 	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids))
 	if err != nil {
 		return nil, errors.Annotate(err, "error selecting contacts")

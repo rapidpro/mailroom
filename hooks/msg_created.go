@@ -114,6 +114,9 @@ func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 		return errors.Annotatef(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
 
+	// set our reply to as well (will be noop in cases whren there is no incoming message)
+	msg.SetReplyTo(session.IncomingMsgID, session.IncomingExternalID)
+
 	// register to have this message committed
 	session.AddPreCommitEvent(commitSessionMessages, msg)
 	session.AddPostCommitEvent(sendSessionMessages, msg)

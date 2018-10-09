@@ -286,16 +286,25 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 		flow = assetFlow.(*models.Flow)
 	}
 
+	msgIn := flows.NewMsgIn(event.MsgUUID, event.MsgID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
+
+	// TODO: how do we track the incoming message id / external_id for use in replies? seems like something we'd
+	// ideally want on the session.
+
 	// build our hook to mark our message as handled
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
-		err = models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topup)
+		// set our incoming message event on our session
+		if len(sessions) != 1 {
+			return errors.Errorf("handle hook called with more than one session")
+		}
+		sessions[0].SetIncomingMsg(event.MsgID, event.MsgExternalID)
+
+		err = models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeFlow, topup)
 		if err != nil {
 			return errors.Annotatef(err, "error marking message as handled")
 		}
 		return nil
 	}
-
-	msgIn := flows.NewMsgIn(event.MsgUUID, event.MsgID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if trigger != nil && (flow == nil || flow.IsArchived() || !flow.IgnoreTriggers()) {
@@ -328,16 +337,17 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 }
 
 type msgEvent struct {
-	OrgID       models.OrgID       `json:"org_id"`
-	ChannelID   models.ChannelID   `json:"channel_id"`
-	ContactID   flows.ContactID    `json:"contact_id"`
-	MsgID       flows.MsgID        `json:"msg_id"`
-	MsgUUID     flows.MsgUUID      `json:"msg_uuid"`
-	URN         urns.URN           `json:"urn"`
-	URNID       models.URNID       `json:"urn_id"`
-	Text        string             `json:"text"`
-	Attachments []flows.Attachment `json:"attachments"`
-	NewContact  bool               `json:"new_contact"`
+	OrgID         models.OrgID       `json:"org_id"`
+	ChannelID     models.ChannelID   `json:"channel_id"`
+	ContactID     flows.ContactID    `json:"contact_id"`
+	MsgID         flows.MsgID        `json:"msg_id"`
+	MsgUUID       flows.MsgUUID      `json:"msg_uuid"`
+	MsgExternalID string             `json:"external_id"`
+	URN           urns.URN           `json:"urn"`
+	URNID         models.URNID       `json:"urn_id"`
+	Text          string             `json:"text"`
+	Attachments   []flows.Attachment `json:"attachments"`
+	NewContact    bool               `json:"new_contact"`
 }
 
 type handleEventTask struct {
