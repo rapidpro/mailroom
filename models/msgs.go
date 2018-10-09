@@ -13,7 +13,6 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -211,7 +210,6 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 	is := make([]interface{}, len(msgs))
 	for i := range msgs {
 		is[i] = &msgs[i].m
-		logrus.WithField("msg_uuid", msgs[i].UUID()).Info("inserting message")
 	}
 
 	return BulkSQL(ctx, "insert messages", tx, insertMsgSQL, is)

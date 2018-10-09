@@ -61,6 +61,12 @@ var assetCache = cache.New(5*time.Second, time.Minute*5)
 const cacheTimeout = time.Second * 5
 const locationCacheTimeout = time.Hour
 
+// clearCache clears our entire org cache
+func clearCache() {
+	orgCache.Flush()
+	assetCache.Flush()
+}
+
 // GetOrgAssets creates or gets org assets for the passed in org
 func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
 	// do we have a recent cache?
