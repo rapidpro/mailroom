@@ -1,3 +1,7 @@
+v0.0.32
+----------
+ * migrate date tests properly in routers
+
 v0.0.31
 ----------
  * increase our rate of flushing to librato
