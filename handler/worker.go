@@ -19,6 +19,8 @@ import (
 	"github.com/nyaruka/mailroom/runner"
 )
 
+// TODO: lock all of these events by contact
+
 const (
 	contactEventType         = "handle_event"
 	stopEventType            = "stop_event"
@@ -32,6 +34,32 @@ const (
 
 func init() {
 	mailroom.AddTaskFunction(contactEventType, handleContactEvent)
+}
+
+// AddHandleTask adds a single task for the passed in contact
+func AddHandleTask(rc redis.Conn, contactID flows.ContactID, task *queue.Task) error {
+	// marshal our task
+	taskJSON, err := json.Marshal(task)
+	if err != nil {
+		return errors.Annotatef(err, "error marshalling contact task")
+	}
+
+	// first push the event on our contact queue
+	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, contactID)
+	_, err = redis.String(rc.Do("rpush", contactQ, string(taskJSON)))
+	if err != nil {
+		return errors.Annotatef(err, "error adding contact event")
+	}
+
+	// create our contact event
+	contactTask := &handleEventTask{ContactID: contactID}
+
+	// then add a handle task for that contact
+	err = queue.AddTask(rc, mailroom.HandlerQueue, contactEventType, task.OrgID, contactTask, queue.DefaultPriority)
+	if err != nil {
+		return errors.Annotatef(err, "error adding handle event task")
+	}
+	return nil
 }
 
 // handleContactEvent is called when an event comes in for a contact, we pop the next event from the contact queue and handle it
@@ -85,9 +113,82 @@ func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 		}
 		return handleMsgEvent(mr.CTX, mr.DB, mr.RP, msg)
 
+	case timeoutEventType:
+		evt := &timeoutEvent{}
+		err := json.Unmarshal(contactEvent.Task, evt)
+		if err != nil {
+			return errors.Annotatef(err, "error unmarshalling timeout event")
+		}
+		return handleTimeoutEvent(mr.CTX, mr.DB, mr.RP, evt)
+
 	default:
 		return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
 	}
+}
+
+// handleTimeoutEvent is called for timeout events
+func handleTimeoutEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *timeoutEvent) error {
+	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
+	if err != nil {
+		return errors.Annotatef(err, "error loading org")
+	}
+
+	// load our contact
+	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{event.ContactID})
+	if err != nil {
+		return errors.Annotatef(err, "error loading contact")
+	}
+
+	// contact has been deleted or is blocked, ignore this event
+	if len(contacts) == 0 || contacts[0].IsBlocked() {
+		return nil
+	}
+
+	modelContact := contacts[0]
+
+	// build session assets
+	sa, err := models.GetSessionAssets(org)
+	if err != nil {
+		return errors.Annotatef(err, "unable to load session assets")
+	}
+
+	// build our flow contact
+	contact, err := modelContact.FlowContact(org, sa)
+	if err != nil {
+		return errors.Annotatef(err, "error creating flow contact")
+	}
+
+	// load our flow
+	flow, err := org.FlowByID(event.FlowID)
+	if err != nil {
+		return errors.Annotatef(err, "error loading flow for trigger")
+	}
+
+	// didn't find it? no longer active, return
+	if flow == nil || flow.IsArchived() {
+		return nil
+	}
+
+	// get the active session for this contact
+	session, err := models.ActiveSessionForContact(ctx, db, org, contact)
+	if err != nil {
+		return errors.Annotatef(err, "error loading active session for contact")
+	}
+
+	// if we didn't find a session or it is another session, ignore
+	if session == nil || session.ID != event.SessionID {
+		return nil
+	}
+
+	// TODO: should be checking that our timeout is the same as what we were triggered with
+
+	// resume their flow based on the timeout
+	resume := resumes.NewWaitTimeoutResume(org.Env(), contact)
+	_, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
+	if err != nil {
+		return errors.Annotatef(err, "error resuming flow for timeout")
+	}
+	return nil
 }
 
 // handleChannelEvent is called for channel events
@@ -466,4 +567,35 @@ type channelEvent struct {
 	ContactID  flows.ContactID  `json:"contact_id"`
 	ReferralID string           `json:"referrer_id"`
 	NewContact bool             `json:"new_contact"`
+}
+
+// NewTimeoutEvent creates a new event task for the passed in timeout event
+func NewTimeoutEvent(orgID models.OrgID, contactID flows.ContactID, flowID models.FlowID, runID models.FlowRunID, sessionID models.SessionID) *queue.Task {
+	event := &timeoutEvent{
+		OrgID:     orgID,
+		ContactID: contactID,
+		RunID:     runID,
+		SessionID: sessionID,
+		FlowID:    flowID,
+	}
+	eventJSON, err := json.Marshal(event)
+	if err != nil {
+		panic(err)
+	}
+
+	task := &queue.Task{
+		Type:  timeoutEventType,
+		OrgID: int(orgID),
+		Task:  eventJSON,
+	}
+
+	return task
+}
+
+type timeoutEvent struct {
+	OrgID     models.OrgID     `json:"org_id"`
+	ContactID flows.ContactID  `json:"contact_id"`
+	RunID     models.FlowRunID `json:"run_id"`
+	SessionID models.SessionID `json:"session_id"`
+	FlowID    models.FlowID    `json:"flow_id"`
 }

@@ -22,11 +22,14 @@ type SessionCommitHook func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, 
 type SessionID int64
 type SessionStatus string
 
+type FlowRunID int64
+
 const (
 	SessionStatusActive    = "A"
 	SessionStatusCompleted = "C"
 	SessionStatusErrored   = "E"
 	SessionStatusWaiting   = "W"
+	SessionStatusExpired   = "X"
 )
 
 var sessionStatusMap = map[flows.SessionStatus]SessionStatus{
@@ -105,7 +108,7 @@ func (s *Session) SetIncomingMsg(id flows.MsgID, externalID string) {
 
 // FlowRun is the mailroom type for a FlowRun
 type FlowRun struct {
-	ID         FlowID        `db:"id"`
+	ID         FlowRunID     `db:"id"`
 	UUID       flows.RunUUID `db:"uuid"`
 	IsActive   bool          `db:"is_active"`
 	CreatedOn  time.Time     `db:"created_on"`
