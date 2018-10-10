@@ -1,3 +1,7 @@
+v0.0.33
+----------
+ * resolve relative URLs to absolute URLs
+
 v0.0.32
 ----------
  * migrate date tests properly in routers
