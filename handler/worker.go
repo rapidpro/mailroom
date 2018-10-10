@@ -28,8 +28,8 @@ const (
 	newConversationEventType = "new_conversation"
 	referralEventType        = "referral"
 
-	expireEventType  = "expire_event"
-	timeoutEventType = "timeout_event"
+	expirationEventType = "expiration_event"
+	timeoutEventType    = "timeout_event"
 )
 
 func init() {
@@ -113,21 +113,21 @@ func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 		}
 		return handleMsgEvent(mr.CTX, mr.DB, mr.RP, msg)
 
-	case timeoutEventType:
-		evt := &timeoutEvent{}
+	case timeoutEventType, expirationEventType:
+		evt := &timedEvent{}
 		err := json.Unmarshal(contactEvent.Task, evt)
 		if err != nil {
 			return errors.Annotatef(err, "error unmarshalling timeout event")
 		}
-		return handleTimeoutEvent(mr.CTX, mr.DB, mr.RP, evt)
+		return handleTimedEvent(mr.CTX, mr.DB, mr.RP, contactEvent.Type, evt)
 
 	default:
 		return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
 	}
 }
 
-// handleTimeoutEvent is called for timeout events
-func handleTimeoutEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *timeoutEvent) error {
+// handleTimedEvent is called for timeout events
+func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *timedEvent) error {
 	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Annotatef(err, "error loading org")
@@ -165,6 +165,7 @@ func handleTimeoutEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event 
 	}
 
 	// didn't find it? no longer active, return
+	// TODO: mark this session and runs as complete?
 	if flow == nil || flow.IsArchived() {
 		return nil
 	}
@@ -183,7 +184,16 @@ func handleTimeoutEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event 
 	// TODO: should be checking that our timeout is the same as what we were triggered with
 
 	// resume their flow based on the timeout
-	resume := resumes.NewWaitTimeoutResume(org.Env(), contact)
+	var resume flows.Resume
+	switch eventType {
+	case expirationEventType:
+		resume = resumes.NewRunExpirationResume(org.Env(), contact)
+	case timeoutEventType:
+		resume = resumes.NewWaitTimeoutResume(org.Env(), contact)
+	default:
+		return errors.Errorf("unknown event type: %s", eventType)
+	}
+
 	_, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
 	if err != nil {
 		return errors.Annotatef(err, "error resuming flow for timeout")
@@ -571,7 +581,7 @@ type channelEvent struct {
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event
 func NewTimeoutEvent(orgID models.OrgID, contactID flows.ContactID, flowID models.FlowID, runID models.FlowRunID, sessionID models.SessionID) *queue.Task {
-	event := &timeoutEvent{
+	event := &timedEvent{
 		OrgID:     orgID,
 		ContactID: contactID,
 		RunID:     runID,
@@ -592,7 +602,30 @@ func NewTimeoutEvent(orgID models.OrgID, contactID flows.ContactID, flowID model
 	return task
 }
 
-type timeoutEvent struct {
+// NewExpirationEvent creates a new event task for the passed in expiration event
+func NewExpirationEvent(orgID models.OrgID, contactID flows.ContactID, flowID models.FlowID, runID models.FlowRunID, sessionID models.SessionID) *queue.Task {
+	event := &timedEvent{
+		OrgID:     orgID,
+		ContactID: contactID,
+		RunID:     runID,
+		SessionID: sessionID,
+		FlowID:    flowID,
+	}
+	eventJSON, err := json.Marshal(event)
+	if err != nil {
+		panic(err)
+	}
+
+	task := &queue.Task{
+		Type:  expirationEventType,
+		OrgID: int(orgID),
+		Task:  eventJSON,
+	}
+
+	return task
+}
+
+type timedEvent struct {
 	OrgID     models.OrgID     `json:"org_id"`
 	ContactID flows.ContactID  `json:"contact_id"`
 	RunID     models.FlowRunID `json:"run_id"`

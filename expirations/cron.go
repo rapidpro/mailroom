@@ -2,19 +2,24 @@ package expirations
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/juju/errors"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
+	"github.com/nyaruka/mailroom/handler"
+	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/sirupsen/logrus"
 )
 
 const (
 	expirationLock  = "run_expirations"
+	markerGroup     = "run_expirations"
 	expireBatchSize = 500
 )
 
@@ -92,7 +97,29 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		}
 
 		// need to continue this session and flow, create a task for that
+		taskID := fmt.Sprintf("%d:%s", expiration.RunID, expiration.ExpiresOn.Format(time.RFC3339))
+		queued, err := marker.HasTask(rc, markerGroup, taskID)
+		if err != nil {
+			return errors.Annotatef(err, "error checking whether expiratoin is queued")
+		}
 
+		// already queued? move on
+		if queued {
+			continue
+		}
+
+		// ok, queue this task
+		task := handler.NewExpirationEvent(expiration.OrgID, expiration.ContactID, expiration.FlowID, expiration.RunID, expiration.SessionID)
+		err = handler.AddHandleTask(rc, expiration.ContactID, task)
+		if err != nil {
+			return errors.Annotatef(err, "error adding new expiration task")
+		}
+
+		// and mark it as queued
+		err = marker.AddTask(rc, markerGroup, taskID)
+		if err != nil {
+			return errors.Annotatef(err, "error marking expiration task as queued")
+		}
 	}
 
 	// commit any stragglers
@@ -109,15 +136,20 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 const selectExpiredRunsSQL = `
 	SELECT 
-		id as run_id, 
-		parent_id as parent_id,
-		session_id as session_id
+		fr.org_id as org_id,	
+		fr.flow_id as flow_id,		
+		fr.id as run_id, 
+		fr.parent_id as parent_id,
+		fr.session_id as session_id,
+		fr.expires_on as expires_on
 	FROM 
-		flows_flowrun
+		flows_flowrun fr
+		JOIN orgs_org o ON fr.org_id = o.id
 	WHERE 
-		is_active = TRUE AND 
-		expires_on < NOW() AND 
-		connection_id IS NULL
+		fr.is_active = TRUE AND 
+		fr.expires_on < NOW() AND 
+		fr.connection_id IS NULL AND
+		o.flow_server_enabled = TRUE
 	ORDER BY 
 		expires_on ASC
 	LIMIT 25000
@@ -153,7 +185,11 @@ const expireSessionsSQL = `
 `
 
 type RunExpiration struct {
+	OrgID     models.OrgID      `db:"org_id"`
+	FlowID    models.FlowID     `db:"flow_id"`
+	ContactID flows.ContactID   `db:"contact_id"`
 	RunID     models.FlowRunID  `db:"run_id"`
 	ParentID  *models.FlowRunID `db:"parent_id"`
-	SessionID *models.SessionID `db:"session_id"`
+	SessionID models.SessionID  `db:"session_id"`
+	ExpiresOn time.Time         `db:"expires_on"`
 }
