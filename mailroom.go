@@ -12,7 +12,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/librato"
-	_ "github.com/nyaruka/mailroom/handlers"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/sirupsen/logrus"
 )
@@ -37,11 +36,15 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 	taskFunctions[taskType] = taskFunc
 }
 
+// TODO: better handling of global config
+// Config our global mailroom config
+var Config *MailroomConfig
+
 const BatchQueue = "batch"
 
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	Config    *Config
+	Config    *MailroomConfig
 	DB        *sqlx.DB
 	RedisPool *redis.Pool
 	Quit      chan bool
@@ -52,7 +55,8 @@ type Mailroom struct {
 }
 
 // NewMailroom creates and returns a new mailroom instance
-func NewMailroom(config *Config) *Mailroom {
+func NewMailroom(config *MailroomConfig) *Mailroom {
+	Config = config
 	mr := &Mailroom{
 		Config:    config,
 		Quit:      make(chan bool),

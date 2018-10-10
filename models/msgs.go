@@ -3,8 +3,10 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -14,6 +16,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -135,7 +138,12 @@ func NewOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgI
 	// if we have attachments, add them
 	if len(m.Attachments()) > 0 {
 		for _, a := range m.Attachments() {
-			msg.Attachments = append(msg.Attachments, string(a))
+			// if our URL is relative, remap it to something fully qualified
+			url := a.URL()
+			if !strings.HasPrefix(url, "http") {
+				url = fmt.Sprintf("https://%s%s", mailroom.Config.AttachmentDomain, url)
+			}
+			msg.Attachments = append(msg.Attachments, fmt.Sprintf("%s:%s", a.ContentType(), url))
 		}
 	}
 

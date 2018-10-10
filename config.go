@@ -1,7 +1,7 @@
 package mailroom
 
-// Config is our top level configuration object
-type Config struct {
+// MailroomConfig is our top level configuration object
+type MailroomConfig struct {
 	SentryDSN  string `help:"the DSN used for logging errors to Sentry"`
 	DB         string `help:"URL describing how to connect to the RapidPro database"`
 	DBPoolSize int    `help:"the size of our db pool"`
@@ -13,11 +13,13 @@ type Config struct {
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
+
+	AttachmentDomain string `help:"the domain that will be used for relative attachment"`
 }
 
-// NewConfig returns a new default configuration object
-func NewConfig() *Config {
-	return &Config{
+// NewMailroomConfig returns a new default configuration object
+func NewMailroomConfig() *MailroomConfig {
+	return &MailroomConfig{
 		DB:           "postgres://temba@localhost/temba?sslmode=disable",
 		DBPoolSize:   8,
 		Redis:        "redis://localhost:6379/0",
