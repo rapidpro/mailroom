@@ -11,6 +11,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/types"
 	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
@@ -82,7 +83,7 @@ type Msg struct {
 	NextAttempt  time.Time          `db:"next_attempt"    json:"next_attempt"`
 	ExternalID   null.String        `db:"external_id"     json:"external_id"`
 	Attachments  pq.StringArray     `db:"attachments"     json:"attachments"`
-	Metadata     null.String        `db:"metadata"        json:"metadata"`
+	Metadata     types.JSONText     `db:"metadata"        json:"metadata"`
 	ChannelID    ChannelID          `db:"channel_id"      json:"channel_id"`
 	ChannelUUID  assets.ChannelUUID `                     json:"channel_uuid"`
 	ConnectionID ConnectionID       `db:"connection_id"`
@@ -160,7 +161,7 @@ func NewOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgI
 		if err != nil {
 			return nil, errors.Annotate(err, "error marshalling quick replies")
 		}
-		msg.Metadata.SetValid(string(metadataJSON))
+		msg.Metadata = metadataJSON
 	}
 
 	// set URN auth info if we have any (this is used when queuing later on)
