@@ -1,3 +1,7 @@
+v0.0.35
+----------
+ * proper encoding of quick replies
+
 v0.0.34
 ----------
  * deal with case of attachment URL not having leading /
