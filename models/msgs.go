@@ -141,7 +141,11 @@ func NewOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgI
 			// if our URL is relative, remap it to something fully qualified
 			url := a.URL()
 			if !strings.HasPrefix(url, "http") {
-				url = fmt.Sprintf("https://%s%s", mailroom.Config.AttachmentDomain, url)
+				if strings.HasPrefix(url, "/") {
+					url = fmt.Sprintf("https://%s%s", mailroom.Config.AttachmentDomain, url)
+				} else {
+					url = fmt.Sprintf("https://%s/%s", mailroom.Config.AttachmentDomain, url)
+				}
 			}
 			msg.Attachments = append(msg.Attachments, fmt.Sprintf("%s:%s", a.ContentType(), url))
 		}
