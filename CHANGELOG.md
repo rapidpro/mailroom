@@ -1,3 +1,7 @@
+v0.0.34
+----------
+ * deal with case of attachment URL not having leading /
+
 v0.0.33
 ----------
  * resolve relative URLs to absolute URLs
