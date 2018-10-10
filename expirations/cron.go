@@ -40,6 +40,7 @@ func StartExpirationCron(mr *mailroom.Mailroom) error {
 }
 
 // expireRuns expires all the runs that have an expiration in the past
+// TODO: extend lock
 func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
 	start := time.Now()
@@ -47,7 +48,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 	rc := rp.Get()
 	defer rc.Close()
 
-	// batch of run expirations we'll need to expire at once
+	// we expire runs and sessions that have no continuation in batches
 	batch := make([]interface{}, 0, expireBatchSize)
 
 	// select our expired runs
@@ -100,7 +101,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		taskID := fmt.Sprintf("%d:%s", expiration.RunID, expiration.ExpiresOn.Format(time.RFC3339))
 		queued, err := marker.HasTask(rc, markerGroup, taskID)
 		if err != nil {
-			return errors.Annotatef(err, "error checking whether expiratoin is queued")
+			return errors.Annotatef(err, "error checking whether expiration is queued")
 		}
 
 		// already queued? move on
@@ -135,53 +136,53 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 }
 
 const selectExpiredRunsSQL = `
-	SELECT 
-		fr.org_id as org_id,	
-		fr.flow_id as flow_id,		
-		fr.id as run_id, 
+	SELECT
+		fr.org_id as org_id,
+		fr.flow_id as flow_id,
+		fr.id as run_id,
 		fr.parent_id as parent_id,
 		fr.session_id as session_id,
 		fr.expires_on as expires_on
-	FROM 
+	FROM
 		flows_flowrun fr
 		JOIN orgs_org o ON fr.org_id = o.id
-	WHERE 
-		fr.is_active = TRUE AND 
-		fr.expires_on < NOW() AND 
+	WHERE
+		fr.is_active = TRUE AND
+		fr.expires_on < NOW() AND
 		fr.connection_id IS NULL AND
 		o.flow_server_enabled = TRUE
-	ORDER BY 
+	ORDER BY
 		expires_on ASC
 	LIMIT 25000
 `
 
 const expireRunsSQL = `
-	UPDATE 
+	UPDATE
 		flows_flowrun fr
-	SET 
-		is_active = FALSE, 
-		exited_on = NOW(), 
-		exit_type = 'E', 
-		modified_on = NOW(), 
-		child_context = NULL, 
+	SET
+		is_active = FALSE,
+		exited_on = NOW(),
+		exit_type = 'E',
+		modified_on = NOW(),
+		child_context = NULL,
 		parent_context = NULL
 	FROM
 		VALUES(:run_id)) as r(run_id)
-	WHERE 
+	WHERE
 		fr.id = r.run_id::int
 `
 
 const expireSessionsSQL = `
-	UPDATE 
+	UPDATE
 		flows_flowsession s
-	SET 
-		is_active = FALSE, 
-		ended_on = NOW(), 
-		status = 'X' 
-	FROM 
+	SET
+		is_active = FALSE,
+		ended_on = NOW(),
+		status = 'X'
+	FROM
 		(VALUES(:session_id)) AS r(session_id)
 	WHERE
-		s.id = r.session_id::int		
+		s.id = r.session_id::int
 `
 
 type RunExpiration struct {

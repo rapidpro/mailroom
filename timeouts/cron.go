@@ -39,6 +39,7 @@ func StartTimeoutCron(mr *mailroom.Mailroom) error {
 }
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue
+// TODO: extend lock
 func timeoutRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "timeout").WithField("lock", lockValue)
 	start := time.Now()
