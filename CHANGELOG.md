@@ -1,3 +1,7 @@
+v0.0.36
+----------
+ * update tests for quick replies
+
 v0.0.35
 ----------
  * proper encoding of quick replies
