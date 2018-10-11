@@ -24,6 +24,9 @@ func (o *Org) ID() OrgID { return o.id }
 // DateFormat returns the date format for this org
 func (o *Org) DateFormat() utils.DateFormat { return o.env.DateFormat() }
 
+// NumberFormat returns the date format for this org
+func (o *Org) NumberFormat() *utils.NumberFormat { return utils.DefaultNumberFormat }
+
 // TimeFormat returns the time format for this org
 func (o *Org) TimeFormat() utils.TimeFormat { return o.env.TimeFormat() }
 
