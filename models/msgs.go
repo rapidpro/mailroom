@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/gsm7"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -170,7 +171,13 @@ func NewOutgoingMsg(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, orgID OrgI
 		msg.URNAuth = urnAuth
 	}
 
-	// TODO: calculate real msg count
+	// calculate msg count
+	if m.URN().Scheme() == urns.TelScheme {
+		msg.MsgCount = gsm7.Segments(m.Text()) + len(m.Attachments())
+	} else {
+		msg.MsgCount = 1
+	}
+
 	return msg, nil
 }
 

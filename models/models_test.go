@@ -195,14 +195,15 @@ func TestMsgs(t *testing.T) {
 		Attachments  flows.AttachmentList
 		QuickReplies []string
 		Metadata     sqlx_types.JSONText
+		MsgCount     int
 		HasErr       bool
 	}{
 		{chanUUID, channel, "missing urn id", flows.ContactID(42), urns.URN("tel:+250700000001"), ContactURNID(0),
-			nil, nil, sqlx_types.JSONText(nil), true},
+			nil, nil, sqlx_types.JSONText(nil), 1, true},
 		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), ContactURNID(42),
-			nil, []string{"yes", "no"}, sqlx_types.JSONText(`{"quick_replies":["yes","no"]}`), false},
+			nil, []string{"yes", "no"}, sqlx_types.JSONText(`{"quick_replies":["yes","no"]}`), 1, false},
 		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), ContactURNID(42),
-			flows.AttachmentList([]flows.Attachment{flows.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, sqlx_types.JSONText(nil), false},
+			flows.AttachmentList([]flows.Attachment{flows.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, sqlx_types.JSONText(nil), 2, false},
 	}
 
 	now := time.Now()
@@ -226,6 +227,7 @@ func TestMsgs(t *testing.T) {
 			assert.Equal(t, tc.URN, msg.URN)
 			assert.Equal(t, tc.ContactURNID, msg.ContactURNID)
 			assert.Equal(t, tc.Metadata, msg.Metadata)
+			assert.Equal(t, tc.MsgCount, msg.MsgCount)
 			assert.Equal(t, now, msg.CreatedOn)
 			assert.True(t, msg.ID > 0)
 			assert.True(t, msg.QueuedOn.After(now))
