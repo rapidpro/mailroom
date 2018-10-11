@@ -220,7 +220,7 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	case newConversationEventType:
 		trigger = models.FindMatchingNewConversationTrigger(org, channel)
 	case referralEventType:
-		trigger = models.FindMatchingReferralTrigger(org, channel, event.ReferralID)
+		trigger = models.FindMatchingReferralTrigger(org, channel, event.Extra["referrer_id"])
 	default:
 		return errors.Errorf("unknown channel event type: %s", eventType)
 	}
@@ -567,7 +567,7 @@ type msgEvent struct {
 	ChannelID     models.ChannelID   `json:"channel_id"`
 	MsgID         flows.MsgID        `json:"msg_id"`
 	MsgUUID       flows.MsgUUID      `json:"msg_uuid"`
-	MsgExternalID string             `json:"external_id"`
+	MsgExternalID string             `json:"msg_external_id"`
 	URN           urns.URN           `json:"urn"`
 	URNID         models.URNID       `json:"urn_id"`
 	Text          string             `json:"text"`
@@ -581,11 +581,11 @@ type stopEvent struct {
 }
 
 type channelEvent struct {
-	ContactID  flows.ContactID  `json:"contact_id"`
-	OrgID      models.OrgID     `json:"org_id"`
-	ChannelID  models.ChannelID `json:"channel_id"`
-	ReferralID string           `json:"referrer_id"`
-	NewContact bool             `json:"new_contact"`
+	ContactID  flows.ContactID   `json:"contact_id"`
+	OrgID      models.OrgID      `json:"org_id"`
+	ChannelID  models.ChannelID  `json:"channel_id"`
+	Extra      map[string]string `json:"extra"`
+	NewContact bool              `json:"new_contact"`
 }
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event
