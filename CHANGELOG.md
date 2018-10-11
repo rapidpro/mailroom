@@ -1,3 +1,7 @@
+v0.0.37
+----------
+ * calculate real tps cost when building messages
+
 v0.0.36
 ----------
  * update tests for quick replies
