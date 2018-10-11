@@ -181,14 +181,14 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return nil
 	}
 
-	// TODO: should be checking that our timeout is the same as what we were triggered with
-
 	// resume their flow based on the timeout
 	var resume flows.Resume
 	switch eventType {
 	case expirationEventType:
+		// TODO: check our expiration is still the same
 		resume = resumes.NewRunExpirationResume(org.Env(), contact)
 	case timeoutEventType:
+		// TODO: check our timeout is still the same
 		resume = resumes.NewWaitTimeoutResume(org.Env(), contact)
 	default:
 		return errors.Errorf("unknown event type: %s", eventType)
@@ -548,10 +548,23 @@ func initiliazeNewContact(ctx context.Context, db *sqlx.DB, org *models.OrgAsset
 	return nil
 }
 
+type handleEventTask struct {
+	ContactID flows.ContactID `json:"contact_id"`
+}
+
+type timedEvent struct {
+	ContactID flows.ContactID  `json:"contact_id"`
+	OrgID     models.OrgID     `json:"org_id"`
+	RunID     models.FlowRunID `json:"run_id"`
+	SessionID models.SessionID `json:"session_id"`
+	FlowID    models.FlowID    `json:"flow_id"`
+	Time      time.Time        `json:"time"`
+}
+
 type msgEvent struct {
+	ContactID     flows.ContactID    `json:"contact_id"`
 	OrgID         models.OrgID       `json:"org_id"`
 	ChannelID     models.ChannelID   `json:"channel_id"`
-	ContactID     flows.ContactID    `json:"contact_id"`
 	MsgID         flows.MsgID        `json:"msg_id"`
 	MsgUUID       flows.MsgUUID      `json:"msg_uuid"`
 	MsgExternalID string             `json:"external_id"`
@@ -563,30 +576,27 @@ type msgEvent struct {
 }
 
 type stopEvent struct {
+	ContactID flows.ContactID `json:"contact_id"`
 	OrgID     models.OrgID    `json:"org_id"`
-	ContactID flows.ContactID `json:"contact_id"`
-}
-
-type handleEventTask struct {
-	ContactID flows.ContactID `json:"contact_id"`
 }
 
 type channelEvent struct {
+	ContactID  flows.ContactID  `json:"contact_id"`
 	OrgID      models.OrgID     `json:"org_id"`
 	ChannelID  models.ChannelID `json:"channel_id"`
-	ContactID  flows.ContactID  `json:"contact_id"`
 	ReferralID string           `json:"referrer_id"`
 	NewContact bool             `json:"new_contact"`
 }
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event
-func NewTimeoutEvent(orgID models.OrgID, contactID flows.ContactID, flowID models.FlowID, runID models.FlowRunID, sessionID models.SessionID) *queue.Task {
+func newTimedEvent(eventType string, orgID models.OrgID, contactID flows.ContactID, flowID models.FlowID, runID models.FlowRunID, sessionID models.SessionID, time time.Time) *queue.Task {
 	event := &timedEvent{
 		OrgID:     orgID,
 		ContactID: contactID,
 		RunID:     runID,
 		SessionID: sessionID,
 		FlowID:    flowID,
+		Time:      time,
 	}
 	eventJSON, err := json.Marshal(event)
 	if err != nil {
@@ -594,41 +604,20 @@ func NewTimeoutEvent(orgID models.OrgID, contactID flows.ContactID, flowID model
 	}
 
 	task := &queue.Task{
-		Type:  timeoutEventType,
+		Type:  eventType,
 		OrgID: int(orgID),
 		Task:  eventJSON,
 	}
 
 	return task
+}
+
+// NewTimeoutEvent creates a new event task for the passed in timeout event
+func NewTimeoutEvent(orgID models.OrgID, contactID flows.ContactID, flowID models.FlowID, runID models.FlowRunID, sessionID models.SessionID, time time.Time) *queue.Task {
+	return newTimedEvent(timeoutEventType, orgID, contactID, flowID, runID, sessionID, time)
 }
 
 // NewExpirationEvent creates a new event task for the passed in expiration event
-func NewExpirationEvent(orgID models.OrgID, contactID flows.ContactID, flowID models.FlowID, runID models.FlowRunID, sessionID models.SessionID) *queue.Task {
-	event := &timedEvent{
-		OrgID:     orgID,
-		ContactID: contactID,
-		RunID:     runID,
-		SessionID: sessionID,
-		FlowID:    flowID,
-	}
-	eventJSON, err := json.Marshal(event)
-	if err != nil {
-		panic(err)
-	}
-
-	task := &queue.Task{
-		Type:  expirationEventType,
-		OrgID: int(orgID),
-		Task:  eventJSON,
-	}
-
-	return task
-}
-
-type timedEvent struct {
-	OrgID     models.OrgID     `json:"org_id"`
-	ContactID flows.ContactID  `json:"contact_id"`
-	RunID     models.FlowRunID `json:"run_id"`
-	SessionID models.SessionID `json:"session_id"`
-	FlowID    models.FlowID    `json:"flow_id"`
+func NewExpirationEvent(orgID models.OrgID, contactID flows.ContactID, flowID models.FlowID, runID models.FlowRunID, sessionID models.SessionID, time time.Time) *queue.Task {
+	return newTimedEvent(expirationEventType, orgID, contactID, flowID, runID, sessionID, time)
 }

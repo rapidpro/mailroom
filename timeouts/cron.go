@@ -76,7 +76,7 @@ func timeoutRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName stri
 		}
 
 		// ok, queue this task
-		task := handler.NewTimeoutEvent(timeout.OrgID, timeout.ContactID, timeout.FlowID, timeout.RunID, timeout.SessionID)
+		task := handler.NewTimeoutEvent(timeout.OrgID, timeout.ContactID, timeout.FlowID, timeout.RunID, timeout.SessionID, timeout.TimeoutOn)
 		err = handler.AddHandleTask(rc, timeout.ContactID, task)
 		if err != nil {
 			return errors.Annotatef(err, "error adding new handle task")

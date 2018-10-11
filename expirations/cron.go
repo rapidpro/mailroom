@@ -110,7 +110,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		}
 
 		// ok, queue this task
-		task := handler.NewExpirationEvent(expiration.OrgID, expiration.ContactID, expiration.FlowID, expiration.RunID, expiration.SessionID)
+		task := handler.NewExpirationEvent(expiration.OrgID, expiration.ContactID, expiration.FlowID, expiration.RunID, expiration.SessionID, expiration.ExpiresOn)
 		err = handler.AddHandleTask(rc, expiration.ContactID, task)
 		if err != nil {
 			return errors.Annotatef(err, "error adding new expiration task")
