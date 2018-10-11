@@ -12,7 +12,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/librato"
-	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/sirupsen/logrus"
 )
@@ -37,24 +36,30 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 	taskFunctions[taskType] = taskFunc
 }
 
+// TODO: better handling of global config
+// Config our global mailroom config
+var Config *MailroomConfig
+
 const BatchQueue = "batch"
 const HandlerQueue = "handler"
 
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	Config         *Config
-	DB             *sqlx.DB
-	RP             *redis.Pool
-	Quit           chan bool
-	CTX            context.Context
-	Cancel         context.CancelFunc
-	WaitGroup      *sync.WaitGroup
+	Config    *MailroomConfig
+	DB        *sqlx.DB
+	RP        *redis.Pool
+	Quit      chan bool
+	CTX       context.Context
+	Cancel    context.CancelFunc
+	WaitGroup *sync.WaitGroup
+
 	batchForeman   *Foreman
 	handlerForeman *Foreman
 }
 
 // NewMailroom creates and returns a new mailroom instance
-func NewMailroom(config *Config) *Mailroom {
+func NewMailroom(config *MailroomConfig) *Mailroom {
+	Config = config
 	mr := &Mailroom{
 		Config:    config,
 		Quit:      make(chan bool),
@@ -157,7 +162,7 @@ func (mr *Mailroom) Start() error {
 	// if we have a librato token, configure it
 	if mr.Config.LibratoToken != "" {
 		host, _ := os.Hostname()
-		librato.Configure(mr.Config.LibratoUsername, mr.Config.LibratoToken, host, time.Second*5, mr.WaitGroup)
+		librato.Configure(mr.Config.LibratoUsername, mr.Config.LibratoToken, host, time.Second, mr.WaitGroup)
 		librato.Start()
 	}
 

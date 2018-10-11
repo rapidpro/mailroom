@@ -1,3 +1,35 @@
+v0.0.37
+----------
+ * calculate real tps cost when building messages
+
+v0.0.36
+----------
+ * update tests for quick replies
+
+v0.0.35
+----------
+ * proper encoding of quick replies
+
+v0.0.34
+----------
+ * deal with case of attachment URL not having leading /
+
+v0.0.33
+----------
+ * resolve relative URLs to absolute URLs
+
+v0.0.32
+----------
+ * migrate date tests properly in routers
+
+v0.0.31
+----------
+ * increase our rate of flushing to librato
+
+v0.0.30
+----------
+ * ignore flow triggered events
+
 v0.0.29
 ----------
  * remove use of models.ContactID, updated modified_on for contacts that change groups

@@ -13,13 +13,14 @@ import (
 
 	_ "github.com/nyaruka/mailroom/campaigns"
 	_ "github.com/nyaruka/mailroom/expirations"
+	_ "github.com/nyaruka/mailroom/hooks"
 	_ "github.com/nyaruka/mailroom/starts"
 )
 
 var version = "Dev"
 
 func main() {
-	config := mailroom.NewConfig()
+	config := mailroom.NewMailroomConfig()
 	loader := ezconf.NewLoader(
 		config,
 		"mailroom", "Mailroom - flow event handler for RapidPro",

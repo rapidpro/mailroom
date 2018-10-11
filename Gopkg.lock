@@ -90,7 +90,8 @@
   name = "github.com/jmoiron/sqlx"
   packages = [
     ".",
-    "reflectx"
+    "reflectx",
+    "types"
   ]
   revision = "0dae4fefe7c0e190f7b5a78dac28a1c82cc8d849"
 
@@ -264,6 +265,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2c458cbc6189e2f5150716f36ee654526ec2552d90f73a8c9b8a4dd5770e5eca"
+  inputs-digest = "60c487d4505f727f897bebb3d24b8c36c92ee88620f047abd3ccf59086e5b92f"
   solver-name = "gps-cdcl"
   solver-version = 1

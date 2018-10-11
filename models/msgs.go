@@ -3,16 +3,21 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/types"
 	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/gsm7"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -78,7 +83,7 @@ type Msg struct {
 		NextAttempt          time.Time          `db:"next_attempt"    json:"next_attempt"`
 		ExternalID           null.String        `db:"external_id"     json:"external_id"`
 		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
-		Metadata             null.String        `db:"metadata"        json:"metadata"`
+		Metadata             types.JSONText     `db:"metadata"        json:"metadata"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
 		ConnectionID         ConnectionID       `db:"connection_id"`
@@ -111,7 +116,8 @@ func (m *Msg) MsgType() MsgType                { return m.m.MsgType }
 func (m *Msg) ErrorCount() int                 { return m.m.ErrorCount }
 func (m *Msg) NextAttempt() time.Time          { return m.m.NextAttempt }
 func (m *Msg) ExternalID() null.String         { return m.m.ExternalID }
-func (m *Msg) Metadata() null.String           { return m.m.Metadata }
+func (m *Msg) Metadata() types.JSONText        { return m.m.Metadata }
+func (m *Msg) MsgCount() int                   { return m.m.MsgCount }
 func (m *Msg) ChannelID() ChannelID            { return m.m.ChannelID }
 func (m *Msg) ChannelUUID() assets.ChannelUUID { return m.m.ChannelUUID }
 func (m *Msg) ConnectionID() ConnectionID      { return m.m.ConnectionID }
@@ -173,7 +179,16 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
 		for _, a := range out.Attachments() {
-			m.Attachments = append(m.Attachments, string(a))
+			// if our URL is relative, remap it to something fully qualified
+			url := a.URL()
+			if !strings.HasPrefix(url, "http") {
+				if strings.HasPrefix(url, "/") {
+					url = fmt.Sprintf("https://%s%s", mailroom.Config.AttachmentDomain, url)
+				} else {
+					url = fmt.Sprintf("https://%s/%s", mailroom.Config.AttachmentDomain, url)
+				}
+			}
+			m.Attachments = append(m.Attachments, fmt.Sprintf("%s:%s", a.ContentType(), url))
 		}
 	}
 
@@ -186,7 +201,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 		if err != nil {
 			return nil, errors.Annotate(err, "error marshalling quick replies")
 		}
-		m.Metadata.SetValid(string(metadataJSON))
+		m.Metadata = metadataJSON
 	}
 
 	// set URN auth info if we have any (this is used when queuing later on)
@@ -195,7 +210,13 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 		m.URNAuth = urnAuth
 	}
 
-	// TODO: calculate real msg count
+	// calculate msg count
+	if m.URN.Scheme() == urns.TelScheme {
+		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
+	} else {
+		m.MsgCount = 1
+	}
+
 	return msg, nil
 }
 

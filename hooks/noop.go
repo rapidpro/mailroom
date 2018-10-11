@@ -20,9 +20,10 @@ func init() {
 	models.RegisterEventHook(events.TypeWebhookCalled, NoopHandler)
 	models.RegisterEventHook(events.TypeWaitTimedOut, NoopHandler)
 	models.RegisterEventHook(events.TypeRunExpired, NoopHandler)
+	models.RegisterEventHook(events.TypeFlowTriggered, NoopHandler)
 }
 
-// NoopHandler is our handler for events we ignore in a run
+// NoopHandler is our hook for events we ignore in a run
 func NoopHandler(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, event flows.Event) error {
 	logrus.WithFields(logrus.Fields{
 		"event_type":   event.Type(),
