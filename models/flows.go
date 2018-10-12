@@ -133,6 +133,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	f.uuid as uuid,
 	f.name as name,
 	f.is_archived as is_archived,
+	f.ignore_triggers as ignore_triggers,	
 	fr.definition::jsonb || 
 	jsonb_build_object(
 		'flow_type', f.flow_type, 

@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -44,7 +43,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	start := time.Now()
 
 	// build our flow session
-	fs, err := engine.ReadSession(sa, engine.NewDefaultConfig(), httpClient, json.RawMessage(session.Output))
+	fs, err := session.FlowSession(sa, org.Env(), httpClient)
 	if err != nil {
 		return nil, errors.Annotatef(err, "unable to create session from output")
 	}

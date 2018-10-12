@@ -54,15 +54,16 @@ var keptEvents = map[string]bool{
 
 // Session is the mailroom type for a FlowSession
 type Session struct {
-	ID           SessionID       `db:"id"`
-	Status       SessionStatus   `db:"status"`
-	Responded    bool            `db:"responded"`
-	Output       string          `db:"output"`
-	ContactID    flows.ContactID `db:"contact_id"`
-	OrgID        OrgID           `db:"org_id"`
-	CreatedOn    time.Time       `db:"created_on"`
-	EndedOn      *time.Time      `db:"ended_on"`
-	ActiveFlowID *FlowID         `db:"active_flow_id"`
+	ID            SessionID       `db:"id"`
+	Status        SessionStatus   `db:"status"`
+	Responded     bool            `db:"responded"`
+	Output        string          `db:"output"`
+	ContactID     flows.ContactID `db:"contact_id"`
+	OrgID         OrgID           `db:"org_id"`
+	CreatedOn     time.Time       `db:"created_on"`
+	EndedOn       *time.Time      `db:"ended_on"`
+	TimeoutOn     *time.Time      `db:"timeout_on"`
+	CurrentFlowID *FlowID         `db:"current_flow_id"`
 
 	IncomingMsgID      null.Int
 	IncomingExternalID string
@@ -132,7 +133,7 @@ type FlowRun struct {
 	ContactID       flows.ContactID `db:"contact_id"`
 	FlowID          FlowID          `db:"flow_id"`
 	OrgID           OrgID           `db:"org_id"`
-	ParentID        null.Int        `db:"parent_id"`
+	ParentUUID      *flows.RunUUID  `db:"parent_uuid"`
 	SessionID       SessionID       `db:"session_id"`
 	StartID         StartID         `db:"start_id"`
 
@@ -190,6 +191,21 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 
 		// save the run to our session
 		session.runs = append(session.runs, run)
+
+		// if this run is waiting, save it as the current flow
+		if r.Status() == flows.RunStatusWaiting {
+			flow, err := org.Flow(r.Flow().UUID())
+			if err != nil {
+				return nil, errors.Annotatef(err, "error loading current flow")
+			}
+			flowID := flow.(*Flow).ID()
+			session.CurrentFlowID = &flowID
+		}
+	}
+
+	// set our timeout if we have a wait
+	if s.Wait() != nil {
+		session.TimeoutOn = s.Wait().TimeoutOn()
 	}
 
 	return session, nil
@@ -224,9 +240,9 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, c
 
 const selectLastSessionSQL = `
 SELECT 
-	id, status, responded, output, contact_id, org_id, created_on, ended_on 
+	id, status, responded, output, contact_id, org_id, created_on, ended_on, current_flow_id 
 FROM 
-	flows_flow_session
+	flows_flowsession
 WHERE
 	contact_id = $1 AND
 	status = 'W'
@@ -237,15 +253,15 @@ LIMIT 1
 
 const insertCompleteSessionSQL = `
 INSERT INTO
-flows_flowsession(status, responded, output, contact_id, org_id, created_on, ended_on)
-           VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), NOW())
+	flows_flowsession(status, responded, output, contact_id, org_id, created_on, ended_on)
+               VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), NOW())
 RETURNING id
 `
 
 const insertIncompleteSessionSQL = `
 INSERT INTO
-flows_flowsession(status, responded, output, contact_id, org_id, created_on)
-           VALUES(:status, :responded, :output, :contact_id, :org_id, NOW())
+	flows_flowsession(status, responded, output, contact_id, org_id, created_on, current_flow_id, timeout_on)
+               VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), :current_flow_id, :timeout_on)
 RETURNING id
 `
 
@@ -292,29 +308,43 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 			return errors.Annotatef(err, "error creating run: %s", r.UUID())
 		}
 
-		// save the run to our session
+		// set the run on our session
 		s.runs = append(s.runs, run)
 	}
 
-	// if we haven't already been marked as responded, walk our runs looking for an input
-	if !s.Responded {
-		for _, r := range fs.Runs() {
+	// set our timeout if there is one
+	if fs.Wait() == nil {
+		s.TimeoutOn = nil
+	} else {
+		s.TimeoutOn = fs.Wait().TimeoutOn()
+	}
+
+	// run through our runs to figure out our current flow
+	for _, r := range fs.Runs() {
+		// if this run is waiting, save it as the current flow
+		if r.Status() == flows.RunStatusWaiting {
+			flow, err := org.Flow(r.Flow().UUID())
+			if err != nil {
+				return errors.Annotatef(err, "error loading current flow")
+			}
+			flowID := flow.(*Flow).ID()
+			s.CurrentFlowID = &flowID
+		}
+
+		// if we haven't already been marked as responded, walk our runs looking for an input
+		if !s.Responded {
+			// run through events, see if any are received events
 			for _, e := range r.Events() {
 				if e.Type() == events.TypeMsgReceived {
 					s.Responded = true
 					break
 				}
 			}
-			if s.Responded {
-				break
-			}
 		}
 	}
 
-	// TODO: determine current flow
-
-	// TODO: write new session state to db
-	_, err = tx.NamedQuery(updateSessionSQL, s)
+	// write our new session state to the db
+	_, err = tx.NamedExecContext(ctx, updateSessionSQL, s)
 	if err != nil {
 		return errors.Annotatef(err, "error updating session")
 	}
@@ -322,14 +352,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// figure out which runs are new and which are updated
 	updatedRuns := make([]interface{}, 0, 1)
 	newRuns := make([]interface{}, 0)
-	for _, r := range fs.Runs() {
-		modified, found := s.seenRuns[r.UUID()]
+	for _, r := range s.Runs() {
+		modified, found := s.seenRuns[r.UUID]
 		if !found {
 			newRuns = append(newRuns, r)
 			continue
 		}
 
-		if r.ModifiedOn().After(modified) {
+		if r.ModifiedOn.After(modified) {
 			updatedRuns = append(updatedRuns, r)
 			continue
 		}
@@ -370,31 +400,34 @@ UPDATE
 SET 
 	output = :output, 
 	status = :status, 
-	ended_on = IF :status = 'W' THEN NULL ELSE NOW() END,
-	responded = :responded
+	ended_on = CASE WHEN :status = 'W' THEN NULL ELSE NOW() END,
+	responded = :responded,
+	current_flow_id = :current_flow_id,
+	timeout_on = :timeout_on
 WHERE 
 	id = :id
 `
 
 const updateRunSQL = `
 UPDATE
-	flows_flowrun
+	flows_flowrun fr
 SET
-	is_active = r.name,
+	is_active = r.is_active::bool,
 	exit_type = r.exit_type,
-	exited_on = r.exited_on,
-	expires_on = r.expires_on,
-	responded = r.responded,
+	exited_on = r.exited_on::timestamp with time zone,
+	expires_on = r.expires_on::timestamp with time zone,
+	responded = r.responded::bool,
 	results = r.results,
-	path = r.path,
-	events = r.events,
-	current_node_uuid = r.current_node_uuid
+	path = r.path::jsonb,
+	events = r.events::jsonb,
+	current_node_uuid = r.current_node_uuid::uuid,
+	modified_on = NOW()
 FROM (
-	VALUES(:id, :is_active, :exit_type, :exited_on, :expires_on, :responded, :results, :path, :events, :current_node_uuid)
+	VALUES(:uuid, :is_active, :exit_type, :exited_on, :expires_on, :responded, :results, :path, :events, :current_node_uuid)
 ) AS
-	r(id, is_active, exit_type, exited_on, expires_on, responded, results, path, events, current_node_uuid)
+	r(uuid, is_active, exit_type, exited_on, expires_on, responded, results, path, events, current_node_uuid)
 WHERE
-	c.id = r.id::int
+	fr.uuid = r.uuid::uuid
 `
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
@@ -482,9 +515,9 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 const insertRunSQL = `
 INSERT INTO
 flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, expires_on, responded, results, path, 
-	          events, current_node_uuid, contact_id, flow_id, org_id, session_id, start_id)
+	          events, current_node_uuid, contact_id, flow_id, org_id, session_id, start_id, parent_uuid)
 	   VALUES(:uuid, :is_active, :created_on, NOW(), :exited_on, :exit_type, :expires_on, :responded, :results, :path,
-	          :events, :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id, :start_id)
+	          :events, :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id, :start_id, :parent_uuid)
 RETURNING id
 `
 
@@ -520,6 +553,7 @@ func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error)
 		CreatedOn:       r.CreatedOn(),
 		ExitedOn:        r.ExitedOn(),
 		ExpiresOn:       r.ExpiresOn(),
+		ModifiedOn:      r.ModifiedOn(),
 		ContactID:       r.Contact().ID(),
 		FlowID:          flow.(*Flow).ID(),
 		SessionID:       session.ID,
@@ -531,7 +565,8 @@ func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error)
 	}
 
 	// set our exit type if we exited
-	if r.Status() != flows.RunStatusActive {
+	// TODO: audit exit types
+	if r.Status() != flows.RunStatusActive && r.Status() != flows.RunStatusWaiting {
 		if r.Status() == flows.RunStatusErrored {
 			run.ExitType = ExitInterrupted
 		} else {
@@ -562,8 +597,13 @@ func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error)
 	}
 	run.Results = string(resultsJSON)
 
+	// set our parent UUID if we have a parent
+	if r.Parent() != nil {
+		uuid := r.Parent().UUID()
+		run.ParentUUID = &uuid
+	}
+
 	// TODO: set responded (always false for now)
-	// TODO: set parent id (always null for now)
 	return run, nil
 }
 

@@ -60,6 +60,7 @@ func (f *Foreman) Assign() {
 	log.WithFields(logrus.Fields{
 		"state":   "started",
 		"workers": len(f.workers),
+		"queue":   f.queue,
 	}).Info("workers started and waiting")
 
 	lastSleep := false

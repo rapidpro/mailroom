@@ -21,11 +21,12 @@ type MailroomConfig struct {
 // NewMailroomConfig returns a new default configuration object
 func NewMailroomConfig() *MailroomConfig {
 	return &MailroomConfig{
-		DB:           "postgres://temba@localhost/temba?sslmode=disable",
-		DBPoolSize:   8,
-		Redis:        "redis://localhost:6379/0",
-		BatchWorkers: 6,
-		LogLevel:     "error",
-		Version:      "Dev",
+		DB:             "postgres://temba@localhost/temba?sslmode=disable",
+		DBPoolSize:     8,
+		Redis:          "redis://localhost:6379/0",
+		BatchWorkers:   4,
+		HandlerWorkers: 128,
+		LogLevel:       "error",
+		Version:        "Dev",
 	}
 }

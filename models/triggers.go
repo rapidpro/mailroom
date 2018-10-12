@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/sirupsen/logrus"
 )
 
 type TriggerType string
@@ -141,6 +142,7 @@ func FindMatchingMsgTrigger(org *OrgAssets, contact *flows.Contact, text string)
 
 	var match, catchAll, groupCatchAll *Trigger
 	for _, t := range org.Triggers() {
+		logrus.WithField("text", text).WithField("trigger_type", t.TriggerType()).WithField("trigger", t.Keyword()).Info("evaluating keyword")
 		if t.TriggerType() == KeywordTriggerType {
 			// does this match based on the rules of the trigger?
 			matched := (t.Keyword() == keyword && (t.MatchType() == MatchFirst || (t.MatchType() == MatchOnly && only)))

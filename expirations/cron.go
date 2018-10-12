@@ -82,7 +82,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		count++
 
 		// no parent id? we can add this to our batch
-		if expiration.ParentID == nil {
+		if expiration.ParentUUID == nil {
 			batch = append(batch, expiration)
 
 			// batch is full? commit it
@@ -110,7 +110,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		}
 
 		// ok, queue this task
-		task := handler.NewExpirationEvent(expiration.OrgID, expiration.ContactID, expiration.FlowID, expiration.RunID, expiration.SessionID, expiration.ExpiresOn)
+		task := handler.NewExpirationEvent(expiration.OrgID, expiration.ContactID, expiration.SessionID, expiration.ExpiresOn)
 		err = handler.AddHandleTask(rc, expiration.ContactID, task)
 		if err != nil {
 			return errors.Annotatef(err, "error adding new expiration task")
@@ -140,7 +140,7 @@ const selectExpiredRunsSQL = `
 		fr.org_id as org_id,
 		fr.flow_id as flow_id,
 		fr.id as run_id,
-		fr.parent_id as parent_id,
+		fr.parent_uuid as parent_uuid,
 		fr.session_id as session_id,
 		fr.expires_on as expires_on
 	FROM
@@ -167,7 +167,7 @@ const expireRunsSQL = `
 		child_context = NULL,
 		parent_context = NULL
 	FROM
-		VALUES(:run_id)) as r(run_id)
+		(VALUES(:run_id)) as r(run_id)
 	WHERE
 		fr.id = r.run_id::int
 `
@@ -176,7 +176,7 @@ const expireSessionsSQL = `
 	UPDATE
 		flows_flowsession s
 	SET
-		is_active = FALSE,
+		timeout_on = NULL,
 		ended_on = NOW(),
 		status = 'X'
 	FROM
@@ -186,11 +186,11 @@ const expireSessionsSQL = `
 `
 
 type RunExpiration struct {
-	OrgID     models.OrgID      `db:"org_id"`
-	FlowID    models.FlowID     `db:"flow_id"`
-	ContactID flows.ContactID   `db:"contact_id"`
-	RunID     models.FlowRunID  `db:"run_id"`
-	ParentID  *models.FlowRunID `db:"parent_id"`
-	SessionID models.SessionID  `db:"session_id"`
-	ExpiresOn time.Time         `db:"expires_on"`
+	OrgID      models.OrgID     `db:"org_id"`
+	FlowID     models.FlowID    `db:"flow_id"`
+	ContactID  flows.ContactID  `db:"contact_id"`
+	RunID      models.FlowRunID `db:"run_id"`
+	ParentUUID *flows.RunUUID   `db:"parent_uuid"`
+	SessionID  models.SessionID `db:"session_id"`
+	ExpiresOn  time.Time        `db:"expires_on"`
 }

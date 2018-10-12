@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	timeoutLock = "run_timeouts"
-	markerGroup = "run_timeouts"
+	timeoutLock = "sessions_timeouts"
+	markerGroup = "session_timeouts"
 )
 
 func init() {
@@ -32,7 +32,7 @@ func StartTimeoutCron(mr *mailroom.Mailroom) error {
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return timeoutRuns(ctx, mr.DB, mr.RP, lockName, lockValue)
+			return timeoutSessions(ctx, mr.DB, mr.RP, lockName, lockValue)
 		},
 	)
 	return nil
@@ -40,14 +40,14 @@ func StartTimeoutCron(mr *mailroom.Mailroom) error {
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue
 // TODO: extend lock
-func timeoutRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "timeout").WithField("lock", lockValue)
 	start := time.Now()
 
-	// find all runs that need to be expired (we exclude IVR runs)
-	rows, err := db.QueryxContext(ctx, timedoutRunsSQL)
+	// find all sessions that need to be expired (we exclude IVR runs)
+	rows, err := db.QueryxContext(ctx, timedoutSessionsSQL)
 	if err != nil {
-		return errors.Annotatef(err, "error selecting timed out runs")
+		return errors.Annotatef(err, "error selecting timed out sessions")
 	}
 	defer rows.Close()
 
@@ -64,7 +64,7 @@ func timeoutRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName stri
 		}
 
 		// check whether we've already queued this
-		taskID := fmt.Sprintf("%d:%s", timeout.RunID, timeout.TimeoutOn.Format(time.RFC3339))
+		taskID := fmt.Sprintf("%d:%s", timeout.SessionID, timeout.TimeoutOn.Format(time.RFC3339))
 		queued, err := marker.HasTask(rc, markerGroup, taskID)
 		if err != nil {
 			return errors.Annotatef(err, "error checking whether task is queued")
@@ -76,7 +76,7 @@ func timeoutRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName stri
 		}
 
 		// ok, queue this task
-		task := handler.NewTimeoutEvent(timeout.OrgID, timeout.ContactID, timeout.FlowID, timeout.RunID, timeout.SessionID, timeout.TimeoutOn)
+		task := handler.NewTimeoutEvent(timeout.OrgID, timeout.ContactID, timeout.SessionID, timeout.TimeoutOn)
 		err = handler.AddHandleTask(rc, timeout.ContactID, task)
 		if err != nil {
 			return errors.Annotatef(err, "error adding new handle task")
@@ -95,31 +95,29 @@ func timeoutRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName stri
 	return nil
 }
 
-const timedoutRunsSQL = `
+const timedoutSessionsSQL = `
 	SELECT 
-		r.id as run_id,
-		r.flow_id as flow_id,
-		r.timeout_on as timeout_on,
-		r.session_id as session_id,
-		r.contact_id as contact_id,
-		r.org_id as org_id
+		s.id as session_id,
+		s.timeout_on as timeout_on,
+		s.contact_id as contact_id,
+		s.org_id as org_id
 	FROM 
-		flows_flowrun r
-		JOIN orgs_org o ON r.org_id = o.id
+		flows_flowsession s
+		JOIN orgs_org o ON s.org_id = o.id
 	WHERE 
-		is_active = TRUE AND 
-		timeout_on > NOW() AND
-		o.flow_server_enabled = TRUE
+		status = 'W' AND 
+		timeout_on < NOW() AND
+		o.flow_server_enabled = TRUE AND
+		connection_id IS NULL
 	ORDER BY 
-		timedout_on ASC
+		timeout_on ASC
 	LIMIT 25000
 `
 
 type Timeout struct {
-	RunID     models.FlowRunID `db:"run_id"`
-	TimeoutOn time.Time        `db:"timeout_on"`
-	FlowID    models.FlowID    `db:"flow_id"`
-	SessionID models.SessionID `db:"session_id"`
-	ContactID flows.ContactID  `db:"contact_id"`
 	OrgID     models.OrgID     `db:"org_id"`
+	FlowID    models.FlowID    `db:"flow_id"`
+	ContactID flows.ContactID  `db:"contact_id"`
+	SessionID models.SessionID `db:"session_id"`
+	TimeoutOn time.Time        `db:"timeout_on"`
 }

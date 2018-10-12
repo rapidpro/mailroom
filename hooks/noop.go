@@ -21,6 +21,7 @@ func init() {
 	models.RegisterEventHook(events.TypeWaitTimedOut, NoopHandler)
 	models.RegisterEventHook(events.TypeRunExpired, NoopHandler)
 	models.RegisterEventHook(events.TypeFlowTriggered, NoopHandler)
+	models.RegisterEventHook(events.TypeMsgWait, NoopHandler)
 }
 
 // NoopHandler is our hook for events we ignore in a run

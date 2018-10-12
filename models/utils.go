@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -59,6 +60,7 @@ func extractValues(sql string) (string, error) {
 type Queryer interface {
 	Rebind(query string) string
 	QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
 func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []interface{}) error {

@@ -15,6 +15,7 @@ import (
 	_ "github.com/nyaruka/mailroom/expirations"
 	_ "github.com/nyaruka/mailroom/hooks"
 	_ "github.com/nyaruka/mailroom/starts"
+	_ "github.com/nyaruka/mailroom/timeouts"
 )
 
 var version = "Dev"

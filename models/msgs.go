@@ -252,7 +252,7 @@ RETURNING
 
 // UpdateMessage updates the passed in message status, visibility and msg type
 func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, topup TopupID) error {
-	_, err := tx.QueryxContext(
+	_, err := tx.ExecContext(
 		ctx,
 		`UPDATE 
 			msgs_msg 
