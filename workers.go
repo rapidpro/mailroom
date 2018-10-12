@@ -3,6 +3,7 @@ package mailroom
 import (
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/sirupsen/logrus"
 )
@@ -63,8 +64,6 @@ func (f *Foreman) Assign() {
 		"queue":   f.queue,
 	}).Info("workers started and waiting")
 
-	lastSleep := false
-
 	for true {
 		select {
 		// return if we have been told to stop
@@ -79,23 +78,44 @@ func (f *Foreman) Assign() {
 			task, err := queue.PopNextTask(rc, f.queue)
 			rc.Close()
 
-			if err == nil && task != nil {
-				// if so, assign it to our worker
-				worker.job <- task
-				lastSleep = false
-			} else {
-				// we received an error getting the next message, log it
-				if err != nil {
-					log.WithError(err).Error("error popping task")
+			// received an error? continue
+			if err != nil {
+				log.WithError(err).Error("error popping task")
+				f.availableWorkers <- worker
+				time.Sleep(time.Second)
+
+			} else if task == nil {
+				// no task? oh well, add our worker back to the pool and wait for a new one
+				f.availableWorkers <- worker
+
+				rc := f.mr.RP.Get()
+				psc := redis.PubSubConn{Conn: rc}
+				psc.Subscribe(f.queue)
+
+				next := make(chan bool, 1)
+				go func() {
+					for {
+						switch psc.ReceiveWithTimeout(time.Minute).(type) {
+						case redis.Message, error:
+							next <- true
+							return
+						}
+					}
+				}()
+
+				// wait for a new task or to quit
+				select {
+				case <-f.quit:
+					log.WithField("state", "stopped").Info("foreman stopped")
+					return
+				case <-next:
+				case <-time.After(time.Minute):
 				}
 
-				// add our worker back to our queue and sleep a bit
-				if !lastSleep {
-					log.Debug("sleeping, no tasks")
-					lastSleep = true
-				}
-				f.availableWorkers <- worker
-				time.Sleep(250 * time.Millisecond)
+				psc.Close()
+			} else {
+				// assign our task to our worker
+				worker.job <- task
 			}
 		}
 	}
@@ -152,7 +172,7 @@ func (w *Worker) Stop() {
 }
 
 func (w *Worker) handleTask(task *queue.Task) {
-	log := logrus.WithField("comp", "sender").WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.OrgID)
+	log := logrus.WithField("comp", w.foreman.queue).WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.OrgID)
 
 	defer func() {
 		// catch any panics and recover

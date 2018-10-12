@@ -54,6 +54,7 @@ func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task inter
 
 	rc.Send("zadd", fmt.Sprintf(queuePattern, queue, orgID), score, jsonPayload)
 	rc.Send("zincrby", fmt.Sprintf(activePattern, queue), 0, orgID)
+	rc.Send("publish", queue, "new")
 	_, err = rc.Do("")
 	return err
 }

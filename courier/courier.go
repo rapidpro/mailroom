@@ -108,7 +108,8 @@ end
 
 -- if we aren't then add to our active
 if not curr or curr < tps then
-redis.call("zincrby", KEYS[2] .. ":active", 0, queueKey)
+  redis.call("zincrby", KEYS[2] .. ":active", 0, queueKey)
+  redis.call("publish", KEYS[2], "new")
   return 1
 else
   return 0
