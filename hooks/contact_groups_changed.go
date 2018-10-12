@@ -112,7 +112,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 		// add our add event
 		session.AddPreCommitEvent(contactGroupsChangedHook, hookEvent)
-		//session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
+		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
 	}
 
 	// add each of our groups
@@ -134,7 +134,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		}
 
 		session.AddPreCommitEvent(contactGroupsChangedHook, hookEvent)
-		//session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
+		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
 	}
 
 	return nil

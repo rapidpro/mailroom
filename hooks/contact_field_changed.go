@@ -99,7 +99,7 @@ func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 
 	// add our callback
 	session.AddPreCommitEvent(contactFieldChangedHook, event)
-	//session.AddPreCommitEvent(updateCampaignEventsHook, event)
+	session.AddPreCommitEvent(updateCampaignEventsHook, event)
 
 	return nil
 }
