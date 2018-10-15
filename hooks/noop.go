@@ -17,7 +17,6 @@ func init() {
 	models.RegisterEventHook(events.TypeMsgReceived, NoopHandler)
 	models.RegisterEventHook(events.TypeRunResultChanged, NoopHandler)
 	models.RegisterEventHook(events.TypeContactChanged, NoopHandler)
-	models.RegisterEventHook(events.TypeWebhookCalled, NoopHandler)
 	models.RegisterEventHook(events.TypeWaitTimedOut, NoopHandler)
 	models.RegisterEventHook(events.TypeRunExpired, NoopHandler)
 	models.RegisterEventHook(events.TypeFlowTriggered, NoopHandler)

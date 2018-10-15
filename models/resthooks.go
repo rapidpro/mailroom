@@ -73,4 +73,48 @@ WHERE
 	r.is_active = TRUE
 ORDER BY
 	r.slug ASC
-) r;`
+) r;
+`
+
+// UnsubscribeResthooks unsubscribles all the resthooks passed in
+func UnsubscribeResthooks(ctx context.Context, tx *sqlx.Tx, unsubs []*ResthookUnsubscribe) error {
+	is := make([]interface{}, len(unsubs))
+	for i := range unsubs {
+		is[i] = unsubs[i]
+	}
+
+	err := BulkSQL(ctx, "unsubscribing resthooks", tx, unsubscribeResthooksSQL, is)
+	if err != nil {
+		return errors.Annotatef(err, "error unsubscribing from resthooks")
+	}
+
+	return nil
+}
+
+type ResthookUnsubscribe struct {
+	OrgID OrgID  `db:"org_id"`
+	Slug  string `db:"slug"`
+	URL   string `db:"url"`
+}
+
+const unsubscribeResthooksSQL = `
+UPDATE 
+	api_resthooksubscriber
+SET 
+	is_active = FALSE, 
+	modified_on = NOW()
+WHERE
+	id = ANY(
+		SELECT 
+			s.id 
+		FROM 
+			api_resthooksubscriber s
+			JOIN api_resthook r ON s.resthook_id = r.id,
+			(VALUES(:org_id, :slug, :url)) AS u(org_id, slug, url)
+		WHERE 
+			s.is_active = TRUE AND
+			r.org_id = u.org_id::int AND
+			r.slug = u.slug AND
+			s.target_url = u.url
+	)
+`
