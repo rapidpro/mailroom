@@ -448,3 +448,33 @@ SET
 WHERE 
 	id = $1
 `
+
+// AddContactURNs adds all the passed in contact urns in a single query
+func AddContactURNs(ctx context.Context, tx *sqlx.Tx, adds []*ContactURNAdd) error {
+	// convert to interface
+	is := make([]interface{}, len(adds))
+	for i := range adds {
+		is[i] = adds[i]
+	}
+
+	// and bulk insert
+	return BulkSQL(ctx, "inserting contact urns", tx, insertContactURNsSQL, is)
+}
+
+// ContactURNAdd is our object that represents a single contact URN addition
+type ContactURNAdd struct {
+	ContactID flows.ContactID `db:"contact_id"`
+	Identity  string          `db:"identity"`
+	Path      string          `db:"path"`
+	Display   *string         `db:"display"`
+	Auth      *string         `db:"auth"`
+	Scheme    string          `db:"scheme"`
+	Priority  int             `db:"priority"`
+	OrgID     OrgID           `db:"org_id"`
+}
+
+const insertContactURNsSQL = `
+INSERT INTO
+	contacts_contacturn(contact_id, identity, path, display, auth, scheme, priority, org_id)
+                 VALUES(:contact_id, :identity, :path, :display, :auth, :scheme, :priority, :org_id)
+`
