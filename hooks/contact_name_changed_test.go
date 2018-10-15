@@ -4,19 +4,19 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/actions"
 )
 
 func TestContactNameChanged(t *testing.T) {
-	tcs := []EventTestCase{
-		EventTestCase{
-			Events: ContactEventMap{
-				Cathy: []flows.Event{
-					events.NewContactNameChangedEvent("Fred"),
-					events.NewContactNameChangedEvent("Tarzan"),
+	tcs := []HookTestCase{
+		HookTestCase{
+			Actions: ContactActionMap{
+				Cathy: []flows.Action{
+					actions.NewSetContactNameAction(newActionUUID(), "Fred"),
+					actions.NewSetContactNameAction(newActionUUID(), "Tarzan"),
 				},
-				Evan: []flows.Event{
-					events.NewContactNameChangedEvent("Geoff Newman"),
+				Evan: []flows.Action{
+					actions.NewSetContactNameAction(newActionUUID(), "Geoff Newman"),
 				},
 			},
 			Assertions: []SQLAssertion{
@@ -43,5 +43,5 @@ func TestContactNameChanged(t *testing.T) {
 		},
 	}
 
-	RunEventTestCases(t, tcs)
+	RunActionTestCases(t, tcs)
 }

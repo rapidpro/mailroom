@@ -4,19 +4,19 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/actions"
 )
 
 func TestContactLanguageChanged(t *testing.T) {
-	tcs := []EventTestCase{
-		EventTestCase{
-			Events: ContactEventMap{
-				Cathy: []flows.Event{
-					events.NewContactLanguageChangedEvent("fra"),
-					events.NewContactLanguageChangedEvent("eng"),
+	tcs := []HookTestCase{
+		HookTestCase{
+			Actions: ContactActionMap{
+				Cathy: []flows.Action{
+					actions.NewSetContactLanguageAction(newActionUUID(), "fra"),
+					actions.NewSetContactLanguageAction(newActionUUID(), "eng"),
 				},
-				Evan: []flows.Event{
-					events.NewContactLanguageChangedEvent("spa"),
+				Evan: []flows.Action{
+					actions.NewSetContactLanguageAction(newActionUUID(), "spa"),
 				},
 			},
 			Assertions: []SQLAssertion{
@@ -39,5 +39,5 @@ func TestContactLanguageChanged(t *testing.T) {
 		},
 	}
 
-	RunEventTestCases(t, tcs)
+	RunActionTestCases(t, tcs)
 }

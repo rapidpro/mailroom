@@ -22,6 +22,7 @@ const TypeRunExpiration string = "run_expiration"
 //     "contact": {
 //       "uuid": "9f7ede93-4b16-4692-80ad-b7dc54a1cd81",
 //       "name": "Bob",
+//       "created_on": "2018-01-01T12:00:00.000000Z",
 //       "language": "fra",
 //       "fields": {"gender": {"text": "Male"}},
 //       "groups": []
@@ -37,12 +38,9 @@ type RunExpirationResume struct {
 // NewRunExpirationResume creates a new run expired resume with the passed in values
 func NewRunExpirationResume(env utils.Environment, contact *flows.Contact) *RunExpirationResume {
 	return &RunExpirationResume{
-		baseResume: newBaseResume(env, contact),
+		baseResume: newBaseResume(TypeRunExpiration, env, contact),
 	}
 }
-
-// Type returns the type of this resume
-func (r *RunExpirationResume) Type() string { return TypeRunExpiration }
 
 // Apply applies our state changes and saves any events to the run
 func (r *RunExpirationResume) Apply(run flows.FlowRun, step flows.Step) error {
@@ -60,15 +58,27 @@ var _ flows.Resume = (*RunExpirationResume)(nil)
 
 // ReadRunExpirationResume reads a run expired resume
 func ReadRunExpirationResume(session flows.Session, data json.RawMessage) (flows.Resume, error) {
-	resume := &RunExpirationResume{}
-	e := baseResumeEnvelope{}
-	if err := utils.UnmarshalAndValidate(data, &e); err != nil {
+	e := &baseResumeEnvelope{}
+	if err := utils.UnmarshalAndValidate(data, e); err != nil {
 		return nil, err
 	}
 
-	if err := unmarshalBaseResume(session, &resume.baseResume, &e); err != nil {
+	r := &RunExpirationResume{}
+
+	if err := r.unmarshal(session, e); err != nil {
 		return nil, err
 	}
 
-	return resume, nil
+	return r, nil
+}
+
+// MarshalJSON marshals this resume into JSON
+func (r *RunExpirationResume) MarshalJSON() ([]byte, error) {
+	e := &baseResumeEnvelope{}
+
+	if err := r.marshal(e); err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(e)
 }

@@ -34,8 +34,13 @@ type AddInputLabelsAction struct {
 	Labels []*assets.LabelReference `json:"labels" validate:"required,dive"`
 }
 
-// Type returns the type of this action
-func (a *AddInputLabelsAction) Type() string { return TypeAddInputLabels }
+// NewAddInputLabelsAction creates a new add labels action
+func NewAddInputLabelsAction(uuid flows.ActionUUID, labels []*assets.LabelReference) *AddInputLabelsAction {
+	return &AddInputLabelsAction{
+		BaseAction: NewBaseAction(TypeAddInputLabels, uuid),
+		Labels:     labels,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *AddInputLabelsAction) Validate(assets flows.SessionAssets) error {
@@ -46,7 +51,7 @@ func (a *AddInputLabelsAction) Validate(assets flows.SessionAssets) error {
 // Execute runs the labeling action
 func (a *AddInputLabelsAction) Execute(run flows.FlowRun, step flows.Step) error {
 	// only generate event if run has input
-	input := run.Input()
+	input := run.Session().Input()
 	if input == nil {
 		return nil
 	}

@@ -6,7 +6,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/models"
 )
 
@@ -17,22 +17,18 @@ func TestContactGroupsChanged(t *testing.T) {
 	teachers := assets.NewGroupReference(assets.GroupUUID("27ea3e9c-497c-4f13-aaa5-bf768fea1597"), "Teachers")
 	teachersID := models.GroupID(34)
 
-	unknown := assets.NewGroupReference(assets.GroupUUID("cab5fd6b-caea-42ea-8f5e-7796f04225e2"), "Unknown")
-
-	tcs := []EventTestCase{
-		EventTestCase{
-			Events: ContactEventMap{
-				Cathy: []flows.Event{
-					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{doctors}},
-					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{doctors}},
-					&events.ContactGroupsChangedEvent{GroupsRemoved: []*assets.GroupReference{doctors}},
-					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{teachers}},
+	tcs := []HookTestCase{
+		HookTestCase{
+			Actions: ContactActionMap{
+				Cathy: []flows.Action{
+					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{teachers}),
 				},
-				Evan: []flows.Event{
-					&events.ContactGroupsChangedEvent{GroupsRemoved: []*assets.GroupReference{doctors}},
-					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{teachers}},
-					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{unknown}},
-					&events.ContactGroupsChangedEvent{GroupsAdded: []*assets.GroupReference{unknown}},
+				Evan: []flows.Action{
+					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{teachers}),
 				},
 			},
 			Assertions: []SQLAssertion{
@@ -60,5 +56,5 @@ func TestContactGroupsChanged(t *testing.T) {
 		},
 	}
 
-	RunEventTestCases(t, tcs)
+	RunActionTestCases(t, tcs)
 }

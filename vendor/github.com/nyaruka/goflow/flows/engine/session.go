@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/inputs"
 	"github.com/nyaruka/goflow/flows/runs"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/flows/waits"
@@ -19,6 +20,7 @@ import (
 type pushedFlow struct {
 	flow      flows.Flow
 	parentRun flows.FlowRun
+	terminal  bool
 }
 
 type session struct {
@@ -31,6 +33,7 @@ type session struct {
 	runs    []flows.FlowRun
 	status  flows.SessionStatus
 	wait    flows.Wait
+	input   flows.Input
 
 	// state which is temporary to each call
 	runsByUUID map[flows.RunUUID]flows.FlowRun
@@ -56,17 +59,22 @@ func NewSession(assets flows.SessionAssets, engineConfig flows.EngineConfig, htt
 	}
 }
 
-func (s *session) Assets() flows.SessionAssets          { return s.assets }
+func (s *session) Assets() flows.SessionAssets { return s.assets }
+func (s *session) Trigger() flows.Trigger      { return s.trigger }
+
 func (s *session) Environment() utils.Environment       { return s.env }
 func (s *session) SetEnvironment(env utils.Environment) { s.env = env }
-func (s *session) Trigger() flows.Trigger               { return s.trigger }
-func (s *session) Contact() *flows.Contact              { return s.contact }
-func (s *session) SetContact(contact *flows.Contact)    { s.contact = contact }
+
+func (s *session) Contact() *flows.Contact           { return s.contact }
+func (s *session) SetContact(contact *flows.Contact) { s.contact = contact }
+
+func (s *session) Input() flows.Input         { return s.input }
+func (s *session) SetInput(input flows.Input) { s.input = input }
 
 func (s *session) FlowOnStack(uuid assets.FlowUUID) bool { return s.flowStack.hasFlow(uuid) }
 
-func (s *session) PushFlow(flow flows.Flow, parentRun flows.FlowRun) {
-	s.pushedFlow = &pushedFlow{flow: flow, parentRun: parentRun}
+func (s *session) PushFlow(flow flows.Flow, parentRun flows.FlowRun, terminal bool) {
+	s.pushedFlow = &pushedFlow{flow: flow, parentRun: parentRun, terminal: terminal}
 }
 
 func (s *session) Runs() []flows.FlowRun { return s.runs }
@@ -229,6 +237,13 @@ func (s *session) continueUntilWait(currentRun flows.FlowRun, destination flows.
 	for {
 		// if we have a flow trigger handle that first to find our destination in the new flow
 		if s.pushedFlow != nil {
+			// if this is terminal, then we need to interrupt all other runs so we don't try to resume them
+			if s.pushedFlow.terminal {
+				for _, run := range s.runs {
+					run.Exit(flows.RunStatusInterrupted)
+				}
+			}
+
 			// create a new run for it
 			flow := s.pushedFlow.flow
 			currentRun = runs.NewRun(s, s.pushedFlow.flow, currentRun)
@@ -252,10 +267,12 @@ func (s *session) continueUntilWait(currentRun flows.FlowRun, destination flows.
 				currentRun.Exit(flows.RunStatusCompleted)
 			}
 
-			// switch back our parent run
-			if currentRun.ParentInSession() != nil {
+			parentRun := currentRun.ParentInSession()
+
+			// switch back our parent run if it's still active
+			if parentRun != nil && parentRun.Status() == flows.RunStatusActive {
 				childRun := currentRun
-				currentRun = currentRun.ParentInSession()
+				currentRun = parentRun
 				s.flowStack.pop()
 
 				// as long as we didn't error, we can try to resume it
@@ -306,9 +323,6 @@ func (s *session) continueUntilWait(currentRun flows.FlowRun, destination flows.
 				if s.status == flows.SessionStatusWaiting {
 					return nil
 				}
-
-				// mark this node as visited to prevent loops
-				s.flowStack.visit(node.UUID())
 			}
 		}
 	}
@@ -316,6 +330,9 @@ func (s *session) continueUntilWait(currentRun flows.FlowRun, destination flows.
 
 // visits the given node, creating a step in our current run path
 func (s *session) visitNode(run flows.FlowRun, node flows.Node, trigger flows.Trigger) (flows.Step, flows.NodeUUID, error) {
+	// mark this node as visited to prevent loops
+	s.flowStack.visit(node.UUID())
+
 	step := run.CreateStep(node)
 
 	// this might be the first run of the session in which case a trigger might need to initialize the run
@@ -329,8 +346,7 @@ func (s *session) visitNode(run flows.FlowRun, node flows.Node, trigger flows.Tr
 	if node.Actions() != nil {
 		for _, action := range node.Actions() {
 			if log.GetLevel() >= log.DebugLevel {
-				actionEnvelope, _ := utils.EnvelopeFromTyped(action)
-				actionJSON, _ := json.Marshal(actionEnvelope)
+				actionJSON, _ := json.Marshal(action)
 				log.WithField("action_type", action.Type()).WithField("payload", string(actionJSON)).WithField("run", run.UUID()).Debug("action executing")
 			}
 
@@ -351,16 +367,22 @@ func (s *session) visitNode(run flows.FlowRun, node flows.Node, trigger flows.Tr
 		return step, noDestination, nil
 	}
 
-	// if our node has a wait before its router, we hand back to the caller
+	// our node might have wait
 	wait := node.Wait()
 	if wait != nil {
-		wait.Begin(run, step)
 
-		run.SetStatus(flows.RunStatusWaiting)
-		s.wait = wait
-		s.status = flows.SessionStatusWaiting
+		// waits have the option to skip themselves
+		if wait.Begin(run, step) {
+			// mark ouselves as waiting and hand back to
+			run.SetStatus(flows.RunStatusWaiting)
+			s.wait = wait
+			s.status = flows.SessionStatusWaiting
 
-		return step, noDestination, nil
+			return step, noDestination, nil
+		}
+
+		// if our wait skipped we need to pretend we were never at this node to avoid a loop error if we end up back here
+		s.flowStack.unvisit(node.UUID())
 	}
 
 	// use our node's router to determine where to go next
@@ -437,63 +459,70 @@ const noDestination = flows.NodeUUID("")
 //------------------------------------------------------------------------------------------
 
 type sessionEnvelope struct {
-	Environment json.RawMessage      `json:"environment"`
-	Trigger     *utils.TypedEnvelope `json:"trigger"`
-	Contact     *json.RawMessage     `json:"contact,omitempty"`
-	Runs        []json.RawMessage    `json:"runs"`
-	Status      flows.SessionStatus  `json:"status"`
-	Wait        *utils.TypedEnvelope `json:"wait,omitempty"`
+	Environment json.RawMessage     `json:"environment"`
+	Trigger     json.RawMessage     `json:"trigger" validate:"required"`
+	Contact     *json.RawMessage    `json:"contact,omitempty"`
+	Runs        []json.RawMessage   `json:"runs"`
+	Status      flows.SessionStatus `json:"status" validate:"required"`
+	Wait        json.RawMessage     `json:"wait,omitempty"`
+	Input       json.RawMessage     `json:"input,omitempty" validate:"omitempty"`
 }
 
 // ReadSession decodes a session from the passed in JSON
 func ReadSession(assets flows.SessionAssets, engineConfig flows.EngineConfig, httpClient *utils.HTTPClient, data json.RawMessage) (flows.Session, error) {
-	var envelope sessionEnvelope
+	e := &sessionEnvelope{}
 	var err error
 
-	if err = utils.UnmarshalAndValidate(data, &envelope); err != nil {
+	if err = utils.UnmarshalAndValidate(data, e); err != nil {
 		return nil, fmt.Errorf("unable to read session: %s", err)
 	}
 
 	s := NewSession(assets, engineConfig, httpClient).(*session)
-	s.status = envelope.Status
+	s.status = e.Status
 
 	// read our environment
-	s.env, err = utils.ReadEnvironment(envelope.Environment)
+	s.env, err = utils.ReadEnvironment(e.Environment)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read environment: %s", err)
 	}
 
 	// read our trigger
-	if envelope.Trigger != nil {
-		if s.trigger, err = triggers.ReadTrigger(s, envelope.Trigger); err != nil {
-			return nil, fmt.Errorf("unable to read trigger[type=%s]: %s", envelope.Trigger.Type, err)
+	if e.Trigger != nil {
+		if s.trigger, err = triggers.ReadTrigger(s, e.Trigger); err != nil {
+			return nil, fmt.Errorf("unable to read trigger: %s", err)
 		}
 	}
 
 	// read our contact
-	if envelope.Contact != nil {
-		if s.contact, err = flows.ReadContact(s.Assets(), *envelope.Contact, false); err != nil {
+	if e.Contact != nil {
+		if s.contact, err = flows.ReadContact(s.Assets(), *e.Contact, false); err != nil {
 			return nil, fmt.Errorf("unable to read contact: %s", err)
 		}
 	}
 
 	// read each of our runs
-	for i := range envelope.Runs {
-		run, err := runs.ReadRun(s, envelope.Runs[i])
+	for i := range e.Runs {
+		run, err := runs.ReadRun(s, e.Runs[i])
 		if err != nil {
 			return nil, fmt.Errorf("unable to read run %d: %s", i, err)
 		}
 		s.addRun(run)
 	}
 
-	// and our wait
-	if envelope.Wait != nil {
-		s.wait, err = waits.ReadWait(envelope.Wait)
+	// and our wait and input
+	if e.Wait != nil {
+		s.wait, err = waits.ReadWait(e.Wait)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read wait[type=%s]: %s", envelope.Wait.Type, err)
+			return nil, fmt.Errorf("unable to read wait: %s", err)
+		}
+	}
+	if e.Input != nil {
+		if s.input, err = inputs.ReadInput(s, e.Input); err != nil {
+			return nil, fmt.Errorf("unable to read input: %s", err)
 		}
 	}
 
+	// TODO more and don't limit to sessions being read
 	// perform some structural validation
 	if s.status == flows.SessionStatusWaiting && s.wait == nil {
 		return nil, fmt.Errorf("session has status of \"waiting\" but no wait object")
@@ -504,12 +533,12 @@ func ReadSession(assets flows.SessionAssets, engineConfig flows.EngineConfig, ht
 
 // MarshalJSON marshals this session into JSON
 func (s *session) MarshalJSON() ([]byte, error) {
-	var envelope sessionEnvelope
+	e := &sessionEnvelope{
+		Status: s.status,
+	}
 	var err error
 
-	envelope.Status = s.status
-
-	if envelope.Environment, err = json.Marshal(s.env); err != nil {
+	if e.Environment, err = json.Marshal(s.env); err != nil {
 		return nil, err
 	}
 	if s.contact != nil {
@@ -518,25 +547,32 @@ func (s *session) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		envelope.Contact = &contactJSON
+		e.Contact = &contactJSON
 	}
 	if s.trigger != nil {
-		if envelope.Trigger, err = utils.EnvelopeFromTyped(s.trigger); err != nil {
+		if e.Trigger, err = json.Marshal(s.trigger); err != nil {
 			return nil, err
 		}
 	}
 	if s.wait != nil {
-		if envelope.Wait, err = utils.EnvelopeFromTyped(s.wait); err != nil {
+		if e.Wait, err = json.Marshal(s.wait); err != nil {
 			return nil, err
 		}
 	}
-	envelope.Runs = make([]json.RawMessage, len(s.runs))
-	for i := range s.runs {
-		envelope.Runs[i], err = json.Marshal(s.runs[i])
+	if s.input != nil {
+		e.Input, err = json.Marshal(s.input)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return json.Marshal(envelope)
+	e.Runs = make([]json.RawMessage, len(s.runs))
+	for i := range s.runs {
+		e.Runs[i], err = json.Marshal(s.runs[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return json.Marshal(e)
 }

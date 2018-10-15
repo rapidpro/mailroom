@@ -443,7 +443,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 				Type:    trigger.KeywordMatchType(),
 				Keyword: trigger.Keyword(),
 			}
-			trigger := triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), nil, msgIn, match, time.Now())
+			trigger := triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), msgIn, match, time.Now())
 
 			_, err = runner.StartFlowForContact(ctx, db, rp, org, sa, trigger, hook)
 			if err != nil {

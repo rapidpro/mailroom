@@ -4,46 +4,35 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/shopspring/decimal"
 )
 
 func TestContactFieldChanged(t *testing.T) {
-	testsuite.Reset()
-
 	genderUUID := models.FieldUUID("0ecedc66-12d8-4a46-bcc7-8168f77e4ff6")
 	gender := assets.NewFieldReference("gender", "Gender")
 
 	ageUUID := models.FieldUUID("4f1b24f7-6320-4a86-bcb6-036e7a736094")
 	age := assets.NewFieldReference("age", "Age")
 
-	unknown := assets.NewFieldReference("unknown", "unknown ")
-
-	// TODO: add other field types (state, district, ward, datetime)
-	decimal30 := types.NewXNumber(decimal.New(30, 0))
-
-	tcs := []EventTestCase{
-		EventTestCase{
-			Events: ContactEventMap{
-				Cathy: []flows.Event{
-					events.NewContactFieldChangedEvent(gender, &flows.Value{Text: types.NewXText("Male")}),
-					events.NewContactFieldChangedEvent(gender, &flows.Value{Text: types.NewXText("Female")}),
-					events.NewContactFieldChangedEvent(age, &flows.Value{}),
+	tcs := []HookTestCase{
+		HookTestCase{
+			Actions: ContactActionMap{
+				Cathy: []flows.Action{
+					actions.NewSetContactFieldAction(newActionUUID(), gender, "Male"),
+					actions.NewSetContactFieldAction(newActionUUID(), gender, "Female"),
+					actions.NewSetContactFieldAction(newActionUUID(), age, ""),
 				},
-				Evan: []flows.Event{
-					events.NewContactFieldChangedEvent(gender, &flows.Value{Text: types.NewXText("Male")}),
-					events.NewContactFieldChangedEvent(gender, &flows.Value{}),
-					events.NewContactFieldChangedEvent(age, &flows.Value{Text: types.NewXText("30"), Number: &decimal30}),
+				Evan: []flows.Action{
+					actions.NewSetContactFieldAction(newActionUUID(), gender, "Male"),
+					actions.NewSetContactFieldAction(newActionUUID(), gender, ""),
+					actions.NewSetContactFieldAction(newActionUUID(), age, "30"),
 				},
-				Bob: []flows.Event{
-					events.NewContactFieldChangedEvent(gender, &flows.Value{}),
-					events.NewContactFieldChangedEvent(gender, &flows.Value{Text: types.NewXText("Male")}),
-					events.NewContactFieldChangedEvent(age, &flows.Value{Text: types.NewXText("Old")}),
-					events.NewContactFieldChangedEvent(unknown, &flows.Value{Text: types.NewXText("unknown")}),
+				Bob: []flows.Action{
+					actions.NewSetContactFieldAction(newActionUUID(), gender, ""),
+					actions.NewSetContactFieldAction(newActionUUID(), gender, "Male"),
+					actions.NewSetContactFieldAction(newActionUUID(), age, "Old"),
 				},
 			},
 			Assertions: []SQLAssertion{
@@ -86,5 +75,5 @@ func TestContactFieldChanged(t *testing.T) {
 		},
 	}
 
-	RunEventTestCases(t, tcs)
+	RunActionTestCases(t, tcs)
 }

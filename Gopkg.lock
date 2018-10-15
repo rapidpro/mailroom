@@ -138,7 +138,6 @@
   version = "v0.2.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/nyaruka/goflow"
   packages = [
     "assets",
@@ -168,7 +167,8 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "941287cae756b8f822368b05a10b02ff6b0c1578"
+  revision = "d64fbfbfe7f1443c6035beb9eb0969e0725fa092"
+  version = "v0.22.0"
 
 [[projects]]
   branch = "master"

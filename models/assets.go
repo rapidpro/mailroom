@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -61,8 +62,8 @@ var assetCache = cache.New(5*time.Second, time.Minute*5)
 const cacheTimeout = time.Second * 5
 const locationCacheTimeout = time.Hour
 
-// clearCache clears our entire org cache
-func clearCache() {
+// FlushCache clears our entire org cache
+func FlushCache() {
 	orgCache.Flush()
 	assetCache.Flush()
 }
@@ -226,6 +227,8 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 		return flow, nil
 	}
 
+	fmt.Printf("did not find flow: %s\n", flowUUID)
+
 	dbFlow, err := loadFlowByUUID(a.ctx, a.db, flowUUID)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error loading flow: %s", flowUUID)
@@ -259,6 +262,28 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 	a.flowCacheLock.Unlock()
 
 	return dbFlow, nil
+}
+
+// SetFlow sets the flow definition for the passed in ID. Should only be used for unit tests
+func (a *OrgAssets) SetFlow(flowID FlowID, flow flows.Flow) (*Flow, error) {
+	// build our definition
+	definition, err := json.Marshal(flow)
+	if err != nil {
+		return nil, errors.Annotatef(err, "error marshalling flow definition")
+	}
+
+	f := &Flow{}
+	f.f.UUID = flow.UUID()
+	f.f.Name = flow.Name()
+	f.f.ID = flowID
+	f.f.Definition = definition
+
+	a.flowByID[flowID] = f
+	a.flowByUUID[flow.UUID()] = f
+
+	fmt.Printf("cached flow: %s\n", flow.UUID())
+	fmt.Println(string(definition))
+	return f, nil
 }
 
 func (a *OrgAssets) Campaigns() []*Campaign {

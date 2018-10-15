@@ -37,7 +37,7 @@ func TestTriggers(t *testing.T) {
 	farmersAllID := insertTrigger(t, db, true, FlowID(3), CatchallTriggerType, "", MatchOnly, []GroupID{GroupID(32)})
 	othersAllID := insertTrigger(t, db, true, FlowID(3), CatchallTriggerType, "", MatchOnly, nil)
 
-	clearCache()
+	FlushCache()
 
 	org, err := GetOrgAssets(ctx, db, OrgID(1))
 	assert.NoError(t, err)

@@ -30,7 +30,8 @@ type ChannelEvent struct {
 //     "flow": {"uuid": "50c3706e-fedb-42c0-8eab-dda3335714b7", "name": "Registration"},
 //     "contact": {
 //       "uuid": "9f7ede93-4b16-4692-80ad-b7dc54a1cd81",
-//       "name": "Bob"
+//       "name": "Bob",
+//       "created_on": "2018-01-01T12:00:00.000000Z"
 //     },
 //     "event": {
 //         "type": "new_conversation",
@@ -42,34 +43,15 @@ type ChannelEvent struct {
 // @trigger channel
 type ChannelTrigger struct {
 	baseTrigger
-	Event *ChannelEvent
+	event *ChannelEvent
 }
 
 // NewChannelTrigger creates a new channel trigger with the passed in values
 func NewChannelTrigger(env utils.Environment, flow *assets.FlowReference, contact *flows.Contact, event *ChannelEvent, params types.XValue, triggeredOn time.Time) *ChannelTrigger {
 	return &ChannelTrigger{
-		baseTrigger: baseTrigger{
-			environment: env,
-			flow:        flow,
-			contact:     contact,
-			params:      params,
-			triggeredOn: triggeredOn,
-		},
-		Event: event,
+		baseTrigger: newBaseTrigger(TypeChannel, env, flow, contact, params, triggeredOn),
+		event:       event,
 	}
-}
-
-// Type returns the type of this trigger
-func (t *ChannelTrigger) Type() string { return TypeChannel }
-
-// Resolve resolves the given key when this trigger is referenced in an expression
-func (t *ChannelTrigger) Resolve(env utils.Environment, key string) types.XValue {
-	switch key {
-	case "type":
-		return types.NewXText(TypeChannel)
-	}
-
-	return t.baseTrigger.Resolve(env, key)
 }
 
 // ToXJSON is called when this type is passed to @(json(...))
@@ -90,30 +72,31 @@ type channelTriggerEnvelope struct {
 
 // ReadChannelTrigger reads a channel trigger
 func ReadChannelTrigger(session flows.Session, data json.RawMessage) (flows.Trigger, error) {
-	trigger := &ChannelTrigger{}
-	e := channelTriggerEnvelope{}
-	if err := utils.UnmarshalAndValidate(data, &e); err != nil {
+	e := &channelTriggerEnvelope{}
+	if err := utils.UnmarshalAndValidate(data, e); err != nil {
 		return nil, err
 	}
 
-	if err := unmarshalBaseTrigger(session, &trigger.baseTrigger, &e.baseTriggerEnvelope); err != nil {
+	t := &ChannelTrigger{
+		event: e.Event,
+	}
+
+	if err := t.unmarshal(session, &e.baseTriggerEnvelope); err != nil {
 		return nil, err
 	}
 
-	trigger.Event = e.Event
-
-	return trigger, nil
+	return t, nil
 }
 
 // MarshalJSON marshals this trigger into JSON
 func (t *ChannelTrigger) MarshalJSON() ([]byte, error) {
-	var envelope channelTriggerEnvelope
+	e := &channelTriggerEnvelope{
+		Event: t.event,
+	}
 
-	if err := marshalBaseTrigger(&t.baseTrigger, &envelope.baseTriggerEnvelope); err != nil {
+	if err := t.marshal(&e.baseTriggerEnvelope); err != nil {
 		return nil, err
 	}
 
-	envelope.Event = t.Event
-
-	return json.Marshal(envelope)
+	return json.Marshal(e)
 }

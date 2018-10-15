@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/inputs"
@@ -26,7 +25,8 @@ const TypeMsg string = "msg"
 //     "flow": {"uuid": "50c3706e-fedb-42c0-8eab-dda3335714b7", "name": "Registration"},
 //     "contact": {
 //       "uuid": "9f7ede93-4b16-4692-80ad-b7dc54a1cd81",
-//       "name": "Bob"
+//       "name": "Bob",
+//       "created_on": "2018-01-01T12:00:00.000000Z"
 //     },
 //     "msg": {
 //       "uuid": "2d611e17-fb22-457f-b802-b8f7ec5cda5b",
@@ -65,9 +65,9 @@ type KeywordMatch struct {
 }
 
 // NewMsgTrigger creates a new message trigger
-func NewMsgTrigger(env utils.Environment, contact *flows.Contact, flow *assets.FlowReference, params types.XValue, msg *flows.MsgIn, match *KeywordMatch, triggeredOn time.Time) flows.Trigger {
+func NewMsgTrigger(env utils.Environment, contact *flows.Contact, flow *assets.FlowReference, msg *flows.MsgIn, match *KeywordMatch, triggeredOn time.Time) flows.Trigger {
 	return &MsgTrigger{
-		baseTrigger: baseTrigger{environment: env, contact: contact, flow: flow, triggeredOn: triggeredOn},
+		baseTrigger: newBaseTrigger(TypeMsg, env, flow, contact, nil, triggeredOn),
 		msg:         msg,
 		match:       match,
 	}
@@ -75,33 +75,15 @@ func NewMsgTrigger(env utils.Environment, contact *flows.Contact, flow *assets.F
 
 // InitializeRun performs additional initialization when we visit our first node
 func (t *MsgTrigger) InitializeRun(run flows.FlowRun, step flows.Step) error {
-	// update the run's input
+	// update our input
 	input, err := inputs.NewMsgInput(run.Session().Assets(), t.msg, t.triggeredOn)
 	if err != nil {
 		return err
 	}
 
-	run.SetInput(input)
+	run.Session().SetInput(input)
 	run.LogEvent(step, events.NewMsgReceivedEvent(t.msg))
 	return nil
-}
-
-// Type returns the type of this trigger
-func (t *MsgTrigger) Type() string { return TypeMsg }
-
-// Resolve resolves the given key when this trigger is referenced in an expression
-func (t *MsgTrigger) Resolve(env utils.Environment, key string) types.XValue {
-	switch key {
-	case "type":
-		return types.NewXText(TypeMsg)
-	}
-
-	return t.baseTrigger.Resolve(env, key)
-}
-
-// ToXJSON is called when this type is passed to @(json(...))
-func (t *MsgTrigger) ToXJSON(env utils.Environment) types.XText {
-	return types.ResolveKeys(env, t, "type", "params").ToXJSON(env)
 }
 
 var _ flows.Trigger = (*MsgTrigger)(nil)
@@ -118,32 +100,33 @@ type msgTriggerEnvelope struct {
 
 // ReadMsgTrigger reads a message trigger
 func ReadMsgTrigger(session flows.Session, data json.RawMessage) (flows.Trigger, error) {
-	trigger := &MsgTrigger{}
-	e := msgTriggerEnvelope{}
-	if err := utils.UnmarshalAndValidate(data, &e); err != nil {
+	e := &msgTriggerEnvelope{}
+	if err := utils.UnmarshalAndValidate(data, e); err != nil {
 		return nil, err
 	}
 
-	if err := unmarshalBaseTrigger(session, &trigger.baseTrigger, &e.baseTriggerEnvelope); err != nil {
+	t := &MsgTrigger{
+		msg:   e.Msg,
+		match: e.Match,
+	}
+
+	if err := t.unmarshal(session, &e.baseTriggerEnvelope); err != nil {
 		return nil, err
 	}
 
-	trigger.msg = e.Msg
-	trigger.match = e.Match
-
-	return trigger, nil
+	return t, nil
 }
 
 // MarshalJSON marshals this trigger into JSON
 func (t *MsgTrigger) MarshalJSON() ([]byte, error) {
-	var envelope msgTriggerEnvelope
+	e := &msgTriggerEnvelope{
+		Msg:   t.msg,
+		Match: t.match,
+	}
 
-	if err := marshalBaseTrigger(&t.baseTrigger, &envelope.baseTriggerEnvelope); err != nil {
+	if err := t.marshal(&e.baseTriggerEnvelope); err != nil {
 		return nil, err
 	}
 
-	envelope.Msg = t.msg
-	envelope.Match = t.match
-
-	return json.Marshal(envelope)
+	return json.Marshal(e)
 }
