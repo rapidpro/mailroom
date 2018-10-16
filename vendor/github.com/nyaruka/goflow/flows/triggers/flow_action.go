@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/runs"
 	"github.com/nyaruka/goflow/utils"
@@ -29,7 +28,8 @@ const TypeFlowAction string = "flow_action"
 //       "contact": {
 //         "uuid": "c59b0033-e748-4240-9d4c-e85eb6800151",
 //         "name": "Bob",
-//         "fields": {"state": {"value": "Azuay", "created_on": "2000-01-01T00:00:00.000000000-00:00"}}
+//         "fields": {"gender": {"text": "Male"}},
+//         "created_on": "2018-01-01T12:00:00.000000000-00:00"
 //       },
 //       "status": "active",
 //       "results": {
@@ -37,7 +37,7 @@ const TypeFlowAction string = "flow_action"
 //           "result_name": "Age",
 //           "value": "33",
 //           "node": "cd2be8c4-59bc-453c-8777-dec9a80043b8",
-//           "created_on": "2000-01-01T00:00:00.000000000-00:00"
+//           "created_on": "2018-01-01T12:00:00.000000000-00:00"
 //         }
 //       }
 //     }
@@ -49,26 +49,8 @@ type FlowActionTrigger struct {
 	run flows.RunSummary
 }
 
-// Type returns the type of this trigger
-func (t *FlowActionTrigger) Type() string { return TypeFlowAction }
-
 // Run returns the summary of the run that triggered this session
 func (t *FlowActionTrigger) Run() flows.RunSummary { return t.run }
-
-// Resolve resolves the given key when this trigger is referenced in an expression
-func (t *FlowActionTrigger) Resolve(env utils.Environment, key string) types.XValue {
-	switch key {
-	case "type":
-		return types.NewXText(TypeFlowAction)
-	}
-
-	return t.baseTrigger.Resolve(env, key)
-}
-
-// ToXJSON is called when this type is passed to @(json(...))
-func (t *FlowActionTrigger) ToXJSON(env utils.Environment) types.XText {
-	return types.ResolveKeys(env, t, "type", "params").ToXJSON(env)
-}
 
 var _ flows.Trigger = (*FlowActionTrigger)(nil)
 
@@ -83,36 +65,36 @@ type flowActionTriggerEnvelope struct {
 
 // ReadFlowActionTrigger reads a flow action trigger
 func ReadFlowActionTrigger(session flows.Session, data json.RawMessage) (flows.Trigger, error) {
+	e := &flowActionTriggerEnvelope{}
+	if err := utils.UnmarshalAndValidate(data, e); err != nil {
+		return nil, err
+	}
+
 	var err error
-	trigger := &FlowActionTrigger{}
-	e := flowActionTriggerEnvelope{}
-	if err := utils.UnmarshalAndValidate(data, &e); err != nil {
-		return nil, err
-	}
-
-	if err := unmarshalBaseTrigger(session, &trigger.baseTrigger, &e.baseTriggerEnvelope); err != nil {
-		return nil, err
-	}
-
-	if trigger.run, err = runs.ReadRunSummary(session, e.Run); err != nil {
+	t := &FlowActionTrigger{}
+	if t.run, err = runs.ReadRunSummary(session, e.Run); err != nil {
 		return nil, fmt.Errorf("unable to read run summary: %s", err)
 	}
 
-	return trigger, nil
+	if err := t.unmarshal(session, &e.baseTriggerEnvelope); err != nil {
+		return nil, err
+	}
+
+	return t, nil
 }
 
 // MarshalJSON marshals this trigger into JSON
 func (t *FlowActionTrigger) MarshalJSON() ([]byte, error) {
-	var envelope flowActionTriggerEnvelope
+	e := &flowActionTriggerEnvelope{}
+
 	var err error
-
-	if err := marshalBaseTrigger(&t.baseTrigger, &envelope.baseTriggerEnvelope); err != nil {
+	if e.Run, err = json.Marshal(t.run); err != nil {
 		return nil, err
 	}
 
-	if envelope.Run, err = json.Marshal(t.run); err != nil {
+	if err := t.marshal(&e.baseTriggerEnvelope); err != nil {
 		return nil, err
 	}
 
-	return json.Marshal(envelope)
+	return json.Marshal(e)
 }

@@ -28,7 +28,7 @@ func HandleCampaignEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*5)
 	defer cancel()
 
-	return fireEventFires(ctx, mr.DB, mr.RedisPool, task)
+	return fireEventFires(ctx, mr.DB, mr.RP, task)
 }
 
 // fireEventFires handles expired campaign events

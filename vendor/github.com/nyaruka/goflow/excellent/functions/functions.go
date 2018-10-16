@@ -53,6 +53,7 @@ var XFUNCTIONS = map[string]XFunction{
 	"left":              TextAndIntegerFunction(Left),
 	"lower":             OneTextFunction(Lower),
 	"right":             TextAndIntegerFunction(Right),
+	"regex_match":       InitialTextFunction(1, 2, RegexMatch),
 	"text_compare":      TwoTextFunction(TextCompare),
 	"repeat":            TextAndIntegerFunction(Repeat),
 	"replace":           ThreeTextFunction(Replace),
@@ -609,6 +610,45 @@ func Left(env utils.Environment, text types.XText, count int) types.XValue {
 // @function lower(text)
 func Lower(env utils.Environment, text types.XText) types.XValue {
 	return types.NewXText(strings.ToLower(text.Native()))
+}
+
+// RegexMatch returns the first match of the regular expression `pattern` in `text`.
+//
+// An optional third parameter `group` determines which matching group will be returned.
+//
+//   @(regex_match("sda34dfddg67", "\d+")) -> 34
+//   @(regex_match("Bob Smith", "(\w+) (\w+)", 1)) -> Bob
+//   @(regex_match("Bob Smith", "(\w+) (\w+)", 2)) -> Smith
+//   @(regex_match("Bob Smith", "(\w+) (\w+)", 5)) -> ERROR
+//   @(regex_match("abc", "[\.")) -> ERROR
+//
+// @function regex_match(text, pattern [,group])
+func RegexMatch(env utils.Environment, text types.XText, args ...types.XValue) types.XValue {
+	pattern, xerr := types.ToXText(env, args[0])
+	if xerr != nil {
+		return xerr
+	}
+
+	groupNum := 0
+	if len(args) == 2 {
+		groupNum, xerr = types.ToInteger(env, args[1])
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	exp, err := regexp.Compile(`(?mi)` + pattern.Native())
+	if err != nil {
+		return types.NewXErrorf("invalid regular expression")
+	}
+
+	groups := exp.FindStringSubmatch(text.Native())
+
+	if groupNum < 0 || groupNum >= len(groups) {
+		return types.NewXErrorf("invalid regular expression group")
+	}
+
+	return types.NewXText(groups[groupNum])
 }
 
 // Right returns the `count` right-most characters in `text`
@@ -1385,7 +1425,7 @@ func FormatDateTime(env utils.Environment, args ...types.XValue) types.XValue {
 
 // FormatNumber formats `number` to the given number of decimal `places`.
 //
-// An optional third argument `commas` can be false to disable the use of commas as thousand separators.
+// An optional third argument `humanize` can be false to disable the use of thousand separators.
 //
 //   @(format_number(31337)) -> 31,337.00
 //   @(format_number(31337, 2)) -> 31,337.00
@@ -1393,7 +1433,7 @@ func FormatDateTime(env utils.Environment, args ...types.XValue) types.XValue {
 //   @(format_number(31337, 0, false)) -> 31337
 //   @(format_number("foo", 2, false)) -> ERROR
 //
-// @function format_number(number, places [, commas])
+// @function format_number(number, places [, humanize])
 func FormatNumber(env utils.Environment, args ...types.XValue) types.XValue {
 	if len(args) < 1 || len(args) > 3 {
 		return types.NewXErrorf("takes 1 to 3 arguments, got %d", len(args))
@@ -1414,27 +1454,33 @@ func FormatNumber(env utils.Environment, args ...types.XValue) types.XValue {
 		}
 	}
 
-	commas := types.XBooleanTrue
+	human := types.XBooleanTrue
 	if len(args) > 2 {
-		if commas, err = types.ToXBoolean(env, args[2]); err != nil {
+		if human, err = types.ToXBoolean(env, args[2]); err != nil {
 			return err
 		}
 	}
 
+	return types.NewXText(FormatDecimal(num.Native(), env.NumberFormat(), places, human.Native()))
+}
+
+// FormatDecimal formats the given decimal
+func FormatDecimal(value decimal.Decimal, format *utils.NumberFormat, places int, groupDigits bool) string {
 	// build our format string
-	formatStr := bytes.Buffer{}
-	if commas.Native() {
-		formatStr.WriteString("#,###.")
+	formatStr := strings.Builder{}
+	if groupDigits {
+		formatStr.WriteString(fmt.Sprintf("#%s###", format.DigitGroupingSymbol))
 	} else {
-		formatStr.WriteString("####.")
+		formatStr.WriteString("####")
 	}
+	formatStr.WriteString(format.DecimalSymbol)
 	if places > 0 {
 		for i := 0; i < places; i++ {
 			formatStr.WriteString("#")
 		}
 	}
-	f64, _ := num.Native().Float64()
-	return types.NewXText(humanize.FormatFloat(formatStr.String(), f64))
+	f64, _ := value.Float64()
+	return humanize.FormatFloat(formatStr.String(), f64)
 }
 
 // FormatLocation formats the given `location` as its name.

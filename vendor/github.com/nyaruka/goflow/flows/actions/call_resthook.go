@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nyaruka/goflow/assets/rest/types"
+	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 )
@@ -38,8 +38,14 @@ type CallResthookAction struct {
 	ResultName string `json:"result_name,omitempty"`
 }
 
-// Type returns the type of this action
-func (a *CallResthookAction) Type() string { return TypeCallResthook }
+// NewCallResthookAction creates a new call resthook action
+func NewCallResthookAction(uuid flows.ActionUUID, resthook string, resultName string) *CallResthookAction {
+	return &CallResthookAction{
+		BaseAction: NewBaseAction(TypeCallResthook, uuid),
+		Resthook:   resthook,
+		ResultName: resultName,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *CallResthookAction) Validate(assets flows.SessionAssets) error {
@@ -47,7 +53,7 @@ func (a *CallResthookAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs this action
-func (a *CallResthookAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *CallResthookAction) Execute(run flows.FlowRun, step flows.Step) error {
 	// if resthook doesn't exist, treat it like an existing one with no subscribers
 	resthook := run.Session().Assets().Resthooks().FindBySlug(a.Resthook)
 	if resthook == nil {
@@ -57,7 +63,7 @@ func (a *CallResthookAction) Execute(run flows.FlowRun, step flows.Step, log flo
 	// build our payload
 	payload, err := run.EvaluateTemplateAsString(flows.DefaultWebhookPayload, false)
 	if err != nil {
-		a.logError(err, log)
+		a.logError(run, step, err)
 	}
 
 	// make a call to each subscriber URL
@@ -66,7 +72,7 @@ func (a *CallResthookAction) Execute(run flows.FlowRun, step flows.Step, log flo
 	for _, url := range resthook.Subscribers() {
 		req, err := http.NewRequest("POST", url, strings.NewReader(payload))
 		if err != nil {
-			a.logError(err, log)
+			a.logError(run, step, err)
 			return nil
 		}
 
@@ -74,16 +80,16 @@ func (a *CallResthookAction) Execute(run flows.FlowRun, step flows.Step, log flo
 
 		webhook, err := flows.MakeWebhookCall(run.Session(), req)
 		if err != nil {
-			a.logError(err, log)
+			a.logError(run, step, err)
 		} else {
 			webhooks = append(webhooks, webhook)
-			a.log(events.NewWebhookCalledEvent(webhook, a.Resthook), log)
+			a.log(run, step, events.NewWebhookCalledEvent(webhook, a.Resthook))
 		}
 	}
 
 	asResult := a.pickResultWebhook(webhooks)
 	if asResult != nil && a.ResultName != "" {
-		a.saveWebhookResult(run, step, a.ResultName, asResult, log)
+		a.saveWebhookResult(run, step, a.ResultName, asResult)
 	}
 
 	return nil

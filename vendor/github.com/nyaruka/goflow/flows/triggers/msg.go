@@ -1,0 +1,132 @@
+package triggers
+
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/inputs"
+	"github.com/nyaruka/goflow/utils"
+)
+
+func init() {
+	RegisterType(TypeMsg, ReadMsgTrigger)
+}
+
+// TypeMsg is the type for message triggered sessions
+const TypeMsg string = "msg"
+
+// MsgTrigger is used when a session was triggered by a message being recieved by the caller
+//
+//   {
+//     "type": "msg",
+//     "flow": {"uuid": "50c3706e-fedb-42c0-8eab-dda3335714b7", "name": "Registration"},
+//     "contact": {
+//       "uuid": "9f7ede93-4b16-4692-80ad-b7dc54a1cd81",
+//       "name": "Bob",
+//       "created_on": "2018-01-01T12:00:00.000000Z"
+//     },
+//     "msg": {
+//       "uuid": "2d611e17-fb22-457f-b802-b8f7ec5cda5b",
+//       "channel": {"uuid": "61602f3e-f603-4c70-8a8f-c477505bf4bf", "name": "Twilio"},
+//       "urn": "tel:+12065551212",
+//       "text": "hi there",
+//       "attachments": ["https://s3.amazon.com/mybucket/attachment.jpg"]
+//     },
+//     "keyword_match": {
+//       "type": "first_word",
+//       "keyword": "start"
+//     },
+//     "triggered_on": "2000-01-01T00:00:00.000000000-00:00"
+//   }
+//
+// @trigger msg
+type MsgTrigger struct {
+	baseTrigger
+	msg   *flows.MsgIn
+	match *KeywordMatch
+}
+
+// KeywordMatchType describes how the message matched a keyword
+type KeywordMatchType string
+
+// the different types of keyword match
+const (
+	KeywordMatchTypeFirstWord KeywordMatchType = "first_word"
+	KeywordMatchTypeOnlyWord  KeywordMatchType = "only_word"
+)
+
+// KeywordMatch describes why the message triggered a session
+type KeywordMatch struct {
+	Type    KeywordMatchType `json:"type" validate:"required"`
+	Keyword string           `json:"keyword" validate:"required"`
+}
+
+// NewMsgTrigger creates a new message trigger
+func NewMsgTrigger(env utils.Environment, contact *flows.Contact, flow *assets.FlowReference, msg *flows.MsgIn, match *KeywordMatch, triggeredOn time.Time) flows.Trigger {
+	return &MsgTrigger{
+		baseTrigger: newBaseTrigger(TypeMsg, env, flow, contact, nil, triggeredOn),
+		msg:         msg,
+		match:       match,
+	}
+}
+
+// InitializeRun performs additional initialization when we visit our first node
+func (t *MsgTrigger) InitializeRun(run flows.FlowRun, step flows.Step) error {
+	// update our input
+	input, err := inputs.NewMsgInput(run.Session().Assets(), t.msg, t.triggeredOn)
+	if err != nil {
+		return err
+	}
+
+	run.Session().SetInput(input)
+	run.LogEvent(step, events.NewMsgReceivedEvent(t.msg))
+	return nil
+}
+
+var _ flows.Trigger = (*MsgTrigger)(nil)
+
+//------------------------------------------------------------------------------------------
+// JSON Encoding / Decoding
+//------------------------------------------------------------------------------------------
+
+type msgTriggerEnvelope struct {
+	baseTriggerEnvelope
+	Msg   *flows.MsgIn  `json:"msg" validate:"required,dive"`
+	Match *KeywordMatch `json:"keyword_match,omitempty" validate:"omitempty,dive"`
+}
+
+// ReadMsgTrigger reads a message trigger
+func ReadMsgTrigger(session flows.Session, data json.RawMessage) (flows.Trigger, error) {
+	e := &msgTriggerEnvelope{}
+	if err := utils.UnmarshalAndValidate(data, e); err != nil {
+		return nil, err
+	}
+
+	t := &MsgTrigger{
+		msg:   e.Msg,
+		match: e.Match,
+	}
+
+	if err := t.unmarshal(session, &e.baseTriggerEnvelope); err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}
+
+// MarshalJSON marshals this trigger into JSON
+func (t *MsgTrigger) MarshalJSON() ([]byte, error) {
+	e := &msgTriggerEnvelope{
+		Msg:   t.msg,
+		Match: t.match,
+	}
+
+	if err := t.marshal(&e.baseTriggerEnvelope); err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(e)
+}

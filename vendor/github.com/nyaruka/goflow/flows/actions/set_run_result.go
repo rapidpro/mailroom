@@ -37,8 +37,15 @@ type SetRunResultAction struct {
 	Category string `json:"category"`
 }
 
-// Type returns the type of this action
-func (a *SetRunResultAction) Type() string { return TypeSetRunResult }
+// NewSetRunResultAction creates a new set run result action
+func NewSetRunResultAction(uuid flows.ActionUUID, name string, value string, category string) *SetRunResultAction {
+	return &SetRunResultAction{
+		BaseAction: NewBaseAction(TypeSetRunResult, uuid),
+		Name:       name,
+		Value:      value,
+		Category:   category,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *SetRunResultAction) Validate(assets flows.SessionAssets) error {
@@ -46,14 +53,14 @@ func (a *SetRunResultAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs this action
-func (a *SetRunResultAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *SetRunResultAction) Execute(run flows.FlowRun, step flows.Step) error {
 	// get our localized value if any
 	template := run.GetText(utils.UUID(a.UUID()), "value", a.Value)
 	value, err := run.EvaluateTemplateAsString(template, false)
 
 	// log any error received
 	if err != nil {
-		a.logError(err, log)
+		a.logError(run, step, err)
 	}
 
 	categoryLocalized := run.GetText(utils.UUID(a.UUID()), "category", a.Category)
@@ -61,6 +68,6 @@ func (a *SetRunResultAction) Execute(run flows.FlowRun, step flows.Step, log flo
 		categoryLocalized = ""
 	}
 
-	a.saveResult(run, step, a.Name, value, a.Category, categoryLocalized, nil, nil, log)
+	a.saveResult(run, step, a.Name, value, a.Category, categoryLocalized, nil, nil)
 	return nil
 }

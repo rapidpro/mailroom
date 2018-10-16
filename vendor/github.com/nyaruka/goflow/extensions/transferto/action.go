@@ -32,11 +32,18 @@ var TypeTransferAirtime = "transfer_airtime"
 type TransferAirtimeAction struct {
 	actions.BaseAction
 
-	Amounts map[string]decimal.Decimal `json:"amounts"`
+	Amounts    map[string]decimal.Decimal `json:"amounts"`
+	ResultName string                     `json:"result_name,omitempty"`
 }
 
-// Type returns the type of this router
-func (a *TransferAirtimeAction) Type() string { return TypeTransferAirtime }
+// NewTransferAirtimeAction creates a new airtime transfer action
+func NewTransferAirtimeAction(uuid flows.ActionUUID, amounts map[string]decimal.Decimal, resultName string) *TransferAirtimeAction {
+	return &TransferAirtimeAction{
+		BaseAction: actions.NewBaseAction(TypeTransferAirtime, uuid),
+		Amounts:    amounts,
+		ResultName: resultName,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *TransferAirtimeAction) Validate(assets flows.SessionAssets) error {
@@ -49,18 +56,25 @@ func (a *TransferAirtimeAction) AllowedFlowTypes() []flows.FlowType {
 }
 
 // Execute runs this action
-func (a *TransferAirtimeAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *TransferAirtimeAction) Execute(run flows.FlowRun, step flows.Step) error {
 	contact := run.Contact()
 	if contact == nil {
-		log.Add(events.NewErrorEvent(fmt.Errorf("can't execute action in session without a contact")))
+		run.LogEvent(step, events.NewErrorEvent(fmt.Errorf("can't execute action in session without a contact")))
 		return nil
 	}
+
+	// check that our contact has a tel URN
+	telURNs := contact.URNs().WithScheme(urns.TelScheme)
+	if len(telURNs) == 0 {
+		run.LogEvent(step, events.NewErrorEvent(fmt.Errorf("can't transfer airtime to contact without a tel URN")))
+		return nil
+	}
+	recipient := telURNs[0].Path()
 
 	// log error and return if we don't have a configuration
 	rawConfig := run.Session().Environment().Extension("transferto")
 	if rawConfig == nil {
-		log.Add(events.NewErrorEvent(fmt.Errorf("missing transferto configuration")))
-		log.Add(NewFailedAirtimeTransferredEvent())
+		run.LogEvent(step, events.NewErrorEvent(fmt.Errorf("missing transferto configuration")))
 		return nil
 	}
 
@@ -69,51 +83,74 @@ func (a *TransferAirtimeAction) Execute(run flows.FlowRun, step flows.Step, log 
 		return fmt.Errorf("unable to read config: %s", err)
 	}
 
-	// if airtime transferred are disabled, return a mock event
-	if config.Disabled {
-		log.Add(NewAirtimeTransferredEvent(config.Currency, decimal.RequireFromString("1")))
-		return nil
-	}
-
-	// check that our contact has a tel URN
-	telURNs := contact.URNs().WithScheme(urns.TelScheme)
-	if len(telURNs) == 0 {
-		log.Add(events.NewErrorEvent(fmt.Errorf("can't transfer airtime to contact without a tel URN")))
-		log.Add(NewFailedAirtimeTransferredEvent())
-		return nil
-	}
-
-	currency, amount, err := attemptTransfer(run.Contact().PreferredChannel(), config, a.Amounts, telURNs[0].Path(), run.Session().HTTPClient())
+	transfer, err := attemptTransfer(contact.PreferredChannel(), config, a.Amounts, recipient, run.Session().HTTPClient())
 
 	if err != nil {
-		log.Add(events.NewErrorEvent(err))
-		log.Add(NewFailedAirtimeTransferredEvent())
-		return nil
+		run.LogEvent(step, events.NewErrorEvent(err))
+	} else {
+		run.LogEvent(step, NewAirtimeTransferredEvent(transfer))
 	}
 
-	log.Add(NewAirtimeTransferredEvent(currency, amount))
+	if a.ResultName != "" && transfer != nil {
+		value := transfer.actualAmount.String()
+		category := statusCategories[transfer.status]
+		result := flows.NewResult(a.ResultName, value, category, "", step.NodeUUID(), nil, nil, utils.Now())
+
+		run.SaveResult(result)
+		run.LogEvent(step, events.NewRunResultChangedEvent(result))
+	}
 	return nil
 }
 
-// attempts to make the transfer, returning the actual amount transfered or an error
-func attemptTransfer(channel *flows.Channel, config *transferToConfig, amounts map[string]decimal.Decimal, recipient string, httpClient *utils.HTTPClient) (string, decimal.Decimal, error) {
+type transferStatus string
+
+const (
+	transferStatusSuccess transferStatus = "success"
+	transferStatusFailed  transferStatus = "failed"
+)
+
+type transfer struct {
+	recipient     string
+	currency      string
+	desiredAmount decimal.Decimal
+	actualAmount  decimal.Decimal
+	status        transferStatus
+}
+
+var statusCategories = map[transferStatus]string{
+	transferStatusSuccess: "Success",
+	transferStatusFailed:  "Failure",
+}
+
+// attempts to make the transfer, returning the actual transfer or an error
+func attemptTransfer(channel *flows.Channel, config *transferToConfig, amounts map[string]decimal.Decimal, recipient string, httpClient *utils.HTTPClient) (*transfer, error) {
+	// if airtime transferred are disabled, return a mock transfer
+	if config.Disabled {
+		amount := decimal.RequireFromString("1")
+		return &transfer{recipient: recipient, currency: config.Currency, desiredAmount: amount, actualAmount: amount, status: transferStatusSuccess}, nil
+	}
+
 	cl := client.NewTransferToClient(config.Login, config.APIToken, httpClient)
+	t := &transfer{recipient: recipient, status: transferStatusFailed}
 
 	info, err := cl.MSISDNInfo(recipient, config.Currency, "1")
 	if err != nil {
-		return "", decimal.Zero, err
+		return t, err
 	}
 
+	t.currency = info.DestinationCurrency
+
 	// look up the amount to send in this currency
-	amount, hasAmount := amounts[info.DestinationCurrency]
+	amount, hasAmount := amounts[t.currency]
 	if !hasAmount {
-		return "", decimal.Zero, fmt.Errorf("no amount configured for transfers in %s", info.DestinationCurrency)
+		return t, fmt.Errorf("no amount configured for transfers in %s", t.currency)
 	}
+	t.desiredAmount = amount
 
 	if info.OpenRange {
 		// TODO add support for open-range topups once we can find numbers to test this with
 		// see https://shop.transferto.com/shop/v3/doc/TransferTo_API_OR.pdf
-		return "", decimal.Zero, fmt.Errorf("transferto account is configured for open-range which is not yet supported")
+		return t, fmt.Errorf("transferto account is configured for open-range which is not yet supported")
 	}
 
 	// find the product closest to our desired amount
@@ -126,10 +163,11 @@ func attemptTransfer(channel *flows.Channel, config *transferToConfig, amounts m
 			useAmount = price
 		}
 	}
+	t.actualAmount = useAmount
 
 	reservedID, err := cl.ReserveID()
 	if err != nil {
-		return "", decimal.Zero, err
+		return t, err
 	}
 
 	var fromMSISDN string
@@ -139,8 +177,10 @@ func attemptTransfer(channel *flows.Channel, config *transferToConfig, amounts m
 
 	topup, err := cl.Topup(reservedID, fromMSISDN, recipient, useProduct, "")
 	if err != nil {
-		return "", decimal.Zero, err
+		return t, err
 	}
+	t.actualAmount = topup.ActualProductSent
+	t.status = transferStatusSuccess
 
-	return topup.DestinationCurrency, topup.ActualProductSent, nil
+	return t, nil
 }

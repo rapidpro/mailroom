@@ -9,6 +9,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/sirupsen/logrus"
@@ -81,6 +82,7 @@ func (c *Campaign) GroupUUID() assets.GroupUUID { return c.c.GroupUUID }
 func (c *Campaign) Events() []*CampaignEvent { return c.c.Events }
 
 // CampaignEvent is our struct for an individual campaign event
+
 type CampaignEvent struct {
 	e struct {
 		ID            CampaignEventID   `json:"id"`
@@ -102,7 +104,40 @@ func (e *CampaignEvent) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &e.e)
 }
 
-// ScheduleForTime calculates the next fire (if any) for the passed in contact for this CampaignEvent
+// ScheduleForContact calculates the next fire ( if any) for the passed in contact
+func (e *CampaignEvent) ScheduleForContact(tz *time.Location, now time.Time, contact *flows.Contact) (*time.Time, error) {
+	// we aren't part of the group, move on
+	if contact.Groups().FindByUUID(e.Campaign().GroupUUID()) == nil {
+		return nil, nil
+	}
+
+	// get our value for the event
+	value := contact.Fields()[e.RelativeToKey()]
+
+	// no value? move on
+	if value == nil {
+		return nil, nil
+	}
+
+	// get the typed value
+	typed := value.TypedValue()
+	start, isTime := typed.(types.XDateTime)
+
+	// nil or not a date? move on
+	if !isTime {
+		return nil, nil
+	}
+
+	// calculate our next fire
+	scheduled, err := e.ScheduleForTime(tz, now, start.Native())
+	if err != nil {
+		return nil, errors.Annotatef(err, "error calculating offset for start: %s and event: %d", start, e.ID())
+	}
+
+	return scheduled, nil
+}
+
+// ScheduleForTime calculates the next fire (if any) for the passed in time and timezone
 func (e *CampaignEvent) ScheduleForTime(tz *time.Location, now time.Time, start time.Time) (*time.Time, error) {
 	// convert to our timezone
 	start = start.In(tz)
@@ -336,3 +371,67 @@ WHERE
 	f.id IN(?) AND
 	f.fired IS NULL
 `
+
+// DeleteUnfiredEventFires removes event fires for the passed in event and contact
+func DeleteUnfiredEventFires(ctx context.Context, tx *sqlx.Tx, removes []*FireDelete) error {
+	if len(removes) == 0 {
+		return nil
+	}
+
+	// convert to list of interfaces
+	is := make([]interface{}, len(removes))
+	for i := range removes {
+		is[i] = removes[i]
+	}
+	return BulkSQL(ctx, "removing campaign event fires", tx, removeUnfiredFiresSQL, is)
+}
+
+const removeUnfiredFiresSQL = `
+DELETE FROM
+	campaigns_eventfire
+WHERE 
+	id
+IN (
+	SELECT 
+		c.id 
+	FROM 
+		campaigns_eventfire c,
+		(VALUES(:contact_id, :event_id)) AS f(contact_id, event_id)
+	WHERE
+		c.contact_id = f.contact_id::int AND 
+		c.event_id = f.event_id::int AND 
+		c.fired IS NULL
+);
+`
+
+type FireDelete struct {
+	ContactID flows.ContactID `db:"contact_id"`
+	EventID   CampaignEventID `db:"event_id"`
+}
+
+// AddEventFires adds the passed in event fires to our db
+func AddEventFires(ctx context.Context, tx *sqlx.Tx, adds []*FireAdd) error {
+	if len(adds) == 0 {
+		return nil
+	}
+
+	// convert to list of interfaces
+	is := make([]interface{}, len(adds))
+	for i := range adds {
+		is[i] = adds[i]
+	}
+	return BulkSQL(ctx, "adding campaign event fires", tx, insertEventFiresSQL, is)
+}
+
+const insertEventFiresSQL = `
+	INSERT INTO 
+		campaigns_eventfire
+		(contact_id, event_id, scheduled)
+	VALUES(:contact_id, :event_id, :scheduled)
+`
+
+type FireAdd struct {
+	ContactID flows.ContactID `db:"contact_id"`
+	EventID   CampaignEventID `db:"event_id"`
+	Scheduled time.Time       `db:"scheduled"`
+}

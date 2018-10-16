@@ -2,7 +2,6 @@ package events
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -24,7 +23,8 @@ const TypeEnvironmentChanged string = "environment_changed"
 //       "date_format": "YYYY-MM-DD",
 //       "time_format": "hh:mm",
 //       "timezone": "Africa/Kigali",
-//       "languages": ["eng", "fra"]
+//       "default_language": "eng",
+//       "allowed_languages": ["eng", "fra"]
 //     }
 //   }
 //
@@ -35,23 +35,13 @@ type EnvironmentChangedEvent struct {
 	Environment json.RawMessage `json:"environment"`
 }
 
-// Type returns the type of this event
-func (e *EnvironmentChangedEvent) Type() string { return TypeEnvironmentChanged }
-
-// Validate validates our event is valid and has all the assets it needs
-func (e *EnvironmentChangedEvent) Validate(assets flows.SessionAssets) error {
-	return nil
-}
-
-// Apply applies this event to the given run
-func (e *EnvironmentChangedEvent) Apply(run flows.FlowRun) error {
-	env, err := utils.ReadEnvironment(e.Environment)
-	if err != nil {
-		return fmt.Errorf("unable to read environment: %s", err)
+// NewEnvironmentChangedEvent creates a new environment changed event
+func NewEnvironmentChangedEvent(env utils.Environment) *EnvironmentChangedEvent {
+	marshalled, _ := json.Marshal(env)
+	return &EnvironmentChangedEvent{
+		BaseEvent:   NewBaseEvent(TypeEnvironmentChanged),
+		Environment: marshalled,
 	}
-
-	run.Session().SetEnvironment(env)
-	return nil
 }
 
-var _ flows.CallerEvent = (*EnvironmentChangedEvent)(nil)
+var _ flows.Event = (*EnvironmentChangedEvent)(nil)

@@ -30,7 +30,7 @@ func init() {
 
 // handleFlowStart creates all the batches of contacts to start in a flow
 func handleFlowStart(mr *mailroom.Mailroom, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*15)
+	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*45)
 	defer cancel()
 
 	// decode our task body
@@ -43,7 +43,7 @@ func handleFlowStart(mr *mailroom.Mailroom, task *queue.Task) error {
 		return errors.Annotatef(err, "error unmarshalling flow start task: %s", string(task.Task))
 	}
 
-	return CreateFlowBatches(ctx, mr.DB, mr.RedisPool, startTask)
+	return CreateFlowBatches(ctx, mr.DB, mr.RP, startTask)
 }
 
 // CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
@@ -123,7 +123,7 @@ func handleFlowStartBatch(mr *mailroom.Mailroom, task *queue.Task) error {
 	}
 
 	// start these contacts in our flow
-	_, err = runner.StartFlowBatch(ctx, mr.DB, mr.RedisPool, startBatch)
+	_, err = runner.StartFlowBatch(ctx, mr.DB, mr.RP, startBatch)
 	if err != nil {
 		return errors.Annotatef(err, "error starting flow batch")
 	}

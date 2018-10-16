@@ -33,8 +33,13 @@ type SetContactNameAction struct {
 	Name string `json:"name"`
 }
 
-// Type returns the type of this action
-func (a *SetContactNameAction) Type() string { return TypeSetContactName }
+// NewSetContactNameAction creates a new set name action
+func NewSetContactNameAction(uuid flows.ActionUUID, name string) *SetContactNameAction {
+	return &SetContactNameAction{
+		BaseAction: NewBaseAction(TypeSetContactName, uuid),
+		Name:       name,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *SetContactNameAction) Validate(assets flows.SessionAssets) error {
@@ -42,9 +47,9 @@ func (a *SetContactNameAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs this action
-func (a *SetContactNameAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *SetContactNameAction) Execute(run flows.FlowRun, step flows.Step) error {
 	if run.Contact() == nil {
-		a.logError(fmt.Errorf("can't execute action in session without a contact"), log)
+		a.logError(run, step, fmt.Errorf("can't execute action in session without a contact"))
 		return nil
 	}
 
@@ -53,15 +58,16 @@ func (a *SetContactNameAction) Execute(run flows.FlowRun, step flows.Step, log f
 
 	// if we received an error, log it
 	if err != nil {
-		a.logError(err, log)
+		a.logError(run, step, err)
 		return nil
 	}
 
 	if run.Contact().Name() != name {
 		run.Contact().SetName(name)
-		a.log(events.NewContactNameChangedEvent(name), log)
+		a.log(run, step, events.NewContactNameChangedEvent(name))
+
+		a.reevaluateDynamicGroups(run, step)
 	}
 
-	a.reevaluateDynamicGroups(run, log)
 	return nil
 }

@@ -32,24 +32,13 @@ type ContactChangedEvent struct {
 	Contact json.RawMessage `json:"contact"`
 }
 
-// Type returns the type of this event
-func (e *ContactChangedEvent) Type() string { return TypeContactChanged }
-
-// Validate validates our event is valid and has all the assets it needs
-func (e *ContactChangedEvent) Validate(assets flows.SessionAssets) error {
-	return nil
-}
-
-// Apply applies this event to the given run
-func (e *ContactChangedEvent) Apply(run flows.FlowRun) error {
-	contact, err := flows.ReadContact(run.Session().Assets(), e.Contact)
-	if err != nil {
-		return err
+// NewContactChangedEvent creates a new contact changed event
+func NewContactChangedEvent(contact *flows.Contact) *ContactChangedEvent {
+	marshalled, _ := json.Marshal(contact)
+	return &ContactChangedEvent{
+		BaseEvent: NewBaseEvent(TypeContactChanged),
+		Contact:   marshalled,
 	}
-
-	run.SetContact(contact)
-	run.Session().SetContact(contact)
-	return nil
 }
 
-var _ flows.CallerEvent = (*ContactChangedEvent)(nil)
+var _ flows.Event = (*ContactChangedEvent)(nil)

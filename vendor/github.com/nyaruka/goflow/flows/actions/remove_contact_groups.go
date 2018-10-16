@@ -37,8 +37,14 @@ type RemoveContactGroupsAction struct {
 	AllGroups bool                     `json:"all_groups"`
 }
 
-// Type returns the type of this action
-func (a *RemoveContactGroupsAction) Type() string { return TypeRemoveContactGroups }
+// NewRemoveContactGroupsAction creates a new remove from groups action
+func NewRemoveContactGroupsAction(uuid flows.ActionUUID, groups []*assets.GroupReference, allGroups bool) *RemoveContactGroupsAction {
+	return &RemoveContactGroupsAction{
+		BaseAction: NewBaseAction(TypeRemoveContactGroups, uuid),
+		Groups:     groups,
+		AllGroups:  allGroups,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *RemoveContactGroupsAction) Validate(assets flows.SessionAssets) error {
@@ -51,10 +57,10 @@ func (a *RemoveContactGroupsAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs the action
-func (a *RemoveContactGroupsAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *RemoveContactGroupsAction) Execute(run flows.FlowRun, step flows.Step) error {
 	contact := run.Contact()
 	if contact == nil {
-		a.logError(fmt.Errorf("can't execute action in session without a contact"), log)
+		a.logError(run, step, fmt.Errorf("can't execute action in session without a contact"))
 		return nil
 	}
 
@@ -68,7 +74,7 @@ func (a *RemoveContactGroupsAction) Execute(run flows.FlowRun, step flows.Step, 
 			}
 		}
 	} else {
-		if groups, err = a.resolveGroups(run, step, a.Groups, log); err != nil {
+		if groups, err = a.resolveGroups(run, step, a.Groups); err != nil {
 			return err
 		}
 	}
@@ -82,7 +88,7 @@ func (a *RemoveContactGroupsAction) Execute(run flows.FlowRun, step flows.Step, 
 
 		// error if group is dynamic
 		if group.IsDynamic() {
-			a.logError(fmt.Errorf("can't manually remove contact from dynamic group '%s' (%s)", group.Name(), group.UUID()), log)
+			a.logError(run, step, fmt.Errorf("can't manually remove contact from dynamic group '%s' (%s)", group.Name(), group.UUID()))
 			continue
 		}
 
@@ -92,7 +98,7 @@ func (a *RemoveContactGroupsAction) Execute(run flows.FlowRun, step flows.Step, 
 
 	// only generate event if contact's groups change
 	if len(removed) > 0 {
-		a.log(events.NewContactGroupsChangedEvent(nil, removed), log)
+		a.log(run, step, events.NewContactGroupsChangedEvent(nil, removed))
 	}
 
 	return nil

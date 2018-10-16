@@ -22,7 +22,8 @@ const TypeStartFlow string = "start_flow"
 //   {
 //     "uuid": "8eebd020-1af5-431c-b943-aa670fc74da9",
 //     "type": "start_flow",
-//     "flow": {"uuid": "b7cf0d83-f1c9-411c-96fd-c511a4cfa86d", "name": "Collect Language"}
+//     "flow": {"uuid": "b7cf0d83-f1c9-411c-96fd-c511a4cfa86d", "name": "Collect Language"},
+//     "terminal": false
 //   }
 //
 // @action start_flow
@@ -30,11 +31,18 @@ type StartFlowAction struct {
 	BaseAction
 	universalAction
 
-	Flow *assets.FlowReference `json:"flow" validate:"required"`
+	Flow     *assets.FlowReference `json:"flow" validate:"required"`
+	Terminal bool                  `json:"terminal"`
 }
 
-// Type returns the type of this action
-func (a *StartFlowAction) Type() string { return TypeStartFlow }
+// NewStartFlowAction creates a new start flow action
+func NewStartFlowAction(uuid flows.ActionUUID, flow *assets.FlowReference, terminal bool) *StartFlowAction {
+	return &StartFlowAction{
+		BaseAction: NewBaseAction(TypeStartFlow, uuid),
+		Flow:       flow,
+		Terminal:   terminal,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *StartFlowAction) Validate(assets flows.SessionAssets) error {
@@ -44,9 +52,9 @@ func (a *StartFlowAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs our action
-func (a *StartFlowAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *StartFlowAction) Execute(run flows.FlowRun, step flows.Step) error {
 	if run.Session().FlowOnStack(a.Flow.UUID) {
-		a.fatalError(run, fmt.Errorf("flow loop detected, stopping execution before starting flow: %s", a.Flow.UUID), log)
+		a.fatalError(run, step, fmt.Errorf("flow loop detected, stopping execution before starting flow: %s", a.Flow.UUID))
 		return nil
 	}
 
@@ -55,7 +63,7 @@ func (a *StartFlowAction) Execute(run flows.FlowRun, step flows.Step, log flows.
 		return err
 	}
 
-	run.Session().PushFlow(flow, run)
-	a.log(events.NewFlowTriggeredEvent(a.Flow, run.UUID()), log)
+	run.Session().PushFlow(flow, run, a.Terminal)
+	a.log(run, step, events.NewFlowTriggeredEvent(a.Flow, run.UUID(), a.Terminal))
 	return nil
 }

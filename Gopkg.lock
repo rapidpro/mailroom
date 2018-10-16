@@ -138,11 +138,10 @@
   version = "v0.2.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/nyaruka/goflow"
   packages = [
     "assets",
-    "assets/rest/types",
+    "assets/static/types",
     "contactql",
     "contactql/gen",
     "excellent",
@@ -157,6 +156,7 @@
     "flows/engine",
     "flows/events",
     "flows/inputs",
+    "flows/resumes",
     "flows/routers",
     "flows/routers/tests",
     "flows/runs",
@@ -167,7 +167,8 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "59185ab72f5e6cadef365fd16406e4615818f233"
+  revision = "d64fbfbfe7f1443c6035beb9eb0969e0725fa092"
+  version = "v0.22.0"
 
 [[projects]]
   branch = "master"
@@ -264,6 +265,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "60c487d4505f727f897bebb3d24b8c36c92ee88620f047abd3ccf59086e5b92f"
+  inputs-digest = "9e8b4e5e7344c89340722a52f0d9b5bdfe3b2edfab8950c352fefbcee8a3ac16"
   solver-name = "gps-cdcl"
   solver-version = 1

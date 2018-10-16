@@ -8,7 +8,7 @@ import (
 	"github.com/nyaruka/mailroom"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/nyaruka/mailroom/handlers"
+	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"

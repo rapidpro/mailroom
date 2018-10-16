@@ -60,6 +60,7 @@ func (f *Foreman) Assign() {
 	log.WithFields(logrus.Fields{
 		"state":   "started",
 		"workers": len(f.workers),
+		"queue":   f.queue,
 	}).Info("workers started and waiting")
 
 	lastSleep := false
@@ -74,7 +75,7 @@ func (f *Foreman) Assign() {
 		// otherwise, grab the next task and assign it to a worker
 		case worker := <-f.availableWorkers:
 			// see if we have a task to work on
-			rc := f.mr.RedisPool.Get()
+			rc := f.mr.RP.Get()
 			task, err := queue.PopNextTask(rc, f.queue)
 			rc.Close()
 
@@ -161,7 +162,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 		}
 
 		// mark our task as complete
-		rc := w.foreman.mr.RedisPool.Get()
+		rc := w.foreman.mr.RP.Get()
 		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.OrgID)
 		if err != nil {
 			log.WithError(err)

@@ -24,7 +24,7 @@ const TypeSetContactField string = "set_contact_field"
 //     "uuid": "8eebd020-1af5-431c-b943-aa670fc74da9",
 //     "type": "set_contact_field",
 //     "field": {"key": "gender", "name": "Gender"},
-//     "value": "Male"
+//     "value": "Female"
 //   }
 //
 // @action set_contact_field
@@ -36,8 +36,14 @@ type SetContactFieldAction struct {
 	Value string                 `json:"value"`
 }
 
-// Type returns the type of this action
-func (a *SetContactFieldAction) Type() string { return TypeSetContactField }
+// NewSetContactFieldAction creates a new set channel action
+func NewSetContactFieldAction(uuid flows.ActionUUID, field *assets.FieldReference, value string) *SetContactFieldAction {
+	return &SetContactFieldAction{
+		BaseAction: NewBaseAction(TypeSetContactField, uuid),
+		Field:      field,
+		Value:      value,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *SetContactFieldAction) Validate(assets flows.SessionAssets) error {
@@ -46,9 +52,9 @@ func (a *SetContactFieldAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs this action
-func (a *SetContactFieldAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *SetContactFieldAction) Execute(run flows.FlowRun, step flows.Step) error {
 	if run.Contact() == nil {
-		a.logError(fmt.Errorf("can't execute action in session without a contact"), log)
+		a.logError(run, step, fmt.Errorf("can't execute action in session without a contact"))
 		return nil
 	}
 
@@ -57,18 +63,23 @@ func (a *SetContactFieldAction) Execute(run flows.FlowRun, step flows.Step, log 
 
 	// if we received an error, log it
 	if err != nil {
-		a.logError(err, log)
+		a.logError(run, step, err)
 		return nil
 	}
 
 	fields := run.Session().Assets().Fields()
-	value, err := run.Contact().SetFieldValue(run.Environment(), fields, a.Field.Key, rawValue)
+
+	field, err := fields.Get(a.Field.Key)
 	if err != nil {
 		return err
 	}
 
-	a.log(events.NewContactFieldChangedEvent(a.Field, value), log)
+	oldValue := run.Contact().Fields().Get(field)
+	newValue := run.Contact().Fields().Set(run.Environment(), field, rawValue, fields)
 
-	a.reevaluateDynamicGroups(run, log)
+	if !newValue.Equals(oldValue) {
+		a.log(run, step, events.NewContactFieldChangedEvent(a.Field, newValue))
+		a.reevaluateDynamicGroups(run, step)
+	}
 	return nil
 }

@@ -11,6 +11,8 @@ import (
 
 type ChannelID int
 
+var NilChannelID = ChannelID(0)
+
 type ChannelType string
 
 const ChannelTypeAndroid = ChannelType("A")
@@ -65,6 +67,11 @@ func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
 
 // Parent returns the UUID of the parent channel to this channel
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
+
+// ChannelReference return a channel reference for this channel
+func (c *Channel) ChannelReference() *assets.ChannelReference {
+	return assets.NewChannelReference(c.UUID(), c.Name())
+}
 
 // loadChannels loads all the channels for the passed in org
 func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Channel, error) {

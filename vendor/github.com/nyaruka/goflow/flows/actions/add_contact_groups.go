@@ -35,6 +35,14 @@ type AddContactGroupsAction struct {
 	Groups []*assets.GroupReference `json:"groups" validate:"required,dive"`
 }
 
+// NewAddContactGroupsAction creates a new add to groups action
+func NewAddContactGroupsAction(uuid flows.ActionUUID, groups []*assets.GroupReference) *AddContactGroupsAction {
+	return &AddContactGroupsAction{
+		BaseAction: NewBaseAction(TypeAddContactGroups, uuid),
+		Groups:     groups,
+	}
+}
+
 // Type returns the type of this action
 func (a *AddContactGroupsAction) Type() string { return TypeAddContactGroups }
 
@@ -45,14 +53,14 @@ func (a *AddContactGroupsAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute adds our contact to the specified groups
-func (a *AddContactGroupsAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *AddContactGroupsAction) Execute(run flows.FlowRun, step flows.Step) error {
 	contact := run.Contact()
 	if contact == nil {
-		a.logError(fmt.Errorf("can't execute action in session without a contact"), log)
+		a.logError(run, step, fmt.Errorf("can't execute action in session without a contact"))
 		return nil
 	}
 
-	groups, err := a.resolveGroups(run, step, a.Groups, log)
+	groups, err := a.resolveGroups(run, step, a.Groups)
 	if err != nil {
 		return err
 	}
@@ -66,7 +74,7 @@ func (a *AddContactGroupsAction) Execute(run flows.FlowRun, step flows.Step, log
 
 		// error if group is dynamic
 		if group.IsDynamic() {
-			a.logError(fmt.Errorf("can't manually add contact to dynamic group '%s' (%s)", group.Name(), group.UUID()), log)
+			a.logError(run, step, fmt.Errorf("can't manually add contact to dynamic group '%s' (%s)", group.Name(), group.UUID()))
 			continue
 		}
 
@@ -76,7 +84,7 @@ func (a *AddContactGroupsAction) Execute(run flows.FlowRun, step flows.Step, log
 
 	// only generate event if contact's groups change
 	if len(added) > 0 {
-		a.log(events.NewContactGroupsChangedEvent(added, nil), log)
+		a.log(run, step, events.NewContactGroupsChangedEvent(added, nil))
 	}
 
 	return nil

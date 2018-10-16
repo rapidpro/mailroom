@@ -41,8 +41,18 @@ type StartSessionAction struct {
 	CreateContact bool                      `json:"create_contact,omitempty"`
 }
 
-// Type returns the type of this action
-func (a *StartSessionAction) Type() string { return TypeStartSession }
+// NewStartSessionAction creates a new start session action
+func NewStartSessionAction(uuid flows.ActionUUID, urns []urns.URN, contacts []*flows.ContactReference, groups []*assets.GroupReference, legacyVars []string, flow *assets.FlowReference, createContact bool) *StartSessionAction {
+	return &StartSessionAction{
+		BaseAction:    NewBaseAction(TypeStartSession, uuid),
+		URNs:          urns,
+		Contacts:      contacts,
+		Groups:        groups,
+		LegacyVars:    legacyVars,
+		Flow:          flow,
+		CreateContact: createContact,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *StartSessionAction) Validate(assets flows.SessionAssets) error {
@@ -55,8 +65,8 @@ func (a *StartSessionAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs our action
-func (a *StartSessionAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
-	urnList, contactRefs, groupRefs, err := a.resolveContactsAndGroups(run, step, a.URNs, a.Contacts, a.Groups, a.LegacyVars, log)
+func (a *StartSessionAction) Execute(run flows.FlowRun, step flows.Step) error {
+	urnList, contactRefs, groupRefs, err := a.resolveContactsAndGroups(run, step, a.URNs, a.Contacts, a.Groups, a.LegacyVars)
 	if err != nil {
 		return err
 	}
@@ -66,6 +76,6 @@ func (a *StartSessionAction) Execute(run flows.FlowRun, step flows.Step, log flo
 		return err
 	}
 
-	a.log(events.NewSessionTriggeredEvent(a.Flow, urnList, contactRefs, groupRefs, a.CreateContact, runSnapshot), log)
+	a.log(run, step, events.NewSessionTriggeredEvent(a.Flow, urnList, contactRefs, groupRefs, a.CreateContact, runSnapshot))
 	return nil
 }

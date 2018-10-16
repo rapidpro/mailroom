@@ -34,8 +34,14 @@ type AddContactURNAction struct {
 	Path   string `json:"path" validate:"required"`
 }
 
-// Type returns the type of this action
-func (a *AddContactURNAction) Type() string { return TypeAddContactURN }
+// NewAddContactURNAction creates a new add URN action
+func NewAddContactURNAction(uuid flows.ActionUUID, scheme string, path string) *AddContactURNAction {
+	return &AddContactURNAction{
+		BaseAction: NewBaseAction(TypeAddContactURN, uuid),
+		Scheme:     scheme,
+		Path:       path,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *AddContactURNAction) Validate(assets flows.SessionAssets) error {
@@ -43,11 +49,11 @@ func (a *AddContactURNAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs the labeling action
-func (a *AddContactURNAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *AddContactURNAction) Execute(run flows.FlowRun, step flows.Step) error {
 	// only generate event if run has a contact
 	contact := run.Contact()
 	if contact == nil {
-		a.logError(fmt.Errorf("can't execute action in session without a contact"), log)
+		a.logError(run, step, fmt.Errorf("can't execute action in session without a contact"))
 		return nil
 	}
 
@@ -55,21 +61,22 @@ func (a *AddContactURNAction) Execute(run flows.FlowRun, step flows.Step, log fl
 
 	// if we received an error, log it although it might just be a non-expression like foo@bar.com
 	if err != nil {
-		a.logError(err, log)
+		a.logError(run, step, err)
 	}
 
 	// if we don't have a valid URN, log error
 	urn, err := urns.NewURNFromParts(a.Scheme, evaluatedPath, "", "")
 	if err != nil {
-		a.logError(fmt.Errorf("unable to add URN '%s:%s': %s", a.Scheme, evaluatedPath, err.Error()), log)
+		a.logError(run, step, fmt.Errorf("unable to add URN '%s:%s': %s", a.Scheme, evaluatedPath, err.Error()))
 		return nil
 	}
 
 	if !run.Contact().HasURN(urn) {
 		run.Contact().AddURN(urn)
-		a.log(events.NewURNAddedEvent(urn), log)
+		a.log(run, step, events.NewURNAddedEvent(urn))
+
+		a.reevaluateDynamicGroups(run, step)
 	}
 
-	a.reevaluateDynamicGroups(run, log)
 	return nil
 }

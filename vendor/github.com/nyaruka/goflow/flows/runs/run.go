@@ -10,7 +10,6 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/inputs"
 	"github.com/nyaruka/goflow/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -21,11 +20,9 @@ type flowRun struct {
 	session     flows.Session
 	environment flows.RunEnvironment
 
-	flow    flows.Flow
-	contact *flows.Contact
+	flow flows.Flow
 
 	context types.XValue
-	input   flows.Input
 	parent  flows.FlowRun
 
 	results flows.Results
@@ -33,26 +30,28 @@ type flowRun struct {
 	events  []flows.Event
 	status  flows.RunStatus
 
-	createdOn time.Time
-	expiresOn *time.Time
-	exitedOn  *time.Time
+	createdOn  time.Time
+	modifiedOn time.Time
+	expiresOn  *time.Time
+	exitedOn   *time.Time
 }
 
 // NewRun initializes a new context and flow run for the passed in flow and contact
-func NewRun(session flows.Session, flow flows.Flow, contact *flows.Contact, parent flows.FlowRun) flows.FlowRun {
+func NewRun(session flows.Session, flow flows.Flow, parent flows.FlowRun) flows.FlowRun {
+	now := utils.Now()
 	r := &flowRun{
-		uuid:      flows.RunUUID(utils.NewUUID()),
-		session:   session,
-		flow:      flow,
-		contact:   contact,
-		results:   flows.NewResults(),
-		status:    flows.RunStatusActive,
-		createdOn: utils.Now(),
+		uuid:       flows.RunUUID(utils.NewUUID()),
+		session:    session,
+		flow:       flow,
+		parent:     parent,
+		results:    flows.NewResults(),
+		status:     flows.RunStatusActive,
+		createdOn:  now,
+		modifiedOn: now,
 	}
 
 	r.environment = newRunEnvironment(session.Environment(), r)
 	r.context = newRunContext(r)
-	r.parent = parent
 
 	r.ResetExpiration(nil)
 
@@ -63,22 +62,28 @@ func (r *flowRun) UUID() flows.RunUUID               { return r.uuid }
 func (r *flowRun) Session() flows.Session            { return r.session }
 func (r *flowRun) Environment() flows.RunEnvironment { return r.environment }
 
-func (r *flowRun) Flow() flows.Flow                  { return r.flow }
-func (r *flowRun) Contact() *flows.Contact           { return r.contact }
-func (r *flowRun) SetContact(contact *flows.Contact) { r.contact = contact }
+func (r *flowRun) Flow() flows.Flow        { return r.flow }
+func (r *flowRun) Contact() *flows.Contact { return r.session.Contact() }
+func (r *flowRun) Context() types.XValue   { return r.context }
+func (r *flowRun) Events() []flows.Event   { return r.events }
 
-func (r *flowRun) Context() types.XValue  { return r.context }
 func (r *flowRun) Results() flows.Results { return r.results }
-func (r *flowRun) Events() []flows.Event  { return r.events }
+func (r *flowRun) SaveResult(result *flows.Result) {
+	r.results.Save(result)
+	r.modifiedOn = utils.Now()
+}
 
 func (r *flowRun) Exit(status flows.RunStatus) {
-	r.SetStatus(status)
 	now := utils.Now()
+
+	r.status = status
 	r.exitedOn = &now
+	r.modifiedOn = now
 }
 func (r *flowRun) Status() flows.RunStatus { return r.status }
 func (r *flowRun) SetStatus(status flows.RunStatus) {
 	r.status = status
+	r.modifiedOn = utils.Now()
 }
 
 // ParentInSession returns the parent of the run within the same session if one exists
@@ -112,41 +117,28 @@ func (r *flowRun) Ancestors() []flows.FlowRun {
 	return ancestors
 }
 
-func (r *flowRun) Input() flows.Input         { return r.input }
-func (r *flowRun) SetInput(input flows.Input) { r.input = input }
-
-func (r *flowRun) AddEvent(s flows.Step, action flows.Action, event flows.Event) {
+func (r *flowRun) LogEvent(s flows.Step, event flows.Event) {
 	if s != nil {
 		event.SetStepUUID(s.UUID())
 		r.events = append(r.events, event)
+		r.modifiedOn = utils.Now()
 	}
 
-	// only add this event to the session's event log if it didn't come from the caller
-	_, isCaller := event.(flows.CallerEvent)
-	if !isCaller {
-		r.Session().LogEvent(event)
-	}
+	r.Session().LogEvent(event)
 
 	if log.GetLevel() >= log.DebugLevel {
-		var origin string
-		if isCaller {
-			origin = "caller"
-		} else {
-			origin = "engine"
-		}
-		eventEnvelope, _ := utils.EnvelopeFromTyped(event)
-		eventJSON, _ := json.Marshal(eventEnvelope)
-		log.WithField("event_type", event.Type()).WithField("payload", string(eventJSON)).WithField("run", r.UUID()).Debugf("%s event applied", origin)
+		eventJSON, _ := json.Marshal(event)
+		log.WithField("event_type", event.Type()).WithField("payload", string(eventJSON)).WithField("run", r.UUID()).Debugf("event logged")
 	}
 }
 
-func (r *flowRun) AddError(step flows.Step, action flows.Action, err error) {
-	r.AddEvent(step, action, events.NewErrorEvent(err))
+func (r *flowRun) LogError(step flows.Step, err error) {
+	r.LogEvent(step, events.NewErrorEvent(err))
 }
 
-func (r *flowRun) AddFatalError(step flows.Step, action flows.Action, err error) {
+func (r *flowRun) LogFatalError(step flows.Step, err error) {
 	r.Exit(flows.RunStatusErrored)
-	r.AddEvent(step, action, events.NewFatalErrorEvent(err))
+	r.LogEvent(step, events.NewFatalErrorEvent(err))
 }
 
 func (r *flowRun) Path() []flows.Step { return r.path }
@@ -154,6 +146,7 @@ func (r *flowRun) CreateStep(node flows.Node) flows.Step {
 	now := utils.Now()
 	step := &step{stepUUID: flows.StepUUID(utils.NewUUID()), nodeUUID: node.UUID(), arrivedOn: now}
 	r.path = append(r.path, step)
+	r.modifiedOn = now
 	return step
 }
 
@@ -174,6 +167,7 @@ func (r *flowRun) PathLocation() (flows.Step, flows.Node, error) {
 }
 
 func (r *flowRun) CreatedOn() time.Time  { return r.createdOn }
+func (r *flowRun) ModifiedOn() time.Time { return r.modifiedOn }
 func (r *flowRun) ExpiresOn() *time.Time { return r.expiresOn }
 func (r *flowRun) ResetExpiration(from *time.Time) {
 	if r.Flow().ExpireAfterMinutes() >= 0 {
@@ -186,6 +180,7 @@ func (r *flowRun) ResetExpiration(from *time.Time) {
 		expiresOn := from.Add(expiresAfterMinutes * time.Minute)
 
 		r.expiresOn = &expiresOn
+		r.modifiedOn = utils.Now()
 	}
 
 	if r.ParentInSession() != nil {
@@ -205,16 +200,48 @@ func (r *flowRun) EvaluateTemplateAsString(template string, urlEncode bool) (str
 	return excellent.EvaluateTemplateAsString(r.Environment(), r.Context(), template, urlEncode, RunContextTopLevels)
 }
 
+// get the ordered list of languages to be used for localization in this run
+func (r *flowRun) getLanguages() []utils.Language {
+	// TODO cache this this?
+
+	contact := r.Contact()
+	languages := make([]utils.Language, 0, 3)
+
+	// if contact has a allowed language, it takes priority
+	if contact != nil && contact.Language() != utils.NilLanguage {
+		for _, l := range r.Environment().AllowedLanguages() {
+			if l == contact.Language() {
+				languages = append(languages, contact.Language())
+				break
+			}
+		}
+	}
+
+	// next we include the default language if it's different to the contact language
+	defaultLanguage := r.Environment().DefaultLanguage()
+	if defaultLanguage != utils.NilLanguage && defaultLanguage != contact.Language() {
+		languages = append(languages, defaultLanguage)
+	}
+
+	// finally we include the flow native language if it isn't an allowed language - because it's the only
+	// one guaranteed to have translations
+	return append(languages, r.flow.Language())
+}
+
 func (r *flowRun) GetText(uuid utils.UUID, key string, native string) string {
 	textArray := r.GetTextArray(uuid, key, []string{native})
 	return textArray[0]
 }
 
 func (r *flowRun) GetTextArray(uuid utils.UUID, key string, native []string) []string {
-	return r.GetTranslatedTextArray(uuid, key, native, r.environment.Languages())
+	return r.GetTranslatedTextArray(uuid, key, native, r.getLanguages())
 }
 
-func (r *flowRun) GetTranslatedTextArray(uuid utils.UUID, key string, native []string, languages utils.LanguageList) []string {
+func (r *flowRun) GetTranslatedTextArray(uuid utils.UUID, key string, native []string, languages []utils.Language) []string {
+	if languages == nil {
+		languages = r.getLanguages()
+	}
+
 	for _, lang := range languages {
 		if lang == r.Flow().Language() {
 			return native
@@ -250,8 +277,6 @@ func (r *flowRun) Resolve(env utils.Environment, key string) types.XValue {
 		return r.Contact()
 	case "flow":
 		return r.Flow()
-	case "input":
-		return r.Input()
 	case "status":
 		return types.NewXText(string(r.Status()))
 	case "results":
@@ -294,77 +319,69 @@ var _ flows.RunSummary = (*flowRun)(nil)
 //------------------------------------------------------------------------------------------
 
 type runEnvelope struct {
-	UUID   flows.RunUUID          `json:"uuid" validate:"required,uuid4"`
-	Flow   *assets.FlowReference  `json:"flow" validate:"required,dive"`
-	Path   []*step                `json:"path" validate:"dive"`
-	Events []*utils.TypedEnvelope `json:"events,omitempty"`
+	UUID       flows.RunUUID         `json:"uuid" validate:"required,uuid4"`
+	Flow       *assets.FlowReference `json:"flow" validate:"required,dive"`
+	Path       []*step               `json:"path" validate:"dive"`
+	Events     []json.RawMessage     `json:"events,omitempty"`
+	Results    flows.Results         `json:"results,omitempty" validate:"omitempty,dive"`
+	Status     flows.RunStatus       `json:"status" validate:"required"`
+	ParentUUID flows.RunUUID         `json:"parent_uuid,omitempty" validate:"omitempty,uuid4"`
 
-	Status     flows.RunStatus `json:"status"`
-	ParentUUID flows.RunUUID   `json:"parent_uuid,omitempty" validate:"omitempty,uuid4"`
-
-	Results flows.Results        `json:"results,omitempty" validate:"omitempty,dive"`
-	Input   *utils.TypedEnvelope `json:"input,omitempty" validate:"omitempty,dive"`
-	Webhook *flows.WebhookCall   `json:"webhook,omitempty" validate:"omitempty,dive"`
-
-	CreatedOn time.Time  `json:"created_on"`
-	ExpiresOn *time.Time `json:"expires_on"`
-	ExitedOn  *time.Time `json:"exited_on"`
+	CreatedOn  time.Time  `json:"created_on" validate:"required"`
+	ModifiedOn time.Time  `json:"modified_on" validate:"required"`
+	ExpiresOn  *time.Time `json:"expires_on"`
+	ExitedOn   *time.Time `json:"exited_on"`
 }
 
 // ReadRun decodes a run from the passed in JSON. Parent run UUID is returned separately as the
 // run in question might be loaded yet from the session.
 func ReadRun(session flows.Session, data json.RawMessage) (flows.FlowRun, error) {
-	r := &flowRun{}
-	var envelope runEnvelope
+	e := &runEnvelope{}
 	var err error
 
-	if err = utils.UnmarshalAndValidate(data, &envelope); err != nil {
+	if err = utils.UnmarshalAndValidate(data, e); err != nil {
 		return nil, fmt.Errorf("unable to read run: %s", err)
 	}
 
-	r.session = session
-	r.contact = session.Contact()
-	r.uuid = envelope.UUID
-	r.status = envelope.Status
-	r.createdOn = envelope.CreatedOn
-	r.expiresOn = envelope.ExpiresOn
-	r.exitedOn = envelope.ExitedOn
+	r := &flowRun{
+		session:    session,
+		uuid:       e.UUID,
+		status:     e.Status,
+		createdOn:  e.CreatedOn,
+		modifiedOn: e.ModifiedOn,
+		expiresOn:  e.ExpiresOn,
+		exitedOn:   e.ExitedOn,
+	}
 
 	// lookup flow
-	if r.flow, err = session.Assets().Flows().Get(envelope.Flow.UUID); err != nil {
-		return nil, fmt.Errorf("unable to load flow[uuid=%s]: %s", envelope.Flow.UUID, err)
+	if r.flow, err = session.Assets().Flows().Get(e.Flow.UUID); err != nil {
+		return nil, fmt.Errorf("unable to load flow[uuid=%s]: %s", e.Flow.UUID, err)
 	}
 
 	// lookup parent run
-	if envelope.ParentUUID != "" {
-		if r.parent, err = session.GetRun(envelope.ParentUUID); err != nil {
+	if e.ParentUUID != "" {
+		if r.parent, err = session.GetRun(e.ParentUUID); err != nil {
 			return nil, err
 		}
 	}
 
-	if envelope.Input != nil {
-		if r.input, err = inputs.ReadInput(session, envelope.Input); err != nil {
-			return nil, fmt.Errorf("unable to read input[type=%s]: %s", envelope.Input.Type, err)
-		}
-	}
-
-	if envelope.Results != nil {
-		r.results = envelope.Results
+	if e.Results != nil {
+		r.results = e.Results
 	} else {
 		r.results = flows.NewResults()
 	}
 
 	// read in our path
-	r.path = make([]flows.Step, len(envelope.Path))
-	for i, step := range envelope.Path {
+	r.path = make([]flows.Step, len(e.Path))
+	for i, step := range e.Path {
 		r.path[i] = step
 	}
 
 	// read in our events
-	r.events = make([]flows.Event, len(envelope.Events))
+	r.events = make([]flows.Event, len(e.Events))
 	for i := range r.events {
-		if r.events[i], err = events.ReadEvent(envelope.Events[i]); err != nil {
-			return nil, fmt.Errorf("unable to read event[type=%s]: %s", envelope.Events[i].Type, err)
+		if r.events[i], err = events.ReadEvent(e.Events[i]); err != nil {
+			return nil, fmt.Errorf("unable to read event: %s", err)
 		}
 	}
 
@@ -377,35 +394,34 @@ func ReadRun(session flows.Session, data json.RawMessage) (flows.FlowRun, error)
 
 // MarshalJSON marshals this flow run into JSON
 func (r *flowRun) MarshalJSON() ([]byte, error) {
-	var re runEnvelope
 	var err error
 
-	re.UUID = r.uuid
-	re.Flow = r.flow.Reference()
-	re.Status = r.status
-	re.CreatedOn = r.createdOn
-	re.ExpiresOn = r.expiresOn
-	re.ExitedOn = r.exitedOn
-	re.Results = r.results
+	e := &runEnvelope{
+		UUID:       r.uuid,
+		Flow:       r.flow.Reference(),
+		Status:     r.status,
+		CreatedOn:  r.createdOn,
+		ModifiedOn: r.modifiedOn,
+		ExpiresOn:  r.expiresOn,
+		ExitedOn:   r.exitedOn,
+		Results:    r.results,
+	}
 
 	if r.parent != nil {
-		re.ParentUUID = r.parent.UUID()
+		e.ParentUUID = r.parent.UUID()
 	}
 
-	re.Input, err = utils.EnvelopeFromTyped(r.input)
-	if err != nil {
-		return nil, err
-	}
-
-	re.Path = make([]*step, len(r.path))
+	e.Path = make([]*step, len(r.path))
 	for i, s := range r.path {
-		re.Path[i] = s.(*step)
+		e.Path[i] = s.(*step)
 	}
 
-	re.Events, err = events.EventsToEnvelopes(r.events)
-	if err != nil {
-		return nil, err
+	e.Events = make([]json.RawMessage, len(r.events))
+	for i := range r.events {
+		if e.Events[i], err = json.Marshal(r.events[i]); err != nil {
+			return nil, err
+		}
 	}
 
-	return json.Marshal(re)
+	return json.Marshal(e)
 }

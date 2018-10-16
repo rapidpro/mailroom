@@ -33,8 +33,13 @@ type SetContactChannelAction struct {
 	Channel *assets.ChannelReference `json:"channel"`
 }
 
-// Type returns the type of this action
-func (a *SetContactChannelAction) Type() string { return TypeSetContactChannel }
+// NewSetContactChannelAction creates a new set channel action
+func NewSetContactChannelAction(uuid flows.ActionUUID, channel *assets.ChannelReference) *SetContactChannelAction {
+	return &SetContactChannelAction{
+		BaseAction: NewBaseAction(TypeSetContactChannel, uuid),
+		Channel:    channel,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *SetContactChannelAction) Validate(assets flows.SessionAssets) error {
@@ -42,9 +47,9 @@ func (a *SetContactChannelAction) Validate(assets flows.SessionAssets) error {
 	return err
 }
 
-func (a *SetContactChannelAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *SetContactChannelAction) Execute(run flows.FlowRun, step flows.Step) error {
 	if run.Contact() == nil {
-		a.logError(fmt.Errorf("can't execute action in session without a contact"), log)
+		a.logError(run, step, fmt.Errorf("can't execute action in session without a contact"))
 		return nil
 	}
 
@@ -55,7 +60,7 @@ func (a *SetContactChannelAction) Execute(run flows.FlowRun, step flows.Step, lo
 
 	if run.Contact().PreferredChannel() != channel {
 		run.Contact().UpdatePreferredChannel(channel)
-		a.log(events.NewContactChannelChangedEvent(a.Channel), log)
+		a.log(run, step, events.NewContactChannelChangedEvent(a.Channel))
 	}
 	return nil
 }

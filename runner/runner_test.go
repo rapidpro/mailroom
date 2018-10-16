@@ -8,7 +8,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
-	_ "github.com/nyaruka/mailroom/handlers"
+	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
@@ -64,7 +64,7 @@ func TestCampaignStarts(t *testing.T) {
 	models.AssertContactRunsPresent(t, db, contacts, models.FlowID(31),
 		`AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-		 AND current_node_uuid = 'b003fd70-aafd-4ccc-bdb5-4f70e870cd64'
+		 AND current_node_uuid = '089df97c-bb0f-4dc0-9774-b60e3a77fe72'
 		 AND session_id IS NOT NULL`,
 	)
 	models.AssertContactMessagesPresent(t, db, contacts,

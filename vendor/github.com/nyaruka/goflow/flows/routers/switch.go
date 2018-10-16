@@ -37,15 +37,12 @@ type SwitchRouter struct {
 
 func NewSwitchRouter(defaultExit flows.ExitUUID, operand string, cases []Case, resultName string) *SwitchRouter {
 	return &SwitchRouter{
-		BaseRouter: BaseRouter{ResultName_: resultName},
+		BaseRouter: newBaseRouter(TypeSwitch, resultName),
 		Default:    defaultExit,
 		Operand:    operand,
 		Cases:      cases,
 	}
 }
-
-// Type returns the type of this router
-func (r *SwitchRouter) Type() string { return TypeSwitch }
 
 // Validate validates the arguments for this router
 func (r *SwitchRouter) Validate(exits []flows.Exit) error {
@@ -82,7 +79,7 @@ func (r *SwitchRouter) PickRoute(run flows.FlowRun, exits []flows.Exit, step flo
 	// first evaluate our operand
 	operand, err := run.EvaluateTemplate(r.Operand)
 	if err != nil {
-		run.AddError(step, nil, err)
+		run.LogError(step, err)
 	}
 
 	var operandAsStr *string
@@ -113,7 +110,7 @@ func (r *SwitchRouter) PickRoute(run flows.FlowRun, exits []flows.Exit, step flo
 			test := localizedArgs[i]
 			arg, err := run.EvaluateTemplate(test)
 			if err != nil {
-				run.AddError(step, nil, err)
+				run.LogError(step, err)
 			}
 			args = append(args, arg)
 		}
@@ -145,7 +142,7 @@ func (r *SwitchRouter) PickRoute(run flows.FlowRun, exits []flows.Exit, step flo
 		// evaluate our operand as a string
 		value, xerr := types.ToXText(env, operand)
 		if xerr != nil {
-			run.AddError(step, nil, xerr)
+			run.LogError(step, xerr)
 		}
 
 		return operandAsStr, flows.NewRoute(r.Default, value.Native(), nil), nil

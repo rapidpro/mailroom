@@ -13,6 +13,11 @@ func init() {
 	RegisterType(TypeSendMsg, func() flows.Action { return &SendMsgAction{} })
 }
 
+type msgDestination struct {
+	urn     urns.URN
+	channel *flows.Channel
+}
+
 // TypeSendMsg is the type for the send message action
 const TypeSendMsg string = "send_msg"
 
@@ -39,13 +44,16 @@ type SendMsgAction struct {
 	AllURNs      bool     `json:"all_urns,omitempty"`
 }
 
-type msgDestination struct {
-	urn     urns.URN
-	channel *flows.Channel
+// NewSendMsgAction creates a new send msg action
+func NewSendMsgAction(uuid flows.ActionUUID, text string, attachments []string, quickReplies []string, allURNs bool) *SendMsgAction {
+	return &SendMsgAction{
+		BaseAction:   NewBaseAction(TypeSendMsg, uuid),
+		Text:         text,
+		Attachments:  attachments,
+		QuickReplies: quickReplies,
+		AllURNs:      allURNs,
+	}
 }
-
-// Type returns the type of this action
-func (a *SendMsgAction) Type() string { return TypeSendMsg }
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *SendMsgAction) Validate(assets flows.SessionAssets) error {
@@ -53,13 +61,13 @@ func (a *SendMsgAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute runs this action
-func (a *SendMsgAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *SendMsgAction) Execute(run flows.FlowRun, step flows.Step) error {
 	if run.Contact() == nil {
-		a.logError(fmt.Errorf("can't execute action in session without a contact"), log)
+		a.logError(run, step, fmt.Errorf("can't execute action in session without a contact"))
 		return nil
 	}
 
-	evaluatedText, evaluatedAttachments, evaluatedQuickReplies := a.evaluateMessage(run, run.Environment().Languages(), a.Text, a.Attachments, a.QuickReplies, log)
+	evaluatedText, evaluatedAttachments, evaluatedQuickReplies := a.evaluateMessage(run, step, nil, a.Text, a.Attachments, a.QuickReplies)
 
 	channels := run.Session().Assets().Channels()
 	destinations := []msgDestination{}
@@ -84,7 +92,7 @@ func (a *SendMsgAction) Execute(run flows.FlowRun, step flows.Step, log flows.Ev
 		}
 
 		msg := flows.NewMsgOut(dest.urn, channelRef, evaluatedText, evaluatedAttachments, evaluatedQuickReplies)
-		a.log(events.NewMsgCreatedEvent(msg), log)
+		a.log(run, step, events.NewMsgCreatedEvent(msg))
 	}
 
 	return nil

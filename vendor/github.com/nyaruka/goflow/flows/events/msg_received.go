@@ -2,7 +2,6 @@ package events
 
 import (
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/inputs"
 )
 
 func init() {
@@ -37,39 +36,9 @@ type MsgReceivedEvent struct {
 // NewMsgReceivedEvent creates a new incoming msg event for the passed in channel, URN and text
 func NewMsgReceivedEvent(msg *flows.MsgIn) *MsgReceivedEvent {
 	return &MsgReceivedEvent{
-		BaseEvent: NewBaseEvent(),
+		BaseEvent: NewBaseEvent(TypeMsgReceived),
 		Msg:       *msg,
 	}
 }
 
-// Type returns the type of this event
-func (e *MsgReceivedEvent) Type() string { return TypeMsgReceived }
-
-// Validate validates our event is valid and has all the assets it needs
-func (e *MsgReceivedEvent) Validate(assets flows.SessionAssets) error {
-	if e.Msg.Channel() != nil {
-		_, err := assets.Channels().Get(e.Msg.Channel().UUID)
-		return err
-	}
-	return nil
-}
-
-// Apply applies this event to the given run
-func (e *MsgReceivedEvent) Apply(run flows.FlowRun) error {
-	var channel *flows.Channel
-	var err error
-	if e.Msg.Channel() != nil {
-		channel, err = run.Session().Assets().Channels().Get(e.Msg.Channel().UUID)
-		if err != nil {
-			return err
-		}
-	}
-
-	// update this run's input
-	input := inputs.NewMsgInput(flows.InputUUID(e.Msg.UUID()), channel, e.CreatedOn(), e.Msg.URN(), e.Msg.Text(), e.Msg.Attachments())
-	run.SetInput(input)
-	run.ResetExpiration(nil)
-	return nil
-}
-
-var _ flows.CallerEvent = (*MsgReceivedEvent)(nil)
+var _ flows.Event = (*MsgReceivedEvent)(nil)

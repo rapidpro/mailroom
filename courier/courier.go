@@ -47,7 +47,7 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 
 	for _, msg := range msgs {
 		// no channel, continue
-		if msg.ChannelUUID == "" {
+		if msg.ChannelUUID() == "" {
 			continue
 		}
 
@@ -77,7 +77,7 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 			batch = []*models.Msg{msg}
 
 			priority = defaultPriority
-			if msg.HighPriority {
+			if msg.HighPriority() {
 				priority = highPriority
 			}
 		}

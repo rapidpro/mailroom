@@ -9,7 +9,8 @@ type MailroomConfig struct {
 	Version    string `help:"the version of this mailroom install"`
 	LogLevel   string `help:"the logging level courier should use"`
 
-	BatchWorkers int `help:"the number of go routines that will be used to handle batch events"`
+	BatchWorkers   int `help:"the number of go routines that will be used to handle batch events"`
+	HandlerWorkers int `help:"the number of go routines that will be used to handle messages"`
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
@@ -20,11 +21,12 @@ type MailroomConfig struct {
 // NewMailroomConfig returns a new default configuration object
 func NewMailroomConfig() *MailroomConfig {
 	return &MailroomConfig{
-		DB:           "postgres://temba@localhost/temba?sslmode=disable",
-		DBPoolSize:   8,
-		Redis:        "redis://localhost:6379/0",
-		BatchWorkers: 6,
-		LogLevel:     "error",
-		Version:      "Dev",
+		DB:             "postgres://temba@localhost/temba?sslmode=disable",
+		DBPoolSize:     8,
+		Redis:          "redis://localhost:6379/0",
+		BatchWorkers:   4,
+		HandlerWorkers: 128,
+		LogLevel:       "error",
+		Version:        "Dev",
 	}
 }

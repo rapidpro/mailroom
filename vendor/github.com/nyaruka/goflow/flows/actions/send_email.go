@@ -39,8 +39,15 @@ type SendEmailAction struct {
 	Body      string   `json:"body" validate:"required"`
 }
 
-// Type returns the type of this action
-func (a *SendEmailAction) Type() string { return TypeSendEmail }
+// NewSendEmailAction creates a new send email action
+func NewSendEmailAction(uuid flows.ActionUUID, addresses []string, subject string, body string) *SendEmailAction {
+	return &SendEmailAction{
+		BaseAction: NewBaseAction(TypeSendEmail, uuid),
+		Addresses:  addresses,
+		Subject:    subject,
+		Body:       body,
+	}
+}
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *SendEmailAction) Validate(assets flows.SessionAssets) error {
@@ -48,13 +55,13 @@ func (a *SendEmailAction) Validate(assets flows.SessionAssets) error {
 }
 
 // Execute creates the email events
-func (a *SendEmailAction) Execute(run flows.FlowRun, step flows.Step, log flows.EventLog) error {
+func (a *SendEmailAction) Execute(run flows.FlowRun, step flows.Step) error {
 	subject, err := run.EvaluateTemplateAsString(a.Subject, false)
 	if err != nil {
-		a.logError(err, log)
+		a.logError(run, step, err)
 	}
 	if subject == "" {
-		a.logError(fmt.Errorf("email subject evaluated to empty string, skipping"), log)
+		a.logError(run, step, fmt.Errorf("email subject evaluated to empty string, skipping"))
 		return nil
 	}
 
@@ -63,10 +70,10 @@ func (a *SendEmailAction) Execute(run flows.FlowRun, step flows.Step, log flows.
 
 	body, err := run.EvaluateTemplateAsString(a.Body, false)
 	if err != nil {
-		a.logError(err, log)
+		a.logError(run, step, err)
 	}
 	if body == "" {
-		a.logError(fmt.Errorf("email body evaluated to empty string, skipping"), log)
+		a.logError(run, step, fmt.Errorf("email body evaluated to empty string, skipping"))
 		return nil
 	}
 
@@ -75,10 +82,10 @@ func (a *SendEmailAction) Execute(run flows.FlowRun, step flows.Step, log flows.
 	for _, address := range a.Addresses {
 		evaluatedAddress, err := run.EvaluateTemplateAsString(address, false)
 		if err != nil {
-			a.logError(err, log)
+			a.logError(run, step, err)
 		}
 		if evaluatedAddress == "" {
-			a.logError(fmt.Errorf("email address evaluated to empty string, skipping"), log)
+			a.logError(run, step, fmt.Errorf("email address evaluated to empty string, skipping"))
 			continue
 		}
 
@@ -91,7 +98,7 @@ func (a *SendEmailAction) Execute(run flows.FlowRun, step flows.Step, log flows.
 	}
 
 	if len(evaluatedAddresses) > 0 {
-		a.log(events.NewEmailCreatedEvent(evaluatedAddresses, subject, body), log)
+		a.log(run, step, events.NewEmailCreatedEvent(evaluatedAddresses, subject, body))
 	}
 
 	return nil

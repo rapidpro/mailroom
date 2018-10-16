@@ -23,7 +23,7 @@ func (f *Field) Asset() assets.Field { return f.Field }
 
 // Value represents a value in each of the field types
 type Value struct {
-	Text     types.XText      `json:"text"`
+	Text     types.XText      `json:"text" validate:"required"`
 	Datetime *types.XDateTime `json:"datetime,omitempty"`
 	Number   *types.XNumber   `json:"number,omitempty"`
 	State    LocationPath     `json:"state,omitempty"`
@@ -43,27 +43,39 @@ func NewValue(text types.XText, datetime *types.XDateTime, number *types.XNumber
 	}
 }
 
+// Equals determines whether two values are equal
+func (v *Value) Equals(o *Value) bool {
+	if v == nil && o == nil {
+		return true
+	}
+	if (v == nil && o != nil) || (v != nil && o == nil) {
+		return false
+	}
+
+	dateEqual := (v.Datetime == nil && o.Datetime == nil) || (v.Datetime != nil && o.Datetime != nil && v.Datetime.Equals(*o.Datetime))
+	numEqual := (v.Number == nil && o.Number == nil) || (v.Number != nil && o.Number != nil && v.Number.Equals(*o.Number))
+
+	return v.Text.Equals(o.Text) && dateEqual && numEqual && v.State == o.State && v.District == o.District && v.Ward == o.Ward
+}
+
 // FieldValue represents a field and a set of values for that field
 type FieldValue struct {
 	field *Field
 	*Value
 }
 
-// NewFieldValue creates a new field value with the passed in values
-func NewFieldValue(field *Field, text types.XText, datetime *types.XDateTime, number *types.XNumber, state LocationPath, district LocationPath, ward LocationPath) *FieldValue {
-	return &FieldValue{
-		field: field,
-		Value: NewValue(text, datetime, number, state, district, ward),
-	}
+// NewFieldValue creates a new field value
+func NewFieldValue(field *Field, value *Value) *FieldValue {
+	return &FieldValue{field: field, Value: value}
 }
 
-// IsEmpty returns whether this field value is set for any type
-func (v *FieldValue) IsEmpty() bool {
-	return v.Text.Empty() && v.Datetime == nil && v.Number == nil && v.State == "" && v.District == "" && v.Ward == ""
-}
-
-// TypedValue returns the value in its proper type
+// TypedValue returns the value in its proper type or nil if there is no value in that type
 func (v *FieldValue) TypedValue() types.XValue {
+	// the typed value of no value is nil
+	if v == nil {
+		return nil
+	}
+
 	switch v.field.Type() {
 	case assets.FieldTypeText:
 		return v.Text
@@ -76,11 +88,17 @@ func (v *FieldValue) TypedValue() types.XValue {
 			return *v.Number
 		}
 	case assets.FieldTypeState:
-		return v.State
+		if v.State != "" {
+			return v.State
+		}
 	case assets.FieldTypeDistrict:
-		return v.District
+		if v.District != "" {
+			return v.District
+		}
 	case assets.FieldTypeWard:
-		return v.Ward
+		if v.Ward != "" {
+			return v.Ward
+		}
 	}
 	return nil
 }
@@ -99,11 +117,7 @@ func (v *FieldValue) Describe() string { return "field value" }
 
 // Reduce is called when this object needs to be reduced to a primitive
 func (v *FieldValue) Reduce(env utils.Environment) types.XPrimitive {
-	typed := v.TypedValue()
-	if typed != nil {
-		return typed.Reduce(env)
-	}
-	return nil
+	return types.Reduce(env, v.TypedValue())
 }
 
 // ToXJSON is called when this type is passed to @(json(...))
@@ -115,22 +129,34 @@ func (v *FieldValue) ToXJSON(env utils.Environment) types.XText {
 var _ types.XValue = (*FieldValue)(nil)
 var _ types.XResolvable = (*FieldValue)(nil)
 
-// EmptyFieldValue is used when a contact doesn't have a value set for a field
-var EmptyFieldValue = &FieldValue{}
-
 // FieldValues is the set of all field values for a contact
 type FieldValues map[string]*FieldValue
 
 // NewFieldValues creates a new field value map
-func NewFieldValues(a SessionAssets, values map[assets.Field]*Value) (FieldValues, error) {
-	fieldValues := make(FieldValues, len(values))
-	for asset, val := range values {
-		field, err := a.Fields().Get(asset.Key())
-		if err != nil {
-			return nil, err
+func NewFieldValues(a SessionAssets, values map[string]*Value, strict bool) (FieldValues, error) {
+	allFields := a.Fields().All()
+	fieldValues := make(FieldValues, len(allFields))
+	for _, field := range allFields {
+		value := values[field.Key()]
+		if value != nil {
+			if value.Text.Empty() {
+				return nil, fmt.Errorf("field values can't be empty")
+			}
+			fieldValues[field.Key()] = NewFieldValue(field, value)
+		} else {
+			fieldValues[field.Key()] = nil
 		}
-		fieldValues[field.Key()] = &FieldValue{field: field, Value: val}
 	}
+
+	if strict {
+		for key := range values {
+			_, valid := fieldValues[key]
+			if !valid {
+				return nil, fmt.Errorf("invalid field key: %s", key)
+			}
+		}
+	}
+
 	return fieldValues, nil
 }
 
@@ -143,32 +169,35 @@ func (f FieldValues) clone() FieldValues {
 	return clone
 }
 
-func (f FieldValues) getValue(key string) *FieldValue {
-	return f[key]
+// Get gets the field value set for the given field
+func (f FieldValues) Get(field *Field) *Value {
+	fieldVal := f[field.Key()]
+	if fieldVal != nil {
+		return fieldVal.Value
+	}
+	return nil
 }
 
-func (f FieldValues) setValue(env RunEnvironment, fields *FieldAssets, key string, rawValue string) (*Value, error) {
-	// lookup the actual field object for this key
-	field, err := fields.Get(key)
-	if err != nil {
-		return nil, err
-	}
+// Clear clears the field value set for the given field
+func (f FieldValues) Clear(field *Field) {
+	delete(f, field.Key())
+}
 
+// Set sets the field value set for the given field
+func (f FieldValues) Set(env utils.Environment, field *Field, rawValue string, fields *FieldAssets) *Value {
+	runEnv := env.(RunEnvironment)
 	var value *Value
 
 	// if raw value is empty string, set an empty value, other parse into different types
 	if rawValue == "" {
-		value = &Value{}
-	} else {
-		value = f.parseValue(env, fields, field, rawValue)
+		f.Clear(field)
+		return nil
 	}
 
-	fieldValue := &FieldValue{
-		field: field,
-		Value: value,
-	}
-	f[key] = fieldValue
-	return fieldValue.Value, nil
+	value = f.parseValue(runEnv, fields, field, rawValue)
+	fieldValue := NewFieldValue(field, value)
+	f[field.Key()] = fieldValue
+	return fieldValue.Value
 }
 
 func (f FieldValues) parseValue(env RunEnvironment, fields *FieldAssets, field *Field, rawValue string) *Value {
@@ -237,11 +266,17 @@ func (f FieldValues) parseValue(env RunEnvironment, fields *FieldAssets, field *
 }
 
 func (f FieldValues) getFirstLocationValue(env RunEnvironment, fields *FieldAssets, valueType assets.FieldType) *utils.Location {
+	// do we have a field of this type?
 	field := fields.FirstOfType(valueType)
 	if field == nil {
 		return nil
 	}
+	// does this contact have a value for that field?
 	value := f[field.Key()].TypedValue()
+	if value == nil {
+		return nil
+	}
+
 	location, err := env.LookupLocation(value.(LocationPath))
 	if err != nil {
 		return nil
@@ -249,9 +284,15 @@ func (f FieldValues) getFirstLocationValue(env RunEnvironment, fields *FieldAsse
 	return location
 }
 
-// Length is called to get the length of this object
+// Length is called to get the length of this object which in this case is the number of set values
 func (f FieldValues) Length() int {
-	return len(f)
+	count := 0
+	for _, v := range f {
+		if v != nil {
+			count++
+		}
+	}
+	return count
 }
 
 // Resolve resolves the given key when this set of field values is referenced in an expression
