@@ -102,39 +102,53 @@ func TestBatchStart(t *testing.T) {
 
 	// and our batch object
 	contactIDs := []flows.ContactID{42, 43}
-	start := models.NewFlowStart(
-		models.NewStartID(1), models.OrgID(1), models.FlowID(31),
-		nil, contactIDs, true, true,
-	)
-	batch := start.CreateBatch(contactIDs)
-	batch.SetIsLast(true)
 
-	sessions, err := StartFlowBatch(ctx, db, rp, batch)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(sessions))
+	tcs := []struct {
+		Restart       bool
+		IncludeActive bool
+		Count         int
+		TotalCount    int
+	}{
+		{true, true, 2, 2},
+		{false, true, 0, 2},
+		{false, false, 0, 2},
+		{true, false, 2, 4},
+	}
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
-		 AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
-		[]interface{}{pq.Array(contactIDs)}, 2,
-	)
+	for i, tc := range tcs {
+		start := models.NewFlowStart(
+			models.NewStartID(1), models.OrgID(1), models.FlowID(31),
+			nil, contactIDs, tc.Restart, tc.IncludeActive,
+		)
+		batch := start.CreateBatch(contactIDs)
+		batch.SetIsLast(true)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
-		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-		 AND current_node_uuid = '089df97c-bb0f-4dc0-9774-b60e3a77fe72'
-		 AND session_id IS NOT NULL`,
-		[]interface{}{pq.Array(contactIDs), 31}, 2,
-	)
+		sessions, err := StartFlowBatch(ctx, db, rp, batch)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.Count, len(sessions))
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
-		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
-		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = 2`,
-		[]interface{}{pq.Array(contactIDs)}, 2,
-	)
+		testsuite.AssertQueryCount(t, db,
+			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
+			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+			[]interface{}{pq.Array(contactIDs)}, tc.TotalCount, "%d: unexpected number of sessions", i,
+		)
 
+		testsuite.AssertQueryCount(t, db,
+			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
+			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
+			AND current_node_uuid = '089df97c-bb0f-4dc0-9774-b60e3a77fe72'
+			AND session_id IS NOT NULL`,
+			[]interface{}{pq.Array(contactIDs), 31}, tc.TotalCount, "%d: unexpected number of runs", i,
+		)
+
+		testsuite.AssertQueryCount(t, db,
+			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
+			AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
+			AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = 2`,
+			[]interface{}{pq.Array(contactIDs)}, tc.TotalCount, "%d: unexpected number of messages", i,
+		)
+	}
 }
 
 func TestContactRuns(t *testing.T) {
@@ -186,10 +200,12 @@ func TestContactRuns(t *testing.T) {
 		SessionStatus string
 		RunActive     bool
 		Substring     string
+		PathLength    int
+		EventLength   int
 	}{
-		{"Red", "W", true, "%I like Red too%"},
-		{"Mutzig", "W", true, "%they made red Mutzig%"},
-		{"Luke", "C", false, "%Thanks Luke%"},
+		{"Red", "W", true, "%I like Red too%", 4, 3},
+		{"Mutzig", "W", true, "%they made red Mutzig%", 6, 5},
+		{"Luke", "C", false, "%Thanks Luke%", 7, 7},
 	}
 
 	for i, tc := range tcs {
@@ -209,8 +225,10 @@ func TestContactRuns(t *testing.T) {
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-			 AND is_active = $3 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL`,
-			[]interface{}{contact.ID(), flow.ID(), tc.RunActive}, 1, "%d: didn't find expected run", i,
+			 AND is_active = $3 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
+			 AND json_array_length(path::json) = $4 AND json_array_length(events::json) = $5
+			 AND session_id IS NOT NULL AND expires_on IS NOT NULL`,
+			[]interface{}{contact.ID(), flow.ID(), tc.RunActive, tc.PathLength, tc.EventLength}, 1, "%d: didn't find expected run", i,
 		)
 
 		testsuite.AssertQueryCount(t, db,
