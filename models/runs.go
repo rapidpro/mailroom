@@ -583,6 +583,11 @@ func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error)
 		if keptEvents[e.Type()] {
 			filteredEvents = append(filteredEvents, e)
 		}
+
+		// mark ourselves as responded if we received a message
+		if e.Type() == events.TypeMsgReceived {
+			run.Responded = true
+		}
 	}
 	eventJSON, err := json.Marshal(filteredEvents)
 	if err != nil {
@@ -603,7 +608,6 @@ func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error)
 		run.ParentUUID = &uuid
 	}
 
-	// TODO: set responded (always false for now)
 	return run, nil
 }
 

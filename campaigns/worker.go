@@ -59,7 +59,10 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 		// unmark all these fires as fires so they can retry
 		rc := rp.Get()
 		for _, id := range eventTask.FireIDs {
-			marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", id))
+			rerr := marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", id))
+			if rerr != nil {
+				log.WithError(rerr).WithField("fire_id", id).Error("error unmarking campaign fire")
+			}
 		}
 		rc.Close()
 

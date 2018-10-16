@@ -1,25 +1,24 @@
 package runner
 
 import (
-	"os"
 	"testing"
 	"time"
 
+	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/utils"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(m *testing.M) {
-	testsuite.Reset()
-	os.Exit(m.Run())
-}
-
 func TestCampaignStarts(t *testing.T) {
+	testsuite.Reset()
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
@@ -58,18 +57,26 @@ func TestCampaignStarts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
 
-	models.AssertContactSessionsPresent(t, db, contacts,
-		`AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
+		 AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+		[]interface{}{pq.Array(contacts)}, 2,
 	)
-	models.AssertContactRunsPresent(t, db, contacts, models.FlowID(31),
-		`AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
+		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND current_node_uuid = '089df97c-bb0f-4dc0-9774-b60e3a77fe72'
 		 AND session_id IS NOT NULL`,
+		[]interface{}{pq.Array(contacts), 31}, 2,
 	)
-	models.AssertContactMessagesPresent(t, db, contacts,
-		`AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
+		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
 		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = 2`,
+		[]interface{}{pq.Array(contacts)}, 2,
 	)
 
 	testsuite.AssertQueryCount(t, db,
@@ -77,4 +84,138 @@ func TestCampaignStarts(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN (42,43) AND event_id = 1`, nil, 2)
+}
+
+func TestBatchStart(t *testing.T) {
+	testsuite.Reset()
+	db := testsuite.DB()
+	ctx := testsuite.CTX()
+	rp := testsuite.RP()
+
+	// delete our android channel, we want our messages to be sent through courier
+	db.MustExec(`DELETE FROM channels_channel where id = 1;`)
+
+	// create a start object
+	db.MustExec(
+		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, contact_count, status, flow_id, created_by_id, modified_by_id)
+		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', 31, 1, 1)`, utils.NewUUID())
+
+	// and our batch object
+	contactIDs := []flows.ContactID{42, 43}
+	start := models.NewFlowStart(
+		models.NewStartID(1), models.OrgID(1), models.FlowID(31),
+		nil, contactIDs, true, true,
+	)
+	batch := start.CreateBatch(contactIDs)
+	batch.SetIsLast(true)
+
+	sessions, err := StartFlowBatch(ctx, db, rp, batch)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(sessions))
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
+		 AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+		[]interface{}{pq.Array(contactIDs)}, 2,
+	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
+		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
+		 AND current_node_uuid = '089df97c-bb0f-4dc0-9774-b60e3a77fe72'
+		 AND session_id IS NOT NULL`,
+		[]interface{}{pq.Array(contactIDs), 31}, 2,
+	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
+		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
+		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = 2`,
+		[]interface{}{pq.Array(contactIDs)}, 2,
+	)
+
+}
+
+func TestContactRuns(t *testing.T) {
+	testsuite.Reset()
+	db := testsuite.DB()
+	ctx := testsuite.CTX()
+	rp := testsuite.RP()
+
+	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
+	assert.NoError(t, err)
+
+	sa, err := models.GetSessionAssets(org)
+	assert.NoError(t, err)
+
+	flow, err := org.FlowByID(1)
+	assert.NoError(t, err)
+
+	// load our contact
+	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{42})
+	assert.NoError(t, err)
+
+	contact, err := contacts[0].FlowContact(org, sa)
+	assert.NoError(t, err)
+
+	trigger := triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
+	session, err := StartFlowForContact(ctx, db, rp, org, sa, trigger, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, session)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
+		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+		[]interface{}{contact.ID(), flow.ID()}, 1,
+	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
+		 AND is_active = TRUE AND responded = FALSE AND org_id = 1`,
+		[]interface{}{contact.ID(), flow.ID()}, 1,
+	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`,
+		[]interface{}{contact.ID()}, 1,
+	)
+
+	tcs := []struct {
+		Message       string
+		SessionStatus string
+		RunActive     bool
+		Substring     string
+	}{
+		{"Red", "W", true, "%I like Red too%"},
+		{"Mutzig", "W", true, "%they made red Mutzig%"},
+		{"Luke", "C", false, "%Thanks Luke%"},
+	}
+
+	for i, tc := range tcs {
+		// answer our first question
+		resume := resumes.NewMsgResume(org.Env(), contact,
+			flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), 10, urns.URN("tel:+250700000001"), nil, tc.Message, nil))
+
+		session, err = ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
+		assert.NoError(t, err)
+		assert.NotNil(t, session)
+
+		testsuite.AssertQueryCount(t, db,
+			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
+			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+			[]interface{}{contact.ID(), flow.ID(), tc.SessionStatus}, 1, "%d: didn't find expected session", i,
+		)
+
+		testsuite.AssertQueryCount(t, db,
+			`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
+			 AND is_active = $3 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL`,
+			[]interface{}{contact.ID(), flow.ID(), tc.RunActive}, 1, "%d: didn't find expected run", i,
+		)
+
+		testsuite.AssertQueryCount(t, db,
+			`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`,
+			[]interface{}{contact.ID(), tc.Substring}, 1, "%d: didn't find expected message", i,
+		)
+	}
 }

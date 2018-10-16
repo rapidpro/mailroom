@@ -95,7 +95,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	}
 	logrus.WithField("contact_uuid", resume.Contact().UUID()).WithField("elapsed", time.Since(start)).Info("resumed session")
 
-	return nil, nil
+	return session, nil
 }
 
 // StartFlowBatch starts the flow for the passed in org, contacts and flow
