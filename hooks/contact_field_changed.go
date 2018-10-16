@@ -22,7 +22,7 @@ type ContactFieldChangedHook struct{}
 
 var contactFieldChangedHook = &ContactFieldChangedHook{}
 
-// Apply squashes and delete all our contact groups
+// Apply squashes and writes all the field updates for the contacts
 func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// our list of updates
 	fieldUpdates := make([]interface{}, 0, len(sessions))

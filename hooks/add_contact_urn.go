@@ -21,7 +21,7 @@ type ContactURNAddedHook struct{}
 
 var contactURNAddedHook = &ContactURNAddedHook{}
 
-// Apply squashes and delete all our contact groups
+// Apply adds all our URNS in a batch
 func (h *ContactURNAddedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// gather all our contact urn adds
 	urnAdds := make([]*models.ContactURNAdd, 0, len(sessions))
