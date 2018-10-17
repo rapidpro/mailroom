@@ -7,13 +7,13 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
 	"github.com/nyaruka/mailroom/handler"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,19 +54,19 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 	// select our expired runs
 	rows, err := db.QueryxContext(ctx, selectExpiredRunsSQL)
 	if err != nil {
-		return errors.Annotatef(err, "error querying for expired runs")
+		return errors.Wrapf(err, "error querying for expired runs")
 	}
 	defer rows.Close()
 
 	expireBatch := func(batch []interface{}) error {
 		err = models.BulkSQL(ctx, "expiring runs", db, expireRunsSQL, batch)
 		if err != nil {
-			return errors.Annotatef(err, "error expiring runs")
+			return errors.Wrapf(err, "error expiring runs")
 		}
 
 		err = models.BulkSQL(ctx, "expiring sessions", db, expireSessionsSQL, batch)
 		if err != nil {
-			return errors.Annotatef(err, "error expiring sessions")
+			return errors.Wrapf(err, "error expiring sessions")
 		}
 		return nil
 	}
@@ -76,7 +76,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		expiration := &RunExpiration{}
 		err := rows.StructScan(expiration)
 		if err != nil {
-			return errors.Annotatef(err, "error scanning expired run")
+			return errors.Wrapf(err, "error scanning expired run")
 		}
 
 		count++
@@ -101,7 +101,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		taskID := fmt.Sprintf("%d:%s", expiration.RunID, expiration.ExpiresOn.Format(time.RFC3339))
 		queued, err := marker.HasTask(rc, markerGroup, taskID)
 		if err != nil {
-			return errors.Annotatef(err, "error checking whether expiration is queued")
+			return errors.Wrapf(err, "error checking whether expiration is queued")
 		}
 
 		// already queued? move on
@@ -113,13 +113,13 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		task := handler.NewExpirationEvent(expiration.OrgID, expiration.ContactID, expiration.SessionID, expiration.ExpiresOn)
 		err = handler.AddHandleTask(rc, expiration.ContactID, task)
 		if err != nil {
-			return errors.Annotatef(err, "error adding new expiration task")
+			return errors.Wrapf(err, "error adding new expiration task")
 		}
 
 		// and mark it as queued
 		err = marker.AddTask(rc, markerGroup, taskID)
 		if err != nil {
-			return errors.Annotatef(err, "error marking expiration task as queued")
+			return errors.Wrapf(err, "error marking expiration task as queued")
 		}
 	}
 

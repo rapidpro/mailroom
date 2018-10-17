@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -131,7 +131,7 @@ func (e *CampaignEvent) ScheduleForContact(tz *time.Location, now time.Time, con
 	// calculate our next fire
 	scheduled, err := e.ScheduleForTime(tz, now, start.Native())
 	if err != nil {
-		return nil, errors.Annotatef(err, "error calculating offset for start: %s and event: %d", start, e.ID())
+		return nil, errors.Wrapf(err, "error calculating offset for start: %s and event: %d", start, e.ID())
 	}
 
 	return scheduled, nil
@@ -203,7 +203,7 @@ func (e *CampaignEvent) Campaign() *Campaign { return e.campaign }
 func loadCampaigns(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Campaign, error) {
 	rows, err := db.Queryx(selectCampaignsSQL, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying campaigns for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying campaigns for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -212,7 +212,7 @@ func loadCampaigns(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Campai
 		campaign := &Campaign{}
 		err := readJSONRow(rows, &campaign.c)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error unmarshalling campaign")
+			return nil, errors.Wrapf(err, "error unmarshalling campaign")
 		}
 
 		campaigns = append(campaigns, campaign)
@@ -304,7 +304,7 @@ func DeleteEventFires(ctx context.Context, db *sqlx.DB, fires []*EventFire) erro
 
 	_, err := db.ExecContext(ctx, deleteEventFires, pq.Array(ids))
 	if err != nil {
-		return errors.Annotatef(err, "error deleting fires for inactive event")
+		return errors.Wrapf(err, "error deleting fires for inactive event")
 	}
 
 	return nil
@@ -333,13 +333,13 @@ func LoadEventFires(ctx context.Context, db *sqlx.DB, ids []int64) ([]*EventFire
 
 	q, vs, err := sqlx.In(loadEventFireSQL, ids)
 	if err != nil {
-		return nil, errors.Annotate(err, "error rebinding campaign fire query")
+		return nil, errors.Wrap(err, "error rebinding campaign fire query")
 	}
 	q = db.Rebind(q)
 
 	rows, err := db.QueryxContext(ctx, q, vs...)
 	if err != nil {
-		return nil, errors.Annotate(err, "error querying event fires")
+		return nil, errors.Wrap(err, "error querying event fires")
 	}
 	defer rows.Close()
 
@@ -348,7 +348,7 @@ func LoadEventFires(ctx context.Context, db *sqlx.DB, ids []int64) ([]*EventFire
 		fire := &EventFire{}
 		err := rows.StructScan(fire)
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning campaign fire")
+			return nil, errors.Wrap(err, "error scanning campaign fire")
 		}
 		fires = append(fires, fire)
 	}

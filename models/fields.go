@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/pkg/errors"
 )
 
 // FieldID is our type for the database field ID
@@ -45,7 +45,7 @@ func (f *Field) Type() assets.FieldType { return f.f.FieldType }
 func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Field, error) {
 	rows, err := db.Queryx(selectFieldsSQL, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying fields for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying fields for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -54,7 +54,7 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 		field := &Field{}
 		err = readJSONRow(rows, &field.f)
 		if err != nil {
-			return nil, errors.Annotate(err, "error reading field")
+			return nil, errors.Wrap(err, "error reading field")
 		}
 		fields = append(fields, field)
 	}

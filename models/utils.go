@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,12 +16,12 @@ func readJSONRow(rows *sqlx.Rows, destination interface{}) error {
 	var jsonBlob string
 	err := rows.Scan(&jsonBlob)
 	if err != nil {
-		return errors.Annotate(err, "error scanning row json")
+		return errors.Wrap(err, "error scanning row json")
 	}
 
 	err = json.Unmarshal([]byte(jsonBlob), destination)
 	if err != nil {
-		return errors.Annotate(err, "error unmarshalling row json")
+		return errors.Wrap(err, "error unmarshalling row json")
 	}
 
 	return nil
@@ -82,13 +82,13 @@ func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []int
 	for i, value := range vs {
 		valueSQL, valueArgs, err := sqlx.Named(sql, value)
 		if err != nil {
-			return errors.Annotatef(err, "error converting bulk insert args")
+			return errors.Wrapf(err, "error converting bulk insert args")
 		}
 
 		args = append(args, valueArgs...)
 		argValues, err := extractValues(valueSQL)
 		if err != nil {
-			return errors.Annotatef(err, "error extracting values from sql: %s", valueSQL)
+			return errors.Wrapf(err, "error extracting values from sql: %s", valueSQL)
 		}
 
 		// append to our global values, adding comma if necessary
@@ -100,7 +100,7 @@ func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []int
 
 	valuesSQL, err := extractValues(sql)
 	if err != nil {
-		return errors.Annotatef(err, "error extracting values from sql: %s", sql)
+		return errors.Wrapf(err, "error extracting values from sql: %s", sql)
 	}
 
 	bulkInsert := tx.Rebind(strings.Replace(sql, valuesSQL, values.String(), -1))
@@ -108,7 +108,7 @@ func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []int
 	// insert them all at once
 	rows, err := tx.QueryxContext(ctx, bulkInsert, args...)
 	if err != nil {
-		return errors.Annotatef(err, "error during bulk insert")
+		return errors.Wrapf(err, "error during bulk insert")
 	}
 	defer rows.Close()
 
@@ -121,7 +121,7 @@ func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []int
 
 			err = rows.StructScan(v)
 			if err != nil {
-				return errors.Annotate(err, "error scanning for insert id")
+				return errors.Wrap(err, "error scanning for insert id")
 			}
 		}
 	}

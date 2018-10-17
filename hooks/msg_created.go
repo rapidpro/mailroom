@@ -6,11 +6,11 @@ import (
 	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -74,7 +74,7 @@ func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	topup, err := models.DecrementOrgCredits(ctx, tx, rc, org.OrgID(), len(msgs))
 	rc.Close()
 	if err != nil {
-		return errors.Annotatef(err, "error finding active topup")
+		return errors.Wrapf(err, "error finding active topup")
 	}
 
 	// if we have an active topup, assign it to our messages
@@ -87,7 +87,7 @@ func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// insert all our messages
 	err = models.InsertMessages(ctx, tx, msgs)
 	if err != nil {
-		return errors.Annotatef(err, "error writing messages")
+		return errors.Wrapf(err, "error writing messages")
 	}
 
 	return nil
@@ -111,7 +111,7 @@ func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 
 	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, session.ContactID, &event.Msg, event.CreatedOn())
 	if err != nil {
-		return errors.Annotatef(err, "error creating outgoing message to %s", event.Msg.URN())
+		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
 
 	// set our reply to as well (will be noop in cases whren there is no incoming message)

@@ -6,11 +6,11 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/goflow/flows"
@@ -45,7 +45,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	// build our flow session
 	fs, err := session.FlowSession(sa, org.Env(), httpClient)
 	if err != nil {
-		return nil, errors.Annotatef(err, "unable to create session from output")
+		return nil, errors.Wrapf(err, "unable to create session from output")
 	}
 
 	// resume our session
@@ -53,19 +53,19 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 
 	// had a problem resuming our flow? bail
 	if err != nil {
-		return nil, errors.Annotatef(err, "error resuming flow")
+		return nil, errors.Wrapf(err, "error resuming flow")
 	}
 
 	// write our updated session, applying any events in the process
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting transaction")
+		return nil, errors.Wrapf(err, "error starting transaction")
 	}
 
 	// write our updated session and runs
 	err = session.WriteUpdatedSession(ctx, tx, rp, org, fs)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error updating session for resume")
+		return nil, errors.Wrapf(err, "error updating session for resume")
 	}
 
 	// call our commit hook before committing our session
@@ -76,13 +76,13 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	// commit at once
 	err = tx.Commit()
 	if err != nil {
-		return nil, errors.Annotatef(err, "error committing resumption of flow")
+		return nil, errors.Wrapf(err, "error committing resumption of flow")
 	}
 
 	// now take care of any post-commit hooks
 	tx, err = db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting transaction for post commit hooks")
+		return nil, errors.Wrapf(err, "error starting transaction for post commit hooks")
 	}
 
 	err = models.ApplyPostEventHooks(ctx, tx, rp, org, []*models.Session{session})
@@ -91,7 +91,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	}
 
 	if err != nil {
-		return nil, errors.Annotatef(err, "error committing session changes on resume")
+		return nil, errors.Wrapf(err, "error committing session changes on resume")
 	}
 	logrus.WithField("contact_uuid", resume.Contact().UUID()).WithField("elapsed", time.Since(start)).Info("resumed session")
 
@@ -118,13 +118,13 @@ func StartFlowBatch(
 	// create our org assets
 	org, err := models.GetOrgAssets(ctx, db, batch.OrgID())
 	if err != nil {
-		return nil, errors.Annotatef(err, "error creating assets for org: %d", batch.OrgID())
+		return nil, errors.Wrapf(err, "error creating assets for org: %d", batch.OrgID())
 	}
 
 	// try to load our flow
 	flow, err := org.FlowByID(batch.FlowID())
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading campaign flow: %d", batch.FlowID())
+		return nil, errors.Wrapf(err, "error loading campaign flow: %d", batch.FlowID())
 	}
 
 	// flow is no longer active, skip
@@ -159,7 +159,7 @@ func StartFlowBatch(
 
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, batch.ContactIDs(), options, triggerBuilder, updateStartID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting flow batch")
+		return nil, errors.Wrapf(err, "error starting flow batch")
 	}
 
 	// log both our total and average
@@ -191,7 +191,7 @@ func FireCampaignEvents(
 	// create our org assets
 	org, err := models.GetOrgAssets(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error creating assets for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error creating assets for org: %d", orgID)
 	}
 
 	// find our actual event
@@ -201,7 +201,7 @@ func FireCampaignEvents(
 	if dbEvent == nil {
 		err := models.DeleteEventFires(ctx, db, fires)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error deleting events for already fired events")
+			return nil, errors.Wrapf(err, "error deleting events for already fired events")
 		}
 		return nil, nil
 	}
@@ -209,7 +209,7 @@ func FireCampaignEvents(
 	// try to load our flow
 	flow, err := org.Flow(flowUUID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading campaign flow: %s", flowUUID)
+		return nil, errors.Wrapf(err, "error loading campaign flow: %s", flowUUID)
 	}
 	dbFlow := flow.(*models.Flow)
 
@@ -285,7 +285,7 @@ func StartFlowForContacts(
 		// find all participants that have been in this flow
 		started, err := models.FindFlowStartedOverlap(ctx, db, flow.ID(), contactIDs)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error finding others started flow: %d", flow.ID())
+			return nil, errors.Wrapf(err, "error finding others started flow: %d", flow.ID())
 		}
 		for _, c := range started {
 			exclude[c] = true
@@ -297,7 +297,7 @@ func StartFlowForContacts(
 		// find all participants active in any flow
 		active, err := models.FindActiveRunOverlap(ctx, db, contactIDs)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error finding other active flow: %d", flow.ID())
+			return nil, errors.Wrapf(err, "error finding other active flow: %d", flow.ID())
 		}
 		for _, c := range active {
 			exclude[c] = true
@@ -320,13 +320,13 @@ func StartFlowForContacts(
 	// build our session assets
 	assets, err := models.GetSessionAssets(org)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting flow, unable to load assets")
+		return nil, errors.Wrapf(err, "error starting flow, unable to load assets")
 	}
 
 	// load all our contacts
 	contacts, err := models.LoadContacts(ctx, db, org, includedContacts)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading contacts to start")
+		return nil, errors.Wrapf(err, "error loading contacts to start")
 	}
 
 	// ok, we've filtered our contacts, build our triggers
@@ -334,7 +334,7 @@ func StartFlowForContacts(
 	for _, c := range contacts {
 		contact, err := c.FlowContact(org, assets)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error creating flow contact")
+			return nil, errors.Wrapf(err, "error creating flow contact")
 		}
 		triggers = append(triggers, buildTrigger(contact))
 	}
@@ -365,7 +365,7 @@ func StartFlowForContacts(
 	// we write our sessions and all their objects in a single transaction
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting transaction")
+		return nil, errors.Wrapf(err, "error starting transaction")
 	}
 
 	// if we are interrupting contacts, then augment our hook to do so
@@ -381,7 +381,7 @@ func StartFlowForContacts(
 			// and interrupt them from all active runs
 			err := models.InterruptContactRuns(ctx, tx, interruptedContacts)
 			if err != nil {
-				return errors.Annotatef(err, "error interrupting contacts")
+				return errors.Wrapf(err, "error interrupting contacts")
 			}
 
 			// if we have a hook from our original caller, call that too
@@ -395,7 +395,7 @@ func StartFlowForContacts(
 	// write our session to the db
 	dbSessions, err := models.WriteSessions(ctx, tx, rp, org, sessions, hook)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error writing sessions")
+		return nil, errors.Wrapf(err, "error writing sessions")
 	}
 
 	// commit it at once
@@ -406,7 +406,7 @@ func StartFlowForContacts(
 	// this was an error and this was a single session being committed, no use retrying
 	if err != nil && len(sessions) == 1 {
 		log.WithField("contact_uuid", sessions[0].Contact().UUID()).WithError(err).Errorf("error writing session to db")
-		return nil, errors.Annotatef(err, "error committing session")
+		return nil, errors.Wrapf(err, "error committing session")
 	}
 
 	// otherwise, it may have been just one session that killed us, retry them one at a time
@@ -417,7 +417,7 @@ func StartFlowForContacts(
 		for _, session := range sessions {
 			tx, err := db.BeginTxx(ctx, nil)
 			if err != nil {
-				return nil, errors.Annotatef(err, "error starting transaction for retry")
+				return nil, errors.Wrapf(err, "error starting transaction for retry")
 			}
 
 			dbSession, err := models.WriteSessions(ctx, tx, rp, org, []flows.Session{session}, hook)
@@ -441,7 +441,7 @@ func StartFlowForContacts(
 	// now take care of any post-commit hooks
 	tx, err = db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting transaction for post commit hooks")
+		return nil, errors.Wrapf(err, "error starting transaction for post commit hooks")
 	}
 
 	err = models.ApplyPostEventHooks(ctx, tx, rp, org, dbSessions)
@@ -500,7 +500,7 @@ func StartFlowForContact(
 	// start our flow
 	err := session.Start(trigger)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting flow")
+		return nil, errors.Wrapf(err, "error starting flow")
 	}
 	log.WithField("elapsed", time.Since(start)).Info("flow engine start")
 	librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
@@ -508,7 +508,7 @@ func StartFlowForContact(
 	// we write our sessions and all their objects in a single transaction
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting transaction")
+		return nil, errors.Wrapf(err, "error starting transaction")
 	}
 
 	parentHook := hook
@@ -522,7 +522,7 @@ func StartFlowForContact(
 		// and interrupt them from all active runs
 		err := models.InterruptContactRuns(ctx, tx, interruptedContacts)
 		if err != nil {
-			return errors.Annotatef(err, "error interrupting contacts")
+			return errors.Wrapf(err, "error interrupting contacts")
 		}
 
 		// if we have a hook from our original caller, call that too
@@ -535,7 +535,7 @@ func StartFlowForContact(
 	// write our session to the db
 	dbSessions, err := models.WriteSessions(ctx, tx, rp, org, []flows.Session{session}, hook)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error writing session")
+		return nil, errors.Wrapf(err, "error writing session")
 	}
 
 	// commit it at once
@@ -546,13 +546,13 @@ func StartFlowForContact(
 	// this was an error and this was a single session being committed, no use retrying
 	if err != nil {
 		log.WithError(err).Errorf("error writing session to db")
-		return nil, errors.Annotatef(err, "error committing session")
+		return nil, errors.Wrapf(err, "error committing session")
 	}
 
 	// now take care of any post-commit hooks
 	tx, err = db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error starting transaction for post commit hooks")
+		return nil, errors.Wrapf(err, "error starting transaction for post commit hooks")
 	}
 
 	err = models.ApplyPostEventHooks(ctx, tx, rp, org, dbSessions)

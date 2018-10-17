@@ -8,7 +8,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
@@ -16,6 +15,7 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,7 +50,7 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 	eventTask := eventFireTask{}
 	err := json.Unmarshal(task.Task, &eventTask)
 	if err != nil {
-		return errors.Annotatef(err, "error unmarshalling event fire task: %s", string(task.Task))
+		return errors.Wrapf(err, "error unmarshalling event fire task: %s", string(task.Task))
 	}
 
 	// grab all the fires for this event
@@ -67,7 +67,7 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 		rc.Close()
 
 		// if we had an error, return that
-		return errors.Annotatef(err, "error loading event fire from db: %v", eventTask.FireIDs)
+		return errors.Wrapf(err, "error loading event fire from db: %v", eventTask.FireIDs)
 	}
 
 	// no fires returned
@@ -107,7 +107,7 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 	}
 
 	if err != nil {
-		return errors.Annotatef(err, "error firing campaign events: %d", eventTask.FireIDs)
+		return errors.Wrapf(err, "error firing campaign events: %d", eventTask.FireIDs)
 	}
 
 	return nil

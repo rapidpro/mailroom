@@ -6,10 +6,10 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,7 +34,7 @@ func (h *UnsubscribeResthookHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 
 	err := models.UnsubscribeResthooks(ctx, tx, unsubs)
 	if err != nil {
-		return errors.Annotatef(err, "error unsubscribing from resthooks")
+		return errors.Wrapf(err, "error unsubscribing from resthooks")
 	}
 
 	return nil

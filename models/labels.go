@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/pkg/errors"
 )
 
 type LabelID int
@@ -32,7 +32,7 @@ func (l *Label) Name() string { return l.l.Name }
 func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Label, error) {
 	rows, err := db.Queryx(selectLabelsSQL, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying labels for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying labels for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -41,7 +41,7 @@ func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Lab
 		label := &Label{}
 		err = readJSONRow(rows, &label.l)
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning label row")
+			return nil, errors.Wrap(err, "error scanning label row")
 		}
 		labels = append(labels, label)
 	}

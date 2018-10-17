@@ -7,7 +7,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
@@ -94,7 +94,7 @@ func calculateActiveTopup(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*T
 	topup := &Topup{}
 	rows, err := db.Queryx(selectActiveTopup, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading active topup for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error loading active topup for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -104,7 +104,7 @@ func calculateActiveTopup(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*T
 
 	err = rows.StructScan(topup)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error scanning topup")
+		return nil, errors.Wrapf(err, "error scanning topup")
 	}
 
 	return topup, nil

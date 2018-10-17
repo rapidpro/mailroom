@@ -7,13 +7,13 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,7 +40,7 @@ func handleFlowStart(mr *mailroom.Mailroom, task *queue.Task) error {
 	startTask := &models.FlowStart{}
 	err := json.Unmarshal(task.Task, startTask)
 	if err != nil {
-		return errors.Annotatef(err, "error unmarshalling flow start task: %s", string(task.Task))
+		return errors.Wrapf(err, "error unmarshalling flow start task: %s", string(task.Task))
 	}
 
 	return CreateFlowBatches(ctx, mr.DB, mr.RP, startTask)
@@ -57,7 +57,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 	// now all the ids for our groups
 	rows, err := db.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.GroupIDs()))
 	if err != nil {
-		return errors.Annotatef(err, "error selecting contacts for groups")
+		return errors.Wrapf(err, "error selecting contacts for groups")
 	}
 	defer rows.Close()
 
@@ -65,7 +65,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 	for rows.Next() {
 		err := rows.Scan(&contactID)
 		if err != nil {
-			return errors.Annotatef(err, "error scanning contact id")
+			return errors.Wrapf(err, "error scanning contact id")
 		}
 		contactIDs[contactID] = true
 	}
@@ -101,7 +101,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 	// mark our start as started
 	err = models.MarkStartStarted(ctx, db, start.StartID(), len(contactIDs))
 	if err != nil {
-		return errors.Annotatef(err, "error marking start as started")
+		return errors.Wrapf(err, "error marking start as started")
 	}
 
 	return nil
@@ -119,13 +119,13 @@ func handleFlowStartBatch(mr *mailroom.Mailroom, task *queue.Task) error {
 	startBatch := &models.FlowStartBatch{}
 	err := json.Unmarshal(task.Task, startBatch)
 	if err != nil {
-		return errors.Annotatef(err, "error unmarshalling flow start batch: %s", string(task.Task))
+		return errors.Wrapf(err, "error unmarshalling flow start batch: %s", string(task.Task))
 	}
 
 	// start these contacts in our flow
 	_, err = runner.StartFlowBatch(ctx, mr.DB, mr.RP, startBatch)
 	if err != nil {
-		return errors.Annotatef(err, "error starting flow batch")
+		return errors.Wrapf(err, "error starting flow batch")
 	}
 
 	return err

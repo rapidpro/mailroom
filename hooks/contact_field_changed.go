@@ -6,10 +6,10 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -58,7 +58,7 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 		// marshal the rest of our updates to JSON
 		fieldJSON, err := json.Marshal(updates)
 		if err != nil {
-			return errors.Annotatef(err, "error marshalling field values")
+			return errors.Wrapf(err, "error marshalling field values")
 		}
 
 		// and queue them up for our update
@@ -72,7 +72,7 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 	if len(fieldDeletes) > 0 {
 		err := models.BulkSQL(ctx, "deleting contact field values", tx, deleteContactFieldsSQL, fieldDeletes)
 		if err != nil {
-			return errors.Annotatef(err, "error deleting contact fields")
+			return errors.Wrapf(err, "error deleting contact fields")
 		}
 	}
 
@@ -80,7 +80,7 @@ func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 	if len(fieldUpdates) > 0 {
 		err := models.BulkSQL(ctx, "updating contact field values", tx, updateContactFieldsSQL, fieldUpdates)
 		if err != nil {
-			return errors.Annotatef(err, "error updating contact fields")
+			return errors.Wrapf(err, "error updating contact fields")
 		}
 	}
 

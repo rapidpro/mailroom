@@ -5,10 +5,10 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,7 +33,7 @@ func (h *ContactURNAddedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 
 	err := models.AddContactURNs(ctx, tx, urnAdds)
 	if err != nil {
-		return errors.Annotatef(err, "error adding urns to contacts")
+		return errors.Wrapf(err, "error adding urns to contacts")
 	}
 
 	return nil

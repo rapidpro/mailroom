@@ -5,8 +5,8 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/pkg/errors"
 )
 
 // EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
@@ -33,7 +33,7 @@ func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *O
 	for hook, args := range preHooks {
 		err := hook.Apply(ctx, tx, rp, org, args)
 		if err != nil {
-			return errors.Annotatef(err, "error applying pre commit hook: %v", hook)
+			return errors.Wrapf(err, "error applying pre commit hook: %v", hook)
 		}
 	}
 
@@ -59,7 +59,7 @@ func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 	for hook, args := range postHooks {
 		err := hook.Apply(ctx, tx, rp, org, args)
 		if err != nil {
-			return errors.Annotatef(err, "error applying post commit hook: %v", hook)
+			return errors.Wrapf(err, "error applying post commit hook: %v", hook)
 		}
 	}
 

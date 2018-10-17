@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/utils"
 	cache "github.com/patrickmn/go-cache"
+	"github.com/pkg/errors"
 )
 
 // OrgAssets is our top level cache of all things contained in an org. It is used to build
@@ -113,12 +113,12 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 
 	o.env, err = loadOrg(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading environment for org %d", orgID)
+		return nil, errors.Wrapf(err, "error loading environment for org %d", orgID)
 	}
 
 	o.channels, err = loadChannels(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading channel assets for org %d", orgID)
+		return nil, errors.Wrapf(err, "error loading channel assets for org %d", orgID)
 	}
 	for _, c := range o.channels {
 		channel := c.(*Channel)
@@ -128,7 +128,7 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 
 	o.fields, err = loadFields(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading field assets for org %d", orgID)
+		return nil, errors.Wrapf(err, "error loading field assets for org %d", orgID)
 	}
 	for _, f := range o.fields {
 		field := f.(*Field)
@@ -138,7 +138,7 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 
 	o.groups, err = loadGroups(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading group assets for org %d", orgID)
+		return nil, errors.Wrapf(err, "error loading group assets for org %d", orgID)
 	}
 	for _, g := range o.groups {
 		group := g.(*Group)
@@ -148,17 +148,17 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 
 	o.labels, err = loadLabels(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading group labels for org %d", orgID)
+		return nil, errors.Wrapf(err, "error loading group labels for org %d", orgID)
 	}
 
 	o.resthooks, err = loadResthooks(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading resthooks for org %d", orgID)
+		return nil, errors.Wrapf(err, "error loading resthooks for org %d", orgID)
 	}
 
 	o.campaigns, err = loadCampaigns(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading campaigns for org %d", orgID)
+		return nil, errors.Wrapf(err, "error loading campaigns for org %d", orgID)
 	}
 	for _, c := range o.campaigns {
 		o.campaignsByGroup[c.GroupID()] = append(o.campaignsByGroup[c.GroupID()], c)
@@ -170,7 +170,7 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 
 	o.triggers, err = loadTriggers(ctx, db, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading triggers for org %d", orgID)
+		return nil, errors.Wrapf(err, "error loading triggers for org %d", orgID)
 	}
 
 	// cache locations for an hour
@@ -181,7 +181,7 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		o.locations, err = loadLocations(ctx, db, orgID)
 		o.locationsBuiltAt = time.Now()
 		if err != nil {
-			return nil, errors.Annotatef(err, "error loading group locations for org %d", orgID)
+			return nil, errors.Wrapf(err, "error loading group locations for org %d", orgID)
 		}
 	}
 
@@ -231,7 +231,7 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 
 	dbFlow, err := loadFlowByUUID(a.ctx, a.db, flowUUID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading flow: %s", flowUUID)
+		return nil, errors.Wrapf(err, "error loading flow: %s", flowUUID)
 	}
 
 	a.flowCacheLock.Lock()
@@ -253,7 +253,7 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 
 	dbFlow, err := loadFlowByID(a.ctx, a.db, flowID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading flow: %d", flowID)
+		return nil, errors.Wrapf(err, "error loading flow: %d", flowID)
 	}
 
 	a.flowCacheLock.Lock()
@@ -269,7 +269,7 @@ func (a *OrgAssets) SetFlow(flowID FlowID, flow flows.Flow) (*Flow, error) {
 	// build our definition
 	definition, err := json.Marshal(flow)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error marshalling flow definition")
+		return nil, errors.Wrapf(err, "error marshalling flow definition")
 	}
 
 	f := &Flow{}
