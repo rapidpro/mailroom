@@ -19,8 +19,6 @@ var updateCampaignEventsHook = &UpdateCampaignEventsHook{}
 
 // Apply will update all the campaigns for the passed in sessions, minimizing the number of queries to do so
 func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
-	logrus.WithField("sessions", sessions).Debug("getting campaign callback")
-
 	// these are all the events we need to delete unfired fires for
 	deletes := make([]*models.FireDelete, 0, 5)
 

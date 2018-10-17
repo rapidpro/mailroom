@@ -150,6 +150,7 @@ const selectExpiredRunsSQL = `
 		fr.is_active = TRUE AND
 		fr.expires_on < NOW() AND
 		fr.connection_id IS NULL AND
+		fr.session_id IS NOT NULL AND
 		o.flow_server_enabled = TRUE
 	ORDER BY
 		expires_on ASC
