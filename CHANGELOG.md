@@ -1,3 +1,7 @@
+v0.0.39
+----------
+ * change to pkg/errors instead of juju
+
 v0.0.38
 ----------
  * full handling of timeouts, expirations, handling for flow_server_enabled orgs (alpha)
