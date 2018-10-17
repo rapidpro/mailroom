@@ -1,3 +1,7 @@
+v0.0.40
+----------
+ * latest goflow
+
 v0.0.39
 ----------
  * change to pkg/errors instead of juju
