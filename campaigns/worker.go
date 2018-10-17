@@ -97,8 +97,8 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 		delete(contactMap, session.ContactID)
 	}
 
-	// if we had an error then what remains in our contact map are fires that failed for some reason, umark these
-	if err != nil && len(contactMap) > 0 {
+	// what remains in our contact map are fires that failed for some reason, umark these
+	if len(contactMap) > 0 {
 		rc := rp.Get()
 		for _, failed := range contactMap {
 			marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", failed.FireID))
