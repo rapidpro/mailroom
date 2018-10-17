@@ -7,12 +7,12 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
@@ -154,7 +154,7 @@ type Step struct {
 func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 	output, err := json.Marshal(s)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error marshalling flow session")
+		return nil, errors.Wrapf(err, "error marshalling flow session")
 	}
 
 	// map our status over
@@ -186,7 +186,7 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 	for _, r := range s.Runs() {
 		run, err := newRun(org, session, r)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error creating run: %s", r.UUID())
+			return nil, errors.Wrapf(err, "error creating run: %s", r.UUID())
 		}
 
 		// save the run to our session
@@ -196,7 +196,7 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 		if r.Status() == flows.RunStatusWaiting {
 			flow, err := org.Flow(r.Flow().UUID())
 			if err != nil {
-				return nil, errors.Annotatef(err, "error loading current flow")
+				return nil, errors.Wrapf(err, "error loading current flow")
 			}
 			flowID := flow.(*Flow).ID()
 			session.CurrentFlowID = &flowID
@@ -215,7 +215,7 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *flows.Contact) (*Session, error) {
 	rows, err := db.QueryxContext(ctx, selectLastSessionSQL, contact.ID())
 	if err != nil {
-		return nil, errors.Annotatef(err, "error selecting active session")
+		return nil, errors.Wrapf(err, "error selecting active session")
 	}
 	defer rows.Close()
 
@@ -232,7 +232,7 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, c
 	}
 	err = rows.StructScan(session)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error scanning session")
+		return nil, errors.Wrapf(err, "error scanning session")
 	}
 
 	return session, nil
@@ -269,7 +269,7 @@ RETURNING id
 func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment, client *utils.HTTPClient) (flows.Session, error) {
 	session, err := engine.ReadSession(sa, engine.NewDefaultConfig(), client, json.RawMessage(s.Output))
 	if err != nil {
-		return nil, errors.Annotatef(err, "unable to unmarshal session")
+		return nil, errors.Wrapf(err, "unable to unmarshal session")
 	}
 
 	// walk through our session, populate seen runs
@@ -290,7 +290,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	output, err := json.Marshal(fs)
 	if err != nil {
-		return errors.Annotatef(err, "error marshalling flow session")
+		return errors.Wrapf(err, "error marshalling flow session")
 	}
 	s.Output = string(output)
 
@@ -305,7 +305,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for _, r := range fs.Runs() {
 		run, err := newRun(org, s, r)
 		if err != nil {
-			return errors.Annotatef(err, "error creating run: %s", r.UUID())
+			return errors.Wrapf(err, "error creating run: %s", r.UUID())
 		}
 
 		// set the run on our session
@@ -325,7 +325,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 		if r.Status() == flows.RunStatusWaiting {
 			flow, err := org.Flow(r.Flow().UUID())
 			if err != nil {
-				return errors.Annotatef(err, "error loading current flow")
+				return errors.Wrapf(err, "error loading current flow")
 			}
 			flowID := flow.(*Flow).ID()
 			s.CurrentFlowID = &flowID
@@ -346,7 +346,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// write our new session state to the db
 	_, err = tx.NamedExecContext(ctx, updateSessionSQL, s)
 	if err != nil {
-		return errors.Annotatef(err, "error updating session")
+		return errors.Wrapf(err, "error updating session")
 	}
 
 	// figure out which runs are new and which are updated
@@ -368,27 +368,27 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// update all modified runs at once
 	err = BulkSQL(ctx, "update runs", tx, updateRunSQL, updatedRuns)
 	if err != nil {
-		return errors.Annotatef(err, "error updating runs")
+		return errors.Wrapf(err, "error updating runs")
 	}
 
 	// insert all new runs at once
 	err = BulkSQL(ctx, "insert runs", tx, insertRunSQL, newRuns)
 	if err != nil {
-		return errors.Annotatef(err, "error writing runs")
+		return errors.Wrapf(err, "error writing runs")
 	}
 
 	// apply all our events
 	for _, e := range fs.Events() {
 		err := ApplyEvent(ctx, tx, rp, org, s, e)
 		if err != nil {
-			return errors.Annotatef(err, "error applying event: %v", e)
+			return errors.Wrapf(err, "error applying event: %v", e)
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
 	err = ApplyPreEventHooks(ctx, tx, rp, org, []*Session{s})
 	if err != nil {
-		return errors.Annotatef(err, "error applying pre commit hooks")
+		return errors.Wrapf(err, "error applying pre commit hooks")
 	}
 
 	return nil
@@ -444,7 +444,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	for _, s := range ss {
 		session, err := NewSession(org, s)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error creating session objects")
+			return nil, errors.Wrapf(err, "error creating session objects")
 		}
 		sessions = append(sessions, session)
 
@@ -459,20 +459,20 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	if hook != nil {
 		err := hook(ctx, tx, rp, org, sessions)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error calling commit hook: %v", hook)
+			return nil, errors.Wrapf(err, "error calling commit hook: %v", hook)
 		}
 	}
 
 	// insert our complete sessions first
 	err := BulkSQL(ctx, "insert completed sessions", tx, insertCompleteSessionSQL, completeSessionsI)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error inserting completed sessions")
+		return nil, errors.Wrapf(err, "error inserting completed sessions")
 	}
 
 	// insert them all
 	err = BulkSQL(ctx, "insert complete sessions", tx, insertIncompleteSessionSQL, incompleteSessionsI)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error inserting incomplete sessions")
+		return nil, errors.Wrapf(err, "error inserting incomplete sessions")
 	}
 
 	// for each session associate our run with each
@@ -489,7 +489,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	// insert all runs
 	err = BulkSQL(ctx, "insert runs", tx, insertRunSQL, runs)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error writing runs")
+		return nil, errors.Wrapf(err, "error writing runs")
 	}
 
 	// apply our all events for the session
@@ -497,7 +497,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 		for _, e := range ss[i].Events() {
 			err := ApplyEvent(ctx, tx, rp, org, sessions[i], e)
 			if err != nil {
-				return nil, errors.Annotatef(err, "error applying event: %v", e)
+				return nil, errors.Wrapf(err, "error applying event: %v", e)
 			}
 		}
 	}
@@ -505,7 +505,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	// gather all our pre commit events, group them by hook
 	err = ApplyPreEventHooks(ctx, tx, rp, org, sessions)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error applying pre commit hooks")
+		return nil, errors.Wrapf(err, "error applying pre commit hooks")
 	}
 
 	// return our session
@@ -544,7 +544,7 @@ func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error)
 
 	flow, err := org.Flow(r.Flow().UUID())
 	if err != nil {
-		return nil, errors.Annotatef(err, "unable to load flow with uuid: %s", r.Flow().UUID())
+		return nil, errors.Wrapf(err, "unable to load flow with uuid: %s", r.Flow().UUID())
 	}
 
 	// create our run
@@ -591,14 +591,14 @@ func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error)
 	}
 	eventJSON, err := json.Marshal(filteredEvents)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error marshalling events for run: %s", run.UUID)
+		return nil, errors.Wrapf(err, "error marshalling events for run: %s", run.UUID)
 	}
 	run.Events = string(eventJSON)
 
 	// write our results out
 	resultsJSON, err := json.Marshal(r.Results())
 	if err != nil {
-		return nil, errors.Annotatef(err, "error marshalling results for run: %s", run.UUID)
+		return nil, errors.Wrapf(err, "error marshalling results for run: %s", run.UUID)
 	}
 	run.Results = string(resultsJSON)
 
@@ -662,7 +662,7 @@ func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.C
 	start := time.Now()
 	res, err := tx.ExecContext(ctx, interruptContactRunsSQL, pq.Array(contactIDs))
 	if err != nil {
-		return errors.Annotatef(err, "error interrupting contact runs")
+		return errors.Wrapf(err, "error interrupting contact runs")
 	}
 	rows, _ := res.RowsAffected()
 	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("interrupted runs")
@@ -671,7 +671,7 @@ func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.C
 	start = time.Now()
 	res, err = tx.ExecContext(ctx, interruptContactSessionsSQL, pq.Array(contactIDs))
 	if err != nil {
-		return errors.Annotatef(err, "error interrupting contact sessions")
+		return errors.Wrapf(err, "error interrupting contact sessions")
 	}
 	rows, _ = res.RowsAffected()
 	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("interrupted sessions")

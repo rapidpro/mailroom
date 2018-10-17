@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -64,7 +64,7 @@ func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, error) {
 	rows, err := db.Queryx(selectTriggersSQL, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying triggers for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying triggers for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -73,7 +73,7 @@ func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, er
 		trigger := &Trigger{}
 		err = readJSONRow(rows, &trigger.t)
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning label row")
+			return nil, errors.Wrap(err, "error scanning label row")
 		}
 		triggers = append(triggers, trigger)
 	}

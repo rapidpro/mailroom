@@ -10,12 +10,12 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,7 +29,7 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 
 	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids))
 	if err != nil {
-		return nil, errors.Annotate(err, "error selecting contacts")
+		return nil, errors.Wrap(err, "error selecting contacts")
 	}
 	defer rows.Close()
 
@@ -38,7 +38,7 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 		e := &contactEnvelope{}
 		err := readJSONRow(rows, e)
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning contact json")
+			return nil, errors.Wrap(err, "error scanning contact json")
 		}
 
 		contact := &Contact{
@@ -139,7 +139,7 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 		c.fields,
 	)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error creating flow contact")
+		return nil, errors.Wrapf(err, "error creating flow contact")
 	}
 
 	return contact, nil
@@ -149,7 +149,7 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
 	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET is_stopped = FALSE, modified_on = NOW() WHERE id = $1`, c.id)
 	if err != nil {
-		return errors.Annotatef(err, "error unstopping contact")
+		return errors.Wrapf(err, "error unstopping contact")
 	}
 	c.isStopped = false
 	return nil
@@ -187,7 +187,7 @@ func (c *Contact) UpdatePreferredURNAndChannel(ctx context.Context, db *sqlx.DB,
 			if URNID(getURNInt(u, "id")) == urnID {
 				u, err := updateURNChannelPriority(u, channel, topPriority)
 				if err != nil {
-					return errors.Annotatef(err, "unable to update URN: %s", u)
+					return errors.Wrapf(err, "unable to update URN: %s", u)
 				}
 				topURN = u
 				changed = append(changed, u)
@@ -204,7 +204,7 @@ func (c *Contact) UpdatePreferredURNAndChannel(ctx context.Context, db *sqlx.DB,
 			if isTelChannel && u.Scheme() == urns.TelScheme {
 				u, err := updateURNChannelPriority(u, channel, getURNInt(u, "priority"))
 				if err != nil {
-					return errors.Annotatef(err, "unable to update URN: %s", u)
+					return errors.Wrapf(err, "unable to update URN: %s", u)
 				}
 				c.urns[i] = u
 				changed = append(changed, u)
@@ -227,7 +227,7 @@ func (c *Contact) UpdatePreferredURNAndChannel(ctx context.Context, db *sqlx.DB,
 	// commit them
 	err := BulkSQL(ctx, "updating preferred URN", db, updateURNs, updates)
 	if err != nil {
-		return errors.Annotatef(err, "error committing urn update")
+		return errors.Wrapf(err, "error committing urn update")
 	}
 
 	// TODO: if we did anything, update our modified_on as well
@@ -271,7 +271,7 @@ func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urn
 
 	urn, err = urns.NewURNFromParts(scheme, path, parsedQuery.Encode(), display)
 	if err != nil {
-		return urns.NilURN, errors.Annotatef(err, "unable to create new urn")
+		return urns.NilURN, errors.Wrapf(err, "unable to create new urn")
 	}
 
 	return urn, nil
@@ -405,20 +405,20 @@ func StopContact(ctx context.Context, tx *sqlx.Tx, orgID OrgID, contactID flows.
 	// delete the contact from all groups
 	_, err := tx.ExecContext(ctx, deleteAllContactGroupsSQL, orgID, contactID)
 	if err != nil {
-		return errors.Annotatef(err, "error removing stopped contact from groups")
+		return errors.Wrapf(err, "error removing stopped contact from groups")
 	}
 
 	// remove the contact from any triggers
 	// TODO: this could leave a trigger with no contacts or groups
 	_, err = tx.ExecContext(ctx, deleteAllContactTriggersSQL, contactID)
 	if err != nil {
-		return errors.Annotatef(err, "error removing contact from triggers")
+		return errors.Wrapf(err, "error removing contact from triggers")
 	}
 
 	// mark as stopped
 	_, err = tx.ExecContext(ctx, markContactStoppedSQL, contactID)
 	if err != nil {
-		return errors.Annotatef(err, "error marking contact as stopped")
+		return errors.Wrapf(err, "error marking contact as stopped")
 	}
 
 	return nil

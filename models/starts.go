@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/pkg/errors"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -27,7 +27,7 @@ func NewStartID(id int) StartID {
 func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error {
 	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C' WHERE id = $1", startID)
 	if err != nil {
-		return errors.Annotatef(err, "error setting start as complete")
+		return errors.Wrapf(err, "error setting start as complete")
 	}
 	return nil
 }
@@ -36,7 +36,7 @@ func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error 
 func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contactCount int) error {
 	_, err := db.Exec("UPDATE flows_flowstart SET status = 'S', contact_count = $2 WHERE id = $1", startID, contactCount)
 	if err != nil {
-		return errors.Annotatef(err, "error setting start as started")
+		return errors.Wrapf(err, "error setting start as started")
 	}
 	return nil
 

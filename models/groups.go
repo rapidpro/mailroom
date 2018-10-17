@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/pkg/errors"
 )
 
 type GroupID int
@@ -37,7 +37,7 @@ func (g *Group) Query() string { return g.g.Query }
 func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Group, error) {
 	rows, err := db.Queryx(selectGroupsSQL, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying groups for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying groups for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -46,7 +46,7 @@ func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Gro
 		group := &Group{}
 		err = readJSONRow(rows, &group.g)
 		if err != nil {
-			return nil, errors.Annotate(err, "error reading group row")
+			return nil, errors.Wrap(err, "error reading group row")
 		}
 
 		groups = append(groups, group)

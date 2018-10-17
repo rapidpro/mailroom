@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/pkg/errors"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -77,7 +77,7 @@ func (c *Channel) ChannelReference() *assets.ChannelReference {
 func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Channel, error) {
 	rows, err := db.Queryx(selectChannelsSQL, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying channels for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -86,7 +86,7 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 		channel := &Channel{}
 		err := readJSONRow(rows, &channel.c)
 		if err != nil {
-			return nil, errors.Annotatef(err, "error unmarshalling channel")
+			return nil, errors.Wrapf(err, "error unmarshalling channel")
 		}
 
 		channels = append(channels, channel)

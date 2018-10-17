@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/legacy"
+	"github.com/pkg/errors"
 )
 
 type FlowID int
@@ -61,7 +61,7 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, arg interface{}) (*F
 
 	rows, err := db.Queryx(sql, arg)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying flow by: %s", arg)
+		return nil, errors.Wrapf(err, "error querying flow by: %s", arg)
 	}
 	defer rows.Close()
 
@@ -72,25 +72,25 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, arg interface{}) (*F
 
 	err = readJSONRow(rows, &flow.f)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error reading flow definition by: %s", arg)
+		return nil, errors.Wrapf(err, "error reading flow definition by: %s", arg)
 	}
 
 	// load it in from our json
 	legacyFlow, err := legacy.ReadLegacyFlow([]byte(flow.f.Definition))
 	if err != nil {
-		return nil, errors.Annotatef(err, "error reading flow into legacy format: %s", arg)
+		return nil, errors.Wrapf(err, "error reading flow into legacy format: %s", arg)
 	}
 
 	// migrate forwards returning our final flow definition
 	newFlow, err := legacyFlow.Migrate(false, false)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error migrating flow: %s", arg)
+		return nil, errors.Wrapf(err, "error migrating flow: %s", arg)
 	}
 
 	// write this flow back out in our new format
 	flow.f.Definition, err = json.Marshal(newFlow)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error mashalling migrated flow definition: %s", arg)
+		return nil, errors.Wrapf(err, "error mashalling migrated flow definition: %s", arg)
 	}
 
 	return flow, nil

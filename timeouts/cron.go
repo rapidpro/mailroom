@@ -7,13 +7,13 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
 	"github.com/nyaruka/mailroom/handler"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,7 +47,7 @@ func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName 
 	// find all sessions that need to be expired (we exclude IVR runs)
 	rows, err := db.QueryxContext(ctx, timedoutSessionsSQL)
 	if err != nil {
-		return errors.Annotatef(err, "error selecting timed out sessions")
+		return errors.Wrapf(err, "error selecting timed out sessions")
 	}
 	defer rows.Close()
 
@@ -60,14 +60,14 @@ func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName 
 	for rows.Next() {
 		err := rows.StructScan(timeout)
 		if err != nil {
-			return errors.Annotatef(err, "error scanning timeout")
+			return errors.Wrapf(err, "error scanning timeout")
 		}
 
 		// check whether we've already queued this
 		taskID := fmt.Sprintf("%d:%s", timeout.SessionID, timeout.TimeoutOn.Format(time.RFC3339))
 		queued, err := marker.HasTask(rc, markerGroup, taskID)
 		if err != nil {
-			return errors.Annotatef(err, "error checking whether task is queued")
+			return errors.Wrapf(err, "error checking whether task is queued")
 		}
 
 		// already queued? move on
@@ -79,13 +79,13 @@ func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName 
 		task := handler.NewTimeoutEvent(timeout.OrgID, timeout.ContactID, timeout.SessionID, timeout.TimeoutOn)
 		err = handler.AddHandleTask(rc, timeout.ContactID, task)
 		if err != nil {
-			return errors.Annotatef(err, "error adding new handle task")
+			return errors.Wrapf(err, "error adding new handle task")
 		}
 
 		// and mark it as queued
 		err = marker.AddTask(rc, markerGroup, taskID)
 		if err != nil {
-			return errors.Annotatef(err, "error marking timeout task as queued")
+			return errors.Wrapf(err, "error marking timeout task as queued")
 		}
 
 		count++

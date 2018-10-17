@@ -6,9 +6,9 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -105,7 +105,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 		for ce := range addEvents {
 			scheduled, err := ce.ScheduleForContact(tz, now, s.Contact())
 			if err != nil {
-				return errors.Annotatef(err, "error calculating offset")
+				return errors.Wrapf(err, "error calculating offset")
 			}
 
 			// no scheduled date? move on
@@ -125,13 +125,13 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	// first delete all our removed fires
 	err := models.DeleteUnfiredEventFires(ctx, tx, deletes)
 	if err != nil {
-		return errors.Annotatef(err, "error deleting unfired event fires")
+		return errors.Wrapf(err, "error deleting unfired event fires")
 	}
 
 	// then insert our new ones
 	err = models.AddEventFires(ctx, tx, inserts)
 	if err != nil {
-		return errors.Annotatef(err, "error inserting new event fires")
+		return errors.Wrapf(err, "error inserting new event fires")
 	}
 
 	return nil

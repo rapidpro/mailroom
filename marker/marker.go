@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/juju/errors"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -28,7 +28,7 @@ func HasTask(rc redis.Conn, taskGroup string, taskID string) (bool, error) {
 	yesterdayKey := fmt.Sprintf(keyPattern, taskGroup, time.Now().Add(time.Hour*-24).UTC().Format("2006_01_02"))
 	found, err := redis.Bool(hasTask.Do(rc, todayKey, yesterdayKey, taskID))
 	if err != nil {
-		return false, errors.Annotatef(err, "error checking for task: %s for group: %s", taskID, taskGroup)
+		return false, errors.Wrapf(err, "error checking for task: %s for group: %s", taskID, taskGroup)
 	}
 	return found, nil
 }
@@ -40,7 +40,7 @@ func AddTask(rc redis.Conn, taskGroup string, taskID string) error {
 	rc.Send("expire", dateKey, oneDay)
 	_, err := rc.Do("")
 	if err != nil {
-		return errors.Annotatef(err, "error adding task: %s to redis set for group: %s", taskID, taskGroup)
+		return errors.Wrapf(err, "error adding task: %s to redis set for group: %s", taskID, taskGroup)
 	}
 	return nil
 }
@@ -53,7 +53,7 @@ func RemoveTask(rc redis.Conn, taskGroup string, taskID string) error {
 	rc.Send("srem", yesterdayKey, taskID)
 	_, err := rc.Do("")
 	if err != nil {
-		return errors.Annotatef(err, "error removing task: %s from redis set for group: %s", taskID, taskGroup)
+		return errors.Wrapf(err, "error removing task: %s from redis set for group: %s", taskID, taskGroup)
 	}
 	return nil
 }

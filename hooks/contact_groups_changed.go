@@ -5,11 +5,11 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -60,12 +60,12 @@ func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	// do our updates
 	err := models.AddContactsToGroups(ctx, tx, adds)
 	if err != nil {
-		return errors.Annotatef(err, "error adding contacts to groups")
+		return errors.Wrapf(err, "error adding contacts to groups")
 	}
 
 	err = models.RemoveContactsFromGroups(ctx, tx, removes)
 	if err != nil {
-		return errors.Annotatef(err, "error removing contacts from groups")
+		return errors.Wrapf(err, "error removing contacts from groups")
 	}
 
 	// build the list of all contact ids changed, we'll update modified_on for them
@@ -76,7 +76,7 @@ func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	if len(changedIDs) > 0 {
 		_, err = tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(changedIDs))
 		if err != nil {
-			return errors.Annotatef(err, "error updating contacts modified_on")
+			return errors.Wrapf(err, "error updating contacts modified_on")
 		}
 	}
 

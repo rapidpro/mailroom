@@ -11,13 +11,13 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
-	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/gsm7"
+	"github.com/pkg/errors"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -146,14 +146,14 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	_, _, query, _ := out.URN().ToParts()
 	parsedQuery, err := url.ParseQuery(query)
 	if err != nil {
-		return nil, errors.Annotatef(err, "unable to parse urn: %s", out.URN())
+		return nil, errors.Wrapf(err, "unable to parse urn: %s", out.URN())
 	}
 
 	// get the id of our URN
 	idQuery := parsedQuery.Get("id")
 	urnID, err := strconv.Atoi(idQuery)
 	if urnID == 0 {
-		return nil, errors.Annotatef(err, "unable to create msg for URN, has no id: %s", out.URN())
+		return nil, errors.Wrapf(err, "unable to create msg for URN, has no id: %s", out.URN())
 	}
 
 	msg := &Msg{}
@@ -199,7 +199,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 
 		metadataJSON, err := json.Marshal(metadata)
 		if err != nil {
-			return nil, errors.Annotate(err, "error marshalling quick replies")
+			return nil, errors.Wrap(err, "error marshalling quick replies")
 		}
 		m.Metadata = metadataJSON
 	}
@@ -266,7 +266,7 @@ func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status Ms
 		msgID, status, visibility, msgType, topup)
 
 	if err != nil {
-		return errors.Annotatef(err, "error updating msg: %d", msgID)
+		return errors.Wrapf(err, "error updating msg: %d", msgID)
 	}
 
 	return nil
@@ -291,13 +291,13 @@ func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status M
 
 	q, vs, err := sqlx.In(updateMsgStatusSQL, ids, status)
 	if err != nil {
-		return errors.Annotate(err, "error preparing query for updating message status")
+		return errors.Wrap(err, "error preparing query for updating message status")
 	}
 	q = tx.Rebind(q)
 
 	_, err = tx.ExecContext(ctx, q, vs...)
 	if err != nil {
-		return errors.Annotate(err, "error updating message status")
+		return errors.Wrap(err, "error updating message status")
 	}
 
 	return nil

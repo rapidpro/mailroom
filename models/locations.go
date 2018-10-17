@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/pkg/errors"
 )
 
 // Location is our mailroom type for administrative locations
@@ -45,7 +45,7 @@ func (l *Location) Children() []*Location { return l.Children_ }
 func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.LocationHierarchy, error) {
 	rows, err := db.Query(loadLocationsSQL, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying locations for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying locations for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -60,7 +60,7 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 
 		err := rows.Scan(&location.id, &location.level, &location.osmID, &location.parentID, &location.Name_, pq.Array(&location.Aliases_))
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning location row")
+			return nil, errors.Wrap(err, "error scanning location row")
 		}
 
 		if location.level > maxLevel {
@@ -94,13 +94,13 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	// ok, encode to json
 	locationJSON, err := json.Marshal(root)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error marshalling json hierarchy")
+		return nil, errors.Wrapf(err, "error marshalling json hierarchy")
 	}
 
 	// then read it in
 	hierarchy, err := utils.ReadLocationHierarchy(locationJSON)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error unmarshalling hierarchy: %s", string(locationJSON))
+		return nil, errors.Wrapf(err, "error unmarshalling hierarchy: %s", string(locationJSON))
 	}
 
 	return []assets.LocationHierarchy{hierarchy}, nil

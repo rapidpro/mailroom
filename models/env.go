@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/pkg/errors"
 )
 
 type OrgID int
@@ -62,19 +62,19 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	var orgJSON json.RawMessage
 	rows, err := db.Query(selectOrgEnvironment, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error loading org: %d", orgID)
+		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}
 	defer rows.Close()
 
 	rows.Next()
 	err = rows.Scan(&org.id, &orgJSON)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error scanning org: %d", orgID)
+		return nil, errors.Wrapf(err, "error scanning org: %d", orgID)
 	}
 
 	org.env, err = utils.ReadEnvironment(orgJSON)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error unmarshalling org json: %s", orgJSON)
+		return nil, errors.Wrapf(err, "error unmarshalling org json: %s", orgJSON)
 	}
 
 	return org, nil

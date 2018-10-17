@@ -7,7 +7,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
@@ -15,6 +14,7 @@ import (
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,7 +50,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 
 	rows, err := db.QueryxContext(ctx, expiredEventsQuery)
 	if err != nil {
-		return errors.Annotatef(err, "error loading expired campaign events")
+		return errors.Wrapf(err, "error loading expired campaign events")
 	}
 	defer rows.Close()
 
@@ -74,14 +74,14 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 
 			err = queue.AddTask(rc, mailroom.BatchQueue, campaignEventFireType, int(task.OrgID), task, queue.DefaultPriority)
 			if err != nil {
-				return errors.Annotate(err, "error queuing task")
+				return errors.Wrap(err, "error queuing task")
 			}
 
 			// mark each of these fires as queued
 			for _, id := range task.FireIDs {
 				err = marker.AddTask(rc, campaignsLock, fmt.Sprintf("%d", id))
 				if err != nil {
-					return errors.Annotate(err, "error marking event as queued")
+					return errors.Wrap(err, "error marking event as queued")
 				}
 			}
 			log.WithField("task", fmt.Sprintf("%vvv", task)).WithField("fire_count", len(task.FireIDs)).Debug("added event fire task")
@@ -97,14 +97,14 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 		row := &eventFireRow{}
 		err := rows.StructScan(row)
 		if err != nil {
-			return errors.Annotatef(err, "error reading event fire row")
+			return errors.Wrapf(err, "error reading event fire row")
 		}
 
 		// check whether this event has already been queued to fire
 		taskID := fmt.Sprintf("%d", row.FireID)
 		dupe, err := marker.HasTask(rc, campaignsLock, taskID)
 		if err != nil {
-			return errors.Annotate(err, "error checking task lock")
+			return errors.Wrap(err, "error checking task lock")
 		}
 
 		// this has already been queued, move on
@@ -121,7 +121,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 		// different task, queue up our current task
 		err = queueTask(task)
 		if err != nil {
-			return errors.Annotatef(err, "error queueing task")
+			return errors.Wrapf(err, "error queueing task")
 		}
 
 		// and create a new one based on this row
@@ -139,7 +139,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 	// queue our last task
 	err = queueTask(task)
 	if err != nil {
-		return errors.Annotatef(err, "error queueing task")
+		return errors.Wrapf(err, "error queueing task")
 	}
 
 	librato.Gauge("mr.campaign_event_cron_elapsed", float64(time.Since(start))/float64(time.Second))

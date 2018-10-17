@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/juju/errors"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/pkg/errors"
 )
 
 // ResthookID is our type for the database id of a resthook
@@ -33,7 +33,7 @@ func (r *Resthook) Subscribers() []string { return r.r.Subscribers }
 func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Resthook, error) {
 	rows, err := db.Queryx(selectResthooksSQL, orgID)
 	if err != nil {
-		return nil, errors.Annotatef(err, "error querying resthooks for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying resthooks for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -42,7 +42,7 @@ func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 		resthook := &Resthook{}
 		err = readJSONRow(rows, &resthook.r)
 		if err != nil {
-			return nil, errors.Annotate(err, "error scanning resthook row")
+			return nil, errors.Wrap(err, "error scanning resthook row")
 		}
 
 		resthooks = append(resthooks, resthook)
@@ -85,7 +85,7 @@ func UnsubscribeResthooks(ctx context.Context, tx *sqlx.Tx, unsubs []*ResthookUn
 
 	err := BulkSQL(ctx, "unsubscribing resthooks", tx, unsubscribeResthooksSQL, is)
 	if err != nil {
-		return errors.Annotatef(err, "error unsubscribing from resthooks")
+		return errors.Wrapf(err, "error unsubscribing from resthooks")
 	}
 
 	return nil
