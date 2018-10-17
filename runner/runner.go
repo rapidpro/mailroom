@@ -244,10 +244,29 @@ func FireCampaignEvents(
 		return nil, tx.Commit()
 	}
 
+	// our start options are based on the start mode for our event
+	options := NewStartOptions()
+	switch dbEvent.StartMode() {
+	case models.StartModeInterrupt:
+		options.IncludeActive = true
+		options.RestartParticipants = true
+		options.Interrupt = true
+	case models.StartModePassive:
+		options.IncludeActive = true
+		options.RestartParticipants = true
+		options.Interrupt = false
+	case models.StartModeSkip:
+		options.IncludeActive = false
+		options.RestartParticipants = false
+		options.Interrupt = false
+	default:
+		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())
+	}
+
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	now := time.Now()
-	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
+	options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 		delete(skippedContacts, contact.ID())
 		return triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, now)
 	}
@@ -255,7 +274,7 @@ func FireCampaignEvents(
 	// this is our pre commit callback for our sessions, we'll mark the event fires associated
 	// with the passed in sessions as complete in the same transaction
 	fired := time.Now()
-	updateEventFires := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+	options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
 		// build up our list of event fire ids based on the session contact ids
 		fires := make([]*models.EventFire, 0, len(sessions))
 		for _, s := range sessions {
@@ -274,27 +293,6 @@ func FireCampaignEvents(
 		// bulk update those event fires
 		return models.MarkEventsFired(ctx, tx, fires, fired)
 	}
-
-	// our start options are based on the start mode for our event
-	options := NewStartOptions()
-
-	switch dbEvent.StartMode() {
-	case models.StartModeInterrupt:
-		options.IncludeActive = true
-		options.RestartParticipants = true
-		options.Interrupt = true
-	case models.StartModePassive:
-		options.IncludeActive = true
-		options.RestartParticipants = true
-		options.Interrupt = false
-	case models.StartModeSkip:
-		options.IncludeActive = false
-		options.RestartParticipants = false
-		options.Interrupt = false
-	}
-
-	options.TriggerBuilder = triggerBuilder
-	options.CommitHook = updateEventFires
 
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, dbFlow, contactIDs, options)
 	if err != nil {
