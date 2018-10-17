@@ -33,34 +33,35 @@ type StartSessionAction struct {
 	BaseAction
 	onlineAction
 
+	Flow          *assets.FlowReference     `json:"flow" validate:"required"`
 	URNs          []urns.URN                `json:"urns,omitempty"`
 	Contacts      []*flows.ContactReference `json:"contacts,omitempty" validate:"dive"`
 	Groups        []*assets.GroupReference  `json:"groups,omitempty" validate:"dive"`
 	LegacyVars    []string                  `json:"legacy_vars,omitempty"`
-	Flow          *assets.FlowReference     `json:"flow" validate:"required"`
 	CreateContact bool                      `json:"create_contact,omitempty"`
 }
 
 // NewStartSessionAction creates a new start session action
-func NewStartSessionAction(uuid flows.ActionUUID, urns []urns.URN, contacts []*flows.ContactReference, groups []*assets.GroupReference, legacyVars []string, flow *assets.FlowReference, createContact bool) *StartSessionAction {
+func NewStartSessionAction(uuid flows.ActionUUID, flow *assets.FlowReference, urns []urns.URN, contacts []*flows.ContactReference, groups []*assets.GroupReference, legacyVars []string, createContact bool) *StartSessionAction {
 	return &StartSessionAction{
 		BaseAction:    NewBaseAction(TypeStartSession, uuid),
+		Flow:          flow,
 		URNs:          urns,
 		Contacts:      contacts,
 		Groups:        groups,
 		LegacyVars:    legacyVars,
-		Flow:          flow,
 		CreateContact: createContact,
 	}
 }
 
 // Validate validates our action is valid and has all the assets it needs
-func (a *StartSessionAction) Validate(assets flows.SessionAssets) error {
-	// check we have the flow
-	if _, err := assets.Flows().Get(a.Flow.UUID); err != nil {
+func (a *StartSessionAction) Validate(assets flows.SessionAssets, context *flows.ValidationContext) error {
+	// check the flow exists and that it's valid
+	if err := a.validateFlow(assets, a.Flow, context); err != nil {
 		return err
 	}
-	// check we have all groups
+
+	// finally check that all the groups exist
 	return a.validateGroups(assets, a.Groups)
 }
 

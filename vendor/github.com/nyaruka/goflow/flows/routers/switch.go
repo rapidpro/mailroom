@@ -26,16 +26,28 @@ type Case struct {
 	ExitUUID    flows.ExitUUID `json:"exit_uuid"            validate:"required"`
 }
 
+// NewCase creates a new case
+func NewCase(uuid utils.UUID, type_ string, arguments []string, omitOperand bool, exitUUID flows.ExitUUID) *Case {
+	return &Case{
+		UUID:        uuid,
+		Type:        type_,
+		Arguments:   arguments,
+		OmitOperand: omitOperand,
+		ExitUUID:    exitUUID,
+	}
+}
+
 // SwitchRouter is a router which allows specifying 0-n cases which should each be tested in order, following
 // whichever case returns true, or if none do, then taking the default exit
 type SwitchRouter struct {
 	BaseRouter
 	Default flows.ExitUUID `json:"default_exit_uuid"   validate:"omitempty,uuid4"`
 	Operand string         `json:"operand"             validate:"required"`
-	Cases   []Case         `json:"cases"`
+	Cases   []*Case        `json:"cases"`
 }
 
-func NewSwitchRouter(defaultExit flows.ExitUUID, operand string, cases []Case, resultName string) *SwitchRouter {
+// NewSwitchRouter creates a new switch router
+func NewSwitchRouter(defaultExit flows.ExitUUID, operand string, cases []*Case, resultName string) *SwitchRouter {
 	return &SwitchRouter{
 		BaseRouter: newBaseRouter(TypeSwitch, resultName),
 		Default:    defaultExit,
@@ -96,7 +108,7 @@ func (r *SwitchRouter) PickRoute(run flows.FlowRun, exits []flows.Exit, step flo
 		// try to look up our function
 		xtest := tests.XTESTS[test]
 		if xtest == nil {
-			return nil, flows.NoRoute, fmt.Errorf("Unknown test '%s', taking no exit", c.Type)
+			return nil, flows.NoRoute, fmt.Errorf("unknown test '%s', taking no exit", c.Type)
 		}
 
 		// build our argument list
@@ -121,7 +133,9 @@ func (r *SwitchRouter) PickRoute(run flows.FlowRun, exits []flows.Exit, step flo
 		// tests have to return either errors or test results
 		switch typedResult := result.(type) {
 		case types.XError:
-			return nil, flows.NoRoute, types.NewXErrorf("error calling %s: %s", strings.ToUpper(test), typedResult.(types.XError).Error())
+			// test functions can return an error
+			run.LogError(step, fmt.Errorf("error calling test %s: %s", strings.ToUpper(test), typedResult.Error()))
+			continue
 		case tests.XTestResult:
 			// looks truthy, lets return this exit
 			if typedResult.Matched() {
@@ -133,7 +147,7 @@ func (r *SwitchRouter) PickRoute(run flows.FlowRun, exits []flows.Exit, step flo
 				return operandAsStr, flows.NewRoute(c.ExitUUID, resultAsStr.Native(), typedResult.Extra()), nil
 			}
 		default:
-			return nil, flows.NoRoute, fmt.Errorf("Unexpected result type from test %v: %#v", xtest, result)
+			return nil, flows.NoRoute, fmt.Errorf("unexpected result type from test %v: %#v", xtest, result)
 		}
 	}
 

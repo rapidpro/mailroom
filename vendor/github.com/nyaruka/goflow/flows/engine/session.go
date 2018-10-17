@@ -162,7 +162,7 @@ func (s *session) Resume(resume flows.Resume) error {
 	}
 
 	// check flow is valid and has everything it needs to run
-	if err := waitingRun.Flow().Validate(s.Assets()); err != nil {
+	if err := waitingRun.Flow().Validate(s.Assets(), flows.NewValidationContext()); err != nil {
 		return fmt.Errorf("validation failed for flow[uuid=%s]: %s", waitingRun.Flow().UUID(), err)
 	}
 
@@ -401,7 +401,7 @@ func (s *session) pickNodeExit(run flows.FlowRun, node flows.Node, step flows.St
 	var exitUUID flows.ExitUUID
 	if router != nil {
 		if operand, route, err = router.PickRoute(run, node.Exits(), step); err != nil {
-			return nil, noDestination, err
+			return nil, noDestination, fmt.Errorf("error routing from node[uuid=%s]: %s", node.UUID(), err)
 		}
 		exitUUID = route.Exit()
 	} else if len(node.Exits()) > 0 {

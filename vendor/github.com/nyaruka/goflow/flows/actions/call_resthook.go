@@ -48,7 +48,7 @@ func NewCallResthookAction(uuid flows.ActionUUID, resthook string, resultName st
 }
 
 // Validate validates our action is valid and has all the assets it needs
-func (a *CallResthookAction) Validate(assets flows.SessionAssets) error {
+func (a *CallResthookAction) Validate(assets flows.SessionAssets, context *flows.ValidationContext) error {
 	return nil
 }
 
@@ -78,12 +78,12 @@ func (a *CallResthookAction) Execute(run flows.FlowRun, step flows.Step) error {
 
 		req.Header.Add("Content-Type", "application/json")
 
-		webhook, err := flows.MakeWebhookCall(run.Session(), req)
+		webhook, err := flows.MakeWebhookCall(run.Session(), req, a.Resthook)
 		if err != nil {
 			a.logError(run, step, err)
 		} else {
 			webhooks = append(webhooks, webhook)
-			a.log(run, step, events.NewWebhookCalledEvent(webhook, a.Resthook))
+			a.log(run, step, events.NewWebhookCalledEvent(webhook))
 		}
 	}
 

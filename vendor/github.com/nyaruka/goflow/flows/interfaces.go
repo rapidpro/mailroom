@@ -119,6 +119,24 @@ type SessionAssets interface {
 	Resthooks() *ResthookAssets
 }
 
+// ValidationContext contains state required during flow validation to avoid infinite loops
+type ValidationContext struct {
+	started map[assets.FlowUUID]bool
+}
+
+// NewValidationContext creates a new flow validation context
+func NewValidationContext() *ValidationContext {
+	return &ValidationContext{started: make(map[assets.FlowUUID]bool, 1)}
+}
+
+func (v *ValidationContext) Start(flow Flow) {
+	v.started[flow.UUID()] = true
+}
+
+func (v *ValidationContext) IsStarted(flow Flow) bool {
+	return v.started[flow.UUID()]
+}
+
 // Flow describes the ordered logic of actions and routers. It renders as its name in a template, and has the following
 // properties which can be accessed:
 //
@@ -142,11 +160,12 @@ type Flow interface {
 	Name() string
 	Revision() int
 	Language() utils.Language
+	Type() FlowType
 	ExpireAfterMinutes() int
 	Localization() Localization
 	UI() UI
 
-	Validate(SessionAssets) error
+	Validate(SessionAssets, *ValidationContext) error
 	Nodes() []Node
 	GetNode(uuid NodeUUID) Node
 
@@ -156,13 +175,13 @@ type Flow interface {
 // Node is a single node in a flow
 type Node interface {
 	UUID() NodeUUID
-
 	Actions() []Action
 	AddAction(Action)
-
 	Router() Router
 	Exits() []Exit
 	Wait() Wait
+
+	Validate(SessionAssets, *ValidationContext, Flow, map[utils.UUID]bool) error
 }
 
 // Action is an action within a flow node
@@ -170,7 +189,7 @@ type Action interface {
 	UUID() ActionUUID
 
 	Execute(FlowRun, Step) error
-	Validate(SessionAssets) error
+	Validate(SessionAssets, *ValidationContext) error
 	AllowedFlowTypes() []FlowType
 	utils.Typed
 }

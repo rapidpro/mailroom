@@ -12,24 +12,25 @@ import (
 )
 
 type flow struct {
-	uuid     assets.FlowUUID
-	name     string
-	language utils.Language
-	flowType flows.FlowType
-
+	uuid               assets.FlowUUID
+	name               string
+	language           utils.Language
+	flowType           flows.FlowType
 	revision           int
 	expireAfterMinutes int
 	localization       flows.Localization
-
-	nodes   []flows.Node
-	nodeMap map[flows.NodeUUID]flows.Node
+	nodes              []flows.Node
 
 	// only read for legacy flows which are being migrated
 	ui flows.UI
+
+	// internal state
+	nodeMap map[flows.NodeUUID]flows.Node
+	valid   bool
 }
 
 // NewFlow creates a new flow
-func NewFlow(uuid assets.FlowUUID, name string, language utils.Language, flowType flows.FlowType, revision int, expireAfterMinutes int, localization flows.Localization, nodes []flows.Node, ui flows.UI) (flows.Flow, error) {
+func NewFlow(uuid assets.FlowUUID, name string, language utils.Language, flowType flows.FlowType, revision int, expireAfterMinutes int, localization flows.Localization, nodes []flows.Node, ui flows.UI) flows.Flow {
 	f := &flow{
 		uuid:               uuid,
 		name:               name,
@@ -39,37 +40,22 @@ func NewFlow(uuid assets.FlowUUID, name string, language utils.Language, flowTyp
 		expireAfterMinutes: expireAfterMinutes,
 		localization:       localization,
 		nodes:              nodes,
+		nodeMap:            make(map[flows.NodeUUID]flows.Node, len(nodes)),
 		ui:                 ui,
 	}
-	if err := f.buildNodeMap(); err != nil {
-		return nil, err
-	}
 
-	// go back through nodes and perform basic structural validation
 	for _, node := range f.nodes {
-
-		// check every exit has a valid destination
-		for _, exit := range node.Exits() {
-			if exit.DestinationNodeUUID() != "" && f.nodeMap[exit.DestinationNodeUUID()] == nil {
-				return nil, fmt.Errorf("destination %s of exit[uuid=%s] isn't a known node", exit.DestinationNodeUUID(), exit.UUID())
-			}
-		}
-
-		// and the router if there is one
-		if node.Router() != nil {
-			if err := node.Router().Validate(node.Exits()); err != nil {
-				return nil, fmt.Errorf("router is invalid on node[uuid=%s]: %v", node.UUID(), err)
-			}
-		}
+		f.nodeMap[node.UUID()] = node
 	}
 
-	return f, nil
+	return f
 }
 
 func (f *flow) UUID() assets.FlowUUID                  { return f.uuid }
 func (f *flow) Name() string                           { return f.name }
 func (f *flow) Revision() int                          { return f.revision }
 func (f *flow) Language() utils.Language               { return f.language }
+func (f *flow) Type() flows.FlowType                   { return f.flowType }
 func (f *flow) ExpireAfterMinutes() int                { return f.expireAfterMinutes }
 func (f *flow) Nodes() []flows.Node                    { return f.nodes }
 func (f *flow) Localization() flows.Localization       { return f.localization }
@@ -78,8 +64,17 @@ func (f *flow) GetNode(uuid flows.NodeUUID) flows.Node { return f.nodeMap[uuid] 
 
 // Validates that structurally we are sane. IE, all required fields are present and
 // all exits with destinations point to valid endpoints.
-func (f *flow) Validate(assets flows.SessionAssets) error {
-	var err error
+func (f *flow) Validate(assets flows.SessionAssets, context *flows.ValidationContext) error {
+	// check we haven't already started validating this flow to avoid an infinite loop
+	if context.IsStarted(f) {
+		return nil
+	}
+	context.Start(f)
+
+	// if this flow has already been validated, don't need to do it again
+	if f.valid {
+		return nil
+	}
 
 	// track UUIDs used by nodes and actions to ensure that they are unique
 	seenUUIDs := make(map[utils.UUID]bool)
@@ -91,33 +86,13 @@ func (f *flow) Validate(assets flows.SessionAssets) error {
 		}
 		seenUUIDs[utils.UUID(node.UUID())] = true
 
-		// validate all the node's actions
-		for _, action := range node.Actions() {
-
-			// check that this action is valid for this flow type
-			isValidInType := false
-			for _, allowedType := range action.AllowedFlowTypes() {
-				if f.flowType == allowedType {
-					isValidInType = true
-					break
-				}
-			}
-			if !isValidInType {
-				return fmt.Errorf("action type '%s' is not allowed in a flow of type '%s'", action.Type(), f.flowType)
-			}
-
-			uuidAlreadySeen := seenUUIDs[utils.UUID(action.UUID())]
-			if uuidAlreadySeen {
-				return fmt.Errorf("action UUID %s isn't unique", action.UUID())
-			}
-			seenUUIDs[utils.UUID(action.UUID())] = true
-
-			if err := action.Validate(assets); err != nil {
-				return fmt.Errorf("validation failed for action[uuid=%s, type=%s]: %v", action.UUID(), action.Type(), err)
-			}
+		if err := node.Validate(assets, context, f, seenUUIDs); err != nil {
+			return fmt.Errorf("validation failed for node[uuid=%s]: %s", node.UUID(), err)
 		}
 	}
-	return err
+
+	f.valid = true
+	return nil
 }
 
 // Resolve resolves the given key when this flow is referenced in an expression
@@ -154,19 +129,6 @@ func (f *flow) Reference() *assets.FlowReference {
 	return assets.NewFlowReference(f.uuid, f.name)
 }
 
-func (f *flow) buildNodeMap() error {
-	f.nodeMap = make(map[flows.NodeUUID]flows.Node)
-
-	for _, node := range f.nodes {
-		// make sure we haven't seen this node before
-		if f.nodeMap[node.UUID()] != nil {
-			return fmt.Errorf("duplicate node uuid: %s", node.UUID())
-		}
-		f.nodeMap[node.UUID()] = node
-	}
-	return nil
-}
-
 //------------------------------------------------------------------------------------------
 // JSON Encoding / Decoding
 //------------------------------------------------------------------------------------------
@@ -198,7 +160,7 @@ func ReadFlow(data json.RawMessage) (flows.Flow, error) {
 		nodes[n] = e.Nodes[n]
 	}
 
-	return NewFlow(e.UUID, e.Name, e.Language, e.Type, e.Revision, e.ExpireAfterMinutes, e.Localization, nodes, nil)
+	return NewFlow(e.UUID, e.Name, e.Language, e.Type, e.Revision, e.ExpireAfterMinutes, e.Localization, nodes, nil), nil
 }
 
 // MarshalJSON marshals this flow into JSON

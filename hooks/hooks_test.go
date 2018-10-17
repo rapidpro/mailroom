@@ -67,16 +67,16 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 
 	exits := make([]flows.Exit, len(tc.Actions))
 	exitNodes := make([]flows.Node, len(tc.Actions))
-	cases := make([]routers.Case, len(tc.Actions))
+	cases := make([]*routers.Case, len(tc.Actions))
 	i = 0
 	for cid, actions := range tc.Actions {
-		cases[i] = routers.Case{
-			UUID:        utils.NewUUID(),
-			Type:        "has_any_word",
-			Arguments:   []string{fmt.Sprintf("%d", cid)},
-			OmitOperand: false,
-			ExitUUID:    exitUUIDs[i],
-		}
+		cases[i] = routers.NewCase(
+			utils.NewUUID(),
+			"has_any_word",
+			[]string{fmt.Sprintf("%d", cid)},
+			false,
+			exitUUIDs[i],
+		)
 
 		exitNodes[i] = definition.NewNode(
 			flows.NodeUUID(utils.NewUUID()),
@@ -106,16 +106,16 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	entry := definition.NewNode(
 		flows.NodeUUID(utils.NewUUID()),
 		nil,
+		nil,
 		router,
 		exits,
-		nil,
 	)
 
 	nodes := []flows.Node{entry}
 	nodes = append(nodes, exitNodes...)
 
 	// we have our nodes, lets create our flow
-	flow, err := definition.NewFlow(
+	flow := definition.NewFlow(
 		uuid,
 		"Test Flow",
 		"eng",
@@ -126,10 +126,6 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		nodes,
 		nil,
 	)
-
-	if err != nil {
-		t.Errorf("error creating test flow: %s", err)
-	}
 
 	return flow
 }

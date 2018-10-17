@@ -97,18 +97,12 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/juju/errors"
-  packages = ["."]
-  revision = "22422dad46e14561a0854ad42497a75af9b61909"
-
-[[projects]]
   name = "github.com/lib/pq"
   packages = [
     ".",
     "oid"
   ]
-  revision = "4ded0e9383f75c197b3a2aaa6d590ac52df6fd79"
-  version = "v1.0.0"
+  revision = "9eb73efc1fcc404148b56765b0d3f61d9a5ef8ee"
 
 [[projects]]
   name = "github.com/naoina/go-stringutil"
@@ -138,6 +132,7 @@
   version = "v0.2.0"
 
 [[projects]]
+  branch = "master"
   name = "github.com/nyaruka/goflow"
   packages = [
     "assets",
@@ -167,8 +162,7 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "d64fbfbfe7f1443c6035beb9eb0969e0725fa092"
-  version = "v0.22.0"
+  revision = "891b1b6595b82386f5b8cdaae662aef21d568640"
 
 [[projects]]
   branch = "master"
@@ -265,6 +259,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9e8b4e5e7344c89340722a52f0d9b5bdfe3b2edfab8950c352fefbcee8a3ac16"
+  inputs-digest = "011aa85ae332f48266451815bb6af7f46818d6d5661edb977b1542a4be1a207f"
   solver-name = "gps-cdcl"
   solver-version = 1

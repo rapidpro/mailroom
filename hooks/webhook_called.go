@@ -2,7 +2,6 @@ package hooks
 
 import (
 	"context"
-	"strings"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -53,8 +52,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 	}).Debug("webhook called")
 
 	// if this was a resthook and the status was 410, that means we should remove it
-	// TODO: replace with something more sane
-	if strings.Contains(event.Response, "410") && event.Resthook != "" {
+	if event.Status == flows.WebhookStatusSubscriberGone {
 		unsub := &models.ResthookUnsubscribe{
 			OrgID: org.OrgID(),
 			Slug:  event.Resthook,

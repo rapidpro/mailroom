@@ -17,6 +17,7 @@ var webhookStatusCategories = map[flows.WebhookStatus]string{
 	flows.WebhookStatusSuccess:         "Success",
 	flows.WebhookStatusResponseError:   "Failure",
 	flows.WebhookStatusConnectionError: "Failure",
+	flows.WebhookStatusSubscriberGone:  "Failure",
 }
 
 var registeredTypes = map[string](func() flows.Action){}
@@ -71,6 +72,18 @@ func (a *BaseAction) validateLabels(assets flows.SessionAssets, references []*as
 		}
 	}
 	return nil
+}
+
+// helper function for actions that have a flow reference that must be validated
+func (a *BaseAction) validateFlow(assets flows.SessionAssets, reference *assets.FlowReference, context *flows.ValidationContext) error {
+	// check the flow exists
+	flow, err := assets.Flows().Get(reference.UUID)
+	if err != nil {
+		return err
+	}
+
+	// and that it's valid
+	return flow.Validate(assets, context)
 }
 
 // helper function for actions that have a set of group references that must be resolved to actual groups
