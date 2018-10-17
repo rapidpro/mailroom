@@ -1,3 +1,7 @@
+v0.0.41
+----------
+ * less logging, only look at expired runs with sessions
+
 v0.0.40
 ----------
  * latest goflow
