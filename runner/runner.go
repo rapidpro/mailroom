@@ -23,6 +23,17 @@ var (
 	httpClient = utils.NewHTTPClient("mailroom")
 )
 
+// NewStartOptions creates and returns the default start options to be used for flow starts
+func NewStartOptions() *StartOptions {
+	start := &StartOptions{
+		RestartParticipants: true,
+		IncludeActive:       true,
+		Interrupt:           true,
+	}
+	return start
+}
+
+// StartOptions define the various parameters that can be used when starting a flow
 type StartOptions struct {
 	// RestartParticipants should be true if the flow start should restart participants already in this flow
 	RestartParticipants bool
@@ -33,6 +44,12 @@ type StartOptions struct {
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	// (simple campaign events do not currently interrupt)
 	Interrupt bool
+
+	// CommitHook is the hook that will be called in the transaction where each session is written
+	CommitHook models.SessionCommitHook
+
+	// TriggerBuilder is the builder that will be used to build a trigger for each contact started in the flow
+	TriggerBuilder TriggerBuilder
 }
 
 // TriggerBuilder defines the interface for building a trigger for the passed in contact
@@ -151,13 +168,14 @@ func StartFlowBatch(
 	}
 
 	// options for our flow start
-	options := &StartOptions{
-		RestartParticipants: batch.RestartParticipants(),
-		IncludeActive:       batch.IncludeActive(),
-		Interrupt:           true,
-	}
+	options := NewStartOptions()
+	options.RestartParticipants = batch.RestartParticipants()
+	options.IncludeActive = batch.IncludeActive()
+	options.Interrupt = true
+	options.TriggerBuilder = triggerBuilder
+	options.CommitHook = updateStartID
 
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, batch.ContactIDs(), options, triggerBuilder, updateStartID)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, batch.ContactIDs(), options)
 	if err != nil {
 		return nil, errors.Annotatef(err, "error starting flow batch")
 	}
@@ -183,9 +201,11 @@ func FireCampaignEvents(
 
 	contactIDs := make([]flows.ContactID, 0, len(fires))
 	fireMap := make(map[flows.ContactID]*models.EventFire, len(fires))
+	skippedContacts := make(map[flows.ContactID]*models.EventFire, len(fires))
 	for _, f := range fires {
 		contactIDs = append(contactIDs, f.ContactID)
 		fireMap[f.ContactID] = f
+		skippedContacts[f.ContactID] = f
 	}
 
 	// create our org assets
@@ -228,6 +248,7 @@ func FireCampaignEvents(
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	now := time.Now()
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
+		delete(skippedContacts, contact.ID())
 		return triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, now)
 	}
 
@@ -245,17 +266,37 @@ func FireCampaignEvents(
 			fires = append(fires, fire)
 		}
 
+		// also add in any contacts that were skipped
+		for _, e := range skippedContacts {
+			fires = append(fires, e)
+		}
+
 		// bulk update those event fires
 		return models.MarkEventsFired(ctx, tx, fires, fired)
 	}
 
-	// start our contacts
-	options := &StartOptions{
-		IncludeActive:       true,
-		RestartParticipants: true,
-		Interrupt:           false,
+	// our start options are based on the start mode for our event
+	options := NewStartOptions()
+
+	switch dbEvent.StartMode() {
+	case models.StartModeInterrupt:
+		options.IncludeActive = true
+		options.RestartParticipants = true
+		options.Interrupt = true
+	case models.StartModePassive:
+		options.IncludeActive = true
+		options.RestartParticipants = true
+		options.Interrupt = false
+	case models.StartModeSkip:
+		options.IncludeActive = false
+		options.RestartParticipants = false
+		options.Interrupt = false
 	}
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, dbFlow, contactIDs, options, triggerBuilder, updateEventFires)
+
+	options.TriggerBuilder = triggerBuilder
+	options.CommitHook = updateEventFires
+
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, dbFlow, contactIDs, options)
 	if err != nil {
 		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
 	}
@@ -270,8 +311,7 @@ func FireCampaignEvents(
 // StartFlowForContacts runs the passed in flow for the passed in contact
 func StartFlowForContacts(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets,
-	flow *models.Flow, contactIDs []flows.ContactID, options *StartOptions,
-	buildTrigger TriggerBuilder, hook models.SessionCommitHook) ([]*models.Session, error) {
+	flow *models.Flow, contactIDs []flows.ContactID, options *StartOptions) ([]*models.Session, error) {
 
 	if len(contactIDs) == 0 {
 		return nil, nil
@@ -336,7 +376,7 @@ func StartFlowForContacts(
 		if err != nil {
 			return nil, errors.Annotatef(err, "error creating flow contact")
 		}
-		triggers = append(triggers, buildTrigger(contact))
+		triggers = append(triggers, options.TriggerBuilder(contact))
 	}
 
 	start := time.Now()
@@ -369,8 +409,8 @@ func StartFlowForContacts(
 	}
 
 	// if we are interrupting contacts, then augment our hook to do so
+	hook := options.CommitHook
 	if options.Interrupt {
-		parentHook := hook
 		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
 			// build the list of contacts being interrupted
 			interruptedContacts := make([]flows.ContactID, 0, len(sessions))
@@ -385,8 +425,8 @@ func StartFlowForContacts(
 			}
 
 			// if we have a hook from our original caller, call that too
-			if parentHook != nil {
-				err = parentHook(ctx, tx, rp, org, sessions)
+			if options.CommitHook != nil {
+				err = options.CommitHook(ctx, tx, rp, org, sessions)
 			}
 			return err
 		}

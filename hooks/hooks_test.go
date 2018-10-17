@@ -156,12 +156,12 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		flow, err := org.SetFlow(flowID, flowDef)
 		assert.NoError(t, err)
 
-		triggerBuilder := func(contact *flows.Contact) flows.Trigger {
+		options := runner.NewStartOptions()
+		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 			return triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
 		}
 
-		_, err = runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.ContactID{Cathy, Bob, Evan},
-			&runner.StartOptions{RestartParticipants: true, IncludeActive: true}, triggerBuilder, nil)
+		_, err = runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.ContactID{Cathy, Bob, Evan}, options)
 		assert.NoError(t, err)
 
 		// now check our assertions
