@@ -33,6 +33,9 @@ type CampaignEventUUID utils.UUID
 // OffsetUnit defines what time unit our offset is in
 type OffsetUnit string
 
+// StartMode defines how a campaign event should be started
+type StartMode string
+
 const (
 	// OffsetMinute means our offset is in minutes
 	OffsetMinute = OffsetUnit("M")
@@ -48,6 +51,15 @@ const (
 
 	// NilDeliveryHour is our constant for not having a set delivery hour
 	NilDeliveryHour = -1
+
+	// StartModeInterrupt means the flow for this campaign event should interrupt other flows
+	StartModeInterrupt = StartMode("I")
+
+	// StartModeSkip means the flow should be skipped if the user is active in another flow
+	StartModeSkip = StartMode("S")
+
+	// StartModePassive means the flow should be started without interrupting the user in other flows
+	StartModePassive = StartMode("P")
 )
 
 // Campaign is our struct for a campaign and all its events
@@ -88,6 +100,7 @@ type CampaignEvent struct {
 		ID            CampaignEventID   `json:"id"`
 		UUID          CampaignEventUUID `json:"uuid"`
 		EventType     string            `json:"event_type"`
+		StartMode     StartMode         `json:"start_mode"`
 		RelativeToID  FieldID           `json:"relative_to_id"`
 		RelativeToKey string            `json:"relative_to_key"`
 		Offset        int               `json:"offset"`
@@ -199,6 +212,9 @@ func (e *CampaignEvent) DeliveryHour() int { return e.e.DeliveryHour }
 // Campaign returns the campaign this event is part of
 func (e *CampaignEvent) Campaign() *Campaign { return e.campaign }
 
+// StartMode returns the start mode for this campaign event
+func (e *CampaignEvent) StartMode() StartMode { return e.e.StartMode }
+
 // loadCampaigns loads all the campaigns for the passed in org
 func loadCampaigns(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Campaign, error) {
 	rows, err := db.Queryx(selectCampaignsSQL, orgID)
@@ -240,7 +256,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		SELECT
 			e.id as id,
             e.uuid as uuid,
-            e.event_type as event_type,
+			e.event_type as event_type,
+			e.start_mode as start_mode,
 			e.relative_to_id as relative_to_id,
 			f.key as relative_to_key,
             e.offset as offset,
@@ -399,7 +416,7 @@ IN (
 		(VALUES(:contact_id, :event_id)) AS f(contact_id, event_id)
 	WHERE
 		c.contact_id = f.contact_id::int AND 
-		c.event_id = f.event_id::int AND 
+		c.event_id = f.event_id::int AND
 		c.fired IS NULL
 );
 `
