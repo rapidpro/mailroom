@@ -287,7 +287,7 @@ WHERE
 
 // MarkEventsFired sets the fired date on all the passed in event fires and updates the associated
 // rows in the database
-func MarkEventsFired(ctx context.Context, tx *sqlx.Tx, fires []*EventFire, fired time.Time) error {
+func MarkEventsFired(ctx context.Context, tx Queryer, fires []*EventFire, fired time.Time) error {
 	// set fired on all our values
 	updates := make([]interface{}, 0, len(fires))
 	for _, f := range fires {

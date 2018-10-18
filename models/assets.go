@@ -227,8 +227,6 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 		return flow, nil
 	}
 
-	fmt.Printf("did not find flow: %s\n", flowUUID)
-
 	dbFlow, err := loadFlowByUUID(a.ctx, a.db, flowUUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %s", flowUUID)
@@ -281,8 +279,6 @@ func (a *OrgAssets) SetFlow(flowID FlowID, flow flows.Flow) (*Flow, error) {
 	a.flowByID[flowID] = f
 	a.flowByUUID[flow.UUID()] = f
 
-	fmt.Printf("cached flow: %s\n", flow.UUID())
-	fmt.Println(string(definition))
 	return f, nil
 }
 

@@ -290,6 +290,9 @@ func FireCampaignEvents(
 			fires = append(fires, e)
 		}
 
+		// mark those as cleared
+		skippedContacts = make(map[flows.ContactID]*models.EventFire)
+
 		// bulk update those event fires
 		return models.MarkEventsFired(ctx, tx, fires, fired)
 	}
@@ -297,6 +300,17 @@ func FireCampaignEvents(
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, dbFlow, contactIDs, options)
 	if err != nil {
 		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
+	} else {
+		// make sure any skipped contacts are marked as fired
+		// this can occur if there were no sessions committed, so our hook above is never called
+		fires := make([]*models.EventFire, 0, len(sessions))
+		for _, e := range skippedContacts {
+			fires = append(fires, e)
+		}
+		err = models.MarkEventsFired(ctx, db, fires, fired)
+		if err != nil {
+			logrus.WithField("fire_ids", fires).WithError(err).Errorf("error marking events as fired: %s", event)
+		}
 	}
 
 	// log both our total and average
