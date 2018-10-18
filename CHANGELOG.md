@@ -1,3 +1,7 @@
+v0.0.42
+----------
+ * add support for campaign start modes
+
 v0.0.41
 ----------
  * less logging, only look at expired runs with sessions
