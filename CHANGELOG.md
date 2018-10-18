@@ -1,3 +1,7 @@
+v0.0.43
+----------
+ * mark events as fired even if we end up not creating any sessions
+
 v0.0.42
 ----------
  * add support for campaign start modes
