@@ -162,7 +162,7 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "891b1b6595b82386f5b8cdaae662aef21d568640"
+  revision = "9dfc9bf97f926c8d542d6b622d4bfc38b95eb0e3"
 
 [[projects]]
   branch = "master"
@@ -171,10 +171,10 @@
   revision = "cacc769357b85e728935b017fa2074d356e9dc8b"
 
 [[projects]]
+  branch = "master"
   name = "github.com/nyaruka/phonenumbers"
   packages = ["."]
-  revision = "f9f7777fbf70d7574e916dc2e3c14d04cf461ca2"
-  version = "v1.0.28"
+  revision = "7250c0532717da823cea71e505188803618ae5f0"
 
 [[projects]]
   name = "github.com/patrickmn/go-cache"
