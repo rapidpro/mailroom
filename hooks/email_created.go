@@ -85,6 +85,7 @@ func (h *SendEmails) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org
 
 			err = d.DialAndSend(m)
 			if err != nil {
+				// TODO: how can we expose these errors to end users somehow?
 				logrus.WithFields(logrus.Fields{
 					"smtp_server": config,
 					"subject":     email.Subject,
