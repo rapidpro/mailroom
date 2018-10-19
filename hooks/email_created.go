@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/url"
 	"strconv"
-	"sync"
 
 	"github.com/go-mail/mail"
 	"github.com/nyaruka/mailroom"
@@ -26,9 +25,6 @@ func init() {
 type SendEmails struct{}
 
 var sendEmails = &SendEmails{}
-
-var smtpOnce sync.Once
-var defaultSMTPConfig map[string]string
 
 const (
 	configSMTPServer = "SMTP_SERVER"
