@@ -14,8 +14,9 @@ type OrgID int
 
 // Org is mailroom's type for RapidPro orgs. It also implements the utils.Environment interface for GoFlow
 type Org struct {
-	id  OrgID
-	env utils.Environment
+	id     OrgID
+	env    utils.Environment
+	config map[string]interface{}
 }
 
 // ID returns the id of the org
@@ -56,10 +57,29 @@ func (o *Org) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.env)
 }
 
+// ConfigValue returns the string value for the passed in config (or default if not found)
+func (o *Org) ConfigValue(key string, def string) string {
+	if o.config == nil {
+		return def
+	}
+
+	val, found := o.config[key]
+	if !found {
+		return def
+	}
+
+	strVal, isStr := val.(string)
+	if !isStr {
+		return def
+	}
+
+	return strVal
+}
+
 // loadOrg loads the org for the passed in id, returning any error encountered
 func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	org := &Org{}
-	var orgJSON json.RawMessage
+	var orgJSON, orgConfig json.RawMessage
 	rows, err := db.Query(selectOrgEnvironment, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
@@ -67,7 +87,7 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	defer rows.Close()
 
 	rows.Next()
-	err = rows.Scan(&org.id, &orgJSON)
+	err = rows.Scan(&org.id, &orgConfig, &orgJSON)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error scanning org: %d", orgID)
 	}
@@ -77,12 +97,19 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 		return nil, errors.Wrapf(err, "error unmarshalling org json: %s", orgJSON)
 	}
 
+	org.config = make(map[string]interface{})
+	err = json.Unmarshal(orgConfig, &org.config)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error unmarshalling org config: %s", orgConfig)
+	}
+
 	return org, nil
 }
 
 const selectOrgEnvironment = `
-SELECT id, ROW_TO_JSON(o) FROM (SELECT
+SELECT id, config, ROW_TO_JSON(o) FROM (SELECT
 	id,
+	COALESCE(o.config::json,'{}'::json) as config,
 	(SELECT CASE date_format
 		WHEN 'D' THEN 'DD-MM-YYYY'
 		WHEN 'M' THEN 'MM-DD-YYYY'

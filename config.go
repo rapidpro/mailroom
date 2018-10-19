@@ -8,6 +8,7 @@ type MailroomConfig struct {
 	Redis      string `help:"URL describing how to connect to Redis"`
 	Version    string `help:"the version of this mailroom install"`
 	LogLevel   string `help:"the logging level courier should use"`
+	SMTPServer string `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
 
 	BatchWorkers   int `help:"the number of go routines that will be used to handle batch events"`
 	HandlerWorkers int `help:"the number of go routines that will be used to handle messages"`
@@ -28,5 +29,6 @@ func NewMailroomConfig() *MailroomConfig {
 		HandlerWorkers: 128,
 		LogLevel:       "error",
 		Version:        "Dev",
+		SMTPServer:     "",
 	}
 }
