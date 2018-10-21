@@ -56,6 +56,12 @@
   revision = "084a9de9eb0361fbd5ded14b55c84e5493a5d7f6"
 
 [[projects]]
+  name = "github.com/go-mail/mail"
+  packages = ["."]
+  revision = "63235f23494bf20d713a585bce40b2a0675c2f77"
+  version = "2.2.0"
+
+[[projects]]
   name = "github.com/go-playground/locales"
   packages = [
     ".",
@@ -245,6 +251,12 @@
   version = "v0.3.0"
 
 [[projects]]
+  branch = "v3"
+  name = "gopkg.in/alexcesaro/quotedprintable.v3"
+  packages = ["."]
+  revision = "2caba252f4dc53eaf6b553000885530023f54623"
+
+[[projects]]
   name = "gopkg.in/go-playground/validator.v9"
   packages = ["."]
   revision = "e69e9a28bb62b977fdc58d051f1bb477b7cbe486"
@@ -259,6 +271,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "011aa85ae332f48266451815bb6af7f46818d6d5661edb977b1542a4be1a207f"
+  inputs-digest = "4a728b2a53797aae9908f9adba4ec32bd804cfefa71d2634c5e3fe2ca4aa5784"
   solver-name = "gps-cdcl"
   solver-version = 1

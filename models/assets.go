@@ -25,7 +25,7 @@ type OrgAssets struct {
 
 	orgID OrgID
 
-	env utils.Environment
+	env *Org
 
 	flowByUUID    map[assets.FlowUUID]assets.Flow
 	flowByID      map[FlowID]assets.Flow
@@ -193,6 +193,8 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
 
 func (a *OrgAssets) Env() utils.Environment { return a.env }
+
+func (a *OrgAssets) Org() *Org { return a.env }
 
 func (a *OrgAssets) Channels() ([]assets.Channel, error) {
 	return a.channels, nil
