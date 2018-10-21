@@ -1,3 +1,9 @@
+v0.0.44
+----------
+ * correct handling of catch all triggers
+ * add support for email created event
+ * ignore msg created events that have no urns
+
 v0.0.43
 ----------
  * mark events as fired even if we end up not creating any sessions
