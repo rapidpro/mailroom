@@ -429,7 +429,8 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
-	if trigger != nil && (flow == nil || flow.IsArchived() || !flow.IgnoreTriggers()) {
+	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || flow.IsArchived() || !flow.IgnoreTriggers())) ||
+		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil || flow.IsArchived())) {
 		// load our flow
 		flow, err := org.FlowByID(trigger.FlowID())
 		if err != nil {

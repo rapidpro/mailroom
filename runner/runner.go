@@ -82,6 +82,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	// write our updated session and runs
 	err = session.WriteUpdatedSession(ctx, tx, rp, org, fs)
 	if err != nil {
+		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
 	}
 
@@ -93,6 +94,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	// commit at once
 	err = tx.Commit()
 	if err != nil {
+		tx.Rollback()
 		return nil, errors.Wrapf(err, "error committing resumption of flow")
 	}
 
@@ -108,6 +110,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	}
 
 	if err != nil {
+		tx.Rollback()
 		return nil, errors.Wrapf(err, "error committing session changes on resume")
 	}
 	logrus.WithField("contact_uuid", resume.Contact().UUID()).WithField("elapsed", time.Since(start)).Info("resumed session")
