@@ -1,3 +1,11 @@
+v1.0.30
+----------
+ * fix FormatByPattern with user defined pattern. Fixes: #16
+
+v1.0.29
+----------
+ * update metadata v8.9.16 (test diff validated against python lib)
+
 v1.0.28
 ----------
  * update metadata to v8.9.14, fix go.mod dependency

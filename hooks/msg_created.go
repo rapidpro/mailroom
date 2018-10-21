@@ -3,6 +3,8 @@ package hooks
 import (
 	"context"
 
+	"github.com/nyaruka/gocommon/urns"
+
 	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -96,6 +98,13 @@ func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 // ApplyMsgCreatedEvent creates the db msg for the passed in event
 func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
+
+	// ignore events that don't have a channel or URN set
+	// TODO: maybe we should create these messages in a failed state?
+	if event.Msg.URN() == urns.NilURN || event.Msg.Channel() == nil {
+		return nil
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
 		"session_id":   session.ID,
