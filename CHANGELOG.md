@@ -1,3 +1,7 @@
+v0.0.45
+----------
+ * refactor starts so they pass through same codepath in all cases
+
 v0.0.44
 ----------
  * correct handling of catch all triggers
