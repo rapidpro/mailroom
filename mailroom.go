@@ -197,7 +197,7 @@ func (mr *Mailroom) Stop() error {
 
 func handleSignals() {
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGQUIT, syscall.SIGUSR1)
+	signal.Notify(sigs, syscall.SIGQUIT)
 	buf := make([]byte, 1<<20)
 	for {
 		sig := <-sigs

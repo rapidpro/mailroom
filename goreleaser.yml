@@ -2,7 +2,6 @@ build:
   main: ./cmd/mailroom/main.go
   binary: mailroom
   goos:
-    - windows
     - darwin
     - linux
   goarch:
