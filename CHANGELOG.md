@@ -1,3 +1,7 @@
+v0.0.46
+----------
+ * only wait for sigquit
+
 v0.0.45
 ----------
  * refactor starts so they pass through same codepath in all cases
