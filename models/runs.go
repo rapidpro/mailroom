@@ -651,7 +651,7 @@ WHERE
 `
 
 // InterruptContactRuns interrupts all runs and sesions that exist for the passed in list of contacts
-func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.ContactID) error {
+func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.ContactID, now time.Time) error {
 	if len(contactIDs) == 0 {
 		return nil
 	}
@@ -660,7 +660,7 @@ func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.C
 
 	// first interrupt our runs
 	start := time.Now()
-	res, err := tx.ExecContext(ctx, interruptContactRunsSQL, pq.Array(contactIDs))
+	res, err := tx.ExecContext(ctx, interruptContactRunsSQL, pq.Array(contactIDs), now)
 	if err != nil {
 		return errors.Wrapf(err, "error interrupting contact runs")
 	}
@@ -669,7 +669,7 @@ func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.C
 
 	// then our sessions
 	start = time.Now()
-	res, err = tx.ExecContext(ctx, interruptContactSessionsSQL, pq.Array(contactIDs))
+	res, err = tx.ExecContext(ctx, interruptContactSessionsSQL, pq.Array(contactIDs), now)
 	if err != nil {
 		return errors.Wrapf(err, "error interrupting contact sessions")
 	}
@@ -684,7 +684,7 @@ UPDATE
 	flows_flowrun
 SET
 	is_active = FALSE,
-	exited_on = NOW(),
+	exited_on = $2,
 	exit_type = 'I',
 	modified_on = NOW(),
 	child_context = NULL,
@@ -697,7 +697,8 @@ const interruptContactSessionsSQL = `
 UPDATE
 	flows_flowsession
 SET
-	status = 'I'
+	status = 'I',
+	ended_on = $2
 WHERE
 	id = ANY (SELECT id FROM flows_flowsession WHERE contact_id = ANY($1) AND status = 'W')
 `
