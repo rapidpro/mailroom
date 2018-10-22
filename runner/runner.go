@@ -407,13 +407,13 @@ func StartFlow(
 		triggers = append(triggers, options.TriggerBuilder(contact))
 	}
 
-	return StartFlowForContacts(ctx, db, rp, org, assets, triggers, options.CommitHook)
+	return StartFlowForContacts(ctx, db, rp, org, assets, triggers, options.CommitHook, options.Interrupt)
 }
 
 // StartFlowForContacts runs the passed in flow for the passed in contact
 func StartFlowForContacts(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets,
-	triggers []flows.Trigger, hook models.SessionCommitHook) ([]*models.Session, error) {
+	triggers []flows.Trigger, hook models.SessionCommitHook, interrupt bool) ([]*models.Session, error) {
 
 	// no triggers? nothing to do
 	if len(triggers) == 0 {
@@ -460,10 +460,12 @@ func StartFlowForContacts(
 		contactIDs[i] = triggers[i].Contact().ID()
 	}
 
-	// interrupt all our contacts
-	err = models.InterruptContactRuns(ctx, tx, contactIDs)
-	if err != nil {
-		return nil, errors.Wrap(err, "error interrupting contacts")
+	// interrupt all our contacts if desired
+	if interrupt {
+		err = models.InterruptContactRuns(txCTX, tx, contactIDs)
+		if err != nil {
+			return nil, errors.Wrap(err, "error interrupting contacts")
+		}
 	}
 
 	// write our session to the db
@@ -494,12 +496,14 @@ func StartFlowForContacts(
 				return nil, errors.Wrapf(err, "error starting transaction for retry")
 			}
 
-			// interrupt this contact
-			err = models.InterruptContactRuns(txCTX, tx, []flows.ContactID{session.Contact().ID()})
-			if err != nil {
-				tx.Rollback()
-				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error interrupting contact")
-				continue
+			// interrupt this contact if appropriate
+			if interrupt {
+				err = models.InterruptContactRuns(txCTX, tx, []flows.ContactID{session.Contact().ID()})
+				if err != nil {
+					tx.Rollback()
+					log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error interrupting contact")
+					continue
+				}
 			}
 
 			dbSession, err := models.WriteSessions(txCTX, tx, rp, org, []flows.Session{session}, hook)

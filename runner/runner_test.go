@@ -174,7 +174,7 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	trigger := triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, nil)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 

@@ -287,7 +287,7 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	// start them in the triggered flow, interrupting their current flow/session
 	// TODO: replace with a real channel trigger
 	channelTrigger := triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
-	_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{channelTrigger}, nil)
+	_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{channelTrigger}, nil, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -446,7 +446,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 			}
 			trigger := triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), msgIn, match, time.Now())
 
-			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, hook)
+			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
