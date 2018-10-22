@@ -174,9 +174,9 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	trigger := triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
-	session, err := StartFlowForContact(ctx, db, rp, org, sa, trigger, nil)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
-	assert.NotNil(t, session)
+	assert.NotNil(t, sessions)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
@@ -208,6 +208,7 @@ func TestContactRuns(t *testing.T) {
 		{"Luke", "C", false, "%Thanks Luke%", 7, 7},
 	}
 
+	session := sessions[0]
 	for i, tc := range tcs {
 		// answer our first question
 		resume := resumes.NewMsgResume(org.Env(), contact,

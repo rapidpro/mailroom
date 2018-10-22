@@ -157,7 +157,7 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 			return triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
 		}
 
-		_, err = runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.ContactID{Cathy, Bob, Evan}, options)
+		_, err = runner.StartFlow(ctx, db, rp, org, flow, []flows.ContactID{Cathy, Bob, Evan}, options)
 		assert.NoError(t, err)
 
 		// now check our assertions
