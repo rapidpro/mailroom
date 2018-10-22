@@ -1,3 +1,7 @@
+v0.0.47
+----------
+ * set exited_on and ended_on based on server clock
+
 v0.0.46
 ----------
  * only wait for sigquit
