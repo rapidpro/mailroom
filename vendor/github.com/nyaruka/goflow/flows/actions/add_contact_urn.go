@@ -2,6 +2,7 @@ package actions
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
@@ -15,7 +16,7 @@ func init() {
 // TypeAddContactURN is our type for the add URN action
 const TypeAddContactURN string = "add_contact_urn"
 
-// AddContactURNAction can be used to add a URN to the current contact. A [event:contact_urn_added] event
+// AddContactURNAction can be used to add a URN to the current contact. A [event:contact_urns_changed] event
 // will be created when this action is encountered.
 //
 //   {
@@ -64,6 +65,12 @@ func (a *AddContactURNAction) Execute(run flows.FlowRun, step flows.Step) error 
 		a.logError(run, step, err)
 	}
 
+	evaluatedPath = strings.TrimSpace(evaluatedPath)
+	if evaluatedPath == "" {
+		a.logError(run, step, fmt.Errorf("can't add URN with empty path"))
+		return nil
+	}
+
 	// if we don't have a valid URN, log error
 	urn, err := urns.NewURNFromParts(a.Scheme, evaluatedPath, "", "")
 	if err != nil {
@@ -71,9 +78,10 @@ func (a *AddContactURNAction) Execute(run flows.FlowRun, step flows.Step) error 
 		return nil
 	}
 
-	if !run.Contact().HasURN(urn) {
-		run.Contact().AddURN(urn)
-		a.log(run, step, events.NewURNAddedEvent(urn))
+	contactURN := flows.NewContactURN(urn.Normalize(""), nil)
+
+	if contact.AddURN(contactURN) {
+		a.log(run, step, events.NewContactURNsChangedEvent(contact.URNs().RawURNs()))
 
 		a.reevaluateDynamicGroups(run, step)
 	}

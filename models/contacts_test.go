@@ -66,13 +66,13 @@ func TestContacts(t *testing.T) {
 
 	// change cathy to have a preferred URN and channel of our telephone
 	channel := org.ChannelByID(ChannelID(2))
-	err = modelContacts[2].UpdatePreferredURNAndChannel(ctx, db, URNID(82), channel)
+	err = modelContacts[2].UpdatePreferredURN(ctx, db, org, URNID(82), channel)
 	assert.NoError(t, err)
 
 	cathy, err := modelContacts[2].FlowContact(org, session)
 	assert.NoError(t, err)
-	assert.Equal(t, cathy.URNs()[0].String(), "tel:+250700000039?channel=c534272e-817d-4a78-a70c-f21df34407f8&channel_id=2&id=82&priority=101")
-	assert.Equal(t, cathy.URNs()[1].String(), "whatsapp:250788373373?id=10044&priority=100")
+	assert.Equal(t, cathy.URNs()[0].String(), "tel:+250700000039?channel=c534272e-817d-4a78-a70c-f21df34407f8&id=82&priority=1000")
+	assert.Equal(t, cathy.URNs()[1].String(), "whatsapp:250788373373?id=10044&priority=999")
 
 	// add another tel urn to cathy
 	db.MustExec(
@@ -84,12 +84,22 @@ func TestContacts(t *testing.T) {
 	assert.NoError(t, err)
 
 	// set our preferred channel again
-	err = modelContacts[0].UpdatePreferredURNAndChannel(ctx, db, URNID(82), channel)
+	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, URNID(10045), channel)
 	assert.NoError(t, err)
 
 	cathy, err = modelContacts[0].FlowContact(org, session)
 	assert.NoError(t, err)
-	assert.Equal(t, cathy.URNs()[0].String(), "tel:+250700000039?channel=c534272e-817d-4a78-a70c-f21df34407f8&channel_id=2&id=82&priority=101")
-	assert.Equal(t, cathy.URNs()[1].String(), "whatsapp:250788373373?id=10044&priority=100")
-	assert.Equal(t, cathy.URNs()[2].String(), "tel:+250788373393?channel=c534272e-817d-4a78-a70c-f21df34407f8&channel_id=2&id=10045&priority=10")
+	assert.Equal(t, cathy.URNs()[0].String(), "tel:+250788373393?channel=c534272e-817d-4a78-a70c-f21df34407f8&id=10045&priority=1000")
+	assert.Equal(t, cathy.URNs()[1].String(), "tel:+250700000039?channel=c534272e-817d-4a78-a70c-f21df34407f8&id=82&priority=999")
+	assert.Equal(t, cathy.URNs()[2].String(), "whatsapp:250788373373?id=10044&priority=998")
+
+	// no op this time
+	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, URNID(10045), channel)
+	assert.NoError(t, err)
+
+	cathy, err = modelContacts[0].FlowContact(org, session)
+	assert.NoError(t, err)
+	assert.Equal(t, cathy.URNs()[0].String(), "tel:+250788373393?channel=c534272e-817d-4a78-a70c-f21df34407f8&id=10045&priority=1000")
+	assert.Equal(t, cathy.URNs()[1].String(), "tel:+250700000039?channel=c534272e-817d-4a78-a70c-f21df34407f8&id=82&priority=999")
+	assert.Equal(t, cathy.URNs()[2].String(), "whatsapp:250788373373?id=10044&priority=998")
 }

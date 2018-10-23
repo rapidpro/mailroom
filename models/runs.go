@@ -282,7 +282,7 @@ func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment, cli
 }
 
 // WriteUpdatedSession updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
-func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, fs flows.Session) error {
+func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, fs flows.Session, es []flows.Event) error {
 	// make sure we have our seen runs
 	if s.seenRuns == nil {
 		return errors.Errorf("missing seen runs, cannot update session")
@@ -378,7 +378,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// apply all our events
-	for _, e := range fs.Events() {
+	for _, e := range es {
 		err := ApplyEvent(ctx, tx, rp, org, s, e)
 		if err != nil {
 			return errors.Wrapf(err, "error applying event: %v", e)
@@ -432,7 +432,7 @@ WHERE
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, ss []flows.Session, hook SessionCommitHook) ([]*Session, error) {
+func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, ss []flows.Session, es [][]flows.Event, hook SessionCommitHook) ([]*Session, error) {
 	if len(ss) == 0 {
 		return nil, nil
 	}
@@ -494,7 +494,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 
 	// apply our all events for the session
 	for i := range ss {
-		for _, e := range ss[i].Events() {
+		for _, e := range es[i] {
 			err := ApplyEvent(ctx, tx, rp, org, sessions[i], e)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error applying event: %v", e)

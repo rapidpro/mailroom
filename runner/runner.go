@@ -72,7 +72,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 
 	// resume our session
 	resumeStart := time.Now()
-	err = fs.Resume(resume)
+	es, err := fs.Resume(resume)
 	logrus.WithField("contact_id", resume.Contact().ID()).WithField("elapsed", time.Since(resumeStart)).Info("engine resume complete")
 
 	// had a problem resuming our flow? bail
@@ -90,7 +90,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	}
 
 	// write our updated session and runs
-	err = session.WriteUpdatedSession(txCTX, tx, rp, org, fs)
+	err = session.WriteUpdatedSession(txCTX, tx, rp, org, fs, es)
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
@@ -427,6 +427,8 @@ func StartFlowForContacts(
 
 	// for each trigger start the flow
 	sessions := make([]flows.Session, 0, len(triggers))
+	sessionEvents := make([][]flows.Event, 0, len(triggers))
+
 	for _, trigger := range triggers {
 		// create the session for this flow and run
 		session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
@@ -434,7 +436,7 @@ func StartFlowForContacts(
 		// start our flow
 		log := log.WithField("contact_uuid", trigger.Contact().UUID())
 		start := time.Now()
-		err := session.Start(trigger)
+		events, err := session.Start(trigger)
 		if err != nil {
 			log.WithError(err).Errorf("error starting flow")
 			continue
@@ -443,6 +445,7 @@ func StartFlowForContacts(
 		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
+		sessionEvents = append(sessionEvents, events)
 	}
 
 	// we write our sessions and all their objects in a single transaction
@@ -469,7 +472,7 @@ func StartFlowForContacts(
 	}
 
 	// write our session to the db
-	dbSessions, err := models.WriteSessions(txCTX, tx, rp, org, sessions, hook)
+	dbSessions, err := models.WriteSessions(txCTX, tx, rp, org, sessions, sessionEvents, hook)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error writing sessions")
 	}
@@ -487,7 +490,10 @@ func StartFlowForContacts(
 		tx.Rollback()
 
 		// we failed writing our sessions in one go, try one at a time
-		for _, session := range sessions {
+		for i := range sessions {
+			session := sessions[i]
+			events := sessionEvents[i]
+
 			txCTX, cancel := context.WithTimeout(ctx, commitTimeout)
 			defer cancel()
 
@@ -506,7 +512,7 @@ func StartFlowForContacts(
 				}
 			}
 
-			dbSession, err := models.WriteSessions(txCTX, tx, rp, org, []flows.Session{session}, hook)
+			dbSession, err := models.WriteSessions(txCTX, tx, rp, org, []flows.Session{session}, [][]flows.Event{events}, hook)
 			if err != nil {
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")

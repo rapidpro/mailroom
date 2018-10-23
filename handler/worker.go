@@ -354,7 +354,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 	channel := org.ChannelByID(event.ChannelID)
 
 	// make sure this URN is our highest priority (this is usually a noop)
-	err = modelContact.UpdatePreferredURNAndChannel(ctx, db, event.URNID, channel)
+	err = modelContact.UpdatePreferredURN(ctx, db, org, event.URNID, channel)
 	if err != nil {
 		return errors.Wrapf(err, "error changing primary URN")
 	}
