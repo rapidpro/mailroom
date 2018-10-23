@@ -1,3 +1,7 @@
+v0.0.48
+----------
+ * add support for contact urn changed event, unify updating appropriately
+
 v0.0.47
 ----------
  * set exited_on and ended_on based on server clock
