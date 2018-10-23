@@ -44,7 +44,7 @@ func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 		"contact_uuid": session.ContactUUID(),
 		"session_id":   session.ID,
 		"urns":         event.URNs,
-	}).Debug("contact urn added")
+	}).Debug("contact urns changed")
 
 	// create our URN changed event
 	change := &models.ContactURNsChanged{
