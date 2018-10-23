@@ -15,9 +15,10 @@ func init() {
 // TypeSetContactChannel is the type for the set contact channel action
 const TypeSetContactChannel string = "set_contact_channel"
 
-// SetContactChannelAction can be used to update the preferred channel of the current contact.
+// SetContactChannelAction can be used to change or clear the preferred channel of the current contact.
 //
-// A [event:contact_channel_changed] event will be created with the set channel.
+// Because channel affinity is a property of a contact's URNs, a [event:contact_urns_changed] event will be created if any
+// changes are made to the contact's URNs.
 //
 //   {
 //     "uuid": "8eebd020-1af5-431c-b943-aa670fc74da9",
@@ -43,24 +44,33 @@ func NewSetContactChannelAction(uuid flows.ActionUUID, channel *assets.ChannelRe
 
 // Validate validates our action is valid and has all the assets it needs
 func (a *SetContactChannelAction) Validate(assets flows.SessionAssets, context *flows.ValidationContext) error {
-	_, err := assets.Channels().Get(a.Channel.UUID)
-	return err
+	if a.Channel != nil {
+		_, err := assets.Channels().Get(a.Channel.UUID)
+		return err
+	}
+	return nil
 }
 
 func (a *SetContactChannelAction) Execute(run flows.FlowRun, step flows.Step) error {
-	if run.Contact() == nil {
+	contact := run.Contact()
+	if contact == nil {
 		a.logError(run, step, fmt.Errorf("can't execute action in session without a contact"))
 		return nil
 	}
 
-	channel, err := run.Session().Assets().Channels().Get(a.Channel.UUID)
-	if err != nil {
-		return err
+	var channel *flows.Channel
+	var err error
+	if a.Channel != nil {
+		channel, err = run.Session().Assets().Channels().Get(a.Channel.UUID)
+		if err != nil {
+			return err
+		}
 	}
 
-	if run.Contact().PreferredChannel() != channel {
-		run.Contact().UpdatePreferredChannel(channel)
-		a.log(run, step, events.NewContactChannelChangedEvent(a.Channel))
+	// if URNs have changed in anyway, generate a URNs changed event
+	if run.Contact().UpdatePreferredChannel(channel) {
+		a.log(run, step, events.NewContactURNsChangedEvent(contact.URNs().RawURNs()))
 	}
+
 	return nil
 }

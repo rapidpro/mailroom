@@ -99,7 +99,6 @@ func LoadContacts(ctx context.Context, db *sqlx.DB, org *OrgAssets, ids []flows.
 			}
 			if channel != nil {
 				query["channel"] = []string{string(channel.UUID())}
-				query["channel_id"] = []string{fmt.Sprintf("%d", channel.ID())}
 			}
 			if u.Auth != "" {
 				query["auth"] = []string{u.Auth}
@@ -153,134 +152,6 @@ func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
 	}
 	c.isStopped = false
 	return nil
-}
-
-// UpdatePreferredURNAndChannel updates the URNs for the contact (if needbe) to have the passed in URN as top
-// priority with the passed in channel as the preferred channel
-func (c *Contact) UpdatePreferredURNAndChannel(ctx context.Context, db *sqlx.DB, urnID URNID, channel *Channel) error {
-	// no urns? no op
-	if len(c.urns) == 0 {
-		return errors.Errorf("can't set preferred URN on contact with no URNs")
-	}
-
-	// no channel, that's an error
-	if channel == nil {
-		return errors.Errorf("can't set preferred channel to a nil channel")
-	}
-
-	// whether this is a tel channel
-	isTelChannel := false
-	for _, s := range channel.Schemes() {
-		if s == urns.TelScheme {
-			isTelChannel = true
-			break
-		}
-	}
-
-	// if this isn't our highest priority URN, reorder our urn
-	changed := make([]urns.URN, 0, 1)
-	if URNID(getURNInt(c.urns[0], "id")) != urnID {
-		topPriority := getURNInt(c.urns[0], "priority") + 1
-		topURN := urns.NilURN
-		otherURNs := make([]urns.URN, 0, len(c.urns))
-		for _, u := range c.urns {
-			if URNID(getURNInt(u, "id")) == urnID {
-				u, err := updateURNChannelPriority(u, channel, topPriority)
-				if err != nil {
-					return errors.Wrapf(err, "unable to update URN: %s", u)
-				}
-				topURN = u
-				changed = append(changed, u)
-			} else {
-				otherURNs = append(otherURNs, u)
-			}
-		}
-		c.urns = append([]urns.URN{topURN}, otherURNs...)
-	}
-
-	// now do a pass to see if any of our tel URNs need to have their channel affinity changed
-	if isTelChannel {
-		for i, u := range c.urns {
-			if isTelChannel && u.Scheme() == urns.TelScheme {
-				u, err := updateURNChannelPriority(u, channel, getURNInt(u, "priority"))
-				if err != nil {
-					return errors.Wrapf(err, "unable to update URN: %s", u)
-				}
-				c.urns[i] = u
-				changed = append(changed, u)
-			}
-		}
-	}
-
-	// finally build up our list of updates
-	updates := make([]interface{}, 0, len(changed))
-	for _, u := range changed {
-		id := getURNInt(u, "id")
-		channelID := getURNInt(u, "channel_id")
-		priority := getURNInt(u, "priority")
-		if id == 0 || channelID == 0 {
-			return errors.Errorf("unable to read id or channel_id from URN: %s", u)
-		}
-		updates = append(updates, urnUpdate{URNID: URNID(id), ChannelID: ChannelID(channelID), Priority: priority})
-	}
-
-	// commit them
-	err := BulkSQL(ctx, "updating preferred URN", db, updateURNs, updates)
-	if err != nil {
-		return errors.Wrapf(err, "error committing urn update")
-	}
-
-	// TODO: if we did anything, update our modified_on as well
-	return nil
-}
-
-const updateURNs = `
-	UPDATE 
-		contacts_contacturn
-	SET
-		channel_id = r.channel_id::int,
-		priority = r.priority::int
-	FROM (
-		VALUES(:id, :channel_id, :priority)
-	) AS
-		r(id, channel_id, priority)
-	WHERE
-		contacts_contacturn.id = r.id::int
-`
-
-func getURNInt(urn urns.URN, key string) int {
-	_, _, query, _ := urn.ToParts()
-	parsedQuery, err := url.ParseQuery(query)
-	if err != nil {
-		return 0
-	}
-
-	value, _ := strconv.Atoi(parsedQuery.Get(key))
-	return value
-}
-
-func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urns.URN, error) {
-	scheme, path, query, display := urn.ToParts()
-	parsedQuery, err := url.ParseQuery(query)
-	if err != nil {
-		return urns.NilURN, errors.Errorf("error parsing query from URN: %s", urn)
-	}
-	parsedQuery["priority"] = []string{fmt.Sprintf("%d", priority)}
-	parsedQuery["channel"] = []string{string(channel.UUID())}
-	parsedQuery["channel_id"] = []string{fmt.Sprintf("%d", channel.ID())}
-
-	urn, err = urns.NewURNFromParts(scheme, path, parsedQuery.Encode(), display)
-	if err != nil {
-		return urns.NilURN, errors.Wrapf(err, "unable to create new urn")
-	}
-
-	return urn, nil
-}
-
-type urnUpdate struct {
-	URNID     URNID     `db:"id"`
-	ChannelID ChannelID `db:"channel_id"`
-	Priority  int       `db:"priority"`
 }
 
 // Contact is our mailroom struct that represents a contact
@@ -449,20 +320,272 @@ WHERE
 	id = $1
 `
 
-// AddContactURNs adds all the passed in contact urns in a single query
-func AddContactURNs(ctx context.Context, tx *sqlx.Tx, adds []*ContactURNAdd) error {
-	// convert to interface
-	is := make([]interface{}, len(adds))
-	for i := range adds {
-		is[i] = adds[i]
+// UpdatePreferredURN updates the URNs for the contact (if needbe) to have the passed in URN as top priority
+// with the passed in channel as the preferred channel
+func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID, channel *Channel) error {
+	// no urns? that's an error
+	if len(c.urns) == 0 {
+		return errors.Errorf("can't set preferred URN on contact with no URNs")
 	}
 
-	// and bulk insert
-	return BulkSQL(ctx, "inserting contact urns", tx, insertContactURNsSQL, is)
+	// no channel, that's an error
+	if channel == nil {
+		return errors.Errorf("can't set preferred channel to a nil channel")
+	}
+
+	// is this already our top URN
+	topURNID := URNID(getURNInt(c.urns[0], "id"))
+	topChannelID := getURNChannelID(org, c.urns[0])
+
+	// we are already the top URN, nothing to do
+	if topURNID == urnID && topChannelID != nil && *topChannelID == channel.ID() {
+		return nil
+	}
+
+	// we need to build a new list, first find our URN
+	topURN := urns.NilURN
+	newURNs := make([]urns.URN, 0, len(c.urns))
+
+	priority := 999
+	for _, urn := range c.urns {
+		id := URNID(getURNInt(urn, "id"))
+		if id == urnID {
+			updated, err := updateURNChannelPriority(urn, channel, 1000)
+			if err != nil {
+				return errors.Wrapf(err, "error updating channel on urn")
+			}
+			topURN = updated
+		} else {
+			updated, err := updateURNChannelPriority(urn, nil, priority)
+			if err != nil {
+				return errors.Wrapf(err, "error updating priority on urn")
+			}
+			newURNs = append(newURNs, updated)
+			priority--
+		}
+	}
+
+	if topURN == urns.NilURN {
+		return errors.Errorf("unable to find urn with id: %d", urnID)
+	}
+
+	c.urns = []urns.URN{topURN}
+	c.urns = append(c.urns, newURNs...)
+
+	change := &ContactURNsChanged{
+		ContactID: c.ID(),
+		URNs:      c.urns,
+	}
+
+	// write our new state to the db
+	err := UpdateContactURNs(ctx, tx, org, []*ContactURNsChanged{change})
+	if err != nil {
+		return errors.Wrapf(err, "error updating urns for contact")
+	}
+
+	err = UpdateContactModifiedOn(ctx, tx, []flows.ContactID{c.ID()})
+	if err != nil {
+		return errors.Wrapf(err, "error updating modified on on contact")
+	}
+
+	return nil
 }
 
-// ContactURNAdd is our object that represents a single contact URN addition
-type ContactURNAdd struct {
+func getURNInt(urn urns.URN, key string) int {
+	values, err := urn.Query()
+	if err != nil {
+		return 0
+	}
+
+	value, _ := strconv.Atoi(values.Get(key))
+	return value
+}
+
+func getURNChannelID(org *OrgAssets, urn urns.URN) *ChannelID {
+	values, err := urn.Query()
+	if err != nil {
+		return nil
+	}
+
+	channelUUID := values.Get("channel")
+	if channelUUID == "" {
+		return nil
+	}
+
+	channel := org.ChannelByUUID(assets.ChannelUUID(channelUUID))
+	if channel != nil {
+		channelID := channel.ID()
+		return &channelID
+	}
+	return nil
+}
+
+func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urns.URN, error) {
+	query, err := urn.Query()
+	if err != nil {
+		return urns.NilURN, errors.Errorf("error parsing query from URN: %s", urn)
+	}
+	if channel != nil {
+		query["channel"] = []string{string(channel.UUID())}
+	}
+	query["priority"] = []string{strconv.FormatInt(int64(priority), 10)}
+
+	urn, err = urns.NewURNFromParts(urn.Scheme(), urn.Path(), query.Encode(), urn.Display())
+	if err != nil {
+		return urns.NilURN, errors.Wrapf(err, "unable to create new urn")
+	}
+
+	return urn, nil
+}
+
+// UpdateContactModifiedOn updates modified on on the passed in contact
+func UpdateContactModifiedOn(ctx context.Context, tx Queryer, contactIDs []flows.ContactID) error {
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
+	return err
+}
+
+// UpdateContactURNs updates the contact urns in our database to match the passed in changes
+func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes []*ContactURNsChanged) error {
+	// keep track of all our inserts
+	inserts := make([]interface{}, 0, len(changes))
+
+	// and updates
+	updates := make([]interface{}, 0, len(changes))
+
+	// identities we are inserting
+	identities := make([]string, 0, 1)
+
+	// for each of our changes (one per contact)
+	for _, change := range changes {
+		// priority for each contact starts at 1000
+		priority := 1000
+
+		// for each of our urns
+		for _, urn := range change.URNs {
+			// parse our query
+			query, err := urn.Query()
+			if err != nil {
+				return errors.Wrapf(err, "error parsing query for urn: %s", urn)
+			}
+
+			// figure out if we have a channel
+			channelID := getURNChannelID(org, urn)
+
+			// do we have an id?
+			urnID := getURNInt(urn, "id")
+
+			if urnID > 0 {
+				// if so, this is a URN update
+				updates = append(updates, &urnUpdate{
+					URNID:     URNID(urnID),
+					ChannelID: channelID,
+					Priority:  priority,
+				})
+			} else {
+				// otherwise this is a new URN insert
+				var display *string
+				if urn.Display() != "" {
+					d := urn.Display()
+					display = &d
+				}
+
+				var auth *string
+				if len(query["auth"]) > 0 {
+					a := query["auth"][0]
+					auth = &a
+				}
+
+				// new URN, add it instead
+				inserts = append(inserts, &urnInsert{
+					ContactID: change.ContactID,
+					Identity:  urn.Identity().String(),
+					Path:      urn.Path(),
+					Display:   display,
+					Auth:      auth,
+					Scheme:    urn.Scheme(),
+					Priority:  priority,
+					OrgID:     org.OrgID(),
+				})
+
+				identities = append(identities, urn.Identity().String())
+			}
+
+			// decrease our priority for the next URN
+			priority--
+		}
+	}
+
+	// first update existing URNs
+	err := BulkSQL(ctx, "updating contact urns", tx, updateContactURNsSQL, updates)
+	if err != nil {
+		return errors.Wrapf(err, "error updating urns")
+	}
+
+	if len(inserts) > 0 {
+		// find the unique ids of the contacts that may be affected by our URN inserts
+		rows, err := tx.QueryxContext(ctx,
+			`SELECT contact_id FROM contacts_contacturn WHERE identity = ANY($1) AND org_id = $2 AND contact_id IS NOT NULL`,
+			pq.Array(identities), org.OrgID(),
+		)
+		if err != nil {
+			return errors.Wrapf(err, "error finding contacts for urns")
+		}
+		defer rows.Close()
+
+		orphanedIDs := make([]flows.ContactID, 0, len(inserts))
+		for rows.Next() {
+			var contactID flows.ContactID
+			err := rows.Scan(&contactID)
+			if err != nil {
+				return errors.Wrapf(err, "error reading orphaned contacts")
+			}
+			orphanedIDs = append(orphanedIDs, contactID)
+		}
+
+		// then insert new urns, we do these one by one since we have to deal with conflicts
+		for _, insert := range inserts {
+			_, err := tx.NamedExecContext(ctx, insertContactURNsSQL, insert)
+			if err != nil {
+				return errors.Wrapf(err, "error inserting new urns")
+			}
+		}
+
+		// finally mark all the orphaned contacts as modified
+		if len(orphanedIDs) > 0 {
+			err := UpdateContactModifiedOn(ctx, tx, orphanedIDs)
+			if err != nil {
+				return errors.Wrapf(err, "error updating orphaned contacts")
+			}
+		}
+	}
+
+	// NOTE: caller needs to update modified on for this contact
+	return nil
+}
+
+// urnUpdate is our object that represents a single contact URN update
+type urnUpdate struct {
+	URNID     URNID      `db:"id"`
+	ChannelID *ChannelID `db:"channel_id"`
+	Priority  int        `db:"priority"`
+}
+
+const updateContactURNsSQL = `
+UPDATE 
+	contacts_contacturn u
+SET
+	channel_id = r.channel_id::int,
+	priority = r.priority::int
+FROM
+	(VALUES(:id, :channel_id, :priority))
+AS
+	r(id, channel_id, priority)
+WHERE
+	u.id = r.id::int
+`
+
+// urnInsert is our object that represents a single contact URN addition
+type urnInsert struct {
 	ContactID flows.ContactID `db:"contact_id"`
 	Identity  string          `db:"identity"`
 	Path      string          `db:"path"`
@@ -476,5 +599,18 @@ type ContactURNAdd struct {
 const insertContactURNsSQL = `
 INSERT INTO
 	contacts_contacturn(contact_id, identity, path, display, auth, scheme, priority, org_id)
-                 VALUES(:contact_id, :identity, :path, :display, :auth, :scheme, :priority, :org_id)
-`
+				 VALUES(:contact_id, :identity, :path, :display, :auth, :scheme, :priority, :org_id)
+ON CONFLICT(identity, org_id)
+DO 
+	UPDATE
+	SET 
+		contact_id = :contact_id,
+		priority = :priority
+	`
+
+// ContactURNsChanged represents the new status of URNs for a contact
+type ContactURNsChanged struct {
+	ContactID flows.ContactID
+	OrgID     OrgID
+	URNs      []urns.URN
+}

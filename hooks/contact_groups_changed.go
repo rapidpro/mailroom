@@ -106,13 +106,14 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		}
 
 		hookEvent := &models.GroupRemove{
-			session.Contact().ID(),
-			group.ID(),
+			ContactID: session.Contact().ID(),
+			GroupID:   group.ID(),
 		}
 
 		// add our add event
 		session.AddPreCommitEvent(contactGroupsChangedHook, hookEvent)
 		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
+		session.AddPreCommitEvent(contactModifiedHook, session.Contact().ID())
 	}
 
 	// add each of our groups
@@ -129,12 +130,13 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 		// add our add event
 		hookEvent := &models.GroupAdd{
-			session.Contact().ID(),
-			group.ID(),
+			ContactID: session.Contact().ID(),
+			GroupID:   group.ID(),
 		}
 
 		session.AddPreCommitEvent(contactGroupsChangedHook, hookEvent)
 		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
+		session.AddPreCommitEvent(contactModifiedHook, session.Contact().ID())
 	}
 
 	return nil

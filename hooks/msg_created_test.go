@@ -11,6 +11,8 @@ import (
 )
 
 func TestMsgCreated(t *testing.T) {
+	testsuite.Reset()
+
 	mailroom.Config = mailroom.NewMailroomConfig()
 	mailroom.Config.AttachmentDomain = "foo.bar.com"
 	defer func() { mailroom.Config = nil }()
@@ -25,6 +27,7 @@ func TestMsgCreated(t *testing.T) {
 	testsuite.DB().MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, Bob)
 
 	// TODO: test setting reply_to_id
+	// TODO: test replying to a newly added URN
 
 	tcs := []HookTestCase{
 		HookTestCase{

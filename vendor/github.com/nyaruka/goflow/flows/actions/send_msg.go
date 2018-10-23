@@ -21,7 +21,9 @@ type msgDestination struct {
 // TypeSendMsg is the type for the send message action
 const TypeSendMsg string = "send_msg"
 
-// SendMsgAction can be used to reply to the current contact in a flow. The text field may contain templates.
+// SendMsgAction can be used to reply to the current contact in a flow. The text field may contain templates. The action
+// will attempt to find pairs of URNs and channels which can be used for sending. If it can't find such a pair, it will
+// create a message without a channel or URN.
 //
 // A [event:msg_created] event will be created with the evaluated text.
 //
@@ -75,7 +77,7 @@ func (a *SendMsgAction) Execute(run flows.FlowRun, step flows.Step) error {
 	for _, u := range run.Contact().URNs() {
 		channel := channels.GetForURN(u, assets.ChannelRoleSend)
 		if channel != nil {
-			destinations = append(destinations, msgDestination{urn: u.URN, channel: channel})
+			destinations = append(destinations, msgDestination{urn: u.URN(), channel: channel})
 
 			// if we're not sending to all URNs we just need the first sendable URN
 			if !a.AllURNs {
@@ -92,6 +94,13 @@ func (a *SendMsgAction) Execute(run flows.FlowRun, step flows.Step) error {
 		}
 
 		msg := flows.NewMsgOut(dest.urn, channelRef, evaluatedText, evaluatedAttachments, evaluatedQuickReplies)
+		a.log(run, step, events.NewMsgCreatedEvent(msg))
+	}
+
+	// if we couldn't find a destination, create a msg without a URN or channel and it's up to the caller
+	// to handle that as they want
+	if len(destinations) == 0 {
+		msg := flows.NewMsgOut(urns.NilURN, nil, evaluatedText, evaluatedAttachments, evaluatedQuickReplies)
 		a.log(run, step, events.NewMsgCreatedEvent(msg))
 	}
 
