@@ -127,7 +127,7 @@ func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []int
 		}
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("rows", len(vs)).Debugf("%s bulk sql complete", label)
+	logrus.WithField("elapsed", time.Since(start)).WithField("rows", len(vs)).Infof("%s bulk sql complete", label)
 
 	return nil
 }

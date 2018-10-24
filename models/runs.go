@@ -693,6 +693,7 @@ WHERE
 	id = ANY (SELECT id FROM flows_flowrun WHERE contact_id = ANY($1) AND is_active = TRUE)
 `
 
+// TODO: we probably should have an index for active sessions like this
 const interruptContactSessionsSQL = `
 UPDATE
 	flows_flowsession

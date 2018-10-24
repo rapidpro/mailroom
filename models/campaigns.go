@@ -117,10 +117,21 @@ func (e *CampaignEvent) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &e.e)
 }
 
+// QualifiesByGroup returns whether the passed in contact qualifies for this event by group membership
+func (e *CampaignEvent) QualifiesByGroup(contact *flows.Contact) bool {
+	return contact.Groups().FindByUUID(e.Campaign().GroupUUID()) != nil
+}
+
+// QualifiesByField returns whether the passed in contact qualifies for this event by group membership
+func (e *CampaignEvent) QualifiesByField(contact *flows.Contact) bool {
+	value := contact.Fields()[e.RelativeToKey()]
+	return value != nil
+}
+
 // ScheduleForContact calculates the next fire ( if any) for the passed in contact
 func (e *CampaignEvent) ScheduleForContact(tz *time.Location, now time.Time, contact *flows.Contact) (*time.Time, error) {
 	// we aren't part of the group, move on
-	if contact.Groups().FindByUUID(e.Campaign().GroupUUID()) == nil {
+	if !e.QualifiesByGroup(contact) {
 		return nil, nil
 	}
 

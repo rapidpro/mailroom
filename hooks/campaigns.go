@@ -28,7 +28,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	for s, es := range sessions {
 		groupAdds := make(map[models.GroupID]bool)
 		groupRemoves := make(map[models.GroupID]bool)
-		fieldChanges := make(map[*models.Field]bool)
+		fieldChanges := make(map[models.FieldID]bool)
 
 		for _, e := range es {
 			switch event := e.(type) {
@@ -51,7 +51,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 					}).Debug("unable to find field with key, ignoring for campaign updates")
 					continue
 				}
-				fieldChanges[field] = true
+				fieldChanges[field.ID()] = true
 			}
 		}
 
@@ -65,18 +65,23 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 		for g := range groupRemoves {
 			for _, c := range org.CampaignByGroupID(g) {
 				for _, e := range c.Events() {
-					// TODO: filter by field value?
-					deleteEvents[e.ID()] = true
+					// only delete events that we qualify for or that were changed
+					if e.QualifiesByField(s.Contact()) || fieldChanges[e.RelativeToID()] {
+						deleteEvents[e.ID()] = true
+					}
 				}
 			}
 		}
 
 		// for every field that was changed, we need to also remove event fires and recalculate
 		for f := range fieldChanges {
-			fieldEvents := org.CampaignEventsByFieldID(f.ID())
+			fieldEvents := org.CampaignEventsByFieldID(f)
 			for _, e := range fieldEvents {
-				deleteEvents[e.ID()] = true
-				addEvents[e] = true
+				// only recalculate the events if this contact qualifies for this event or this group was removed
+				if e.QualifiesByGroup(s.Contact()) || groupRemoves[e.Campaign().GroupID()] {
+					deleteEvents[e.ID()] = true
+					addEvents[e] = true
+				}
 			}
 		}
 

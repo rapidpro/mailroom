@@ -39,7 +39,9 @@ func TestCampaigns(t *testing.T) {
 					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 				},
 				Evan: []flows.Action{
+					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
 				},
 			},
 			Assertions: []SQLAssertion{
