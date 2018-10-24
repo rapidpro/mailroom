@@ -259,7 +259,7 @@ func TestServer(t *testing.T) {
 		assert.NoError(t, err, "%d: error creating request", i)
 
 		resp, err := http.DefaultClient.Do(req)
-		assert.NoError(t, err, "%d: error marking request", i)
+		assert.NoError(t, err, "%d: error making request", i)
 
 		assert.Equal(t, tc.Status, resp.StatusCode, "%d: unexpected status", i)
 
