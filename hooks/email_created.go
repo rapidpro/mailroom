@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-mail/mail"
-	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/pkg/errors"
 
 	"github.com/gomodule/redigo/redis"
@@ -33,7 +33,7 @@ const (
 // Apply sends all our emails
 func (h *SendEmails) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// get our smtp server config
-	config := org.Org().ConfigValue(configSMTPServer, mailroom.Config.SMTPServer)
+	config := org.Org().ConfigValue(configSMTPServer, config.Mailroom.SMTPServer)
 
 	// no config? noop
 	if config == "" {

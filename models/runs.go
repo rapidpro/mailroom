@@ -171,7 +171,7 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 	// create our session object
 	session := &Session{
 		Status:    sessionStatus,
-		Responded: false, // TODO: populate once we are running real flows
+		Responded: false,
 		Output:    string(output),
 		ContactID: s.Contact().ID(),
 		OrgID:     org.OrgID(),

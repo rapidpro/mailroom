@@ -15,7 +15,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/pkg/errors"
 	null "gopkg.in/guregu/null.v3"
@@ -183,9 +183,9 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 			url := a.URL()
 			if !strings.HasPrefix(url, "http") {
 				if strings.HasPrefix(url, "/") {
-					url = fmt.Sprintf("https://%s%s", mailroom.Config.AttachmentDomain, url)
+					url = fmt.Sprintf("https://%s%s", config.Mailroom.AttachmentDomain, url)
 				} else {
-					url = fmt.Sprintf("https://%s/%s", mailroom.Config.AttachmentDomain, url)
+					url = fmt.Sprintf("https://%s/%s", config.Mailroom.AttachmentDomain, url)
 				}
 			}
 			m.Attachments = append(m.Attachments, fmt.Sprintf("%s:%s", a.ContentType(), url))

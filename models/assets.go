@@ -70,6 +70,10 @@ func FlushCache() {
 
 // GetOrgAssets creates or gets org assets for the passed in org
 func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
+	if db == nil {
+		return nil, errors.Errorf("nil db, cannot load org")
+	}
+
 	// do we have a recent cache?
 	key := fmt.Sprintf("%d", orgID)
 	var cached *OrgAssets
@@ -234,6 +238,10 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 		return nil, errors.Wrapf(err, "error loading flow: %s", flowUUID)
 	}
 
+	if dbFlow == nil {
+		return nil, errors.Errorf("no flow with uuid: %s", flowUUID)
+	}
+
 	a.flowCacheLock.Lock()
 	a.flowByID[dbFlow.ID()] = dbFlow
 	a.flowByUUID[dbFlow.UUID()] = dbFlow
@@ -254,6 +262,10 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 	dbFlow, err := loadFlowByID(a.ctx, a.db, flowID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %d", flowID)
+	}
+
+	if dbFlow == nil {
+		return nil, errors.Errorf("no flow with id: %d", flowID)
 	}
 
 	a.flowCacheLock.Lock()

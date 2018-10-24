@@ -16,7 +16,9 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/librato"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/web"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,16 +42,12 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 	taskFunctions[taskType] = taskFunc
 }
 
-// TODO: better handling of global config
-// Config our global mailroom config
-var Config *MailroomConfig
-
 const BatchQueue = "batch"
 const HandlerQueue = "handler"
 
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	Config    *MailroomConfig
+	Config    *config.Config
 	DB        *sqlx.DB
 	RP        *redis.Pool
 	Quit      chan bool
@@ -59,11 +57,12 @@ type Mailroom struct {
 
 	batchForeman   *Foreman
 	handlerForeman *Foreman
+
+	webserver *web.Server
 }
 
 // NewMailroom creates and returns a new mailroom instance
-func NewMailroom(config *MailroomConfig) *Mailroom {
-	Config = config
+func NewMailroom(config *config.Config) *Mailroom {
 	mr := &Mailroom{
 		Config:    config,
 		Quit:      make(chan bool),
@@ -174,6 +173,10 @@ func (mr *Mailroom) Start() error {
 	mr.batchForeman.Start()
 	mr.handlerForeman.Start()
 
+	// start our web server
+	mr.webserver = web.NewServer(mr.CTX, mr.DB, mr.RP, mr.Config, mr.WaitGroup)
+	mr.webserver.Start()
+
 	logrus.Info("mailroom started")
 
 	// wait for any signals such as QUIT for dumping stack
@@ -190,6 +193,10 @@ func (mr *Mailroom) Stop() error {
 	librato.Stop()
 	close(mr.Quit)
 	mr.Cancel()
+
+	// stop our web server
+	mr.webserver.Stop()
+
 	mr.WaitGroup.Wait()
 	logrus.Info("mailroom stopped")
 	return nil
