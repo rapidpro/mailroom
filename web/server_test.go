@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -225,6 +226,10 @@ func TestServer(t *testing.T) {
 
 	server := NewServer(ctx, db, rp, config.Mailroom, wg)
 	server.Start()
+
+	// give our server time to start
+	time.Sleep(time.Second)
+
 	defer server.Stop()
 
 	// TODO: test custom flow definitions

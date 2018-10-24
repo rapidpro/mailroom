@@ -17,6 +17,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// NewServer creates a new web server, it will need to be started after being created
 func NewServer(ctx context.Context, db *sqlx.DB, rp *redis.Pool, config *config.Config, wg *sync.WaitGroup) *Server {
 	s := &Server{
 		ctx: ctx,
