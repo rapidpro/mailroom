@@ -9,6 +9,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/nyaruka/ezconf"
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/sirupsen/logrus"
 
 	_ "github.com/nyaruka/mailroom/campaigns"
@@ -21,7 +22,7 @@ import (
 var version = "Dev"
 
 func main() {
-	config := mailroom.NewMailroomConfig()
+	config := config.Mailroom
 	loader := ezconf.NewLoader(
 		config,
 		"mailroom", "Mailroom - flow event handler for RapidPro",

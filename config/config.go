@@ -1,7 +1,13 @@
-package mailroom
+package config
 
-// MailroomConfig is our top level configuration object
-type MailroomConfig struct {
+var Mailroom *Config
+
+func init() {
+	Mailroom = NewMailroomConfig()
+}
+
+// Config is our top level configuration object
+type Config struct {
 	SentryDSN  string `help:"the DSN used for logging errors to Sentry"`
 	DB         string `help:"URL describing how to connect to the RapidPro database"`
 	DBPoolSize int    `help:"the size of our db pool"`
@@ -17,11 +23,15 @@ type MailroomConfig struct {
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
 
 	AttachmentDomain string `help:"the domain that will be used for relative attachment"`
+
+	AuthToken string `help:"the token clients will need to authenticate web requests"`
+	Address   string `help:"the address to bind our web server to"`
+	Port      int    `help:"the port to bind our web server to"`
 }
 
 // NewMailroomConfig returns a new default configuration object
-func NewMailroomConfig() *MailroomConfig {
-	return &MailroomConfig{
+func NewMailroomConfig() *Config {
+	return &Config{
 		DB:             "postgres://temba@localhost/temba?sslmode=disable",
 		DBPoolSize:     8,
 		Redis:          "redis://localhost:6379/0",
@@ -30,5 +40,8 @@ func NewMailroomConfig() *MailroomConfig {
 		LogLevel:       "error",
 		Version:        "Dev",
 		SMTPServer:     "",
+
+		Address: "localhost",
+		Port:    8090,
 	}
 }

@@ -3,7 +3,7 @@ package hooks
 import (
 	"testing"
 
-	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/nyaruka/goflow/flows"
@@ -13,9 +13,8 @@ import (
 func TestMsgCreated(t *testing.T) {
 	testsuite.Reset()
 
-	mailroom.Config = mailroom.NewMailroomConfig()
-	mailroom.Config.AttachmentDomain = "foo.bar.com"
-	defer func() { mailroom.Config = nil }()
+	config.Mailroom.AttachmentDomain = "foo.bar.com"
+	defer func() { config.Mailroom.AttachmentDomain = "" }()
 
 	// add a URN for cathy so we can test all urn sends
 	testsuite.DB().MustExec(

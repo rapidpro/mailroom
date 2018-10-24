@@ -36,6 +36,34 @@ func (f *Flow) Name() string { return f.f.Name }
 // Definition returns the definition for this flow
 func (f *Flow) Definition() json.RawMessage { return f.f.Definition }
 
+// SetDefinition sets our definition from the passed in new definition format
+func (f *Flow) SetDefinition(definition json.RawMessage) {
+	f.f.Definition = definition
+}
+
+// SetLegacyDefinition sets our definition from the passed in legacy definition
+func (f *Flow) SetLegacyDefinition(legacyDefinition json.RawMessage) error {
+	// load it in from our json
+	legacyFlow, err := legacy.ReadLegacyFlow(legacyDefinition)
+	if err != nil {
+		return errors.Wrapf(err, "error reading flow into legacy format: %s", legacyDefinition)
+	}
+
+	// migrate forwards returning our final flow definition
+	newFlow, err := legacyFlow.Migrate(false, false)
+	if err != nil {
+		return errors.Wrapf(err, "error migrating flow: %s", legacyDefinition)
+	}
+
+	// write this flow back out in our new format
+	f.f.Definition, err = json.Marshal(newFlow)
+	if err != nil {
+		return errors.Wrapf(err, "error mashalling migrated flow definition: %s", legacyDefinition)
+	}
+
+	return nil
+}
+
 // IsArchived returns whether this flow is archived
 func (f *Flow) IsArchived() bool { return f.f.IsArchived }
 
@@ -75,22 +103,10 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, arg interface{}) (*F
 		return nil, errors.Wrapf(err, "error reading flow definition by: %s", arg)
 	}
 
-	// load it in from our json
-	legacyFlow, err := legacy.ReadLegacyFlow([]byte(flow.f.Definition))
+	// our definition is really a legacy definition, set it from that
+	err = flow.SetLegacyDefinition(flow.f.Definition)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading flow into legacy format: %s", arg)
-	}
-
-	// migrate forwards returning our final flow definition
-	newFlow, err := legacyFlow.Migrate(false, false)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error migrating flow: %s", arg)
-	}
-
-	// write this flow back out in our new format
-	flow.f.Definition, err = json.Marshal(newFlow)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error mashalling migrated flow definition: %s", arg)
+		return nil, errors.Wrapf(err, "error setting flow definition from legacy")
 	}
 
 	return flow, nil
