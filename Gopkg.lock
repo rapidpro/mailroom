@@ -56,6 +56,15 @@
   revision = "084a9de9eb0361fbd5ded14b55c84e5493a5d7f6"
 
 [[projects]]
+  name = "github.com/go-chi/chi"
+  packages = [
+    ".",
+    "middleware"
+  ]
+  revision = "b5294d10673813fac8558e7f47242bc9e61b4c25"
+  version = "v3.3.3"
+
+[[projects]]
   name = "github.com/go-mail/mail"
   packages = ["."]
   revision = "63235f23494bf20d713a585bce40b2a0675c2f77"
@@ -167,7 +176,7 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "3e56fc310bf5de7347a60c15a42a735ac4e340bf"
+  revision = "a5abe38388aff4e786abb289bca1fe91bf14053a"
 
 [[projects]]
   branch = "master"
@@ -270,6 +279,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e399154aa81141365d339e9b87718d7079b9fc67db09c59bc23e7ef6b9963d45"
+  inputs-digest = "90c9ebe5dfd8c3f1fb7da79248000316781b005922c533eb2f2724a4d2bd4d05"
   solver-name = "gps-cdcl"
   solver-version = 1

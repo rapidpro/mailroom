@@ -43,6 +43,9 @@ func (o *Org) AllowedLanguages() []utils.Language { return o.env.AllowedLanguage
 // RedactionPolicy returns the redaction policy (are we anonymous) for this org
 func (o *Org) RedactionPolicy() utils.RedactionPolicy { return o.env.RedactionPolicy() }
 
+// DefaultCountry returns the default country for this organization (mostly used for number parsing)
+func (o *Org) DefaultCountry() utils.Country { return o.env.DefaultCountry() }
+
 // Now returns the current time in the current timezone for this org
 func (o *Org) Now() time.Time { return o.env.Now() }
 
@@ -129,7 +132,22 @@ SELECT id, config, ROW_TO_JSON(o) FROM (SELECT
 		FROM (
 			SELECT iso_code FROM orgs_language WHERE org_id = o.id
 		) 
-	l) allowed_languages
+	l) allowed_languages,
+	COALESCE((SELECT
+		country
+	FROM
+		channels_channel c
+	WHERE
+		c.org_id = o.id AND
+		c.is_active = TRUE AND
+		c.country IS NOT NULL
+	GROUP BY
+		c.country
+	ORDER BY
+		count(c.country) desc,
+		country
+	LIMIT 1
+	), '') default_country
 	FROM 
 		orgs_org o
 	WHERE
