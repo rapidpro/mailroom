@@ -1,3 +1,7 @@
+v0.0.50
+----------
+ * more optimizations for campaign calculations, fix null value case
+
 v0.0.49
 ----------
  * derive default country from channel countries
