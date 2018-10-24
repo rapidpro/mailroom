@@ -1,3 +1,8 @@
+v0.0.49
+----------
+ * derive default country from channel countries
+ * v1 of simulation endpoint
+
 v0.0.48
 ----------
  * add support for contact urn changed event, unify updating appropriately
