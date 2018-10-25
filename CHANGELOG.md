@@ -1,3 +1,7 @@
+v0.0.52
+----------
+ * latest goflow
+
 v0.0.51
 ----------
  * add migrate endpoint
