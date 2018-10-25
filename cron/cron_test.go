@@ -58,7 +58,7 @@ func TestCron(t *testing.T) {
 	assert.NoError(t, err)
 
 	// sleep some more
-	time.Sleep(time.Millisecond * 300)
+	time.Sleep(time.Millisecond * 310)
 
 	// should have incremented three more times
 	assert.Equal(t, 7, fired)
