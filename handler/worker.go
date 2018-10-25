@@ -34,7 +34,7 @@ const (
 )
 
 func init() {
-	mailroom.AddTaskFunction(contactEventType, handleContactEvent)
+	mailroom.AddTaskFunction(contactEventType, handleEvent)
 }
 
 // AddHandleTask adds a single task for the passed in contact
@@ -63,9 +63,13 @@ func AddHandleTask(rc redis.Conn, contactID flows.ContactID, task *queue.Task) e
 	return nil
 }
 
+func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+	return handleContactEvent(ctx, mr.DB, mr.RP, task)
+}
+
 // handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
 // a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func handleContactEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -78,7 +82,7 @@ func handleContactEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.
 	// read all the events for this contact, one by one
 	for {
 		// pop the next event off this contacts queue
-		rc := mr.RP.Get()
+		rc := rp.Get()
 		contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)
 		event, err := redis.String(rc.Do("lpop", contactQ))
 		rc.Close()
@@ -109,7 +113,7 @@ func handleContactEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling stop event")
 			}
-			err = handleStopEvent(ctx, mr.DB, mr.RP, evt)
+			err = handleStopEvent(ctx, db, rp, evt)
 
 		case newConversationEventType, referralEventType:
 			evt := &channelEvent{}
@@ -117,7 +121,7 @@ func handleContactEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling channel event")
 			}
-			err = handleChannelEvent(ctx, mr.DB, mr.RP, contactEvent.Type, evt)
+			err = handleChannelEvent(ctx, db, rp, contactEvent.Type, evt)
 
 		case msgEventType:
 			msg := &msgEvent{}
@@ -125,7 +129,7 @@ func handleContactEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event")
 			}
-			err = handleMsgEvent(ctx, mr.DB, mr.RP, msg)
+			err = handleMsgEvent(ctx, db, rp, msg)
 
 		case timeoutEventType, expirationEventType:
 			evt := &timedEvent{}
@@ -133,7 +137,7 @@ func handleContactEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling timeout event")
 			}
-			err = handleTimedEvent(ctx, mr.DB, mr.RP, contactEvent.Type, evt)
+			err = handleTimedEvent(ctx, db, rp, contactEvent.Type, evt)
 
 		default:
 			return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
@@ -443,9 +447,14 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 		// trigger flow is still active, start it
 		if flow != nil && !flow.IsArchived() {
 			// start them in the triggered flow, interrupting their current flow/session
-			match := &triggers.KeywordMatch{
-				Type:    trigger.KeywordMatchType(),
-				Keyword: trigger.Keyword(),
+			var match *triggers.KeywordMatch
+
+			// if our trigger is on a keyword, populate the type
+			if trigger.Keyword() != "" {
+				match = &triggers.KeywordMatch{
+					Type:    trigger.KeywordMatchType(),
+					Keyword: trigger.Keyword(),
+				}
 			}
 			trigger := triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), msgIn, match, time.Now())
 
