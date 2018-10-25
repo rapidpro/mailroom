@@ -18,7 +18,6 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -140,8 +139,6 @@ func (m *Msg) Attachments() []flows.Attachment {
 
 // SetResponseTo set the incoming message that this session should be associated with in this sprint
 func (m *Msg) SetResponseTo(id null.Int, externalID string) {
-	logrus.WithField("response_id", id).Info("setting response to id")
-
 	m.m.ResponseToID = id
 	m.m.ResponseToExternalID = externalID
 }
