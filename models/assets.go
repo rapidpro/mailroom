@@ -68,26 +68,10 @@ func FlushCache() {
 	assetCache.Flush()
 }
 
-// GetOrgAssets creates or gets org assets for the passed in org
-func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
-	if db == nil {
-		return nil, errors.Errorf("nil db, cannot load org")
-	}
-
-	// do we have a recent cache?
-	key := fmt.Sprintf("%d", orgID)
-	var cached *OrgAssets
-	c, found := orgCache.Get(key)
-	if found {
-		cached = c.(*OrgAssets)
-	}
-
-	// if we found a source built in the last five seconds, use it
-	if found && time.Since(cached.builtAt) < cacheTimeout {
-		return cached, nil
-	}
-
-	// otherwire, we build one from scratch
+// NewOrgAssets creates and returns a new org assets objects, potentially using the previous
+// org assets passed in to prevent refetching locations
+func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets) (*OrgAssets, error) {
+	// build our new assets
 	o := &OrgAssets{
 		ctx:     ctx,
 		db:      db,
@@ -178,9 +162,9 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 	}
 
 	// cache locations for an hour
-	if cached != nil && time.Since(cached.locationsBuiltAt) < locationCacheTimeout {
-		o.locations = cached.locations
-		o.locationsBuiltAt = cached.locationsBuiltAt
+	if prev != nil && time.Since(prev.locationsBuiltAt) < locationCacheTimeout {
+		o.locations = prev.locations
+		o.locationsBuiltAt = prev.locationsBuiltAt
 	} else {
 		o.locations, err = loadLocations(ctx, db, orgID)
 		o.locationsBuiltAt = time.Now()
@@ -189,9 +173,65 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 		}
 	}
 
+	return o, nil
+}
+
+// GetOrgAssets creates or gets org assets for the passed in org
+func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
+	if db == nil {
+		return nil, errors.Errorf("nil db, cannot load org")
+	}
+
+	// do we have a recent cache?
+	key := fmt.Sprintf("%d", orgID)
+	var cached *OrgAssets
+	c, found := orgCache.Get(key)
+	if found {
+		cached = c.(*OrgAssets)
+	}
+
+	// if we found a source built in the last five seconds, use it
+	if found && time.Since(cached.builtAt) < cacheTimeout {
+		return cached, nil
+	}
+
+	// otherwise build a new one
+	o, err := NewOrgAssets(ctx, db, orgID, cached)
+	if err != nil {
+		return nil, err
+	}
+
 	// add this org to our cache
 	orgCache.Add(key, o, time.Minute)
+
+	// return our assets
 	return o, nil
+}
+
+// NewSessionAssets creates new sessions assets, returning the result
+func NewSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
+	assets, err := engine.NewSessionAssets(org)
+	if err != nil {
+		return nil, err
+	}
+	return assets, nil
+}
+
+// GetSessionAssets returns a goflow session assets object for the parred in org assets
+func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
+	key := fmt.Sprintf("%d", org.OrgID())
+	cached, found := assetCache.Get(key)
+	if found {
+		return cached.(flows.SessionAssets), nil
+	}
+
+	assets, err := NewSessionAssets(org)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating session assets from org")
+	}
+
+	assetCache.Set(key, assets, cache.DefaultExpiration)
+	return assets, nil
 }
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
@@ -338,21 +378,4 @@ func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
 
 func (a *OrgAssets) Resthooks() ([]assets.Resthook, error) {
 	return a.resthooks, nil
-}
-
-// GetSessionAssets returns a goflow session assets object for the parred in org assets
-func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
-	key := fmt.Sprintf("%d", org.OrgID())
-	cached, found := assetCache.Get(key)
-	if found {
-		return cached.(flows.SessionAssets), nil
-	}
-
-	assets, err := engine.NewSessionAssets(org)
-	if err != nil {
-		return nil, err
-	}
-
-	assetCache.Set(key, assets, cache.DefaultExpiration)
-	return assets, nil
 }

@@ -25,6 +25,8 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 	log := logrus.WithField("cron", name).WithField("lockName", lockName)
 
 	go func() {
+		defer log.Info("exiting")
+
 		// we run expiration every minute on the minute
 		for true {
 			select {

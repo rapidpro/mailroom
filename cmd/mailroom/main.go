@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 
 	"github.com/evalphobia/logrus_sentry"
@@ -62,9 +63,27 @@ func main() {
 		logrus.Fatalf("error starting server: %s", err)
 	}
 
-	ch := make(chan os.Signal)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-	logrus.WithField("comp", "main").WithField("signal", <-ch).Info("stopping")
+	// handle our signals
+	handleSignals(mr)
+}
 
-	mr.Stop()
+// handleSignals takes care of trapping quit, interrupt or terminate signals and doing the right thing
+func handleSignals(mr *mailroom.Mailroom) {
+	sigs := make(chan os.Signal)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	for {
+		sig := <-sigs
+		switch sig {
+		case syscall.SIGQUIT:
+			buf := make([]byte, 1<<20)
+			stacklen := runtime.Stack(buf, true)
+			logrus.WithField("comp", "main").WithField("signal", sig).Info("received quit signal, dumping stack")
+			logrus.Printf("\n%s", buf[:stacklen])
+		case syscall.SIGINT, syscall.SIGTERM:
+			logrus.WithField("comp", "main").WithField("signal", sig).Info("received exit signal, exiting")
+			mr.Stop()
+			return
+		}
+	}
 }

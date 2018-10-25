@@ -215,6 +215,40 @@ const (
 			}
 		]
 	}`
+
+	minLegacyDef = `
+	{
+		"flow": {
+			"base_language": "eng",
+			"action_sets": [{
+				"y": 0,
+				"x": 100,
+				"destination": null,
+				"uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
+				"actions": [{
+					"msg": {
+						"eng": "Hello world"
+					},
+					"type": "reply"
+				}],
+				"exit_uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+			}],
+			"version": 8,
+			"flow_type": "F",
+			"entry": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
+			"rule_sets": [],
+			"metadata": {
+				"uuid": "42362831-f376-4df1-b6d9-a80b102821d9",
+				"expires": 10080,
+				"revision": 1,
+				"id": 41049,
+				"name": "No ruleset flow",
+				"saved_on": "2015-11-20T11:02:19.790131Z"
+			}
+		},
+		"include_ui": true
+	}
+	`
 )
 
 func TestServer(t *testing.T) {
@@ -241,12 +275,17 @@ func TestServer(t *testing.T) {
 		Status   int
 		Response string
 	}{
-		{"/", "POST", "", 400, "illegal"},
+		{"/arst", "GET", "", 404, "not found"},
+		{"/", "POST", "", 405, "illegal"},
 		{"/", "GET", "", 200, "mailroom"},
-		{"/sim/start", "GET", "", 400, "illegal"},
-		{"/sim/start", "POST", startBody, 200, "What is your favorite color?"},
-		{"/sim/resume", "GET", "", 400, "illegal"},
-		{"/sim/resume", "POST", resumeBody, 200, "Good choice, I like Blue too! What is your favorite beer?"},
+		{"/mr/", "POST", "", 405, "illegal"},
+		{"/mr/", "GET", "", 200, "mailroom"},
+		{"/mr/sim/start", "GET", "", 405, "illegal"},
+		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
+		{"/mr/sim/resume", "GET", "", 405, "illegal"},
+		{"/mr/sim/resume", "POST", resumeBody, 200, "Good choice, I like Blue too! What is your favorite beer?"},
+		{"/mr/flow/migrate", "GET", "", 405, "illegal"},
+		{"/mr/flow/migrate", "POST", minLegacyDef, 200, `"type":"send_msg"`},
 	}
 
 	for i, tc := range tcs {

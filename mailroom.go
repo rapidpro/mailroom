@@ -3,14 +3,10 @@ package mailroom
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
-	"os/signal"
-	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -33,7 +29,7 @@ func AddInitFunction(initFunc InitFunction) {
 }
 
 // TaskFunction is the function that will be called for a type of task
-type TaskFunction func(mr *Mailroom, task *queue.Task) error
+type TaskFunction func(ctx context.Context, mr *Mailroom, task *queue.Task) error
 
 var taskFunctions = make(map[string]TaskFunction)
 
@@ -179,9 +175,6 @@ func (mr *Mailroom) Start() error {
 
 	logrus.Info("mailroom started")
 
-	// wait for any signals such as QUIT for dumping stack
-	handleSignals()
-
 	return nil
 }
 
@@ -200,19 +193,4 @@ func (mr *Mailroom) Stop() error {
 	mr.WaitGroup.Wait()
 	logrus.Info("mailroom stopped")
 	return nil
-}
-
-func handleSignals() {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGQUIT)
-	buf := make([]byte, 1<<20)
-	for {
-		sig := <-sigs
-		switch sig {
-		case syscall.SIGQUIT:
-			stacklen := runtime.Stack(buf, true)
-			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
-		default:
-		}
-	}
 }

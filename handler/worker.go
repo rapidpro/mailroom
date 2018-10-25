@@ -65,7 +65,10 @@ func AddHandleTask(rc redis.Conn, contactID flows.ContactID, task *queue.Task) e
 
 // handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
 // a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
+func handleContactEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+
 	eventTask := &handleEventTask{}
 	err := json.Unmarshal(task.Task, eventTask)
 	if err != nil {
@@ -106,7 +109,7 @@ func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling stop event")
 			}
-			err = handleStopEvent(mr.CTX, mr.DB, mr.RP, evt)
+			err = handleStopEvent(ctx, mr.DB, mr.RP, evt)
 
 		case newConversationEventType, referralEventType:
 			evt := &channelEvent{}
@@ -114,7 +117,7 @@ func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling channel event")
 			}
-			err = handleChannelEvent(mr.CTX, mr.DB, mr.RP, contactEvent.Type, evt)
+			err = handleChannelEvent(ctx, mr.DB, mr.RP, contactEvent.Type, evt)
 
 		case msgEventType:
 			msg := &msgEvent{}
@@ -122,7 +125,7 @@ func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event")
 			}
-			err = handleMsgEvent(mr.CTX, mr.DB, mr.RP, msg)
+			err = handleMsgEvent(ctx, mr.DB, mr.RP, msg)
 
 		case timeoutEventType, expirationEventType:
 			evt := &timedEvent{}
@@ -130,7 +133,7 @@ func handleContactEvent(mr *mailroom.Mailroom, task *queue.Task) error {
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling timeout event")
 			}
-			err = handleTimedEvent(mr.CTX, mr.DB, mr.RP, contactEvent.Type, evt)
+			err = handleTimedEvent(ctx, mr.DB, mr.RP, contactEvent.Type, evt)
 
 		default:
 			return errors.Errorf("unknown contact event type: %s", contactEvent.Type)

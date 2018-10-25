@@ -42,8 +42,10 @@ func NewServer(ctx context.Context, db *sqlx.DB, rp *redis.Pool, config *config.
 	router.NotFound(s.wrapJSONHandler(s.handle404))
 	router.MethodNotAllowed(s.wrapJSONHandler(s.handle405))
 	router.Get("/", s.wrapJSONHandler(s.handleIndex))
-	router.Post("/sim/start", s.wrapJSONHandler(s.handleStart))
-	router.Post("/sim/resume", s.wrapJSONHandler(s.handleResume))
+	router.Get("/mr", s.wrapJSONHandler(s.handleIndex))
+	router.Post("/mr/flow/migrate", s.wrapJSONHandler(s.handleMigrate))
+	router.Post("/mr/sim/start", s.wrapJSONHandler(s.handleStart))
+	router.Post("/mr/sim/resume", s.wrapJSONHandler(s.handleResume))
 
 	// configure our http server
 	s.httpServer = &http.Server{
@@ -56,10 +58,12 @@ func NewServer(ctx context.Context, db *sqlx.DB, rp *redis.Pool, config *config.
 	return s
 }
 
-type JSONHandler func(r *http.Request) (interface{}, error)
+type JSONHandler func(r *http.Request) (interface{}, int, error)
 
 func (s *Server) wrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-type", "application/json")
+
 		auth := r.Header.Get("authorization")
 		if s.config.AuthToken != "" && s.config.AuthToken != fmt.Sprintf("Token %s", auth) {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -67,7 +71,7 @@ func (s *Server) wrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 			return
 		}
 
-		value, err := handler(r)
+		value, status, err := handler(r)
 		if err != nil {
 			value = map[string]string{
 				"error": err.Error(),
@@ -83,8 +87,7 @@ func (s *Server) wrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 		}
 
 		if err != nil {
-			// TODO: this should be more specific
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(status)
 			w.Write(serialized)
 			return
 		}
