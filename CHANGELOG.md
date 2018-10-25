@@ -1,3 +1,9 @@
+v0.0.51
+----------
+ * add migrate endpoint
+ * better status codes in webserver
+ * graceful exits
+
 v0.0.50
 ----------
  * more optimizations for campaign calculations, fix null value case
