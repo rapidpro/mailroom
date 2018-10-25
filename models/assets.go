@@ -48,7 +48,9 @@ type OrgAssets struct {
 	groupsByID   map[GroupID]*Group
 	groupsByUUID map[assets.GroupUUID]*Group
 
-	labels    []assets.Label
+	labels       []assets.Label
+	labelsByUUID map[assets.LabelUUID]*Label
+
 	resthooks []assets.Resthook
 	triggers  []*Trigger
 
@@ -91,6 +93,8 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		campaignEventsByField: make(map[FieldID][]*CampaignEvent),
 		campaignEventsByID:    make(map[CampaignEventID]*CampaignEvent),
 		campaignsByGroup:      make(map[GroupID][]*Campaign),
+
+		labelsByUUID: make(map[assets.LabelUUID]*Label),
 
 		flowByUUID: make(map[assets.FlowUUID]assets.Flow),
 		flowByID:   make(map[FlowID]assets.Flow),
@@ -137,6 +141,9 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	o.labels, err = loadLabels(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading group labels for org %d", orgID)
+	}
+	for _, l := range o.labels {
+		o.labelsByUUID[l.UUID()] = l.(*Label)
 	}
 
 	o.resthooks, err = loadResthooks(ctx, db, orgID)
@@ -366,6 +373,10 @@ func (a *OrgAssets) GroupByUUID(groupUUID assets.GroupUUID) *Group {
 
 func (a *OrgAssets) Labels() ([]assets.Label, error) {
 	return a.labels, nil
+}
+
+func (a *OrgAssets) LabelByUUID(uuid assets.LabelUUID) *Label {
+	return a.labelsByUUID[uuid]
 }
 
 func (a *OrgAssets) Triggers() []*Trigger {

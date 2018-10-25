@@ -1,11 +1,15 @@
 package hooks
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
@@ -22,17 +26,26 @@ var (
 	httpClient = utils.NewHTTPClient("mailroom")
 )
 
-type ContactEventMap map[flows.ContactID][]flows.Event
 type ContactActionMap map[flows.ContactID][]flows.Action
+type ContactMsgMap map[flows.ContactID]*flows.MsgIn
 
 const (
-	Cathy = flows.ContactID(43)
-	Bob   = flows.ContactID(58)
-	Evan  = flows.ContactID(47)
+	Org1 = models.OrgID(1)
+
+	Cathy      = flows.ContactID(43)
+	CathyURN   = urns.URN("tel:+250700000002")
+	CathyURNID = models.URNID(43)
+
+	Bob      = flows.ContactID(58)
+	BobURN   = urns.URN("tel:+250700000017")
+	BobURNID = models.URNID(59)
+
+	Evan = flows.ContactID(47)
 )
 
 type HookTestCase struct {
 	Actions    ContactActionMap
+	Msgs       ContactMsgMap
 	Assertions []SQLAssertion
 }
 
@@ -130,6 +143,21 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	return flow
 }
 
+func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID flows.ContactID, urn urns.URN, urnID models.URNID, text string) *flows.MsgIn {
+	msgUUID := flows.MsgUUID(utils.NewUUID())
+	var msgID flows.MsgID
+
+	err := db.Get(&msgID,
+		`INSERT INTO msgs_msg(uuid, text, created_on, direction, status, visibility, msg_count, error_count, next_attempt, contact_id, contact_urn_id, org_id)
+	  						  VALUES($1, $2, NOW(), 'I', 'P', 'V', 1, 0, NOW(), $3, $4, $5) RETURNING id`,
+		msgUUID, text, contactID, urnID, orgID)
+	if err != nil {
+		panic(err)
+	}
+
+	return flows.NewMsgIn(msgUUID, msgID, urn, nil, text, nil)
+}
+
 func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 	models.FlushCache()
 
@@ -153,8 +181,22 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		assert.NoError(t, err)
 
 		options := runner.NewStartOptions()
+		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+			for _, s := range sessions {
+				msg := tc.Msgs[s.Contact().ID()]
+				if msg != nil {
+					s.SetIncomingMsg(msg.ID(), "")
+				}
+			}
+			return nil
+		}
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
-			return triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
+			msg := tc.Msgs[contact.ID()]
+			if msg == nil {
+				return triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
+			} else {
+				return triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), msg, nil, time.Now())
+			}
 		}
 
 		_, err = runner.StartFlow(ctx, db, rp, org, flow, []flows.ContactID{Cathy, Bob, Evan}, options)
