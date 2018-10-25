@@ -24,8 +24,8 @@ func init() {
 }
 
 // HandleCampaignEvent is called by mailroom when a campaign event task is ready to be processed.
-func HandleCampaignEvent(mr *mailroom.Mailroom, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(mr.CTX, time.Minute*5)
+func HandleCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
 	return fireEventFires(ctx, mr.DB, mr.RP, task)

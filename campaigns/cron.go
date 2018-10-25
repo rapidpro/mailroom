@@ -32,7 +32,9 @@ func init() {
 func StartCampaignCron(mr *mailroom.Mailroom) error {
 	cron.StartCron(mr.Quit, mr.RP, campaignsLock, time.Second*60,
 		func(lockName string, lockValue string) error {
-			return fireCampaignEvents(mr.CTX, mr.DB, mr.RP, lockName, lockValue)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+			defer cancel()
+			return fireCampaignEvents(ctx, mr.DB, mr.RP, lockName, lockValue)
 		},
 	)
 

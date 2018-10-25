@@ -1,6 +1,7 @@
 package mailroom
 
 import (
+	"context"
 	"time"
 
 	"github.com/nyaruka/mailroom/queue"
@@ -175,7 +176,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 
 	taskFunc, found := taskFunctions[task.Type]
 	if found {
-		err := taskFunc(w.foreman.mr, task)
+		err := taskFunc(context.Background(), w.foreman.mr, task)
 		if err != nil {
 			log.WithError(err).Error("error running task")
 		}

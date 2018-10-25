@@ -2,6 +2,9 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/nyaruka/goflow/assets"
@@ -9,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
@@ -58,16 +62,16 @@ type startRequest struct {
 }
 
 // handles a request to /start
-func (s *Server) handleStart(r *http.Request) (interface{}, error) {
+func (s *Server) handleStart(r *http.Request) (interface{}, int, error) {
 	request := &startRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, maxRequestBytes); err != nil {
-		return nil, errors.Wrapf(err, "request failed validation")
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
 	// grab our org
-	org, err := models.GetOrgAssets(s.ctx, s.db, request.OrgID)
+	org, err := models.NewOrgAssets(s.ctx, s.db, request.OrgID, nil)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to load org assets")
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// for each of our passed in definitions
@@ -75,14 +79,14 @@ func (s *Server) handleStart(r *http.Request) (interface{}, error) {
 		// populate our flow in our org from our request
 		err = populateFlow(org, flow.UUID, flow.Definition, flow.LegacyDefinition)
 		if err != nil {
-			return nil, err
+			return nil, http.StatusBadRequest, err
 		}
 	}
 
 	// build our session
-	assets, err := models.GetSessionAssets(org)
+	assets, err := models.NewSessionAssets(org)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable get session assets")
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
 	}
 
 	session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
@@ -90,16 +94,16 @@ func (s *Server) handleStart(r *http.Request) (interface{}, error) {
 	// read our trigger
 	trigger, err := triggers.ReadTrigger(session, request.Trigger)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to read trigger")
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
 
 	// start our flow
 	newEvents, err := session.Start(trigger)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error starting session")
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
 
-	return &sessionResponse{Session: session, Events: newEvents}, nil
+	return &sessionResponse{Session: session, Events: newEvents}, http.StatusOK, nil
 }
 
 // Resumes an existing engine session
@@ -122,16 +126,16 @@ type resumeRequest struct {
 	Resume  json.RawMessage `json:"resume" validate:"required"`
 }
 
-func (s *Server) handleResume(r *http.Request) (interface{}, error) {
+func (s *Server) handleResume(r *http.Request) (interface{}, int, error) {
 	request := &resumeRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, maxRequestBytes); err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
 
 	// grab our org
-	org, err := models.GetOrgAssets(s.ctx, s.db, request.OrgID)
+	org, err := models.NewOrgAssets(s.ctx, s.db, request.OrgID, nil)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
 
 	// for each of our passed in definitions
@@ -139,34 +143,34 @@ func (s *Server) handleResume(r *http.Request) (interface{}, error) {
 		// populate our flow in our org from our request
 		err = populateFlow(org, flow.UUID, flow.Definition, flow.LegacyDefinition)
 		if err != nil {
-			return nil, err
+			return nil, http.StatusBadRequest, err
 		}
 	}
 
 	// build our session
-	assets, err := models.GetSessionAssets(org)
+	assets, err := models.NewSessionAssets(org)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 
 	session, err := engine.ReadSession(assets, engine.NewDefaultConfig(), httpClient, request.Session)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
 
 	// read our resume
 	resume, err := resumes.ReadResume(session, request.Resume)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
 
 	// resume our session
 	newEvents, err := session.Resume(resume)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 
-	return &sessionResponse{Session: session, Events: newEvents}, nil
+	return &sessionResponse{Session: session, Events: newEvents}, http.StatusOK, nil
 }
 
 // populateFlow takes care of setting the definition for the flow with the passed in UUID according to the passed in definitions
@@ -193,18 +197,67 @@ func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawM
 	return errors.Errorf("missing definition or legacy_definition for flow: %s", uuid)
 }
 
-func (s *Server) handleIndex(r *http.Request) (interface{}, error) {
+// Migrates a legacy flow to the new flow definition specification
+//
+//   {
+//     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...},
+//     "include_ui": false
+//   }
+//
+type migrateRequest struct {
+	Flow          json.RawMessage `json:"flow"`
+	CollapseExits *bool           `json:"collapse_exits"`
+	IncludeUI     *bool           `json:"include_ui"`
+}
+
+func (s *Server) handleMigrate(r *http.Request) (interface{}, int, error) {
+	migrate := migrateRequest{}
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	if err := r.Body.Close(); err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	if err := json.Unmarshal(body, &migrate); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling definition")
+	}
+
+	if migrate.Flow == nil {
+		return nil, http.StatusBadRequest, errors.Errorf("missing flow element")
+	}
+
+	legacyFlow, err := legacy.ReadLegacyFlow(migrate.Flow)
+	if err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading legacy flow")
+	}
+
+	collapseExits := migrate.CollapseExits == nil || *migrate.CollapseExits
+	includeUI := migrate.IncludeUI == nil || *migrate.IncludeUI
+
+	flow, err := legacyFlow.Migrate(collapseExits, includeUI)
+	if err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "error migrating legacy flow")
+	}
+
+	return flow, http.StatusOK, nil
+}
+
+func (s *Server) handleIndex(r *http.Request) (interface{}, int, error) {
 	response := map[string]string{
+		"url":       fmt.Sprintf("%s", r.URL),
 		"component": "mailroom",
 		"version":   s.config.Version,
 	}
-	return response, nil
+	return response, http.StatusOK, nil
 }
 
-func (s *Server) handle404(r *http.Request) (interface{}, error) {
-	return nil, errors.Errorf("not found: %s", r.URL.String())
+func (s *Server) handle404(r *http.Request) (interface{}, int, error) {
+	return nil, http.StatusNotFound, errors.Errorf("not found: %s", r.URL.String())
 }
 
-func (s *Server) handle405(r *http.Request) (interface{}, error) {
-	return nil, errors.Errorf("illegal method: %s", r.Method)
+func (s *Server) handle405(r *http.Request) (interface{}, int, error) {
+	return nil, http.StatusMethodNotAllowed, errors.Errorf("illegal method: %s", r.Method)
 }
