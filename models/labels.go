@@ -5,6 +5,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
 )
 
@@ -64,3 +65,31 @@ ORDER BY
 	name ASC
 ) r;
 `
+
+// AddMsgLabels inserts the passed in msg labels to our db
+func AddMsgLabels(ctx context.Context, tx *sqlx.Tx, adds []*MsgLabelAdd) error {
+	is := make([]interface{}, len(adds))
+	for i := range adds {
+		is[i] = adds[i]
+	}
+
+	err := BulkSQL(ctx, "inserting msg labels", tx, insertMsgLabelsSQL, is)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting new msg labels")
+	}
+	return nil
+}
+
+const insertMsgLabelsSQL = `
+INSERT INTO 
+	msgs_msg_labels(msg_id, label_id)
+	VALUES(:msg_id, :label_id)
+ON CONFLICT
+	DO NOTHING
+`
+
+// MsgLabelAdd represents a single label that should be added to a message
+type MsgLabelAdd struct {
+	MsgID   flows.MsgID `db:"msg_id"`
+	LabelID LabelID     `db:"label_id"`
+}

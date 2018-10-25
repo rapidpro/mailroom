@@ -137,6 +137,12 @@ func (m *Msg) Attachments() []flows.Attachment {
 	return attachments
 }
 
+// SetResponseTo set the incoming message that this session should be associated with in this sprint
+func (m *Msg) SetResponseTo(id null.Int, externalID string) {
+	m.m.ResponseToID = id
+	m.m.ResponseToExternalID = externalID
+}
+
 func (m *Msg) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.m)
 }
@@ -218,12 +224,6 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	}
 
 	return msg, nil
-}
-
-// SetReplyTo set the incoming message that this session should be associated with in this sprint
-func (m *Msg) SetReplyTo(id null.Int, externalID string) {
-	m.m.ResponseToID = id
-	m.m.ResponseToExternalID = externalID
 }
 
 // InsertMessages inserts the passed in messages in a single query

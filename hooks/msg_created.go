@@ -124,7 +124,7 @@ func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 	}
 
 	// set our reply to as well (will be noop in cases whren there is no incoming message)
-	msg.SetReplyTo(session.IncomingMsgID, session.IncomingExternalID)
+	msg.SetResponseTo(session.IncomingMsgID, session.IncomingExternalID)
 
 	// register to have this message committed
 	session.AddPreCommitEvent(commitSessionMessages, msg)
