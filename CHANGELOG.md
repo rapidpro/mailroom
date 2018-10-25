@@ -1,3 +1,7 @@
+v0.0.53
+----------
+ * add support for input_labels_added event
+
 v0.0.52
 ----------
  * latest goflow
