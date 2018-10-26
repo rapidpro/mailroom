@@ -1,3 +1,7 @@
+v0.0.55
+----------
+ * latest goflow, fixes case issues
+
 v0.0.54
 ----------
  * goflow fix for looping
