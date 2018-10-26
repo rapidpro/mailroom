@@ -155,7 +155,7 @@ func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID flows.ContactI
 		panic(err)
 	}
 
-	return flows.NewMsgIn(msgUUID, msgID, urn, nil, text, nil)
+	return flows.NewMsgIn(msgUUID, msgID, urn, nil, text, nil, "")
 }
 
 func RunActionTestCases(t *testing.T, tcs []HookTestCase) {

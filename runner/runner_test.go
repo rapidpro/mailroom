@@ -212,7 +212,7 @@ func TestContactRuns(t *testing.T) {
 	for i, tc := range tcs {
 		// answer our first question
 		resume := resumes.NewMsgResume(org.Env(), contact,
-			flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), 10, urns.URN("tel:+250700000001"), nil, tc.Message, nil))
+			flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), 10, urns.URN("tel:+250700000001"), nil, tc.Message, nil, ""))
 
 		session, err = ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
 		assert.NoError(t, err)

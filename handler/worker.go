@@ -418,7 +418,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 		}
 	}
 
-	msgIn := flows.NewMsgIn(event.MsgUUID, event.MsgID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
+	msgIn := flows.NewMsgIn(event.MsgUUID, event.MsgID, event.URN, channel.ChannelReference(), event.Text, event.Attachments, event.MsgExternalID)
 
 	// build our hook to mark our message as handled
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
