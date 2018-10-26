@@ -1,3 +1,7 @@
+v0.0.56
+----------
+ * update calls to NewMsgIn
+
 v0.0.55
 ----------
  * latest goflow, fixes case issues
