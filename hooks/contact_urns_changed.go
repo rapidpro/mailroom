@@ -16,13 +16,13 @@ func init() {
 	models.RegisterEventHook(events.TypeContactURNsChanged, handleContactURNsChanged)
 }
 
-// ContactURNsChangedHook is our hook for when a URN is added to a contact
-type ContactURNsChangedHook struct{}
+// CommitURNChangesHook is our hook for when a URN is added to a contact
+type CommitURNChangesHook struct{}
 
-var contactURNsChangedHook = &ContactURNsChangedHook{}
+var commitURNChangesHook = &CommitURNChangesHook{}
 
 // Apply adds all our URNS in a batch
-func (h *ContactURNsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// gather all our urn changes, we only care about the last change for each session
 	changes := make([]*models.ContactURNsChanged, 0, len(sessions))
 	for _, sessionChanges := range sessions {
@@ -54,7 +54,7 @@ func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	}
 
 	// add our callback
-	session.AddPreCommitEvent(contactURNsChangedHook, change)
+	session.AddPreCommitEvent(commitURNChangesHook, change)
 	session.AddPreCommitEvent(contactModifiedHook, session.Contact().ID())
 
 	return nil

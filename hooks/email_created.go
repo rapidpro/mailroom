@@ -18,20 +18,20 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeEmailCreated, ApplyEmailCreatedEvent)
+	models.RegisterEventHook(events.TypeEmailCreated, handleEmailCreated)
 }
 
-// SendEmails is our hook for sending emails
-type SendEmails struct{}
+// SendEmailsHook is our hook for sending emails
+type SendEmailsHook struct{}
 
-var sendEmails = &SendEmails{}
+var sendEmailsHook = &SendEmailsHook{}
 
 const (
 	configSMTPServer = "SMTP_SERVER"
 )
 
 // Apply sends all our emails
-func (h *SendEmails) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *SendEmailsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// get our smtp server config
 	config := org.Org().ConfigValue(configSMTPServer, config.Mailroom.SMTPServer)
 
@@ -98,8 +98,8 @@ func (h *SendEmails) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org
 	return nil
 }
 
-// ApplyEmailCreatedEvent event queues an email to be sent later on
-func ApplyEmailCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+// handleEmailCreated event queues an email to be sent later on
+func handleEmailCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.EmailCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
@@ -109,7 +109,7 @@ func ApplyEmailCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 	}).Debug("creating email")
 
 	// register to send this email after our session is committed
-	session.AddPostCommitEvent(sendEmails, event)
+	session.AddPostCommitEvent(sendEmailsHook, event)
 
 	return nil
 }

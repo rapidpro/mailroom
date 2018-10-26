@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
 	null "gopkg.in/guregu/null.v3"
@@ -70,13 +71,19 @@ func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarsha
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
 	s struct {
-		StartID             StartID           `json:"start_id"`
-		OrgID               OrgID             `json:"org_id"`
-		FlowID              FlowID            `json:"flow_id"`
-		GroupIDs            []GroupID         `json:"group_ids"`
-		ContactIDs          []flows.ContactID `json:"contact_ids"`
-		RestartParticipants bool              `json:"restart_participants"`
-		IncludeActive       bool              `json:"include_active"`
+		StartID StartID `json:"start_id"`
+		OrgID   OrgID   `json:"org_id"`
+		FlowID  FlowID  `json:"flow_id"`
+
+		GroupIDs      []GroupID         `json:"group_ids,omitempty"`
+		ContactIDs    []flows.ContactID `json:"contact_ids,omitempty"`
+		URNs          []urns.URN        `json:"urns,omitempty"`
+		CreateContact bool              `json:"create_contact"`
+
+		RestartParticipants bool `json:"restart_participants"`
+		IncludeActive       bool `json:"include_active"`
+
+		Parent json.RawMessage `json:"parent,omitempty"`
 	}
 }
 
@@ -85,8 +92,12 @@ func (s *FlowStart) OrgID() OrgID                  { return s.s.OrgID }
 func (s *FlowStart) FlowID() FlowID                { return s.s.FlowID }
 func (s *FlowStart) GroupIDs() []GroupID           { return s.s.GroupIDs }
 func (s *FlowStart) ContactIDs() []flows.ContactID { return s.s.ContactIDs }
+func (s *FlowStart) URNs() []urns.URN              { return s.s.URNs }
+func (s *FlowStart) CreateContact() bool           { return s.s.CreateContact }
 func (s *FlowStart) RestartParticipants() bool     { return s.s.RestartParticipants }
 func (s *FlowStart) IncludeActive() bool           { return s.s.IncludeActive }
+
+func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
 
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }

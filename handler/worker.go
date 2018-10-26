@@ -394,7 +394,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 
 	// if this is a new contact, we need to calculate dynamic groups and campaigns
 	if newContact {
-		err = initiliazeNewContact(ctx, db, org, contact)
+		err = models.CalculateDynamicGroups(ctx, db, org, contact)
 		if err != nil {
 			return errors.Wrapf(err, "unable to initialize new contact")
 		}
@@ -480,95 +480,6 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
-	return nil
-}
-
-// initializeNewContact initializes the passed in contact, making sure it is part of any dynamic groups it
-// should be as well as taking care of any campaign events.
-func initiliazeNewContact(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, contact *flows.Contact) error {
-	orgGroups, _ := org.Groups()
-	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups))
-	if len(errs) > 0 {
-		return errors.Wrapf(errs[0], "error calculating dynamic groups")
-	}
-
-	// start a transaction to commit all our changes at once
-	tx, err := db.BeginTxx(ctx, nil)
-	if err != nil {
-		return errors.Wrapf(err, "unable to start transaction")
-	}
-	campaigns := make(map[models.CampaignID]*models.Campaign)
-
-	groupAdds := make([]*models.GroupAdd, 0, 1)
-	for _, a := range added {
-		group := org.GroupByUUID(a.UUID())
-		if group == nil {
-			return errors.Wrapf(err, "added to unknown group: %s", a.UUID())
-		}
-		groupAdds = append(groupAdds, &models.GroupAdd{
-			ContactID: contact.ID(),
-			GroupID:   group.ID(),
-		})
-
-		// add in any campaigns we may qualify for
-		for _, c := range org.CampaignByGroupID(group.ID()) {
-			campaigns[c.ID()] = c
-		}
-	}
-	err = models.AddContactsToGroups(ctx, tx, groupAdds)
-	if err != nil {
-		return errors.Wrapf(err, "error adding contact to groups")
-	}
-
-	groupRemoves := make([]*models.GroupRemove, 0, 1)
-	for _, r := range removed {
-		group := org.GroupByUUID(r.UUID())
-		if group == nil {
-			return errors.Wrapf(err, "removed from an unknown group: %s", r.UUID())
-		}
-		groupRemoves = append(groupRemoves, &models.GroupRemove{
-			ContactID: contact.ID(),
-			GroupID:   group.ID(),
-		})
-	}
-	err = models.RemoveContactsFromGroups(ctx, tx, groupRemoves)
-	if err != nil {
-		return errors.Wrapf(err, "error removing contact from group")
-	}
-
-	// for each campaign figure out if we need to be added to any events
-	fireAdds := make([]*models.FireAdd, 0, 2)
-	tz := org.Env().Timezone()
-	now := time.Now()
-	for _, c := range campaigns {
-		for _, ce := range c.Events() {
-			scheduled, err := ce.ScheduleForContact(tz, now, contact)
-			if err != nil {
-				return errors.Wrapf(err, "error calculating schedule for event: %d", ce.ID())
-			}
-
-			if scheduled != nil {
-				fireAdds = append(fireAdds, &models.FireAdd{
-					ContactID: contact.ID(),
-					EventID:   ce.ID(),
-					Scheduled: *scheduled,
-				})
-			}
-		}
-	}
-
-	// add any event adds
-	err = models.AddEventFires(ctx, tx, fireAdds)
-	if err != nil {
-		return errors.Wrapf(err, "unable to add new event fires for contact")
-	}
-
-	// ok, commit everything
-	err = tx.Commit()
-	if err != nil {
-		return errors.Wrapf(err, "unable to commit new contact updates")
-	}
-
 	return nil
 }
 

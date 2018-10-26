@@ -17,13 +17,13 @@ func init() {
 	models.RegisterEventHook(events.TypeInputLabelsAdded, handleInputLabelsAdded)
 }
 
-// CommitInputLabelsAdded is our hook for input labels being added
-type CommitInputLabelsAdded struct{}
+// CommitAddedLabelsHook is our hook for input labels being added
+type CommitAddedLabelsHook struct{}
 
-var commitInputLabelsAdded = &CommitInputLabelsAdded{}
+var commitAddedLabelsHook = &CommitAddedLabelsHook{}
 
 // Apply applies our input labels added, committing them in a single batch
-func (h *CommitInputLabelsAdded) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitAddedLabelsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build our list of msg label adds, we dedupe these so we never double add in the same transaction
 	seen := make(map[string]bool)
 	adds := make([]*models.MsgLabelAdd, 0, len(sessions))
@@ -63,7 +63,7 @@ func handleInputLabelsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 			return errors.Errorf("cannot add label, no incoming message for session: %d", session.ID)
 		}
 
-		session.AddPreCommitEvent(commitInputLabelsAdded, &models.MsgLabelAdd{
+		session.AddPreCommitEvent(commitAddedLabelsHook, &models.MsgLabelAdd{
 			MsgID:   flows.MsgID(session.IncomingMsgID.Int64),
 			LabelID: label.ID(),
 		})

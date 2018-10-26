@@ -17,16 +17,16 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeMsgCreated, ApplyMsgCreatedEvent)
+	models.RegisterEventHook(events.TypeMsgCreated, handleMsgCreated)
 }
 
-// SendSessionMessages is our hook for sending session messages
-type SendSessionMessages struct{}
+// SendMessagesHook is our hook for sending session messages
+type SendMessagesHook struct{}
 
-var sendSessionMessages = &SendSessionMessages{}
+var sendMessagesHook = &SendMessagesHook{}
 
 // Apply sends all non-android messages to courier
-func (h *SendSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -57,13 +57,13 @@ func (h *SendSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 	return nil
 }
 
-// CommitSessionMessages is our hook for comitting session messages
-type CommitSessionMessages struct{}
+// CommitMessagesHook is our hook for comitting session messages
+type CommitMessagesHook struct{}
 
-var commitSessionMessages = &CommitSessionMessages{}
+var commitMessagesHook = &CommitMessagesHook{}
 
 // Apply takes care of inserting all the messages in the passed in sessions assigning topups to them as needed.
-func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	msgs := make([]*models.Msg, 0, len(sessions))
 	for _, s := range sessions {
 		for _, m := range s {
@@ -95,8 +95,8 @@ func (h *CommitSessionMessages) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	return nil
 }
 
-// ApplyMsgCreatedEvent creates the db msg for the passed in event
-func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+// handleMsgCreated creates the db msg for the passed in event
+func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
 
 	// ignore events that don't have a channel or URN set
@@ -127,8 +127,8 @@ func ApplyMsgCreatedEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 	msg.SetResponseTo(session.IncomingMsgID, session.IncomingExternalID)
 
 	// register to have this message committed
-	session.AddPreCommitEvent(commitSessionMessages, msg)
-	session.AddPostCommitEvent(sendSessionMessages, msg)
+	session.AddPreCommitEvent(commitMessagesHook, msg)
+	session.AddPostCommitEvent(sendMessagesHook, msg)
 
 	return nil
 }

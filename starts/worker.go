@@ -54,6 +54,24 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 		contactIDs[id] = true
 	}
 
+	// add any urns as well
+	urnContactIDs, err := models.ContactIDsFromURNs(start.URNs())
+	if err != nil {
+		return errors.Wrapf(err, "error getting contact ids from urns")
+	}
+	for _, id := range urnContactIDs {
+		contactIDs[id] = true
+	}
+
+	// if we are meant to create a brand new contact, do so
+	if start.CreateContact() {
+		newID, err := models.CreateContact(db, start.OrgID)
+		if err != nil {
+			return errors.Wrapf(err, "error creating new contact")
+		}
+		contactIDs[newID] = true
+	}
+
 	// now all the ids for our groups
 	rows, err := db.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.GroupIDs()))
 	if err != nil {

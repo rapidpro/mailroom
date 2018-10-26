@@ -17,13 +17,13 @@ func init() {
 	models.RegisterEventHook(events.TypeContactGroupsChanged, handleContactGroupsChanged)
 }
 
-// ContactGroupsChangedHook is our hook for all group changes
-type ContactGroupsChangedHook struct{}
+// CommitGroupChangesHook is our hook for all group changes
+type CommitGroupChangesHook struct{}
 
-var contactGroupsChangedHook = &ContactGroupsChangedHook{}
+var commitGroupChangesHook = &CommitGroupChangesHook{}
 
 // Apply squashes and adds or removes all our contact groups
-func (h *ContactGroupsChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build up our list of all adds and removes
 	adds := make([]*models.GroupAdd, 0, len(sessions))
 	removes := make([]*models.GroupRemove, 0, len(sessions))
@@ -111,7 +111,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		}
 
 		// add our add event
-		session.AddPreCommitEvent(contactGroupsChangedHook, hookEvent)
+		session.AddPreCommitEvent(commitGroupChangesHook, hookEvent)
 		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
 		session.AddPreCommitEvent(contactModifiedHook, session.Contact().ID())
 	}
@@ -134,7 +134,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			GroupID:   group.ID(),
 		}
 
-		session.AddPreCommitEvent(contactGroupsChangedHook, hookEvent)
+		session.AddPreCommitEvent(commitGroupChangesHook, hookEvent)
 		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
 		session.AddPreCommitEvent(contactModifiedHook, session.Contact().ID())
 	}
