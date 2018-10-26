@@ -1,3 +1,7 @@
+v0.0.57
+----------
+ * latest goflow, fixes migration of webhook action
+
 v0.0.56
 ----------
  * update calls to NewMsgIn
