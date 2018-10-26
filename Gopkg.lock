@@ -176,7 +176,7 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "d08d4385ec3e5d2a6e50a9417b338595c74738f3"
+  revision = "3e060ef383f5352ad9a63272c98065bc6dd925f7"
 
 [[projects]]
   branch = "master"
