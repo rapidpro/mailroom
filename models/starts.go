@@ -46,13 +46,17 @@ func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contact
 // FlowStartBatch represents a single flow batch that needs to be started
 type FlowStartBatch struct {
 	b struct {
-		StartID             StartID           `json:"start_id"`
-		OrgID               OrgID             `json:"org_id"`
-		FlowID              FlowID            `json:"flow_id"`
-		ContactIDs          []flows.ContactID `json:"contact_ids"`
-		RestartParticipants bool              `json:"restart_participants"`
-		IncludeActive       bool              `json:"include_active"`
-		IsLast              bool              `json:"is_last,omitempty"`
+		StartID    StartID           `json:"start_id"`
+		OrgID      OrgID             `json:"org_id"`
+		FlowID     FlowID            `json:"flow_id"`
+		ContactIDs []flows.ContactID `json:"contact_ids"`
+
+		Parent json.RawMessage `json:"parent,omitempty"`
+
+		RestartParticipants bool `json:"restart_participants"`
+		IncludeActive       bool `json:"include_active"`
+
+		IsLast bool `json:"is_last,omitempty"`
 	}
 }
 
@@ -122,5 +126,6 @@ func (s *FlowStart) CreateBatch(contactIDs []flows.ContactID) *FlowStartBatch {
 	b.b.ContactIDs = contactIDs
 	b.b.RestartParticipants = s.RestartParticipants()
 	b.b.IncludeActive = s.IncludeActive()
+	b.b.Parent = s.Parent()
 	return b
 }
