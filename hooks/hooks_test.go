@@ -44,10 +44,13 @@ const (
 )
 
 type HookTestCase struct {
-	Actions    ContactActionMap
-	Msgs       ContactMsgMap
-	Assertions []SQLAssertion
+	Actions       ContactActionMap
+	Msgs          ContactMsgMap
+	Assertions    []Assertion
+	SQLAssertions []SQLAssertion
 }
+
+type Assertion func(t *testing.T, db *sqlx.DB, rc redis.Conn) error
 
 type SQLAssertion struct {
 	SQL   string
@@ -206,8 +209,15 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 
 		// now check our assertions
 		time.Sleep(1 * time.Second)
-		for ii, a := range tc.Assertions {
+		for ii, a := range tc.SQLAssertions {
 			testsuite.AssertQueryCount(t, db, a.SQL, a.Args, a.Count, "%d:%d: mismatch in expected count for query: %s", i, ii, a.SQL)
 		}
+
+		rc := rp.Get()
+		for ii, a := range tc.Assertions {
+			err := a(t, db, rc)
+			assert.NoError(t, err, "%d: %d error checking assertion", i, ii)
+		}
+		rc.Close()
 	}
 }

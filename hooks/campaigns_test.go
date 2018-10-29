@@ -44,7 +44,7 @@ func TestCampaigns(t *testing.T) {
 					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
 				},
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{Cathy},

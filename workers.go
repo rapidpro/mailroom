@@ -8,6 +8,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// task types
+const (
+	// TODO: move other task types here
+	StartFlowType = "start_flow"
+)
+
 // Foreman takes care of managing our set of sending workers and assigns msgs for each to send
 type Foreman struct {
 	mr               *Mailroom

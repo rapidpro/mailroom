@@ -10,7 +10,6 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/starts"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -77,7 +76,7 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 				priority = queue.HighPriority
 			}
 
-			err = queue.AddTask(rc, taskQ, starts.StartFlowType, int(org.OrgID()), start, priority)
+			err = queue.AddTask(rc, taskQ, mailroom.StartFlowType, int(org.OrgID()), start, priority)
 			if err != nil {
 				return errors.Wrapf(err, "error queuing flow start")
 			}

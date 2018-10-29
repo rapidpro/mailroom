@@ -19,7 +19,7 @@ func TestContactNameChanged(t *testing.T) {
 					actions.NewSetContactNameAction(newActionUUID(), "Geoff Newman"),
 				},
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where name = 'Tarzan' and id = $1",
 					Args:  []interface{}{Cathy},

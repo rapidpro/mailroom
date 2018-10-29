@@ -35,7 +35,7 @@ func TestContactFieldChanged(t *testing.T) {
 					actions.NewSetContactFieldAction(newActionUUID(), age, "Old"),
 				},
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Female"}'::jsonb`,
 					Args:  []interface{}{Cathy, genderUUID},

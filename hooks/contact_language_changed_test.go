@@ -19,7 +19,7 @@ func TestContactLanguageChanged(t *testing.T) {
 					actions.NewSetContactLanguageAction(newActionUUID(), "spa"),
 				},
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'eng'",
 					Args:  []interface{}{Cathy},

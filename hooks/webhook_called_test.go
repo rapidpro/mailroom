@@ -45,7 +45,7 @@ func TestWebhookCalled(t *testing.T) {
 					actions.NewCallWebhookAction(newActionUUID(), "GET", server.URL+"?unsub=1", nil, "", ""),
 				},
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from api_resthooksubscriber where is_active = FALSE",
 					Args:  nil,
