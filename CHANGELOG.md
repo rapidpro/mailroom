@@ -1,3 +1,7 @@
+v0.0.59
+----------
+ * fix datediff units, add session trigger support
+
 v0.0.58
 ----------
  * add session trigger action
