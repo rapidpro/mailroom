@@ -26,13 +26,13 @@ func TestCampaignStarts(t *testing.T) {
 	// delete our android channel, we want our messages to be sent through courier
 	db.MustExec(`DELETE FROM channels_channel where id = 1;`)
 
-	event := triggers.CampaignEvent{
-		UUID: "e68f4c70-9db1-44c8-8498-602d6857235e",
-		Campaign: triggers.Campaign{
-			UUID: "5da68501-61c4-4638-a494-3314a6d5edbd",
-			Name: "Doctor Reminders",
-		},
-	}
+	event := triggers.NewCampaignEvent(
+		"e68f4c70-9db1-44c8-8498-602d6857235e",
+		triggers.NewCampaignReference(
+			"5da68501-61c4-4638-a494-3314a6d5edbd",
+			"Doctor Reminders",
+		),
+	)
 
 	// create our event fires
 	now := time.Now()
@@ -53,7 +53,7 @@ func TestCampaignStarts(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, models.OrgID(1), fires, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), &event)
+	sessions, err := FireCampaignEvents(ctx, db, rp, models.OrgID(1), fires, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), event)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
 
@@ -118,14 +118,15 @@ func TestBatchStart(t *testing.T) {
 	for i, tc := range tcs {
 		start := models.NewFlowStart(
 			models.NewStartID(1), models.OrgID(1), models.FlowID(31),
-			nil, contactIDs, tc.Restart, tc.IncludeActive,
+			nil, contactIDs, nil, false, tc.Restart, tc.IncludeActive,
+			nil,
 		)
 		batch := start.CreateBatch(contactIDs)
 		batch.SetIsLast(true)
 
 		sessions, err := StartFlowBatch(ctx, db, rp, batch)
 		assert.NoError(t, err)
-		assert.Equal(t, tc.Count, len(sessions))
+		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
@@ -173,7 +174,7 @@ func TestContactRuns(t *testing.T) {
 	contact, err := contacts[0].FlowContact(org, sa)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
+	trigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, time.Now())
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
@@ -211,8 +212,9 @@ func TestContactRuns(t *testing.T) {
 	session := sessions[0]
 	for i, tc := range tcs {
 		// answer our first question
-		resume := resumes.NewMsgResume(org.Env(), contact,
-			flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), 10, urns.URN("tel:+250700000001"), nil, tc.Message, nil))
+		msg := flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), urns.URN("tel:+250700000001"), nil, tc.Message, nil)
+		msg.SetID(10)
+		resume := resumes.NewMsgResume(org.Env(), contact, msg)
 
 		session, err = ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
 		assert.NoError(t, err)

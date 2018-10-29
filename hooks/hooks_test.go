@@ -155,7 +155,9 @@ func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID flows.ContactI
 		panic(err)
 	}
 
-	return flows.NewMsgIn(msgUUID, msgID, urn, nil, text, nil)
+	msg := flows.NewMsgIn(msgUUID, urn, nil, text, nil)
+	msg.SetID(msgID)
+	return msg
 }
 
 func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
@@ -193,9 +195,9 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 			msg := tc.Msgs[contact.ID()]
 			if msg == nil {
-				return triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
+				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, time.Now())
 			} else {
-				return triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), msg, nil, time.Now())
+				return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil, time.Now())
 			}
 		}
 

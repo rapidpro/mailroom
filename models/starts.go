@@ -69,6 +69,8 @@ func (b *FlowStartBatch) IncludeActive() bool           { return b.b.IncludeActi
 func (b *FlowStartBatch) IsLast() bool                  { return b.b.IsLast }
 func (b *FlowStartBatch) SetIsLast(last bool)           { b.b.IsLast = last }
 
+func (b *FlowStartBatch) Parent() json.RawMessage { return b.b.Parent }
+
 func (b *FlowStartBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
@@ -106,15 +108,23 @@ func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
 
-func NewFlowStart(startID StartID, orgID OrgID, flowID FlowID, groupIDs []GroupID, contactIDs []flows.ContactID, restartParticipants bool, includeActive bool) *FlowStart {
+func NewFlowStart(
+	startID StartID, orgID OrgID, flowID FlowID,
+	groupIDs []GroupID, contactIDs []flows.ContactID, urns []urns.URN, createContact bool,
+	restartParticipants bool, includeActive bool, parent json.RawMessage) *FlowStart {
+
 	s := &FlowStart{}
 	s.s.StartID = startID
 	s.s.OrgID = orgID
 	s.s.FlowID = flowID
 	s.s.GroupIDs = groupIDs
 	s.s.ContactIDs = contactIDs
+	s.s.URNs = urns
+	s.s.CreateContact = createContact
 	s.s.RestartParticipants = restartParticipants
 	s.s.IncludeActive = includeActive
+	s.s.Parent = parent
+
 	return s
 }
 

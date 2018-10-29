@@ -128,6 +128,35 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []flows.C
 	return contacts, nil
 }
 
+// ContactIDsFromReferences queries the contacts for the passed in org, returning the contact ids for the references
+func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, refs []*flows.ContactReference) ([]flows.ContactID, error) {
+	// build our list of UUIDs
+	uuids := make([]interface{}, len(refs))
+	for i := range refs {
+		uuids[i] = refs[i].UUID
+	}
+
+	ids := make([]flows.ContactID, 0, len(refs))
+	rows, err := tx.QueryxContext(ctx,
+		`SELECT id FROM contacts_contact WHERE org_id = $1 AND uuid = ANY($2) AND is_active = TRUE`,
+		org.OrgID(), pq.Array(uuids),
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error selecting contact ids by uuid")
+	}
+	defer rows.Close()
+
+	var id flows.ContactID
+	for rows.Next() {
+		err := rows.Scan(&id)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning contact id")
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
 func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flows.Contact, error) {
 	// create our flow contact
@@ -422,7 +451,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
 // campaigns as necessary based on those group changes.
-func CalculateDynamicGroups(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, contact *flows.Contact) error {
+func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, contact *flows.Contact) error {
 	orgGroups, _ := org.Groups()
 	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups))
 	if len(errs) > 0 {

@@ -73,7 +73,7 @@ ORDER BY
 `
 
 // RemoveContactsFromGroups fires a bulk SQL query to remove all the contacts in the passed in groups
-func RemoveContactsFromGroups(ctx context.Context, tx *sqlx.Tx, removals []*GroupRemove) error {
+func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*GroupRemove) error {
 	if len(removals) == 0 {
 		return nil
 	}
@@ -109,7 +109,7 @@ IN (
 `
 
 // AddContactsToGroups fires a bulk SQL query to remove all the contacts in the passed in groups
-func AddContactsToGroups(ctx context.Context, tx *sqlx.Tx, adds []*GroupAdd) error {
+func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) error {
 	if len(adds) == 0 {
 		return nil
 	}

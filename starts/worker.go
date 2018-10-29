@@ -20,13 +20,14 @@ import (
 )
 
 const (
-	startFlowType      = "start_flow"
+	StartFlowType = "start_flow"
+
 	startFlowBatchType = "start_flow_batch"
 	startBatchSize     = 100
 )
 
 func init() {
-	mailroom.AddTaskFunction(startFlowType, handleFlowStart)
+	mailroom.AddTaskFunction(StartFlowType, handleFlowStart)
 	mailroom.AddTaskFunction(startFlowBatchType, handleFlowStartBatch)
 }
 
@@ -36,7 +37,7 @@ func handleFlowStart(ctx context.Context, mr *mailroom.Mailroom, task *queue.Tas
 	defer cancel()
 
 	// decode our task body
-	if task.Type != startFlowType {
+	if task.Type != StartFlowType {
 		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
 	}
 	startTask := &models.FlowStart{}
