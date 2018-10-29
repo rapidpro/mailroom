@@ -40,7 +40,6 @@ func NewMsgIn(uuid MsgUUID, urn urns.URN, channel *assets.ChannelReference, text
 			Text_:        text,
 			Attachments_: attachments,
 		},
-		ExternalID_: externalID,
 	}
 }
 
