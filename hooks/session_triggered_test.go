@@ -24,7 +24,7 @@ func TestSessionTriggered(t *testing.T) {
 	org, err := models.GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	flow, err := org.FlowByID(1)
+	flow, err := org.FlowByID(31)
 	assert.NoError(t, err)
 
 	// TODO: test contacts, urns, groups
@@ -38,7 +38,7 @@ func TestSessionTriggered(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
-					SQL:   "select count(*) from flows_flowrun where contact_id = $1 and is_active = FALSE",
+					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
 					Args:  []interface{}{Cathy},
 					Count: 1,
 				},
@@ -54,7 +54,7 @@ func TestSessionTriggered(t *testing.T) {
 					assert.Equal(t, start.CreateContact(), true)
 					assert.Nil(t, start.ContactIDs())
 					assert.Nil(t, start.GroupIDs())
-					assert.Equal(t, start.FlowID(), models.FlowID(1))
+					assert.Equal(t, start.FlowID(), flow.ID())
 					return nil
 				},
 			},

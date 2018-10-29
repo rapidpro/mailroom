@@ -451,6 +451,10 @@ func StartFlowForContacts(
 		sessionEvents = append(sessionEvents, events)
 	}
 
+	if len(sessions) == 0 {
+		return nil, nil
+	}
+
 	// we write our sessions and all their objects in a single transaction
 	txCTX, cancel := context.WithTimeout(ctx, commitTimeout*time.Duration(len(sessions)))
 	defer cancel()
