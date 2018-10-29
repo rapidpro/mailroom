@@ -44,10 +44,13 @@ const (
 )
 
 type HookTestCase struct {
-	Actions    ContactActionMap
-	Msgs       ContactMsgMap
-	Assertions []SQLAssertion
+	Actions       ContactActionMap
+	Msgs          ContactMsgMap
+	Assertions    []Assertion
+	SQLAssertions []SQLAssertion
 }
+
+type Assertion func(t *testing.T, db *sqlx.DB, rc redis.Conn) error
 
 type SQLAssertion struct {
 	SQL   string
@@ -155,7 +158,9 @@ func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID flows.ContactI
 		panic(err)
 	}
 
-	return flows.NewMsgIn(msgUUID, msgID, urn, nil, text, nil, "")
+	msg := flows.NewMsgIn(msgUUID, urn, nil, text, nil)
+	msg.SetID(msgID)
+	return msg
 }
 
 func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
@@ -193,9 +198,9 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 			msg := tc.Msgs[contact.ID()]
 			if msg == nil {
-				return triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
+				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, time.Now())
 			} else {
-				return triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), msg, nil, time.Now())
+				return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil, time.Now())
 			}
 		}
 
@@ -204,8 +209,15 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 
 		// now check our assertions
 		time.Sleep(1 * time.Second)
-		for ii, a := range tc.Assertions {
+		for ii, a := range tc.SQLAssertions {
 			testsuite.AssertQueryCount(t, db, a.SQL, a.Args, a.Count, "%d:%d: mismatch in expected count for query: %s", i, ii, a.SQL)
 		}
+
+		rc := rp.Get()
+		for ii, a := range tc.Assertions {
+			err := a(t, db, rc)
+			assert.NoError(t, err, "%d: %d error checking assertion", i, ii)
+		}
+		rc.Close()
 	}
 }

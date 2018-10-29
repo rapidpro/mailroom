@@ -3,12 +3,27 @@ package models
 import (
 	"testing"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	Org1 = OrgID(1)
+
+	Cathy      = flows.ContactID(43)
+	CathyURN   = urns.URN("tel:+250700000002")
+	CathyURNID = URNID(43)
+
+	Bob      = flows.ContactID(58)
+	BobURN   = urns.URN("tel:+250700000017")
+	BobURNID = URNID(59)
+
+	Evan = flows.ContactID(47)
 )
 
 func TestContacts(t *testing.T) {
@@ -102,4 +117,68 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, cathy.URNs()[0].String(), "tel:+250788373393?channel=c534272e-817d-4a78-a70c-f21df34407f8&id=10045&priority=1000")
 	assert.Equal(t, cathy.URNs()[1].String(), "tel:+250700000039?channel=c534272e-817d-4a78-a70c-f21df34407f8&id=82&priority=999")
 	assert.Equal(t, cathy.URNs()[2].String(), "whatsapp:250788373373?id=10044&priority=998")
+}
+
+func TestContactsFromURN(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	tcs := []struct {
+		OrgID     OrgID
+		URN       urns.URN
+		ContactID flows.ContactID
+	}{
+		{Org1, CathyURN, Cathy},
+		{Org1, urns.URN(CathyURN.String() + "?foo=bar"), Cathy},
+		{Org1, urns.URN("telegram:12345678"), 10041},
+		{Org1, urns.URN("telegram:12345678"), 10041},
+	}
+
+	org, err := GetOrgAssets(ctx, db, Org1)
+	assert.NoError(t, err)
+
+	assets, err := GetSessionAssets(org)
+	assert.NoError(t, err)
+
+	for i, tc := range tcs {
+		ids, err := ContactIDsFromURNs(ctx, db, org, assets, []urns.URN{tc.URN})
+		assert.NoError(t, err, "%d: error getting contact ids", i)
+
+		if len(ids) != 1 {
+			assert.Fail(t, "%d: unexpected number of ids returned", i)
+			continue
+		}
+		assert.Equal(t, tc.ContactID, ids[0], "%d: mismatch in contact ids", i)
+	}
+}
+
+func TestCreateContact(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	tcs := []struct {
+		OrgID     OrgID
+		URN       urns.URN
+		ContactID flows.ContactID
+	}{
+		{Org1, CathyURN, Cathy},
+		{Org1, urns.URN(CathyURN.String() + "?foo=bar"), Cathy},
+		{Org1, urns.URN("telegram:12345678"), 10043},
+		{Org1, urns.URN("telegram:12345678"), 10043},
+		{Org1, urns.NilURN, 10045},
+	}
+
+	org, err := GetOrgAssets(ctx, db, Org1)
+	assert.NoError(t, err)
+
+	assets, err := GetSessionAssets(org)
+	assert.NoError(t, err)
+
+	for i, tc := range tcs {
+		id, err := CreateContact(ctx, db, org, assets, tc.URN)
+		assert.NoError(t, err, "%d: error creating contact", i)
+		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
+	}
 }

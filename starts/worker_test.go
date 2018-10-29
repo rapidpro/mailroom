@@ -70,8 +70,9 @@ func TestStarts(t *testing.T) {
 		// handle our start task
 		start := models.NewFlowStart(
 			models.NewStartID(startID), models.OrgID(1), tc.FlowID,
-			tc.GroupIDs, tc.ContactIDs,
+			tc.GroupIDs, tc.ContactIDs, nil, false,
 			tc.RestartParticipants, tc.IncludeActive,
+			nil,
 		)
 		err := CreateFlowBatches(ctx, db, rp, start)
 		assert.NoError(t, err)

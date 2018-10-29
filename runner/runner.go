@@ -169,7 +169,10 @@ func StartFlowBatch(
 	// this will build our trigger for each contact started
 	now := time.Now()
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
-		return triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, now)
+		if batch.Parent() != nil {
+			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.Parent(), now)
+		}
+		return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, now)
 	}
 
 	// before committing our runs we want to set the start they are associated with

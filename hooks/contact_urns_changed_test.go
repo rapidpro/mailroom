@@ -29,7 +29,7 @@ func TestAddContactURN(t *testing.T) {
 				},
 				Evan: []flows.Action{},
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'telegram' and path = '11551' and priority = 998",
 					Args:  []interface{}{Cathy},

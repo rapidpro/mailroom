@@ -274,7 +274,7 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	if event.NewContact {
-		err = initiliazeNewContact(ctx, db, org, contact)
+		err = models.CalculateDynamicGroups(ctx, db, org, contact)
 		if err != nil {
 			return errors.Wrapf(err, "unable to initialize new contact")
 		}
@@ -293,7 +293,7 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	// start them in the triggered flow, interrupting their current flow/session
 	// TODO: replace with a real channel trigger
-	channelTrigger := triggers.NewManualTrigger(org.Env(), contact, flow.FlowReference(), nil, time.Now())
+	channelTrigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, time.Now())
 	_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{channelTrigger}, nil, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow for contact")
@@ -394,7 +394,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 
 	// if this is a new contact, we need to calculate dynamic groups and campaigns
 	if newContact {
-		err = initiliazeNewContact(ctx, db, org, contact)
+		err = models.CalculateDynamicGroups(ctx, db, org, contact)
 		if err != nil {
 			return errors.Wrapf(err, "unable to initialize new contact")
 		}
@@ -418,7 +418,9 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 		}
 	}
 
-	msgIn := flows.NewMsgIn(event.MsgUUID, event.MsgID, event.URN, channel.ChannelReference(), event.Text, event.Attachments, event.MsgExternalID)
+	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
+	msgIn.SetExternalID(event.MsgExternalID)
+	msgIn.SetID(event.MsgID)
 
 	// build our hook to mark our message as handled
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
@@ -456,7 +458,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 					Keyword: trigger.Keyword(),
 				}
 			}
-			trigger := triggers.NewMsgTrigger(org.Env(), contact, flow.FlowReference(), msgIn, match, time.Now())
+			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, match, time.Now())
 
 			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
@@ -480,95 +482,6 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
-	return nil
-}
-
-// initializeNewContact initializes the passed in contact, making sure it is part of any dynamic groups it
-// should be as well as taking care of any campaign events.
-func initiliazeNewContact(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, contact *flows.Contact) error {
-	orgGroups, _ := org.Groups()
-	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups))
-	if len(errs) > 0 {
-		return errors.Wrapf(errs[0], "error calculating dynamic groups")
-	}
-
-	// start a transaction to commit all our changes at once
-	tx, err := db.BeginTxx(ctx, nil)
-	if err != nil {
-		return errors.Wrapf(err, "unable to start transaction")
-	}
-	campaigns := make(map[models.CampaignID]*models.Campaign)
-
-	groupAdds := make([]*models.GroupAdd, 0, 1)
-	for _, a := range added {
-		group := org.GroupByUUID(a.UUID())
-		if group == nil {
-			return errors.Wrapf(err, "added to unknown group: %s", a.UUID())
-		}
-		groupAdds = append(groupAdds, &models.GroupAdd{
-			ContactID: contact.ID(),
-			GroupID:   group.ID(),
-		})
-
-		// add in any campaigns we may qualify for
-		for _, c := range org.CampaignByGroupID(group.ID()) {
-			campaigns[c.ID()] = c
-		}
-	}
-	err = models.AddContactsToGroups(ctx, tx, groupAdds)
-	if err != nil {
-		return errors.Wrapf(err, "error adding contact to groups")
-	}
-
-	groupRemoves := make([]*models.GroupRemove, 0, 1)
-	for _, r := range removed {
-		group := org.GroupByUUID(r.UUID())
-		if group == nil {
-			return errors.Wrapf(err, "removed from an unknown group: %s", r.UUID())
-		}
-		groupRemoves = append(groupRemoves, &models.GroupRemove{
-			ContactID: contact.ID(),
-			GroupID:   group.ID(),
-		})
-	}
-	err = models.RemoveContactsFromGroups(ctx, tx, groupRemoves)
-	if err != nil {
-		return errors.Wrapf(err, "error removing contact from group")
-	}
-
-	// for each campaign figure out if we need to be added to any events
-	fireAdds := make([]*models.FireAdd, 0, 2)
-	tz := org.Env().Timezone()
-	now := time.Now()
-	for _, c := range campaigns {
-		for _, ce := range c.Events() {
-			scheduled, err := ce.ScheduleForContact(tz, now, contact)
-			if err != nil {
-				return errors.Wrapf(err, "error calculating schedule for event: %d", ce.ID())
-			}
-
-			if scheduled != nil {
-				fireAdds = append(fireAdds, &models.FireAdd{
-					ContactID: contact.ID(),
-					EventID:   ce.ID(),
-					Scheduled: *scheduled,
-				})
-			}
-		}
-	}
-
-	// add any event adds
-	err = models.AddEventFires(ctx, tx, fireAdds)
-	if err != nil {
-		return errors.Wrapf(err, "unable to add new event fires for contact")
-	}
-
-	// ok, commit everything
-	err = tx.Commit()
-	if err != nil {
-		return errors.Wrapf(err, "unable to commit new contact updates")
-	}
-
 	return nil
 }
 

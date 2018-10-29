@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/nyaruka/gocommon/urns"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -18,13 +20,12 @@ import (
 )
 
 const (
-	startFlowType      = "start_flow"
 	startFlowBatchType = "start_flow_batch"
 	startBatchSize     = 100
 )
 
 func init() {
-	mailroom.AddTaskFunction(startFlowType, handleFlowStart)
+	mailroom.AddTaskFunction(mailroom.StartFlowType, handleFlowStart)
 	mailroom.AddTaskFunction(startFlowBatchType, handleFlowStartBatch)
 }
 
@@ -34,7 +35,7 @@ func handleFlowStart(ctx context.Context, mr *mailroom.Mailroom, task *queue.Tas
 	defer cancel()
 
 	// decode our task body
-	if task.Type != startFlowType {
+	if task.Type != mailroom.StartFlowType {
 		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
 	}
 	startTask := &models.FlowStart{}
@@ -54,7 +55,51 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 		contactIDs[id] = true
 	}
 
-	// now all the ids for our groups
+	var org *models.OrgAssets
+	var assets flows.SessionAssets
+	var err error
+
+	// look up any contacts by URN
+	if len(start.URNs()) > 0 {
+		org, err = models.GetOrgAssets(ctx, db, start.OrgID())
+		if err != nil {
+			return errors.Wrapf(err, "error loading org assets")
+		}
+		assets, err = models.GetSessionAssets(org)
+		if err != nil {
+			return errors.Wrapf(err, "error loading session assets")
+		}
+
+		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, org, assets, start.URNs())
+		if err != nil {
+			return errors.Wrapf(err, "error getting contact ids from urns")
+		}
+		for _, id := range urnContactIDs {
+			contactIDs[id] = true
+		}
+	}
+
+	// if we are meant to create a new contact, do so
+	if start.CreateContact() {
+		if org == nil {
+			org, err = models.GetOrgAssets(ctx, db, start.OrgID())
+			if err != nil {
+				return errors.Wrapf(err, "error loading org assets")
+			}
+			assets, err = models.GetSessionAssets(org)
+			if err != nil {
+				return errors.Wrapf(err, "error loading session assets")
+			}
+		}
+
+		newID, err := models.CreateContact(ctx, db, org, assets, urns.NilURN)
+		if err != nil {
+			return errors.Wrapf(err, "error creating new contact")
+		}
+		contactIDs[newID] = true
+	}
+
+	// now add all the ids for our groups
 	rows, err := db.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.GroupIDs()))
 	if err != nil {
 		return errors.Wrapf(err, "error selecting contacts for groups")

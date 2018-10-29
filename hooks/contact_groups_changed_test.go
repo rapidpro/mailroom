@@ -31,7 +31,7 @@ func TestContactGroupsChanged(t *testing.T) {
 					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{teachers}),
 				},
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{Cathy, doctorsID},

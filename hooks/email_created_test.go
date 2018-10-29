@@ -20,7 +20,7 @@ func TestEmailCreated(t *testing.T) {
 					actions.NewSendEmailAction(newActionUUID(), []string{"cathy@foo.bar", "bob@foo.bar"}, "Test Email", "This is your test email"),
 				},
 			},
-			Assertions: []SQLAssertion{},
+			SQLAssertions: []SQLAssertion{},
 		},
 	}
 	RunActionTestCases(t, tcs)

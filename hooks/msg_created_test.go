@@ -46,7 +46,7 @@ func TestMsgCreated(t *testing.T) {
 			Msgs: ContactMsgMap{
 				Cathy: msg1,
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from msgs_msg where text='Hello World' and contact_id = $1 and metadata = $2 and response_to_id = $3",
 					Args:  []interface{}{Cathy, `{"quick_replies":["yes","no"]}`, msg1.ID()},

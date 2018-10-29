@@ -17,13 +17,13 @@ func init() {
 	models.RegisterEventHook(events.TypeContactFieldChanged, handleContactFieldChanged)
 }
 
-// ContactFieldChangedHook is our hook for contact field changes
-type ContactFieldChangedHook struct{}
+// CommitFieldChangesHook is our hook for contact field changes
+type CommitFieldChangesHook struct{}
 
-var contactFieldChangedHook = &ContactFieldChangedHook{}
+var commitFieldChangesHook = &CommitFieldChangesHook{}
 
 // Apply squashes and writes all the field updates for the contacts
-func (h *ContactFieldChangedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// our list of updates
 	fieldUpdates := make([]interface{}, 0, len(sessions))
 	fieldDeletes := make([]interface{}, 0)
@@ -98,7 +98,7 @@ func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 	}).Debug("contact field changed")
 
 	// add our callback
-	session.AddPreCommitEvent(contactFieldChangedHook, event)
+	session.AddPreCommitEvent(commitFieldChangesHook, event)
 	session.AddPreCommitEvent(updateCampaignEventsHook, event)
 
 	return nil

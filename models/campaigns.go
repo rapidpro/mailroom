@@ -437,8 +437,17 @@ type FireDelete struct {
 	EventID   CampaignEventID `db:"event_id"`
 }
 
+// DeleteUnfiredContactEvents deletes all unfired event fires for the passed in contact
+func DeleteUnfiredContactEvents(ctx context.Context, tx Queryer, contactID flows.ContactID) error {
+	_, err := tx.ExecContext(ctx, `DELETE FROM campaigns_eventfire WHERE contact_id = $1 AND fired IS NULL`, contactID)
+	if err != nil {
+		return errors.Wrapf(err, "error deleting unfired contact events")
+	}
+	return nil
+}
+
 // AddEventFires adds the passed in event fires to our db
-func AddEventFires(ctx context.Context, tx *sqlx.Tx, adds []*FireAdd) error {
+func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 	if len(adds) == 0 {
 		return nil
 	}

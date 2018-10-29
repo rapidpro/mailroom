@@ -92,7 +92,7 @@ func (s *Server) handleStart(r *http.Request) (interface{}, int, error) {
 	session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
 
 	// read our trigger
-	trigger, err := triggers.ReadTrigger(session, request.Trigger)
+	trigger, err := triggers.ReadTrigger(assets, request.Trigger)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}

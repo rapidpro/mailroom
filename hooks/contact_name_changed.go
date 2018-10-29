@@ -12,16 +12,16 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactNameChanged, applyContactNameChanged)
+	models.RegisterEventHook(events.TypeContactNameChanged, handleContactNameChanged)
 }
 
-// our hook for name changes
-type CommitContactNameChanges struct{}
+// CommitNameChangesHook is our hook for name changes
+type CommitNameChangesHook struct{}
 
-var commitContactNameChanges = &CommitContactNameChanges{}
+var commitNameChangesHook = &CommitNameChangesHook{}
 
 // Apply commits our contact name changes as a bulk update for the passed in map of sessions
-func (h *CommitContactNameChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build up our list of pairs of contact id and contact name
 	updates := make([]interface{}, 0, len(sessions))
 	for s, e := range sessions {
@@ -34,8 +34,8 @@ func (h *CommitContactNameChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 	return models.BulkSQL(ctx, "updating contact name", tx, updateContactNameSQL, updates)
 }
 
-// applyContactNameChanged changes the name of the contact
-func applyContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+// handleContactNameChanged changes the name of the contact
+func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.ContactNameChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
@@ -43,7 +43,7 @@ func applyContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, o
 		"name":         event.Name,
 	}).Debug("changing contact name")
 
-	session.AddPreCommitEvent(commitContactNameChanges, event)
+	session.AddPreCommitEvent(commitNameChangesHook, event)
 	return nil
 }
 

@@ -12,16 +12,16 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactLanguageChanged, applyContactLanguageChanged)
+	models.RegisterEventHook(events.TypeContactLanguageChanged, handleContactLanguageChanged)
 }
 
-// our hook for language changes
-type CommitContactLanguageChanges struct{}
+// CommitLanguageChangesHook is our hook for language changes
+type CommitLanguageChangesHook struct{}
 
-var commitContactLanguageChanges = &CommitContactLanguageChanges{}
+var commitLanguageChangesHook = &CommitLanguageChangesHook{}
 
 // Apply applies our contact language change before our commit
-func (h *CommitContactLanguageChanges) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// build up our list of pairs of contact id and language name
 	updates := make([]interface{}, 0, len(sessions))
 	for s, e := range sessions {
@@ -34,8 +34,8 @@ func (h *CommitContactLanguageChanges) Apply(ctx context.Context, tx *sqlx.Tx, r
 	return models.BulkSQL(ctx, "updating contact language", tx, updateContactLanguageSQL, updates)
 }
 
-// applyContactLanguageChanged is called when we process a contact language change
-func applyContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+// handleContactLanguageChanged is called when we process a contact language change
+func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.ContactLanguageChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
@@ -43,7 +43,7 @@ func applyContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 		"language":     event.Language,
 	}).Debug("changing contact language")
 
-	session.AddPreCommitEvent(commitContactLanguageChanges, event)
+	session.AddPreCommitEvent(commitLanguageChangesHook, event)
 	return nil
 }
 

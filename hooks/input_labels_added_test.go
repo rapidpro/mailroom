@@ -37,7 +37,7 @@ func TestInputLabelsAdded(t *testing.T) {
 				Cathy: msg1,
 				Bob:   msg2,
 			},
-			Assertions: []SQLAssertion{
+			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from msgs_msg_labels WHERE msg_id = $1",
 					Args:  []interface{}{msg1.ID()},
