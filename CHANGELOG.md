@@ -1,3 +1,19 @@
+v0.0.57
+----------
+ * latest goflow, fixes migration of webhook action
+
+v0.0.56
+----------
+ * update calls to NewMsgIn
+
+v0.0.55
+----------
+ * latest goflow, fixes case issues
+
+v0.0.54
+----------
+ * goflow fix for looping
+
 v0.0.53
 ----------
  * add support for input_labels_added event
