@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	commitTimeout     = 5 * time.Second
-	postCommitTimeout = 15 * time.Second
+	commitTimeout     = 15 * time.Second
+	postCommitTimeout = 30 * time.Second
 )
 
 var (
