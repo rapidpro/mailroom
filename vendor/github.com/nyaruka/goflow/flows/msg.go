@@ -82,11 +82,8 @@ func (m *BaseMsg) Attachments() []Attachment { return m.Attachments_ }
 // ExternalID returns the optional external ID of this incoming message
 func (m *MsgIn) ExternalID() string { return m.ExternalID_ }
 
-<<<<<<< HEAD
 // SetExternalID sets the external ID of this message
 func (m *MsgIn) SetExternalID(id string) { m.ExternalID_ = id }
 
-=======
->>>>>>> master
 // QuickReplies returns the quick replies of this outgoing message
 func (m *MsgOut) QuickReplies() []string { return m.QuickReplies_ }
