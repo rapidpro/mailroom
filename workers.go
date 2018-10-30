@@ -12,6 +12,8 @@ import (
 const (
 	// TODO: move other task types here
 	StartFlowType = "start_flow"
+
+	StartBroadcastType = "start_broadcast"
 )
 
 // Foreman takes care of managing our set of sending workers and assigns msgs for each to send

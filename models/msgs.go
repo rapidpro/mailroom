@@ -15,6 +15,8 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/pkg/errors"
@@ -48,6 +50,10 @@ const (
 type ConnectionID null.Int
 
 type MsgStatus string
+
+type BroadcastID int64
+
+const NilBroadcastID = BroadcastID(0)
 
 const (
 	MsgStatusInitializing = MsgStatus("I")
@@ -312,3 +318,74 @@ SET
 WHERE
 	id IN (?)
 `
+
+// BroadcastTranslation is the translation for the passed in language
+type BroadcastTranslation struct {
+	Text         string             `json:"text"`
+	Attachments  []flows.Attachment `json:"attachments,omitempty"`
+	QuickReplies []string           `json:"quick_replies,omitempty"`
+}
+
+// Broadcast represents a broadcast that needs to be sent
+type Broadcast struct {
+	b struct {
+		Translations map[utils.Language]*BroadcastTranslation `json:"translations"`
+		BaseLanguage utils.Language                           `json:"base_language"`
+		URNs         []urns.URN                               `json:"urns,omitempty"`
+		ContactIDs   []flows.ContactID                        `json:"contact_ids,omitempty"`
+		GroupIDs     []GroupID                                `json:"group_ids,omitempty"`
+	}
+}
+
+func (b *Broadcast) ContactIDs() []flows.ContactID                          { return b.b.ContactIDs }
+func (b *Broadcast) GroupIDs() []GroupID                                    { return b.b.GroupIDs }
+func (b *Broadcast) URNs() []urns.URN                                       { return b.b.URNs }
+func (b *Broadcast) Translations() map[utils.Language]*BroadcastTranslation { return b.b.Translations }
+
+func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
+func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
+
+// NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
+func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
+	bcast := &Broadcast{}
+	bcast.b.BaseLanguage = event.BaseLanguage
+	bcast.b.URNs = event.URNs
+	bcast.b.Translations = make(map[utils.Language]*BroadcastTranslation)
+	for l, t := range event.Translations {
+		bcast.b.Translations[l] = &BroadcastTranslation{
+			Text:         t.Text,
+			Attachments:  t.Attachments,
+			QuickReplies: t.QuickReplies,
+		}
+	}
+
+	// resolve our contact references
+	contactIDs, err := ContactIDsFromReferences(ctx, tx, org, event.Contacts)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error resolving contact references")
+	}
+	bcast.b.ContactIDs = contactIDs
+
+	// and our groups
+	groups := make([]GroupID, 0, len(event.Groups))
+	for i := range event.Groups {
+		group := org.GroupByUUID(event.Groups[i].UUID)
+		if group != nil {
+			groups = append(groups, group.ID())
+		}
+	}
+	bcast.b.GroupIDs = groups
+
+	return bcast, nil
+}
+
+// BroadcastBatch represents a batch of contacts that need messages sent for
+type BroadcastBatch struct {
+	b struct {
+		Translations map[utils.Language]BroadcastTranslation `json:"translations"`
+		BaseLanguage utils.Language                          `json:"base_language"`
+		URNs         []urns.URN                              `json:"urns,omitempty"`
+		ContactIDs   []flows.ContactID                       `json:"contact_ids,omitempty"`
+		IsLast       bool                                    `json:"is_last"`
+	}
+}

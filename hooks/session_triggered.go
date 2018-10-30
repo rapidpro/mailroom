@@ -50,7 +50,9 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 			groups := make([]models.GroupID, 0, len(event.Groups))
 			for i := range event.Groups {
 				group := org.GroupByUUID(event.Groups[i].UUID)
-				groups = append(groups, group.ID())
+				if group != nil {
+					groups = append(groups, group.ID())
+				}
 			}
 
 			// load our contacts by uuid
