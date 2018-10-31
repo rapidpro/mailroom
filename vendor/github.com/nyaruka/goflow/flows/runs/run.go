@@ -266,7 +266,6 @@ func (r *flowRun) GetTranslatedTextArray(uuid utils.UUID, key string, native []s
 			}
 			return merged
 		}
-
 	}
 	return native
 }
