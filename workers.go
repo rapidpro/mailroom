@@ -11,7 +11,6 @@ import (
 
 // task types
 const (
-	// TODO: move other task types here
 	StartFlowType = "start_flow"
 
 	SendBroadcastType      = "send_broadcast"
