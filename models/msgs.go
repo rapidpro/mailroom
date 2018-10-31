@@ -351,6 +351,7 @@ func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
 	bcast := &Broadcast{}
+	bcast.b.OrgID = org.OrgID()
 	bcast.b.BaseLanguage = event.BaseLanguage
 	bcast.b.URNs = event.URNs
 	bcast.b.Translations = make(map[utils.Language]*BroadcastTranslation)
@@ -386,6 +387,7 @@ func (b *Broadcast) CreateBatch(contactIDs []flows.ContactID) *BroadcastBatch {
 	batch := &BroadcastBatch{}
 	batch.b.BaseLanguage = b.b.BaseLanguage
 	batch.b.Translations = b.b.Translations
+	batch.b.OrgID = b.b.OrgID
 	batch.b.ContactIDs = contactIDs
 	return batch
 }
@@ -471,7 +473,7 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 			c := channels.GetForURN(u, assets.ChannelRoleSend)
 			if c != nil {
 				urn = u.URN()
-				channel = org.ChannelByUUID(channel.UUID())
+				channel = org.ChannelByUUID(c.UUID())
 				break
 			}
 		}

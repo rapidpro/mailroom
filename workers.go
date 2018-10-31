@@ -2,6 +2,7 @@ package mailroom
 
 import (
 	"context"
+	"runtime/debug"
 	"time"
 
 	"github.com/nyaruka/mailroom/queue"
@@ -13,8 +14,12 @@ const (
 	// TODO: move other task types here
 	StartFlowType = "start_flow"
 
-	SendBroadcastType      = "start_broadcast"
-	SendBroadcastBatchType = "start_broadcast_batch"
+	SendBroadcastType      = "send_broadcast"
+	SendBroadcastBatchType = "send_broadcast_batch"
+
+	FireCampaignEventType = "fire_campaign_event"
+
+	HandleEvent = "handle_event"
 )
 
 // Foreman takes care of managing our set of sending workers and assigns msgs for each to send
@@ -168,6 +173,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 		// catch any panics and recover
 		panicLog := recover()
 		if panicLog != nil {
+			debug.PrintStack()
 			log.Errorf("panic handling task: %s", panicLog)
 		}
 

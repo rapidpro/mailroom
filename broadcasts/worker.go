@@ -134,22 +134,27 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	return nil
 }
 
-// HandleBroadcastStartBatch starts a batch of contacts in a broadcast
+// handleSendBroadcastBatch sends our messages
 func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*60)
 	defer cancel()
 
 	// decode our task body
 	if task.Type != mailroom.SendBroadcastBatchType {
-		return errors.Errorf("unknown event type passed to broadcast worker: %s", task.Type)
+		return errors.Errorf("unknown event type passed to send worker: %s", task.Type)
 	}
-	bcast := &models.BroadcastBatch{}
-	err := json.Unmarshal(task.Task, bcast)
+	broadcast := &models.BroadcastBatch{}
+	err := json.Unmarshal(task.Task, broadcast)
 	if err != nil {
-		return errors.Wrapf(err, "error unmarshalling broadcast batch: %s", string(task.Task))
+		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
 	}
 
-	org, err := models.GetOrgAssets(ctx, mr.DB, bcast.OrgID())
+	return SendBroadcastBatch(ctx, mr.DB, mr.RP, broadcast)
+}
+
+// SendBroadcastBatch sends the passed in broadcast batch
+func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.BroadcastBatch) error {
+	org, err := models.GetOrgAssets(ctx, db, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
@@ -160,13 +165,13 @@ func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *
 	}
 
 	// create this batch of messages
-	msgs, err := models.CreateBroadcastMessages(ctx, mr.DB, org, sa, bcast)
+	msgs, err := models.CreateBroadcastMessages(ctx, db, org, sa, bcast)
 	if err != nil {
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
 	// and queue them to courier for sending
-	rc := mr.RP.Get()
+	rc := rp.Get()
 	defer rc.Close()
 
 	err = courier.QueueMessages(rc, msgs)

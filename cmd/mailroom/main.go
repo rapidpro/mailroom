@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/sirupsen/logrus"
 
+	_ "github.com/nyaruka/mailroom/broadcasts"
 	_ "github.com/nyaruka/mailroom/campaigns"
 	_ "github.com/nyaruka/mailroom/expirations"
 	_ "github.com/nyaruka/mailroom/hooks"
