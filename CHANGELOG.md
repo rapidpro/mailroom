@@ -1,3 +1,8 @@
+v0.0.60
+----------
+ * v1 of broadcast support
+ * lastest goflow
+
 v0.0.59
 ----------
  * fix datediff units, add session trigger support
