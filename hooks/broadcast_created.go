@@ -48,7 +48,6 @@ func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 			priority := queue.DefaultPriority
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
-			// TODO: this probably isn't enough to guarantee instant execution
 			if len(bcast.GroupIDs()) > 0 {
 				taskQ = mailroom.BatchQueue
 				priority = queue.HighPriority

@@ -501,13 +501,16 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 			}
 		}
 
-		// first try contact language
+		// have a valid contact language, try that
 		trans := bcast.Translations()
 		t := trans[lang]
+
+		// not found? try org default language
 		if t == nil {
 			t = trans[org.Env().DefaultLanguage()]
 		}
 
+		// not found? use broadcast base language
 		if t == nil {
 			t = trans[bcast.BaseLanguage()]
 		}
@@ -527,7 +530,7 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 		return msg, nil
 	}
 
-	// first run through all our normal contacts
+	// run through all our contacts to create our messages
 	for _, c := range contacts {
 		// use the preferred URN if present
 		urn := broadcastURNs[c.ID()]
@@ -553,7 +556,7 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 		}
 	}
 
-	// insert our messages
+	// insert them in a single request
 	err = InsertMessages(ctx, db, msgs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting broadcast messages")
