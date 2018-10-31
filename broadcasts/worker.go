@@ -74,6 +74,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	}
 
 	urnContacts := make(map[flows.ContactID]urns.URN)
+	repeatedContacts := make(map[flows.ContactID]urns.URN)
 
 	q := mailroom.BatchQueue
 
@@ -85,9 +86,10 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	// we want to remove contacts that are also present in URN sends, these will be a special case in our last batch
 	for u, id := range urnMap {
 		if contactIDs[id] {
-			urnContacts[id] = u
+			repeatedContacts[id] = u
 			delete(contactIDs, id)
 		}
+		urnContacts[id] = u
 	}
 
 	rc := rp.Get()
@@ -99,10 +101,11 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	queueBatch := func(isLast bool) {
 		// if this is our last batch include those contacts that overlap with our urns
 		if isLast {
-			for id := range urnContacts {
+			for id := range repeatedContacts {
 				contacts = append(contacts, id)
 			}
 		}
+
 		batch := bcast.CreateBatch(contacts)
 
 		// also set our URNs
@@ -127,9 +130,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	}
 
 	// queue our last batch
-	if len(contacts) > 0 {
-		queueBatch(true)
-	}
+	queueBatch(true)
 
 	return nil
 }

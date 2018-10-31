@@ -445,7 +445,7 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 	}
 
 	// load all our contacts
-	contacts, err := LoadContacts(ctx, db, org, bcast.ContactIDs())
+	contacts, err := LoadContacts(ctx, db, org, contactIDs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
 	}
