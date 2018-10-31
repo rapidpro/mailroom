@@ -149,7 +149,7 @@ func TestContactsFromURN(t *testing.T) {
 			assert.Fail(t, "%d: unexpected number of ids returned", i)
 			continue
 		}
-		assert.Equal(t, tc.ContactID, ids[0], "%d: mismatch in contact ids", i)
+		assert.Equal(t, tc.ContactID, ids[tc.URN], "%d: mismatch in contact ids", i)
 	}
 }
 

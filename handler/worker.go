@@ -23,18 +23,16 @@ import (
 // TODO: lock all of these events by contact
 
 const (
-	contactEventType         = "handle_event"
 	stopEventType            = "stop_event"
 	msgEventType             = "msg_event"
 	newConversationEventType = "new_conversation"
 	referralEventType        = "referral"
-
-	expirationEventType = "expiration_event"
-	timeoutEventType    = "timeout_event"
+	expirationEventType      = "expiration_event"
+	timeoutEventType         = "timeout_event"
 )
 
 func init() {
-	mailroom.AddTaskFunction(contactEventType, handleEvent)
+	mailroom.AddTaskFunction(mailroom.HandleEvent, handleEvent)
 }
 
 // AddHandleTask adds a single task for the passed in contact
@@ -56,7 +54,7 @@ func AddHandleTask(rc redis.Conn, contactID flows.ContactID, task *queue.Task) e
 	contactTask := &handleEventTask{ContactID: contactID}
 
 	// then add a handle task for that contact
-	err = queue.AddTask(rc, mailroom.HandlerQueue, contactEventType, task.OrgID, contactTask, queue.DefaultPriority)
+	err = queue.AddTask(rc, mailroom.HandlerQueue, mailroom.HandleEvent, task.OrgID, contactTask, queue.DefaultPriority)
 	if err != nil {
 		return errors.Wrapf(err, "error adding handle event task")
 	}

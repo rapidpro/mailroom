@@ -20,7 +20,7 @@ import (
 )
 
 func init() {
-	mailroom.AddTaskFunction(campaignEventFireType, HandleCampaignEvent)
+	mailroom.AddTaskFunction(mailroom.FireCampaignEventType, HandleCampaignEvent)
 }
 
 // HandleCampaignEvent is called by mailroom when a campaign event task is ready to be processed.
@@ -44,7 +44,7 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 	log := logrus.WithField("comp", "campaign_worker").WithField("task", string(task.Task))
 
 	// decode our task body
-	if task.Type != campaignEventFireType {
+	if task.Type != mailroom.FireCampaignEventType {
 		return errors.Errorf("unknown event type passed to campaign worker: %s", task.Type)
 	}
 	eventTask := eventFireTask{}

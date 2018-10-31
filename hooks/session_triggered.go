@@ -50,7 +50,9 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 			groups := make([]models.GroupID, 0, len(event.Groups))
 			for i := range event.Groups {
 				group := org.GroupByUUID(event.Groups[i].UUID)
-				groups = append(groups, group.ID())
+				if group != nil {
+					groups = append(groups, group.ID())
+				}
 			}
 
 			// load our contacts by uuid
@@ -71,6 +73,7 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 			priority := queue.DefaultPriority
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
+			// TODO: this really isn't enough to guarantee fast execution
 			if len(start.GroupIDs()) > 0 {
 				taskQ = mailroom.BatchQueue
 				priority = queue.HighPriority
