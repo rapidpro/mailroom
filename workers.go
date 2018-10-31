@@ -13,7 +13,8 @@ const (
 	// TODO: move other task types here
 	StartFlowType = "start_flow"
 
-	StartBroadcastType = "start_broadcast"
+	SendBroadcastType      = "start_broadcast"
+	SendBroadcastBatchType = "start_broadcast_batch"
 )
 
 // Foreman takes care of managing our set of sending workers and assigns msgs for each to send

@@ -73,6 +73,7 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 			priority := queue.DefaultPriority
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
+			// TODO: this really isn't enough to guarantee fast execution
 			if len(start.GroupIDs()) > 0 {
 				taskQ = mailroom.BatchQueue
 				priority = queue.HighPriority

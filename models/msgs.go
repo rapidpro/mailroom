@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -334,12 +335,14 @@ type Broadcast struct {
 		URNs         []urns.URN                               `json:"urns,omitempty"`
 		ContactIDs   []flows.ContactID                        `json:"contact_ids,omitempty"`
 		GroupIDs     []GroupID                                `json:"group_ids,omitempty"`
+		OrgID        OrgID                                    `json:"org_id"`
 	}
 }
 
 func (b *Broadcast) ContactIDs() []flows.ContactID                          { return b.b.ContactIDs }
 func (b *Broadcast) GroupIDs() []GroupID                                    { return b.b.GroupIDs }
 func (b *Broadcast) URNs() []urns.URN                                       { return b.b.URNs }
+func (b *Broadcast) OrgID() OrgID                                           { return b.b.OrgID }
 func (b *Broadcast) Translations() map[utils.Language]*BroadcastTranslation { return b.b.Translations }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
@@ -379,13 +382,180 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 	return bcast, nil
 }
 
+func (b *Broadcast) CreateBatch(contactIDs []flows.ContactID) *BroadcastBatch {
+	batch := &BroadcastBatch{}
+	batch.b.BaseLanguage = b.b.BaseLanguage
+	batch.b.Translations = b.b.Translations
+	batch.b.ContactIDs = contactIDs
+	return batch
+}
+
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {
 	b struct {
-		Translations map[utils.Language]BroadcastTranslation `json:"translations"`
-		BaseLanguage utils.Language                          `json:"base_language"`
-		URNs         []urns.URN                              `json:"urns,omitempty"`
-		ContactIDs   []flows.ContactID                       `json:"contact_ids,omitempty"`
-		IsLast       bool                                    `json:"is_last"`
+		Translations map[utils.Language]*BroadcastTranslation `json:"translations"`
+		BaseLanguage utils.Language                           `json:"base_language"`
+		URNs         map[flows.ContactID]urns.URN             `json:"urns,omitempty"`
+		ContactIDs   []flows.ContactID                        `json:"contact_ids,omitempty"`
+		IsLast       bool                                     `json:"is_last"`
+		OrgID        OrgID                                    `json:"org_id"`
 	}
+}
+
+func (b *BroadcastBatch) ContactIDs() []flows.ContactID             { return b.b.ContactIDs }
+func (b *BroadcastBatch) URNs() map[flows.ContactID]urns.URN        { return b.b.URNs }
+func (b *BroadcastBatch) SetURNs(urns map[flows.ContactID]urns.URN) { b.b.URNs = urns }
+func (b *BroadcastBatch) OrgID() OrgID                              { return b.b.OrgID }
+func (b *BroadcastBatch) Translations() map[utils.Language]*BroadcastTranslation {
+	return b.b.Translations
+}
+func (b *BroadcastBatch) BaseLanguage() utils.Language { return b.b.BaseLanguage }
+func (b *BroadcastBatch) IsLast() bool                 { return b.b.IsLast }
+func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
+
+func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
+func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
+
+func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, sa flows.SessionAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+	repeatedContacts := make(map[flows.ContactID]bool)
+	broadcastURNs := bcast.URNs()
+
+	// build our list of contact ids
+	contactIDs := bcast.ContactIDs()
+
+	// build a map of the contacts that are present both in our URN list and our contact id list
+	if broadcastURNs != nil {
+		for _, id := range contactIDs {
+			_, found := broadcastURNs[id]
+			if found {
+				repeatedContacts[id] = true
+			}
+		}
+	}
+
+	// if we have URN we need to send to, add those contacts as well if not already repeated
+	if broadcastURNs != nil {
+		for id := range broadcastURNs {
+			if !repeatedContacts[id] {
+				contactIDs = append(contactIDs, id)
+			}
+		}
+	}
+
+	// load all our contacts
+	contacts, err := LoadContacts(ctx, db, org, bcast.ContactIDs())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
+	}
+
+	channels := sa.Channels()
+
+	// for each contact, build our message
+	msgs := make([]*Msg, 0, len(contacts))
+
+	// utility method to build up our message
+	buildMessage := func(c *Contact, u urns.URN) (*Msg, error) {
+		if c.IsStopped() || c.IsBlocked() {
+			return nil, nil
+		}
+
+		contact, err := c.FlowContact(org, sa)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating flow contact")
+		}
+
+		urn := urns.NilURN
+		var channel *Channel
+
+		for _, u := range contact.URNs() {
+			c := channels.GetForURN(u, assets.ChannelRoleSend)
+			if c != nil {
+				urn = u.URN()
+				channel = org.ChannelByUUID(channel.UUID())
+				break
+			}
+		}
+
+		// no urn and channel? move on
+		if channel == nil {
+			return nil, nil
+		}
+
+		// resolve our translations, the order is:
+		//   1) valid contact language
+		//   2) org default language
+		//   3) broadcast base language
+		lang := contact.Language()
+		if lang != utils.NilLanguage {
+			found := false
+			for _, l := range org.Env().AllowedLanguages() {
+				if l == lang {
+					found = true
+					break
+				}
+			}
+			if !found {
+				lang = utils.NilLanguage
+			}
+		}
+
+		// first try contact language
+		trans := bcast.Translations()
+		t := trans[lang]
+		if t == nil {
+			t = trans[org.Env().DefaultLanguage()]
+		}
+
+		if t == nil {
+			t = trans[bcast.BaseLanguage()]
+		}
+
+		if t == nil {
+			logrus.WithField("base_language", bcast.BaseLanguage()).WithField("translations", trans).Error("unable to find translation for broadcast")
+			return nil, nil
+		}
+
+		// create our outgoing message
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), t.Text, t.Attachments, t.QuickReplies)
+		msg, err := NewOutgoingMsg(org.OrgID(), channel, contact.ID(), out, time.Now())
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating outgoing message")
+		}
+
+		return msg, nil
+	}
+
+	// first run through all our normal contacts
+	for _, c := range contacts {
+		// use the preferred URN if present
+		urn := broadcastURNs[c.ID()]
+		msg, err := buildMessage(c, urn)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating broadcast message")
+		}
+		if msg != nil {
+			msgs = append(msgs, msg)
+		}
+
+		// if this is a contact that will receive two messages, calculate that one as well
+		if repeatedContacts[c.ID()] {
+			m2, err := buildMessage(c, urns.NilURN)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error creating broadcast message")
+			}
+
+			// add this message if it isn't a duplicate
+			if m2 != nil && m2.URN() != msg.URN() {
+				msgs = append(msgs, m2)
+			}
+		}
+	}
+
+	// insert our messages
+	err = InsertMessages(ctx, db, msgs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting broadcast messages")
+	}
+
+	return msgs, nil
 }

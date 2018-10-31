@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
@@ -136,3 +137,25 @@ VALUES(:contact_id, :group_id)
 ON CONFLICT
 	DO NOTHING
 `
+
+// ContactIDsForGroupIDs returns the unique contacts that are in the passed in groups
+func ContactIDsForGroupIDs(ctx context.Context, tx Queryer, groupIDs []GroupID) ([]flows.ContactID, error) {
+	// now add all the ids for our groups
+	rows, err := tx.QueryxContext(ctx, `SELECT DISTINCT(contact_id) FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(groupIDs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error selecting contacts for groups")
+	}
+	defer rows.Close()
+
+	contactIDs := make([]flows.ContactID, 0, 10)
+	var contactID flows.ContactID
+	for rows.Next() {
+		err := rows.Scan(&contactID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning contact id")
+		}
+		contactIDs = append(contactIDs, contactID)
+	}
+
+	return contactIDs, nil
+}

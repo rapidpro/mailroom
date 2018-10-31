@@ -307,9 +307,15 @@ WHERE
 
 // ContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a list the same length as
 // the passed in URNs with the ids of the contacts. There is no guarantee in the order of the ids returned
-func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, us []urns.URN) ([]flows.ContactID, error) {
+func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, us []urns.URN) (map[urns.URN]flows.ContactID, error) {
 	// build a map of our urns to contact id
 	urnMap := make(map[urns.URN]flows.ContactID, len(us))
+
+	// and another map from URN identity to the passed in URN
+	urnIdentities := make(map[urns.URN]urns.URN, len(us))
+	for _, u := range us {
+		urnIdentities[u.Identity()] = u
+	}
 
 	// try to select our contact ids
 	identities := make([]string, len(us))
@@ -340,7 +346,12 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 			return nil, errors.Wrapf(err, "error scanning urn result")
 		}
 
-		urnMap[urn] = id
+		original, found := urnIdentities[urn]
+		if !found {
+			return nil, errors.Wrapf(err, "unable to find original URN from identity")
+		}
+
+		urnMap[original] = id
 	}
 
 	// if we didn't find some contacts
@@ -352,17 +363,18 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 				if err != nil {
 					return nil, errors.Wrapf(err, "error while creating contact")
 				}
-				urnMap[u] = id
+
+				original, found := urnIdentities[u]
+				if !found {
+					return nil, errors.Wrapf(err, "unable to find original URN from identity")
+				}
+				urnMap[original] = id
 			}
 		}
 	}
 
-	// build our list of contact ids
-	ids := make([]flows.ContactID, 0, len(urnMap))
-	for _, id := range urnMap {
-		ids = append(ids, id)
-	}
-	return ids, nil
+	// return our map of urns to ids
+	return urnMap, nil
 }
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
@@ -395,10 +407,10 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 			// if this was a duplicate URN, we should be able to select this contact instead
 			if pqErr.Code.Name() == "unique_violation" {
 				ids, err := ContactIDsFromURNs(ctx, db, org, assets, []urns.URN{urn})
-				if err != nil {
+				if err != nil || len(ids) == 0 {
 					return NilContactID, errors.Wrapf(err, "unable to load contact for urn: %s", urn)
 				}
-				return ids[0], nil
+				return ids[urn], nil
 			}
 		}
 		return NilContactID, errors.Wrapf(err, "error creating new contact")
