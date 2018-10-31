@@ -1,3 +1,7 @@
+v0.0.61
+----------
+ * fix for single URN broadcasts not sending
+
 v0.0.60
 ----------
  * v1 of broadcast support
