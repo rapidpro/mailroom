@@ -24,19 +24,20 @@ func requestLogger(next http.Handler) http.Handler {
 			scheme = "https"
 		}
 
-		elapsed := time.Now().Sub(start).Nanoseconds()
+		elapsed := time.Since(start)
 		uri := fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI)
+		ww.Header().Set("X-Elapsed-NS", strconv.FormatInt(int64(elapsed), 10))
 
-		ww.Header().Set("X-Elapsed-NS", strconv.FormatInt(elapsed, 10))
-
-		log.WithFields(log.Fields{
-			"method":     r.Method,
-			"status":     ww.Status(),
-			"elapsed":    elapsed,
-			"length":     ww.BytesWritten(),
-			"url":        uri,
-			"user_agent": r.UserAgent(),
-		}).Info("request completed")
+		if r.RequestURI != "/" {
+			log.WithFields(log.Fields{
+				"method":     r.Method,
+				"status":     ww.Status(),
+				"elapsed":    elapsed,
+				"length":     ww.BytesWritten(),
+				"url":        uri,
+				"user_agent": r.UserAgent(),
+			}).Info("request completed")
+		}
 	})
 }
 
