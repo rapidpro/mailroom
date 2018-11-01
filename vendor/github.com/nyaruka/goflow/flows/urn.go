@@ -53,7 +53,7 @@ func ValidateURNScheme(fl validator.FieldLevel) bool {
 //   @contact.urns.0.path -> +12065551212
 //   @contact.urns.1.display -> nyaruka
 //   @(format_urn(contact.urns.0)) -> (206) 555-1212
-//   @(json(contact.urns.0)) -> {"display":"","path":"+12065551212","scheme":"tel"}
+//   @(json(contact.urns.0)) -> {"display":"(206) 555-1212","path":"+12065551212","scheme":"tel"}
 //
 // @context urn
 type ContactURN struct {
@@ -140,7 +140,7 @@ func (u *ContactURN) Resolve(env utils.Environment, key string) types.XValue {
 		if env.RedactionPolicy() == utils.RedactionPolicyURNs {
 			return redactedURN
 		}
-		return types.NewXText(u.urn.Display())
+		return types.NewXText(u.urn.Format())
 	case "channel":
 		return u.Channel()
 	}
@@ -269,3 +269,55 @@ func (l URNList) Length() int {
 var _ types.XValue = (URNList)(nil)
 var _ types.XIndexable = (URNList)(nil)
 var _ types.XResolvable = (URNList)(nil)
+
+// URNShortcuts provides a simpler way to access single URNs
+type URNShortcuts struct {
+	urns URNList
+}
+
+// NewURNShortcuts creates a new URN shortcuts
+func NewURNShortcuts(urns URNList) *URNShortcuts {
+	return &URNShortcuts{urns: urns}
+}
+
+// Resolve resolves the given key when this is referenced in an expression
+func (s *URNShortcuts) Resolve(env utils.Environment, key string) types.XValue {
+	scheme := strings.ToLower(key)
+
+	// a scheme means find the first URN with that scheme
+	if urns.IsValidScheme(scheme) {
+		filtered := s.urns.WithScheme(scheme)
+		if len(filtered) > 0 {
+			return filtered[0]
+		}
+		return types.XTextEmpty
+	}
+
+	if len(s.urns) > 0 {
+		return s.urns[0].Resolve(env, key)
+	}
+
+	return types.NewXResolveError(s, key)
+}
+
+// Describe returns a representation of this type for error messages
+func (s *URNShortcuts) Describe() string { return "URN" }
+
+// Reduce is called when this object needs to be reduced to a primitive
+func (s *URNShortcuts) Reduce(env utils.Environment) types.XPrimitive {
+	if len(s.urns) > 0 {
+		return s.urns[0].Reduce(env)
+	}
+	return nil
+}
+
+// ToXJSON is called when this type is passed to @(json(...))
+func (s *URNShortcuts) ToXJSON(env utils.Environment) types.XText {
+	if len(s.urns) > 0 {
+		return s.urns[0].ToXJSON(env)
+	}
+	return types.XTextEmpty
+}
+
+var _ types.XValue = (*URNShortcuts)(nil)
+var _ types.XResolvable = (*URNShortcuts)(nil)
