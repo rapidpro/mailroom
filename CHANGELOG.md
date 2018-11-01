@@ -1,3 +1,8 @@
+v0.0.62
+----------
+ * dont require authorization for / and /mr for status checks
+ * mailroom tweaks in support of simulation
+
 v0.0.61
 ----------
  * fix for single URN broadcasts not sending
