@@ -39,13 +39,13 @@ func NewServer(ctx context.Context, db *sqlx.DB, rp *redis.Pool, config *config.
 	router.Use(requestLogger)
 
 	// wire up our main pages
-	router.NotFound(s.wrapJSONHandler(s.handle404))
-	router.MethodNotAllowed(s.wrapJSONHandler(s.handle405))
-	router.Get("/", s.wrapJSONHandler(s.handleIndex))
-	router.Get("/mr", s.wrapJSONHandler(s.handleIndex))
-	router.Post("/mr/flow/migrate", s.wrapJSONHandler(s.handleMigrate))
-	router.Post("/mr/sim/start", s.wrapJSONHandler(s.handleStart))
-	router.Post("/mr/sim/resume", s.wrapJSONHandler(s.handleResume))
+	router.NotFound(s.wrapJSONHandler(s.handle404, false))
+	router.MethodNotAllowed(s.wrapJSONHandler(s.handle405, false))
+	router.Get("/", s.wrapJSONHandler(s.handleIndex, false))
+	router.Get("/mr", s.wrapJSONHandler(s.handleIndex, false))
+	router.Post("/mr/flow/migrate", s.wrapJSONHandler(s.handleMigrate, true))
+	router.Post("/mr/sim/start", s.wrapJSONHandler(s.handleStart, true))
+	router.Post("/mr/sim/resume", s.wrapJSONHandler(s.handleResume, true))
 
 	// configure our http server
 	s.httpServer = &http.Server{
@@ -60,16 +60,18 @@ func NewServer(ctx context.Context, db *sqlx.DB, rp *redis.Pool, config *config.
 
 type JSONHandler func(r *http.Request) (interface{}, int, error)
 
-func (s *Server) wrapJSONHandler(handler JSONHandler) http.HandlerFunc {
+func (s *Server) wrapJSONHandler(handler JSONHandler, protected bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-type", "application/json")
 
-		auth := r.Header.Get("authorization")
-		if s.config.AuthToken != "" && fmt.Sprintf("Token %s", s.config.AuthToken) != auth {
-			logrus.WithField("token", auth).Error("invalid auth token, deying")
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error": "missing bearer token"}`))
-			return
+		if protected {
+			auth := r.Header.Get("authorization")
+			if s.config.AuthToken != "" && fmt.Sprintf("Token %s", s.config.AuthToken) != auth {
+				logrus.WithField("token", auth).Error("invalid auth token, deying")
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(`{"error": "missing bearer token"}`))
+				return
+			}
 		}
 
 		value, status, err := handler(r)
