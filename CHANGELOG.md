@@ -1,3 +1,7 @@
+v0.0.63
+----------
+ * latest goflow, fixes @parent.contact.urn
+
 v0.0.62
 ----------
  * dont require authorization for / and /mr for status checks
