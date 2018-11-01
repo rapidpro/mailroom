@@ -30,12 +30,12 @@ func requestLogger(next http.Handler) http.Handler {
 		ww.Header().Set("X-Elapsed-NS", strconv.FormatInt(elapsed, 10))
 
 		log.WithFields(log.Fields{
-			"http_method":       r.Method,
-			"resp_status":       ww.Status(),
-			"resp_time_ms":      float64(elapsed) / 1000000.0,
-			"resp_bytes_length": ww.BytesWritten(),
-			"uri":               uri,
-			"user_agent":        r.UserAgent(),
+			"method":     r.Method,
+			"status":     ww.Status(),
+			"elapsed":    elapsed,
+			"length":     ww.BytesWritten(),
+			"url":        uri,
+			"user_agent": r.UserAgent(),
 		}).Info("request completed")
 	})
 }

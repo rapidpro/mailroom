@@ -65,7 +65,8 @@ func (s *Server) wrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 		w.Header().Set("Content-type", "application/json")
 
 		auth := r.Header.Get("authorization")
-		if s.config.AuthToken != "" && s.config.AuthToken != fmt.Sprintf("Token %s", auth) {
+		if s.config.AuthToken != "" && fmt.Sprintf("Token %s", s.config.AuthToken) != auth {
+			logrus.WithField("token", auth).Error("invalid auth token, deying")
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error": "missing bearer token"}`))
 			return
@@ -87,6 +88,7 @@ func (s *Server) wrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 		}
 
 		if err != nil {
+			logrus.WithError(err).Error("client error")
 			w.WriteHeader(status)
 			w.Write(serialized)
 			return
