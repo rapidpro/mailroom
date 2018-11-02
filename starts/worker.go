@@ -118,29 +118,35 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 	rc := rp.Get()
 	defer rc.Close()
 
-	// build up batches of contacts to start
+	// by default we start in the batch queue unless we have two or fewer contacts
+	q := mailroom.BatchQueue
+	if len(contactIDs) <= 2 {
+		q = mailroom.HandlerQueue
+	}
+
 	contacts := make([]flows.ContactID, 0, 100)
+	queueBatch := func(last bool) {
+		batch := start.CreateBatch(contacts)
+		batch.SetIsLast(last)
+		err = queue.AddTask(rc, q, startFlowBatchType, int(start.OrgID()), batch, queue.DefaultPriority)
+		if err != nil {
+			// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
+			logrus.WithError(err).WithField("start_id", start.StartID).Error("error while queuing start")
+		}
+		contacts = make([]flows.ContactID, 0, 100)
+	}
+
+	// build up batches of contacts to start
 	for c := range contactIDs {
 		if len(contacts) == startBatchSize {
-			batch := start.CreateBatch(contacts)
-			err = queue.AddTask(rc, mailroom.BatchQueue, startFlowBatchType, int(start.OrgID()), batch, queue.DefaultPriority)
-			if err != nil {
-				// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
-				logrus.WithError(err).WithField("start_id", start.StartID).Error("error while queuing start")
-			}
-			contacts = make([]flows.ContactID, 0, 100)
+			queueBatch(false)
 		}
 		contacts = append(contacts, c)
 	}
 
 	// queue our last batch
 	if len(contacts) > 0 {
-		batch := start.CreateBatch(contacts)
-		batch.SetIsLast(true)
-		err = queue.AddTask(rc, mailroom.BatchQueue, startFlowBatchType, int(start.OrgID()), batch, queue.DefaultPriority)
-		if err != nil {
-			logrus.WithError(err).WithField("start_id", start.StartID).Error("error while queuing start")
-		}
+		queueBatch(true)
 	}
 
 	// mark our start as started

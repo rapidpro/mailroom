@@ -50,17 +50,18 @@ func TestStarts(t *testing.T) {
 		ContactIDs          []flows.ContactID
 		RestartParticipants bool
 		IncludeActive       bool
+		Queue               string
 		ContactCount        int
 		BatchCount          int
 		TotalCount          int
 	}{
-		{models.FlowID(31), []models.GroupID{36}, nil, false, false, 525, 6, 520},
-		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{1318}, false, false, 525, 6, 0},
-		{models.FlowID(31), nil, []flows.ContactID{1318}, true, true, 1, 1, 1},
-		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{51}, false, false, 526, 6, 1},
-		{models.FlowID(31), nil, []flows.ContactID{51}, false, false, 1, 1, 0},
-		{models.FlowID(31), nil, []flows.ContactID{51}, false, true, 1, 1, 0},
-		{models.FlowID(31), nil, []flows.ContactID{51}, true, true, 1, 1, 1},
+		{models.FlowID(31), []models.GroupID{36}, nil, false, false, mailroom.BatchQueue, 525, 6, 520},
+		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{1318}, false, false, mailroom.BatchQueue, 525, 6, 0},
+		{models.FlowID(31), nil, []flows.ContactID{1318}, true, true, mailroom.HandlerQueue, 1, 1, 1},
+		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{51}, false, false, mailroom.BatchQueue, 526, 6, 1},
+		{models.FlowID(31), nil, []flows.ContactID{51}, false, false, mailroom.HandlerQueue, 1, 1, 0},
+		{models.FlowID(31), nil, []flows.ContactID{51}, false, true, mailroom.HandlerQueue, 1, 1, 0},
+		{models.FlowID(31), nil, []flows.ContactID{51}, true, true, mailroom.HandlerQueue, 1, 1, 1},
 	}
 
 	for i, tc := range tcs {
@@ -81,7 +82,7 @@ func TestStarts(t *testing.T) {
 		var task *queue.Task
 		count := 0
 		for {
-			task, err = queue.PopNextTask(rc, mailroom.BatchQueue)
+			task, err = queue.PopNextTask(rc, tc.Queue)
 			assert.NoError(t, err)
 			if task == nil {
 				break

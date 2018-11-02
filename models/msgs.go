@@ -456,7 +456,7 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 	msgs := make([]*Msg, 0, len(contacts))
 
 	// utility method to build up our message
-	buildMessage := func(c *Contact, u urns.URN) (*Msg, error) {
+	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
 		if c.IsStopped() || c.IsBlocked() {
 			return nil, nil
 		}
@@ -469,12 +469,28 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 		urn := urns.NilURN
 		var channel *Channel
 
-		for _, u := range contact.URNs() {
-			c := channels.GetForURN(u, assets.ChannelRoleSend)
-			if c != nil {
-				urn = u.URN()
-				channel = org.ChannelByUUID(c.UUID())
-				break
+		// we are forcing to send to a non-preferred URN, find the channel
+		if forceURN != urns.NilURN {
+			for _, u := range contact.URNs() {
+				if u.URN().Identity() == forceURN.Identity() {
+					c := channels.GetForURN(u, assets.ChannelRoleSend)
+					if c == nil {
+						return nil, nil
+					}
+					urn = u.URN()
+					channel = org.ChannelByUUID(c.UUID())
+					break
+				}
+			}
+		} else {
+			// no forced URN, find the first URN we can send to
+			for _, u := range contact.URNs() {
+				c := channels.GetForURN(u, assets.ChannelRoleSend)
+				if c != nil {
+					urn = u.URN()
+					channel = org.ChannelByUUID(c.UUID())
+					break
+				}
 			}
 		}
 

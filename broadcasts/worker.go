@@ -78,8 +78,8 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 
 	q := mailroom.BatchQueue
 
-	// no groups? we can queue straight to handler queue for faster sending
-	if len(bcast.GroupIDs()) == 0 {
+	// two or fewer contacts? queue to our handler queue for sending
+	if len(contactIDs) <= 2 {
 		q = mailroom.HandlerQueue
 	}
 
