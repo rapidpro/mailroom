@@ -21,8 +21,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TODO: lock all of these events by contact
-
 const (
 	stopEventType            = "stop_event"
 	msgEventType             = "msg_event"
