@@ -1,3 +1,7 @@
+v0.0.65
+----------
+ * add contact locking when processing contact events
+
 v0.0.64
 ----------
  * add tests for broadcast batching
