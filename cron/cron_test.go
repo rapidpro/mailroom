@@ -33,36 +33,6 @@ func TestCron(t *testing.T) {
 	time.Sleep(time.Millisecond * 320)
 	assert.Equal(t, 4, fired)
 
-	// grab our lock
-	locked, err := GrabLock(rc, "test_lock", "123456789", 300)
-	assert.True(t, locked)
-	assert.NoError(t, err)
-
-	// cant lock with a different key
-	locked, err = GrabLock(rc, "test_lock", "different", 300)
-	assert.False(t, locked)
-	assert.NoError(t, err)
-
-	// extend our lock
-	err = ExtendLock(rc, "test_lock", "123456789", 300)
-	assert.NoError(t, err)
-
-	// sleep some more
-	time.Sleep(time.Millisecond * 300)
-
-	// our # of fires should be the same
-	assert.Equal(t, 4, fired)
-
-	// release the lock
-	err = ReleaseLock(rc, "test_lock", "123456789")
-	assert.NoError(t, err)
-
-	// sleep some more
-	time.Sleep(time.Millisecond * 310)
-
-	// should have incremented three more times
-	assert.Equal(t, 7, fired)
-
 	close(quit)
 }
 
