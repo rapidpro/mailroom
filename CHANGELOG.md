@@ -1,3 +1,8 @@
+v0.0.64
+----------
+ * add tests for broadcast batching
+ * dont log requests to index page (usually from health checker)
+
 v0.0.63
 ----------
  * latest goflow, fixes @parent.contact.urn
