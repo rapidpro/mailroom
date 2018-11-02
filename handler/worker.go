@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
@@ -77,11 +78,21 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 		return errors.Wrapf(err, "error decoding contact event task")
 	}
 
+	// acquire the lock for this contact
+	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)
+	lock, err := locker.GrabLock(rp, contactQ, time.Minute*5, time.Minute*5)
+	if err != nil {
+		return errors.Wrapf(err, "error acquiring lock for contact %d", eventTask.ContactID)
+	}
+	if lock == "" {
+		return errors.Errorf("unable to acquire lock for contact %d in timeout period, skipping", eventTask.ContactID)
+	}
+	defer locker.ReleaseLock(rp, contactQ, lock)
+
 	// read all the events for this contact, one by one
 	for {
 		// pop the next event off this contacts queue
 		rc := rp.Get()
-		contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)
 		event, err := redis.String(rc.Do("lpop", contactQ))
 		rc.Close()
 

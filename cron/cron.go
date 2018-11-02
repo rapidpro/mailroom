@@ -2,11 +2,11 @@ package cron
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/mailroom/locker"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,31 +37,26 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 			case <-time.After(wait):
 				// try to insert our expiring lock to redis
 				lastFire = time.Now()
-				lockValue := makeKey(10)
-				log := log.WithField("lockValue", lockValue)
 
-				rc := rp.Get()
-				locked, err := GrabLock(rc, lockName, lockValue, 300)
-				rc.Close()
+				lock, err := locker.GrabLock(rp, lockName, time.Minute*5, 0)
 				if err != nil {
 					break
 				}
+				log := log.WithField("lock", lock)
 
-				if !locked {
+				if lock == "" {
 					log.Debug("lock already present, sleeping")
 					break
 				}
 
 				// ok, got the lock, run our cron function
-				err = fireCron(cronFunc, lockName, lockValue)
+				err = fireCron(cronFunc, lockName, lock)
 				if err != nil {
 					log.WithError(err).Error("error while running cron")
 				}
 
 				// release our lock
-				rc = rp.Get()
-				err = ReleaseLock(rc, lockName, lockValue)
-				rc.Close()
+				err = locker.ReleaseLock(rp, lockName, lock)
 				if err != nil {
 					log.WithError(err).Error("error releasing lock")
 				}
@@ -90,61 +85,6 @@ func fireCron(cronFunc Function, lockName string, lockValue string) error {
 	}()
 
 	return cronFunc(lockName, lockValue)
-}
-
-// GrabLock grabs the passed in lock from redis in an atomic operation. It returns
-// whether the lock was available and acquired
-func GrabLock(rc redis.Conn, key string, value string, expiration int) (bool, error) {
-	success, err := rc.Do("SET", key, value, "EX", expiration, "NX")
-	if err != nil {
-		return false, err
-	}
-
-	return success == "OK", nil
-}
-
-var releaseScript = redis.NewScript(2, `
-    -- KEYS: [Key, Value]
-	if redis.call("get", KEYS[1]) == KEYS[2] then
-      return redis.call("del", KEYS[1])
-    else
-      return 0
-    end
-`)
-
-// ReleaseLock releases the passed in lock, returning any error encountered while doing
-// so. It is not considered an error to release a lock that is no longer present
-func ReleaseLock(rc redis.Conn, key string, value string) error {
-	// we use lua here because we only want to release the lock if we own it
-	_, err := releaseScript.Do(rc, key, value)
-	return err
-}
-
-var expireScript = redis.NewScript(3, `
-    -- KEYS: [Key, Value, Expiration]
-	  if redis.call("get", KEYS[1]) == KEYS[2] then
-      return redis.call("expire", KEYS[1], KEYS[3])
-    else
-      return 0
-    end
-`)
-
-// ExtendLock extends our lock expiration by the passed in number of seconds
-func ExtendLock(rc redis.Conn, key string, value string, expiration int) error {
-	// we use lua here because we only want to set the expiration time if we own it
-	_, err := expireScript.Do(rc, key, value, expiration)
-	return err
-}
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-// makeKey creates a random key of the length passed in
-func makeKey(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }
 
 // nextFire returns the next time we should fire based on the passed in time and interval
