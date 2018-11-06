@@ -168,7 +168,7 @@ func TestChannelEvents(t *testing.T) {
 
 	last := time.Now()
 	for i, tc := range tcs {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		event := &channelEvent{
 			ContactID: tc.ContactID,
@@ -199,7 +199,7 @@ func TestChannelEvents(t *testing.T) {
 		// if we are meant to have a response
 		var text string
 		db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, last)
-		assert.Equal(t, text, tc.Response, "%d: response: '%s' is not '%s'", i, text, tc.Response)
+		assert.Equal(t, tc.Response, text, "%d: response: '%s' is not '%s'", i, text, tc.Response)
 		last = time.Now()
 	}
 }
@@ -253,7 +253,7 @@ func TestTimedEvents(t *testing.T) {
 	var runExpiration time.Time
 
 	for i, tc := range tcs {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		var task *queue.Task
 		if tc.EventType == msgEventType {
