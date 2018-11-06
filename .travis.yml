@@ -13,6 +13,9 @@ addons:
 go:
 - "1.11"
 
+services:
+- redis-server
+
 before_install:
   - sudo sed -e 's/^bind.*/bind 127.0.0.1/' /etc/redis/redis.conf > redis.conf
   - sudo mv redis.conf /etc/redis
@@ -27,6 +30,7 @@ before_script:
 
 script:
 - go test -p=1 -coverprofile=coverage.text -covermode=atomic github.com/nyaruka/mailroom/...
+- df -h
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
