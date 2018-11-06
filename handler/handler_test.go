@@ -59,6 +59,8 @@ func TestMsgEvents(t *testing.T) {
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
 		VALUES(TRUE, now(), now(), '', false, 32, 'C', 'O', 1, 1, 2, 0) RETURNING id`)
 
+	models.FlushCache()
+
 	tcs := []struct {
 		ContactID flows.ContactID
 		URN       urns.URN
@@ -169,10 +171,10 @@ func TestChannelEvents(t *testing.T) {
 		{referralEventType, cathy, cathyURNID, org1, nexmoChannel, nil, "Pick a number between 1-10."},
 	}
 
+	models.FlushCache()
+
 	last := time.Now()
 	for i, tc := range tcs {
-		time.Sleep(50 * time.Millisecond)
-
 		event := &channelEvent{
 			ContactID: tc.ContactID,
 			URNID:     tc.URNID,
@@ -226,6 +228,8 @@ func TestTimedEvents(t *testing.T) {
 		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`,
 		favoritesFlow,
 	)
+
+	models.FlushCache()
 
 	tcs := []struct {
 		EventType string
