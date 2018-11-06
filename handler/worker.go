@@ -257,6 +257,7 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	// load the channel for this event
 	channel := org.ChannelByID(event.ChannelID)
 	if channel == nil {
+		logrus.WithField("channel_id", event.ChannelID).Info("ignoring event, couldn't find channel")
 		return nil
 	}
 
