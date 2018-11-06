@@ -131,6 +131,8 @@ func TestChannelEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
+	logrus.Info("starting channel test")
+
 	// trigger on our twitter channel for new conversations and favorites flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
