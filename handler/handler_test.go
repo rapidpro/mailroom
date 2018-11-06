@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
@@ -116,16 +115,9 @@ func TestMsgEvents(t *testing.T) {
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
-		if tc.Response != "" {
-			var text string
-			err := db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 ORDER BY id DESC LIMIT 1`, tc.ContactID)
-			if err != nil {
-				assert.NoError(t, err, "%d: error selecting last message", i)
-				continue
-			}
-
-			assert.True(t, strings.Contains(text, tc.Response), "%d: response: '%s' does not contain '%s'", i, text, tc.Response)
-		}
+		var text string
+		db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 ORDER BY id DESC LIMIT 1`, tc.ContactID)
+		assert.Equal(t, text, tc.Response, "%d: response: '%s' does not contain '%s'", i, text, tc.Response)
 	}
 }
 

@@ -18,7 +18,7 @@ const (
 
 	FireCampaignEventType = "fire_campaign_event"
 
-	HandleEvent = "handle_event"
+	HandleContactEvent = "handle_contact_event"
 )
 
 // Foreman takes care of managing our set of sending workers and assigns msgs for each to send

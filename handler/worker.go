@@ -32,7 +32,7 @@ const (
 )
 
 func init() {
-	mailroom.AddTaskFunction(mailroom.HandleEvent, handleEvent)
+	mailroom.AddTaskFunction(mailroom.HandleContactEvent, handleEvent)
 }
 
 // AddHandleTask adds a single task for the passed in contact
@@ -54,7 +54,7 @@ func AddHandleTask(rc redis.Conn, contactID flows.ContactID, task *queue.Task) e
 	contactTask := &handleEventTask{ContactID: contactID}
 
 	// then add a handle task for that contact
-	err = queue.AddTask(rc, mailroom.HandlerQueue, mailroom.HandleEvent, task.OrgID, contactTask, queue.DefaultPriority)
+	err = queue.AddTask(rc, mailroom.HandlerQueue, mailroom.HandleContactEvent, task.OrgID, contactTask, queue.DefaultPriority)
 	if err != nil {
 		return errors.Wrapf(err, "error adding handle event task")
 	}
