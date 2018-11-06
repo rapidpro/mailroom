@@ -40,7 +40,6 @@ func StartExpirationCron(mr *mailroom.Mailroom) error {
 }
 
 // expireRuns expires all the runs that have an expiration in the past
-// TODO: extend lock
 func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
 	start := time.Now()
@@ -110,7 +109,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		}
 
 		// ok, queue this task
-		task := handler.NewExpirationEvent(expiration.OrgID, expiration.ContactID, expiration.SessionID, expiration.ExpiresOn)
+		task := handler.NewExpirationTask(expiration.OrgID, expiration.ContactID, expiration.SessionID, expiration.RunID, expiration.ExpiresOn)
 		err = handler.AddHandleTask(rc, expiration.ContactID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error adding new expiration task")

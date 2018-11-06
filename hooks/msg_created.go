@@ -123,7 +123,7 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
 
-	// set our reply to as well (will be noop in cases whren there is no incoming message)
+	// set our reply to as well (will be noop in cases when there is no incoming message)
 	msg.SetResponseTo(session.IncomingMsgID, session.IncomingExternalID)
 
 	// register to have this message committed

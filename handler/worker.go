@@ -9,6 +9,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
@@ -124,7 +125,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 
 		case newConversationEventType, referralEventType:
 			evt := &channelEvent{}
-			err := json.Unmarshal(contactEvent.Task, evt)
+			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling channel event")
 			}
@@ -207,11 +208,31 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	var resume flows.Resume
 	switch eventType {
 	case expirationEventType:
-		// TODO: check our expiration is still the same
+		// check that our expiration is still the same
+		expiration, err := models.RunExpiration(ctx, db, event.RunID)
+		if err != nil {
+			return errors.Wrapf(err, "unable to load expiration for run")
+		}
+
+		if expiration.UTC() != event.Time.UTC() {
+			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, has been updated")
+			return nil
+		}
+
 		resume = resumes.NewRunExpirationResume(org.Env(), contact)
 	case timeoutEventType:
-		// TODO: check our timeout is still the same
-		// TODO: check that there is no pending outgoing message
+		if session.TimeoutOn == nil {
+			log.WithField("session_id", session.ID).Info("ignoring session timeout, has no timeout set")
+			return nil
+		}
+
+		// check that the timeout is the same
+		timeout := *session.TimeoutOn
+		if timeout.UTC() == event.Time.UTC() {
+			log.WithField("event_timeout", event.Time).WithField("session_timeout", timeout).Info("ignoring timeout, has been updated")
+			return nil
+		}
+
 		resume = resumes.NewWaitTimeoutResume(org.Env(), contact)
 	default:
 		return errors.Errorf("unknown event type: %s", eventType)
@@ -239,13 +260,17 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		return nil
 	}
 
+	var channelEvent *triggers.ChannelEvent
+
 	// do we have associated trigger?
 	var trigger *models.Trigger
 	switch eventType {
 	case newConversationEventType:
 		trigger = models.FindMatchingNewConversationTrigger(org, channel)
+		channelEvent = triggers.NewChannelEvent(newConversationEventType, channel.ChannelReference())
 	case referralEventType:
 		trigger = models.FindMatchingReferralTrigger(org, channel, event.Extra["referrer_id"])
+		channelEvent = triggers.NewChannelEvent(referralEventType, channel.ChannelReference())
 	default:
 		return errors.Errorf("unknown channel event type: %s", eventType)
 	}
@@ -274,6 +299,12 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		return errors.Wrapf(err, "unable to load session assets")
 	}
 
+	// make sure this URN is our highest priority (this is usually a noop)
+	err = modelContact.UpdatePreferredURN(ctx, db, org, event.URNID, channel)
+	if err != nil {
+		return errors.Wrapf(err, "error changing primary URN")
+	}
+
 	// build our flow contact
 	contact, err := modelContact.FlowContact(org, sa)
 	if err != nil {
@@ -298,9 +329,19 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		return nil
 	}
 
+	// create our parameters, we just convert this from JSON
+	// TODO: this is done because a nil XJSONObject doesn't know how to marshal itself, goflow could fix
+	params := types.NewXJSONObject([]byte("{}"))
+	if event.Extra != nil {
+		asJSON, err := json.Marshal(event.Extra)
+		if err != nil {
+			return errors.Wrapf(err, "unable to marshal extra from channel event")
+		}
+		params = types.NewXJSONObject(asJSON)
+	}
+
 	// start them in the triggered flow, interrupting their current flow/session
-	// TODO: replace with a real channel trigger
-	channelTrigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, time.Now())
+	channelTrigger := triggers.NewChannelTrigger(org.Env(), flow.FlowReference(), contact, channelEvent, params, time.Now())
 	_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{channelTrigger}, nil, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow for contact")
@@ -500,6 +541,7 @@ type timedEvent struct {
 	ContactID flows.ContactID  `json:"contact_id"`
 	OrgID     models.OrgID     `json:"org_id"`
 	SessionID models.SessionID `json:"session_id"`
+	RunID     models.FlowRunID `json:"run_id,omitempty"`
 	Time      time.Time        `json:"time"`
 }
 
@@ -524,6 +566,7 @@ type stopEvent struct {
 
 type channelEvent struct {
 	ContactID  flows.ContactID   `json:"contact_id"`
+	URNID      models.URNID      `json:"urn_id"`
 	OrgID      models.OrgID      `json:"org_id"`
 	ChannelID  models.ChannelID  `json:"channel_id"`
 	Extra      map[string]string `json:"extra"`
@@ -531,11 +574,12 @@ type channelEvent struct {
 }
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event
-func newTimedEvent(eventType string, orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
+func newTimedTask(eventType string, orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
 	event := &timedEvent{
 		OrgID:     orgID,
 		ContactID: contactID,
 		SessionID: sessionID,
+		RunID:     runID,
 		Time:      time,
 	}
 	eventJSON, err := json.Marshal(event)
@@ -552,12 +596,12 @@ func newTimedEvent(eventType string, orgID models.OrgID, contactID flows.Contact
 	return task
 }
 
-// NewTimeoutEvent creates a new event task for the passed in timeout event
-func NewTimeoutEvent(orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
-	return newTimedEvent(timeoutEventType, orgID, contactID, sessionID, time)
+// NewTimeoutTask creates a new event task for the passed in timeout event
+func NewTimeoutTask(orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
+	return newTimedTask(timeoutEventType, orgID, contactID, sessionID, models.NilFlowRunID, time)
 }
 
-// NewExpirationEvent creates a new event task for the passed in expiration event
-func NewExpirationEvent(orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
-	return newTimedEvent(expirationEventType, orgID, contactID, sessionID, time)
+// NewExpirationTask creates a new event task for the passed in expiration event
+func NewExpirationTask(orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
+	return newTimedTask(expirationEventType, orgID, contactID, sessionID, runID, time)
 }
