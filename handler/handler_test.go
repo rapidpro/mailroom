@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -198,7 +199,10 @@ func TestChannelEvents(t *testing.T) {
 
 		// if we are meant to have a response
 		var text string
-		db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, last)
+		err = db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, last)
+		if err != nil {
+			logrus.WithError(err).Error("error making query")
+		}
 		assert.Equal(t, tc.Response, text, "%d: response: '%s' is not '%s'", i, text, tc.Response)
 		last = time.Now()
 	}
