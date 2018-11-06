@@ -1,3 +1,8 @@
+v0.0.66
+----------
+ * flush cache before each set of tests
+ * more tests, tweaks to timed events
+
 v0.0.65
 ----------
  * add contact locking when processing contact events
