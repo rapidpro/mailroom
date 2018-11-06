@@ -24,6 +24,8 @@ type SessionStatus string
 
 type FlowRunID int64
 
+const NilFlowRunID = FlowRunID(0)
+
 const (
 	SessionStatusActive    = "A"
 	SessionStatusCompleted = "C"
@@ -649,6 +651,16 @@ WHERE
 	contact_id = ANY($1) AND
 	is_active = TRUE
 `
+
+// RunExpiration looks up the run expiration for the passed in run
+func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (time.Time, error) {
+	var expiration time.Time
+	err := db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE id = $1`, runID)
+	if err != nil {
+		return expiration, errors.Wrapf(err, "unable to select expiration for run: %d", runID)
+	}
+	return expiration, nil
+}
 
 // InterruptContactRuns interrupts all runs and sesions that exist for the passed in list of contacts
 func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.ContactID, now time.Time) error {

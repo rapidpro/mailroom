@@ -85,10 +85,15 @@ func FindMatchingNewConversationTrigger(org *OrgAssets, channel *Channel) *Trigg
 	var match *Trigger
 	for _, t := range org.Triggers() {
 		if t.TriggerType() == NewConversationTriggerType {
+			// exact match? return right away
 			if t.ChannelID() == channel.ID() {
 				return t
 			}
-			match = t
+
+			// trigger has no channel filter, record this as match
+			if t.ChannelID() == NilChannelID && match == nil {
+				match = t
+			}
 		}
 	}
 
@@ -109,7 +114,7 @@ func FindMatchingReferralTrigger(org *OrgAssets, channel *Channel, referrerID st
 			// matches channel? that is a good match
 			if t.ChannelID() == channel.ID() {
 				match = t
-			} else if match == nil {
+			} else if match == nil && t.ChannelID() == NilChannelID {
 				// otherwise if we haven't been set yet, pick that
 				match = t
 			}
