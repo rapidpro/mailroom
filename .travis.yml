@@ -21,6 +21,7 @@ before_install:
   - sudo mv redis.conf /etc/redis
   - sudo service redis-server start
   - echo PING | nc localhost 6379
+  - sudo mount -o remount,size=50% /var/ramfs
   - df -h
 
 before_script:
