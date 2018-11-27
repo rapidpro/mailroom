@@ -10,10 +10,10 @@ import (
 )
 
 func TestContactFieldChanged(t *testing.T) {
-	genderUUID := models.FieldUUID("a9f68c45-1374-4807-bfac-81a2ed784395")
+	genderUUID := models.FieldUUID("e25f711c-7460-4cd5-9461-39744a1feade")
 	gender := assets.NewFieldReference("gender", "Gender")
 
-	ageUUID := models.FieldUUID("88187e22-e098-44ed-ad29-2c54c183adcb")
+	ageUUID := models.FieldUUID("4e83c89a-31f1-4628-bb4b-8f035a515145")
 	age := assets.NewFieldReference("age", "Age")
 
 	tcs := []HookTestCase{
