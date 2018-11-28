@@ -1,3 +1,8 @@
+v0.0.67
+----------
+ * move to latest goflow
+ * update test sql to latest from rapidpro
+
 v0.0.66
 ----------
  * flush cache before each set of tests
