@@ -6,14 +6,10 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
-	"github.com/nyaruka/mailroom/models"
 )
 
 func TestContactFieldChanged(t *testing.T) {
-	genderUUID := models.FieldUUID("e25f711c-7460-4cd5-9461-39744a1feade")
 	gender := assets.NewFieldReference("gender", "Gender")
-
-	ageUUID := models.FieldUUID("4e83c89a-31f1-4628-bb4b-8f035a515145")
 	age := assets.NewFieldReference("age", "Age")
 
 	tcs := []HookTestCase{

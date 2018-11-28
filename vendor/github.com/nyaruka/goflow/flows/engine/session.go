@@ -202,7 +202,7 @@ func (s *session) prepareForSprint() error {
 // Resume resumes a waiting session
 func (s *session) tryToResume(waitingRun flows.FlowRun, resume flows.Resume) error {
 	// figure out where in the flow we began waiting on
-	step, _, err := waitingRun.PathLocation()
+	step, node, err := waitingRun.PathLocation()
 	if err != nil {
 		return err
 	}
@@ -210,9 +210,10 @@ func (s *session) tryToResume(waitingRun flows.FlowRun, resume flows.Resume) err
 	// set up our flow stack based on the current run hierarchy
 	s.flowStack = flowStackFromRun(waitingRun)
 
-	// try to end our wait which will return and error if it can't be ended with this resume
-	if err := s.wait.End(resume); err != nil {
-		return err
+	// try to end our wait which will return and log an error if it can't be ended with this resume
+	if err := s.wait.End(resume, node); err != nil {
+		s.LogEvent(events.NewErrorEvent(err))
+		return nil
 	}
 	s.wait = nil
 	s.status = flows.SessionStatusActive
@@ -222,15 +223,9 @@ func (s *session) tryToResume(waitingRun flows.FlowRun, resume flows.Resume) err
 		return err
 	}
 
-	var destination flows.NodeUUID
-
-	if waitingRun.Status() == flows.RunStatusWaiting {
-		waitingRun.SetStatus(flows.RunStatusActive)
-
-		destination, err = s.findResumeDestination(waitingRun)
-		if err != nil {
-			return err
-		}
+	destination, err := s.findResumeDestination(waitingRun)
+	if err != nil {
+		return err
 	}
 
 	// off to the races again...
@@ -239,6 +234,11 @@ func (s *session) tryToResume(waitingRun flows.FlowRun, resume flows.Resume) err
 
 // finds the next destination in a run that may have been waiting or a parent paused for a child subflow
 func (s *session) findResumeDestination(run flows.FlowRun) (flows.NodeUUID, error) {
+	// we might have no immediate destination in this run, but continueUntilWait can resume a parent run
+	if run.Status() != flows.RunStatusActive {
+		return noDestination, nil
+	}
+
 	step, node, err := run.PathLocation()
 	if err != nil {
 		return noDestination, err

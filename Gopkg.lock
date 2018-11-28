@@ -101,6 +101,12 @@
   version = "v2.0.0"
 
 [[projects]]
+  name = "github.com/hashicorp/go-version"
+  packages = ["."]
+  revision = "b5a281d3160aa11950a6182bd9a9dc2cb1e02d50"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/jmoiron/sqlx"
   packages = [
@@ -176,7 +182,7 @@
     "legacy/gen",
     "utils"
   ]
-  revision = "83b6c0bb146f73ab6f264be742d17ac482fe9f4b"
+  revision = "d67e865b5aec054ca1be598aa314ee820519027d"
 
 [[projects]]
   branch = "master"
