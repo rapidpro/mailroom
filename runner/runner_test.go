@@ -67,7 +67,6 @@ func TestCampaignStarts(t *testing.T) {
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
 		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-		 AND current_node_uuid = '63f8e274-c5ce-40c5-be52-d9eb01780663'
 		 AND session_id IS NOT NULL`,
 		[]interface{}{pq.Array(contacts), 31}, 2,
 	)
@@ -138,7 +137,6 @@ func TestBatchStart(t *testing.T) {
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
 			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-			AND current_node_uuid = '63f8e274-c5ce-40c5-be52-d9eb01780663'
 			AND session_id IS NOT NULL`,
 			[]interface{}{pq.Array(contactIDs), 31}, tc.TotalCount, "%d: unexpected number of runs", i,
 		)

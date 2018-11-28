@@ -27,7 +27,8 @@ type OrgAssets struct {
 
 	env *Org
 
-	flowByUUID    map[assets.FlowUUID]assets.Flow
+	flowByUUID map[assets.FlowUUID]assets.Flow
+
 	flowByID      map[FlowID]assets.Flow
 	flowCacheLock sync.RWMutex
 
