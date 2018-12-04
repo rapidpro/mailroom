@@ -106,9 +106,9 @@ type Msg struct {
 		// These three fields are set on the last outgoing message in a session's sprint. In the case
 		// of the session being at a wait with a timeout then the timeout will be set. It is up to
 		// Courier to update the session's timeout appropriately after sending the message.
-		SessionID        SessionID  `json:"session_id,omitempty"`
-		SessionWaitStart *time.Time `json:"session_wait_start,omitempty"`
-		SessionTimeout   int        `json:"session_timeout,omitempty"`
+		SessionID            SessionID  `json:"session_id,omitempty"`
+		SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
+		SessionTimeout       int        `json:"session_timeout_on,omitempty"`
 	}
 
 	channel *Channel
@@ -243,7 +243,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 // SetTimeout sets the timeout for this message
 func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
 	m.m.SessionID = id
-	m.m.SessionWaitStart = &start
+	m.m.SessionWaitStartedOn = &start
 	m.m.SessionTimeout = int(timeout / time.Second)
 }
 
