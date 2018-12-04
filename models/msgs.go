@@ -102,6 +102,13 @@ type Msg struct {
 		URNAuth              string             `                     json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"`
+
+		// These three fields are set on the last outgoing message in a session's sprint. In the case
+		// of the session being at a wait with a timeout then the timeout will be set. It is up to
+		// Courier to update the session's timeout appropriately after sending the message.
+		SessionID        SessionID  `json:"session_id,omitempty"`
+		SessionWaitStart *time.Time `json:"session_wait_start,omitempty"`
+		SessionTimeout   int        `json:"session_timeout,omitempty"`
 	}
 
 	channel *Channel
@@ -231,6 +238,13 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	}
 
 	return msg, nil
+}
+
+// SetTimeout sets the timeout for this message
+func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
+	m.m.SessionID = id
+	m.m.SessionWaitStart = &start
+	m.m.SessionTimeout = int(timeout / time.Second)
 }
 
 // InsertMessages inserts the passed in messages in a single query

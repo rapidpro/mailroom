@@ -2,7 +2,9 @@ package models
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -65,10 +67,14 @@ type Session struct {
 	CreatedOn     time.Time       `db:"created_on"`
 	EndedOn       *time.Time      `db:"ended_on"`
 	TimeoutOn     *time.Time      `db:"timeout_on"`
+	WaitStartedOn *time.Time      `db:"wait_started_on"`
 	CurrentFlowID *FlowID         `db:"current_flow_id"`
 
 	IncomingMsgID      null.Int
 	IncomingExternalID string
+
+	// time after our last message is sent that we should timeout
+	timeout *time.Duration
 
 	contact *flows.Contact
 	runs    []*FlowRun
@@ -91,6 +97,16 @@ func (s *Session) Contact() *flows.Contact {
 // Runs returns our flow run
 func (s *Session) Runs() []*FlowRun {
 	return s.runs
+}
+
+// Timeout returns the amount of time after our last message sends that we should timeout
+func (s *Session) Timeout() *time.Duration {
+	return s.timeout
+}
+
+// OutputMD5 returns the md5 of the passed in session
+func (s *Session) OutputMD5() string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(s.Output)))
 }
 
 // AddPreCommitEvent adds a new event to be handled by a pre commit hook
@@ -206,8 +222,11 @@ func NewSession(org *OrgAssets, s flows.Session) (*Session, error) {
 	}
 
 	// set our timeout if we have a wait
-	if s.Wait() != nil {
-		session.TimeoutOn = s.Wait().TimeoutOn()
+	if s.Wait() != nil && s.Wait().Timeout() != nil {
+		seconds := time.Duration(*s.Wait().Timeout()) * time.Second
+		session.timeout = &seconds
+		now := time.Now()
+		session.WaitStartedOn = &now
 	}
 
 	return session, nil
@@ -255,15 +274,15 @@ LIMIT 1
 
 const insertCompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession(status, responded, output, contact_id, org_id, created_on, ended_on)
-               VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), NOW())
+	flows_flowsession(status, responded, output, contact_id, org_id, created_on, ended_on, wait_started_on)
+               VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), NOW(), NULL)
 RETURNING id
 `
 
 const insertIncompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession(status, responded, output, contact_id, org_id, created_on, current_flow_id, timeout_on)
-               VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), :current_flow_id, :timeout_on)
+	flows_flowsession(status, responded, output, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on)
+               VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), :current_flow_id, :timeout_on, :wait_started_on)
 RETURNING id
 `
 
@@ -314,11 +333,17 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 		s.runs = append(s.runs, run)
 	}
 
-	// set our timeout if there is one
-	if fs.Wait() == nil {
-		s.TimeoutOn = nil
-	} else {
-		s.TimeoutOn = fs.Wait().TimeoutOn()
+	// clear out timeout on, that will be set when we get a callback from courier
+	s.TimeoutOn = nil
+	s.WaitStartedOn = nil
+
+	// but set our timeout in seconds
+	s.timeout = nil
+	if fs.Wait() != nil && fs.Wait().Timeout() != nil {
+		seconds := time.Duration(*fs.Wait().Timeout()) * time.Second
+		s.timeout = &seconds
+		now := time.Now()
+		s.WaitStartedOn = &now
 	}
 
 	// run through our runs to figure out our current flow
@@ -405,7 +430,8 @@ SET
 	ended_on = CASE WHEN :status = 'W' THEN NULL ELSE NOW() END,
 	responded = :responded,
 	current_flow_id = :current_flow_id,
-	timeout_on = :timeout_on
+	timeout_on = :timeout_on,
+	wait_started_on = :wait_started_on
 WHERE 
 	id = :id
 `
