@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,7 +63,7 @@ type startRequest struct {
 }
 
 // handles a request to /start
-func (s *Server) handleStart(r *http.Request) (interface{}, int, error) {
+func (s *Server) handleStart(ctx context.Context, r *http.Request) (interface{}, int, error) {
 	request := &startRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, maxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
@@ -126,7 +127,7 @@ type resumeRequest struct {
 	Resume  json.RawMessage `json:"resume" validate:"required"`
 }
 
-func (s *Server) handleResume(r *http.Request) (interface{}, int, error) {
+func (s *Server) handleResume(ctx context.Context, r *http.Request) (interface{}, int, error) {
 	request := &resumeRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, maxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, err
@@ -210,7 +211,7 @@ type migrateRequest struct {
 	IncludeUI     *bool           `json:"include_ui"`
 }
 
-func (s *Server) handleMigrate(r *http.Request) (interface{}, int, error) {
+func (s *Server) handleMigrate(ctx context.Context, r *http.Request) (interface{}, int, error) {
 	migrate := migrateRequest{}
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
 	if err != nil {
@@ -245,7 +246,7 @@ func (s *Server) handleMigrate(r *http.Request) (interface{}, int, error) {
 	return flow, http.StatusOK, nil
 }
 
-func (s *Server) handleIndex(r *http.Request) (interface{}, int, error) {
+func (s *Server) handleIndex(ctx context.Context, r *http.Request) (interface{}, int, error) {
 	response := map[string]string{
 		"url":       fmt.Sprintf("%s", r.URL),
 		"component": "mailroom",
@@ -254,10 +255,10 @@ func (s *Server) handleIndex(r *http.Request) (interface{}, int, error) {
 	return response, http.StatusOK, nil
 }
 
-func (s *Server) handle404(r *http.Request) (interface{}, int, error) {
+func (s *Server) handle404(ctx context.Context, r *http.Request) (interface{}, int, error) {
 	return nil, http.StatusNotFound, errors.Errorf("not found: %s", r.URL.String())
 }
 
-func (s *Server) handle405(r *http.Request) (interface{}, int, error) {
+func (s *Server) handle405(ctx context.Context, r *http.Request) (interface{}, int, error) {
 	return nil, http.StatusMethodNotAllowed, errors.Errorf("illegal method: %s", r.Method)
 }
