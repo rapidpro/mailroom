@@ -1,3 +1,9 @@
+v0.0.68
+----------
+ * make sure we filter by org id when looking up flows from asserts
+ * update msg payload to be in sync with db and courier
+ * add timeout and wait_started_on fields to msg sent to courier and session
+
 v0.0.67
 ----------
  * move to latest goflow
