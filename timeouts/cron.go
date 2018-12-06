@@ -26,6 +26,8 @@ func init() {
 	mailroom.AddInitFunction(StartTimeoutCron)
 }
 
+// TODO: needs proper tests
+
 // StartTimeoutCron starts our cron job of continuing timed out sessions every minute
 func StartTimeoutCron(mr *mailroom.Mailroom) error {
 	cron.StartCron(mr.Quit, mr.RP, timeoutLock, time.Second*60,

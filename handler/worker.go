@@ -204,7 +204,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return nil
 	}
 
-	// resume their flow based on the timeout
+	// resume their flow based on the timed event
 	var resume flows.Resume
 	switch eventType {
 	case expirationEventType:
@@ -214,7 +214,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 			return errors.Wrapf(err, "unable to load expiration for run")
 		}
 
-		if expiration.UTC() != event.Time.UTC() {
+		if !expiration.Equal(event.Time) {
 			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, has been updated")
 			return nil
 		}
@@ -228,7 +228,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 
 		// check that the timeout is the same
 		timeout := *session.TimeoutOn
-		if timeout.UTC() == event.Time.UTC() {
+		if !timeout.Equal(event.Time) {
 			log.WithField("event_timeout", event.Time).WithField("session_timeout", timeout).Info("ignoring timeout, has been updated")
 			return nil
 		}

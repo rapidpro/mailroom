@@ -75,19 +75,19 @@ func (f *Flow) FlowReference() *assets.FlowReference {
 	return assets.NewFlowReference(f.UUID(), f.Name())
 }
 
-func loadFlowByUUID(ctx context.Context, db *sqlx.DB, flowUUID assets.FlowUUID) (*Flow, error) {
-	return loadFlow(ctx, db, selectFlowByUUIDSQL, flowUUID)
+func loadFlowByUUID(ctx context.Context, db *sqlx.DB, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
+	return loadFlow(ctx, db, selectFlowByUUIDSQL, orgID, flowUUID)
 }
 
-func loadFlowByID(ctx context.Context, db *sqlx.DB, flowID FlowID) (*Flow, error) {
-	return loadFlow(ctx, db, selectFlowByIDSQL, flowID)
+func loadFlowByID(ctx context.Context, db *sqlx.DB, orgID OrgID, flowID FlowID) (*Flow, error) {
+	return loadFlow(ctx, db, selectFlowByIDSQL, orgID, flowID)
 }
 
 // loads the flow with the passed in UUID
-func loadFlow(ctx context.Context, db *sqlx.DB, sql string, arg interface{}) (*Flow, error) {
+func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
 	flow := &Flow{}
 
-	rows, err := db.Queryx(sql, arg)
+	rows, err := db.Queryx(sql, orgID, arg)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying flow by: %s", arg)
 	}
@@ -134,7 +134,8 @@ FROM
 	flows_flowrevision fr, 
 	flows_flow f 
 WHERE 
-	f.uuid = $1 AND 
+    f.org_id = $1 AND
+	f.uuid = $2 AND 
 	fr.flow_id = f.id AND 
 	fr.is_active = TRUE AND
 	f.is_active = TRUE
@@ -165,7 +166,8 @@ FROM
 	flows_flowrevision fr, 
 	flows_flow f 
 WHERE 
-	f.id = $1 AND 
+    f.org_id = $1 AND
+	f.id = $2 AND 
 	fr.flow_id = f.id AND 
 	fr.is_active = TRUE AND
 	f.is_active = TRUE

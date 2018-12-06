@@ -52,7 +52,7 @@ func TestMsgEvents(t *testing.T) {
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'start', false, 1, 'K', 'O', 1, 1, 2, 0) RETURNING id`)
+		VALUES(TRUE, now(), now(), 'start', false, 4, 'K', 'O', 1, 1, 2, 0) RETURNING id`)
 
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
