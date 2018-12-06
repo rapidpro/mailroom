@@ -261,7 +261,17 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, c
 
 const selectLastSessionSQL = `
 SELECT 
-	id, status, responded, output, contact_id, org_id, created_on, ended_on, current_flow_id 
+	id, 
+	status, 
+	responded, 
+	output, 
+	contact_id, 
+	org_id, 
+	created_on, 
+	ended_on, 
+	timeout_on,
+	wait_started_on,
+	current_flow_id
 FROM 
 	flows_flowsession
 WHERE

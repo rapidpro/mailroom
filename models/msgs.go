@@ -108,7 +108,7 @@ type Msg struct {
 		// Courier to update the session's timeout appropriately after sending the message.
 		SessionID            SessionID  `json:"session_id,omitempty"`
 		SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
-		SessionTimeout       int        `json:"session_timeout_on,omitempty"`
+		SessionTimeout       int        `json:"session_timeout,omitempty"`
 	}
 
 	channel *Channel
