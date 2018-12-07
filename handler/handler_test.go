@@ -88,7 +88,7 @@ func TestMsgEvents(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		event := &msgEvent{
+		event := &MsgEvent{
 			ContactID: tc.ContactID,
 			OrgID:     tc.OrgID,
 			ChannelID: tc.ChannelID,
@@ -103,7 +103,7 @@ func TestMsgEvents(t *testing.T) {
 		assert.NoError(t, err)
 
 		task := &queue.Task{
-			Type:  msgEventType,
+			Type:  MsgEventType,
 			OrgID: int(tc.OrgID),
 			Task:  eventJSON,
 		}
@@ -165,17 +165,17 @@ func TestChannelEvents(t *testing.T) {
 		Extra     map[string]string
 		Response  string
 	}{
-		{newConversationEventType, cathy, cathyTwitterURN, org1, twitterChannel, nil, "What is your favorite color?"},
-		{newConversationEventType, cathy, cathyURNID, org1, nexmoChannel, nil, ""},
-		{referralEventType, cathy, cathyTwitterURN, org1, twitterChannel, nil, ""},
-		{referralEventType, cathy, cathyURNID, org1, nexmoChannel, nil, "Pick a number between 1-10."},
+		{NewConversationEventType, cathy, cathyTwitterURN, org1, twitterChannel, nil, "What is your favorite color?"},
+		{NewConversationEventType, cathy, cathyURNID, org1, nexmoChannel, nil, ""},
+		{ReferralEventType, cathy, cathyTwitterURN, org1, twitterChannel, nil, ""},
+		{ReferralEventType, cathy, cathyURNID, org1, nexmoChannel, nil, "Pick a number between 1-10."},
 	}
 
 	models.FlushCache()
 
 	last := time.Now()
 	for i, tc := range tcs {
-		event := &channelEvent{
+		event := &ChannelEvent{
 			ContactID: tc.ContactID,
 			URNID:     tc.URNID,
 			OrgID:     tc.OrgID,
@@ -242,19 +242,19 @@ func TestTimedEvents(t *testing.T) {
 		OrgID     models.OrgID
 	}{
 		// start the flow
-		{msgEventType, cathy, cathyURN, cathyURNID, "start", "What is your favorite color?", twitterChannel, org1},
+		{MsgEventType, cathy, cathyURN, cathyURNID, "start", "What is your favorite color?", twitterChannel, org1},
 
 		// this expiration does nothing because the times don't match
-		{expirationEventType, cathy, cathyURN, cathyURNID, "bad", "", twitterChannel, org1},
+		{ExpirationEventType, cathy, cathyURN, cathyURNID, "bad", "", twitterChannel, org1},
 
 		// this checks that the flow wasn't expired
-		{msgEventType, cathy, cathyURN, cathyURNID, "red", "Good choice, I like Red too! What is your favorite beer?", twitterChannel, org1},
+		{MsgEventType, cathy, cathyURN, cathyURNID, "red", "Good choice, I like Red too! What is your favorite beer?", twitterChannel, org1},
 
 		// this expiration will actually take
-		{expirationEventType, cathy, cathyURN, cathyURNID, "good", "", twitterChannel, org1},
+		{ExpirationEventType, cathy, cathyURN, cathyURNID, "good", "", twitterChannel, org1},
 
 		// we won't get a response as we will be out of the flow
-		{msgEventType, cathy, cathyURN, cathyURNID, "mutzig", "", twitterChannel, org1},
+		{MsgEventType, cathy, cathyURN, cathyURNID, "mutzig", "", twitterChannel, org1},
 	}
 
 	last := time.Now()
@@ -266,8 +266,8 @@ func TestTimedEvents(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		var task *queue.Task
-		if tc.EventType == msgEventType {
-			event := &msgEvent{
+		if tc.EventType == MsgEventType {
+			event := &MsgEvent{
 				ContactID: tc.ContactID,
 				OrgID:     tc.OrgID,
 				ChannelID: tc.ChannelID,
@@ -286,7 +286,7 @@ func TestTimedEvents(t *testing.T) {
 				OrgID: int(tc.OrgID),
 				Task:  eventJSON,
 			}
-		} else if tc.EventType == expirationEventType {
+		} else if tc.EventType == ExpirationEventType {
 			var expiration time.Time
 			if tc.Message == "bad" {
 				expiration = time.Now()
@@ -295,7 +295,7 @@ func TestTimedEvents(t *testing.T) {
 			}
 
 			task = newTimedTask(
-				expirationEventType,
+				ExpirationEventType,
 				tc.OrgID,
 				tc.ContactID,
 				sessionID,

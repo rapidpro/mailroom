@@ -27,8 +27,6 @@ func init() {
 	mailroom.AddInitFunction(StartExpirationCron)
 }
 
-// TODO: needs proper tests
-
 // StartExpirationCron starts our cron job of expiring runs every minute
 func StartExpirationCron(mr *mailroom.Mailroom) error {
 	cron.StartCron(mr.Quit, mr.RP, expirationLock, time.Second*60,
