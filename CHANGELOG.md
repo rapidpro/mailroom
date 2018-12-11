@@ -1,3 +1,7 @@
+v0.0.70
+----------
+ * add timings for flow loading
+
 v0.0.69
 ----------
  * add timings for loading org assets
