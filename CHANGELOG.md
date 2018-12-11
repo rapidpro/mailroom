@@ -1,3 +1,7 @@
+v0.0.71
+----------
+ * optimize getting flow definition
+
 v0.0.70
 ----------
  * add timings for flow loading
