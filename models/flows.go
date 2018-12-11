@@ -145,7 +145,7 @@ LEFT JOIN (
 	FROM 
 		flows_flowrevision
 	WHERE
-		flows_flowrevision.flow_id = ANY(SELECT id FROM flows_flow WHERE uuid = $2) AND
+		flow_id = ANY(SELECT id FROM flows_flow WHERE uuid = $2) AND
 		is_active = TRUE
 	ORDER BY 
 		revision DESC
@@ -185,7 +185,7 @@ LEFT JOIN (
 	FROM 
 		flows_flowrevision
 	WHERE
-		flows_flowrevision.flow_id = $2 AND
+		flow_id = $2 AND
 		is_active = TRUE
 	ORDER BY 
 		revision DESC
