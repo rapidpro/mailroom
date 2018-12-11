@@ -1,3 +1,8 @@
+v0.0.69
+----------
+ * add timings for loading org assets
+ * add unit tests for expirations and timeouts
+
 v0.0.68
 ----------
  * make sure we filter by org id when looking up flows from asserts
