@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type OrgID int
@@ -81,6 +82,8 @@ func (o *Org) ConfigValue(key string, def string) string {
 
 // loadOrg loads the org for the passed in id, returning any error encountered
 func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
+	start := time.Now()
+
 	org := &Org{}
 	var orgJSON, orgConfig json.RawMessage
 	rows, err := db.Query(selectOrgEnvironment, orgID)
@@ -105,6 +108,8 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling org config: %s", orgConfig)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).Debug("loaded org environment")
 
 	return org, nil
 }

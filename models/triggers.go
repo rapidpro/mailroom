@@ -3,12 +3,14 @@ package models
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type TriggerType string
@@ -61,6 +63,8 @@ func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 }
 
 func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, error) {
+	start := time.Now()
+
 	rows, err := db.Queryx(selectTriggersSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying triggers for org: %d", orgID)
@@ -76,6 +80,8 @@ func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, er
 		}
 		triggers = append(triggers, trigger)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(triggers)).Debug("loaded triggers")
 
 	return triggers, nil
 }

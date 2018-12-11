@@ -2,10 +2,12 @@ package models
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -75,6 +77,8 @@ func (c *Channel) ChannelReference() *assets.ChannelReference {
 
 // loadChannels loads all the channels for the passed in org
 func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Channel, error) {
+	start := time.Now()
+
 	rows, err := db.Queryx(selectChannelsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
@@ -91,6 +95,8 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 
 		channels = append(channels, channel)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(channels)).Debug("loaded channels")
 
 	return channels, nil
 }

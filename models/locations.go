@@ -3,12 +3,14 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // Location is our mailroom type for administrative locations
@@ -43,6 +45,8 @@ func (l *Location) Children() []*Location { return l.Children_ }
 
 // loadLocations loads all the locations for this org returning the root node
 func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.LocationHierarchy, error) {
+	start := time.Now()
+
 	rows, err := db.Query(loadLocationsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying locations for org: %d", orgID)
@@ -102,6 +106,8 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling hierarchy: %s", string(locationJSON))
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).Debug("loaded locations")
 
 	return []assets.LocationHierarchy{hierarchy}, nil
 }
