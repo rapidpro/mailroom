@@ -119,64 +119,80 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg int
 
 const selectFlowByUUIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
-	f.id as id, 
-	f.uuid as uuid,
-	f.name as name,
-	f.is_archived as is_archived,
-	f.ignore_triggers as ignore_triggers,
-	fr.definition::jsonb || 
-	jsonb_build_object(
-		'flow_type', f.flow_type, 
-		'metadata', jsonb_build_object(
-			'uuid', f.uuid, 
-			'id', f.id,
-			'name', f.name, 
-			'revision', fr.revision, 
-			'expires', f.expires_after_minutes
-		)
+	id, 
+	uuid, 
+	name,
+	is_archived,
+	ignore_triggers,
+	definition::jsonb || 
+		jsonb_build_object(
+			'flow_type', f.flow_type, 
+			'metadata', jsonb_build_object(
+				'uuid', f.uuid, 
+				'id', f.id,
+				'name', f.name, 
+				'revision', revision, 
+				'expires', f.expires_after_minutes
+			)
 	) as definition
-FROM 
-	flows_flowrevision fr, 
-	flows_flow f 
-WHERE 
-    f.org_id = $1 AND
-	f.uuid = $2 AND 
-	fr.flow_id = f.id AND 
-	fr.is_active = TRUE AND
-	f.is_active = TRUE
-ORDER BY 
-	fr.revision DESC 
-LIMIT 1
+FROM
+	flows_flow f
+LEFT JOIN (
+	SELECT 
+		flow_id, 
+		definition, 
+		revision
+	FROM 
+		flows_flowrevision
+	WHERE
+		flows_flowrevision.flow_id = ANY(SELECT id FROM flows_flow WHERE uuid = $2) AND
+		is_active = TRUE
+	ORDER BY 
+		revision DESC
+	LIMIT 1
+) fr ON fr.flow_id = f.id
+WHERE
+    org_id = $1 AND
+	uuid = $2 AND
+	is_active = TRUE
 ) r;`
 
 const selectFlowByIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
-	f.id as id, 
-	f.uuid as uuid,
-	f.name as name,
-	f.is_archived as is_archived,
-	f.ignore_triggers as ignore_triggers,	
-	fr.definition::jsonb || 
-	jsonb_build_object(
-		'flow_type', f.flow_type, 
-		'metadata', jsonb_build_object(
-			'uuid', f.uuid, 
-			'id', f.id,
-			'name', f.name, 
-			'revision', fr.revision, 
-			'expires', f.expires_after_minutes
-		)
+	id, 
+	uuid, 
+	name,
+	is_archived,
+	ignore_triggers,
+	definition::jsonb || 
+		jsonb_build_object(
+			'flow_type', f.flow_type, 
+			'metadata', jsonb_build_object(
+				'uuid', f.uuid, 
+				'id', f.id,
+				'name', f.name, 
+				'revision', revision, 
+				'expires', f.expires_after_minutes
+			)
 	) as definition
-FROM 
-	flows_flowrevision fr, 
-	flows_flow f 
-WHERE 
-    f.org_id = $1 AND
-	f.id = $2 AND 
-	fr.flow_id = f.id AND 
-	fr.is_active = TRUE AND
-	f.is_active = TRUE
-ORDER BY 
-	fr.revision DESC 
-LIMIT 1
+FROM
+	flows_flow f
+LEFT JOIN (
+	SELECT 
+		flow_id, 
+		definition, 
+		revision
+	FROM 
+		flows_flowrevision
+	WHERE
+		flows_flowrevision.flow_id = $2 AND
+		is_active = TRUE
+	ORDER BY 
+		revision DESC
+	LIMIT 1
+) fr ON fr.flow_id = f.id
+WHERE
+    org_id = $1 AND
+	id = $2 AND
+	is_active = TRUE
 ) r;`
