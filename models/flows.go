@@ -12,12 +12,21 @@ import (
 
 type FlowID int
 
+type FlowType string
+
+const (
+	IVRFlow       = FlowType("V")
+	MessagingFlow = FlowType("M")
+	SurveyorFlow  = FlowType("S")
+)
+
 // Flow is the mailroom type for a flow
 type Flow struct {
 	f struct {
 		ID             FlowID          `json:"id"`
 		UUID           assets.FlowUUID `json:"uuid"`
 		Name           string          `json:"name"`
+		FlowType       FlowType        `json:"flow_type"`
 		Definition     json.RawMessage `json:"definition"`
 		IsArchived     bool            `json:"is_archived"`
 		IgnoreTriggers bool            `json:"ignore_triggers"`
@@ -35,6 +44,9 @@ func (f *Flow) Name() string { return f.f.Name }
 
 // Definition returns the definition for this flow
 func (f *Flow) Definition() json.RawMessage { return f.f.Definition }
+
+// FlowType return the type of flow this is
+func (f *Flow) FlowType() FlowType { return f.f.FlowType }
 
 // SetDefinition sets our definition from the passed in new definition format
 func (f *Flow) SetDefinition(definition json.RawMessage) {
@@ -119,6 +131,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	f.name as name,
 	f.is_archived as is_archived,
 	f.ignore_triggers as ignore_triggers,
+	f.flow_type as flow_type,
 	fr.definition::jsonb || 
 	jsonb_build_object(
 		'flow_type', f.flow_type, 
@@ -146,11 +159,12 @@ LIMIT 1
 
 const selectFlowByIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
-	f.id as id, 
+	f.id as id,
 	f.uuid as uuid,
 	f.name as name,
 	f.is_archived as is_archived,
-	f.ignore_triggers as ignore_triggers,	
+	f.ignore_triggers as ignore_triggers,
+	f.flow_type as flow_type,
 	fr.definition::jsonb || 
 	jsonb_build_object(
 		'flow_type', f.flow_type, 

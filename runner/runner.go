@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -96,8 +95,6 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
 	}
-
-	fmt.Println(session.Output)
 
 	// call our commit hook before committing our session
 	if hook != nil {

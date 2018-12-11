@@ -32,6 +32,7 @@ type Channel struct {
 		Schemes       []string                 `json:"schemes"`
 		Roles         []assets.ChannelRole     `json:"roles"`
 		MatchPrefixes []string                 `json:"match_prefixes"`
+		Config        map[string]interface{}   `json:"config"`
 	}
 }
 
@@ -67,6 +68,16 @@ func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
 
 // Parent returns the UUID of the parent channel to this channel
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
+
+// ConfigValue returns the config value for the passed in key
+func (c *Channel) ConfigValue(key string, def string) string {
+	value := c.c.Config[key]
+	strValue, isString := value.(string)
+	if isString {
+		return strValue
+	}
+	return def
+}
 
 // ChannelReference return a channel reference for this channel
 func (c *Channel) ChannelReference() *assets.ChannelReference {
@@ -106,6 +117,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.country as country,
 	c.address as address,
 	c.schemes as schemes,
+	c.config as config,
 	(SELECT ARRAY(
 		SELECT CASE r 
 		WHEN 'R' THEN 'receive' 
