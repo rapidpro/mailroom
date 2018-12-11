@@ -3,11 +3,13 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type FlowID int
@@ -85,6 +87,7 @@ func loadFlowByID(ctx context.Context, db *sqlx.DB, orgID OrgID, flowID FlowID) 
 
 // loads the flow with the passed in UUID
 func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
+	start := time.Now()
 	flow := &Flow{}
 
 	rows, err := db.Queryx(sql, orgID, arg)
@@ -108,6 +111,8 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg int
 	if err != nil {
 		return nil, errors.Wrapf(err, "error setting flow definition from legacy")
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("flow", arg).Debug("loaded flow")
 
 	return flow, nil
 }
