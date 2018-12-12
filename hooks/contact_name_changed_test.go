@@ -5,24 +5,25 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/models"
 )
 
 func TestContactNameChanged(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				Cathy: []flows.Action{
+				models.Cathy: []flows.Action{
 					actions.NewSetContactNameAction(newActionUUID(), "Fred"),
 					actions.NewSetContactNameAction(newActionUUID(), "Tarzan"),
 				},
-				Evan: []flows.Action{
+				models.Evan: []flows.Action{
 					actions.NewSetContactNameAction(newActionUUID(), "Geoff Newman"),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where name = 'Tarzan' and id = $1",
-					Args:  []interface{}{Cathy},
+					Args:  []interface{}{models.Cathy},
 					Count: 1,
 				},
 				SQLAssertion{
@@ -31,12 +32,12 @@ func TestContactNameChanged(t *testing.T) {
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where name = 'Bob Newman' and id = $1",
-					Args:  []interface{}{Bob},
+					Args:  []interface{}{models.Bob},
 					Count: 1,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where name = 'Geoff Newman' and id = $1",
-					Args:  []interface{}{Evan},
+					Args:  []interface{}{models.Evan},
 					Count: 1,
 				},
 			},

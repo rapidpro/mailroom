@@ -1,9 +1,6 @@
 package ivr
 
 import (
-	"context"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
@@ -23,6 +20,7 @@ func RegisterClientType(channelType models.ChannelType, constructor ClientConstr
 	constructors[channelType] = constructor
 }
 
+/*
 func RequestCallStart(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, start *models.FlowStart, c *models.Contact) error {
 	// find a tel URL for the contact
 	telURN := urns.NilURN
@@ -55,18 +53,18 @@ func RequestCallStart(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, s
 	}
 
 	// start our call
-	//callID, err := client.RequestCall(channel, urn, url, url)
+	callID, err := client.RequestCall(channel, urn, url, url)
 
 	// create our channel session and return it
-	//return models.CreateChannelSession()
-	return nil
+	return models.CreateChannelSession()
 }
+*/
 
 // GetClient creates the right kind of IVRClient for the passed in channel
 func GetClient(channel *models.Channel) (IVRClient, error) {
 	constructor := constructors[channel.Type()]
 	if constructor == nil {
-		return nil, errors.Errorf("no ivr client for chanel type: %d", channel.Type())
+		return nil, errors.Errorf("no ivr client for chanel type: %s", channel.Type())
 	}
 
 	return constructor(channel)

@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	twilioChannelType = models.ChanelType("T")
+	twilioChannelType = models.ChannelType("T")
 
 	baseURL  = `https://api.twilio.com`
 	callPath = `/2010-04-01/Accounts/{AccountSid}/Calls.json`
@@ -30,8 +30,8 @@ const (
 
 	statusFailed = "failed"
 
-	accountSIDConfig := "account_sid"
-	authTokenConfig := "auth_token"
+	accountSIDConfig = "account_sid"
+	authTokenConfig  = "auth_token"
 )
 
 type client struct {
@@ -41,7 +41,7 @@ type client struct {
 }
 
 func init() {
-	ivr.RegisterClient(twilioChannelType, NewClientFromChannel)
+	ivr.RegisterClientType(twilioChannelType, NewClientFromChannel)
 }
 
 // NewClientFromChannel creates a new Twilio IVR client for the passed in account and and auth token

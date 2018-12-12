@@ -117,7 +117,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.country as country,
 	c.address as address,
 	c.schemes as schemes,
-	c.config as config,
+	COALESCE(c.config, '{}')::json as config,
 	(SELECT ARRAY(
 		SELECT CASE r 
 		WHEN 'R' THEN 'receive' 
