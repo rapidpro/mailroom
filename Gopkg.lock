@@ -177,12 +177,13 @@
     "flows/runs",
     "flows/triggers",
     "flows/waits",
+    "flows/waits/hints",
     "legacy",
     "legacy/expressions",
     "legacy/gen",
     "utils"
   ]
-  revision = "d67e865b5aec054ca1be598aa314ee820519027d"
+  revision = "e3ad7104d90557bbe94ec701e60a6375e15e8cb0"
 
 [[projects]]
   branch = "master"
