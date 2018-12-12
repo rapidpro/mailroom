@@ -1,3 +1,7 @@
+v0.0.72
+----------
+ * update to latest goflow
+
 v0.0.71
 ----------
  * optimize getting flow definition
