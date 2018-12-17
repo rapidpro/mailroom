@@ -2,47 +2,51 @@ package waits
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/utils"
+
+	"github.com/pkg/errors"
 )
 
-var registeredTypes = map[string](func() flows.Wait){}
+type readFunc func(data json.RawMessage) (flows.Wait, error)
+
+var registeredTypes = map[string]readFunc{}
 
 // RegisterType registers a new type of wait
-func RegisterType(name string, initFunc func() flows.Wait) {
-	registeredTypes[name] = initFunc
+func RegisterType(name string, f readFunc) {
+	registeredTypes[name] = f
 }
 
 // the base of all wait types
 type baseWait struct {
-	Type_      string     `json:"type" validate:"required"`
-	Timeout_   *int       `json:"timeout,omitempty"`
-	TimeoutOn_ *time.Time `json:"timeout_on,omitempty"`
+	type_ string
+
+	timeout   *int
+	timeoutOn *time.Time
 }
 
 func newBaseWait(typeName string, timeout *int) baseWait {
-	return baseWait{Type_: typeName, Timeout_: timeout}
+	return baseWait{type_: typeName, timeout: timeout}
 }
 
 // Type returns the type of this wait
-func (w *baseWait) Type() string { return w.Type_ }
+func (w *baseWait) Type() string { return w.type_ }
 
 // Timeout returns the timeout of this wait in seconds or nil if no timeout is set
-func (w *baseWait) Timeout() *int { return w.Timeout_ }
+func (w *baseWait) Timeout() *int { return w.timeout }
 
 // TimeoutOn returns when this wait times out
-func (w *baseWait) TimeoutOn() *time.Time { return w.TimeoutOn_ }
+func (w *baseWait) TimeoutOn() *time.Time { return w.timeoutOn }
 
 // Begin beings waiting
 func (w *baseWait) Begin(run flows.FlowRun) bool {
-	if w.Timeout_ != nil {
-		timeoutOn := utils.Now().Add(time.Second * time.Duration(*w.Timeout_))
+	if w.timeout != nil {
+		timeoutOn := utils.Now().Add(time.Second * time.Duration(*w.timeout))
 
-		w.TimeoutOn_ = &timeoutOn
+		w.timeoutOn = &timeoutOn
 	}
 	return true
 }
@@ -55,13 +59,13 @@ func (w *baseWait) End(resume flows.Resume, node flows.Node) error {
 		return nil
 	case resumes.TypeWaitTimeout:
 		if node.Wait().Timeout() == nil {
-			return fmt.Errorf("can't end with timeout as node no longer has a wait timeout")
+			return errors.Errorf("can't end with timeout as node no longer has a wait timeout")
 		}
 		if w.Timeout() == nil || w.TimeoutOn() == nil {
-			return fmt.Errorf("can't end with timeout as session wait has no timeout")
+			return errors.Errorf("can't end with timeout as session wait has no timeout")
 		}
 		if utils.Now().Before(*w.TimeoutOn()) {
-			return fmt.Errorf("can't end with timeout before wait has timed out")
+			return errors.Errorf("can't end with timeout before wait has timed out")
 		}
 	}
 	return nil
@@ -70,6 +74,12 @@ func (w *baseWait) End(resume flows.Resume, node flows.Node) error {
 //------------------------------------------------------------------------------------------
 // JSON Encoding / Decoding
 //------------------------------------------------------------------------------------------
+
+type baseWaitEnvelope struct {
+	Type      string     `json:"type" validate:"required"`
+	Timeout   *int       `json:"timeout,omitempty"`
+	TimeoutOn *time.Time `json:"timeout_on,omitempty"`
+}
 
 // ReadWait reads a wait from the given JSON
 func ReadWait(data json.RawMessage) (flows.Wait, error) {
@@ -80,9 +90,21 @@ func ReadWait(data json.RawMessage) (flows.Wait, error) {
 
 	f := registeredTypes[typeName]
 	if f == nil {
-		return nil, fmt.Errorf("unknown type: '%s'", typeName)
+		return nil, errors.Errorf("unknown type: '%s'", typeName)
 	}
+	return f(data)
+}
 
-	wait := f()
-	return wait, utils.UnmarshalAndValidate(data, wait)
+func (w *baseWait) unmarshal(e *baseWaitEnvelope) error {
+	w.type_ = e.Type
+	w.timeout = e.Timeout
+	w.timeoutOn = e.TimeoutOn
+	return nil
+}
+
+func (w *baseWait) marshal(e *baseWaitEnvelope) error {
+	e.Type = w.type_
+	e.Timeout = w.timeout
+	e.TimeoutOn = w.timeoutOn
+	return nil
 }

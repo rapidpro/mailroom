@@ -37,6 +37,11 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 			msgs[i] = m.(*models.Msg)
 		}
 
+		// if our session has a timeout, set it on our last message
+		if s.Timeout() != nil && s.WaitStartedOn != nil {
+			msgs[len(msgs)-1].SetTimeout(s.ID, *s.WaitStartedOn, *s.Timeout())
+		}
+
 		log := log.WithField("messages", msgs).WithField("session", s.ID)
 
 		err := courier.QueueMessages(rc, msgs)

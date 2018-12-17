@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // migrates a parameter value in an legacy expression
@@ -31,7 +33,7 @@ func asTemplate(template string) callMigrator {
 	return func(funcName string, params []string) (string, error) {
 		numParamPlaceholders := strings.Count(template, "%s") + strings.Count(template, "%v")
 		if numParamPlaceholders > len(params) {
-			return "", fmt.Errorf("expecting %d params whilst migrating call to %s but got %d", numParamPlaceholders, funcName, len(params))
+			return "", errors.Errorf("expecting %d params whilst migrating call to %s but got %d", numParamPlaceholders, funcName, len(params))
 		}
 
 		paramsAsInterfaces := make([]interface{}, len(params))
@@ -54,7 +56,7 @@ func asJoin(delimiter string) callMigrator {
 func asParamMigrators(newName string, paramMigrators ...paramMigrator) callMigrator {
 	return func(funcName string, params []string) (string, error) {
 		if len(params) > len(paramMigrators) {
-			return "", fmt.Errorf("don't know how to migrate call to %s with %d parameters", funcName, len(params))
+			return "", errors.Errorf("don't know how to migrate call to %s with %d parameters", funcName, len(params))
 		}
 
 		newParams := make([]string, len(params))
@@ -104,7 +106,7 @@ var callMigrators = map[string]callMigrator{
 	"clean":             asIs(),
 	"code":              asIs(),
 	"concatenate":       asJoin(` & `),
-	"date":              asTemplate(`datetime("%s-%s-%s")`),
+	"date":              asRename(`datetime_from_parts`),
 	"datedif":           asRename(`datetime_diff`),
 	"datevalue":         asRename(`datetime`),
 	"day":               asTemplate(`format_date(%s, "D")`),

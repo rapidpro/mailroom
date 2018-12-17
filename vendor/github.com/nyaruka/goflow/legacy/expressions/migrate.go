@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/pkg/errors"
 )
 
 var datePrefixes = []string{
@@ -137,13 +138,8 @@ func migrateExpression(env utils.Environment, resolver interface{}, expression s
 
 	// speed up parsing
 	p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
-	// TODO: add second stage - https://github.com/antlr/antlr4/issues/192
 
-	// this is still super slow, awaiting fixes in golang antlr
-	// leaving this debug in until then
-	// start := time.Now()
 	tree := p.Parse()
-	// timeTrack(start, "Parsing")
 
 	// if we ran into errors parsing, return the first one
 	if len(errListener.Errors()) > 0 {
@@ -179,7 +175,7 @@ func resolveLookup(env utils.Environment, variable interface{}, key string) inte
 		key, rest = popNextVariable(rest)
 
 		if utils.IsNil(variable) {
-			return fmt.Errorf("%s has no property '%s'", variable, key)
+			return errors.Errorf("%s has no property '%s'", variable, key)
 		}
 
 		resolver, isResolver := variable.(Resolvable)
@@ -194,7 +190,7 @@ func resolveLookup(env utils.Environment, variable interface{}, key string) inte
 			}
 
 		} else {
-			return fmt.Errorf("%s has no property '%s'", variable, key)
+			return errors.Errorf("%s has no property '%s'", variable, key)
 		}
 	}
 

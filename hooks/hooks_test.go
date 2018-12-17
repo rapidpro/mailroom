@@ -31,20 +31,6 @@ var (
 type ContactActionMap map[flows.ContactID][]flows.Action
 type ContactMsgMap map[flows.ContactID]*flows.MsgIn
 
-const (
-	Org1 = models.OrgID(1)
-
-	Cathy      = flows.ContactID(43)
-	CathyURN   = urns.URN("tel:+250700000002")
-	CathyURNID = models.URNID(43)
-
-	Bob      = flows.ContactID(58)
-	BobURN   = urns.URN("tel:+250700000017")
-	BobURNID = models.URNID(59)
-
-	Evan = flows.ContactID(47)
-)
-
 type HookTestCase struct {
 	Actions       ContactActionMap
 	Msgs          ContactMsgMap
@@ -71,7 +57,7 @@ func TestMain(m *testing.M) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
-	org, err := models.GetOrgAssets(ctx, db, Org1)
+	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	if err != nil {
 		panic(err)
 	}
@@ -223,7 +209,7 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 			}
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, org, flow, []flows.ContactID{Cathy, Bob, Evan}, options)
+		_, err = runner.StartFlow(ctx, db, rp, org, flow, []flows.ContactID{models.Cathy, models.Bob, models.Evan}, options)
 		assert.NoError(t, err)
 
 		// now check our assertions

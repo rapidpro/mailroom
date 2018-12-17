@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/nyaruka/goflow/flows"
@@ -21,45 +22,45 @@ func TestMsgCreated(t *testing.T) {
 	db.MustExec(
 		`INSERT INTO contacts_contacturn(identity, path, scheme, priority, contact_id, org_id) 
 		                          VALUES('tel:12065551212', '12065551212', 'tel', 10, $1, 1)`,
-		Cathy)
+		models.Cathy)
 
 	// delete all URNs for bob
-	testsuite.DB().MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, Bob)
+	testsuite.DB().MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, models.Bob)
 
 	// TODO: test replying to a newly added URN
 
-	msg1 := createIncomingMsg(db, Org1, Cathy, CathyURN, CathyURNID, "start")
+	msg1 := createIncomingMsg(db, models.Org1, models.Cathy, models.CathyURN, models.CathyURNID, "start")
 
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				Cathy: []flows.Action{
+				models.Cathy: []flows.Action{
 					actions.NewSendMsgAction(newActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
 				},
-				Evan: []flows.Action{
+				models.Evan: []flows.Action{
 					actions.NewSendMsgAction(newActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
 				},
-				Bob: []flows.Action{
+				models.Bob: []flows.Action{
 					actions.NewSendMsgAction(newActionUUID(), "No URNs", nil, nil, false),
 				},
 			},
 			Msgs: ContactMsgMap{
-				Cathy: msg1,
+				models.Cathy: msg1,
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from msgs_msg where text='Hello World' and contact_id = $1 and metadata = $2 and response_to_id = $3",
-					Args:  []interface{}{Cathy, `{"quick_replies":["yes","no"]}`, msg1.ID()},
+					Args:  []interface{}{models.Cathy, `{"quick_replies":["yes","no"]}`, msg1.ID()},
 					Count: 2,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from msgs_msg where text='Hello Attachments' and contact_id = $1 and attachments[1] = $2",
-					Args:  []interface{}{Evan, "image/png:https://foo.bar.com/images/image1.png"},
+					Args:  []interface{}{models.Evan, "image/png:https://foo.bar.com/images/image1.png"},
 					Count: 1,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from msgs_msg where contact_id=$1;",
-					Args:  []interface{}{Bob},
+					Args:  []interface{}{models.Bob},
 					Count: 0,
 				},
 			},

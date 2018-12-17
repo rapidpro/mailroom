@@ -5,6 +5,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 )
 
@@ -16,7 +17,7 @@ func TestEmailCreated(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				Cathy: []flows.Action{
+				models.Cathy: []flows.Action{
 					actions.NewSendEmailAction(newActionUUID(), []string{"cathy@foo.bar", "bob@foo.bar"}, "Test Email", "This is your test email"),
 				},
 			},

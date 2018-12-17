@@ -2,13 +2,18 @@ package legacy
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/nyaruka/goflow/utils"
+	"github.com/pkg/errors"
 )
 
 // Translations is an inline translation map used for localization
 type Translations map[utils.Language]string
+
+func ReadTranslations(data json.RawMessage) (Translations, error) {
+	t := make(Translations)
+	return t, json.Unmarshal(data, &t)
+}
 
 // Base looks up the translation in the given base language, or "base"
 func (t Translations) Base(baseLanguage utils.Language) string {
@@ -53,7 +58,7 @@ func (s *StringOrNumber) UnmarshalJSON(data []byte) error {
 		// data is JSON number
 		*s = StringOrNumber(data)
 	} else {
-		return fmt.Errorf("expected string or number, not %s", string(c))
+		return errors.Errorf("expected string or number, not %s", string(c))
 	}
 	return nil
 }

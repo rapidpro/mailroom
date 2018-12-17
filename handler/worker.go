@@ -23,12 +23,12 @@ import (
 )
 
 const (
-	stopEventType            = "stop_event"
-	msgEventType             = "msg_event"
-	newConversationEventType = "new_conversation"
-	referralEventType        = "referral"
-	expirationEventType      = "expiration_event"
-	timeoutEventType         = "timeout_event"
+	StopEventType            = "stop_event"
+	MsgEventType             = "msg_event"
+	NewConversationEventType = "new_conversation"
+	ReferralEventType        = "referral"
+	ExpirationEventType      = "expiration_event"
+	TimeoutEventType         = "timeout_event"
 )
 
 func init() {
@@ -51,7 +51,7 @@ func AddHandleTask(rc redis.Conn, contactID flows.ContactID, task *queue.Task) e
 	}
 
 	// create our contact event
-	contactTask := &handleEventTask{ContactID: contactID}
+	contactTask := &HandleEventTask{ContactID: contactID}
 
 	// then add a handle task for that contact
 	err = queue.AddTask(rc, mailroom.HandlerQueue, mailroom.HandleContactEvent, task.OrgID, contactTask, queue.DefaultPriority)
@@ -71,7 +71,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	eventTask := &handleEventTask{}
+	eventTask := &HandleEventTask{}
 	err := json.Unmarshal(task.Task, eventTask)
 	if err != nil {
 		return errors.Wrapf(err, "error decoding contact event task")
@@ -115,32 +115,32 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 		// hand off to the appropriate handler
 		switch contactEvent.Type {
 
-		case stopEventType:
-			evt := &stopEvent{}
+		case StopEventType:
+			evt := &StopEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling stop event")
 			}
 			err = handleStopEvent(ctx, db, rp, evt)
 
-		case newConversationEventType, referralEventType:
-			evt := &channelEvent{}
+		case NewConversationEventType, ReferralEventType:
+			evt := &ChannelEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling channel event")
 			}
 			err = handleChannelEvent(ctx, db, rp, contactEvent.Type, evt)
 
-		case msgEventType:
-			msg := &msgEvent{}
+		case MsgEventType:
+			msg := &MsgEvent{}
 			err = json.Unmarshal(contactEvent.Task, msg)
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event")
 			}
 			err = handleMsgEvent(ctx, db, rp, msg)
 
-		case timeoutEventType, expirationEventType:
-			evt := &timedEvent{}
+		case TimeoutEventType, ExpirationEventType:
+			evt := &TimedEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling timeout event")
@@ -159,7 +159,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 }
 
 // handleTimedEvent is called for timeout events
-func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *timedEvent) error {
+func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *TimedEvent) error {
 	start := time.Now()
 	log := logrus.WithField("event_type", eventType).WithField("contact_id", event.OrgID).WithField("session_id", event.SessionID)
 	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
@@ -204,23 +204,23 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return nil
 	}
 
-	// resume their flow based on the timeout
+	// resume their flow based on the timed event
 	var resume flows.Resume
 	switch eventType {
-	case expirationEventType:
+	case ExpirationEventType:
 		// check that our expiration is still the same
 		expiration, err := models.RunExpiration(ctx, db, event.RunID)
 		if err != nil {
 			return errors.Wrapf(err, "unable to load expiration for run")
 		}
 
-		if expiration.UTC() != event.Time.UTC() {
+		if !expiration.Equal(event.Time) {
 			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, has been updated")
 			return nil
 		}
 
 		resume = resumes.NewRunExpirationResume(org.Env(), contact)
-	case timeoutEventType:
+	case TimeoutEventType:
 		if session.TimeoutOn == nil {
 			log.WithField("session_id", session.ID).Info("ignoring session timeout, has no timeout set")
 			return nil
@@ -228,7 +228,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 
 		// check that the timeout is the same
 		timeout := *session.TimeoutOn
-		if timeout.UTC() == event.Time.UTC() {
+		if !timeout.Equal(event.Time) {
 			log.WithField("event_timeout", event.Time).WithField("session_timeout", timeout).Info("ignoring timeout, has been updated")
 			return nil
 		}
@@ -248,7 +248,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 }
 
 // handleChannelEvent is called for channel events
-func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *channelEvent) error {
+func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *ChannelEvent) error {
 	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -266,12 +266,12 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	// do we have associated trigger?
 	var trigger *models.Trigger
 	switch eventType {
-	case newConversationEventType:
+	case NewConversationEventType:
 		trigger = models.FindMatchingNewConversationTrigger(org, channel)
-		channelEvent = triggers.NewChannelEvent(newConversationEventType, channel.ChannelReference())
-	case referralEventType:
+		channelEvent = triggers.NewChannelEvent(NewConversationEventType, channel.ChannelReference())
+	case ReferralEventType:
 		trigger = models.FindMatchingReferralTrigger(org, channel, event.Extra["referrer_id"])
-		channelEvent = triggers.NewChannelEvent(referralEventType, channel.ChannelReference())
+		channelEvent = triggers.NewChannelEvent(ReferralEventType, channel.ChannelReference())
 	default:
 		return errors.Errorf("unknown channel event type: %s", eventType)
 	}
@@ -352,7 +352,7 @@ func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 }
 
 // handleStopEvent is called when a contact is stopped by courier
-func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *stopEvent) error {
+func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *StopEvent) error {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction for stopping contact")
@@ -370,7 +370,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *st
 }
 
 // handleMsgEvent is called when a new message arrives from a contact
-func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msgEvent) error {
+func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent) error {
 	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -535,11 +535,11 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *msg
 	return nil
 }
 
-type handleEventTask struct {
+type HandleEventTask struct {
 	ContactID flows.ContactID `json:"contact_id"`
 }
 
-type timedEvent struct {
+type TimedEvent struct {
 	ContactID flows.ContactID  `json:"contact_id"`
 	OrgID     models.OrgID     `json:"org_id"`
 	SessionID models.SessionID `json:"session_id"`
@@ -547,7 +547,7 @@ type timedEvent struct {
 	Time      time.Time        `json:"time"`
 }
 
-type msgEvent struct {
+type MsgEvent struct {
 	ContactID     flows.ContactID    `json:"contact_id"`
 	OrgID         models.OrgID       `json:"org_id"`
 	ChannelID     models.ChannelID   `json:"channel_id"`
@@ -561,12 +561,12 @@ type msgEvent struct {
 	NewContact    bool               `json:"new_contact"`
 }
 
-type stopEvent struct {
+type StopEvent struct {
 	ContactID flows.ContactID `json:"contact_id"`
 	OrgID     models.OrgID    `json:"org_id"`
 }
 
-type channelEvent struct {
+type ChannelEvent struct {
 	ContactID  flows.ContactID   `json:"contact_id"`
 	URNID      models.URNID      `json:"urn_id"`
 	OrgID      models.OrgID      `json:"org_id"`
@@ -577,7 +577,7 @@ type channelEvent struct {
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event
 func newTimedTask(eventType string, orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
-	event := &timedEvent{
+	event := &TimedEvent{
 		OrgID:     orgID,
 		ContactID: contactID,
 		SessionID: sessionID,
@@ -600,10 +600,10 @@ func newTimedTask(eventType string, orgID models.OrgID, contactID flows.ContactI
 
 // NewTimeoutTask creates a new event task for the passed in timeout event
 func NewTimeoutTask(orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
-	return newTimedTask(timeoutEventType, orgID, contactID, sessionID, models.NilFlowRunID, time)
+	return newTimedTask(TimeoutEventType, orgID, contactID, sessionID, models.NilFlowRunID, time)
 }
 
 // NewExpirationTask creates a new event task for the passed in expiration event
 func NewExpirationTask(orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
-	return newTimedTask(expirationEventType, orgID, contactID, sessionID, runID, time)
+	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, runID, time)
 }

@@ -2,10 +2,12 @@ package models
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
 )
 
@@ -15,7 +17,11 @@ var NilChannelID = ChannelID(0)
 
 type ChannelType string
 
-const ChannelTypeAndroid = ChannelType("A")
+const (
+	ChannelTypeAndroid = ChannelType("A")
+
+	ChannelConfigCallbackDomain = "callback_domain"
+)
 
 // Channel is the mailroom struct that represents channels
 type Channel struct {
@@ -32,6 +38,7 @@ type Channel struct {
 		Schemes       []string                 `json:"schemes"`
 		Roles         []assets.ChannelRole     `json:"roles"`
 		MatchPrefixes []string                 `json:"match_prefixes"`
+		Config        map[string]interface{}   `json:"config"`
 	}
 }
 
@@ -65,8 +72,18 @@ func (c *Channel) Roles() []assets.ChannelRole { return c.c.Roles }
 // MatchPrefixes returns the prefixes we should also match when determining channel affinity
 func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
 
-// Parent returns the UUID of the parent channel to this channel
+// Parent returns a reference to the parent channel of this channel (if any)
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
+
+// ConfigValue returns the config value for the passed in key
+func (c *Channel) ConfigValue(key string, def string) string {
+	value := c.c.Config[key]
+	strValue, isString := value.(string)
+	if isString {
+		return strValue
+	}
+	return def
+}
 
 // ChannelReference return a channel reference for this channel
 func (c *Channel) ChannelReference() *assets.ChannelReference {
@@ -75,6 +92,8 @@ func (c *Channel) ChannelReference() *assets.ChannelReference {
 
 // loadChannels loads all the channels for the passed in org
 func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Channel, error) {
+	start := time.Now()
+
 	rows, err := db.Queryx(selectChannelsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
@@ -92,6 +111,8 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 		channels = append(channels, channel)
 	}
 
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(channels)).Debug("loaded channels")
+
 	return channels, nil
 }
 
@@ -106,6 +127,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.country as country,
 	c.address as address,
 	c.schemes as schemes,
+	COALESCE(c.config, '{}')::json as config,
 	(SELECT ARRAY(
 		SELECT CASE r 
 		WHEN 'R' THEN 'receive' 

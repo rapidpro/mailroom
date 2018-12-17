@@ -281,7 +281,7 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 		return flow, nil
 	}
 
-	dbFlow, err := loadFlowByUUID(a.ctx, a.db, flowUUID)
+	dbFlow, err := loadFlowByUUID(a.ctx, a.db, a.orgID, flowUUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %s", flowUUID)
 	}
@@ -307,7 +307,7 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 		return flow.(*Flow), nil
 	}
 
-	dbFlow, err := loadFlowByID(a.ctx, a.db, flowID)
+	dbFlow, err := loadFlowByID(a.ctx, a.db, a.orgID, flowID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %d", flowID)
 	}

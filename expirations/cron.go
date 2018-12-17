@@ -138,6 +138,7 @@ const selectExpiredRunsSQL = `
 	SELECT
 		fr.org_id as org_id,
 		fr.flow_id as flow_id,
+		fr.contact_id as contact_id,
 		fr.id as run_id,
 		fr.parent_uuid as parent_uuid,
 		fr.session_id as session_id,

@@ -2,11 +2,13 @@ package models
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // FieldID is our type for the database field ID
@@ -43,6 +45,8 @@ func (f *Field) Type() assets.FieldType { return f.f.FieldType }
 
 // loadFields loads the assets for the passed in db
 func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Field, error) {
+	start := time.Now()
+
 	rows, err := db.Queryx(selectFieldsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying fields for org: %d", orgID)
@@ -58,6 +62,8 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 		}
 		fields = append(fields, field)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(fields)).Debug("loaded contact fields")
 
 	return fields, nil
 }
