@@ -71,7 +71,7 @@ func (s *Server) handleSurveyorSubmit(ctx context.Context, r *http.Request) (int
 	}
 
 	// create / fetch our contact based on the highest priority URN
-	contactID, err := models.CreateContact(ctx, s.db, org, assets, urn)
+	_, err = models.CreateContact(ctx, s.db, org, assets, urn)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 	}
