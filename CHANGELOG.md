@@ -1,3 +1,20 @@
+v0.0.72
+----------
+ * update to latest goflow
+
+v0.0.71
+----------
+ * optimize getting flow definition
+
+v0.0.70
+----------
+ * add timings for flow loading
+
+v0.0.69
+----------
+ * add timings for loading org assets
+ * add unit tests for expirations and timeouts
+
 v0.0.68
 ----------
  * make sure we filter by org id when looking up flows from asserts

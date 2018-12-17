@@ -2,10 +2,12 @@ package models
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // ResthookID is our type for the database id of a resthook
@@ -31,6 +33,8 @@ func (r *Resthook) Subscribers() []string { return r.r.Subscribers }
 
 // loads the resthooks for the passed in org
 func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Resthook, error) {
+	start := time.Now()
+
 	rows, err := db.Queryx(selectResthooksSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying resthooks for org: %d", orgID)
@@ -47,6 +51,8 @@ func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 
 		resthooks = append(resthooks, resthook)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(resthooks)).Debug("loaded resthooks")
 
 	return resthooks, nil
 }

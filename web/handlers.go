@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -16,6 +17,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -98,7 +100,9 @@ func (s *Server) handleStart(r *http.Request) (interface{}, int, error) {
 	}
 
 	// start our flow
+	start := time.Now()
 	newEvents, err := session.Start(trigger)
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", request.OrgID).Debug("start simulation complete")
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}

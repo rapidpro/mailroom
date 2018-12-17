@@ -3,11 +3,13 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type FlowID int
@@ -97,6 +99,7 @@ func loadFlowByID(ctx context.Context, db *sqlx.DB, orgID OrgID, flowID FlowID) 
 
 // loads the flow with the passed in UUID
 func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
+	start := time.Now()
 	flow := &Flow{}
 
 	rows, err := db.Queryx(sql, orgID, arg)
@@ -121,71 +124,89 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg int
 		return nil, errors.Wrapf(err, "error setting flow definition from legacy")
 	}
 
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("flow", arg).Debug("loaded flow")
+
 	return flow, nil
 }
 
 const selectFlowByUUIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
-	f.id as id, 
-	f.uuid as uuid,
-	f.name as name,
-	f.is_archived as is_archived,
-	f.ignore_triggers as ignore_triggers,
-	f.flow_type as flow_type,
-	fr.definition::jsonb || 
-	jsonb_build_object(
-		'flow_type', f.flow_type, 
-		'metadata', jsonb_build_object(
-			'uuid', f.uuid, 
-			'id', f.id,
-			'name', f.name, 
-			'revision', fr.revision, 
-			'expires', f.expires_after_minutes
-		)
+	id, 
+	uuid, 
+	name,
+	is_archived,
+	ignore_triggers,
+	flow_type,
+	definition::jsonb || 
+		jsonb_build_object(
+			'flow_type', f.flow_type, 
+			'metadata', jsonb_build_object(
+				'uuid', f.uuid, 
+				'id', f.id,
+				'name', f.name, 
+				'revision', revision, 
+				'expires', f.expires_after_minutes
+			)
 	) as definition
-FROM 
-	flows_flowrevision fr, 
-	flows_flow f 
-WHERE 
-    f.org_id = $1 AND
-	f.uuid = $2 AND 
-	fr.flow_id = f.id AND 
-	fr.is_active = TRUE AND
-	f.is_active = TRUE
-ORDER BY 
-	fr.revision DESC 
-LIMIT 1
+FROM
+	flows_flow f
+LEFT JOIN (
+	SELECT 
+		flow_id, 
+		definition, 
+		revision
+	FROM 
+		flows_flowrevision
+	WHERE
+		flow_id = ANY(SELECT id FROM flows_flow WHERE uuid = $2) AND
+		is_active = TRUE
+	ORDER BY 
+		revision DESC
+	LIMIT 1
+) fr ON fr.flow_id = f.id
+WHERE
+    org_id = $1 AND
+	uuid = $2 AND
+	is_active = TRUE
 ) r;`
 
 const selectFlowByIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
-	f.id as id,
-	f.uuid as uuid,
-	f.name as name,
-	f.is_archived as is_archived,
-	f.ignore_triggers as ignore_triggers,
-	f.flow_type as flow_type,
-	fr.definition::jsonb || 
-	jsonb_build_object(
-		'flow_type', f.flow_type, 
-		'metadata', jsonb_build_object(
-			'uuid', f.uuid, 
-			'id', f.id,
-			'name', f.name, 
-			'revision', fr.revision, 
-			'expires', f.expires_after_minutes
-		)
+	id, 
+	uuid, 
+	name,
+	is_archived,
+	ignore_triggers,
+	flow_type,
+	definition::jsonb || 
+		jsonb_build_object(
+			'flow_type', f.flow_type, 
+			'metadata', jsonb_build_object(
+				'uuid', f.uuid, 
+				'id', f.id,
+				'name', f.name, 
+				'revision', revision, 
+				'expires', f.expires_after_minutes
+			)
 	) as definition
-FROM 
-	flows_flowrevision fr, 
-	flows_flow f 
-WHERE 
-    f.org_id = $1 AND
-	f.id = $2 AND 
-	fr.flow_id = f.id AND 
-	fr.is_active = TRUE AND
-	f.is_active = TRUE
-ORDER BY 
-	fr.revision DESC 
-LIMIT 1
+FROM
+	flows_flow f
+LEFT JOIN (
+	SELECT 
+		flow_id, 
+		definition, 
+		revision
+	FROM 
+		flows_flowrevision
+	WHERE
+		flow_id = $2 AND
+		is_active = TRUE
+	ORDER BY 
+		revision DESC
+	LIMIT 1
+) fr ON fr.flow_id = f.id
+WHERE
+    org_id = $1 AND
+	id = $2 AND
+	is_active = TRUE
 ) r;`

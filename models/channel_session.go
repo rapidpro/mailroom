@@ -147,11 +147,26 @@ func (s *ChannelSession) UpdateExternalID(ctx context.Context, db *sqlx.DB, id s
 	s.s.ExternalID = id
 
 	_, err := db.ExecContext(ctx, `
-	UPDATE channels_channelsession SET external_id = $2 WHERE id = $1
+	UPDATE channels_channelsession SET external_id = $2, modified_on = NOW() WHERE id = $1
 	`, s.s.ID, s.s.ExternalID)
 
 	if err != nil {
 		return errors.Wrapf(err, "error updating external id to: %s for channel session: %d", s.s.ExternalID, s.s.ID)
+	}
+
+	return nil
+}
+
+// UpdateStatus updates the status for this session
+func (s *ChannelSession) UpdateStatus(ctx context.Context, db *sqlx.DB, status ChannelSessionStatus) error {
+	s.s.Status = status
+
+	_, err := db.ExecContext(ctx, `
+	UPDATE channels_channelsession SET status = $2, modified_on = NOW() WHERE id = $1
+	`, s.s.ID, s.s.Status)
+
+	if err != nil {
+		return errors.Wrapf(err, "error updating status for channel session: %d", s.s.ID)
 	}
 
 	return nil

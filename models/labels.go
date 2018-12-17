@@ -2,11 +2,13 @@ package models
 
 import (
 	"context"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type LabelID int
@@ -31,6 +33,8 @@ func (l *Label) Name() string { return l.l.Name }
 
 // loads the labels for the passed in org
 func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Label, error) {
+	start := time.Now()
+
 	rows, err := db.Queryx(selectLabelsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying labels for org: %d", orgID)
@@ -46,6 +50,8 @@ func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Lab
 		}
 		labels = append(labels, label)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(labels)).Debug("loaded labels")
 
 	return labels, nil
 }
