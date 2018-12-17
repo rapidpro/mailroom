@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/nyaruka/goflow/flows"
@@ -37,10 +38,10 @@ func TestWebhookCalled(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				Cathy: []flows.Action{
+				models.Cathy: []flows.Action{
 					actions.NewCallResthookAction(newActionUUID(), "foo", "foo"),
 				},
-				Evan: []flows.Action{
+				models.Evan: []flows.Action{
 					actions.NewCallResthookAction(newActionUUID(), "foo", "foo"),
 					actions.NewCallWebhookAction(newActionUUID(), "GET", server.URL+"?unsub=1", nil, "", ""),
 				},

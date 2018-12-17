@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/nyaruka/goflow/flows"
@@ -16,26 +17,26 @@ func TestInputLabelsAdded(t *testing.T) {
 	reporting := assets.NewLabelReference(assets.LabelUUID("981a4378-4c25-4ba4-bf46-74f357e7f058"), "Reporting")
 	testing := assets.NewLabelReference(assets.LabelUUID("57ec7d9b-f00d-4bda-8db0-0037b5f50c8d"), "Testing")
 
-	msg1 := createIncomingMsg(db, Org1, Cathy, CathyURN, CathyURNID, "start")
-	msg2 := createIncomingMsg(db, Org1, Bob, BobURN, BobURNID, "start")
+	msg1 := createIncomingMsg(db, models.Org1, models.Cathy, models.CathyURN, models.CathyURNID, "start")
+	msg2 := createIncomingMsg(db, models.Org1, models.Bob, models.BobURN, models.BobURNID, "start")
 
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				Cathy: []flows.Action{
+				models.Cathy: []flows.Action{
 					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{reporting}),
 					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{testing}),
 					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{reporting}),
 				},
-				Bob: []flows.Action{},
-				Evan: []flows.Action{
+				models.Bob: []flows.Action{},
+				models.Evan: []flows.Action{
 					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{testing}),
 					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{reporting}),
 				},
 			},
 			Msgs: ContactMsgMap{
-				Cathy: msg1,
-				Bob:   msg2,
+				models.Cathy: msg1,
+				models.Bob:   msg2,
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
@@ -50,7 +51,7 @@ func TestInputLabelsAdded(t *testing.T) {
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from msgs_msg_labels l JOIN msgs_msg m ON l.msg_id = m.id WHERE m.contact_id = $1",
-					Args:  []interface{}{Bob},
+					Args:  []interface{}{models.Bob},
 					Count: 0,
 				},
 			},

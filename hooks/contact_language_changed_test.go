@@ -5,34 +5,35 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/models"
 )
 
 func TestContactLanguageChanged(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				Cathy: []flows.Action{
+				models.Cathy: []flows.Action{
 					actions.NewSetContactLanguageAction(newActionUUID(), "fra"),
 					actions.NewSetContactLanguageAction(newActionUUID(), "eng"),
 				},
-				Evan: []flows.Action{
+				models.Evan: []flows.Action{
 					actions.NewSetContactLanguageAction(newActionUUID(), "spa"),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'eng'",
-					Args:  []interface{}{Cathy},
+					Args:  []interface{}{models.Cathy},
 					Count: 1,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'spa'",
-					Args:  []interface{}{Evan},
+					Args:  []interface{}{models.Evan},
 					Count: 1,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language is NULL;",
-					Args:  []interface{}{Bob},
+					Args:  []interface{}{models.Bob},
 					Count: 1,
 				},
 			},

@@ -12,21 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	Org1 = OrgID(1)
-
-	Cathy      = flows.ContactID(43)
-	CathyURN   = urns.URN("tel:+250700000002")
-	CathyURNID = URNID(43)
-
-	Bob      = flows.ContactID(58)
-	BobURN   = urns.URN("tel:+250700000017")
-	BobURNID = URNID(59)
-
-	Evan = flows.ContactID(47)
-)
-
 func TestContacts(t *testing.T) {
+	testsuite.Reset()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 

@@ -609,8 +609,8 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAs
 	}
 
 	// is this already our top URN
-	topURNID := URNID(getURNInt(c.urns[0], "id"))
-	topChannelID := getURNChannelID(org, c.urns[0])
+	topURNID := URNID(GetURNInt(c.urns[0], "id"))
+	topChannelID := GetURNChannelID(org, c.urns[0])
 
 	// we are already the top URN, nothing to do
 	if topURNID == urnID && topChannelID != nil && *topChannelID == channel.ID() {
@@ -623,7 +623,7 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAs
 
 	priority := topURNPriority - 1
 	for _, urn := range c.urns {
-		id := URNID(getURNInt(urn, "id"))
+		id := URNID(GetURNInt(urn, "id"))
 		if id == urnID {
 			updated, err := updateURNChannelPriority(urn, channel, topURNPriority)
 			if err != nil {
@@ -666,7 +666,7 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAs
 	return nil
 }
 
-func getURNInt(urn urns.URN, key string) int {
+func GetURNInt(urn urns.URN, key string) int {
 	values, err := urn.Query()
 	if err != nil {
 		return 0
@@ -689,7 +689,7 @@ func getURNAuth(urn urns.URN) null.String {
 	return null.NewString(value, true)
 }
 
-func getURNChannelID(org *OrgAssets, urn urns.URN) *ChannelID {
+func GetURNChannelID(org *OrgAssets, urn urns.URN) *ChannelID {
 	values, err := urn.Query()
 	if err != nil {
 		return nil
@@ -757,10 +757,10 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 			}
 
 			// figure out if we have a channel
-			channelID := getURNChannelID(org, urn)
+			channelID := GetURNChannelID(org, urn)
 
 			// do we have an id?
-			urnID := getURNInt(urn, "id")
+			urnID := GetURNInt(urn, "id")
 
 			if urnID > 0 {
 				// if so, this is a URN update

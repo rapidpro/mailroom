@@ -22,6 +22,7 @@ type Config struct {
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
 
+	Domain           string `help:"the domain that mailroom is listening on"`
 	AttachmentDomain string `help:"the domain that will be used for relative attachment"`
 
 	AuthToken string `help:"the token clients will need to authenticate web requests"`
