@@ -1,3 +1,7 @@
+v0.0.73
+----------
+ * fix location selecting using mptt model
+
 v0.0.72
 ----------
  * update to latest goflow
