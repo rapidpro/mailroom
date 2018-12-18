@@ -135,8 +135,8 @@ SELECT
 FROM
 	locations_adminboundary l
 WHERE
-	l.id >= (select lft from locations_adminboundary la, orgs_org o where la.id = o.country_id and o.id = $1) and 
-	l.id <= (select rght from locations_adminboundary la, orgs_org o where la.id = o.country_id and o.id = $1) and
+	l.lft >= (select lft from locations_adminboundary la, orgs_org o where la.id = o.country_id and o.id = $1) and 
+	l.rght <= (select rght from locations_adminboundary la, orgs_org o where la.id = o.country_id and o.id = $1) and
 	l.tree_id = (select tree_id from locations_adminboundary la, orgs_org o where la.id = o.country_id and o.id = $1)
 ORDER BY
 	l.level, l.id;
