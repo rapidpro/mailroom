@@ -108,6 +108,15 @@ func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
 
+func FlowIDForStart(ctx context.Context, db *sqlx.DB, orgID OrgID, startID StartID) (FlowID, error) {
+	flowID := FlowID(0)
+	err := db.Get(&flowID, `SELECT flow_id FROM flows_flowstart WHERE org_id = $1 AND id = $2 AND is_active = TRUE`, orgID, startID)
+	if err != nil {
+		return flowID, errors.Wrapf(err, "unable to load flow for start")
+	}
+	return flowID, nil
+}
+
 func NewFlowStart(
 	startID StartID, orgID OrgID, flowID FlowID,
 	groupIDs []GroupID, contactIDs []flows.ContactID, urns []urns.URN, createContact bool,

@@ -83,8 +83,8 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, config.Domain)
 
 	// create our callback
-	callbackURL := fmt.Sprintf("https://%s/mr/ivr/%d/start?start=%d&contact=%s&channel_session=%d", domain, channel.ID(), start.StartID().Int64, c.UUID(), session.ID())
-	statusURL := fmt.Sprintf("https://%s/mr/ivr/%d/status?start=%d&contact=%s&channel_session=%d", domain, channel.ID(), start.StartID().Int64, c.UUID(), session.ID())
+	callbackURL := fmt.Sprintf("https://%s/mr/ivr/start?channel=%d&start=%d&contact=%s&channel_session=%d", domain, channel.ID(), start.StartID().Int64, c.UUID(), session.ID())
+	statusURL := fmt.Sprintf("https://%s/mr/ivr/status?channel=%d&start=%d&contact=%s&channel_session=%d", domain, channel.ID(), start.StartID().Int64, c.UUID(), session.ID())
 
 	// create the right client
 	client, err := GetClient(channel)
