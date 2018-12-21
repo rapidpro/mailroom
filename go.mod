@@ -17,7 +17,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v0.2.0
-	github.com/nyaruka/goflow v0.0.0-20181220194812-614969edc347
+	github.com/nyaruka/goflow v0.24.1
 	github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8
 	github.com/nyaruka/phonenumbers v0.0.0-20181019165255-7250c0532717 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
