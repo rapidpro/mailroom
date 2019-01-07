@@ -72,7 +72,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 
 	// resume our session
 	resumeStart := time.Now()
-	es, err := fs.Resume(resume)
+	sprint, err := fs.Resume(resume)
 	logrus.WithField("contact_id", resume.Contact().ID()).WithField("elapsed", time.Since(resumeStart)).Info("engine resume complete")
 
 	// had a problem resuming our flow? bail
@@ -90,7 +90,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	}
 
 	// write our updated session and runs
-	err = session.WriteUpdatedSession(txCTX, tx, rp, org, fs, es)
+	err = session.WriteUpdatedSession(txCTX, tx, rp, org, fs, sprint.Events())
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
@@ -439,7 +439,7 @@ func StartFlowForContacts(
 		// start our flow
 		log := log.WithField("contact_uuid", trigger.Contact().UUID())
 		start := time.Now()
-		events, err := session.Start(trigger)
+		sprint, err := session.Start(trigger)
 		if err != nil {
 			log.WithError(err).Errorf("error starting flow")
 			continue
@@ -448,7 +448,7 @@ func StartFlowForContacts(
 		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
-		sessionEvents = append(sessionEvents, events)
+		sessionEvents = append(sessionEvents, sprint.Events())
 	}
 
 	if len(sessions) == 0 {
