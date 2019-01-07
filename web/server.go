@@ -59,7 +59,7 @@ func NewServer(ctx context.Context, db *sqlx.DB, rp *redis.Pool, config *config.
 
 	router.Post("/mr/surveyor/submit", s.wrapJSONHandler(s.requireUserToken(s.handleSurveyorSubmit)))
 
-	router.Post("/mr/ivr/start", s.handleIVRStart)
+	router.Post("/mr/ivr/start", s.wrapJSONHandler(s.handleIVRStart))
 
 	// configure our http server
 	s.httpServer = &http.Server{

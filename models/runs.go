@@ -58,17 +58,18 @@ var keptEvents = map[string]bool{
 
 // Session is the mailroom type for a FlowSession
 type Session struct {
-	ID            SessionID       `db:"id"`
-	Status        SessionStatus   `db:"status"`
-	Responded     bool            `db:"responded"`
-	Output        string          `db:"output"`
-	ContactID     flows.ContactID `db:"contact_id"`
-	OrgID         OrgID           `db:"org_id"`
-	CreatedOn     time.Time       `db:"created_on"`
-	EndedOn       *time.Time      `db:"ended_on"`
-	TimeoutOn     *time.Time      `db:"timeout_on"`
-	WaitStartedOn *time.Time      `db:"wait_started_on"`
-	CurrentFlowID *FlowID         `db:"current_flow_id"`
+	ID            SessionID         `db:"id"`
+	Status        SessionStatus     `db:"status"`
+	Responded     bool              `db:"responded"`
+	Output        string            `db:"output"`
+	ContactID     flows.ContactID   `db:"contact_id"`
+	OrgID         OrgID             `db:"org_id"`
+	CreatedOn     time.Time         `db:"created_on"`
+	EndedOn       *time.Time        `db:"ended_on"`
+	TimeoutOn     *time.Time        `db:"timeout_on"`
+	WaitStartedOn *time.Time        `db:"wait_started_on"`
+	CurrentFlowID *FlowID           `db:"current_flow_id"`
+	ConnectionID  *ChannelSessionID `db:"connection_id"`
 
 	IncomingMsgID      null.Int
 	IncomingExternalID string
