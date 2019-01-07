@@ -31,7 +31,7 @@ func Reset() {
 func ResetDB() {
 	db := sqlx.MustOpen("postgres", "postgres://temba@localhost/temba?sslmode=disable")
 	db.MustExec("drop owned by temba cascade")
-	mustExec("pg_restore", "-d", "temba", "../temba.dump")
+	mustExec("pg_restore", "-d", "temba", "-U", "temba", "../temba.dump")
 }
 
 // DB returns an open test database pool
