@@ -102,13 +102,13 @@ func (s *Server) handleStart(ctx context.Context, r *http.Request) (interface{},
 
 	// start our flow
 	start := time.Now()
-	newEvents, err := session.Start(trigger)
+	sprint, err := session.Start(trigger)
 	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", request.OrgID).Debug("start simulation complete")
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
 
-	return &sessionResponse{Session: session, Events: newEvents}, http.StatusOK, nil
+	return &sessionResponse{Session: session, Events: sprint.Events()}, http.StatusOK, nil
 }
 
 // Resumes an existing engine session
@@ -170,12 +170,12 @@ func (s *Server) handleResume(ctx context.Context, r *http.Request) (interface{}
 	}
 
 	// resume our session
-	newEvents, err := session.Resume(resume)
+	sprint, err := session.Resume(resume)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	return &sessionResponse{Session: session, Events: newEvents}, http.StatusOK, nil
+	return &sessionResponse{Session: session, Events: sprint.Events()}, http.StatusOK, nil
 }
 
 // populateFlow takes care of setting the definition for the flow with the passed in UUID according to the passed in definitions
