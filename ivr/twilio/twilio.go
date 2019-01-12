@@ -6,33 +6,51 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/waits"
+	"github.com/nyaruka/goflow/flows/waits/hints"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	twilioChannelType = models.ChannelType("T")
 
 	baseURL  = `https://api.twilio.com`
-	callPath = `/2010-04-01/Accounts/{AccountSid}/Calls.json`
+	callPath = `/2010-04-01/Accounts/{AccountSID}/Calls.json`
 
 	signatureHeader     = "X-Twilio-Signature"
 	forwardedPathHeader = "X-Forwarded-Path"
 
 	statusFailed = "failed"
 
+	inputTimeout = 120
+
 	accountSIDConfig = "account_sid"
 	authTokenConfig  = "auth_token"
+
+	errorBody = `<?xml version="1.0" encoding="UTF-8"?>
+	<Response>
+		<Say>An error was encountered. Goodbye.</Say>
+		<Hangup></Hangup>
+	</Response>
+	`
 )
+
+var indentMarshal = true
 
 type client struct {
 	baseURL    string
@@ -74,6 +92,7 @@ type CallResponse struct {
 	Status string `json:"status"`
 }
 
+// RequestCall causes this client to request a new outgoing call for this provider
 func (c *client) RequestCall(channel *models.Channel, number urns.URN, callbackURL string, statusURL string) (ivr.CallID, error) {
 	form := url.Values{}
 	form.Set("To", number.Path())
@@ -82,14 +101,15 @@ func (c *client) RequestCall(channel *models.Channel, number urns.URN, callbackU
 	form.Set("StatusCallback", statusURL)
 
 	sendURL := baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
+	logrus.WithField("url", sendURL).Debug("send url")
 
 	resp, err := c.postRequest(sendURL, form)
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
 
-	if resp.StatusCode != 200 {
-		return ivr.NilCallID, errors.Wrapf(err, "received non 200 status for call start: %d", resp.StatusCode)
+	if resp.StatusCode != 201 {
+		return ivr.NilCallID, errors.Errorf("received non 200 status for call start: %d", resp.StatusCode)
 	}
 
 	// read our body
@@ -109,7 +129,118 @@ func (c *client) RequestCall(channel *models.Channel, number urns.URN, callbackU
 		return ivr.NilCallID, errors.Errorf("call status returned as failed")
 	}
 
+	logrus.WithField("body", body).WithField("status", resp.StatusCode).WithField("form", form).Debug("requested call")
+
 	return ivr.CallID(call.SID), nil
+}
+
+// InputForRequest returns the input for the passed in request, if any
+func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
+	// this call isn't active, thats an error
+	if r.Form.Get("CallStatus") != "in-progress" {
+		return "", ivr.NilAttachment, ivr.CallEndedError
+	}
+
+	// this could be a timeout, in which case we return nothing at all
+	timeout := r.Form.Get("timeout")
+	if timeout == "true" {
+		return "", ivr.NilAttachment, nil
+	}
+
+	// this could be empty, in which case we return nothing at all
+	empty := r.Form.Get("empty")
+	if empty == "true" {
+		return "", ivr.NilAttachment, nil
+	}
+
+	// otherwise grab the right field based on our wait type
+	waitType := r.Form.Get("wait_type")
+	switch waitType {
+	case "gather":
+		return r.Form.Get("Digits"), flows.Attachment(""), nil
+	case "record":
+		return "", flows.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
+	default:
+		// TODO: need to download this attachment locally
+		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
+	}
+}
+
+// StatusForRequest returns the current call status for the passed in status (and optional duration if known)
+func (c *client) StatusForRequest(r *http.Request) (models.ChannelSessionStatus, int) {
+	status := r.Form.Get("CallStatus")
+	switch status {
+
+	case "queued", "initiated", "ringing":
+		return models.ChannelSessionStatusWired, 0
+
+	case "in-progress":
+		return models.ChannelSessionStatusInProgress, 0
+
+	case "completed":
+		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
+		return models.ChannelSessionStatusCompleted, duration
+
+	case "busy", "no-answer", "canceled", "failed":
+		return models.ChannelSessionStatusErrored, 0
+
+	default:
+		logrus.WithField("call_status", status).Error("unknown call status in ivr callback")
+		return models.ChannelSessionStatusWired, 0
+	}
+}
+
+// WriteSessionResponse writes a TWIML response for the events in the passed in session
+func (c *client) WriteSessionResponse(channel *models.Channel, session *models.Session, resumeURL string, req *http.Request, w http.ResponseWriter) error {
+	// for errored sessions we should just output our error body
+	if session.Status == models.SessionStatusErrored {
+		return errors.Errorf("cannot write IVR response for errored session")
+	}
+
+	// otherwise look for any say events
+	sprint := session.Sprint()
+	if sprint == nil {
+		return errors.Errorf("cannot write IVR response for session with no sprint")
+	}
+
+	// get our response
+	response, err := responseForSprint(resumeURL, session.Wait(), sprint.Events())
+	if err != nil {
+		return errors.Wrap(err, "unable to build response for IVR call")
+	}
+
+	_, err = w.Write([]byte(response))
+	if err != nil {
+		return errors.Wrap(err, "error writing IVR response")
+	}
+
+	return nil
+}
+
+// WriteErrorResponse writes an error / unavailable response
+func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
+	r := &Response{Error: err.Error()}
+	r.Commands = append(r.Commands, Say{Text: "An error has occurred, please try again later."})
+	r.Commands = append(r.Commands, Hangup{})
+
+	body, err := xml.Marshal(r)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte(xml.Header + string(body)))
+	return err
+}
+
+// WriteEmptyResponse writes an empty (but valid) response
+func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
+	r := &Response{Message: msg}
+
+	body, err := xml.Marshal(r)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte(xml.Header + string(body)))
+	return err
 }
 
 func (c *client) postRequest(sendURL string, form url.Values) (*http.Response, error) {
@@ -180,4 +311,115 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 	base64.StdEncoding.Encode(encoded, hash)
 
 	return encoded, nil
+}
+
+// TWIML building utilities
+
+type Say struct {
+	XMLName string `xml:"Say"`
+	Text    string `xml:",chardata"`
+}
+
+type Play struct {
+	XMLName string `xml:"Play"`
+	URL     string `xml:",chardata"`
+}
+
+type Hangup struct {
+	XMLName string `xml:"Hangup"`
+}
+
+type Redirect struct {
+	XMLName string `xml:"Redirect"`
+	URL     string `xml:",chardata"`
+}
+
+type Gather struct {
+	XMLName     string        `xml:"Gather"`
+	NumDigits   int           `xml:"numDigits,attr,omitempty"`
+	FinishOnKey string        `xml:"finishOnKey,attr,omitempty"`
+	Timeout     int           `xml:"timeout,attr,omitempty"`
+	Action      string        `xml:"action,attr,omitempty"`
+	Commands    []interface{} `xml:",innerxml"`
+}
+
+type Record struct {
+	XMLName string `xml:"Record"`
+	Action  string `xml:"action,attr,omitempty"`
+}
+
+type Response struct {
+	XMLName  string        `xml:"Response"`
+	Message  string        `xml:"_message,omitempty"`
+	Error    string        `xml:"_error,omitempty"`
+	Gather   *Gather       `xml:"Gather"`
+	Commands []interface{} `xml:",innerxml"`
+}
+
+func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
+	r := &Response{}
+	commands := make([]interface{}, 0)
+
+	for _, e := range es {
+		switch event := e.(type) {
+		case *events.IVRCreatedEvent:
+			if len(event.Msg.Attachments()) == 0 {
+				commands = append(commands, Say{Text: event.Msg.Text()})
+			} else {
+				for _, a := range event.Msg.Attachments() {
+					a = models.NormalizeAttachment(a)
+					commands = append(commands, Play{URL: a.URL()})
+				}
+			}
+		}
+	}
+
+	if w != nil {
+		msgWait, isMsgWait := w.(*waits.MsgWait)
+		if !isMsgWait {
+			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
+		}
+
+		switch hint := msgWait.Hint().(type) {
+		case *hints.DigitsHint:
+			resumeURL = resumeURL + "&wait_type=gather"
+			gather := &Gather{
+				Action:   resumeURL,
+				Commands: commands,
+				Timeout:  inputTimeout,
+			}
+			if hint.Count != nil {
+				gather.NumDigits = *hint.Count
+			}
+			gather.FinishOnKey = hint.TerminatedBy
+			r.Gather = gather
+			r.Commands = append(r.Commands, Redirect{URL: resumeURL + "&timeout=true"})
+
+		case *hints.AudioHint:
+			resumeURL = resumeURL + "&wait_type=record"
+			commands = append(commands, Record{Action: resumeURL})
+			commands = append(commands, Redirect{URL: resumeURL + "&empty=true"})
+			r.Commands = commands
+
+		default:
+			return "", errors.Errorf("unable to use wait in IVR call, unknow type: %s", msgWait.Hint().Type())
+		}
+	} else {
+		// no wait? call is over, hang up
+		commands = append(commands, Hangup{})
+		r.Commands = commands
+	}
+
+	var body []byte
+	var err error
+	if indentMarshal {
+		body, err = xml.MarshalIndent(r, "", "  ")
+	} else {
+		body, err = xml.Marshal(r)
+	}
+	if err != nil {
+		return "", errors.Wrap(err, "unable to marshal twiml body")
+	}
+
+	return xml.Header + string(body), nil
 }

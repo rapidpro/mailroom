@@ -3,7 +3,10 @@ package testsuite
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -31,7 +34,15 @@ func Reset() {
 func ResetDB() {
 	db := sqlx.MustOpen("postgres", "postgres://temba@localhost/temba?sslmode=disable")
 	db.MustExec("drop owned by temba cascade")
-	mustExec("pg_restore", "-d", "temba", "../temba.dump")
+	dir, _ := os.Getwd()
+
+	// our working directory is set to the directory of the module being tested, we want to get just
+	// the portion that points to the mailroom directory
+	for !strings.HasSuffix(dir, "mailroom") && dir != "/" {
+		dir = path.Dir(dir)
+	}
+
+	mustExec("pg_restore", "-d", "temba", path.Join(dir, "./temba.dump"))
 }
 
 // DB returns an open test database pool

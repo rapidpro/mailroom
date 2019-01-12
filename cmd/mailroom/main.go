@@ -17,8 +17,15 @@ import (
 	_ "github.com/nyaruka/mailroom/campaigns"
 	_ "github.com/nyaruka/mailroom/expirations"
 	_ "github.com/nyaruka/mailroom/hooks"
+	_ "github.com/nyaruka/mailroom/ivr"
 	_ "github.com/nyaruka/mailroom/starts"
 	_ "github.com/nyaruka/mailroom/timeouts"
+
+	_ "github.com/nyaruka/mailroom/web/ivr"
+	_ "github.com/nyaruka/mailroom/web/simulation"
+	_ "github.com/nyaruka/mailroom/web/surveyor"
+
+	_ "github.com/nyaruka/mailroom/ivr/twilio"
 )
 
 var version = "Dev"

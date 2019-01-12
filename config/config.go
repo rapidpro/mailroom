@@ -25,6 +25,15 @@ type Config struct {
 	Domain           string `help:"the domain that mailroom is listening on"`
 	AttachmentDomain string `help:"the domain that will be used for relative attachment"`
 
+	S3Endpoint         string `help:"the S3 endpoint we will write attachments to"`
+	S3Region           string `help:"the S3 region we will write attachments to"`
+	S3MediaBucket      string `help:"the S3 bucket we will write attachments to"`
+	S3MediaPrefix      string `help:"the prefix that will be added to attachment filenames"`
+	S3DisableSSL       bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
+	S3ForcePathStyle   bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
+	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
+	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
+
 	AuthToken string `help:"the token clients will need to authenticate web requests"`
 	Address   string `help:"the address to bind our web server to"`
 	Port      int    `help:"the port to bind our web server to"`
@@ -41,6 +50,15 @@ func NewMailroomConfig() *Config {
 		LogLevel:       "error",
 		Version:        "Dev",
 		SMTPServer:     "",
+
+		S3Endpoint:         "https://s3.amazonaws.com",
+		S3Region:           "us-east-1",
+		S3MediaBucket:      "mailroom-media",
+		S3MediaPrefix:      "/media/",
+		S3DisableSSL:       false,
+		S3ForcePathStyle:   false,
+		AWSAccessKeyID:     "missing_aws_access_key_id",
+		AWSSecretAccessKey: "missing_aws_secret_access_key",
 
 		Address: "localhost",
 		Port:    8090,

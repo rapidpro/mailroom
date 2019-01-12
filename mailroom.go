@@ -14,8 +14,15 @@ import (
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/s3utils"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/sirupsen/logrus"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 )
 
 // InitFunction is a function that will be called when mailroom starts
@@ -43,9 +50,11 @@ const HandlerQueue = "handler"
 
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	Config    *config.Config
-	DB        *sqlx.DB
-	RP        *redis.Pool
+	Config   *config.Config
+	DB       *sqlx.DB
+	RP       *redis.Pool
+	S3Client s3iface.S3API
+
 	Quit      chan bool
 	CTX       context.Context
 	Cancel    context.CancelFunc
@@ -154,6 +163,27 @@ func (mr *Mailroom) Start() error {
 		log.Info("redis ok")
 	}
 
+	// create our s3 client
+	s3Session, err := session.NewSession(&aws.Config{
+		Credentials:      credentials.NewStaticCredentials(mr.Config.AWSAccessKeyID, mr.Config.AWSSecretAccessKey, ""),
+		Endpoint:         aws.String(mr.Config.S3Endpoint),
+		Region:           aws.String(mr.Config.S3Region),
+		DisableSSL:       aws.Bool(mr.Config.S3DisableSSL),
+		S3ForcePathStyle: aws.Bool(mr.Config.S3ForcePathStyle),
+	})
+	if err != nil {
+		return err
+	}
+	mr.S3Client = s3.New(s3Session)
+
+	// test out our S3 credentials
+	err = s3utils.TestS3(mr.S3Client, mr.Config.S3MediaBucket)
+	if err != nil {
+		log.WithError(err).Error("s3 bucket not reachable")
+	} else {
+		log.Info("s3 bucket ok")
+	}
+
 	for _, initFunc := range initFunctions {
 		initFunc(mr)
 	}
@@ -170,7 +200,7 @@ func (mr *Mailroom) Start() error {
 	mr.handlerForeman.Start()
 
 	// start our web server
-	mr.webserver = web.NewServer(mr.CTX, mr.DB, mr.RP, mr.Config, mr.WaitGroup)
+	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.S3Client, mr.WaitGroup)
 	mr.webserver.Start()
 
 	logrus.Info("mailroom started")

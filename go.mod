@@ -2,6 +2,7 @@ module github.com/nyaruka/mailroom
 
 require (
 	github.com/apex/log v1.0.0
+	github.com/aws/aws-sdk-go v1.16.17
 	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
@@ -12,14 +13,15 @@ require (
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible
+	github.com/gorilla/schema v1.0.2
 	github.com/jmoiron/sqlx v0.0.0-20180614180643-0dae4fefe7c0
 	github.com/lib/pq v0.0.0-20181016162627-9eb73efc1fcc
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
+	github.com/nyaruka/courier v1.2.124 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v0.2.0
-	github.com/nyaruka/goflow v0.24.1
+	github.com/nyaruka/goflow v0.25.0
 	github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8
-	github.com/nyaruka/phonenumbers v0.0.0-20181019165255-7250c0532717 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.8.0
 	github.com/satori/go.uuid v1.2.0
@@ -29,7 +31,9 @@ require (
 	golang.org/x/crypto v0.0.0-20180904163835-0709b304e793 // indirect
 	google.golang.org/appengine v1.4.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
-	gopkg.in/go-playground/validator.v9 v9.21.0 // indirect
+	gopkg.in/go-playground/validator.v9 v9.21.0
 	gopkg.in/guregu/null.v3 v3.4.0
 	gopkg.in/mail.v2 v2.3.1 // indirect
 )
+
+replace github.com/nyaruka/goflow => /Users/nicp/gohack/github.com/nyaruka/goflow

@@ -1,9 +1,8 @@
-package web
+package simulation
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -17,13 +16,16 @@ import (
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	maxRequestBytes int64 = 1048576
-)
+func init() {
+	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/migrate", web.RequireAuthToken(handleMigrate))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(handleStart))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(handleResume))
+}
 
 var (
 	httpClient = utils.NewHTTPClient("mailroom")
@@ -65,14 +67,14 @@ type startRequest struct {
 }
 
 // handles a request to /start
-func (s *Server) handleStart(ctx context.Context, r *http.Request) (interface{}, int, error) {
+func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &startRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, maxRequestBytes); err != nil {
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
 	// grab our org
-	org, err := models.NewOrgAssets(s.ctx, s.db, request.OrgID, nil)
+	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -131,14 +133,14 @@ type resumeRequest struct {
 	Resume  json.RawMessage `json:"resume" validate:"required"`
 }
 
-func (s *Server) handleResume(ctx context.Context, r *http.Request) (interface{}, int, error) {
+func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &resumeRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, maxRequestBytes); err != nil {
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// grab our org
-	org, err := models.NewOrgAssets(s.ctx, s.db, request.OrgID, nil)
+	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -215,7 +217,7 @@ type migrateRequest struct {
 	IncludeUI     *bool           `json:"include_ui"`
 }
 
-func (s *Server) handleMigrate(ctx context.Context, r *http.Request) (interface{}, int, error) {
+func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	migrate := migrateRequest{}
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
 	if err != nil {
@@ -248,21 +250,4 @@ func (s *Server) handleMigrate(ctx context.Context, r *http.Request) (interface{
 	}
 
 	return flow, http.StatusOK, nil
-}
-
-func (s *Server) handleIndex(ctx context.Context, r *http.Request) (interface{}, int, error) {
-	response := map[string]string{
-		"url":       fmt.Sprintf("%s", r.URL),
-		"component": "mailroom",
-		"version":   s.config.Version,
-	}
-	return response, http.StatusOK, nil
-}
-
-func (s *Server) handle404(ctx context.Context, r *http.Request) (interface{}, int, error) {
-	return nil, http.StatusNotFound, errors.Errorf("not found: %s", r.URL.String())
-}
-
-func (s *Server) handle405(ctx context.Context, r *http.Request) (interface{}, int, error) {
-	return nil, http.StatusMethodNotAllowed, errors.Errorf("illegal method: %s", r.Method)
 }

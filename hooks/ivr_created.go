@@ -13,16 +13,16 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeIVRSay, handleSay)
+	models.RegisterEventHook(events.TypeIVRCreated, handleIVRCreated)
 }
 
-// CommitSaysHook is our hook for comitting session messages / say commands
-type CommitSaysHook struct{}
+// CommitIVRHook is our hook for comitting session messages / say commands
+type CommitIVRHook struct{}
 
-var commitSaysHook = &CommitSaysHook{}
+var commitIVRHook = &CommitIVRHook{}
 
 // Apply takes care of inserting all the messages in the passed in sessions assigning topups to them as needed.
-func (h *CommitSaysHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	msgs := make([]*models.Msg, 0, len(sessions))
 	for _, s := range sessions {
 		for _, m := range s {
@@ -54,29 +54,29 @@ func (h *CommitSaysHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 	return nil
 }
 
-// handleSay creates the db msg for the passed in event
-func handleSay(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
-	event := e.(*events.IVRSayEvent)
+// handleIVRCreated creates the db msg for the passed in event
+func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+	event := e.(*events.IVRCreatedEvent)
 
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
 		"session_id":   session.ID,
-		"text":         event.Text,
+		"text":         event.Msg.Text(),
 	}).Debug("ivr say")
 
-	// get our channel
-	channel := org.ChannelByUUID(event.Msg.Channel().UUID)
-	if channel == nil {
-		return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
+	// get our channel connection
+	conn := session.ChannelSession()
+	if conn == nil {
+		return errors.Errorf("ivr sessions must have a channel session set")
 	}
 
-	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, session.ContactID, &event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingIVR(org.OrgID(), conn, event.Msg, event.CreatedOn())
 	if err != nil {
-		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
+		return errors.Wrapf(err, "error creating outgoing ivr say: %s", event.Msg.Text())
 	}
 
 	// register to have this message committed
-	session.AddPreCommitEvent(commitSaysHook, msg)
+	session.AddPreCommitEvent(commitIVRHook, msg)
 
 	return nil
 }

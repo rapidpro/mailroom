@@ -90,15 +90,10 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	}
 
 	// write our updated session and runs
-	err = session.WriteUpdatedSession(txCTX, tx, rp, org, fs, sprint.Events())
+	err = session.WriteUpdatedSession(txCTX, tx, rp, org, fs, sprint, hook)
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
-	}
-
-	// call our commit hook before committing our session
-	if hook != nil {
-		hook(ctx, tx, rp, org, []*models.Session{session})
 	}
 
 	// commit at once
@@ -172,7 +167,7 @@ func StartFlowBatch(
 		if batch.Parent() != nil {
 			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.Parent(), now)
 		}
-		return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, now)
+		return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, nil, now)
 	}
 
 	// before committing our runs we want to set the start they are associated with
@@ -430,7 +425,7 @@ func StartFlowForContacts(
 
 	// for each trigger start the flow
 	sessions := make([]flows.Session, 0, len(triggers))
-	sessionEvents := make([][]flows.Event, 0, len(triggers))
+	sprints := make([]flows.Sprint, 0, len(triggers))
 
 	for _, trigger := range triggers {
 		// create the session for this flow and run
@@ -448,7 +443,7 @@ func StartFlowForContacts(
 		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
-		sessionEvents = append(sessionEvents, sprint.Events())
+		sprints = append(sprints, sprint)
 	}
 
 	if len(sessions) == 0 {
@@ -479,7 +474,7 @@ func StartFlowForContacts(
 	}
 
 	// write our session to the db
-	dbSessions, err := models.WriteSessions(txCTX, tx, rp, org, sessions, sessionEvents, hook)
+	dbSessions, err := models.WriteSessions(txCTX, tx, rp, org, sessions, sprints, hook)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error writing sessions")
 	}
@@ -499,7 +494,7 @@ func StartFlowForContacts(
 		// we failed writing our sessions in one go, try one at a time
 		for i := range sessions {
 			session := sessions[i]
-			events := sessionEvents[i]
+			sprint := sprints[i]
 
 			txCTX, cancel := context.WithTimeout(ctx, commitTimeout)
 			defer cancel()
@@ -519,7 +514,7 @@ func StartFlowForContacts(
 				}
 			}
 
-			dbSession, err := models.WriteSessions(txCTX, tx, rp, org, []flows.Session{session}, [][]flows.Event{events}, hook)
+			dbSession, err := models.WriteSessions(txCTX, tx, rp, org, []flows.Session{session}, []flows.Sprint{sprint}, hook)
 			if err != nil {
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")

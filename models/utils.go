@@ -62,6 +62,7 @@ type Queryer interface {
 	QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error)
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
+	GetContext(ctx context.Context, value interface{}, query string, args ...interface{}) error
 }
 
 func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []interface{}) error {

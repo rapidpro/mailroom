@@ -77,9 +77,10 @@ func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarsha
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
 	s struct {
-		StartID StartID `json:"start_id"`
-		OrgID   OrgID   `json:"org_id"`
-		FlowID  FlowID  `json:"flow_id"`
+		StartID  StartID  `json:"start_id"`
+		OrgID    OrgID    `json:"org_id"`
+		FlowID   FlowID   `json:"flow_id"`
+		FlowType FlowType `json:"flow_type"`
 
 		GroupIDs      []GroupID         `json:"group_ids,omitempty"`
 		ContactIDs    []flows.ContactID `json:"contact_ids,omitempty"`
@@ -96,6 +97,7 @@ type FlowStart struct {
 func (s *FlowStart) StartID() StartID              { return s.s.StartID }
 func (s *FlowStart) OrgID() OrgID                  { return s.s.OrgID }
 func (s *FlowStart) FlowID() FlowID                { return s.s.FlowID }
+func (s *FlowStart) FlowType() FlowType            { return s.s.FlowType }
 func (s *FlowStart) GroupIDs() []GroupID           { return s.s.GroupIDs }
 func (s *FlowStart) ContactIDs() []flows.ContactID { return s.s.ContactIDs }
 func (s *FlowStart) URNs() []urns.URN              { return s.s.URNs }
@@ -108,9 +110,9 @@ func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
 
-func FlowIDForStart(ctx context.Context, db *sqlx.DB, orgID OrgID, startID StartID) (FlowID, error) {
+func FlowIDForStart(ctx context.Context, db Queryer, orgID OrgID, startID StartID) (FlowID, error) {
 	flowID := FlowID(0)
-	err := db.Get(&flowID, `SELECT flow_id FROM flows_flowstart WHERE org_id = $1 AND id = $2 AND is_active = TRUE`, orgID, startID)
+	err := db.GetContext(ctx, &flowID, `SELECT flow_id FROM flows_flowstart WHERE id = $1 AND is_active = TRUE`, startID)
 	if err != nil {
 		return flowID, errors.Wrapf(err, "unable to load flow for start")
 	}

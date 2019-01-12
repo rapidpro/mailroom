@@ -1,4 +1,4 @@
-package web
+package surveyor
 
 import (
 	"context"
@@ -11,7 +11,16 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
+)
+
+func init() {
+	web.RegisterJSONRoute(http.MethodPost, "/mr/surveyor/submit", web.RequireUserToken(handleSurveyorSubmit))
+}
+
+var (
+	httpClient = utils.NewHTTPClient("mailroom")
 )
 
 // Represents a surveyor submission
@@ -30,15 +39,15 @@ type surveyorSubmitResponse struct {
 }
 
 // handles a surveyor request
-func (s *Server) handleSurveyorSubmit(ctx context.Context, r *http.Request) (interface{}, int, error) {
+func handleSurveyorSubmit(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &surveyorSubmitRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, maxRequestBytes); err != nil {
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
 	// grab our org
-	orgID := ctx.Value(orgIDKey).(models.OrgID)
-	org, err := models.NewOrgAssets(s.ctx, s.db, orgID, nil)
+	orgID := ctx.Value(web.OrgIDKey).(models.OrgID)
+	org, err := models.NewOrgAssets(s.CTX, s.DB, orgID, nil)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -71,7 +80,7 @@ func (s *Server) handleSurveyorSubmit(ctx context.Context, r *http.Request) (int
 	}
 
 	// create / fetch our contact based on the highest priority URN
-	_, err = models.CreateContact(ctx, s.db, org, assets, urn)
+	_, err = models.CreateContact(ctx, s.DB, org, assets, urn)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 	}
@@ -86,7 +95,7 @@ func (s *Server) handleSurveyorSubmit(ctx context.Context, r *http.Request) (int
 	}
 
 	// and our user id
-	_, valid := ctx.Value(userIDKey).(int)
+	_, valid := ctx.Value(web.UserIDKey).(int)
 	if !valid {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to request user")
 	}

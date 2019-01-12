@@ -161,6 +161,65 @@ func (m *Msg) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.m)
 }
 
+// NewIncomingIVR creates a new incoming IVR message for the passed in text and attachment
+func NewIncomingIVR(orgID OrgID, conn *ChannelSession, in *flows.MsgIn, createdOn time.Time) *Msg {
+	msg := &Msg{}
+	m := &msg.m
+
+	m.UUID = in.UUID()
+	m.Text = in.Text()
+	m.Direction = DirectionIn
+	m.Status = MsgStatusHandled
+	m.Visibility = VisibilityVisible
+	m.MsgType = TypeIVR
+	m.ContactID = conn.ContactID()
+	m.ContactURNID = conn.ContactURNID()
+	m.ConnectionID = ConnectionID(null.NewInt(int64(conn.ID()), true))
+	m.URN = in.URN()
+
+	m.OrgID = orgID
+	m.TopupID = NilTopupID
+	m.CreatedOn = createdOn
+	m.ChannelID = conn.ChannelID()
+
+	// add any attachments
+	for _, a := range in.Attachments() {
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+	}
+
+	return msg
+}
+
+// NewOutgoingIVR creates a new IVR message for the passed in text with the optional attachment
+func NewOutgoingIVR(orgID OrgID, conn *ChannelSession, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+	msg := &Msg{}
+	m := &msg.m
+
+	m.UUID = out.UUID()
+	m.Text = out.Text()
+	m.HighPriority = false
+	m.Direction = DirectionOut
+	m.Status = MsgStatusWired
+	m.Visibility = VisibilityVisible
+	m.MsgType = TypeIVR
+	m.ContactID = conn.ContactID()
+	m.ContactURNID = conn.ContactURNID()
+	m.ConnectionID = ConnectionID(null.NewInt(int64(conn.ID()), true))
+	m.URN = out.URN()
+
+	m.OrgID = orgID
+	m.TopupID = NilTopupID
+	m.CreatedOn = createdOn
+	m.ChannelID = conn.ChannelID()
+
+	// if we have attachments, add them
+	for _, a := range out.Attachments() {
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+	}
+
+	return msg, nil
+}
+
 // NewOutgoingMsg creates an outgoing message for the passed in flow message. Note that this message is created in a queued state!
 func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	_, _, query, _ := out.URN().ToParts()
@@ -193,22 +252,14 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	m.CreatedOn = createdOn
 	m.ChannelID = channel.ID()
 	m.ChannelUUID = channel.UUID()
+	m.MsgCount = 1
 
 	msg.channel = channel
 
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
 		for _, a := range out.Attachments() {
-			// if our URL is relative, remap it to something fully qualified
-			url := a.URL()
-			if !strings.HasPrefix(url, "http") {
-				if strings.HasPrefix(url, "/") {
-					url = fmt.Sprintf("https://%s%s", config.Mailroom.AttachmentDomain, url)
-				} else {
-					url = fmt.Sprintf("https://%s/%s", config.Mailroom.AttachmentDomain, url)
-				}
-			}
-			m.Attachments = append(m.Attachments, fmt.Sprintf("%s:%s", a.ContentType(), url))
+			m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
 		}
 	}
 
@@ -240,6 +291,20 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 	return msg, nil
 }
 
+// NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
+// include the full host for attachment domains
+func NormalizeAttachment(attachment flows.Attachment) flows.Attachment {
+	url := attachment.URL()
+	if !strings.HasPrefix(url, "http") {
+		if strings.HasPrefix(url, "/") {
+			url = fmt.Sprintf("https://%s%s", config.Mailroom.AttachmentDomain, url)
+		} else {
+			url = fmt.Sprintf("https://%s/%s", config.Mailroom.AttachmentDomain, url)
+		}
+	}
+	return flows.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
+}
+
 // SetTimeout sets the timeout for this message
 func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
 	m.m.SessionID = id
@@ -260,10 +325,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, direction, status, attachments, metadata,
-		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, response_to_id,
+		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, connection_id, response_to_id,
 		 contact_id, contact_urn_id, org_id, topup_id)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :direction, :status, :attachments, :metadata,
-		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :response_to_id,
+		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :connection_id, :response_to_id,
 		 :contact_id, :contact_urn_id, :org_id, :topup_id)
 RETURNING 
 	id as id, 
