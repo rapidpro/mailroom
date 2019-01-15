@@ -40,7 +40,8 @@ type IVRRequest struct {
 	URN          urns.URN                `form:"urn"        validate:"required"`
 }
 
-// writeClientError is just a small utility method to write out a simple JSON error
+// writeClientError is just a small utility method to write out a simple JSON error when we don't have a client yet
+// to do it on our behalf
 func writeClientError(w http.ResponseWriter, err error) error {
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
@@ -92,7 +93,19 @@ func handleIVRRequest(ctx context.Context, s *web.Server, r *http.Request, rawW 
 			desc = "IVR Error"
 			isError = true
 		}
-		_, err := models.WriteChannelLog(ctx, s.DB, desc, isError, r.Method, r.URL.String(), requestTrace, responseTrace.Bytes(), w.Status(), time.Since(start), conn)
+
+		path := r.URL.RequestURI()
+		proxyPath := r.Header.Get("X-Forwarded-Path")
+		if proxyPath != "" {
+			path = proxyPath
+		}
+
+		url := fmt.Sprintf("https://%s%s", r.Host, path)
+		_, err := models.InsertChannelLog(
+			ctx, s.DB, desc, isError,
+			r.Method, url, requestTrace, w.Status(), responseTrace.Bytes(), time.Since(start),
+			conn,
+		)
 		if err != nil {
 			logrus.WithError(err).Error("error writing ivr channel log")
 		}
@@ -114,6 +127,12 @@ func handleIVRRequest(ctx context.Context, s *web.Server, r *http.Request, rawW 
 	client, err := ivr.GetClient(channel)
 	if client == nil {
 		return writeClientError(w, errors.Wrapf(err, "unable to load client for channel: %d", conn.ChannelID()))
+	}
+
+	// validate this request's signature if relevant
+	err = client.ValidateRequestSignature(r)
+	if err != nil {
+		return writeClientError(w, errors.Wrapf(err, "request failed signature validation"))
 	}
 
 	// load our contact

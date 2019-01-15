@@ -45,9 +45,9 @@ RETURNING
 	now() as created_on
 `
 
-// WriteChannelLog writes a channel log to the db returning the inserted log
-func WriteChannelLog(ctx context.Context, db *sqlx.DB,
-	desc string, isError bool, method string, url string, request []byte, response []byte, status int,
+// InsertChannelLog writes a channel log to the db returning the inserted log
+func InsertChannelLog(ctx context.Context, db *sqlx.DB,
+	desc string, isError bool, method string, url string, request []byte, status int, response []byte,
 	elapsed time.Duration, conn *ChannelSession) (*ChannelLog, error) {
 
 	log := &ChannelLog{}

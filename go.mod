@@ -5,6 +5,7 @@ require (
 	github.com/aws/aws-sdk-go v1.16.17
 	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/evalphobia/logrus_sentry v0.4.6
 	github.com/getsentry/raven-go v0.0.0-20180903072508-084a9de9eb03 // indirect

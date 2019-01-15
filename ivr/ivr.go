@@ -21,6 +21,7 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/httputils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/s3utils"
@@ -35,24 +36,57 @@ const (
 	NilAttachment = flows.Attachment("")
 )
 
+const userAgent = "Mailroom/"
+
+// Message that is spoken to an IVR user if an error occurs
+const ErrorMessage = "An error has occurred, please try again later."
+
 // CallEndedError is our constant error for when a call has ended
 var CallEndedError = fmt.Errorf("call ended")
 
+// our map of client constructors
 var constructors = make(map[models.ChannelType]ClientConstructor)
 
 // ClientConstructor defines our signature for creating a new IVR client from a channel
-type ClientConstructor func(c *models.Channel) (IVRClient, error)
+type ClientConstructor func(c *models.Channel) (Client, error)
 
 // RegisterClientType registers the passed in channel type with the passed in constructor
 func RegisterClientType(channelType models.ChannelType, constructor ClientConstructor) {
 	constructors[channelType] = constructor
 }
 
+// GetClient creates the right kind of IVRClient for the passed in channel
+func GetClient(channel *models.Channel) (Client, error) {
+	constructor := constructors[channel.Type()]
+	if constructor == nil {
+		return nil, errors.Errorf("no ivr client for chanel type: %s", channel.Type())
+	}
+
+	return constructor(channel)
+}
+
+// Client defines the interface IVR clients must satisfy
+type Client interface {
+	RequestCall(client *http.Client, number urns.URN, callbackURL string, statusURL string) (CallID, error)
+
+	WriteSessionResponse(session *models.Session, resumeURL string, req *http.Request, w http.ResponseWriter) error
+
+	WriteErrorResponse(w http.ResponseWriter, err error) error
+
+	WriteEmptyResponse(w http.ResponseWriter, msg string) error
+
+	InputForRequest(r *http.Request) (string, flows.Attachment, error)
+
+	StatusForRequest(r *http.Request) (models.ChannelSessionStatus, int)
+
+	ValidateRequestSignature(r *http.Request) error
+}
+
 // RequestCallStart creates a new ChannelSession for the passed in flow start and contact, returning the created session
-func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, org *models.OrgAssets, start *models.FlowStartBatch, c *models.Contact) (*models.ChannelSession, error) {
+func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, org *models.OrgAssets, start *models.FlowStartBatch, contact *models.Contact) (*models.ChannelSession, error) {
 	// find a tel URL for the contact
 	telURN := urns.NilURN
-	for _, u := range c.URNs() {
+	for _, u := range contact.URNs() {
 		if u.Scheme() == urns.TelScheme {
 			telURN = u
 		}
@@ -92,7 +126,7 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 
 	// create our session
 	conn, err := models.CreateIVRSession(
-		ctx, db, org.OrgID(), channel.ID(), c.ID(), models.URNID(urnID),
+		ctx, db, org.OrgID(), channel.ID(), contact.ID(), models.URNID(urnID),
 		models.ChannelSessionDirectionOut, models.ChannelSessionStatusPending, "",
 	)
 	if err != nil {
@@ -115,14 +149,38 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	statusURL := fmt.Sprintf("https://%s/mr/ivr/handle?%s", domain, form.Encode())
 
 	// create the right client
-	client, err := GetClient(channel)
+	c, err := GetClient(channel)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to create ivr client")
 	}
 
-	// start our call
-	// TODO: our interface needs to return a ChannelLog type thing
-	callID, err := client.RequestCall(channel, telURN, startURL, statusURL)
+	// we create our own HTTP client with our own transport so we can log the request and set our user agent
+	logger := httputils.NewLoggingTransport(http.DefaultTransport)
+	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
+
+	// try to request our call start
+	callID, err := c.RequestCall(client, telURN, startURL, statusURL)
+
+	// insert any logged requests
+	for _, rt := range logger.RoundTrips {
+		desc := "Call Requested"
+		isError := false
+		if rt.Status/100 != 2 {
+			desc = "Error Requesting Call"
+			isError = true
+		}
+		_, err := models.InsertChannelLog(
+			ctx, db, desc, isError,
+			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody, rt.Elapsed,
+			conn,
+		)
+
+		// log any error inserting our channel log, but try to continue
+		if err != nil {
+			logrus.WithError(err).Error("error inserting channel log")
+		}
+	}
+
 	if err != nil {
 		logrus.WithError(err).Error("error placing outbound call")
 
@@ -145,12 +203,12 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 
 // StartIVRFlow takes care of starting the flow in the passed in start for the passed in contact and URN
 func StartIVRFlow(
-	ctx context.Context, db *sqlx.DB, rp *redis.Pool, client IVRClient, resumeURL string, org *models.OrgAssets,
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, resumeURL string, org *models.OrgAssets,
 	channel *models.Channel, conn *models.ChannelSession, c *models.Contact, urn urns.URN, startID models.StartID,
 	r *http.Request, w http.ResponseWriter) error {
 
 	// connection isn't in a wired status, that's an error
-	if conn.Status() != models.ChannelSessionStatusWired {
+	if conn.Status() != models.ChannelSessionStatusWired && conn.Status() != models.ChannelSessionStatusInProgress {
 		return client.WriteErrorResponse(w, errors.Errorf("connection in invalid status: %s", conn.Status()))
 	}
 
@@ -201,7 +259,7 @@ func StartIVRFlow(
 	}
 
 	// have our client output our session status
-	err = client.WriteSessionResponse(channel, sessions[0], resumeURL, r, w)
+	err = client.WriteSessionResponse(sessions[0], resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for start")
 	}
@@ -217,7 +275,7 @@ func StartIVRFlow(
 
 // ResumeIVRFlow takes care of resuming the flow in the passed in start for the passed in contact and URN
 func ResumeIVRFlow(
-	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API, resumeURL string, client IVRClient,
+	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API, resumeURL string, client Client,
 	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelSession, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
@@ -361,7 +419,7 @@ func ResumeIVRFlow(
 	}
 
 	// have our client output our session status
-	err = client.WriteSessionResponse(channel, session, resumeURL, r, w)
+	err = client.WriteSessionResponse(session, resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for resume")
 	}
@@ -369,7 +427,9 @@ func ResumeIVRFlow(
 	return nil
 }
 
-func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, client IVRClient, conn *models.ChannelSession, r *http.Request, w http.ResponseWriter) error {
+// HandleIVRStatus is called on status callbacks for an IVR call. We let the client decide whether the call has
+// ended for some reason and update the state of the call and session if so
+func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, conn *models.ChannelSession, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
 	status, duration := client.StatusForRequest(r)
 
@@ -380,30 +440,5 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, client IV
 		}
 	}
 
-	return client.WriteEmptyResponse(w, "status updated")
-}
-
-// GetClient creates the right kind of IVRClient for the passed in channel
-func GetClient(channel *models.Channel) (IVRClient, error) {
-	constructor := constructors[channel.Type()]
-	if constructor == nil {
-		return nil, errors.Errorf("no ivr client for chanel type: %s", channel.Type())
-	}
-
-	return constructor(channel)
-}
-
-// IVRClient defines the interface IVR clients must satisfy
-type IVRClient interface {
-	RequestCall(c *models.Channel, number urns.URN, callbackURL string, statusURL string) (CallID, error)
-
-	WriteSessionResponse(channel *models.Channel, session *models.Session, resumeURL string, req *http.Request, w http.ResponseWriter) error
-
-	WriteErrorResponse(w http.ResponseWriter, err error) error
-
-	WriteEmptyResponse(w http.ResponseWriter, msg string) error
-
-	InputForRequest(r *http.Request) (string, flows.Attachment, error)
-
-	StatusForRequest(r *http.Request) (models.ChannelSessionStatus, int)
+	return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s", status))
 }
