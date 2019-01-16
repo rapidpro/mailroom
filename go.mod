@@ -3,7 +3,7 @@ module github.com/nyaruka/mailroom
 require (
 	github.com/apex/log v1.0.0
 	github.com/aws/aws-sdk-go v1.16.17
-	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44 // indirect
+	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dustin/go-humanize v1.0.0 // indirect

@@ -58,24 +58,24 @@ var keptEvents = map[string]bool{
 
 // Session is the mailroom type for a FlowSession
 type Session struct {
-	ID            SessionID         `db:"id"`
-	Status        SessionStatus     `db:"status"`
-	Responded     bool              `db:"responded"`
-	Output        string            `db:"output"`
-	ContactID     flows.ContactID   `db:"contact_id"`
-	OrgID         OrgID             `db:"org_id"`
-	CreatedOn     time.Time         `db:"created_on"`
-	EndedOn       *time.Time        `db:"ended_on"`
-	TimeoutOn     *time.Time        `db:"timeout_on"`
-	WaitStartedOn *time.Time        `db:"wait_started_on"`
-	CurrentFlowID *FlowID           `db:"current_flow_id"`
-	ConnectionID  *ChannelSessionID `db:"connection_id"`
+	ID            SessionID       `db:"id"`
+	Status        SessionStatus   `db:"status"`
+	Responded     bool            `db:"responded"`
+	Output        string          `db:"output"`
+	ContactID     flows.ContactID `db:"contact_id"`
+	OrgID         OrgID           `db:"org_id"`
+	CreatedOn     time.Time       `db:"created_on"`
+	EndedOn       *time.Time      `db:"ended_on"`
+	TimeoutOn     *time.Time      `db:"timeout_on"`
+	WaitStartedOn *time.Time      `db:"wait_started_on"`
+	CurrentFlowID *FlowID         `db:"current_flow_id"`
+	ConnectionID  *ConnectionID   `db:"connection_id"`
 
 	IncomingMsgID      null.Int
 	IncomingExternalID string
 
-	// any channel session associated with this flow session
-	channelSession *ChannelSession
+	// any channel connection associated with this flow session
+	channelConnection *ChannelConnection
 
 	// time after our last message is sent that we should timeout
 	timeout *time.Duration
@@ -145,15 +145,15 @@ func (s *Session) SetIncomingMsg(id flows.MsgID, externalID string) {
 	s.IncomingExternalID = externalID
 }
 
-// SetChannelSession sets the channel session associated with this sprint
-func (s *Session) SetChannelSession(cs *ChannelSession) {
-	id := cs.ID()
-	s.ConnectionID = &id
-	s.channelSession = cs
+// SetChannelConnection sets the channel connection associated with this sprint
+func (s *Session) SetChannelConnection(cc *ChannelConnection) {
+	connID := cc.ID()
+	s.ConnectionID = &connID
+	s.channelConnection = cc
 }
 
-func (s *Session) ChannelSession() *ChannelSession {
-	return s.channelSession
+func (s *Session) ChannelConnection() *ChannelConnection {
+	return s.channelConnection
 }
 
 // FlowRun is the mailroom type for a FlowRun
@@ -426,9 +426,9 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// if this session is complete, so is any associated connection
-	if s.channelSession != nil {
+	if s.channelConnection != nil {
 		if s.Status == SessionStatusCompleted || s.Status == SessionStatusErrored {
-			err := s.channelSession.UpdateStatus(ctx, tx, ChannelSessionStatusCompleted, 0)
+			err := s.channelConnection.UpdateStatus(ctx, tx, ConnectionStatusCompleted, 0, time.Now())
 			if err != nil {
 				return errors.Wrapf(err, "error update channel connection")
 			}
@@ -536,7 +536,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	sessions := make([]*Session, 0, len(ss))
 	completeSessionsI := make([]interface{}, 0, len(ss))
 	incompleteSessionsI := make([]interface{}, 0, len(ss))
-	completedConnectionIDs := make([]ChannelSessionID, 0, 1)
+	completedConnectionIDs := make([]ConnectionID, 0, 1)
 	for i, s := range ss {
 		session, err := NewSession(org, s, sprints[i])
 		if err != nil {
@@ -546,8 +546,8 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 
 		if session.Status == SessionStatusCompleted {
 			completeSessionsI = append(completeSessionsI, session)
-			if session.channelSession != nil {
-				completedConnectionIDs = append(completedConnectionIDs, session.channelSession.ID())
+			if session.channelConnection != nil {
+				completedConnectionIDs = append(completedConnectionIDs, session.channelConnection.ID())
 			}
 		} else {
 			incompleteSessionsI = append(incompleteSessionsI, session)
@@ -569,7 +569,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// mark any connections that are done as complete as well
-	err = UpdateChannelConnectionStatuses(ctx, tx, completedConnectionIDs, ChannelSessionStatusCompleted)
+	err = UpdateChannelConnectionStatuses(ctx, tx, completedConnectionIDs, ConnectionStatusCompleted)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating channel connections to complete")
 	}

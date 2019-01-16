@@ -17,6 +17,7 @@ type RoundTrip struct {
 	RequestBody  []byte
 	Status       int
 	ResponseBody []byte
+	StartedOn    time.Time
 	Elapsed      time.Duration
 }
 
@@ -30,8 +31,9 @@ type LoggingTransport struct {
 // requests and responses of the parent http client.
 func (t *LoggingTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	rt := &RoundTrip{
-		Method: request.Method,
-		URL:    request.URL.String(),
+		StartedOn: time.Now(),
+		Method:    request.Method,
+		URL:       request.URL.String(),
 	}
 
 	requestBody, err := httputil.DumpRequestOut(request, true)
@@ -41,9 +43,8 @@ func (t *LoggingTransport) RoundTrip(request *http.Request) (*http.Response, err
 	rt.RequestBody = requestBody
 	t.RoundTrips = append(t.RoundTrips, rt)
 
-	start := time.Now()
 	response, err := t.tripper.RoundTrip(request)
-	rt.Elapsed = time.Since(start)
+	rt.Elapsed = time.Since(rt.StartedOn)
 
 	if err != nil {
 		err = errors.Wrapf(err, "error making http request")

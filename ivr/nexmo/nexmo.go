@@ -2,6 +2,7 @@ package nexmo
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -16,12 +17,16 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/buger/jsonparser"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/waits"
 	"github.com/nyaruka/goflow/flows/waits/hints"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
@@ -33,7 +38,7 @@ const (
 
 	baseURL = `https://api.nexmo.com/v1/calls`
 
-	inputTimeout = 120
+	inputTimeout = 10
 
 	appIDConfig      = "nexmo_app_id"
 	privateKeyConfig = "nexmo_app_private_key"
@@ -80,6 +85,102 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 		appID:      appID,
 		privateKey: privateKey,
 	}, nil
+}
+
+func (c *client) DownloadMedia(url string) (*http.Response, error) {
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	token, err := c.generateToken()
+	if err != nil {
+		return nil, errors.Wrapf(err, "error generating jwt token")
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	return http.DefaultClient.Do(req)
+}
+
+func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+	// if this is a recording_url resume, grab that
+	waitType := r.URL.Query().Get("wait_type")
+
+	switch waitType {
+	case "record":
+		recordingUUID := r.URL.Query().Get("recording_uuid")
+		if recordingUUID == "" {
+			return nil, errors.Errorf("record resume without recording_uuid")
+		}
+
+		rc := rp.Get()
+		defer rc.Close()
+
+		redisKey := fmt.Sprintf("recording_%s", recordingUUID)
+		recordingURL, err := redis.String(rc.Do("get", redisKey))
+		if err != nil && err != redis.ErrNil {
+			return nil, errors.Wrapf(err, "error getting recording url from redis")
+		}
+
+		// found a URL, stuff it in our request and move on
+		if recordingURL != "" {
+			r.URL.RawQuery = "&recording_url=" + url.QueryEscape(recordingURL)
+			logrus.WithField("recording_url", recordingURL).Info("found recording URL")
+			rc.Do("del", redisKey)
+			return nil, nil
+		}
+
+		// no recording yet, send back another 1 second input / wait
+		path := r.URL.RequestURI()
+		proxyPath := r.Header.Get("X-Forwarded-Path")
+		if proxyPath != "" {
+			path = proxyPath
+		}
+		url := fmt.Sprintf("https://%s%s", r.Host, path)
+
+		input := &Input{
+			Action:       "input",
+			Timeout:      1,
+			SubmitOnHash: true,
+			EventURL:     []string{url},
+			EventMethod:  http.MethodPost,
+		}
+		return json.MarshalIndent([]interface{}{input}, "", "  ")
+
+	case "recording_url":
+		// this is our async callback for our recording URL, we stuff it in redis and return an empty response
+		recordingUUID := r.URL.Query().Get("recording_uuid")
+		if recordingUUID == "" {
+			return nil, errors.Errorf("recording_url resume without recording_uuid")
+		}
+
+		// get our recording url out
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error reading body from request")
+		}
+		recordingURL, err := jsonparser.GetString(body, "recording_url")
+		if err != nil {
+			return nil, errors.Errorf("invalid json body")
+		}
+		if recordingURL == "" {
+			return nil, errors.Errorf("no recording_url found in request")
+		}
+
+		// write it to redis
+		rc := rp.Get()
+		defer rc.Close()
+
+		redisKey := fmt.Sprintf("recording_%s", recordingUUID)
+		_, err = rc.Do("setex", redisKey, 300, recordingURL)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error inserting recording URL into redis")
+		}
+
+		msgBody := map[string]string{
+			"_message": fmt.Sprintf("inserted recording url: %s for uuid: %s", recordingURL, recordingUUID),
+		}
+		return json.MarshalIndent(msgBody, "", "  ")
+
+	default:
+		return nil, nil
+	}
 }
 
 type Phone struct {
@@ -184,11 +285,6 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 		return "", ivr.NilAttachment, errors.Wrapf(err, "unable to parse ncco request")
 	}
 
-	// this could be a timeout, in which case we return nothing at all
-	if input.TimedOut {
-		return "", ivr.NilAttachment, nil
-	}
-
 	// this could be empty, in which case we return nothing at all
 	empty := r.Form.Get("empty")
 	if empty == "true" {
@@ -199,9 +295,19 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 	waitType := r.Form.Get("wait_type")
 	switch waitType {
 	case "gather":
+		// this could be a timeout, in which case we return nothing at all
+		if input.TimedOut {
+			return "", ivr.NilAttachment, nil
+		}
+
 		return input.DTMF, ivr.NilAttachment, nil
 	case "record":
-		return "", flows.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
+		recordingURL := r.URL.Query().Get("recording_url")
+		if recordingURL == "" {
+			return "", ivr.NilAttachment, nil
+		}
+		logrus.WithField("recording_url", recordingURL).Info("input found recording")
+		return "", flows.Attachment("audio:" + recordingURL), nil
 	default:
 		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
 	}
@@ -214,37 +320,38 @@ type StatusRequest struct {
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (c *client) StatusForRequest(r *http.Request) (models.ChannelSessionStatus, int) {
+func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
 	status := &StatusRequest{}
 	bb, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		logrus.WithError(err).Error("error reading status request body")
-		return models.ChannelSessionStatusErrored, 0
+		return models.ConnectionStatusErrored, 0
 	}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
 		logrus.WithError(err).Error("error unmarshalling ncco status")
-		return models.ChannelSessionStatusErrored, 0
+		return models.ConnectionStatusErrored, 0
 	}
 
 	switch status.Status {
 
 	case "started", "ringing":
-		return models.ChannelSessionStatusWired, 0
+		return models.ConnectionStatusWired, 0
 
 	case "answered":
-		return models.ChannelSessionStatusInProgress, 0
+		// we dont return in progress here as that only gets flipped when we get our callback to the action=start endpoint
+		return models.ConnectionStatusWired, 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(status.Duration)
-		return models.ChannelSessionStatusCompleted, duration
+		return models.ConnectionStatusCompleted, duration
 
 	case "rejected", "busy", "unanswered", "timeout", "failed", "machine":
-		return models.ChannelSessionStatusErrored, 0
+		return models.ConnectionStatusErrored, 0
 
 	default:
 		logrus.WithField("status", status.Status).Error("unknown call status in ncco callback")
-		return models.ChannelSessionStatusWired, 0
+		return models.ConnectionStatusFailed, 0
 	}
 }
 
@@ -414,8 +521,8 @@ type Talk struct {
 }
 
 type Stream struct {
-	Action    string `json:"stream"`
-	StreamURL string `json:",streamUrl"`
+	Action    string   `json:"action"`
+	StreamURL []string `json:"streamUrl"`
 }
 
 type Hangup struct {
@@ -438,16 +545,15 @@ type Input struct {
 
 type Record struct {
 	Action      string   `json:"action"`
-	EndOnKey    string   `json:"endOnKey"`
-	Timeout     int      `json:"timeOut"`
+	EndOnKey    string   `json:"endOnKey,omitempty"`
+	Timeout     int      `json:"timeOut,omitempty"`
 	EventURL    []string `json:"eventUrl"`
 	EventMethod string   `json:"eventMethod"`
 }
 
 func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
-
-	var wait interface{}
+	waitActions := make([]interface{}, 0, 1)
 
 	if w != nil {
 		msgWait, isMsgWait := w.(*waits.MsgWait)
@@ -469,26 +575,51 @@ func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Ev
 			if hint.Count != nil {
 				input.MaxDigits = *hint.Count
 			}
-			wait = input
+			waitActions = append(waitActions, input)
 
 		case *hints.AudioHint:
-			eventURL := resumeURL + "&wait_type=record"
+			// Nexmo is goofy in that they do not synchronously send us recordings. Rather the move on in
+			// the NCCO script immediately and then asynchronously call the event URL on the record URL
+			// when the recording is ready.
+			//
+			// We deal with this by adding the record event with a status callback including a UUID
+			// which we will store the recording url under when it is received. Meanwhile we put an input
+			// with a 1 second timeout in the script that will get called / repeated until the UUID is
+			// populated at which time we will actually continue.
+
+			recordingUUID := string(utils.NewUUID())
+			eventURL := resumeURL + "&wait_type=recording_url&recording_uuid=" + recordingUUID
 			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
 			record := &Record{
 				Action:      "record",
-				EndOnKey:    "#",
-				Timeout:     inputTimeout,
 				EventURL:    []string{eventURL},
 				EventMethod: http.MethodPost,
+				EndOnKey:    "#",
 			}
-			wait = record
+			waitActions = append(waitActions, record)
+
+			// nexmo is goofy in that they do not call our event URL upon gathering the recording but
+			// instead move on. So we need to put in an input here as well
+			eventURL = resumeURL + "&wait_type=record&recording_uuid=" + recordingUUID
+			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
+			input := &Input{
+				Action:       "input",
+				Timeout:      1,
+				SubmitOnHash: true,
+				EventURL:     []string{eventURL},
+				EventMethod:  http.MethodPost,
+			}
+			waitActions = append(waitActions, input)
 
 		default:
 			return "", errors.Errorf("unable to use wait in IVR call, unknow type: %s", msgWait.Hint().Type())
 		}
 	}
 
-	_, isWaitInput := wait.(*Input)
+	isWaitInput := false
+	if len(waitActions) > 0 {
+		_, isWaitInput = waitActions[0].(*Input)
+	}
 
 	for _, e := range es {
 		switch event := e.(type) {
@@ -503,15 +634,15 @@ func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Ev
 				for _, a := range event.Msg.Attachments() {
 					actions = append(actions, Stream{
 						Action:    "stream",
-						StreamURL: a.URL(),
+						StreamURL: []string{a.URL()},
 					})
 				}
 			}
 		}
 	}
 
-	if wait != nil {
-		actions = append(actions, wait)
+	for _, w := range waitActions {
+		actions = append(actions, w)
 	}
 
 	var body []byte

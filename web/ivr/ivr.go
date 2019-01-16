@@ -34,10 +34,10 @@ const (
 
 // IVRRequest is our form for what fields we expect in IVR callbacks
 type IVRRequest struct {
-	StartID      models.StartID          `form:"start"`
-	ConnectionID models.ChannelSessionID `form:"connection" validate:"required"`
-	Action       string                  `form:"action"     validate:"required"`
-	URN          urns.URN                `form:"urn"        validate:"required"`
+	StartID      models.StartID      `form:"start"`
+	ConnectionID models.ConnectionID `form:"connection" validate:"required"`
+	Action       string              `form:"action"     validate:"required"`
+	URN          urns.URN            `form:"urn"        validate:"required"`
 }
 
 // writeClientError is just a small utility method to write out a simple JSON error when we don't have a client yet
@@ -80,7 +80,7 @@ func handleIVRRequest(ctx context.Context, s *web.Server, r *http.Request, rawW 
 	}
 
 	// load our connection
-	conn, err := models.LoadChannelSession(ctx, s.DB, request.ConnectionID)
+	conn, err := models.LoadChannelConnection(ctx, s.DB, request.ConnectionID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load channel connection with id: %d", request.ConnectionID)
 	}
@@ -103,7 +103,8 @@ func handleIVRRequest(ctx context.Context, s *web.Server, r *http.Request, rawW 
 		url := fmt.Sprintf("https://%s%s", r.Host, path)
 		_, err := models.InsertChannelLog(
 			ctx, s.DB, desc, isError,
-			r.Method, url, requestTrace, w.Status(), responseTrace.Bytes(), time.Since(start),
+			r.Method, url, requestTrace, w.Status(), responseTrace.Bytes(),
+			start, time.Since(start),
 			conn,
 		)
 		if err != nil {
@@ -193,10 +194,10 @@ func handleIVRRequest(ctx context.Context, s *web.Server, r *http.Request, rawW 
 		err = client.WriteErrorResponse(w, errors.Errorf("unknown action: %s", request.Action))
 	}
 
-	// had an error? write it out
+	// had an error? mark our connection as errored and log it
 	if err != nil {
 		logrus.WithError(err).Error("error while handling IVR")
-		return client.WriteErrorResponse(w, err)
+		return ivr.WriteErrorResponse(ctx, s.DB, client, conn, w, err)
 	}
 
 	return nil

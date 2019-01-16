@@ -77,13 +77,17 @@ type Client interface {
 
 	InputForRequest(r *http.Request) (string, flows.Attachment, error)
 
-	StatusForRequest(r *http.Request) (models.ChannelSessionStatus, int)
+	StatusForRequest(r *http.Request) (models.ConnectionStatus, int)
+
+	PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error)
 
 	ValidateRequestSignature(r *http.Request) error
+
+	DownloadMedia(url string) (*http.Response, error)
 }
 
 // RequestCallStart creates a new ChannelSession for the passed in flow start and contact, returning the created session
-func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, org *models.OrgAssets, start *models.FlowStartBatch, contact *models.Contact) (*models.ChannelSession, error) {
+func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, org *models.OrgAssets, start *models.FlowStartBatch, contact *models.Contact) (*models.ChannelConnection, error) {
 	// find a tel URL for the contact
 	telURN := urns.NilURN
 	for _, u := range contact.URNs() {
@@ -125,9 +129,9 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	channel := callChannel.Asset().(*models.Channel)
 
 	// create our session
-	conn, err := models.CreateIVRSession(
+	conn, err := models.CreateIVRConnection(
 		ctx, db, org.OrgID(), channel.ID(), contact.ID(), models.URNID(urnID),
-		models.ChannelSessionDirectionOut, models.ChannelSessionStatusPending, "",
+		models.ConnectionDirectionOut, models.ConnectionStatusPending, "",
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating ivr session")
@@ -171,7 +175,8 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 		}
 		_, err := models.InsertChannelLog(
 			ctx, db, desc, isError,
-			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody, rt.Elapsed,
+			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody,
+			rt.StartedOn, rt.Elapsed,
 			conn,
 		)
 
@@ -185,7 +190,7 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 		logrus.WithError(err).Error("error placing outbound call")
 
 		// set our status as errored
-		err := conn.UpdateStatus(ctx, db, models.ChannelSessionStatusFailed, 0)
+		err := conn.UpdateStatus(ctx, db, models.ConnectionStatusFailed, 0, time.Now())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error setting errored status on session")
 		}
@@ -201,15 +206,25 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	return conn, nil
 }
 
+// WriteErrorResponse marks the passed in connection as errored and writes the appropriate error response to our writer
+func WriteErrorResponse(ctx context.Context, db *sqlx.DB, client Client, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
+	// TODO: mark our session as complete as well
+	err := conn.MarkFailed(ctx, db, time.Now())
+	if err != nil {
+		logrus.WithError(err).Error("error when trying to mark connection as errored")
+	}
+	return client.WriteErrorResponse(w, rootErr)
+}
+
 // StartIVRFlow takes care of starting the flow in the passed in start for the passed in contact and URN
 func StartIVRFlow(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, resumeURL string, org *models.OrgAssets,
-	channel *models.Channel, conn *models.ChannelSession, c *models.Contact, urn urns.URN, startID models.StartID,
+	channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN, startID models.StartID,
 	r *http.Request, w http.ResponseWriter) error {
 
 	// connection isn't in a wired status, that's an error
-	if conn.Status() != models.ChannelSessionStatusWired && conn.Status() != models.ChannelSessionStatusInProgress {
-		return client.WriteErrorResponse(w, errors.Errorf("connection in invalid status: %s", conn.Status()))
+	if conn.Status() != models.ConnectionStatusWired {
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
 	}
 
 	// get the flow for our start
@@ -243,7 +258,7 @@ func StartIVRFlow(
 	// we set the connection on the session before our event hooks fire so that IVR messages can be created with the right connection reference
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
 		for _, session := range sessions {
-			session.SetChannelSession(conn)
+			session.SetChannelConnection(conn)
 		}
 		return nil
 	}
@@ -264,8 +279,8 @@ func StartIVRFlow(
 		return errors.Wrapf(err, "error writing ivr response for start")
 	}
 
-	// mark our connection as in progress
-	err = conn.UpdateStatus(ctx, db, models.ChannelSessionStatusInProgress, 0)
+	// mark our connection as started
+	err = conn.MarkStarted(ctx, db, time.Now())
 	if err != nil {
 		return errors.Wrapf(err, "error updating call status")
 	}
@@ -275,13 +290,14 @@ func StartIVRFlow(
 
 // ResumeIVRFlow takes care of resuming the flow in the passed in start for the passed in contact and URN
 func ResumeIVRFlow(
-	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API, resumeURL string, client Client,
-	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelSession, c *models.Contact, urn urns.URN,
+	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API,
+	resumeURL string, client Client,
+	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
 	// connection isn't in progress, that's an error
-	if conn.Status() != models.ChannelSessionStatusInProgress {
-		return client.WriteErrorResponse(w, errors.Errorf("connection in invalid status: %s", conn.Status()))
+	if conn.Status() != models.ConnectionStatusInProgress {
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("connection in invalid status: %s", conn.Status()))
 	}
 
 	// build our session assets
@@ -301,11 +317,22 @@ func ResumeIVRFlow(
 	}
 
 	if session.ConnectionID == nil {
-		return client.WriteErrorResponse(w, errors.Errorf("active session: %d has no connection", session.ID))
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID))
 	}
 
 	if *session.ConnectionID != conn.ID() {
-		return client.WriteErrorResponse(w, errors.Errorf("active session: %d does not match connetion: %d", session.ID, *session.ConnectionID))
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d does not match connetion: %d", session.ID, *session.ConnectionID))
+	}
+
+	// preprocess this request
+	body, err := client.PreprocessResume(ctx, db, rp, conn, r)
+	if err != nil {
+		return errors.Wrapf(err, "error preprocessing resume")
+	}
+
+	if body != nil {
+		_, err := w.Write(body)
+		return err
 	}
 
 	// get the input of our request
@@ -321,7 +348,7 @@ func ResumeIVRFlow(
 			return client.WriteEmptyResponse(w, "session exited, ignoring resume")
 		}
 
-		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable finding input for request"))
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "unable finding input for request"))
 	}
 
 	// our msg UUID
@@ -332,25 +359,26 @@ func ResumeIVRFlow(
 		var err error
 		var resp *http.Response
 		for retry := 0; retry < 45; retry++ {
-			resp, err = http.Get(attachment.URL())
+			resp, err = client.DownloadMedia(attachment.URL())
 			if err == nil && resp.StatusCode == 200 {
 				break
 			}
 			time.Sleep(time.Second)
+			logrus.WithError(err).WithField("retry", retry).WithField("status", resp.StatusCode).WithField("url", attachment.URL()).Info("retrying download of attachment")
 		}
 
 		if err != nil {
-			return client.WriteErrorResponse(w, errors.Wrapf(err, "error downloading attachment, ending call"))
+			return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "error downloading attachment, ending call"))
 		}
 
 		if resp == nil {
-			return client.WriteErrorResponse(w, errors.Errorf("unable to download attachment, ending call"))
+			return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("unable to download attachment, ending call"))
 		}
 
 		// download our body
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to download attachment body, ending call"))
+			return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "unable to download attachment body, ending call"))
 		}
 		resp.Body.Close()
 
@@ -365,6 +393,7 @@ func ResumeIVRFlow(
 		}
 
 		// write to S3
+		logrus.WithField("path", path).Info("** uploading s3 file")
 		url, err := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, contentType, body)
 		if err != nil {
 			return errors.Wrapf(err, "unable to write attachment to s3")
@@ -408,7 +437,7 @@ func ResumeIVRFlow(
 	// hook to set our connection on our session before our event hooks run
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
 		for _, session := range sessions {
-			session.SetChannelSession(conn)
+			session.SetChannelConnection(conn)
 		}
 		return nil
 	}
@@ -429,14 +458,21 @@ func ResumeIVRFlow(
 
 // HandleIVRStatus is called on status callbacks for an IVR call. We let the client decide whether the call has
 // ended for some reason and update the state of the call and session if so
-func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, conn *models.ChannelSession, r *http.Request, w http.ResponseWriter) error {
+func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
 	status, duration := client.StatusForRequest(r)
 
-	if status != conn.Status() || duration > 0 {
-		err := conn.UpdateStatus(ctx, db, status, duration)
-		if err != nil {
-			return errors.Wrapf(err, "error updating call status")
+	// if we errored, mark ourselves appropriately
+	if status == models.ConnectionStatusErrored {
+		conn.MarkErrored(ctx, db, time.Now())
+	} else if status == models.ConnectionStatusFailed {
+		conn.MarkFailed(ctx, db, time.Now())
+	} else {
+		if status != conn.Status() || duration > 0 {
+			err := conn.UpdateStatus(ctx, db, status, duration, time.Now())
+			if err != nil {
+				return errors.Wrapf(err, "error updating call status")
+			}
 		}
 	}
 

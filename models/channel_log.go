@@ -14,18 +14,18 @@ type ChannelLogID int64
 type ChannelLog struct {
 	// inner struct for privacy and so we don't collide with method names
 	l struct {
-		ID           ChannelLogID     `db:"id"`
-		Description  string           `db:"description"`
-		IsError      bool             `db:"is_error"`
-		URL          string           `db:"url"`
-		Method       string           `db:"method"`
-		Request      string           `db:"request"`
-		Response     string           `db:"response"`
-		Status       int              `db:"response_status"`
-		CreatedOn    time.Time        `db:"created_on"`
-		RequestTime  int              `db:"request_time"`
-		ChannelID    ChannelID        `db:"channel_id"`
-		ConnectionID ChannelSessionID `db:"connection_id"`
+		ID           ChannelLogID `db:"id"`
+		Description  string       `db:"description"`
+		IsError      bool         `db:"is_error"`
+		URL          string       `db:"url"`
+		Method       string       `db:"method"`
+		Request      string       `db:"request"`
+		Response     string       `db:"response"`
+		Status       int          `db:"response_status"`
+		CreatedOn    time.Time    `db:"created_on"`
+		RequestTime  int          `db:"request_time"`
+		ChannelID    ChannelID    `db:"channel_id"`
+		ConnectionID ConnectionID `db:"connection_id"`
 	}
 }
 
@@ -38,17 +38,16 @@ INSERT INTO
 		created_on, request_time, channel_id, connection_id)
 	VALUES(
 		:description, :is_error, :url, :method, :request, :response, :response_status,
-		NOW(), :request_time, :channel_id, :connection_id)
+		:created_on, :request_time, :channel_id, :connection_id)
 
 RETURNING 
-	id as id, 
-	now() as created_on
+	id as id
 `
 
 // InsertChannelLog writes a channel log to the db returning the inserted log
 func InsertChannelLog(ctx context.Context, db *sqlx.DB,
 	desc string, isError bool, method string, url string, request []byte, status int, response []byte,
-	elapsed time.Duration, conn *ChannelSession) (*ChannelLog, error) {
+	createdOn time.Time, elapsed time.Duration, conn *ChannelConnection) (*ChannelLog, error) {
 
 	log := &ChannelLog{}
 	l := &log.l
@@ -60,6 +59,7 @@ func InsertChannelLog(ctx context.Context, db *sqlx.DB,
 	l.Request = string(request)
 	l.Response = string(response)
 	l.Status = status
+	l.CreatedOn = createdOn
 	l.RequestTime = int(elapsed / time.Millisecond)
 	l.ChannelID = conn.ChannelID()
 	l.ConnectionID = conn.ID()

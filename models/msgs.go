@@ -48,8 +48,6 @@ const (
 	TypeUSSD  = MsgType("U")
 )
 
-type ConnectionID null.Int
-
 type MsgStatus string
 
 type BroadcastID int64
@@ -93,7 +91,7 @@ type Msg struct {
 		Metadata             types.JSONText     `db:"metadata"        json:"metadata"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
-		ConnectionID         ConnectionID       `db:"connection_id"`
+		ConnectionID         *ConnectionID      `db:"connection_id"`
 		ContactID            flows.ContactID    `db:"contact_id"      json:"contact_id"`
 		ContactURNID         URNID              `db:"contact_urn_id"  json:"contact_urn_id"`
 		ResponseToID         null.Int           `db:"response_to_id"  json:"response_to_id"`
@@ -134,7 +132,7 @@ func (m *Msg) Metadata() types.JSONText        { return m.m.Metadata }
 func (m *Msg) MsgCount() int                   { return m.m.MsgCount }
 func (m *Msg) ChannelID() ChannelID            { return m.m.ChannelID }
 func (m *Msg) ChannelUUID() assets.ChannelUUID { return m.m.ChannelUUID }
-func (m *Msg) ConnectionID() ConnectionID      { return m.m.ConnectionID }
+func (m *Msg) ConnectionID() *ConnectionID     { return m.m.ConnectionID }
 func (m *Msg) URN() urns.URN                   { return m.m.URN }
 func (m *Msg) URNAuth() string                 { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                    { return m.m.OrgID }
@@ -162,7 +160,7 @@ func (m *Msg) MarshalJSON() ([]byte, error) {
 }
 
 // NewIncomingIVR creates a new incoming IVR message for the passed in text and attachment
-func NewIncomingIVR(orgID OrgID, conn *ChannelSession, in *flows.MsgIn, createdOn time.Time) *Msg {
+func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -174,7 +172,8 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelSession, in *flows.MsgIn, createdO
 	m.MsgType = TypeIVR
 	m.ContactID = conn.ContactID()
 	m.ContactURNID = conn.ContactURNID()
-	m.ConnectionID = ConnectionID(null.NewInt(int64(conn.ID()), true))
+	connID := conn.ID()
+	m.ConnectionID = &connID
 	m.URN = in.URN()
 
 	m.OrgID = orgID
@@ -191,7 +190,7 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelSession, in *flows.MsgIn, createdO
 }
 
 // NewOutgoingIVR creates a new IVR message for the passed in text with the optional attachment
-func NewOutgoingIVR(orgID OrgID, conn *ChannelSession, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -204,7 +203,8 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelSession, out *flows.MsgOut, create
 	m.MsgType = TypeIVR
 	m.ContactID = conn.ContactID()
 	m.ContactURNID = conn.ContactURNID()
-	m.ConnectionID = ConnectionID(null.NewInt(int64(conn.ID()), true))
+	connID := conn.ID()
+	m.ConnectionID = &connID
 	m.URN = out.URN()
 
 	m.OrgID = orgID

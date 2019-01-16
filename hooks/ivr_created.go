@@ -65,9 +65,9 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 	}).Debug("ivr say")
 
 	// get our channel connection
-	conn := session.ChannelSession()
+	conn := session.ChannelConnection()
 	if conn == nil {
-		return errors.Errorf("ivr sessions must have a channel session set")
+		return errors.Errorf("ivr sessions must have a channel connection set")
 	}
 
 	msg, err := models.NewOutgoingIVR(org.OrgID(), conn, event.Msg, event.CreatedOn())

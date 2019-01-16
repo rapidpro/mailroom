@@ -2,6 +2,7 @@ package twilio
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
@@ -15,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -85,6 +88,14 @@ func NewClient(accountSID string, authToken string) ivr.Client {
 		accountSID: accountSID,
 		authToken:  authToken,
 	}
+}
+
+func (c *client) DownloadMedia(url string) (*http.Response, error) {
+	return http.Get(url)
+}
+
+func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+	return nil, nil
 }
 
 // CallResponse is our struct for a Twilio call response
@@ -168,26 +179,26 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (c *client) StatusForRequest(r *http.Request) (models.ChannelSessionStatus, int) {
+func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
 	status := r.Form.Get("CallStatus")
 	switch status {
 
 	case "queued", "initiated", "ringing":
-		return models.ChannelSessionStatusWired, 0
+		return models.ConnectionStatusWired, 0
 
 	case "in-progress":
-		return models.ChannelSessionStatusInProgress, 0
+		return models.ConnectionStatusInProgress, 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
-		return models.ChannelSessionStatusCompleted, duration
+		return models.ConnectionStatusCompleted, duration
 
 	case "busy", "no-answer", "canceled", "failed":
-		return models.ChannelSessionStatusErrored, 0
+		return models.ConnectionStatusErrored, 0
 
 	default:
 		logrus.WithField("call_status", status).Error("unknown call status in ivr callback")
-		return models.ChannelSessionStatusWired, 0
+		return models.ConnectionStatusFailed, 0
 	}
 }
 

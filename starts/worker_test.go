@@ -89,7 +89,7 @@ func TestStarts(t *testing.T) {
 			}
 
 			count++
-			assert.Equal(t, startFlowBatchType, task.Type)
+			assert.Equal(t, mailroom.StartFlowBatchType, task.Type)
 			batch := &models.FlowStartBatch{}
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)

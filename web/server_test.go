@@ -22,7 +22,7 @@ func TestServer(t *testing.T) {
 	rp := testsuite.RP()
 	wg := &sync.WaitGroup{}
 
-	server := NewServer(ctx, db, rp, config.Mailroom, wg)
+	server := NewServer(ctx, config.Mailroom, db, rp, nil, wg)
 	server.Start()
 
 	// give our server time to start
