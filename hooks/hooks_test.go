@@ -79,7 +79,7 @@ func TestMain(m *testing.M) {
 func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.Flow {
 	exitUUIDs := make([]flows.ExitUUID, len(tc.Actions))
 	i := 0
-	for _ = range tc.Actions {
+	for range tc.Actions {
 		exitUUIDs[i] = flows.ExitUUID(utils.NewUUID())
 		i++
 	}
@@ -203,9 +203,9 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 			msg := tc.Msgs[contact.ID()]
 			if msg == nil {
-				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, nil, time.Now())
+				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
 			} else {
-				return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil, time.Now())
+				return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil)
 			}
 		}
 

@@ -40,13 +40,13 @@ func TestCampaignStarts(t *testing.T) {
 
 	contacts := []flows.ContactID{42, 43}
 	fires := []*models.EventFire{
-		&models.EventFire{
+		{
 			FireID:    1,
 			EventID:   1,
 			ContactID: 42,
 			Scheduled: now,
 		},
-		&models.EventFire{
+		{
 			FireID:    2,
 			EventID:   1,
 			ContactID: 43,
@@ -172,7 +172,7 @@ func TestContactRuns(t *testing.T) {
 	contact, err := contacts[0].FlowContact(org, sa)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, nil, time.Now())
+	trigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)

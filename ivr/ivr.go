@@ -253,7 +253,7 @@ func StartIVRFlow(
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	connRef := flows.NewConnection(channel.ChannelReference(), urn)
-	trigger := triggers.NewManualTrigger(org.Env(), flowRef, contact, connRef, nil, time.Now())
+	trigger := triggers.NewManualVoiceTrigger(org.Env(), flowRef, contact, connRef, nil)
 
 	// we set the connection on the session before our event hooks fire so that IVR messages can be created with the right connection reference
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {

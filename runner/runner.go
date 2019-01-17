@@ -162,12 +162,11 @@ func StartFlowBatch(
 	}
 
 	// this will build our trigger for each contact started
-	now := time.Now()
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
 		if batch.Parent() != nil {
-			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.Parent(), now)
+			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.Parent())
 		}
-		return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, nil, now)
+		return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
 	}
 
 	// before committing our runs we want to set the start they are associated with
@@ -279,10 +278,9 @@ func FireCampaignEvents(
 
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
-	now := time.Now()
 	options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 		delete(skippedContacts, contact.ID())
-		return triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event, now)
+		return triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event)
 	}
 
 	// this is our pre commit callback for our sessions, we'll mark the event fires associated
