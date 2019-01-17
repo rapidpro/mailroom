@@ -477,11 +477,15 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 // but occasionally we need to load URNs one by one and this accomplishes that
 func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urns.URN, error) {
 	urn := &ContactURN{}
-	err := tx.GetContext(
-		ctx, urn,
-		`SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE id = $1`, urnID,
+	rows, err := tx.QueryxContext(ctx,
+		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE id = $1) r;`,
+		urnID,
 	)
+	if !rows.Next() {
+		return urns.NilURN, errors.Errorf("no urn with id: %d", urnID)
+	}
 
+	err = readJSONRow(rows, urn)
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "error loading contact urn")
 	}
