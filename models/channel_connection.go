@@ -63,6 +63,7 @@ type ChannelConnection struct {
 
 func (c *ChannelConnection) ID() ConnectionID           { return c.c.ID }
 func (c *ChannelConnection) Status() ConnectionStatus   { return c.c.Status }
+func (c *ChannelConnection) NextAttempt() *time.Time    { return c.c.NextAttempt }
 func (c *ChannelConnection) ExternalID() string         { return c.c.ExternalID }
 func (c *ChannelConnection) OrgID() OrgID               { return c.c.OrgID }
 func (c *ChannelConnection) ContactID() flows.ContactID { return c.c.ContactID }

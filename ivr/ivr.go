@@ -470,6 +470,9 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Cl
 	// if we errored, mark ourselves appropriately
 	if status == models.ConnectionStatusErrored {
 		conn.MarkErrored(ctx, db, time.Now())
+		if conn.Status() == models.ConnectionStatusErrored {
+			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
+		}
 	} else if status == models.ConnectionStatusFailed {
 		conn.MarkFailed(ctx, db, time.Now())
 	} else {

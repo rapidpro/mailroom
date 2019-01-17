@@ -141,8 +141,6 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 		return ivr.NilCallID, errors.Errorf("call status returned as failed")
 	}
 
-	logrus.WithField("body", body).WithField("status", resp.StatusCode).WithField("form", form).Debug("requested call")
-
 	return ivr.CallID(call.SID), nil
 }
 
