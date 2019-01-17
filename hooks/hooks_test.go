@@ -138,7 +138,6 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	flow := definition.NewFlow(
 		uuid,
 		"Test Flow",
-		"12.0",
 		utils.Language("eng"),
 		flows.FlowTypeMessaging,
 		1,
@@ -203,9 +202,9 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 			msg := tc.Msgs[contact.ID()]
 			if msg == nil {
-				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil, nil, time.Now())
+				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
 			} else {
-				return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil, time.Now())
+				return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil)
 			}
 		}
 
