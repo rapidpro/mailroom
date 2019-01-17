@@ -129,20 +129,25 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	channel := callChannel.Asset().(*models.Channel)
 
 	// create our session
-	conn, err := models.CreateIVRConnection(
-		ctx, db, org.OrgID(), channel.ID(), contact.ID(), models.URNID(urnID),
+	conn, err := models.InsertIVRConnection(
+		ctx, db, org.OrgID(), channel.ID(), start.StartID(), contact.ID(), models.URNID(urnID),
 		models.ConnectionDirectionOut, models.ConnectionStatusPending, "",
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating ivr session")
 	}
 
+	return conn, RequestCallStartForConnection(ctx, config, db, channel, telURN, conn)
+}
+
+func RequestCallStartForConnection(ctx context.Context, config *config.Config, db *sqlx.DB, channel *models.Channel, telURN urns.URN, conn *models.ChannelConnection) error {
+	// the domain that will be used for callbacks, can be specific for channels due to white labeling
 	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, config.Domain)
 
 	// create our callback
 	form := url.Values{
 		"connection": []string{fmt.Sprintf("%d", conn.ID())},
-		"start":      []string{fmt.Sprintf("%d", start.StartID().Int64)},
+		"start":      []string{fmt.Sprintf("%d", conn.StartID().Int64)},
 		"action":     []string{"start"},
 		"urn":        []string{telURN.String()},
 	}
@@ -155,7 +160,7 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	// create the right client
 	c, err := GetClient(channel)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to create ivr client")
+		return errors.Wrapf(err, "unable to create ivr client")
 	}
 
 	// we create our own HTTP client with our own transport so we can log the request and set our user agent
@@ -192,18 +197,18 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 		// set our status as errored
 		err := conn.UpdateStatus(ctx, db, models.ConnectionStatusFailed, 0, time.Now())
 		if err != nil {
-			return nil, errors.Wrapf(err, "error setting errored status on session")
+			return errors.Wrapf(err, "error setting errored status on session")
 		}
-		return conn, nil
+		return nil
 	}
 
 	// update our channel session and return it
 	err = conn.UpdateExternalID(ctx, db, string(callID))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error updating session external id")
+		return errors.Wrapf(err, "error updating session external id")
 	}
 
-	return conn, nil
+	return nil
 }
 
 // WriteErrorResponse marks the passed in connection as errored and writes the appropriate error response to our writer

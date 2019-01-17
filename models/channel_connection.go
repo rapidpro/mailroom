@@ -22,7 +22,7 @@ const (
 	ConnectionDirectionIn  = ConnectionDirection("I")
 	ConnectionDirectionOut = ConnectionDirection("O")
 
-	ConnectionTypeIVR = ConnectionType("F")
+	ConnectionTypeIVR = ConnectionType("V")
 
 	ConnectionStatusPending    = ConnectionStatus("P")
 	ConnectionStatusQueued     = ConnectionStatus("Q")
@@ -39,24 +39,25 @@ const (
 
 type ChannelConnection struct {
 	c struct {
-		ID           ConnectionID        `json:"id"             db:"id"`
-		IsActive     bool                `json:"is_active"      db:"is_active"`
-		CreatedOn    time.Time           `json:"created_on"     db:"created_on"`
-		ModifiedOn   time.Time           `json:"modified_on"    db:"modified_on"`
-		ExternalID   string              `json:"external_id"    db:"external_id"`
-		Status       ConnectionStatus    `json:"status"         db:"status"`
-		Direction    ConnectionDirection `json:"direction"      db:"direction"`
-		StartedOn    *time.Time          `json:"started_on"     db:"started_on"`
-		EndedOn      *time.Time          `json:"ended_on"       db:"ended_on"`
-		SessionType  ConnectionType      `json:"session_type"   db:"session_type"`
-		Duration     int                 `json:"duration"       db:"duration"`
-		RetryCount   int                 `json:"retry_count"    db:"retry_count"`
-		NextAttempt  *time.Time          `json:"next_attempt"   db:"next_attempt"`
-		ChannelID    ChannelID           `json:"channel_id"     db:"channel_id"`
-		ContactID    flows.ContactID     `json:"contact_id"     db:"contact_id"`
-		ContactURNID URNID               `json:"contact_urn_id" db:"contact_urn_id"`
-		OrgID        OrgID               `json:"org_id"         db:"org_id"`
-		ErrorCount   int                 `json:"error_count"    db:"error_count"`
+		ID             ConnectionID        `json:"id"              db:"id"`
+		IsActive       bool                `json:"is_active"       db:"is_active"`
+		CreatedOn      time.Time           `json:"created_on"      db:"created_on"`
+		ModifiedOn     time.Time           `json:"modified_on"     db:"modified_on"`
+		ExternalID     string              `json:"external_id"     db:"external_id"`
+		Status         ConnectionStatus    `json:"status"          db:"status"`
+		Direction      ConnectionDirection `json:"direction"       db:"direction"`
+		StartedOn      *time.Time          `json:"started_on"      db:"started_on"`
+		EndedOn        *time.Time          `json:"ended_on"        db:"ended_on"`
+		ConnectionType ConnectionType      `json:"connection_type" db:"connection_type"`
+		Duration       int                 `json:"duration"        db:"duration"`
+		RetryCount     int                 `json:"retry_count"     db:"retry_count"`
+		NextAttempt    *time.Time          `json:"next_attempt"    db:"next_attempt"`
+		ChannelID      ChannelID           `json:"channel_id"      db:"channel_id"`
+		ContactID      flows.ContactID     `json:"contact_id"      db:"contact_id"`
+		ContactURNID   URNID               `json:"contact_urn_id"  db:"contact_urn_id"`
+		OrgID          OrgID               `json:"org_id"          db:"org_id"`
+		ErrorCount     int                 `json:"error_count"     db:"error_count"`
+		StartID        StartID             `json:"start_id"        db:"start_id"`
 	}
 }
 
@@ -67,6 +68,7 @@ func (c *ChannelConnection) OrgID() OrgID               { return c.c.OrgID }
 func (c *ChannelConnection) ContactID() flows.ContactID { return c.c.ContactID }
 func (c *ChannelConnection) ContactURNID() URNID        { return c.c.ContactURNID }
 func (c *ChannelConnection) ChannelID() ChannelID       { return c.c.ChannelID }
+func (c *ChannelConnection) StartID() StartID           { return c.c.StartID }
 
 const insertConnectionSQL = `
 INSERT INTO
@@ -78,7 +80,7 @@ INSERT INTO
 	external_id,
 	status,
 	direction,
-	session_type,
+	connection_type,
 	duration,
 	org_id,
 	channel_id,
@@ -95,7 +97,7 @@ VALUES(
 	:external_id,
 	:status,
 	:direction,
-	:session_type,
+	:connection_type,
 	0,
 	:org_id,
 	:channel_id,
@@ -109,8 +111,8 @@ RETURNING
 	NOW();
 `
 
-// CreateIVRConnection creates a new IVR session for the passed in org, channel and contact, inserting it
-func CreateIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelID ChannelID, contactID flows.ContactID, urnID URNID,
+// InsertIVRConnection creates a new IVR session for the passed in org, channel and contact, inserting it
+func InsertIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelID ChannelID, startID StartID, contactID flows.ContactID, urnID URNID,
 	direction ConnectionDirection, status ConnectionStatus, externalID string) (*ChannelConnection, error) {
 
 	connection := &ChannelConnection{}
@@ -123,8 +125,9 @@ func CreateIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelI
 	c.ContactURNID = urnID
 	c.Direction = direction
 	c.Status = status
-	c.SessionType = ConnectionTypeIVR
+	c.ConnectionType = ConnectionTypeIVR
 	c.ExternalID = externalID
+	c.StartID = startID
 
 	rows, err := db.NamedQueryContext(ctx, insertConnectionSQL, c)
 	if err != nil {
@@ -139,6 +142,18 @@ func CreateIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelI
 		return nil, errors.Wrapf(err, "unable to scan id and now for new channel session")
 	}
 
+	// add a many to many for our start if set
+	if !startID.IsZero() {
+		_, err := db.ExecContext(
+			ctx,
+			`INSERT INTO flows_flowstart_connections(flowstart_id, channelconnection_id) VALUES($1, $2) ON CONFLICT DO NOTHING`,
+			startID.Int64, c.ID,
+		)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to add start association for channelconnection")
+		}
+	}
+
 	// set our created and modified the same as the DB
 	c.CreatedOn = now
 	c.ModifiedOn = now
@@ -148,29 +163,31 @@ func CreateIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelI
 
 const selectConnectionSQL = `
 SELECT
-	id, 
-	is_active, 
-	created_on, 
-	modified_on, 
-	external_id, 
-	status, 
-	direction, 
-	started_on, 
-	ended_on, 
-	session_type, 
-	duration, 
-	retry_count, 
-	next_attempt, 
-	channel_id, 
-	contact_id, 
-	contact_urn_id, 
-	org_id, 
-	error_count
+	cc.id as id, 
+	cc.is_active as is_active, 
+	cc.created_on as created_on, 
+	cc.modified_on as modified_on, 
+	cc.external_id as external_id,  
+	cc.status as status, 
+	cc.direction as direction, 
+	cc.started_on as started_on, 
+	cc.ended_on as ended_on, 
+	cc.connection_type as connection_type, 
+	cc.duration as duration, 
+	cc.retry_count as retry_count, 
+	cc.next_attempt as next_attempt, 
+	cc.channel_id as channel_id, 
+	cc.contact_id as contact_id, 
+	cc.contact_urn_id as contact_urn_id, 
+	cc.org_id as org_id, 
+	cc.error_count as error_count, 
+	fsc.flowstart_id as start_id
 FROM
-	channels_channelconnection
+	channels_channelconnection as cc
+	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
-	id = $1 AND
-	is_active = TRUE
+	cc.id = $1 AND
+	cc.is_active = TRUE
 `
 
 // LoadChannelConnection loads a channel connection by id
@@ -181,6 +198,59 @@ func LoadChannelConnection(ctx context.Context, db Queryer, id ConnectionID) (*C
 		return nil, errors.Wrapf(err, "unable to load channel connection with id: %d", id)
 	}
 	return conn, nil
+}
+
+const selectRetryConnectionsSQL = `
+SELECT
+	cc.id as id, 
+	cc.is_active as is_active, 
+	cc.created_on as created_on, 
+	cc.modified_on as modified_on, 
+	cc.external_id as external_id,  
+	cc.status as status, 
+	cc.direction as direction, 
+	cc.started_on as started_on, 
+	cc.ended_on as ended_on, 
+	cc.connection_type as connection_type, 
+	cc.duration as duration, 
+	cc.retry_count as retry_count, 
+	cc.next_attempt as next_attempt, 
+	cc.channel_id as channel_id, 
+	cc.contact_id as contact_id, 
+	cc.contact_urn_id as contact_urn_id, 
+	cc.org_id as org_id, 
+	cc.error_count as error_count, 
+	fsc.flowstart_id as start_id
+FROM
+	channels_channelconnection as cc
+	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
+WHERE
+	cc.is_active = TRUE AND
+	cc.next_attempt < NOW() AND
+	cc.status = 'E'
+LIMIT
+    $1
+`
+
+// LoadChannelConnectionsToRetry returns up to limit connections that need to be retried
+func LoadChannelConnectionsToRetry(ctx context.Context, db Queryer, limit int) ([]*ChannelConnection, error) {
+	rows, err := db.QueryxContext(ctx, selectRetryConnectionsSQL, limit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error selecting connections to retry")
+	}
+	defer rows.Close()
+
+	conns := make([]*ChannelConnection, 0, 10)
+	for rows.Next() {
+		conn := &ChannelConnection{}
+		err = rows.StructScan(&conn.c)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning channel connection")
+		}
+		conns = append(conns, conn)
+	}
+
+	return conns, nil
 }
 
 // UpdateExternalID updates the external id on the passed in channel session

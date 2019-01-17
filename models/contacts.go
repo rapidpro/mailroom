@@ -91,29 +91,9 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []flows.C
 		// finally build up our URN objects
 		contactURNs := make([]urns.URN, 0, len(e.URNs))
 		for _, u := range e.URNs {
-			var channel *Channel
-
-			// load any channel if present
-			if u.ChannelID != ChannelID(0) {
-				channel = org.ChannelByID(u.ChannelID)
-			}
-
-			// we build our query from a combination of preferred channel and auth
-			query := url.Values{
-				"id":       []string{fmt.Sprintf("%d", u.ID)},
-				"priority": []string{fmt.Sprintf("%d", u.Priority)},
-			}
-			if channel != nil {
-				query["channel"] = []string{string(channel.UUID())}
-			}
-			if u.Auth != "" {
-				query["auth"] = []string{u.Auth}
-			}
-
-			// create our URN
-			urn, err := urns.NewURNFromParts(u.Scheme, u.Path, query.Encode(), u.Display)
+			urn, err := u.AsURN(org)
 			if err != nil {
-				logrus.WithField("urn", u.Path).WithField("scheme", u.Scheme).Error("invalid URN, ignoring")
+				logrus.Error("invalid URN, ignoring")
 				continue
 			}
 			contactURNs = append(contactURNs, urn)
@@ -226,27 +206,58 @@ type fieldValueEnvelope struct {
 	Ward     flows.LocationPath `json:"ward,omitempty"`
 }
 
+type ContactURN struct {
+	ID        URNID     `json:"id"          db:"id"`
+	Priority  int       `json:"priority"    db:"priority"`
+	Scheme    string    `json:"scheme"      db:"scheme"`
+	Path      string    `json:"path"        db:"path"`
+	Display   string    `json:"display"     db:"display"`
+	Auth      string    `json:"auth"        db:"auth"`
+	ChannelID ChannelID `json:"channel_id"  db:"channel_id"`
+}
+
+// AsURN returns a full URN representation including the query parameters needed by goflow and mailroom
+func (u *ContactURN) AsURN(org *OrgAssets) (urns.URN, error) {
+	// load any channel if present
+	var channel *Channel
+	if u.ChannelID != ChannelID(0) {
+		channel = org.ChannelByID(u.ChannelID)
+	}
+
+	// we build our query from a combination of preferred channel and auth
+	query := url.Values{
+		"id":       []string{fmt.Sprintf("%d", u.ID)},
+		"priority": []string{fmt.Sprintf("%d", u.Priority)},
+	}
+	if channel != nil {
+		query["channel"] = []string{string(channel.UUID())}
+	}
+	if u.Auth != "" {
+		query["auth"] = []string{u.Auth}
+	}
+
+	// create our URN
+	urn, err := urns.NewURNFromParts(u.Scheme, u.Path, query.Encode(), u.Display)
+	if err != nil {
+		return urns.NilURN, errors.Wrapf(err, "invalid URN %s:%s", u.Scheme, u.Path)
+	}
+
+	return urn, nil
+}
+
 // contactEnvelope is our JSON structure for a contact as read from the database
 type contactEnvelope struct {
-	ID        flows.ContactID                   `json:"id"`
-	UUID      flows.ContactUUID                 `json:"uuid"`
-	Name      string                            `json:"name"`
-	Language  utils.Language                    `json:"language"`
-	IsStopped bool                              `json:"is_stopped"`
-	IsBlocked bool                              `json:"is_blocked"`
-	Fields    map[FieldUUID]*fieldValueEnvelope `json:"fields"`
-	GroupIDs  []GroupID                         `json:"group_ids"`
-	URNs      []struct {
-		ID        URNID     `json:"id"`
-		Priority  int       `json:"priority"`
-		Scheme    string    `json:"scheme"`
-		Path      string    `json:"path"`
-		Display   string    `json:"display"`
-		Auth      string    `json:"auth"`
-		ChannelID ChannelID `json:"channel_id"`
-	} `json:"urns"`
-	ModifiedOn time.Time `json:"modified_on"`
-	CreatedOn  time.Time `json:"created_on"`
+	ID         flows.ContactID                   `json:"id"`
+	UUID       flows.ContactUUID                 `json:"uuid"`
+	Name       string                            `json:"name"`
+	Language   utils.Language                    `json:"language"`
+	IsStopped  bool                              `json:"is_stopped"`
+	IsBlocked  bool                              `json:"is_blocked"`
+	Fields     map[FieldUUID]*fieldValueEnvelope `json:"fields"`
+	GroupIDs   []GroupID                         `json:"group_ids"`
+	URNs       []ContactURN                      `json:"urns"`
+	ModifiedOn time.Time                         `json:"modified_on"`
+	CreatedOn  time.Time                         `json:"created_on"`
 }
 
 const selectContactSQL = `
@@ -459,6 +470,23 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	}
 
 	return contactID, nil
+}
+
+// URNForID will return a URN for the passed in ID including all the special query parameters
+// set that goflow and mailroom depend on. Generally this URN is build when loading a contact
+// but occasionally we need to load URNs one by one and this accomplishes that
+func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urns.URN, error) {
+	urn := &ContactURN{}
+	err := tx.GetContext(
+		ctx, urn,
+		`SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE id = $1`, urnID,
+	)
+
+	if err != nil {
+		return urns.NilURN, errors.Wrapf(err, "error loading contact urn")
+	}
+
+	return urn.AsURN(org)
 }
 
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
