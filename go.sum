@@ -89,6 +89,8 @@ github.com/nyaruka/gocommon v0.2.0 h1:1Le4Ok0Zp2RYULue0n4/02zL+1MrykN/C79HhirGeR
 github.com/nyaruka/gocommon v0.2.0/go.mod h1:ZrhaOKNc+kK1qWNuCuZivskT+ygLyIwu4KZVgcaC1mw=
 github.com/nyaruka/goflow v0.25.0 h1:AcQy6bjPXC3vOr+FGUYwevUk4pnHT2QJtVqfl5m0qwE=
 github.com/nyaruka/goflow v0.25.0/go.mod h1:cxE5ZwYPkWSuM9feqPC7HOr6yw+CyzZVBGpoAE8+pps=
+github.com/nyaruka/goflow v0.25.3 h1:OIFbOL+CuAKkWcxpkP/CqrYU1ShLmdUy3BYHdwKwfKE=
+github.com/nyaruka/goflow v0.25.3/go.mod h1:2Z9qC/VAtmJnrFht88qVVEW3Z8JL4oLZwhWdC0hT+W0=
 github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8 h1:TOvxy0u6LNTWP3gwbdNVCiByXJupr9ATFdzBnBJ2TY8=
 github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8/go.mod h1:huVocfMEHkttMHD4hSr/wjWNyTx/YMzwwajVzV2bq+0=
 github.com/nyaruka/phonenumbers v0.0.0-20180208145444-15aafd6b263c/go.mod h1:xvgYdyui5tFJCm/xA5g17hmHLaU3Qd8PueIPh6V8XAY=
