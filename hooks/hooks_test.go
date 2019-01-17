@@ -138,7 +138,6 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	flow := definition.NewFlow(
 		uuid,
 		"Test Flow",
-		"12.0",
 		utils.Language("eng"),
 		flows.FlowTypeMessaging,
 		1,
