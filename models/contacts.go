@@ -59,7 +59,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []flows.C
 		}
 
 		// load our real groups
-		groups := make([]assets.Group, 0, len(e.GroupIDs))
+		groups := make([]*Group, 0, len(e.GroupIDs))
 		for _, g := range e.GroupIDs {
 			group := org.GroupByID(g)
 			if group != nil {
@@ -139,6 +139,12 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
 func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flows.Contact, error) {
+	// convert our groups to a list of asset groups
+	groups := make([]assets.Group, len(c.groups))
+	for i, g := range c.groups {
+		groups[i] = g
+	}
+
 	// create our flow contact
 	contact, err := flows.NewContactFromAssets(
 		session,
@@ -149,7 +155,7 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 		org.Env().Timezone(),
 		c.createdOn,
 		c.urns,
-		c.groups,
+		groups,
 		c.fields,
 	)
 	if err != nil {
@@ -157,6 +163,17 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 	}
 
 	return contact, nil
+}
+
+// URNForID returns the flow URN for the passed in URN, return NilURN if not found
+func (c *Contact) URNForID(urnID URNID) urns.URN {
+	for _, u := range c.urns {
+		if GetURNID(u) == urnID {
+			return u
+		}
+	}
+
+	return urns.NilURN
 }
 
 // Unstop sets the is_stopped attribute to false for this contact
@@ -178,7 +195,7 @@ type Contact struct {
 	isStopped  bool
 	isBlocked  bool
 	fields     map[string]*flows.Value
-	groups     []assets.Group
+	groups     []*Group
 	urns       []urns.URN
 	modifiedOn time.Time
 	createdOn  time.Time
@@ -191,7 +208,7 @@ func (c *Contact) Language() utils.Language        { return c.language }
 func (c *Contact) IsStopped() bool                 { return c.isStopped }
 func (c *Contact) IsBlocked() bool                 { return c.isBlocked }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
-func (c *Contact) Groups() []assets.Group          { return c.groups }
+func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
@@ -316,8 +333,8 @@ WHERE
 ) r;
 `
 
-// ContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a list the same length as
-// the passed in URNs with the ids of the contacts. There is no guarantee in the order of the ids returned
+// ContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
+// the passed in URNs with the ids of the contacts.
 func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, us []urns.URN) (map[urns.URN]flows.ContactID, error) {
 	// build a map of our urns to contact id
 	urnMap := make(map[urns.URN]flows.ContactID, len(us))
@@ -470,6 +487,26 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	}
 
 	return contactID, nil
+}
+
+// URNForURN will return a URN for the passed in URN including all the special query parameters
+// set that goflow and mailroom depend on.
+func URNForURN(ctx context.Context, tx Queryer, org *OrgAssets, u urns.URN) (urns.URN, error) {
+	urn := &ContactURN{}
+	rows, err := tx.QueryxContext(ctx,
+		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE identity = $1 AND org_id = $2) r;`,
+		u.Identity(), org.OrgID(),
+	)
+	if !rows.Next() {
+		return urns.NilURN, errors.Errorf("no urn with identity: %s", u.Identity())
+	}
+
+	err = readJSONRow(rows, urn)
+	if err != nil {
+		return urns.NilURN, errors.Wrapf(err, "error loading contact urn")
+	}
+
+	return urn.AsURN(org)
 }
 
 // URNForID will return a URN for the passed in ID including all the special query parameters
@@ -738,6 +775,21 @@ func GetURNChannelID(org *OrgAssets, urn urns.URN) *ChannelID {
 		return &channelID
 	}
 	return nil
+}
+
+func GetURNID(urn urns.URN) URNID {
+	values, err := urn.Query()
+	if err != nil {
+		return NilURNID
+	}
+
+	urnStr := values.Get("id")
+	urnID, err := strconv.Atoi(urnStr)
+	if err != nil {
+		return NilURNID
+	}
+
+	return URNID(urnID)
 }
 
 func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urns.URN, error) {

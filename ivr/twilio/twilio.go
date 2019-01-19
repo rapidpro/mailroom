@@ -98,6 +98,24 @@ func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Po
 	return nil, nil
 }
 
+func (c *client) CallIDForRequest(r *http.Request) (string, error) {
+	r.ParseForm()
+	callID := r.Form.Get("CallSid")
+	if callID == "" {
+		return "", errors.Errorf("no CallSid parameter found in URL: %s", r.URL)
+	}
+	return callID, nil
+}
+
+func (c *client) URNForRequest(r *http.Request) (urns.URN, error) {
+	r.ParseForm()
+	tel := r.Form.Get("Caller")
+	if tel == "" {
+		return "", errors.Errorf("no Caller parameter found in URL: %s", r.URL)
+	}
+	return urns.NewTelURNForCountry(tel, "")
+}
+
 // CallResponse is our struct for a Twilio call response
 type CallResponse struct {
 	SID    string `json:"sid"`

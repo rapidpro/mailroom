@@ -21,7 +21,7 @@ func TestChannelConnections(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from channels_channelconnection where external_id = 'test1' AND id = $1`, []interface{}{conn.ID()}, 1)
 
-	conn2, err := LoadChannelConnection(ctx, db, conn.ID())
+	conn2, err := SelectChannelConnection(ctx, db, conn.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, "test1", conn2.ExternalID())
 }

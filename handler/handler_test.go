@@ -157,7 +157,7 @@ func TestChannelEvents(t *testing.T) {
 		cathy)
 
 	tcs := []struct {
-		EventType string
+		EventType models.ChannelEventType
 		ContactID flows.ContactID
 		URNID     models.URNID
 		OrgID     models.OrgID
@@ -175,19 +175,12 @@ func TestChannelEvents(t *testing.T) {
 
 	last := time.Now()
 	for i, tc := range tcs {
-		event := &ChannelEvent{
-			ContactID: tc.ContactID,
-			URNID:     tc.URNID,
-			OrgID:     tc.OrgID,
-			ChannelID: tc.ChannelID,
-			Extra:     tc.Extra,
-		}
-
+		event := models.NewChannelEvent(tc.EventType, tc.OrgID, tc.ChannelID, tc.ContactID, tc.URNID, tc.Extra, false)
 		eventJSON, err := json.Marshal(event)
 		assert.NoError(t, err)
 
 		task := &queue.Task{
-			Type:  tc.EventType,
+			Type:  string(tc.EventType),
 			OrgID: int(tc.OrgID),
 			Task:  eventJSON,
 		}

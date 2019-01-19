@@ -191,12 +191,53 @@ WHERE
 	cc.is_active = TRUE
 `
 
-// LoadChannelConnection loads a channel connection by id
-func LoadChannelConnection(ctx context.Context, db Queryer, id ConnectionID) (*ChannelConnection, error) {
+// SelectChannelConnection loads a channel connection by id
+func SelectChannelConnection(ctx context.Context, db Queryer, id ConnectionID) (*ChannelConnection, error) {
 	conn := &ChannelConnection{}
 	err := db.GetContext(ctx, &conn.c, selectConnectionSQL, id)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load channel connection with id: %d", id)
+	}
+	return conn, nil
+}
+
+const selectConnectionByExternalIDSQL = `
+SELECT
+	cc.id as id, 
+	cc.is_active as is_active, 
+	cc.created_on as created_on, 
+	cc.modified_on as modified_on, 
+	cc.external_id as external_id,  
+	cc.status as status, 
+	cc.direction as direction, 
+	cc.started_on as started_on, 
+	cc.ended_on as ended_on, 
+	cc.connection_type as connection_type, 
+	cc.duration as duration, 
+	cc.retry_count as retry_count, 
+	cc.next_attempt as next_attempt, 
+	cc.channel_id as channel_id, 
+	cc.contact_id as contact_id, 
+	cc.contact_urn_id as contact_urn_id, 
+	cc.org_id as org_id, 
+	cc.error_count as error_count, 
+	fsc.flowstart_id as start_id
+FROM
+	channels_channelconnection as cc
+	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
+WHERE
+	cc.channel_id = $1 AND
+	cc.connection_type = $2 AND
+	cc.external_id = $3 AND
+	cc.is_active = TRUE
+`
+
+// SelectChannelConnectionByExternalID loads a channel connection by id
+func SelectChannelConnectionByExternalID(ctx context.Context, db Queryer, channelID ChannelID, connType ConnectionType, externalID string) (*ChannelConnection, error) {
+	conn := &ChannelConnection{}
+	err := db.GetContext(ctx, &conn.c, selectConnectionByExternalIDSQL, channelID, connType, externalID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to load channel connection with external id: %s", externalID)
 	}
 	return conn, nil
 }

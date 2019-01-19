@@ -67,7 +67,7 @@ func GetClient(channel *models.Channel) (Client, error) {
 
 // Client defines the interface IVR clients must satisfy
 type Client interface {
-	RequestCall(client *http.Client, number urns.URN, callbackURL string, statusURL string) (CallID, error)
+	RequestCall(client *http.Client, number urns.URN, handleURL string, statusURL string) (CallID, error)
 
 	WriteSessionResponse(session *models.Session, resumeURL string, req *http.Request, w http.ResponseWriter) error
 
@@ -84,6 +84,10 @@ type Client interface {
 	ValidateRequestSignature(r *http.Request) error
 
 	DownloadMedia(url string) (*http.Response, error)
+
+	URNForRequest(r *http.Request) (urns.URN, error)
+
+	CallIDForRequest(r *http.Request) (string, error)
 }
 
 // RequestCallStart creates a new ChannelSession for the passed in flow start and contact, returning the created session
@@ -128,7 +132,7 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	// get the channel for this URN
 	channel := callChannel.Asset().(*models.Channel)
 
-	// create our session
+	// create our channel connection
 	conn, err := models.InsertIVRConnection(
 		ctx, db, org.OrgID(), channel.ID(), start.StartID(), contact.ID(), models.URNID(urnID),
 		models.ConnectionDirectionOut, models.ConnectionStatusPending, "",
@@ -152,10 +156,8 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 		"urn":        []string{telURN.String()},
 	}
 
-	startURL := fmt.Sprintf("https://%s/mr/ivr/handle?%s", domain, form.Encode())
-
-	form["action"] = []string{"status"}
-	statusURL := fmt.Sprintf("https://%s/mr/ivr/handle?%s", domain, form.Encode())
+	resumeURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
+	statusURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/status", domain, channel.UUID())
 
 	// create the right client
 	c, err := GetClient(channel)
@@ -168,7 +170,7 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
 
 	// try to request our call start
-	callID, err := c.RequestCall(client, telURN, startURL, statusURL)
+	callID, err := c.RequestCall(client, telURN, resumeURL, statusURL)
 
 	// insert any logged requests
 	for _, rt := range logger.RoundTrips {
@@ -228,7 +230,7 @@ func StartIVRFlow(
 	r *http.Request, w http.ResponseWriter) error {
 
 	// connection isn't in a wired status, that's an error
-	if conn.Status() != models.ConnectionStatusWired {
+	if conn.Status() != models.ConnectionStatusWired && conn.Status() != models.ConnectionStatusInProgress {
 		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
 	}
 

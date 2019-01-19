@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/buger/jsonparser"
@@ -85,6 +86,65 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 		appID:      appID,
 		privateKey: privateKey,
 	}, nil
+}
+
+func readBody(r *http.Request) ([]byte, error) {
+	if r.Body == http.NoBody {
+		return nil, nil
+	}
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, nil
+	}
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	return body, nil
+}
+
+func (c *client) CallIDForRequest(r *http.Request) (string, error) {
+	// get our recording url out
+	body, err := readBody(r)
+	if err != nil {
+		return "", errors.Wrapf(err, "error reading body from request")
+	}
+	callID, err := jsonparser.GetString(body, "uuid")
+	if err != nil {
+		return "", errors.Errorf("invalid json body")
+	}
+
+	if callID == "" {
+		return "", errors.Errorf("no uuid set on call")
+	}
+	return callID, nil
+}
+
+func (c *client) URNForRequest(r *http.Request) (urns.URN, error) {
+	// get our recording url out
+	body, err := readBody(r)
+	if err != nil {
+		return "", errors.Wrapf(err, "error reading body from request")
+	}
+	direction, _ := jsonparser.GetString(body, "direction")
+	if direction == "" {
+		direction = "inbound"
+	}
+
+	urnKey := ""
+	switch direction {
+	case "inbound":
+		urnKey = "from"
+	case "outbound":
+		urnKey = "to"
+	}
+
+	urn, err := jsonparser.GetString(body, urnKey)
+	if err != nil {
+		return "", errors.Errorf("invalid json body")
+	}
+
+	if urn == "" {
+		return "", errors.Errorf("no urn found in body")
+	}
+	return urns.NewTelURNForCountry("+"+urn, "")
 }
 
 func (c *client) DownloadMedia(url string) (*http.Response, error) {
@@ -212,12 +272,12 @@ type CallResponse struct {
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL string, statusURL string) (ivr.CallID, error) {
+func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL string, statusURL string) (ivr.CallID, error) {
 	callR := &CallRequest{
-		AnswerURL:    []string{callbackURL + "&sig=" + url.QueryEscape(c.calculateSignature(callbackURL))},
+		AnswerURL:    []string{resumeURL + "&sig=" + url.QueryEscape(c.calculateSignature(resumeURL))},
 		AnswerMethod: http.MethodPost,
 
-		EventURL:    []string{statusURL + "&sig=" + url.QueryEscape(c.calculateSignature(statusURL))},
+		EventURL:    []string{statusURL + "?sig=" + url.QueryEscape(c.calculateSignature(statusURL))},
 		EventMethod: http.MethodPost,
 	}
 	rawTo, err := strconv.Atoi(number.Path())
@@ -339,8 +399,7 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 		return models.ConnectionStatusWired, 0
 
 	case "answered":
-		// we dont return in progress here as that only gets flipped when we get our callback to the action=start endpoint
-		return models.ConnectionStatusWired, 0
+		return models.ConnectionStatusInProgress, 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(status.Duration)
@@ -357,6 +416,11 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
 func (c *client) ValidateRequestSignature(r *http.Request) error {
+	// only validate handling calls, we can't verify others
+	if !strings.HasSuffix(r.URL.Path, "handle") {
+		return nil
+	}
+
 	actual := r.URL.Query().Get("sig")
 	if actual == "" {
 		return errors.Errorf("missing request sig")
