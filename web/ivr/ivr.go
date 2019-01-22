@@ -30,8 +30,10 @@ import (
 func init() {
 	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/handle", handleFlow)
 	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/status", handleStatus)
-	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/mo_call", handleIncomingCall)
+	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/incoming", handleIncomingCall)
 }
+
+// TODO: creation of requests is awkward, would be nice to figure out how to unify how all that works
 
 func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
 	start := time.Now()
@@ -50,10 +52,9 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	channelUUID := assets.ChannelUUID(chi.URLParam(r, "uuid"))
 
 	// load the org id for this UUID (we could load the entire channel here but we want to take the same paths through everything else)
-	var orgID models.OrgID
-	err = s.DB.GetContext(ctx, &orgID, `SELECT org_id FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
+	orgID, err := models.OrgIDForChannelUUID(ctx, s.DB, channelUUID)
 	if err != nil {
-		return writeClientError(w, errors.Wrapf(err, "no channel found with uuid: %s", channelUUID))
+		return writeClientError(w, err)
 	}
 
 	// load our org
@@ -131,7 +132,6 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 		return client.WriteErrorResponse(w, errors.Errorf("no contact for urn: %s", urn))
 	}
 
-	// at this point we should, TODO: populate
 	urn, err = models.URNForURN(ctx, s.DB, org, urn)
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load urn"))
@@ -191,9 +191,13 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 
 	// no session means no trigger, create a missed call event instead
 	// we first create an incoming call channel event and see if that matches
-	event = models.NewChannelEvent(models.MOMissEventType, org.OrgID(), channel.ID(), contactID, urnID, map[string]string{}, false)
+	event = models.NewChannelEvent(models.MOMissEventType, org.OrgID(), channel.ID(), contactID, urnID, nil, false)
+	err = event.Insert(ctx, s.DB)
+	if err != nil {
+		return client.WriteErrorResponse(w, errors.Wrapf(err, "error inserting channel event"))
+	}
 
-	// TODO: insert our event
+	// TODO: should this create a task to do this handling? (would allow for missed call IVR callbacks)
 
 	// try to handle it, this time looking for a missed call event
 	session, err = handler.HandleChannelEvent(ctx, s.DB, s.RP, models.MOMissEventType, event, nil)
@@ -408,10 +412,9 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, rawW http
 	channelUUID := assets.ChannelUUID(chi.URLParam(r, "uuid"))
 
 	// load the org id for this UUID (we could load the entire channel here but we want to take the same paths through everything else)
-	var orgID models.OrgID
-	err = s.DB.GetContext(ctx, &orgID, `SELECT org_id FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
+	orgID, err := models.OrgIDForChannelUUID(ctx, s.DB, channelUUID)
 	if err != nil {
-		return writeClientError(w, errors.Wrapf(err, "no channel found with uuid: %s", channelUUID))
+		return writeClientError(w, err)
 	}
 
 	// load our org
