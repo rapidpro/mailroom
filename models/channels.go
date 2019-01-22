@@ -2,6 +2,8 @@ package models
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -21,6 +23,8 @@ const (
 	ChannelTypeAndroid = ChannelType("A")
 
 	ChannelConfigCallbackDomain = "callback_domain"
+
+	ChannelConfigMaxConcurrentEvents = "max_concurrent_events"
 )
 
 // Channel is the mailroom struct that represents channels
@@ -81,6 +85,14 @@ func (c *Channel) ConfigValue(key string, def string) string {
 	strValue, isString := value.(string)
 	if isString {
 		return strValue
+	}
+	floatValue, isFloat := value.(float64)
+	if isFloat {
+		return fmt.Sprintf("%d", int64(math.RoundToEven(floatValue)))
+	}
+	boolValue, isBool := value.(bool)
+	if isBool {
+		return fmt.Sprintf("%v", boolValue)
 	}
 	return def
 }

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -69,6 +70,8 @@ func GetClient(channel *models.Channel) (Client, error) {
 type Client interface {
 	RequestCall(client *http.Client, number urns.URN, handleURL string, statusURL string) (CallID, error)
 
+	HangupCall(client *http.Client, externalID string) error
+
 	WriteSessionResponse(session *models.Session, resumeURL string, req *http.Request, w http.ResponseWriter) error
 
 	WriteErrorResponse(w http.ResponseWriter, err error) error
@@ -88,6 +91,64 @@ type Client interface {
 	URNForRequest(r *http.Request) (urns.URN, error)
 
 	CallIDForRequest(r *http.Request) (string, error)
+}
+
+// HangupCall hangs up the passed in call also taking care of updating the status of our call in the process
+func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *models.ChannelConnection) error {
+	// no matter what mark our call as failed
+	defer conn.MarkFailed(ctx, db, time.Now())
+
+	// load our org
+	org, err := models.GetOrgAssets(ctx, db, conn.OrgID())
+	if err != nil {
+		return errors.Wrapf(err, "unable to load org")
+	}
+
+	// and our channel
+	channel := org.ChannelByID(conn.ChannelID())
+	if channel == nil {
+		return errors.Wrapf(err, "unable to load channel")
+	}
+
+	// create the right client
+	c, err := GetClient(channel)
+	if err != nil {
+		return errors.Wrapf(err, "unable to create ivr client")
+	}
+
+	// we create our own HTTP client with our own transport so we can log the request and set our user agent
+	logger := httputils.NewLoggingTransport(http.DefaultTransport)
+	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
+
+	// try to request our call start
+	err = c.HangupCall(client, conn.ExternalID())
+
+	// insert any logged requests
+	for _, rt := range logger.RoundTrips {
+		desc := "Hangup Requested"
+		isError := false
+		if rt.Status/100 != 2 {
+			desc = "Error Hanging up Call"
+			isError = true
+		}
+		_, err := models.InsertChannelLog(
+			ctx, db, desc, isError,
+			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody,
+			rt.StartedOn, rt.Elapsed,
+			conn,
+		)
+
+		// log any error inserting our channel log, but try to continue
+		if err != nil {
+			logrus.WithError(err).Error("error inserting channel log")
+		}
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error hanging call up")
+	}
+
+	return nil
 }
 
 // RequestCallStart creates a new ChannelSession for the passed in flow start and contact, returning the created session
@@ -147,6 +208,30 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 func RequestCallStartForConnection(ctx context.Context, config *config.Config, db *sqlx.DB, channel *models.Channel, telURN urns.URN, conn *models.ChannelConnection) error {
 	// the domain that will be used for callbacks, can be specific for channels due to white labeling
 	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, config.Domain)
+
+	// get max concurrent events if any
+	maxCalls := channel.ConfigValue(models.ChannelConfigMaxConcurrentEvents, "")
+	if maxCalls != "" {
+		maxCalls, _ := strconv.Atoi(maxCalls)
+
+		// max calls is set, lets see how many are currently active on this channel
+		if maxCalls > 0 {
+			count, err := models.ActiveChannelConnectionCount(ctx, db, channel.ID())
+			if err != nil {
+				return errors.Wrapf(err, "error finding number of active channel connections")
+			}
+
+			// we are at max calls, do not move on
+			if count >= maxCalls {
+				logrus.WithField("channel_id", channel.ID()).Info("call being queued, max concurrent reached")
+				err := conn.MarkThrottled(ctx, db, time.Now())
+				if err != nil {
+					return errors.Wrapf(err, "error marking connection as throttled")
+				}
+				return nil
+			}
+		}
+	}
 
 	// create our callback
 	form := url.Values{

@@ -292,7 +292,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 	}
 	callR.From = Phone{Type: "phone", Number: rawFrom}
 
-	resp, err := c.postRequest(client, baseURL, callR)
+	resp, err := c.makeRequest(client, http.MethodPut, baseURL, callR)
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
@@ -321,6 +321,21 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 	logrus.WithField("body", body).WithField("status", resp.StatusCode).Debug("requested call")
 
 	return ivr.CallID(call.UUID), nil
+}
+
+// HangupCall asks Nexmo to hang up the call that is passed in
+func (c *client) HangupCall(client *http.Client, callID string) error {
+	hangupBody := map[string]string{"action": "hangup"}
+	url := baseURL + "/" + callID
+	resp, err := c.makeRequest(client, http.MethodPut, url, hangupBody)
+	if err != nil {
+		return errors.Wrapf(err, "error trying to hangup call")
+	}
+
+	if resp.StatusCode != 204 {
+		return errors.Errorf("received non 204 status for call hangup: %d", resp.StatusCode)
+	}
+	return nil
 }
 
 type NCCOInput struct {
@@ -497,13 +512,13 @@ func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
 	return err
 }
 
-func (c *client) postRequest(client *http.Client, sendURL string, body interface{}) (*http.Response, error) {
+func (c *client) makeRequest(client *http.Client, method string, sendURL string, body interface{}) (*http.Response, error) {
 	bb, err := json.Marshal(body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error json encoding request")
 	}
 
-	req, _ := http.NewRequest(http.MethodPost, sendURL, bytes.NewReader(bb))
+	req, _ := http.NewRequest(method, sendURL, bytes.NewReader(bb))
 	token, err := c.generateToken()
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating jwt token")

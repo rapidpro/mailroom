@@ -48,7 +48,8 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 	defer rc.Close()
 
 	// we expire runs and sessions that have no continuation in batches
-	batch := make([]interface{}, 0, expireBatchSize)
+	expiredRuns := make([]models.FlowRunID, 0, expireBatchSize)
+	expiredSessions := make([]models.SessionID, 0, expireBatchSize)
 
 	// select our expired runs
 	rows, err := db.QueryxContext(ctx, selectExpiredRunsSQL)
@@ -56,19 +57,6 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		return errors.Wrapf(err, "error querying for expired runs")
 	}
 	defer rows.Close()
-
-	expireBatch := func(batch []interface{}) error {
-		err = models.BulkSQL(ctx, "expiring runs", db, expireRunsSQL, batch)
-		if err != nil {
-			return errors.Wrapf(err, "error expiring runs")
-		}
-
-		err = models.BulkSQL(ctx, "expiring sessions", db, expireSessionsSQL, batch)
-		if err != nil {
-			return errors.Wrapf(err, "error expiring sessions")
-		}
-		return nil
-	}
 
 	count := 0
 	for rows.Next() {
@@ -82,15 +70,17 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 		// no parent id? we can add this to our batch
 		if expiration.ParentUUID == nil {
-			batch = append(batch, expiration)
+			expiredRuns = append(expiredRuns, expiration.RunID)
+			expiredSessions = append(expiredSessions, expiration.SessionID)
 
 			// batch is full? commit it
-			if len(batch) == expireBatchSize {
-				err = expireBatch(batch)
+			if len(expiredRuns) == expireBatchSize {
+				err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
 				if err != nil {
 					return err
 				}
-				batch = batch[:0]
+				expiredRuns = expiredRuns[:0]
+				expiredSessions = expiredSessions[:0]
 			}
 
 			continue
@@ -123,8 +113,8 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 	}
 
 	// commit any stragglers
-	if len(batch) > 0 {
-		err = expireBatch(batch)
+	if len(expiredRuns) > 0 {
+		err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
 		if err != nil {
 			return err
 		}
@@ -155,35 +145,6 @@ const selectExpiredRunsSQL = `
 	ORDER BY
 		expires_on ASC
 	LIMIT 25000
-`
-
-const expireRunsSQL = `
-	UPDATE
-		flows_flowrun fr
-	SET
-		is_active = FALSE,
-		exited_on = NOW(),
-		exit_type = 'E',
-		modified_on = NOW(),
-		child_context = NULL,
-		parent_context = NULL
-	FROM
-		(VALUES(:run_id)) as r(run_id)
-	WHERE
-		fr.id = r.run_id::int
-`
-
-const expireSessionsSQL = `
-	UPDATE
-		flows_flowsession s
-	SET
-		timeout_on = NULL,
-		ended_on = NOW(),
-		status = 'X'
-	FROM
-		(VALUES(:session_id)) AS r(session_id)
-	WHERE
-		s.id = r.session_id::int
 `
 
 type RunExpiration struct {

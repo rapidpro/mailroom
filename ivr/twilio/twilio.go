@@ -32,8 +32,9 @@ import (
 const (
 	twilioChannelType = models.ChannelType("T")
 
-	baseURL  = `https://api.twilio.com`
-	callPath = `/2010-04-01/Accounts/{AccountSID}/Calls.json`
+	baseURL    = `https://api.twilio.com`
+	callPath   = `/2010-04-01/Accounts/{AccountSID}/Calls.json`
+	hangupPath = `/2010-04-01/Accounts/{AccountSID}/Calls/{SID}.json`
 
 	signatureHeader = "X-Twilio-Signature"
 
@@ -131,7 +132,6 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 	form.Set("StatusCallback", statusURL)
 
 	sendURL := baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
-	logrus.WithField("url", sendURL).Debug("send url")
 
 	resp, err := c.postRequest(client, sendURL, form)
 	if err != nil {
@@ -160,6 +160,26 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 	}
 
 	return ivr.CallID(call.SID), nil
+}
+
+// HangupCall asks Twilio to hang up the call that is passed in
+func (c *client) HangupCall(client *http.Client, callID string) error {
+	form := url.Values{}
+	form.Set("Status", "completed")
+
+	sendURL := baseURL + strings.Replace(hangupPath, "{AccountSID}", c.accountSID, -1)
+	sendURL = strings.Replace(sendURL, "{SID}", callID, -1)
+
+	resp, err := c.postRequest(client, sendURL, form)
+	if err != nil {
+		return errors.Wrapf(err, "error trying to hangup call")
+	}
+
+	if resp.StatusCode != 200 {
+		return errors.Errorf("received non 204 trying to hang up call: %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 // InputForRequest returns the input for the passed in request, if any

@@ -35,6 +35,10 @@ const (
 	ConnectionStatusNoAnswer   = ConnectionStatus("N")
 	ConnectionStatusCancelled  = ConnectionStatus("C")
 	ConnectionStatusCompleted  = ConnectionStatus("D")
+
+	ConnectionMaxRetries   = 3
+	ConnectionRetryWait    = time.Minute * 5
+	ConnectionThrottleWait = time.Minute * 2
 )
 
 type ChannelConnection struct {
@@ -267,9 +271,12 @@ FROM
 	channels_channelconnection as cc
 	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
+	cc.connection_type = 'V' AND
 	cc.is_active = TRUE AND
-	cc.next_attempt < NOW() AND
-	cc.status = 'E'
+	next_attempt < NOW() AND
+	(cc.status = 'E' OR cc.status = 'Q')
+ORDER BY 
+	cc.next_attempt ASC
 LIMIT
     $1
 `
@@ -332,9 +339,9 @@ func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now tim
 	c.c.Status = ConnectionStatusErrored
 	c.c.EndedOn = &now
 
-	if c.c.RetryCount < 3 {
+	if c.c.RetryCount < ConnectionMaxRetries {
 		c.c.RetryCount++
-		next := now.Add(time.Minute * 5 * time.Duration(c.c.RetryCount))
+		next := now.Add(ConnectionRetryWait * time.Duration(c.c.RetryCount))
 		c.c.NextAttempt = &next
 	} else {
 		c.c.Status = ConnectionStatusFailed
@@ -365,6 +372,24 @@ func (c *ChannelConnection) MarkFailed(ctx context.Context, db Queryer, now time
 
 	if err != nil {
 		return errors.Wrapf(err, "error marking channel connection as failed")
+	}
+
+	return nil
+}
+
+// MarkThrottled updates the status for this connection to be queued, to be retried in a minute
+func (c *ChannelConnection) MarkThrottled(ctx context.Context, db Queryer, now time.Time) error {
+	c.c.Status = ConnectionStatusQueued
+	next := now.Add(ConnectionThrottleWait)
+	c.c.NextAttempt = &next
+
+	_, err := db.ExecContext(ctx,
+		`UPDATE channels_channelconnection SET status = $2, next_attempt = $3, modified_on = NOW() WHERE id = $1`,
+		c.c.ID, c.c.Status, c.c.NextAttempt,
+	)
+
+	if err != nil {
+		return errors.Wrapf(err, "error marking channel connection as throttled")
 	}
 
 	return nil
@@ -412,4 +437,25 @@ func UpdateChannelConnectionStatuses(ctx context.Context, db Queryer, connection
 	}
 
 	return nil
+}
+
+const selectActiveConnectionCountSQL = `
+SELECT 
+	count(*)
+FROM 
+	channels_channelconnection
+WHERE
+	is_active = TRUE AND
+	channel_id = $1 AND
+	(status = 'W' OR status = 'R' OR status = 'I')
+`
+
+// ActiveChannelConnectionCount returns the number of ongoing connections for the passed in channel
+func ActiveChannelConnectionCount(ctx context.Context, db Queryer, id ChannelID) (int, error) {
+	count := 0
+	err := db.GetContext(ctx, &count, selectActiveConnectionCountSQL, id)
+	if err != nil {
+		return 0, errors.Wrapf(err, "unable to select active channel connection count")
+	}
+	return count, nil
 }

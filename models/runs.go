@@ -150,6 +150,11 @@ func (s *Session) SetChannelConnection(cc *ChannelConnection) {
 	connID := cc.ID()
 	s.ConnectionID = &connID
 	s.channelConnection = cc
+
+	// also set it on all our runs
+	for _, r := range s.runs {
+		r.ConnectionID = &connID
+	}
 }
 
 func (s *Session) ChannelConnection() *ChannelConnection {
@@ -185,6 +190,7 @@ type FlowRun struct {
 	ParentUUID      *flows.RunUUID  `db:"parent_uuid"`
 	SessionID       SessionID       `db:"session_id"`
 	StartID         StartID         `db:"start_id"`
+	ConnectionID    *ConnectionID   `db:"connection_id"`
 
 	// we keep a reference to model run as well
 	run flows.FlowRun
@@ -620,9 +626,9 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 const insertRunSQL = `
 INSERT INTO
 flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, expires_on, responded, results, path, 
-	          events, current_node_uuid, contact_id, flow_id, org_id, session_id, start_id, parent_uuid)
+	          events, current_node_uuid, contact_id, flow_id, org_id, session_id, start_id, parent_uuid, connection_id)
 	   VALUES(:uuid, :is_active, :created_on, NOW(), :exited_on, :exit_type, :expires_on, :responded, :results, :path,
-	          :events, :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id, :start_id, :parent_uuid)
+	          :events, :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id, :start_id, :parent_uuid, :connection_id)
 RETURNING id
 `
 
@@ -822,25 +828,16 @@ func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.C
 		return nil
 	}
 
-	// TODO: hangup calls here?
-
 	// first interrupt our runs
-	start := time.Now()
-	res, err := tx.ExecContext(ctx, interruptContactRunsSQL, pq.Array(contactIDs), now)
+	err := Exec(ctx, "interrupting contact runs", tx, interruptContactRunsSQL, pq.Array(contactIDs), now)
 	if err != nil {
-		return errors.Wrapf(err, "error interrupting contact runs")
+		return err
 	}
-	rows, _ := res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("interrupted runs")
 
-	// then our sessions
-	start = time.Now()
-	res, err = tx.ExecContext(ctx, interruptContactSessionsSQL, pq.Array(contactIDs), now)
+	err = Exec(ctx, "interrupting contact sessions", tx, interruptContactSessionsSQL, pq.Array(contactIDs), now)
 	if err != nil {
-		return errors.Wrapf(err, "error interrupting contact sessions")
+		return err
 	}
-	rows, _ = res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("interrupted sessions")
 
 	return nil
 }
@@ -868,4 +865,48 @@ SET
 	ended_on = $2
 WHERE
 	id = ANY (SELECT id FROM flows_flowsession WHERE contact_id = ANY($1) AND status = 'W')
+`
+
+// ExpireRunsAndSessions expires all the passed in runs and sessions. Note this should only be called
+// for runs that have no parents or no way of continuing
+func ExpireRunsAndSessions(ctx context.Context, db Queryer, runIDs []FlowRunID, sessionIDs []SessionID) error {
+	if len(runIDs) == 0 {
+		return nil
+	}
+
+	err := Exec(ctx, "expiring runs", db, expireRunsSQL, pq.Array(runIDs))
+	if err != nil {
+		return err
+	}
+
+	err = Exec(ctx, "expiring sessions", db, expireSessionsSQL, pq.Array(sessionIDs))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+const expireSessionsSQL = `
+	UPDATE
+		flows_flowsession s
+	SET
+		timeout_on = NULL,
+		ended_on = NOW(),
+		status = 'X'
+	WHERE
+		id = ANY($1)
+`
+
+const expireRunsSQL = `
+	UPDATE
+		flows_flowrun fr
+	SET
+		is_active = FALSE,
+		exited_on = NOW(),
+		exit_type = 'E',
+		modified_on = NOW(),
+		child_context = NULL,
+		parent_context = NULL
+	WHERE
+		id = ANY($1)
 `
