@@ -42,7 +42,7 @@ type Config struct {
 // NewMailroomConfig returns a new default configuration object
 func NewMailroomConfig() *Config {
 	return &Config{
-		DB:             "postgres://temba@localhost/temba?sslmode=disable",
+		DB:             "postgres://temba:temba@localhost/temba?sslmode=disable",
 		DBPoolSize:     8,
 		Redis:          "redis://localhost:6379/15",
 		BatchWorkers:   4,
