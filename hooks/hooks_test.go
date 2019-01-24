@@ -24,8 +24,6 @@ import (
 
 var (
 	httpClient = utils.NewHTTPClient("mailroom")
-	ageUUID    models.FieldUUID
-	genderUUID models.FieldUUID
 )
 
 type ContactActionMap map[flows.ContactID][]flows.Action
@@ -52,22 +50,6 @@ func newActionUUID() flows.ActionUUID {
 
 func TestMain(m *testing.M) {
 	testsuite.Reset()
-
-	// populate age and gender UUIDs
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
-
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
-	if err != nil {
-		panic(err)
-	}
-
-	f := org.FieldByKey("age")
-	ageUUID = f.UUID()
-
-	f = org.FieldByKey("gender")
-	genderUUID = f.UUID()
-
 	os.Exit(m.Run())
 }
 
@@ -178,7 +160,7 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 	assert.NoError(t, err)
 
 	// reuse id from one of our real flows
-	flowID := models.FlowID(1)
+	flowID := models.FavoritesFlowID
 	flowUUID := assets.FlowUUID(utils.NewUUID())
 
 	for i, tc := range tcs {
@@ -208,7 +190,7 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 			}
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, org, flow, []flows.ContactID{models.Cathy, models.Bob, models.Evan}, options)
+		_, err = runner.StartFlow(ctx, db, rp, org, flow, []flows.ContactID{models.CathyID, models.BobID, models.GeorgeID}, options)
 		assert.NoError(t, err)
 
 		// now check our assertions

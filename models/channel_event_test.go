@@ -12,14 +12,14 @@ func TestChannelEvents(t *testing.T) {
 	db := testsuite.DB()
 
 	// no extra
-	e := NewChannelEvent(MOMissEventType, Org1, Channel1, Cathy, CathyURNID, nil, false)
+	e := NewChannelEvent(MOMissEventType, Org1, TwilioChannelID, CathyID, CathyURNID, nil, false)
 	err := e.Insert(ctx, db)
 	assert.NoError(t, err)
 	assert.NotZero(t, e.ID())
 	assert.Equal(t, e.Extra(), map[string]string{})
 
 	// with extra
-	e2 := NewChannelEvent(MOMissEventType, Org1, Channel1, Cathy, CathyURNID, map[string]string{"referral_id": "foobar"}, false)
+	e2 := NewChannelEvent(MOMissEventType, Org1, TwilioChannelID, CathyID, CathyURNID, map[string]string{"referral_id": "foobar"}, false)
 	err = e2.Insert(ctx, db)
 	assert.NoError(t, err)
 	assert.NotZero(t, e2.ID())

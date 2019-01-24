@@ -36,8 +36,12 @@ const (
 	ConnectionStatusCancelled  = ConnectionStatus("C")
 	ConnectionStatusCompleted  = ConnectionStatus("D")
 
-	ConnectionMaxRetries   = 3
-	ConnectionRetryWait    = time.Minute * 5
+	ConnectionMaxRetries = 3
+
+	// ConnectionRetryWait is our default wait to retry connections in minutes
+	ConnectionRetryWait = 60
+
+	// ConnectionThrottleWait is our wait between throttle retries
 	ConnectionThrottleWait = time.Minute * 2
 )
 
@@ -335,13 +339,13 @@ func (c *ChannelConnection) MarkStarted(ctx context.Context, db Queryer, now tim
 }
 
 // MarkErrored updates the status for this connection to errored and schedules a retry if appropriate
-func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now time.Time) error {
+func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now time.Time, wait time.Duration) error {
 	c.c.Status = ConnectionStatusErrored
 	c.c.EndedOn = &now
 
 	if c.c.RetryCount < ConnectionMaxRetries {
 		c.c.RetryCount++
-		next := now.Add(ConnectionRetryWait * time.Duration(c.c.RetryCount))
+		next := now.Add(wait)
 		c.c.NextAttempt = &next
 	} else {
 		c.c.Status = ConnectionStatusFailed

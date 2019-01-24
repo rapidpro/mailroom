@@ -2,26 +2,21 @@ package timeouts
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/handler"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/marker"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(m *testing.M) {
-	testsuite.Reset()
-	os.Exit(m.Run())
-}
-
 func TestTimeouts(t *testing.T) {
+	testsuite.Reset()
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 	rc := testsuite.RC()
@@ -33,8 +28,8 @@ func TestTimeouts(t *testing.T) {
 	// need to create a session that has an expired timeout
 	db := testsuite.DB()
 	db.MustExec(`UPDATE orgs_org SET flow_server_enabled=TRUE WHERE id = 1;`)
-	db.MustExec(`INSERT INTO flows_flowsession(org_id, status, responded, contact_id, created_on, timeout_on) VALUES (1, 'W', TRUE, 42, NOW(), NOW());`)
-	db.MustExec(`INSERT INTO flows_flowsession(org_id, status, responded, contact_id, created_on, timeout_on) VALUES (1, 'W', TRUE, 43, NOW(), NOW()+ interval '1' day);`)
+	db.MustExec(`INSERT INTO flows_flowsession(org_id, status, responded, contact_id, created_on, timeout_on) VALUES (1, 'W', TRUE, $1, NOW(), NOW());`, models.CathyID)
+	db.MustExec(`INSERT INTO flows_flowsession(org_id, status, responded, contact_id, created_on, timeout_on) VALUES (1, 'W', TRUE, $1, NOW(), NOW()+ interval '1' day);`, models.GeorgeID)
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our timeouts
@@ -52,7 +47,7 @@ func TestTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 
 	// assert its the right contact
-	assert.Equal(t, flows.ContactID(42), eventTask.ContactID)
+	assert.Equal(t, models.CathyID, eventTask.ContactID)
 
 	// no other
 	task, err = queue.PopNextTask(rc, mailroom.HandlerQueue)

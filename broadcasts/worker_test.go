@@ -2,7 +2,6 @@ package broadcasts
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -20,11 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(m *testing.M) {
-	testsuite.Reset()
-	os.Exit(m.Run())
-}
-
 func TestBroadcasts(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
@@ -33,7 +27,7 @@ func TestBroadcasts(t *testing.T) {
 	rc := testsuite.RC()
 	defer rc.Close()
 
-	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
+	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
 	eng := utils.Language("eng")
@@ -45,19 +39,22 @@ func TestBroadcasts(t *testing.T) {
 		},
 	}
 
-	doctors := assets.NewGroupReference(assets.GroupUUID("85a5a793-4741-4896-b55e-05af65f3c0fa"), "Doctors")
+	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
 	doctorsOnly := []*assets.GroupReference{doctors}
 
-	cathy := flows.NewContactReference(flows.ContactUUID("9a8dca3f-dcf4-46bc-a3dc-a707b95b6664"), "Cathy Quincy")
+	cathy := flows.NewContactReference(models.CathyUUID, "Cathy")
 	cathyOnly := []*flows.ContactReference{cathy}
 
 	// add an extra URN fo cathy
 	db.MustExec(
 		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 100)`, 42)
+								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 100)`, models.CathyID)
 
-	// george has an invalid twitter URN, so he won't cause messages to be sent
-	george := flows.NewContactReference(flows.ContactUUID("d03200d4-fc29-41b9-9894-61f198c26148"), "George Poots")
+	// change george's URN to an invalid twitter URN so it can't be sent
+	db.MustExec(
+		`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, models.GeorgeURNID,
+	)
+	george := flows.NewContactReference(models.GeorgeUUID, "George")
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
@@ -70,10 +67,10 @@ func TestBroadcasts(t *testing.T) {
 		BatchCount   int
 		MsgCount     int
 	}{
-		{basic, eng, doctorsOnly, nil, nil, mailroom.BatchQueue, 21, 1797},
-		{basic, eng, doctorsOnly, georgeOnly, nil, mailroom.BatchQueue, 21, 1797},
+		{basic, eng, doctorsOnly, nil, nil, mailroom.BatchQueue, 2, 121},
+		{basic, eng, doctorsOnly, georgeOnly, nil, mailroom.BatchQueue, 2, 121},
 		{basic, eng, nil, georgeOnly, nil, mailroom.HandlerQueue, 1, 0},
-		{basic, eng, doctorsOnly, cathyOnly, nil, mailroom.BatchQueue, 21, 1797},
+		{basic, eng, doctorsOnly, cathyOnly, nil, mailroom.BatchQueue, 2, 121},
 		{basic, eng, nil, cathyOnly, nil, mailroom.HandlerQueue, 1, 1},
 		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, mailroom.HandlerQueue, 1, 1},
 		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, mailroom.HandlerQueue, 1, 2},

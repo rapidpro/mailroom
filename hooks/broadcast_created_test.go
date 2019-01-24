@@ -24,14 +24,14 @@ func TestBroadcastCreated(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				models.Cathy: []flows.Action{
+				models.CathyID: []flows.Action{
 					actions.NewSendBroadcastAction(newActionUUID(), "hello world", nil, nil, []urns.URN{urns.URN("tel:+12065551212")}, nil, nil, nil),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
-					Args:  []interface{}{models.Cathy},
+					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
 			},

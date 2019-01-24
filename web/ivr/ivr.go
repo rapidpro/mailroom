@@ -374,7 +374,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 
 	case actionStatus:
 		err = ivr.HandleIVRStatus(
-			ctx, s.DB, s.RP, client, conn,
+			ctx, s.DB, s.RP, org, client, conn,
 			r, w,
 		)
 
@@ -484,7 +484,7 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, rawW http
 	}()
 
 	err = ivr.HandleIVRStatus(
-		ctx, s.DB, s.RP, client, conn,
+		ctx, s.DB, s.RP, org, client, conn,
 		r, w,
 	)
 

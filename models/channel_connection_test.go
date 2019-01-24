@@ -11,7 +11,7 @@ func TestChannelConnections(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	conn, err := InsertIVRConnection(ctx, db, Org1, Channel1, NilStartID, Cathy, CathyURNID, ConnectionDirectionOut, ConnectionStatusPending, "")
+	conn, err := InsertIVRConnection(ctx, db, Org1, TwilioChannelID, NilStartID, CathyID, CathyURNID, ConnectionDirectionOut, ConnectionStatusPending, "")
 	assert.NoError(t, err)
 
 	assert.NotEqual(t, ConnectionID(0), conn.ID())

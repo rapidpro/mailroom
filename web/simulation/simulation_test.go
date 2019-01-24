@@ -46,7 +46,7 @@ const (
 			},
 			"flow": {
 				"name": "Favorites",
-				"uuid": "51e3c67d-8483-449c-abf7-25e50686f0db"
+				"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
 			},
 			"triggered_on": "2000-01-01T00:00:00.000000000-00:00",
 			"type": "manual"
@@ -81,8 +81,8 @@ const (
             },
             "msg": {
                 "channel": {
-                    "name": "Nexmo",
-                    "uuid": "c534272e-817d-4a78-a70c-f21df34407f8"
+                    "name": "Twitter",
+                    "uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91"
                 },
                 "text": "I like blue!",
                 "urn": "tel:+12065551212",
@@ -143,7 +143,6 @@ func TestServer(t *testing.T) {
 	time.Sleep(time.Second)
 
 	defer server.Stop()
-
 	// TODO: test custom flow definitions
 	startSession := ""
 

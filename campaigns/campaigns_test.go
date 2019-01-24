@@ -7,9 +7,9 @@ import (
 
 	"github.com/nyaruka/mailroom"
 
-	"github.com/jmoiron/sqlx"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/marker"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
@@ -32,8 +32,8 @@ func TestCampaigns(t *testing.T) {
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
 	db := testsuite.DB()
-	db.MustExec(`UPDATE flows_flow SET flow_server_enabled=TRUE WHERE id = 31;`)
-	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), 42, 2), (NOW(), 43, 2);`)
+	db.MustExec(`UPDATE flows_flow SET flow_server_enabled=TRUE WHERE id = $1;`, models.FavoritesFlowID)
+	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, models.CathyID, models.GeorgeID, models.RemindersEvent1ID)
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our campaign to be started
@@ -50,13 +50,6 @@ func TestCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should now have a flow run for that contact and flow
-	assertCount(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = 42 AND flow_id = 31;`, 1)
-	assertCount(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = 43 AND flow_id = 31;`, 1)
-}
-
-func assertCount(t *testing.T, db *sqlx.DB, query string, count int) {
-	var c int
-	err := db.Get(&c, query)
-	assert.NoError(t, err)
-	assert.Equal(t, count, c)
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, []interface{}{models.CathyID, models.FavoritesFlowID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, []interface{}{models.GeorgeID, models.FavoritesFlowID}, 1)
 }

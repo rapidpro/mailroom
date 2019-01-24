@@ -38,10 +38,10 @@ func TestWebhookCalled(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				models.Cathy: []flows.Action{
+				models.CathyID: []flows.Action{
 					actions.NewCallResthookAction(newActionUUID(), "foo", "foo"),
 				},
-				models.Evan: []flows.Action{
+				models.GeorgeID: []flows.Action{
 					actions.NewCallResthookAction(newActionUUID(), "foo", "foo"),
 					actions.NewCallWebhookAction(newActionUUID(), "GET", server.URL+"?unsub=1", nil, "", ""),
 				},

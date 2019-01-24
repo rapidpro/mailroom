@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
@@ -23,37 +21,34 @@ func TestCampaignStarts(t *testing.T) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
-	// delete our android channel, we want our messages to be sent through courier
-	db.MustExec(`DELETE FROM channels_channel where id = 1;`)
-
 	event := triggers.NewCampaignEvent(
 		"e68f4c70-9db1-44c8-8498-602d6857235e",
 		triggers.NewCampaignReference(
-			"5da68501-61c4-4638-a494-3314a6d5edbd",
+			string(models.DoctorRemindersCampaignUUID),
 			"Doctor Reminders",
 		),
 	)
 
 	// create our event fires
 	now := time.Now()
-	db.MustExec(`INSERT INTO campaigns_eventfire(contact_id, event_id, scheduled) VALUES(42,1, $1),(43,1, $1);`, now)
+	db.MustExec(`INSERT INTO campaigns_eventfire(contact_id, event_id, scheduled) VALUES($2, $1, $4),($3, $1, $4);`, models.RemindersEvent2ID, models.CathyID, models.BobID, now)
 
-	contacts := []flows.ContactID{42, 43}
+	contacts := []flows.ContactID{models.CathyID, models.BobID}
 	fires := []*models.EventFire{
 		&models.EventFire{
 			FireID:    1,
-			EventID:   1,
-			ContactID: 42,
+			EventID:   models.RemindersEvent2ID,
+			ContactID: models.CathyID,
 			Scheduled: now,
 		},
 		&models.EventFire{
 			FireID:    2,
-			EventID:   1,
-			ContactID: 43,
+			EventID:   models.RemindersEvent2ID,
+			ContactID: models.BobID,
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, models.OrgID(1), fires, assets.FlowUUID("ab906843-73db-43fb-b44f-c6f4bce4a8fc"), event)
+	sessions, err := FireCampaignEvents(ctx, db, rp, models.Org1, fires, models.CampaignFlowUUID, event)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
 
@@ -68,21 +63,21 @@ func TestCampaignStarts(t *testing.T) {
 		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND session_id IS NOT NULL`,
-		[]interface{}{pq.Array(contacts), 31}, 2,
+		[]interface{}{pq.Array(contacts), models.CampaignFlowID}, 2,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
 		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
-		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = 2`,
-		[]interface{}{pq.Array(contacts)}, 2,
+		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $2`,
+		[]interface{}{pq.Array(contacts), models.TwilioChannelID}, 2,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`, nil, 0)
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN (42,43) AND event_id = 1`, nil, 2)
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3`, []interface{}{models.CathyID, models.BobID, models.RemindersEvent2ID}, 2)
 }
 
 func TestBatchStart(t *testing.T) {
@@ -91,16 +86,13 @@ func TestBatchStart(t *testing.T) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
-	// delete our android channel, we want our messages to be sent through courier
-	db.MustExec(`DELETE FROM channels_channel where id = 1;`)
-
 	// create a start object
 	db.MustExec(
 		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, contact_count, status, flow_id, created_by_id, modified_by_id)
-		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', 31, 1, 1)`, utils.NewUUID())
+		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', $2, 1, 1)`, utils.NewUUID(), models.SingleMessageFlowID)
 
 	// and our batch object
-	contactIDs := []flows.ContactID{42, 43}
+	contactIDs := []flows.ContactID{models.CathyID, models.BobID}
 
 	tcs := []struct {
 		Restart       bool
@@ -116,7 +108,7 @@ func TestBatchStart(t *testing.T) {
 
 	for i, tc := range tcs {
 		start := models.NewFlowStart(
-			models.NewStartID(1), models.OrgID(1), models.FlowID(31),
+			models.NewStartID(1), models.OrgID(1), models.SingleMessageFlowID,
 			nil, contactIDs, nil, false, tc.Restart, tc.IncludeActive,
 			nil,
 		)
@@ -138,14 +130,14 @@ func TestBatchStart(t *testing.T) {
 			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 			AND session_id IS NOT NULL`,
-			[]interface{}{pq.Array(contactIDs), 31}, tc.TotalCount, "%d: unexpected number of runs", i,
+			[]interface{}{pq.Array(contactIDs), models.SingleMessageFlowID}, tc.TotalCount, "%d: unexpected number of runs", i,
 		)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
-			AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
-			AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = 2`,
-			[]interface{}{pq.Array(contactIDs)}, tc.TotalCount, "%d: unexpected number of messages", i,
+			AND text = 'Hey, how are you?' AND org_id = 1 AND status = 'Q' 
+			AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $2`,
+			[]interface{}{pq.Array(contactIDs), models.TwilioChannelID}, tc.TotalCount, "%d: unexpected number of messages", i,
 		)
 	}
 }
@@ -156,17 +148,17 @@ func TestContactRuns(t *testing.T) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
-	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
+	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
 	sa, err := models.GetSessionAssets(org)
 	assert.NoError(t, err)
 
-	flow, err := org.FlowByID(1)
+	flow, err := org.FlowByID(models.FavoritesFlowID)
 	assert.NoError(t, err)
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{42})
+	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{models.CathyID})
 	assert.NoError(t, err)
 
 	contact, err := contacts[0].FlowContact(org, sa)
@@ -210,7 +202,7 @@ func TestContactRuns(t *testing.T) {
 	session := sessions[0]
 	for i, tc := range tcs {
 		// answer our first question
-		msg := flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), urns.URN("tel:+250700000001"), nil, tc.Message, nil)
+		msg := flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), models.CathyURN, nil, tc.Message, nil)
 		msg.SetID(10)
 		resume := resumes.NewMsgResume(org.Env(), contact, msg)
 

@@ -2,7 +2,6 @@ package starts
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/jmoiron/sqlx"
@@ -17,17 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(m *testing.M) {
-	testsuite.Reset()
-	os.Exit(m.Run())
-}
-
 func insertStart(db *sqlx.DB, uuid utils.UUID, restartParticipants bool, includeActive bool) {
 	// note we don't bother with the many to many for contacts and groups in our testing
 	db.MustExec(
 		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, 
 									 contact_count, status, created_by_id, flow_id, modified_by_id)
-							VALUES(TRUE, now(), now(), $1, $2, $3, 0, 'S', 1, 31, 1)`, uuid, restartParticipants, includeActive)
+							VALUES(TRUE, now(), now(), $1, $2, $3, 0, 'S', 1, $4, 1)`, uuid, restartParticipants, includeActive, models.SingleMessageFlowID)
 }
 
 func TestStarts(t *testing.T) {
@@ -42,7 +36,7 @@ func TestStarts(t *testing.T) {
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
 	db.MustExec(
 		`INSERT INTO flows_flowrun(uuid, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id)
-		                    VALUES($1, TRUE, now(), now(), FALSE, 1318, 31, 1);`, utils.NewUUID())
+		                    VALUES($1, TRUE, now(), now(), FALSE, $2, $3, 1);`, utils.NewUUID(), models.GeorgeID, models.SingleMessageFlowID)
 
 	tcs := []struct {
 		FlowID              models.FlowID
@@ -55,13 +49,13 @@ func TestStarts(t *testing.T) {
 		BatchCount          int
 		TotalCount          int
 	}{
-		{models.FlowID(31), []models.GroupID{36}, nil, false, false, mailroom.BatchQueue, 525, 6, 520},
-		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{1318}, false, false, mailroom.BatchQueue, 525, 6, 0},
-		{models.FlowID(31), nil, []flows.ContactID{1318}, true, true, mailroom.HandlerQueue, 1, 1, 1},
-		{models.FlowID(31), []models.GroupID{36}, []flows.ContactID{51}, false, false, mailroom.BatchQueue, 526, 6, 1},
-		{models.FlowID(31), nil, []flows.ContactID{51}, false, false, mailroom.HandlerQueue, 1, 1, 0},
-		{models.FlowID(31), nil, []flows.ContactID{51}, false, true, mailroom.HandlerQueue, 1, 1, 0},
-		{models.FlowID(31), nil, []flows.ContactID{51}, true, true, mailroom.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, nil, false, false, mailroom.BatchQueue, 121, 2, 121},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []flows.ContactID{models.CathyID}, false, false, mailroom.BatchQueue, 121, 2, 0},
+		{models.SingleMessageFlowID, nil, []flows.ContactID{models.CathyID}, true, true, mailroom.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []flows.ContactID{models.BobID}, false, false, mailroom.BatchQueue, 122, 2, 1},
+		{models.SingleMessageFlowID, nil, []flows.ContactID{models.BobID}, false, false, mailroom.HandlerQueue, 1, 1, 0},
+		{models.SingleMessageFlowID, nil, []flows.ContactID{models.BobID}, false, true, mailroom.HandlerQueue, 1, 1, 0},
+		{models.SingleMessageFlowID, nil, []flows.ContactID{models.BobID}, true, true, mailroom.HandlerQueue, 1, 1, 1},
 	}
 
 	for i, tc := range tcs {
@@ -70,7 +64,7 @@ func TestStarts(t *testing.T) {
 
 		// handle our start task
 		start := models.NewFlowStart(
-			models.NewStartID(startID), models.OrgID(1), tc.FlowID,
+			models.NewStartID(startID), models.Org1, tc.FlowID,
 			tc.GroupIDs, tc.ContactIDs, nil, false,
 			tc.RestartParticipants, tc.IncludeActive,
 			nil,

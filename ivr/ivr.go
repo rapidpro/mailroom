@@ -550,13 +550,26 @@ func ResumeIVRFlow(
 
 // HandleIVRStatus is called on status callbacks for an IVR call. We let the client decide whether the call has
 // ended for some reason and update the state of the call and session if so
-func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
+func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
 	status, duration := client.StatusForRequest(r)
 
 	// if we errored, mark ourselves appropriately
 	if status == models.ConnectionStatusErrored {
-		conn.MarkErrored(ctx, db, time.Now())
+		// on errors, we need to look up the flow to know how long to wait before retrying
+		// get the flow for our start
+		flowID, err := models.FlowIDForStart(ctx, db, org.OrgID(), conn.StartID())
+		if err != nil {
+			return errors.Wrapf(err, "unable to load start: %d", conn.StartID().Int64)
+		}
+
+		flow, err := org.FlowByID(flowID)
+		if err != nil {
+			return errors.Wrapf(err, "unable to load flow: %d", flowID)
+		}
+
+		retryWait := time.Minute * time.Duration(flow.IntConfigValue(models.FlowConfigIVRRetryMinutes, models.ConnectionRetryWait))
+		conn.MarkErrored(ctx, db, time.Now(), retryWait)
 		if conn.Status() == models.ConnectionStatusErrored {
 			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
 		}

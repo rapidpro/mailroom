@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/buger/jsonparser"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/types"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/pkg/errors"
@@ -20,6 +22,8 @@ const (
 	IVRFlow       = FlowType("V")
 	MessagingFlow = FlowType("M")
 	SurveyorFlow  = FlowType("S")
+
+	FlowConfigIVRRetryMinutes = "ivr_retry"
 )
 
 // Flow is the mailroom type for a flow
@@ -28,6 +32,7 @@ type Flow struct {
 		ID             FlowID          `json:"id"`
 		UUID           assets.FlowUUID `json:"uuid"`
 		Name           string          `json:"name"`
+		Config         types.JSONText  `json:"config"`
 		FlowType       FlowType        `json:"flow_type"`
 		Definition     json.RawMessage `json:"definition"`
 		IsArchived     bool            `json:"is_archived"`
@@ -53,6 +58,26 @@ func (f *Flow) FlowType() FlowType { return f.f.FlowType }
 // SetDefinition sets our definition from the passed in new definition format
 func (f *Flow) SetDefinition(definition json.RawMessage) {
 	f.f.Definition = definition
+}
+
+// IntConfigValue returns the value for the key passed in as an int. If the value
+// is not an integer or is not present then the defaultValue is returned
+func (f *Flow) IntConfigValue(key string, defaultValue int64) int64 {
+	value, err := jsonparser.GetInt(f.f.Config, key)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+// StringConfigValue returns the value for the key passed in as a string. If the value
+// is not a string or is not present then the defaultValue is returned
+func (f *Flow) StringConfigValue(key string, defaultValue string) string {
+	value, err := jsonparser.GetString(f.f.Config, key)
+	if err != nil {
+		return defaultValue
+	}
+	return value
 }
 
 // SetLegacyDefinition sets our definition from the passed in legacy definition
@@ -137,6 +162,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	is_archived,
 	ignore_triggers,
 	flow_type,
+	coalesce(metadata, '{}')::jsonb as config,
 	definition::jsonb || 
 		jsonb_build_object(
 			'flow_type', f.flow_type, 
@@ -178,6 +204,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	is_archived,
 	ignore_triggers,
 	flow_type,
+	coalesce(metadata, '{}')::jsonb as config,
 	definition::jsonb || 
 		jsonb_build_object(
 			'flow_type', f.flow_type, 

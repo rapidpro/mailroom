@@ -24,7 +24,7 @@ func TestSessionTriggered(t *testing.T) {
 	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	flow, err := org.FlowByID(31)
+	flow, err := org.FlowByID(models.SingleMessageFlowID)
 	assert.NoError(t, err)
 
 	// TODO: test contacts, urns, groups
@@ -32,14 +32,14 @@ func TestSessionTriggered(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				models.Cathy: []flows.Action{
+				models.CathyID: []flows.Action{
 					actions.NewStartSessionAction(newActionUUID(), flow.FlowReference(), nil, nil, nil, nil, true),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
-					Args:  []interface{}{models.Cathy},
+					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
 			},
