@@ -31,8 +31,8 @@ func TestChannels(t *testing.T) {
 		Prefixes []string
 		Parent   *assets.ChannelReference
 	}{
-		{TwilioChannelID, TwilioChannelUUID, "Twilio", "1234",
-			[]string{"tel"}, []assets.ChannelRole{"send", "receive"}, nil, nil},
+		{TwilioChannelID, TwilioChannelUUID, "Twilio", "+13605551212",
+			[]string{"tel"}, []assets.ChannelRole{"send", "receive", "call", "answer"}, nil, nil},
 		{NexmoChannelID, NexmoChannelUUID, "Nexmo", "5789",
 			[]string{"tel"}, []assets.ChannelRole{"send", "receive"}, []string{"250", "251"}, nil},
 		{TwitterChannelID, TwitterChannelUUID, "Twitter", "ureport", []string{"twitter"}, []assets.ChannelRole{"send", "receive"}, nil,

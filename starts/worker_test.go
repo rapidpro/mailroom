@@ -64,7 +64,7 @@ func TestStarts(t *testing.T) {
 
 		// handle our start task
 		start := models.NewFlowStart(
-			models.NewStartID(startID), models.Org1, tc.FlowID,
+			models.NewStartID(startID), models.Org1, models.MessagingFlow, tc.FlowID,
 			tc.GroupIDs, tc.ContactIDs, nil, false,
 			tc.RestartParticipants, tc.IncludeActive,
 			nil,

@@ -108,7 +108,7 @@ func TestBatchStart(t *testing.T) {
 
 	for i, tc := range tcs {
 		start := models.NewFlowStart(
-			models.NewStartID(1), models.OrgID(1), models.SingleMessageFlowID,
+			models.NewStartID(1), models.OrgID(1), models.MessagingFlow, models.SingleMessageFlowID,
 			nil, contactIDs, nil, false, tc.Restart, tc.IncludeActive,
 			nil,
 		)
