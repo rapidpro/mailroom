@@ -29,10 +29,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var BaseURL = `https://api.twilio.com`
+var IgnoreSignatures = false
+
 const (
 	twilioChannelType = models.ChannelType("T")
 
-	baseURL    = `https://api.twilio.com`
 	callPath   = `/2010-04-01/Accounts/{AccountSID}/Calls.json`
 	hangupPath = `/2010-04-01/Accounts/{AccountSID}/Calls/{SID}.json`
 
@@ -44,6 +46,7 @@ const (
 
 	accountSIDConfig = "account_sid"
 	authTokenConfig  = "auth_token"
+	baseURLConfig    = "send_url"
 
 	errorBody = `<?xml version="1.0" encoding="UTF-8"?>
 	<Response>
@@ -73,6 +76,7 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 	if accountSID == "" || authToken == "" {
 		return nil, errors.Errorf("missing auth_token or account_sid on channel config")
 	}
+	baseURL := channel.ConfigValue(baseURLConfig, BaseURL)
 
 	return &client{
 		channel:    channel,
@@ -85,7 +89,7 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 // NewClient creates a new Twilio IVR client for the passed in account and and auth token
 func NewClient(accountSID string, authToken string) ivr.Client {
 	return &client{
-		baseURL:    baseURL,
+		baseURL:    BaseURL,
 		accountSID: accountSID,
 		authToken:  authToken,
 	}
@@ -131,7 +135,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 	form.Set("Url", callbackURL)
 	form.Set("StatusCallback", statusURL)
 
-	sendURL := baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
+	sendURL := c.baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
 
 	resp, err := c.postRequest(client, sendURL, form)
 	if err != nil {
@@ -139,7 +143,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 	}
 
 	if resp.StatusCode != 201 {
-		return ivr.NilCallID, errors.Errorf("received non 200 status for call start: %d", resp.StatusCode)
+		return ivr.NilCallID, errors.Errorf("received non 201 status for call start: %d", resp.StatusCode)
 	}
 
 	// read our body
@@ -167,7 +171,7 @@ func (c *client) HangupCall(client *http.Client, callID string) error {
 	form := url.Values{}
 	form.Set("Status", "completed")
 
-	sendURL := baseURL + strings.Replace(hangupPath, "{AccountSID}", c.accountSID, -1)
+	sendURL := c.baseURL + strings.Replace(hangupPath, "{AccountSID}", c.accountSID, -1)
 	sendURL = strings.Replace(sendURL, "{SID}", callID, -1)
 
 	resp, err := c.postRequest(client, sendURL, form)
@@ -185,6 +189,8 @@ func (c *client) HangupCall(client *http.Client, callID string) error {
 // InputForRequest returns the input for the passed in request, if any
 func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
 	// this call isn't active, thats an error
+	logrus.WithField("form", r.Form).Info("twilio form")
+	r.ParseForm()
 	if r.Form.Get("CallStatus") != "in-progress" {
 		return "", ivr.NilAttachment, ivr.CallEndedError
 	}
@@ -207,6 +213,10 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 	case "gather":
 		return r.Form.Get("Digits"), flows.Attachment(""), nil
 	case "record":
+		url := r.Form.Get("RecordingUrl")
+		if url == "" {
+			return "", ivr.NilAttachment, nil
+		}
 		return "", flows.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
 	default:
 		// TODO: need to download this attachment locally
@@ -240,6 +250,11 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
 func (c *client) ValidateRequestSignature(r *http.Request) error {
+	// shortcut for testing
+	if IgnoreSignatures {
+		return nil
+	}
+
 	actual := r.Header.Get(signatureHeader)
 	if actual == "" {
 		return errors.Errorf("missing request signature header")

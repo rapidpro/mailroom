@@ -60,7 +60,7 @@ func RegisterClientType(channelType models.ChannelType, constructor ClientConstr
 func GetClient(channel *models.Channel) (Client, error) {
 	constructor := constructors[channel.Type()]
 	if constructor == nil {
-		return nil, errors.Errorf("no ivr client for chanel type: %s", channel.Type())
+		return nil, errors.Errorf("no ivr client for channel type: %s", channel.Type())
 	}
 
 	return constructor(channel)
@@ -289,7 +289,7 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 		return nil
 	}
 
-	// update our channel session and return it
+	// update our channel session
 	err = conn.UpdateExternalID(ctx, db, string(callID))
 	if err != nil {
 		return errors.Wrapf(err, "error updating session external id")
@@ -437,10 +437,10 @@ func ResumeIVRFlow(
 				return errors.Wrapf(err, "error marking sessions complete")
 			}
 
-			return client.WriteEmptyResponse(w, "session exited, ignoring resume")
+			return client.WriteEmptyResponse(w, "call ended, ignoring resume")
 		}
 
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "unable finding input for request"))
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "error finding input for request"))
 	}
 
 	// our msg UUID
@@ -456,7 +456,12 @@ func ResumeIVRFlow(
 				break
 			}
 			time.Sleep(time.Second)
-			logrus.WithError(err).WithField("retry", retry).WithField("status", resp.StatusCode).WithField("url", attachment.URL()).Info("retrying download of attachment")
+
+			if resp != nil {
+				logrus.WithField("retry", retry).WithField("status", resp.StatusCode).WithField("url", attachment.URL()).Info("retrying download of attachment")
+			} else {
+				logrus.WithError(err).WithField("retry", retry).WithField("url", attachment.URL()).Info("retrying download of attachment")
+			}
 		}
 
 		if err != nil {

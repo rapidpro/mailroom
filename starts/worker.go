@@ -123,6 +123,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 		q = mailroom.HandlerQueue
 	}
 
+	// task is different if we are an IVR flow
 	taskType := mailroom.StartFlowBatchType
 	if start.FlowType() == models.IVRFlow {
 		taskType = mailroom.StartIVRFlowBatchType

@@ -17,10 +17,12 @@ import (
 )
 
 // Reset clears out both our database and redis DB
-func Reset() {
+func Reset() (context.Context, *sqlx.DB, *redis.Pool) {
 	logrus.SetLevel(logrus.DebugLevel)
 	ResetDB()
 	ResetRP()
+
+	return CTX(), DB(), RP()
 }
 
 // ResetDB resets our database to our base state from our RapidPro dump

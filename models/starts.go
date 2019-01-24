@@ -49,6 +49,7 @@ type FlowStartBatch struct {
 		StartID    StartID           `json:"start_id"`
 		OrgID      OrgID             `json:"org_id"`
 		FlowID     FlowID            `json:"flow_id"`
+		FlowType   FlowType          `json:"flow_type"`
 		ContactIDs []flows.ContactID `json:"contact_ids"`
 
 		Parent json.RawMessage `json:"parent,omitempty"`
@@ -110,6 +111,7 @@ func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
 
+// FlowIDForStart looks up the flow id for the passed in flow start
 func FlowIDForStart(ctx context.Context, db Queryer, orgID OrgID, startID StartID) (FlowID, error) {
 	flowID := FlowID(0)
 	err := db.GetContext(ctx, &flowID, `SELECT flow_id FROM flows_flowstart WHERE id = $1 AND is_active = TRUE`, startID)
@@ -119,14 +121,16 @@ func FlowIDForStart(ctx context.Context, db Queryer, orgID OrgID, startID StartI
 	return flowID, nil
 }
 
+// NewFlowStart creates a new flow start objects for the passed in parameters
 func NewFlowStart(
-	startID StartID, orgID OrgID, flowID FlowID,
+	startID StartID, orgID OrgID, flowType FlowType, flowID FlowID,
 	groupIDs []GroupID, contactIDs []flows.ContactID, urns []urns.URN, createContact bool,
 	restartParticipants bool, includeActive bool, parent json.RawMessage) *FlowStart {
 
 	s := &FlowStart{}
 	s.s.StartID = startID
 	s.s.OrgID = orgID
+	s.s.FlowType = flowType
 	s.s.FlowID = flowID
 	s.s.GroupIDs = groupIDs
 	s.s.ContactIDs = contactIDs
@@ -139,11 +143,13 @@ func NewFlowStart(
 	return s
 }
 
+// CreateBatch creates a batch for this start using the passed in contact ids
 func (s *FlowStart) CreateBatch(contactIDs []flows.ContactID) *FlowStartBatch {
 	b := &FlowStartBatch{}
 	b.b.StartID = s.StartID()
 	b.b.OrgID = s.OrgID()
 	b.b.FlowID = s.FlowID()
+	b.b.FlowType = s.FlowType()
 	b.b.ContactIDs = contactIDs
 	b.b.RestartParticipants = s.RestartParticipants()
 	b.b.IncludeActive = s.IncludeActive()

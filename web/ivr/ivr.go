@@ -218,10 +218,8 @@ const (
 
 // IVRRequest is our form for what fields we expect in IVR callbacks
 type IVRRequest struct {
-	StartID      models.StartID      `form:"start"`
 	ConnectionID models.ConnectionID `form:"connection" validate:"required"`
 	Action       string              `form:"action"     validate:"required"`
-	URN          urns.URN            `form:"urn"        validate:"required"`
 }
 
 // writeClientError is just a small utility method to write out a simple JSON error when we don't have a client yet
@@ -251,7 +249,7 @@ func buildResumeURL(channel *models.Channel, conn *models.ChannelConnection, urn
 	return fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
 }
 
-// handleFlow handles all incoming IVR requests related to a flow (status is handled elsewhere however)
+// handleFlow handles all incoming IVR requests related to a flow (status is handled elsewhere)
 func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*55)
 	defer cancel()
@@ -343,32 +341,38 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 		return client.WriteErrorResponse(w, errors.Errorf("no contact width id: %d", conn.ContactID()))
 	}
 
+	// load the URN for this connection
+	urn, err := models.URNForID(ctx, s.DB, org, conn.ContactURNID())
+	if err != nil {
+		return client.WriteErrorResponse(w, errors.Errorf("unable to find connection urn: %d", conn.ContactURNID()))
+	}
+
 	// make sure our URN is indeed present on our contact, no funny business
 	found := false
 	for _, u := range contacts[0].URNs() {
-		if u.Identity() == request.URN.Identity() {
+		if u.Identity() == urn.Identity() {
 			found = true
 		}
 	}
 	if !found {
-		return client.WriteErrorResponse(w, errors.Errorf("unable to find URN: %s on contact: %d", request.URN, conn.ContactID()))
+		return client.WriteErrorResponse(w, errors.Errorf("unable to find URN: %s on contact: %d", urn, conn.ContactID()))
 	}
 
-	resumeURL := buildResumeURL(channel, conn, request.URN)
+	resumeURL := buildResumeURL(channel, conn, urn)
 
 	// if this a start, start our contact
 	switch request.Action {
 	case actionStart:
 		err = ivr.StartIVRFlow(
 			ctx, s.DB, s.RP, client, resumeURL,
-			org, channel, conn, contacts[0], request.URN, request.StartID,
+			org, channel, conn, contacts[0], urn, conn.StartID(),
 			r, w,
 		)
 
 	case actionResume:
 		err = ivr.ResumeIVRFlow(
 			ctx, s.Config, s.DB, s.RP, s.S3Client, resumeURL, client,
-			org, channel, conn, contacts[0], request.URN,
+			org, channel, conn, contacts[0], urn,
 			r, w,
 		)
 
