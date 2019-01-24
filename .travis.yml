@@ -28,9 +28,9 @@ before_install:
   - df -h
 
 before_script:
-- psql -U postgres -c "CREATE USER temba;"
-- psql -U postgres -c "ALTER ROLE temba WITH SUPERUSER;"
-- psql -U postgres -c "CREATE DATABASE temba;"
+- psql -U postgres -c "CREATE USER mailroom_test PASSWORD 'temba';"
+- psql -U postgres -c "ALTER ROLE mailroom_test WITH SUPERUSER;"
+- psql -U postgres -c "CREATE DATABASE mailroom_test;"
 
 script:
 - go test -p=1 -coverprofile=coverage.text -covermode=atomic github.com/nyaruka/mailroom/...

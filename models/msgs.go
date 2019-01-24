@@ -66,8 +66,6 @@ const (
 	MsgStatusResent       = MsgStatus("R")
 )
 
-// TODO: response_to_id, response_to_external_id
-
 // Msg is our type for mailroom messages
 type Msg struct {
 	m struct {
