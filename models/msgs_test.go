@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,8 +21,8 @@ func TestMsgs(t *testing.T) {
 	channels, err := loadChannels(ctx, db, orgID)
 	assert.NoError(t, err)
 
-	channel := channels[1].(*Channel)
-	chanUUID := assets.ChannelUUID(utils.UUID("c534272e-817d-4a78-a70c-f21df34407f8"))
+	channel := channels[0].(*Channel)
+	chanUUID := channels[0].UUID()
 
 	tcs := []struct {
 		ChannelUUID  assets.ChannelUUID
@@ -37,11 +37,11 @@ func TestMsgs(t *testing.T) {
 		MsgCount     int
 		HasErr       bool
 	}{
-		{chanUUID, channel, "missing urn id", flows.ContactID(42), urns.URN("tel:+250700000001"), URNID(0),
+		{chanUUID, channel, "missing urn id", CathyID, urns.URN("tel:+250700000001"), URNID(0),
 			nil, nil, sqlx_types.JSONText(nil), 1, true},
-		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), URNID(42),
+		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
 			nil, []string{"yes", "no"}, sqlx_types.JSONText(`{"quick_replies":["yes","no"]}`), 1, false},
-		{chanUUID, channel, "test outgoing", flows.ContactID(42), urns.URN("tel:+250700000001?id=42"), URNID(42),
+		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
 			flows.AttachmentList([]flows.Attachment{flows.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, sqlx_types.JSONText(nil), 2, false},
 	}
 

@@ -23,7 +23,7 @@ func TestFields(t *testing.T) {
 		{"age", "Age", assets.FieldTypeNumber},
 		{"district", "District", assets.FieldTypeDistrict},
 		{"gender", "Gender", assets.FieldTypeText},
-		{"joined", "Joined On", assets.FieldTypeDatetime},
+		{"joined", "Joined", assets.FieldTypeDatetime},
 		{"state", "State", assets.FieldTypeState},
 		{"ward", "Ward", assets.FieldTypeWard},
 	}

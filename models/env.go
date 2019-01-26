@@ -13,6 +13,8 @@ import (
 
 type OrgID int
 
+const NilOrgID = OrgID(0)
+
 // Org is mailroom's type for RapidPro orgs. It also implements the utils.Environment interface for GoFlow
 type Org struct {
 	id     OrgID

@@ -123,7 +123,7 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 		return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
 	}
 
-	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, session.ContactID, &event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, session.ContactID, event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}

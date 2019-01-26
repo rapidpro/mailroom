@@ -23,10 +23,10 @@ import (
 )
 
 const (
-	StopEventType            = "stop_event"
-	MsgEventType             = "msg_event"
 	NewConversationEventType = "new_conversation"
 	ReferralEventType        = "referral"
+	StopEventType            = "stop_event"
+	MsgEventType             = "msg_event"
 	ExpirationEventType      = "expiration_event"
 	TimeoutEventType         = "timeout_event"
 )
@@ -124,12 +124,13 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			err = handleStopEvent(ctx, db, rp, evt)
 
 		case NewConversationEventType, ReferralEventType:
-			evt := &ChannelEvent{}
+			evt := &models.ChannelEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling channel event")
 			}
-			err = handleChannelEvent(ctx, db, rp, contactEvent.Type, evt)
+			// TODO: we should just have courier include event type in its json
+			_, err = HandleChannelEvent(ctx, db, rp, models.ChannelEventType(contactEvent.Type), evt, nil)
 
 		case MsgEventType:
 			msg := &MsgEvent{}
@@ -247,108 +248,130 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	return nil
 }
 
-// handleChannelEvent is called for channel events
-func handleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *ChannelEvent) error {
-	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
+// HandleChannelEvent is called for channel events
+func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType models.ChannelEventType, event *models.ChannelEvent, hook models.SessionCommitHook) (*models.Session, error) {
+	org, err := models.GetOrgAssets(ctx, db, event.OrgID())
 	if err != nil {
-		return errors.Wrapf(err, "error loading org")
+		return nil, errors.Wrapf(err, "error loading org")
 	}
 
 	// load the channel for this event
-	channel := org.ChannelByID(event.ChannelID)
+	channel := org.ChannelByID(event.ChannelID())
 	if channel == nil {
 		logrus.WithField("channel_id", event.ChannelID).Info("ignoring event, couldn't find channel")
-		return nil
+		return nil, nil
 	}
 
-	var channelEvent *triggers.ChannelEvent
-
-	// do we have associated trigger?
-	var trigger *models.Trigger
-	switch eventType {
-	case NewConversationEventType:
-		trigger = models.FindMatchingNewConversationTrigger(org, channel)
-		channelEvent = triggers.NewChannelEvent(NewConversationEventType, channel.ChannelReference())
-	case ReferralEventType:
-		trigger = models.FindMatchingReferralTrigger(org, channel, event.Extra["referrer_id"])
-		channelEvent = triggers.NewChannelEvent(ReferralEventType, channel.ChannelReference())
-	default:
-		return errors.Errorf("unknown channel event type: %s", eventType)
-	}
-
-	// no trigger, noop, move on
-	if trigger == nil {
-		logrus.WithField("channel_id", event.ChannelID).WithField("event_type", eventType).Info("ignoring event, no trigger found")
-		return nil
-	}
-
-	// ok, we have a trigger, load our contact
-	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{event.ContactID})
+	// load our contact
+	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{event.ContactID()})
 	if err != nil {
-		return errors.Wrapf(err, "error loading contact")
+		return nil, errors.Wrapf(err, "error loading contact")
 	}
 
 	// contact has been deleted or is blocked, ignore this event
 	if len(contacts) == 0 || contacts[0].IsBlocked() {
-		return nil
+		return nil, nil
 	}
 
 	modelContact := contacts[0]
 
+	// do we have associated trigger?
+	var trigger *models.Trigger
+	switch eventType {
+
+	case models.NewConversationEventType:
+		trigger = models.FindMatchingNewConversationTrigger(org, channel)
+
+	case models.ReferralEventType:
+		trigger = models.FindMatchingReferralTrigger(org, channel, event.Extra()["referrer_id"])
+
+	case models.MOMissEventType:
+		trigger = models.FindMatchingMissedCallTrigger(org)
+
+	case models.MOCallEventType:
+		trigger = models.FindMatchingMOCallTrigger(org, modelContact)
+
+	default:
+		return nil, errors.Errorf("unknown channel event type: %s", eventType)
+	}
+
+	// no trigger, noop, move on
+	if trigger == nil {
+		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).Info("ignoring event, no trigger found")
+		return nil, nil
+	}
+
 	// build session assets
 	sa, err := models.GetSessionAssets(org)
 	if err != nil {
-		return errors.Wrapf(err, "unable to load session assets")
+		return nil, errors.Wrapf(err, "unable to load session assets")
 	}
 
 	// make sure this URN is our highest priority (this is usually a noop)
-	err = modelContact.UpdatePreferredURN(ctx, db, org, event.URNID, channel)
+	err = modelContact.UpdatePreferredURN(ctx, db, org, event.URNID(), channel)
 	if err != nil {
-		return errors.Wrapf(err, "error changing primary URN")
+		return nil, errors.Wrapf(err, "error changing primary URN")
 	}
 
 	// build our flow contact
 	contact, err := modelContact.FlowContact(org, sa)
 	if err != nil {
-		return errors.Wrapf(err, "error creating flow contact")
+		return nil, errors.Wrapf(err, "error creating flow contact")
 	}
 
-	if event.NewContact {
+	if event.IsNewContact() {
 		err = models.CalculateDynamicGroups(ctx, db, org, contact)
 		if err != nil {
-			return errors.Wrapf(err, "unable to initialize new contact")
+			return nil, errors.Wrapf(err, "unable to initialize new contact")
 		}
 	}
 
 	// load our flow
 	flow, err := org.FlowByID(trigger.FlowID())
 	if err != nil {
-		return errors.Wrapf(err, "error loading flow for trigger")
+		return nil, errors.Wrapf(err, "error loading flow for trigger")
 	}
 
 	// didn't find it? no longer active, return
 	if flow == nil || flow.IsArchived() {
-		return nil
+		return nil, nil
 	}
 
 	// create our parameters, we just convert this from JSON
 	// TODO: this is done because a nil XJSONObject doesn't know how to marshal itself, goflow could fix
 	params := types.NewXJSONObject([]byte("{}"))
-	if event.Extra != nil {
-		asJSON, err := json.Marshal(event.Extra)
+	if event.Extra() != nil {
+		asJSON, err := json.Marshal(event.Extra())
 		if err != nil {
-			return errors.Wrapf(err, "unable to marshal extra from channel event")
+			return nil, errors.Wrapf(err, "unable to marshal extra from channel event")
 		}
 		params = types.NewXJSONObject(asJSON)
 	}
 
-	// start them in the triggered flow, interrupting their current flow/session
-	channelTrigger := triggers.NewChannelTrigger(org.Env(), flow.FlowReference(), contact, channelEvent, params, time.Now())
-	_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{channelTrigger}, nil, true)
-	if err != nil {
-		return errors.Wrapf(err, "error starting flow for contact")
+	// build our flow trigger
+	var flowTrigger flows.Trigger
+	switch eventType {
+
+	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
+		channelEvent := triggers.NewChannelEvent(triggers.ChannelEventType(eventType), channel.ChannelReference())
+		flowTrigger = triggers.NewChannelTrigger(org.Env(), flow.FlowReference(), contact, channelEvent, params)
+
+	case models.MOCallEventType:
+		urn := contacts[0].URNForID(event.URNID())
+		flowTrigger = triggers.NewIncomingCallTrigger(org.Env(), flow.FlowReference(), contact, urn, channel.ChannelReference())
+
+	default:
+		return nil, errors.Errorf("unknown channel event type: %s", eventType)
 	}
-	return nil
+
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{flowTrigger}, hook, true)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error starting flow for contact")
+	}
+	if len(sessions) == 0 {
+		return nil, nil
+	}
+	return sessions[0], nil
 }
 
 // handleStopEvent is called when a contact is stopped by courier
@@ -508,7 +531,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 					Keyword: trigger.Keyword(),
 				}
 			}
-			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, match, time.Now())
+			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, match)
 
 			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
@@ -564,15 +587,6 @@ type MsgEvent struct {
 type StopEvent struct {
 	ContactID flows.ContactID `json:"contact_id"`
 	OrgID     models.OrgID    `json:"org_id"`
-}
-
-type ChannelEvent struct {
-	ContactID  flows.ContactID   `json:"contact_id"`
-	URNID      models.URNID      `json:"urn_id"`
-	OrgID      models.OrgID      `json:"org_id"`
-	ChannelID  models.ChannelID  `json:"channel_id"`
-	Extra      map[string]string `json:"extra"`
-	NewContact bool              `json:"new_contact"`
 }
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event

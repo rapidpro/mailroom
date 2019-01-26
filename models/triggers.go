@@ -106,6 +106,50 @@ func FindMatchingNewConversationTrigger(org *OrgAssets, channel *Channel) *Trigg
 	return match
 }
 
+// FindMatchingMissedCallTrigger finds any trigger set up for incoming calls (these would be IVR flows)
+func FindMatchingMissedCallTrigger(org *OrgAssets) *Trigger {
+	for _, t := range org.Triggers() {
+		if t.TriggerType() == MissedCallTriggerType {
+			return t
+		}
+	}
+
+	return nil
+}
+
+// FindMatchingMOCallTrigger finds any trigger set up for incoming calls (these would be IVR flows)
+// Contact is needed as this trigger can be filtered by contact group
+func FindMatchingMOCallTrigger(org *OrgAssets, contact *Contact) *Trigger {
+	// build a set of the groups this contact is in
+	groupIDs := make(map[GroupID]bool, 10)
+	for _, g := range contact.Groups() {
+		groupIDs[g.ID()] = true
+	}
+
+	var match *Trigger
+	for _, t := range org.Triggers() {
+		if t.TriggerType() == CallTriggerType {
+			// this trigger has no groups, it's a match!
+			if len(t.GroupIDs()) == 0 {
+				if match == nil {
+					match = t
+				}
+				continue
+			}
+
+			// test whether we are part of this trigger's group
+			for _, g := range t.GroupIDs() {
+				if groupIDs[g] {
+					// group keyword matches always take precedence, can return right away
+					return t
+				}
+			}
+		}
+	}
+
+	return match
+}
+
 // FindMatchingReferralTrigger returns the matching trigger for the passed in trigger type
 // Matches are based on referrer_id first (if present), then channel, then any referrer trigger
 func FindMatchingReferralTrigger(org *OrgAssets, channel *Channel, referrerID string) *Trigger {

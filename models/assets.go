@@ -225,7 +225,7 @@ func NewSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
 	return assets, nil
 }
 
-// GetSessionAssets returns a goflow session assets object for the parred in org assets
+// GetSessionAssets returns a goflow session assets object for the passed in org assets
 func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
 	key := fmt.Sprintf("%d", org.OrgID())
 	cached, found := assetCache.Get(key)

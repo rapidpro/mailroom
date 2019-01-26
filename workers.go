@@ -19,9 +19,12 @@ const (
 	FireCampaignEventType = "fire_campaign_event"
 
 	HandleContactEvent = "handle_contact_event"
+
+	StartFlowBatchType    = "start_flow_batch"
+	StartIVRFlowBatchType = "start_ivr_flow_batch"
 )
 
-// Foreman takes care of managing our set of sending workers and assigns msgs for each to send
+// Foreman takes care of managing our set of workers and assigns msgs for each to send
 type Foreman struct {
 	mr               *Mailroom
 	queue            string
@@ -30,7 +33,7 @@ type Foreman struct {
 	quit             chan bool
 }
 
-// NewForeman creates a new Foreman for the passed in server with the number of max senders
+// NewForeman creates a new Foreman for the passed in server with the number of max workers
 func NewForeman(mr *Mailroom, queue string, maxWorkers int) *Foreman {
 	foreman := &Foreman{
 		mr:               mr,
@@ -125,21 +128,21 @@ type Worker struct {
 
 // NewWorker creates a new worker responsible for working on events
 func NewWorker(foreman *Foreman, id int) *Worker {
-	sender := &Worker{
+	worker := &Worker{
 		id:      id,
 		foreman: foreman,
 		job:     make(chan *queue.Task, 1),
 	}
-	return sender
+	return worker
 }
 
-// Start starts our Sender's goroutine and has it start waiting for tasks from the foreman
+// Start starts our Worker's goroutine and has it start waiting for tasks from the foreman
 func (w *Worker) Start() {
 	go func() {
 		w.foreman.mr.WaitGroup.Add(1)
 		defer w.foreman.mr.WaitGroup.Done()
 
-		log := logrus.WithField("comp", "worker").WithField("worker_id", w.id)
+		log := logrus.WithField("queue", w.foreman.queue).WithField("worker_id", w.id)
 		log.Debug("started")
 
 		for true {
@@ -166,7 +169,7 @@ func (w *Worker) Stop() {
 }
 
 func (w *Worker) handleTask(task *queue.Task) {
-	log := logrus.WithField("comp", "sender").WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.OrgID)
+	log := logrus.WithField("queue", w.foreman.queue).WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.OrgID)
 
 	defer func() {
 		// catch any panics and recover

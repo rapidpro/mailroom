@@ -13,33 +13,33 @@ import (
 func TestCampaigns(t *testing.T) {
 	testsuite.Reset()
 
-	doctors := assets.NewGroupReference(assets.GroupUUID("85a5a793-4741-4896-b55e-05af65f3c0fa"), "Doctors")
+	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
 	joined := assets.NewFieldReference("joined", "Joined")
 
 	// init their values
 	testsuite.DB().MustExec(
 		`update contacts_contact set fields = fields - '8c1c1256-78d6-4a5b-9f1c-1761d5728251'
-		WHERE id = $1`, models.Cathy)
+		WHERE id = $1`, models.CathyID)
 
 	testsuite.DB().MustExec(
 		`update contacts_contact set fields = fields ||
 		'{"8c1c1256-78d6-4a5b-9f1c-1761d5728251": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
-		WHERE id = $1`, models.Bob)
+		WHERE id = $1`, models.BobID)
 
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				models.Cathy: []flows.Action{
+				models.CathyID: []flows.Action{
 					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewSetContactFieldAction(newActionUUID(), joined, ""),
 				},
-				models.Bob: []flows.Action{
+				models.BobID: []flows.Action{
 					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 				},
-				models.Evan: []flows.Action{
+				models.GeorgeID: []flows.Action{
 					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
@@ -48,17 +48,17 @@ func TestCampaigns(t *testing.T) {
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
-					Args:  []interface{}{models.Cathy},
+					Args:  []interface{}{models.CathyID},
 					Count: 0,
 				},
 				SQLAssertion{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
-					Args:  []interface{}{models.Bob},
+					Args:  []interface{}{models.BobID},
 					Count: 2,
 				},
 				SQLAssertion{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
-					Args:  []interface{}{models.Evan},
+					Args:  []interface{}{models.GeorgeID},
 					Count: 0,
 				},
 			},

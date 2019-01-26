@@ -20,13 +20,12 @@ import (
 )
 
 const (
-	startFlowBatchType = "start_flow_batch"
-	startBatchSize     = 100
+	startBatchSize = 100
 )
 
 func init() {
 	mailroom.AddTaskFunction(mailroom.StartFlowType, handleFlowStart)
-	mailroom.AddTaskFunction(startFlowBatchType, handleFlowStartBatch)
+	mailroom.AddTaskFunction(mailroom.StartFlowBatchType, handleFlowStartBatch)
 }
 
 // handleFlowStart creates all the batches of contacts to start in a flow
@@ -124,11 +123,17 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 		q = mailroom.HandlerQueue
 	}
 
+	// task is different if we are an IVR flow
+	taskType := mailroom.StartFlowBatchType
+	if start.FlowType() == models.IVRFlow {
+		taskType = mailroom.StartIVRFlowBatchType
+	}
+
 	contacts := make([]flows.ContactID, 0, 100)
 	queueBatch := func(last bool) {
 		batch := start.CreateBatch(contacts)
 		batch.SetIsLast(last)
-		err = queue.AddTask(rc, q, startFlowBatchType, int(start.OrgID()), batch, queue.DefaultPriority)
+		err = queue.AddTask(rc, q, taskType, int(start.OrgID()), batch, queue.DefaultPriority)
 		if err != nil {
 			// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
 			logrus.WithError(err).WithField("start_id", start.StartID).Error("error while queuing start")
@@ -164,7 +169,7 @@ func handleFlowStartBatch(ctx context.Context, mr *mailroom.Mailroom, task *queu
 	defer cancel()
 
 	// decode our task body
-	if task.Type != startFlowBatchType {
+	if task.Type != mailroom.StartFlowBatchType {
 		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
 	}
 	startBatch := &models.FlowStartBatch{}

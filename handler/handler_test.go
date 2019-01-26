@@ -17,24 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	org1           = models.OrgID(1)
-	cathy          = flows.ContactID(42)
-	cathyURN       = urns.URN("tel:+250700000001")
-	cathyURNID     = models.URNID(42)
-	twitterChannel = models.ChannelID(3)
-	nexmoChannel   = models.ChannelID(2)
-
-	org2        = models.OrgID(2)
-	george      = flows.ContactID(54)
-	georgeURN   = urns.URN("tel:+250700000013")
-	georgeURNID = models.URNID(55)
-	channel2    = models.ChannelID(5)
-
-	favoritesFlow = models.FlowID(1)
-	numberFlow    = models.FlowID(3)
-)
-
 func TestMsgEvents(t *testing.T) {
 	testsuite.Reset()
 	db := testsuite.DB()
@@ -47,17 +29,17 @@ func TestMsgEvents(t *testing.T) {
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'start', false, 1, 'K', 'O', 1, 1, 1, 0) RETURNING id`)
+		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`, models.FavoritesFlowID)
 
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'start', false, 4, 'K', 'O', 1, 1, 2, 0) RETURNING id`)
+		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 2, 0) RETURNING id`, models.Org2FavoritesFlowID)
 
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), '', false, 32, 'C', 'O', 1, 1, 2, 0) RETURNING id`)
+		VALUES(TRUE, now(), now(), '', false, $1, 'C', 'O', 1, 1, 2, 0) RETURNING id`, models.Org2SingleMessageFlowID)
 
 	models.FlushCache()
 
@@ -70,21 +52,21 @@ func TestMsgEvents(t *testing.T) {
 		ChannelID models.ChannelID
 		OrgID     models.OrgID
 	}{
-		{cathy, cathyURN, cathyURNID, "noop", "", twitterChannel, org1},
-		{cathy, cathyURN, cathyURNID, "start other", "", twitterChannel, org1},
-		{cathy, cathyURN, cathyURNID, "start", "What is your favorite color?", twitterChannel, org1},
-		{cathy, cathyURN, cathyURNID, "purple", "I don't know that color. Try again.", twitterChannel, org1},
-		{cathy, cathyURN, cathyURNID, "blue", "Good choice, I like Blue too! What is your favorite beer?", twitterChannel, org1},
-		{cathy, cathyURN, cathyURNID, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", twitterChannel, org1},
-		{cathy, cathyURN, cathyURNID, "Cathy", "Thanks Cathy, we are all done!", twitterChannel, org1},
-		{cathy, cathyURN, cathyURNID, "noop", "Thanks Cathy, we are all done!", twitterChannel, org1},
+		{models.CathyID, models.CathyURN, models.CathyURNID, "noop", "", models.TwitterChannelID, models.Org1},
+		{models.CathyID, models.CathyURN, models.CathyURNID, "start other", "", models.TwitterChannelID, models.Org1},
+		{models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, models.Org1},
+		{models.CathyID, models.CathyURN, models.CathyURNID, "purple", "I don't know that color. Try again.", models.TwitterChannelID, models.Org1},
+		{models.CathyID, models.CathyURN, models.CathyURNID, "blue", "Good choice, I like Blue too! What is your favorite beer?", models.TwitterChannelID, models.Org1},
+		{models.CathyID, models.CathyURN, models.CathyURNID, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", models.TwitterChannelID, models.Org1},
+		{models.CathyID, models.CathyURN, models.CathyURNID, "Cathy", "Thanks Cathy, we are all done!", models.TwitterChannelID, models.Org1},
+		{models.CathyID, models.CathyURN, models.CathyURNID, "noop", "Thanks Cathy, we are all done!", models.TwitterChannelID, models.Org1},
 
-		{george, georgeURN, georgeURNID, "other", "Hi George Newman, it is time to consult with your patients.", channel2, org2},
-		{george, georgeURN, georgeURNID, "start", "What is your favorite color?", channel2, org2},
-		{george, georgeURN, georgeURNID, "green", "Good choice, I like Green too! What is your favorite beer?", channel2, org2},
-		{george, georgeURN, georgeURNID, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", channel2, org2},
-		{george, georgeURN, georgeURNID, "george", "Thanks george, we are all done!", channel2, org2},
-		{george, georgeURN, georgeURNID, "blargh", "Hi George Newman, it is time to consult with your patients.", channel2, org2},
+		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "other", "Hey, how are you?", models.Org2ChannelID, models.Org2},
+		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
+		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "green", "Good choice, I like Green too! What is your favorite beer?", models.Org2ChannelID, models.Org2},
+		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", models.Org2ChannelID, models.Org2},
+		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "george", "Thanks george, we are all done!", models.Org2ChannelID, models.Org2},
+		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "blargh", "Hey, how are you?", models.Org2ChannelID, models.Org2},
 	}
 
 	for i, tc := range tcs {
@@ -140,24 +122,24 @@ func TestChannelEvents(t *testing.T) {
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count, channel_id)
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'N', NULL, 1, 1, 1, 0, $2) RETURNING id`,
-		int(favoritesFlow), twitterChannel)
+		models.FavoritesFlowID, models.TwitterChannelID)
 
 	// trigger on our nexmo channel for referral and number flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count, channel_id)
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'R', NULL, 1, 1, 1, 0, $2) RETURNING id`,
-		int(numberFlow), nexmoChannel)
+		models.PickNumberFlowID, models.NexmoChannelID)
 
 	// add a URN for cathy so we can test twitter URNs
 	var cathyTwitterURN models.URNID
 	db.Get(&cathyTwitterURN,
 		`INSERT INTO contacts_contacturn(identity, path, scheme, priority, contact_id, org_id) 
 		                          VALUES('twitterid:123456', '123456', 'twitterid', 10, $1, 1) RETURNING id`,
-		cathy)
+		models.CathyID)
 
 	tcs := []struct {
-		EventType string
+		EventType models.ChannelEventType
 		ContactID flows.ContactID
 		URNID     models.URNID
 		OrgID     models.OrgID
@@ -165,29 +147,22 @@ func TestChannelEvents(t *testing.T) {
 		Extra     map[string]string
 		Response  string
 	}{
-		{NewConversationEventType, cathy, cathyTwitterURN, org1, twitterChannel, nil, "What is your favorite color?"},
-		{NewConversationEventType, cathy, cathyURNID, org1, nexmoChannel, nil, ""},
-		{ReferralEventType, cathy, cathyTwitterURN, org1, twitterChannel, nil, ""},
-		{ReferralEventType, cathy, cathyURNID, org1, nexmoChannel, nil, "Pick a number between 1-10."},
+		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?"},
+		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, ""},
+		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, ""},
+		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "Pick a number between 1-10."},
 	}
 
 	models.FlushCache()
 
 	last := time.Now()
 	for i, tc := range tcs {
-		event := &ChannelEvent{
-			ContactID: tc.ContactID,
-			URNID:     tc.URNID,
-			OrgID:     tc.OrgID,
-			ChannelID: tc.ChannelID,
-			Extra:     tc.Extra,
-		}
-
+		event := models.NewChannelEvent(tc.EventType, tc.OrgID, tc.ChannelID, tc.ContactID, tc.URNID, tc.Extra, false)
 		eventJSON, err := json.Marshal(event)
 		assert.NoError(t, err)
 
 		task := &queue.Task{
-			Type:  tc.EventType,
+			Type:  string(tc.EventType),
 			OrgID: int(tc.OrgID),
 			Task:  eventJSON,
 		}
@@ -226,7 +201,7 @@ func TestTimedEvents(t *testing.T) {
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
 		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`,
-		favoritesFlow,
+		models.FavoritesFlowID,
 	)
 
 	models.FlushCache()
@@ -242,19 +217,19 @@ func TestTimedEvents(t *testing.T) {
 		OrgID     models.OrgID
 	}{
 		// start the flow
-		{MsgEventType, cathy, cathyURN, cathyURNID, "start", "What is your favorite color?", twitterChannel, org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, models.Org1},
 
 		// this expiration does nothing because the times don't match
-		{ExpirationEventType, cathy, cathyURN, cathyURNID, "bad", "", twitterChannel, org1},
+		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "bad", "", models.TwitterChannelID, models.Org1},
 
 		// this checks that the flow wasn't expired
-		{MsgEventType, cathy, cathyURN, cathyURNID, "red", "Good choice, I like Red too! What is your favorite beer?", twitterChannel, org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "red", "Good choice, I like Red too! What is your favorite beer?", models.TwitterChannelID, models.Org1},
 
 		// this expiration will actually take
-		{ExpirationEventType, cathy, cathyURN, cathyURNID, "good", "", twitterChannel, org1},
+		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "good", "", models.TwitterChannelID, models.Org1},
 
 		// we won't get a response as we will be out of the flow
-		{MsgEventType, cathy, cathyURN, cathyURNID, "mutzig", "", twitterChannel, org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "mutzig", "", models.TwitterChannelID, models.Org1},
 	}
 
 	last := time.Now()
