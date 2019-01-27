@@ -59,7 +59,10 @@ var SingleMessageFlowUUID = assets.FlowUUID("a7c11d68-f008-496f-b56d-2d5cf4cf16a
 var IVRFlowID = FlowID(10003)
 var IVRFlowUUID = assets.FlowUUID("2f81d0ea-4d75-4843-9371-3f7465311cce")
 
-var CampaignFlowID = FlowID(10005)
+var SurveyorFlowID = FlowID(10005)
+var SurveyorFlowUUID = assets.FlowUUID("ed8cf8d4-a42c-4ce1-a7e3-44a2918e3cec")
+
+var CampaignFlowID = FlowID(10006)
 var CampaignFlowUUID = assets.FlowUUID("3a92a964-3a8d-420b-9206-2cd9d884ac30")
 
 var DoctorRemindersCampaignUUID = CampaignUUID("72aa12c5-cc11-4bc7-9406-044047845c70")

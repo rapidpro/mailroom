@@ -113,7 +113,7 @@ func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redi
 func RequireUserToken(handler JSONHandler) JSONHandler {
 	return func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
 		token := r.Header.Get("authorization")
-		if !strings.HasPrefix("Token ", token) {
+		if !strings.HasPrefix(token, "Token ") {
 			return nil, http.StatusUnauthorized, errors.New("missing authorization header")
 		}
 
@@ -132,19 +132,23 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 			JOIN auth_user u ON t.user_id = u.id
 		WHERE
 			key = $1 AND
-			g.name IN ("Administrators", "Editors", "Surveyors") AND
-			is_active = TRUE AND
+			g.name IN ('Administrators', 'Editors', 'Surveyors') AND
+			t.is_active = TRUE AND
 			o.is_active = TRUE AND
 			u.is_active = TRUE
-		`)
+		`, token)
 
 		if err != nil {
-			return nil, http.StatusUnauthorized, errors.New("invalid authorization header")
+			return nil, http.StatusUnauthorized, errors.Wrapf(err, "error looking up authorization header")
 		}
 
-		var userID int32
+		if !rows.Next() {
+			return nil, http.StatusUnauthorized, errors.Errorf("invalid authorization header")
+		}
+
+		var userID int64
 		var orgID models.OrgID
-		err = rows.Scan(&userID, orgID)
+		err = rows.Scan(&userID, &orgID)
 		if err != nil {
 			return nil, http.StatusServiceUnavailable, errors.Wrapf(err, "error scanning auth row")
 		}
@@ -181,7 +185,7 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 			}
 		}
 
-		serialized, serr := json.Marshal(value)
+		serialized, serr := json.MarshalIndent(value, "", "  ")
 		if serr != nil {
 			logrus.WithError(err).Error("error serializing handler response")
 			w.WriteHeader(http.StatusInternalServerError)
@@ -196,7 +200,7 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(status)
 		w.Write(serialized)
 	}
 }
