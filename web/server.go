@@ -187,14 +187,14 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 
 		serialized, serr := json.MarshalIndent(value, "", "  ")
 		if serr != nil {
-			logrus.WithError(err).Error("error serializing handler response")
+			logrus.WithError(err).WithField("http_request", r).Error("error serializing handler response")
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(`{"error": "error serializing handler response"}`))
 			return
 		}
 
 		if err != nil {
-			logrus.WithError(err).Error("client error")
+			logrus.WithError(err).WithField("http_request", r).Error("error handling request")
 			w.WriteHeader(status)
 			w.Write(serialized)
 			return
@@ -213,7 +213,7 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 			return
 		}
 
-		logrus.WithError(err).Error(err.Error())
+		logrus.WithError(err).WithField("http_request", r).Error("error handling request")
 		w.WriteHeader(http.StatusInternalServerError)
 		value := map[string]string{
 			"error": err.Error(),

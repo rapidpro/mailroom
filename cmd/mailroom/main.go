@@ -6,9 +6,9 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/evalphobia/logrus_sentry"
 	_ "github.com/lib/pq"
 	"github.com/nyaruka/ezconf"
+	"github.com/nyaruka/logrus_sentry"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/sirupsen/logrus"
@@ -60,6 +60,7 @@ func main() {
 		hook.StacktraceConfiguration.Enable = true
 		hook.StacktraceConfiguration.Skip = 4
 		hook.StacktraceConfiguration.Context = 5
+		hook.StacktraceConfiguration.IncludeErrorBreadcrumb = true
 		if err != nil {
 			logrus.Fatalf("invalid sentry DSN: '%s': %s", config.SentryDSN, err)
 		}
