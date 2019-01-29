@@ -19,3 +19,6 @@ fabfile.py
 fabfile.pyc
 fabconfig.py
 fabconfig.pyc
+
+# GoLand config folder
+.idea/
