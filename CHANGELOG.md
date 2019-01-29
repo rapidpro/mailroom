@@ -1,3 +1,10 @@
+v0.0.75
+----------
+ * use nyaruka sentry so we get breadcrumbs
+ * add http_request to errors in web tier so we get more context
+ * allow submission of surveyor flows
+ * pg 10 support
+
 v0.0.74
 ----------
  * add nexmo and twilio ivr support
