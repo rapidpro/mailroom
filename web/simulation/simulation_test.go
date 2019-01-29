@@ -158,7 +158,7 @@ func TestServer(t *testing.T) {
 		{"/mr/sim/resume", "GET", "", 405, "illegal"},
 		{"/mr/sim/resume", "POST", resumeBody, 200, "Good choice, I like Blue too! What is your favorite beer?"},
 		{"/mr/flow/migrate", "GET", "", 405, "illegal"},
-		{"/mr/flow/migrate", "POST", minLegacyDef, 200, `"type":"send_msg"`},
+		{"/mr/flow/migrate", "POST", minLegacyDef, 200, `"type": "send_msg"`},
 	}
 
 	for i, tc := range tcs {

@@ -22,7 +22,7 @@ require (
 	github.com/nyaruka/courier v1.2.124 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v0.2.0
-	github.com/nyaruka/goflow v0.25.3
+	github.com/nyaruka/goflow v0.25.4
 	github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.8.0

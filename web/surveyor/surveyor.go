@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/goflow/flows/actions/modifiers"
+
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -16,7 +18,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/surveyor/submit", web.RequireUserToken(handleSurveyorSubmit))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/surveyor/submit", web.RequireUserToken(handleSubmit))
 }
 
 var (
@@ -27,20 +29,30 @@ var (
 //
 //   {
 //     "session": {...},
-//     "events": {...}
+//     "events": {...},
+//     "modifiers": {...}
 //   }
 //
-type surveyorSubmitRequest struct {
-	Session json.RawMessage   `json:"session"`
-	Events  []json.RawMessage `json:"events"`
+type submitRequest struct {
+	Session   json.RawMessage   `json:"session"    validate:"required"`
+	Events    []json.RawMessage `json:"events"`
+	Modifiers []json.RawMessage `json:"modifiers"`
 }
 
-type surveyorSubmitResponse struct {
+type submitResponse struct {
+	Session struct {
+		ID     models.SessionID     `json:"id"`
+		Status models.SessionStatus `json:"status"`
+	} `json:"session"`
+	Contact struct {
+		ID   flows.ContactID   `json:"id"`
+		UUID flows.ContactUUID `json:"uuid"`
+	} `json:"contact"`
 }
 
 // handles a surveyor request
-func handleSurveyorSubmit(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	request := &surveyorSubmitRequest{}
+func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &submitRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
@@ -52,15 +64,21 @@ func handleSurveyorSubmit(ctx context.Context, s *web.Server, r *http.Request) (
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
 
+	// and our user id
+	_, valid := ctx.Value(web.UserIDKey).(int64)
+	if !valid {
+		return nil, http.StatusInternalServerError, errors.Errorf("missing request user")
+	}
+
 	// read our session
 	assets, err := models.NewSessionAssets(org)
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error building session assets")
 	}
 
-	session, err := engine.ReadSession(assets, engine.NewDefaultConfig(), httpClient, request.Session)
+	fs, err := engine.ReadSession(assets, engine.NewDefaultConfig(), httpClient, request.Session)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading session")
 	}
 
 	// and our events
@@ -68,37 +86,108 @@ func handleSurveyorSubmit(ctx context.Context, s *web.Server, r *http.Request) (
 	for _, e := range request.Events {
 		event, err := events.ReadEvent(e)
 		if err != nil {
-			return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to unmarshal event: %s", string(e))
+			return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling event: %s", string(e))
 		}
 		sessionEvents = append(sessionEvents, event)
 	}
 
+	// and our modifiers
+	contactModifiers := make([]flows.Modifier, 0, len(request.Modifiers))
+	for _, m := range request.Modifiers {
+		modifier, err := modifiers.ReadModifier(assets, m)
+		if err != nil {
+			return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling modifier: %s", string(m))
+		}
+		contactModifiers = append(contactModifiers, modifier)
+	}
+
 	// create / assign our contact
 	urn := urns.NilURN
-	if len(session.Contact().URNs()) > 0 {
-		urn = session.Contact().URNs()[0].URN()
+	if len(fs.Contact().URNs()) > 0 {
+		urn = fs.Contact().URNs()[0].URN()
 	}
 
 	// create / fetch our contact based on the highest priority URN
-	_, err = models.CreateContact(ctx, s.DB, org, assets, urn)
+	contactID, err := models.CreateContact(ctx, s.DB, org, assets, urn)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 	}
 
 	// load that contact to get the current groups and UUID
-
-	// set the UUID, ID and groups on the session contact
-
-	// write everything out
-	if session == nil {
-		return nil, http.StatusBadRequest, errors.New("no session read")
+	contacts, err := models.LoadContacts(ctx, s.DB, org, []flows.ContactID{contactID})
+	if err == nil && len(contacts) == 0 {
+		err = errors.Errorf("no contacts loaded")
+	}
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading contact")
 	}
 
-	// and our user id
-	_, valid := ctx.Value(web.UserIDKey).(int)
-	if !valid {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to request user")
+	// load our flow contact
+	flowContact, err := contacts[0].FlowContact(org, assets)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading flow contact")
 	}
 
-	return &surveyorSubmitResponse{}, http.StatusOK, nil
+	modifierEvents := make([]flows.Event, 0, len(contactModifiers))
+	appender := func(e flows.Event) {
+		modifierEvents = append(modifierEvents, e)
+	}
+
+	// run through each contact modifier, applying it to our contact
+	for _, m := range contactModifiers {
+		m.Apply(org.Env(), assets, flowContact, appender)
+	}
+
+	// set this updated contact on our session
+	fs.SetContact(flowContact)
+
+	// append our session events to our modifiers events, the union will be used to update the db/contact
+	for _, e := range sessionEvents {
+		modifierEvents = append(modifierEvents, e)
+	}
+
+	// create our sprint
+	sprint := engine.NewSprint(contactModifiers, modifierEvents)
+
+	// write our session out
+	tx, err := s.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for session write")
+	}
+	sessions, err := models.WriteSessions(ctx, tx, s.RP, org, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
+	if err == nil && len(sessions) == 0 {
+		err = errors.Errorf("no sessions written")
+	}
+	if err != nil {
+		tx.Rollback()
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error writing session")
+	}
+	err = tx.Commit()
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing sessions")
+	}
+
+	tx, err = s.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for post commit hooks")
+	}
+
+	// write our post commit hooks
+	err = models.ApplyPostEventHooks(ctx, tx, s.RP, org, sessions)
+	if err != nil {
+		tx.Rollback()
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying post commit hooks")
+	}
+	err = tx.Commit()
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing post commit hooks")
+	}
+
+	response := &submitResponse{}
+	response.Session.ID = sessions[0].ID
+	response.Session.Status = sessions[0].Status
+	response.Contact.ID = flowContact.ID()
+	response.Contact.UUID = flowContact.UUID()
+
+	return response, http.StatusCreated, nil
 }
