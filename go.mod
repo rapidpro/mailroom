@@ -38,4 +38,4 @@ require (
 	gopkg.in/mail.v2 v2.3.1 // indirect
 )
 
-replace github.com/nyaruka/goflow => /Users/nicp/gohack/github.com/nyaruka/goflow
+

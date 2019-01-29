@@ -147,7 +147,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// create our sprint
-	sprint := engine.NewSprintWithValues(contactModifiers, modifierEvents)
+	sprint := engine.NewSprint(contactModifiers, modifierEvents)
 
 	// write our session out
 	tx, err := s.DB.BeginTxx(ctx, nil)
