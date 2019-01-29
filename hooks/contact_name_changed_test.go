@@ -12,18 +12,18 @@ func TestContactNameChanged(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				models.Cathy: []flows.Action{
+				models.CathyID: []flows.Action{
 					actions.NewSetContactNameAction(newActionUUID(), "Fred"),
 					actions.NewSetContactNameAction(newActionUUID(), "Tarzan"),
 				},
-				models.Evan: []flows.Action{
+				models.GeorgeID: []flows.Action{
 					actions.NewSetContactNameAction(newActionUUID(), "Geoff Newman"),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where name = 'Tarzan' and id = $1",
-					Args:  []interface{}{models.Cathy},
+					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
 				SQLAssertion{
@@ -31,13 +31,13 @@ func TestContactNameChanged(t *testing.T) {
 					Count: 1,
 				},
 				SQLAssertion{
-					SQL:   "select count(*) from contacts_contact where name = 'Bob Newman' and id = $1",
-					Args:  []interface{}{models.Bob},
+					SQL:   "select count(*) from contacts_contact where name = 'Bob' and id = $1",
+					Args:  []interface{}{models.BobID},
 					Count: 1,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where name = 'Geoff Newman' and id = $1",
-					Args:  []interface{}{models.Evan},
+					Args:  []interface{}{models.GeorgeID},
 					Count: 1,
 				},
 			},

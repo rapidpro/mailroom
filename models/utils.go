@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -62,6 +63,21 @@ type Queryer interface {
 	QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error)
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
+	GetContext(ctx context.Context, value interface{}, query string, args ...interface{}) error
+}
+
+// Exec calls ExecContext on the passed in Queryer, logging time taken if any rows were affected
+func Exec(ctx context.Context, label string, tx Queryer, sql string, args ...interface{}) error {
+	start := time.Now()
+	res, err := tx.ExecContext(ctx, sql, args...)
+	if err != nil {
+		return errors.Wrapf(err, fmt.Sprintf("error %s", label))
+	}
+	rows, _ := res.RowsAffected()
+	if rows > 0 {
+		logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug(label)
+	}
+	return nil
 }
 
 func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []interface{}) error {

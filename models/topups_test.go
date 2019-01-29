@@ -19,16 +19,15 @@ func TestTopups(t *testing.T) {
 	defer tx.Rollback()
 
 	tx.MustExec(`INSERT INTO orgs_topupcredits(is_squashed, used, topup_id)
-	                                    VALUES(TRUE, 1000000, 3),(TRUE, 998000, 2),(TRUE, 998, 2)`)
+	                                    VALUES(TRUE, 1000000, 1),(TRUE, 99000, 2),(TRUE, 998, 2)`)
 
 	tcs := []struct {
 		OrgID     OrgID
 		TopupID   TopupID
 		Remaining int
 	}{
-		{OrgID(1), TopupID(null.NewInt(1, true)), 1000000},
-		{OrgID(2), TopupID(null.NewInt(2, true)), 2},
-		{OrgID(3), NilTopupID, 0},
+		{Org1, NilTopupID, 0},
+		{Org2, TopupID(null.NewInt(2, true)), 2},
 	}
 
 	for _, tc := range tcs {
@@ -48,11 +47,10 @@ func TestTopups(t *testing.T) {
 		OrgID   OrgID
 		TopupID TopupID
 	}{
-		{OrgID(1), TopupID(null.NewInt(1, true))},
-		{OrgID(2), TopupID(null.NewInt(2, true))},
-		{OrgID(2), TopupID(null.NewInt(2, true))},
-		{OrgID(2), NilTopupID},
-		{OrgID(3), NilTopupID},
+		{Org1, NilTopupID},
+		{Org2, TopupID(null.NewInt(2, true))},
+		{Org2, TopupID(null.NewInt(2, true))},
+		{Org2, NilTopupID},
 	}
 
 	for _, tc := range tc2s {

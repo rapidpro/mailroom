@@ -31,18 +31,18 @@ func TestTriggers(t *testing.T) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
-	joinID := insertTrigger(t, db, true, FlowID(2), KeywordTriggerType, "join", MatchFirst, nil)
-	resistID := insertTrigger(t, db, true, FlowID(3), KeywordTriggerType, "resist", MatchOnly, nil)
-	farmersID := insertTrigger(t, db, true, FlowID(3), KeywordTriggerType, "resist", MatchOnly, []GroupID{GroupID(32)})
-	farmersAllID := insertTrigger(t, db, true, FlowID(3), CatchallTriggerType, "", MatchOnly, []GroupID{GroupID(32)})
-	othersAllID := insertTrigger(t, db, true, FlowID(3), CatchallTriggerType, "", MatchOnly, nil)
+	joinID := insertTrigger(t, db, true, FavoritesFlowID, KeywordTriggerType, "join", MatchFirst, nil)
+	resistID := insertTrigger(t, db, true, SingleMessageFlowID, KeywordTriggerType, "resist", MatchOnly, nil)
+	farmersID := insertTrigger(t, db, true, SingleMessageFlowID, KeywordTriggerType, "resist", MatchOnly, []GroupID{DoctorsGroupID})
+	farmersAllID := insertTrigger(t, db, true, SingleMessageFlowID, CatchallTriggerType, "", MatchOnly, []GroupID{DoctorsGroupID})
+	othersAllID := insertTrigger(t, db, true, SingleMessageFlowID, CatchallTriggerType, "", MatchOnly, nil)
 
 	FlushCache()
 
-	org, err := GetOrgAssets(ctx, db, OrgID(1))
+	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	contactIDs := []flows.ContactID{42, 43}
+	contactIDs := []flows.ContactID{CathyID, GeorgeID}
 	contacts, err := LoadContacts(ctx, db, org, contactIDs)
 	assert.NoError(t, err)
 

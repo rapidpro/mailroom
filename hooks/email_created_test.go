@@ -17,7 +17,7 @@ func TestEmailCreated(t *testing.T) {
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				models.Cathy: []flows.Action{
+				models.CathyID: []flows.Action{
 					actions.NewSendEmailAction(newActionUUID(), []string{"cathy@foo.bar", "bob@foo.bar"}, "Test Email", "This is your test email"),
 				},
 			},

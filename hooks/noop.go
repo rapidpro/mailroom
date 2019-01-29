@@ -19,7 +19,7 @@ func init() {
 	models.RegisterEventHook(events.TypeRunResultChanged, NoopHandler)
 	models.RegisterEventHook(events.TypeWaitTimedOut, NoopHandler)
 	models.RegisterEventHook(events.TypeRunExpired, NoopHandler)
-	models.RegisterEventHook(events.TypeFlowTriggered, NoopHandler)
+	models.RegisterEventHook(events.TypeFlowEntered, NoopHandler)
 	models.RegisterEventHook(events.TypeMsgWait, NoopHandler)
 }
 

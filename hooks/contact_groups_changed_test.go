@@ -11,45 +11,42 @@ import (
 )
 
 func TestContactGroupsChanged(t *testing.T) {
-	doctors := assets.NewGroupReference(assets.GroupUUID("85a5a793-4741-4896-b55e-05af65f3c0fa"), "Doctors")
-	doctorsID := models.GroupID(33)
-
-	teachers := assets.NewGroupReference(assets.GroupUUID("27ea3e9c-497c-4f13-aaa5-bf768fea1597"), "Teachers")
-	teachersID := models.GroupID(34)
+	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
+	testers := assets.NewGroupReference(models.TestersGroupUUID, "Testers")
 
 	tcs := []HookTestCase{
 		HookTestCase{
 			Actions: ContactActionMap{
-				models.Cathy: []flows.Action{
+				models.CathyID: []flows.Action{
 					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{teachers}),
+					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{testers}),
 				},
-				models.Evan: []flows.Action{
+				models.GeorgeID: []flows.Action{
 					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{teachers}),
+					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{testers}),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{models.Cathy, doctorsID},
+					Args:  []interface{}{models.CathyID, models.DoctorsGroupID},
 					Count: 0,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{models.Cathy, teachersID},
+					Args:  []interface{}{models.CathyID, models.TestersGroupID},
 					Count: 1,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{models.Evan, teachersID},
+					Args:  []interface{}{models.GeorgeID, models.TestersGroupID},
 					Count: 1,
 				},
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{models.Bob, teachersID},
+					Args:  []interface{}{models.BobID, models.TestersGroupID},
 					Count: 0,
 				},
 			},
