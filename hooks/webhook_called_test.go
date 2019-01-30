@@ -62,6 +62,21 @@ func TestWebhookCalled(t *testing.T) {
 					Args:  nil,
 					Count: 2,
 				},
+				SQLAssertion{
+					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 200",
+					Args:  []interface{}{models.CathyID},
+					Count: 1,
+				},
+				SQLAssertion{
+					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 410",
+					Args:  []interface{}{models.CathyID},
+					Count: 1,
+				},
+				SQLAssertion{
+					SQL:   "select count(*) from api_webhookresult where contact_id = $1",
+					Args:  []interface{}{models.GeorgeID},
+					Count: 3,
+				},
 			},
 		},
 	}
