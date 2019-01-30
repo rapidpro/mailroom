@@ -1,3 +1,7 @@
+v0.0.76
+----------
+ * write webhook results for webhook/resthook actions
+
 v0.0.75
 ----------
  * use nyaruka sentry so we get breadcrumbs
