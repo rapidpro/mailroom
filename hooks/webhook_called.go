@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"context"
+	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -39,6 +40,29 @@ func (h *UnsubscribeResthookHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 	return nil
 }
 
+// InsertWebhookResultHook is our hook for inserting webhook results
+type InsertWebhookResultHook struct{}
+
+var insertWebhookResultHook = &InsertWebhookResultHook{}
+
+// Apply inserts all the webook results that were created
+func (h *InsertWebhookResultHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+	// gather all our results
+	results := make([]*models.WebhookResult, 0, len(sessions))
+	for _, rs := range sessions {
+		for _, r := range rs {
+			results = append(results, r.(*models.WebhookResult))
+		}
+	}
+
+	err := models.InsertWebhookResults(ctx, tx, results)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting webhook results")
+	}
+
+	return nil
+}
+
 // handleWebhookCalled is called for each webhook call in a session
 func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.WebhookCalledEvent)
@@ -61,6 +85,21 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 
 		session.AddPreCommitEvent(unsubscribeResthookHook, unsub)
 	}
+
+	// if this is a connection error, use that as our response
+	response := event.Response
+	if event.Status == flows.WebhookStatusConnectionError {
+		response = "connection error"
+	}
+
+	// create a result for this call
+	result := models.NewWebhookResult(
+		org.OrgID(), session.ContactID,
+		event.URL, event.Request,
+		event.StatusCode, response,
+		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),
+	)
+	session.AddPreCommitEvent(insertWebhookResultHook, result)
 
 	return nil
 }
