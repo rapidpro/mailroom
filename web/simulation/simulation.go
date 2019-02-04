@@ -52,7 +52,7 @@ type sessionResponse struct {
 //   {
 //     "org_id": 1,
 //     "flows": [{
-//	      "uuid": uuidv4,
+//        "uuid": uuidv4,
 //        "definition": "goflow definition",
 //        "legacy_definition": "legacy definition",
 //     },.. ],
@@ -114,9 +114,9 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 // Resumes an existing engine session
 //
 //   {
-//	   "org_id": 1,
+//     "org_id": 1,
 //     "flows": [{
-//	      "uuid": uuidv4,
+//        "uuid": uuidv4,
 //        "definition": "goflow definition",
 //        "legacy_definition": "legacy definition",
 //     },.. ],
