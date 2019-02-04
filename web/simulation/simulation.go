@@ -61,9 +61,7 @@ type sessionResponse struct {
 //
 type startRequest struct {
 	sessionRequest
-	LegacyFlow json.RawMessage `json:"legacy_flow"`
-	Flow       json.RawMessage `json:"flow"`
-	Trigger    json.RawMessage `json:"trigger" validate:"required"`
+	Trigger json.RawMessage `json:"trigger" validate:"required"`
 }
 
 // handles a request to /start

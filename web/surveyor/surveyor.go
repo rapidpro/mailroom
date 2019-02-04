@@ -29,8 +29,8 @@ var (
 //
 //   {
 //     "session": {...},
-//     "events": {...},
-//     "modifiers": {...}
+//     "events": [{...}],
+//     "modifiers": [{...}]
 //   }
 //
 type submitRequest struct {
