@@ -52,7 +52,7 @@ type sessionResponse struct {
 //   {
 //     "org_id": 1,
 //     "flows": [{
-//	      "uuid": uuidv4,
+//        "uuid": uuidv4,
 //        "definition": "goflow definition",
 //        "legacy_definition": "legacy definition",
 //     },.. ],
@@ -61,9 +61,7 @@ type sessionResponse struct {
 //
 type startRequest struct {
 	sessionRequest
-	LegacyFlow json.RawMessage `json:"legacy_flow"`
-	Flow       json.RawMessage `json:"flow"`
-	Trigger    json.RawMessage `json:"trigger" validate:"required"`
+	Trigger json.RawMessage `json:"trigger" validate:"required"`
 }
 
 // handles a request to /start
@@ -116,9 +114,9 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 // Resumes an existing engine session
 //
 //   {
-//	   "org_id": 1,
+//     "org_id": 1,
 //     "flows": [{
-//	      "uuid": uuidv4,
+//        "uuid": uuidv4,
 //        "definition": "goflow definition",
 //        "legacy_definition": "legacy definition",
 //     },.. ],
