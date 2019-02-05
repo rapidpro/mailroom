@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 )
@@ -54,6 +55,11 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 		// nil channel object but have channel UUID? that's an error
 		if msg.Channel() == nil {
 			return errors.Errorf("msg passed in without channel set")
+		}
+
+		// no contact urn id or urn, also an error
+		if msg.URN() == urns.NilURN || msg.ContactURNID() == nil {
+			return errors.Errorf("msg passed with nil urn: %s", msg.URN())
 		}
 
 		// android channel? ignore

@@ -178,7 +178,7 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	}
 	ca := flows.NewChannelAssets(channels)
 
-	urn, err := flows.ParseRawURN(ca, telURN)
+	urn, err := flows.ParseRawURN(ca, telURN, assets.IgnoreMissing)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to parse URN: %s", telURN)
 	}
@@ -408,12 +408,12 @@ func ResumeIVRFlow(
 		return errors.Wrapf(err, "error loading session for contact")
 	}
 
-	if session.ConnectionID == nil {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID))
+	if session.ConnectionID() == nil {
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
 	}
 
-	if *session.ConnectionID != conn.ID() {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d does not match connetion: %d", session.ID, *session.ConnectionID))
+	if *session.ConnectionID() != conn.ID() {
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d does not match connetion: %d", session.ID(), *session.ConnectionID()))
 	}
 
 	// preprocess this request
@@ -432,7 +432,7 @@ func ResumeIVRFlow(
 	if err != nil {
 		// call has ended, so will our session
 		if err == CallEndedError {
-			err = models.ExitSessions(ctx, db, []models.SessionID{session.ID}, models.ExitCompleted, time.Now())
+			err = models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitCompleted, time.Now())
 			if err != nil {
 				return errors.Wrapf(err, "error marking sessions complete")
 			}

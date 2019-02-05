@@ -87,15 +87,15 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 	}
 
 	// build our session
-	assets, err := models.NewSessionAssets(org)
+	sa, err := models.NewSessionAssets(org)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
 	}
 
-	session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
+	session := engine.NewSession(sa, engine.NewDefaultConfig(), httpClient)
 
 	// read our trigger
-	trigger, err := triggers.ReadTrigger(assets, request.Trigger)
+	trigger, err := triggers.ReadTrigger(sa, request.Trigger, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
@@ -153,18 +153,18 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// build our session
-	assets, err := models.NewSessionAssets(org)
+	sa, err := models.NewSessionAssets(org)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	session, err := engine.ReadSession(assets, engine.NewDefaultConfig(), httpClient, request.Session)
+	session, err := engine.ReadSession(sa, engine.NewDefaultConfig(), httpClient, request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// read our resume
-	resume, err := resumes.ReadResume(session, request.Resume)
+	resume, err := resumes.ReadResume(sa, request.Resume, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

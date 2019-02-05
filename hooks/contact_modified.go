@@ -20,7 +20,7 @@ func (h *ContactModifiedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 	// our list of contact ids
 	contactIDs := make([]flows.ContactID, 0, len(sessions))
 	for session := range sessions {
-		contactIDs = append(contactIDs, session.Contact().ID())
+		contactIDs = append(contactIDs, session.ContactID())
 	}
 
 	err := models.UpdateContactModifiedOn(ctx, tx, contactIDs)

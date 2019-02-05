@@ -49,7 +49,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 			if v == nil || v.Text.Native() == "" {
 				delete(updates, k)
 				fieldDeletes = append(fieldDeletes, &FieldDelete{
-					ContactID: session.ContactID,
+					ContactID: session.ContactID(),
 					FieldUUID: k,
 				})
 			}
@@ -63,7 +63,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 
 		// and queue them up for our update
 		fieldUpdates = append(fieldUpdates, &FieldUpdate{
-			ContactID: session.ContactID,
+			ContactID: session.ContactID(),
 			Updates:   string(fieldJSON),
 		})
 	}
@@ -92,7 +92,7 @@ func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 	event := e.(*events.ContactFieldChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"field_key":    event.Field.Key,
 		"value":        event.Value,
 	}).Debug("contact field changed")

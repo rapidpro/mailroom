@@ -10,6 +10,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
@@ -58,21 +59,24 @@ var keptEvents = map[string]bool{
 
 // Session is the mailroom type for a FlowSession
 type Session struct {
-	ID            SessionID       `db:"id"`
-	Status        SessionStatus   `db:"status"`
-	Responded     bool            `db:"responded"`
-	Output        string          `db:"output"`
-	ContactID     flows.ContactID `db:"contact_id"`
-	OrgID         OrgID           `db:"org_id"`
-	CreatedOn     time.Time       `db:"created_on"`
-	EndedOn       *time.Time      `db:"ended_on"`
-	TimeoutOn     *time.Time      `db:"timeout_on"`
-	WaitStartedOn *time.Time      `db:"wait_started_on"`
-	CurrentFlowID *FlowID         `db:"current_flow_id"`
-	ConnectionID  *ConnectionID   `db:"connection_id"`
+	s struct {
+		ID            SessionID       `db:"id"`
+		SessionType   FlowType        `db:"session_type"`
+		Status        SessionStatus   `db:"status"`
+		Responded     bool            `db:"responded"`
+		Output        string          `db:"output"`
+		ContactID     flows.ContactID `db:"contact_id"`
+		OrgID         OrgID           `db:"org_id"`
+		CreatedOn     time.Time       `db:"created_on"`
+		EndedOn       *time.Time      `db:"ended_on"`
+		TimeoutOn     *time.Time      `db:"timeout_on"`
+		WaitStartedOn *time.Time      `db:"wait_started_on"`
+		CurrentFlowID *FlowID         `db:"current_flow_id"`
+		ConnectionID  *ConnectionID   `db:"connection_id"`
+	}
 
-	IncomingMsgID      null.Int
-	IncomingExternalID string
+	incomingMsgID      null.Int
+	incomingExternalID string
 
 	// any channel connection associated with this flow session
 	channelConnection *ChannelConnection
@@ -93,6 +97,22 @@ type Session struct {
 	// we also keep around a reference to the wait (if any)
 	wait flows.Wait
 }
+
+func (s *Session) ID() SessionID                 { return s.s.ID }
+func (s *Session) SessionType() FlowType         { return s.s.SessionType }
+func (s *Session) Status() SessionStatus         { return s.s.Status }
+func (s *Session) Responded() bool               { return s.s.Responded }
+func (s *Session) Output() string                { return s.s.Output }
+func (s *Session) ContactID() flows.ContactID    { return s.s.ContactID }
+func (s *Session) OrgID() OrgID                  { return s.s.OrgID }
+func (s *Session) CreatedOn() time.Time          { return s.s.CreatedOn }
+func (s *Session) EndedOn() *time.Time           { return s.s.EndedOn }
+func (s *Session) TimeoutOn() *time.Time         { return s.s.TimeoutOn }
+func (s *Session) WaitStartedOn() *time.Time     { return s.s.WaitStartedOn }
+func (s *Session) CurrentFlowID() *FlowID        { return s.s.CurrentFlowID }
+func (s *Session) ConnectionID() *ConnectionID   { return s.s.ConnectionID }
+func (s *Session) IncomingMsgID() null.Int       { return s.incomingMsgID }
+func (s *Session) IncomingMsgExternalID() string { return s.incomingExternalID }
 
 // ContactUUID returns the UUID of our contact
 func (s *Session) ContactUUID() flows.ContactUUID {
@@ -126,7 +146,7 @@ func (s *Session) Timeout() *time.Duration {
 
 // OutputMD5 returns the md5 of the passed in session
 func (s *Session) OutputMD5() string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(s.Output)))
+	return fmt.Sprintf("%x", md5.Sum([]byte(s.s.Output)))
 }
 
 // AddPreCommitEvent adds a new event to be handled by a pre commit hook
@@ -141,19 +161,19 @@ func (s *Session) AddPostCommitEvent(hook EventCommitHook, event interface{}) {
 
 // SetIncomingMsg set the incoming message that this session should be associated with in this sprint
 func (s *Session) SetIncomingMsg(id flows.MsgID, externalID string) {
-	s.IncomingMsgID = null.NewInt(int64(id), true)
-	s.IncomingExternalID = externalID
+	s.incomingMsgID = null.NewInt(int64(id), true)
+	s.incomingExternalID = externalID
 }
 
 // SetChannelConnection sets the channel connection associated with this sprint
 func (s *Session) SetChannelConnection(cc *ChannelConnection) {
 	connID := cc.ID()
-	s.ConnectionID = &connID
+	s.s.ConnectionID = &connID
 	s.channelConnection = cc
 
 	// also set it on all our runs
 	for _, r := range s.runs {
-		r.ConnectionID = &connID
+		r.SetConnectionID(&connID)
 	}
 }
 
@@ -161,39 +181,67 @@ func (s *Session) ChannelConnection() *ChannelConnection {
 	return s.channelConnection
 }
 
+// MarshalJSON is our custom marshaller so that our inner struct get output
+func (s *Session) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.s)
+}
+
+// UnmarshalJSON is our custom marshaller so that our inner struct get output
+func (s *Session) UnmarshalJSON(b []byte) error {
+	return json.Unmarshal(b, &s.s)
+}
+
 // FlowRun is the mailroom type for a FlowRun
 type FlowRun struct {
-	ID         FlowRunID     `db:"id"`
-	UUID       flows.RunUUID `db:"uuid"`
-	IsActive   bool          `db:"is_active"`
-	CreatedOn  time.Time     `db:"created_on"`
-	ModifiedOn time.Time     `db:"modified_on"`
-	ExitedOn   *time.Time    `db:"exited_on"`
-	ExitType   ExitType      `db:"exit_type"`
-	ExpiresOn  *time.Time    `db:"expires_on"`
-	TimeoutOn  *time.Time    `db:"timeout_on"`
-	Responded  bool          `db:"responded"`
+	r struct {
+		ID         FlowRunID     `db:"id"`
+		UUID       flows.RunUUID `db:"uuid"`
+		IsActive   bool          `db:"is_active"`
+		CreatedOn  time.Time     `db:"created_on"`
+		ModifiedOn time.Time     `db:"modified_on"`
+		ExitedOn   *time.Time    `db:"exited_on"`
+		ExitType   ExitType      `db:"exit_type"`
+		ExpiresOn  *time.Time    `db:"expires_on"`
+		TimeoutOn  *time.Time    `db:"timeout_on"`
+		Responded  bool          `db:"responded"`
 
-	// TODO: should this be a complex object that can read / write iself to the DB as JSON?
-	Results string `db:"results"`
+		// TODO: should this be a complex object that can read / write iself to the DB as JSON?
+		Results string `db:"results"`
 
-	// TODO: should this be a complex object that can read / write iself to the DB as JSON?
-	Path string `db:"path"`
+		// TODO: should this be a complex object that can read / write iself to the DB as JSON?
+		Path string `db:"path"`
 
-	// TODO: should this be a complex object that can read / write iself to the DB as JSON?
-	Events string `db:"events"`
+		// TODO: should this be a complex object that can read / write iself to the DB as JSON?
+		Events string `db:"events"`
 
-	CurrentNodeUUID flows.NodeUUID  `db:"current_node_uuid"`
-	ContactID       flows.ContactID `db:"contact_id"`
-	FlowID          FlowID          `db:"flow_id"`
-	OrgID           OrgID           `db:"org_id"`
-	ParentUUID      *flows.RunUUID  `db:"parent_uuid"`
-	SessionID       SessionID       `db:"session_id"`
-	StartID         StartID         `db:"start_id"`
-	ConnectionID    *ConnectionID   `db:"connection_id"`
+		CurrentNodeUUID flows.NodeUUID  `db:"current_node_uuid"`
+		ContactID       flows.ContactID `db:"contact_id"`
+		FlowID          FlowID          `db:"flow_id"`
+		OrgID           OrgID           `db:"org_id"`
+		ParentUUID      *flows.RunUUID  `db:"parent_uuid"`
+		SessionID       SessionID       `db:"session_id"`
+		StartID         StartID         `db:"start_id"`
+		ConnectionID    *ConnectionID   `db:"connection_id"`
+	}
 
 	// we keep a reference to model run as well
 	run flows.FlowRun
+}
+
+func (r *FlowRun) SetSessionID(sessionID SessionID)     { r.r.SessionID = sessionID }
+func (r *FlowRun) SetConnectionID(connID *ConnectionID) { r.r.ConnectionID = connID }
+func (r *FlowRun) SetStartID(startID StartID)           { r.r.StartID = startID }
+func (r *FlowRun) UUID() flows.RunUUID                  { return r.r.UUID }
+func (r *FlowRun) ModifiedOn() time.Time                { return r.r.ModifiedOn }
+
+// MarshalJSON is our custom marshaller so that our inner struct get output
+func (r *FlowRun) MarshalJSON() ([]byte, error) {
+	return json.Marshal(r.r)
+}
+
+// UnmarshalJSON is our custom marshaller so that our inner struct get output
+func (r *FlowRun) UnmarshalJSON(b []byte) error {
+	return json.Unmarshal(b, &r.r)
 }
 
 // Step represents a single step in a run, this struct is used for serialization to the steps
@@ -206,42 +254,49 @@ type Step struct {
 
 // NewSession a session objects from the passed in flow session. It does NOT
 // commit said session to the database.
-func NewSession(org *OrgAssets, s flows.Session, sprint flows.Sprint) (*Session, error) {
-	output, err := json.Marshal(s)
+func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session, error) {
+	output, err := json.Marshal(fs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error marshalling flow session")
 	}
 
 	// map our status over
-	sessionStatus, found := sessionStatusMap[s.Status()]
+	sessionStatus, found := sessionStatusMap[fs.Status()]
 	if !found {
-		return nil, errors.Errorf("unknown session status: %s", s.Status())
+		return nil, errors.Errorf("unknown session status: %s", fs.Status())
 	}
 
 	// session must have at least one run
-	if len(s.Runs()) < 1 {
+	if len(fs.Runs()) < 1 {
 		return nil, errors.Errorf("cannot write session that has no runs")
 	}
 
-	// create our session object
-	session := &Session{
-		Status:    sessionStatus,
-		Responded: false,
-		Output:    string(output),
-		ContactID: s.Contact().ID(),
-		OrgID:     org.OrgID(),
-		CreatedOn: s.Runs()[0].CreatedOn(),
-
-		contact:     s.Contact(),
-		preCommits:  make(map[EventCommitHook][]interface{}),
-		postCommits: make(map[EventCommitHook][]interface{}),
-
-		sprint: sprint,
-		wait:   s.Wait(),
+	// figure out our type
+	sessionType, found := FlowTypeMapping[fs.Type()]
+	if !found {
+		return nil, errors.Errorf("unknown flow type: %s", fs.Type())
 	}
 
+	// create our session object
+	session := &Session{}
+	s := &session.s
+	s.Status = sessionStatus
+	s.SessionType = sessionType
+	s.Responded = false
+	s.Output = string(output)
+	s.ContactID = fs.Contact().ID()
+	s.OrgID = org.OrgID()
+	s.CreatedOn = fs.Runs()[0].CreatedOn()
+
+	session.contact = fs.Contact()
+	session.preCommits = make(map[EventCommitHook][]interface{})
+	session.postCommits = make(map[EventCommitHook][]interface{})
+
+	session.sprint = sprint
+	session.wait = fs.Wait()
+
 	// now build up our runs
-	for _, r := range s.Runs() {
+	for _, r := range fs.Runs() {
 		run, err := newRun(org, session, r)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating run: %s", r.UUID())
@@ -257,16 +312,16 @@ func NewSession(org *OrgAssets, s flows.Session, sprint flows.Sprint) (*Session,
 				return nil, errors.Wrapf(err, "error loading current flow")
 			}
 			flowID := flow.(*Flow).ID()
-			session.CurrentFlowID = &flowID
+			s.CurrentFlowID = &flowID
 		}
 	}
 
 	// set our timeout if we have a wait
-	if s.Wait() != nil && s.Wait().Timeout() != nil {
-		seconds := time.Duration(*s.Wait().Timeout()) * time.Second
+	if fs.Wait() != nil && fs.Wait().Timeout() != nil {
+		seconds := time.Duration(*fs.Wait().Timeout()) * time.Second
 		session.timeout = &seconds
 		now := time.Now()
-		session.WaitStartedOn = &now
+		s.WaitStartedOn = &now
 	}
 
 	return session, nil
@@ -291,7 +346,7 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, c
 		preCommits:  make(map[EventCommitHook][]interface{}),
 		postCommits: make(map[EventCommitHook][]interface{}),
 	}
-	err = rows.StructScan(session)
+	err = rows.StructScan(&session.s)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error scanning session")
 	}
@@ -302,6 +357,7 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, c
 const selectLastSessionSQL = `
 SELECT 
 	id, 
+	session_type,
 	status, 
 	responded, 
 	output, 
@@ -325,21 +381,21 @@ LIMIT 1
 
 const insertCompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession(status, responded, output, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
-               VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), NOW(), NULL, :connection_id)
+	flows_flowsession( session_type, status, responded, output, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
+               VALUES(:session_type,:status,:responded,:output,:contact_id,:org_id, NOW(),      NOW(),    NULL,           :connection_id)
 RETURNING id
 `
 
 const insertIncompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession(status, responded, output, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
-               VALUES(:status, :responded, :output, :contact_id, :org_id, NOW(), :current_flow_id, :timeout_on, :wait_started_on, :connection_id)
+	flows_flowsession( session_type, status, responded, output, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
+               VALUES(:session_type,:status,:responded,:output,:contact_id,:org_id, NOW(),     :current_flow_id,:timeout_on,:wait_started_on,:connection_id)
 RETURNING id
 `
 
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
 func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment, client *utils.HTTPClient) (flows.Session, error) {
-	session, err := engine.ReadSession(sa, engine.NewDefaultConfig(), client, json.RawMessage(s.Output))
+	session, err := engine.ReadSession(sa, engine.NewDefaultConfig(), client, json.RawMessage(s.s.Output), assets.IgnoreMissing)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to unmarshal session")
 	}
@@ -364,14 +420,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	if err != nil {
 		return errors.Wrapf(err, "error marshalling flow session")
 	}
-	s.Output = string(output)
+	s.s.Output = string(output)
 
 	// map our status over
 	status, found := sessionStatusMap[fs.Status()]
 	if !found {
 		return errors.Errorf("unknown session status: %s", fs.Status())
 	}
-	s.Status = status
+	s.s.Status = status
 
 	// now build up our runs
 	for _, r := range fs.Runs() {
@@ -385,8 +441,8 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// clear out timeout on, that will be set when we get a callback from courier
-	s.TimeoutOn = nil
-	s.WaitStartedOn = nil
+	s.s.TimeoutOn = nil
+	s.s.WaitStartedOn = nil
 
 	// set our sprint and wait
 	s.sprint = sprint
@@ -398,7 +454,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 		seconds := time.Duration(*fs.Wait().Timeout()) * time.Second
 		s.timeout = &seconds
 		now := time.Now()
-		s.WaitStartedOn = &now
+		s.s.WaitStartedOn = &now
 	}
 
 	// run through our runs to figure out our current flow
@@ -410,15 +466,15 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 				return errors.Wrapf(err, "error loading current flow")
 			}
 			flowID := flow.(*Flow).ID()
-			s.CurrentFlowID = &flowID
+			s.s.CurrentFlowID = &flowID
 		}
 
 		// if we haven't already been marked as responded, walk our runs looking for an input
-		if !s.Responded {
+		if !s.s.Responded {
 			// run through events, see if any are received events
 			for _, e := range r.Events() {
 				if e.Type() == events.TypeMsgReceived {
-					s.Responded = true
+					s.s.Responded = true
 					break
 				}
 			}
@@ -426,14 +482,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// write our new session state to the db
-	_, err = tx.NamedExecContext(ctx, updateSessionSQL, s)
+	_, err = tx.NamedExecContext(ctx, updateSessionSQL, s.s)
 	if err != nil {
 		return errors.Wrapf(err, "error updating session")
 	}
 
 	// if this session is complete, so is any associated connection
 	if s.channelConnection != nil {
-		if s.Status == SessionStatusCompleted || s.Status == SessionStatusErrored {
+		if s.Status() == SessionStatusCompleted || s.Status() == SessionStatusErrored {
 			err := s.channelConnection.UpdateStatus(ctx, tx, ConnectionStatusCompleted, 0, time.Now())
 			if err != nil {
 				return errors.Wrapf(err, "error update channel connection")
@@ -445,14 +501,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	updatedRuns := make([]interface{}, 0, 1)
 	newRuns := make([]interface{}, 0)
 	for _, r := range s.Runs() {
-		modified, found := s.seenRuns[r.UUID]
+		modified, found := s.seenRuns[r.UUID()]
 		if !found {
-			newRuns = append(newRuns, r)
+			newRuns = append(newRuns, r.r)
 			continue
 		}
 
-		if r.ModifiedOn.After(modified) {
-			updatedRuns = append(updatedRuns, r)
+		if r.ModifiedOn().After(modified) {
+			updatedRuns = append(updatedRuns, r.r)
 			continue
 		}
 	}
@@ -550,13 +606,13 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 		}
 		sessions = append(sessions, session)
 
-		if session.Status == SessionStatusCompleted {
-			completeSessionsI = append(completeSessionsI, session)
+		if session.Status() == SessionStatusCompleted {
+			completeSessionsI = append(completeSessionsI, &session.s)
 			if session.channelConnection != nil {
 				completedConnectionIDs = append(completedConnectionIDs, session.channelConnection.ID())
 			}
 		} else {
-			incompleteSessionsI = append(incompleteSessionsI, session)
+			incompleteSessionsI = append(incompleteSessionsI, &session.s)
 		}
 	}
 
@@ -590,10 +646,10 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	runs := make([]interface{}, 0, len(sessions))
 	for _, s := range sessions {
 		for _, r := range s.runs {
-			runs = append(runs, r)
+			runs = append(runs, &r.r)
 
 			// set our session id now that it is written
-			r.SessionID = s.ID
+			r.SetSessionID(s.ID())
 		}
 	}
 
@@ -634,15 +690,15 @@ RETURNING id
 
 // newRun writes the passed in flow run to our database, also applying any events in those runs as
 // appropriate. (IE, writing db messages etc..)
-func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error) {
+func newRun(org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error) {
 	// no path is invalid
-	if len(r.Path()) < 1 {
+	if len(fr.Path()) < 1 {
 		return nil, errors.Errorf("run must have at least one path segment")
 	}
 
 	// build our path elements
-	path := make([]Step, len(r.Path()))
-	for i, p := range r.Path() {
+	path := make([]Step, len(fr.Path()))
+	for i, p := range fr.Path() {
 		path[i].UUID = p.UUID()
 		path[i].NodeUUID = p.NodeUUID()
 		path[i].ArrivedOn = p.ArrivedOn()
@@ -653,70 +709,70 @@ func newRun(org *OrgAssets, session *Session, r flows.FlowRun) (*FlowRun, error)
 		return nil, err
 	}
 
-	flow, err := org.Flow(r.Flow().UUID())
+	flow, err := org.Flow(fr.Flow().UUID())
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to load flow with uuid: %s", r.Flow().UUID())
+		return nil, errors.Wrapf(err, "unable to load flow with uuid: %s", fr.Flow().UUID())
 	}
 
 	// create our run
-	run := &FlowRun{
-		UUID:            r.UUID(),
-		CreatedOn:       r.CreatedOn(),
-		ExitedOn:        r.ExitedOn(),
-		ExpiresOn:       r.ExpiresOn(),
-		ModifiedOn:      r.ModifiedOn(),
-		ContactID:       r.Contact().ID(),
-		FlowID:          flow.(*Flow).ID(),
-		SessionID:       session.ID,
-		StartID:         NilStartID,
-		OrgID:           org.OrgID(),
-		Path:            string(pathJSON),
-		CurrentNodeUUID: path[len(path)-1].NodeUUID,
-		run:             r,
-	}
+	run := &FlowRun{}
+	r := &run.r
+	r.UUID = fr.UUID()
+	r.CreatedOn = fr.CreatedOn()
+	r.ExitedOn = fr.ExitedOn()
+	r.ExpiresOn = fr.ExpiresOn()
+	r.ModifiedOn = fr.ModifiedOn()
+	r.ContactID = fr.Contact().ID()
+	r.FlowID = flow.(*Flow).ID()
+	r.SessionID = session.ID()
+	r.StartID = NilStartID
+	r.OrgID = org.OrgID()
+	r.Path = string(pathJSON)
+	r.CurrentNodeUUID = path[len(path)-1].NodeUUID
+	run.run = fr
 
 	// set our exit type if we exited
 	// TODO: audit exit types
-	if r.Status() != flows.RunStatusActive && r.Status() != flows.RunStatusWaiting {
-		if r.Status() == flows.RunStatusErrored {
-			run.ExitType = ExitInterrupted
+	if fr.Status() != flows.RunStatusActive && fr.Status() != flows.RunStatusWaiting {
+		if fr.Status() == flows.RunStatusErrored {
+			r.ExitType = ExitInterrupted
 		} else {
-			run.ExitType = ExitCompleted
+			r.ExitType = ExitCompleted
 		}
-		run.IsActive = false
+		r.IsActive = false
 	} else {
-		run.IsActive = true
+		r.IsActive = true
 	}
 
 	// we filter which events we write to our events json right now
 	filteredEvents := make([]flows.Event, 0)
-	for _, e := range r.Events() {
+	for _, e := range fr.Events() {
 		if keptEvents[e.Type()] {
 			filteredEvents = append(filteredEvents, e)
 		}
 
 		// mark ourselves as responded if we received a message
 		if e.Type() == events.TypeMsgReceived {
-			run.Responded = true
+			r.Responded = true
 		}
 	}
 	eventJSON, err := json.Marshal(filteredEvents)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling events for run: %s", run.UUID)
+		return nil, errors.Wrapf(err, "error marshalling events for run: %s", run.UUID())
 	}
-	run.Events = string(eventJSON)
+	r.Events = string(eventJSON)
 
 	// write our results out
-	resultsJSON, err := json.Marshal(r.Results())
+	resultsJSON, err := json.Marshal(fr.Results())
 	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling results for run: %s", run.UUID)
+		return nil, errors.Wrapf(err, "error marshalling results for run: %s", run.UUID())
 	}
-	run.Results = string(resultsJSON)
+	r.Results = string(resultsJSON)
 
 	// set our parent UUID if we have a parent
-	if r.Parent() != nil {
-		uuid := r.Parent().UUID()
-		run.ParentUUID = &uuid
+	if fr.Parent() != nil {
+		uuid := fr.Parent().UUID()
+		r.ParentUUID = &uuid
 	}
 
 	return run, nil

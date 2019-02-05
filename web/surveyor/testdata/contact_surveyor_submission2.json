@@ -1,5 +1,6 @@
 {
     "session": {
+        "type": "messaging_offline",
         "environment": {
             "date_format": "DD-MM-YYYY",
             "time_format": "tt:mm",

@@ -68,7 +68,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 	event := e.(*events.WebhookCalledEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"url":          event.URL,
 		"status":       event.Status,
 		"elapsed_ms":   event.ElapsedMS,
@@ -94,7 +94,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 
 	// create a result for this call
 	result := models.NewWebhookResult(
-		org.OrgID(), session.ContactID,
+		org.OrgID(), session.ContactID(),
 		event.URL, event.Request,
 		event.StatusCode, response,
 		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),

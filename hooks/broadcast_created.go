@@ -68,7 +68,7 @@ func handleBroadcastCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 	event := e.(*events.BroadcastCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"translations": event.Translations[event.BaseLanguage],
 	}).Debug("broadcast created")
 

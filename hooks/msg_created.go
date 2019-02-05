@@ -38,8 +38,8 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 		}
 
 		// if our session has a timeout, set it on our last message
-		if s.Timeout() != nil && s.WaitStartedOn != nil {
-			msgs[len(msgs)-1].SetTimeout(s.ID, *s.WaitStartedOn, *s.Timeout())
+		if s.Timeout() != nil && s.WaitStartedOn() != nil {
+			msgs[len(msgs)-1].SetTimeout(s.ID(), *s.WaitStartedOn(), *s.Timeout())
 		}
 
 		log := log.WithField("messages", msgs).WithField("session", s.ID)
@@ -104,36 +104,52 @@ func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
 
+	logrus.WithFields(logrus.Fields{
+		"contact_uuid": session.ContactUUID(),
+		"session_id":   session.ID(),
+		"text":         event.Msg.Text(),
+		"urn":          event.Msg.URN(),
+	}).Debug("msg created event")
+
 	// ignore events that don't have a channel or URN set
 	// TODO: maybe we should create these messages in a failed state?
-	if event.Msg.URN() == urns.NilURN || event.Msg.Channel() == nil {
+	if session.SessionType() == models.MessagingFlow && (event.Msg.URN() == urns.NilURN || event.Msg.Channel() == nil) {
 		return nil
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
-		"text":         event.Msg.Text(),
-		"urn":          event.Msg.URN(),
-	}).Debug("creating message")
-
-	// get our channel
-	channel := org.ChannelByUUID(event.Msg.Channel().UUID)
-	if channel == nil {
-		return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
+	// messaging flows must have urn id set on them, assert that
+	if session.SessionType() == models.MessagingFlow {
+		urnInt := models.GetURNInt(event.Msg.URN(), "id")
+		if urnInt == 0 {
+			return errors.Errorf("attempt to create messaging message with 0 id URN")
+		}
 	}
 
-	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, session.ContactID, event.Msg, event.CreatedOn())
+	// get our channel
+	var channel *models.Channel
+
+	if event.Msg.Channel() != nil {
+		channel = org.ChannelByUUID(event.Msg.Channel().UUID)
+		if channel == nil {
+			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
+		}
+	}
+
+	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, session.ContactID(), event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
 
 	// set our reply to as well (will be noop in cases when there is no incoming message)
-	msg.SetResponseTo(session.IncomingMsgID, session.IncomingExternalID)
+	msg.SetResponseTo(session.IncomingMsgID(), session.IncomingMsgExternalID())
 
 	// register to have this message committed
 	session.AddPreCommitEvent(commitMessagesHook, msg)
-	session.AddPostCommitEvent(sendMessagesHook, msg)
+
+	// we only send messaging messages
+	if session.SessionType() == models.MessagingFlow {
+		session.AddPostCommitEvent(sendMessagesHook, msg)
+	}
 
 	return nil
 }

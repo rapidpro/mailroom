@@ -200,7 +200,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	}
 
 	// if we didn't find a session or it is another session, ignore
-	if session == nil || session.ID != event.SessionID {
+	if session == nil || session.ID() != event.SessionID {
 		log.Info("ignoring event, couldn't find active session")
 		return nil
 	}
@@ -222,13 +222,13 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 
 		resume = resumes.NewRunExpirationResume(org.Env(), contact)
 	case TimeoutEventType:
-		if session.TimeoutOn == nil {
+		if session.TimeoutOn() == nil {
 			log.WithField("session_id", session.ID).Info("ignoring session timeout, has no timeout set")
 			return nil
 		}
 
 		// check that the timeout is the same
-		timeout := *session.TimeoutOn
+		timeout := *session.TimeoutOn()
 		if !timeout.Equal(event.Time) {
 			log.WithField("event_timeout", event.Time).WithField("session_timeout", timeout).Info("ignoring timeout, has been updated")
 			return nil
@@ -484,8 +484,8 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 	// we have a session and it has an active flow, check whether we should honor triggers
 	var flow *models.Flow
-	if session != nil && session.CurrentFlowID != nil {
-		flow, err = org.FlowByID(*session.CurrentFlowID)
+	if session != nil && session.CurrentFlowID() != nil {
+		flow, err = org.FlowByID(*session.CurrentFlowID())
 		if err != nil {
 			return errors.Wrapf(err, "error loading flow for session")
 		}

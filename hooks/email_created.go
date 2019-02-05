@@ -103,7 +103,7 @@ func handleEmailCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *m
 	event := e.(*events.EmailCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"body":         event.Body,
 		"addresses":    event.Addresses,
 	}).Debug("creating email")
