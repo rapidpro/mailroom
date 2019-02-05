@@ -1,3 +1,11 @@
+v0.0.77
+----------
+ * add session type to session
+ * write both incoming and outgoing surveyor messages
+ * newest goflow
+ * encapsulate flowrun and flowsession
+ * deal with missing fields and groups in surveyor submissions
+
 v0.0.76
 ----------
  * write webhook results for webhook/resthook actions
