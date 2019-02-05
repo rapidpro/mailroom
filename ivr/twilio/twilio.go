@@ -311,7 +311,7 @@ func (c *client) WriteSessionResponse(session *models.Session, resumeURL string,
 
 // WriteErrorResponse writes an error / unavailable response
 func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
-	r := &Response{Error: err.Error()}
+	r := &Response{Message: strings.Replace(err.Error(), "--", "__", -1)}
 	r.Commands = append(r.Commands, Say{Text: ivr.ErrorMessage})
 	r.Commands = append(r.Commands, Hangup{})
 
@@ -325,7 +325,7 @@ func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
 
 // WriteEmptyResponse writes an empty (but valid) response
 func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
-	r := &Response{Message: msg}
+	r := &Response{Message: strings.Replace(msg, "--", "__", -1)}
 
 	body, err := xml.Marshal(r)
 	if err != nil {
@@ -411,8 +411,7 @@ type Record struct {
 
 type Response struct {
 	XMLName  string        `xml:"Response"`
-	Message  string        `xml:"_message,omitempty"`
-	Error    string        `xml:"_error,omitempty"`
+	Message  string        `xml:",comment"`
 	Gather   *Gather       `xml:"Gather"`
 	Commands []interface{} `xml:",innerxml"`
 }
