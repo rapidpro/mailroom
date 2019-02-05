@@ -60,7 +60,7 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"text":         event.Msg.Text(),
 	}).Debug("ivr say")
 

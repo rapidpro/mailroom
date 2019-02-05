@@ -42,13 +42,13 @@ func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	event := e.(*events.ContactURNsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"urns":         event.URNs,
 	}).Debug("contact urns changed")
 
 	// create our URN changed event
 	change := &models.ContactURNsChanged{
-		ContactID: session.Contact().ID(),
+		ContactID: session.ContactID(),
 		OrgID:     org.OrgID(),
 		URNs:      event.URNs,
 	}

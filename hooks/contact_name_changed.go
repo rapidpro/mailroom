@@ -27,7 +27,7 @@ func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for s, e := range sessions {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactNameChangedEvent)
-		updates = append(updates, &nameUpdate{int64(s.ContactID), event.Name})
+		updates = append(updates, &nameUpdate{int64(s.ContactID()), event.Name})
 	}
 
 	// do our update
@@ -39,7 +39,7 @@ func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	event := e.(*events.ContactNameChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"name":         event.Name,
 	}).Debug("changing contact name")
 

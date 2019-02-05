@@ -47,7 +47,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 					logrus.WithFields(logrus.Fields{
 						"field_key":  event.Field.Key,
 						"field_name": event.Field.Name,
-						"session_id": s.ID,
+						"session_id": s.ID(),
 					}).Debug("unable to find field with key, ignoring for campaign updates")
 					continue
 				}
@@ -88,7 +88,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 		// ok, create all our deletes
 		for e := range deleteEvents {
 			deletes = append(deletes, &models.FireDelete{
-				ContactID: s.ContactID,
+				ContactID: s.ContactID(),
 				EventID:   e,
 			})
 		}
@@ -118,7 +118,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 			// ok we have a new fire date, add it to our list of fires to insert
 			inserts = append(inserts, &models.FireAdd{
-				ContactID: s.Contact().ID(),
+				ContactID: s.ContactID(),
 				EventID:   ce.ID(),
 				Scheduled: *scheduled,
 			})

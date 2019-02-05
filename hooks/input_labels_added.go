@@ -48,7 +48,7 @@ func handleInputLabelsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 	event := e.(*events.InputLabelsAddedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"labels":       event.Labels,
 	}).Debug("input labels added")
 
@@ -59,12 +59,12 @@ func handleInputLabelsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 			return errors.Errorf("unable to find label with UUID: %s", l.UUID)
 		}
 
-		if session.IncomingMsgID.IsZero() {
-			return errors.Errorf("cannot add label, no incoming message for session: %d", session.ID)
+		if session.IncomingMsgID().IsZero() {
+			return errors.Errorf("cannot add label, no incoming message for session: %d", session.ID())
 		}
 
 		session.AddPreCommitEvent(commitAddedLabelsHook, &models.MsgLabelAdd{
-			MsgID:   flows.MsgID(session.IncomingMsgID.Int64),
+			MsgID:   flows.MsgID(session.IncomingMsgID().Int64),
 			LabelID: label.ID(),
 		})
 	}

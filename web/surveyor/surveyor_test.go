@@ -57,6 +57,8 @@ func TestSurveyor(t *testing.T) {
 			Assertion{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
 			Assertion{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
 			Assertion{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 1},
+			Assertion{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'O' AND org_id = :org_id`, 4},
+			Assertion{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'I' AND org_id = :org_id`, 3},
 		}},
 		// dupe submission should fail due to run UUIDs being duplicated
 		{"contact_surveyor_submission.json", "sesame", 500, `error writing runs`, []Assertion{
@@ -69,6 +71,8 @@ func TestSurveyor(t *testing.T) {
 			Assertion{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
 			Assertion{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
 			Assertion{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 1},
+			Assertion{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'O' AND org_id = :org_id`, 8},
+			Assertion{`SELECT count(*) FROM msgs_msg WHERE contact_id = :contact_id AND contact_urn_id IS NULL AND direction = 'I' AND org_id = :org_id`, 6},
 		}},
 		// group removal is ONLY in the modifier
 		{"remove_group.json", "sesame", 201, `"status": "C"`, []Assertion{
@@ -76,6 +80,14 @@ func TestSurveyor(t *testing.T) {
 			Assertion{`SELECT count(*) FROM contacts_contact WHERE uuid = 'bdfe862c-84f8-422e-8fdc-ebfaaae0697a'`, 0},
 			Assertion{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
 			Assertion{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123456' AND contact_id = :contact_id`, 1},
+			Assertion{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 0},
+		}},
+		// new contact, new session, group and field no longer exist
+		{"missing_group_field.json", "sesame", 201, `"status": "C"`, []Assertion{
+			Assertion{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id`, 1},
+			Assertion{`SELECT count(*) FROM contacts_contact WHERE uuid = 'c7fa24ca-48f9-45bf-b923-f95aa49c3cd2'`, 0},
+			Assertion{`SELECT count(*) FROM contacts_contact WHERE name = 'Fred' AND fields = jsonb_build_object()`, 1},
+			Assertion{`SELECT count(*) FROM contacts_contacturn WHERE identity = 'tel::+593979123488' AND contact_id = :contact_id`, 1},
 			Assertion{`SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = :contact_id and contactgroup_id = :testers_group_id`, 0},
 		}},
 	}

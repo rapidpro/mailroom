@@ -93,7 +93,7 @@ func handleSessionTriggered(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 	event := e.(*events.SessionTriggeredEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"flow":         event.Flow.Name,
 		"flow_uuid":    event.Flow.UUID,
 	}).Debug("session triggered")

@@ -9,6 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -25,6 +26,12 @@ const (
 
 	FlowConfigIVRRetryMinutes = "ivr_retry"
 )
+
+var FlowTypeMapping = map[flows.FlowType]FlowType{
+	flows.FlowTypeMessaging:        MessagingFlow,
+	flows.FlowTypeVoice:            IVRFlow,
+	flows.FlowTypeMessagingOffline: SurveyorFlow,
+}
 
 // Flow is the mailroom type for a flow
 type Flow struct {

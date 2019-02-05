@@ -27,7 +27,7 @@ func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *
 	for s, e := range sessions {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactLanguageChangedEvent)
-		updates = append(updates, &languageUpdate{int64(s.ContactID), event.Language})
+		updates = append(updates, &languageUpdate{int64(s.ContactID()), event.Language})
 	}
 
 	// do our update
@@ -39,7 +39,7 @@ func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 	event := e.(*events.ContactLanguageChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID,
+		"session_id":   session.ID(),
 		"language":     event.Language,
 	}).Debug("changing contact language")
 

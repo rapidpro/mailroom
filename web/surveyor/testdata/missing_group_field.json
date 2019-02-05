@@ -1,0 +1,473 @@
+{
+    "session": {
+        "type": "messaging_offline",
+        "environment": {
+            "date_format": "DD-MM-YYYY",
+            "time_format": "tt:mm",
+            "timezone": "Africa/Kigali",
+            "default_language": "eng",
+            "allowed_languages": [
+                "eng",
+                "fra"
+            ],
+            "redaction_policy": "none"
+        },
+        "trigger": {
+            "type": "manual",
+            "environment": {
+                "date_format": "DD-MM-YYYY",
+                "time_format": "tt:mm",
+                "timezone": "Africa/Kigali",
+                "default_language": "eng",
+                "allowed_languages": [
+                    "eng",
+                    "fra"
+                ],
+                "redaction_policy": "none"
+            },
+            "flow": {
+                "uuid": "ed8cf8d4-a42c-4ce1-a7e3-44a2918e3cec",
+                "name": "Contact Details"
+            },
+            "contact": {
+                "uuid": "c7fa24ca-48f9-45bf-b923-f95aa49c3cd2",
+                "created_on": "2018-12-18T19:14:53.707395Z"
+            },
+            "triggered_on": "2018-12-18T19:14:53.70753Z"
+        },
+        "contact": {
+            "uuid": "c7fa24ca-48f9-45bf-b923-f95aa49c3cd2",
+            "name": "Fred",
+            "created_on": "2018-12-18T19:14:53.707395Z",
+            "urns": [
+                "tel:+593979123488"
+            ],
+            "groups": [
+                {
+                    "uuid": "933dfd73-b5f3-4a8a-95ed-e9cfa6dd70f2",
+                    "name": "Old Testers"
+                }
+            ],
+            "fields": {
+                "years": {
+                    "text": "37",
+                    "number": 37
+                }
+            }
+        },
+        "runs": [
+            {
+                "uuid": "57fd8979-8a58-494e-873b-b8eb3e539cfb",
+                "flow": {
+                    "uuid": "ed8cf8d4-a42c-4ce1-a7e3-44a2918e3cec",
+                    "name": "Contact Details"
+                },
+                "path": [
+                    {
+                        "uuid": "a6c7ff4d-b23f-450a-ac16-da870f6f73be",
+                        "node_uuid": "036901e0-abb8-4979-92cb-f0d43aeb5b68",
+                        "exit_uuid": "706853c2-831b-4dd8-8073-cd51b21d94d6",
+                        "arrived_on": "2018-12-18T19:14:53.711805Z"
+                    },
+                    {
+                        "uuid": "dd2c2662-437f-480c-93e5-a5150ca67d1f",
+                        "node_uuid": "39fe1ce0-7dee-445e-9945-48c72a05cef5",
+                        "exit_uuid": "bb999ff8-5eb3-45f6-bec6-a0430105b0ca",
+                        "arrived_on": "2018-12-18T19:14:53.712041Z"
+                    },
+                    {
+                        "uuid": "1d0cc3ea-f5c6-409f-af1f-a9bd26c1a367",
+                        "node_uuid": "73dda1a7-9152-45f1-993a-e7d01eb028db",
+                        "exit_uuid": "5e7a398e-eebe-4b32-8600-374659f56d9e",
+                        "arrived_on": "2018-12-18T19:14:55.289318Z"
+                    },
+                    {
+                        "uuid": "16c63d0d-2eaa-4a60-bc9c-b9358b8739f0",
+                        "node_uuid": "1a7612b5-777d-4af3-a657-077c46f242d9",
+                        "exit_uuid": "0c047d03-3b61-4ff2-8bc8-43a89cf1087b",
+                        "arrived_on": "2018-12-18T19:14:55.289954Z"
+                    },
+                    {
+                        "uuid": "dac7fb6e-5e9d-4793-be36-b5e8756a6f6b",
+                        "node_uuid": "2d55c61f-384c-4a07-a17e-1e42fc543dd9",
+                        "exit_uuid": "4e483159-af9f-48a4-907f-c875fde66c70",
+                        "arrived_on": "2018-12-18T19:14:56.721324Z"
+                    },
+                    {
+                        "uuid": "a034eccc-581a-4b84-8a6f-37ed513b53d0",
+                        "node_uuid": "52a6784b-f51f-42c7-8c6a-3e5ec42603bb",
+                        "exit_uuid": "34d09b52-ac85-44a4-b4f4-c7a3b489fcf8",
+                        "arrived_on": "2018-12-18T19:14:56.730637Z"
+                    },
+                    {
+                        "uuid": "94106b99-9e4d-4bfa-9feb-dcd780d7bf89",
+                        "node_uuid": "6d5703f9-938c-4c2f-9cc7-7d1bbe328095",
+                        "exit_uuid": "6bab242d-85d5-4afe-b6e7-5fe7c98f187e",
+                        "arrived_on": "2018-12-18T19:14:57.973998Z"
+                    }
+                ],
+                "events": [
+                    {
+                        "type": "msg_created",
+                        "created_on": "2018-12-18T19:14:53.711924Z",
+                        "step_uuid": "a6c7ff4d-b23f-450a-ac16-da870f6f73be",
+                        "msg": {
+                            "uuid": "c7c3e345-dcb9-487d-9102-b1cbc7deacf1",
+                            "text": "Hi there. What's your name?"
+                        }
+                    },
+                    {
+                        "type": "msg_wait",
+                        "created_on": "2018-12-18T19:14:53.712575Z",
+                        "step_uuid": "dd2c2662-437f-480c-93e5-a5150ca67d1f"
+                    },
+                    {
+                        "type": "msg_received",
+                        "created_on": "2018-12-18T19:14:55.288681Z",
+                        "step_uuid": "dd2c2662-437f-480c-93e5-a5150ca67d1f",
+                        "msg": {
+                            "uuid": "2dcb9bbc-46f7-4bc6-afe9-3887209402cc",
+                            "text": "Fred"
+                        }
+                    },
+                    {
+                        "type": "run_result_changed",
+                        "created_on": "2018-12-18T19:14:55.289221Z",
+                        "step_uuid": "dd2c2662-437f-480c-93e5-a5150ca67d1f",
+                        "name": "Name",
+                        "value": "Fred",
+                        "category": "All Responses",
+                        "input": "Fred"
+                    },
+                    {
+                        "type": "contact_name_changed",
+                        "created_on": "2018-12-18T19:14:55.289471Z",
+                        "step_uuid": "1d0cc3ea-f5c6-409f-af1f-a9bd26c1a367",
+                        "name": "Fred"
+                    },
+                    {
+                        "type": "msg_created",
+                        "created_on": "2018-12-18T19:14:55.289645Z",
+                        "step_uuid": "1d0cc3ea-f5c6-409f-af1f-a9bd26c1a367",
+                        "msg": {
+                            "uuid": "b6fbd0e6-35ce-495a-b3f0-8c5f9852452f",
+                            "text": "Thanks Fred. What's your phone number?"
+                        }
+                    },
+                    {
+                        "type": "msg_wait",
+                        "created_on": "2018-12-18T19:14:55.290128Z",
+                        "step_uuid": "16c63d0d-2eaa-4a60-bc9c-b9358b8739f0"
+                    },
+                    {
+                        "type": "msg_received",
+                        "created_on": "2018-12-18T19:14:56.720739Z",
+                        "step_uuid": "16c63d0d-2eaa-4a60-bc9c-b9358b8739f0",
+                        "msg": {
+                            "uuid": "ca87bcce-f113-4ad2-9c5b-96efbc0d6248",
+                            "text": "+593979123488"
+                        }
+                    },
+                    {
+                        "type": "run_result_changed",
+                        "created_on": "2018-12-18T19:14:56.721229Z",
+                        "step_uuid": "16c63d0d-2eaa-4a60-bc9c-b9358b8739f0",
+                        "name": "Phone",
+                        "value": "+593979123488",
+                        "category": "phone",
+                        "input": "+593979123488"
+                    },
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-12-18T19:14:56.730115Z",
+                        "step_uuid": "dac7fb6e-5e9d-4793-be36-b5e8756a6f6b",
+                        "urns": [
+                            "tel:+593979123488"
+                        ]
+                    },
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-12-18T19:14:56.730233Z",
+                        "step_uuid": "dac7fb6e-5e9d-4793-be36-b5e8756a6f6b",
+                        "groups_added": [
+                            {
+                                "uuid": "933dfd73-b5f3-4a8a-95ed-e9cfa6dd70f2",
+                                "name": "Old Testers"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "msg_created",
+                        "created_on": "2018-12-18T19:14:56.730535Z",
+                        "step_uuid": "dac7fb6e-5e9d-4793-be36-b5e8756a6f6b",
+                        "msg": {
+                            "uuid": "0c578642-8236-4b71-94a8-5f1db5bd3764",
+                            "text": "Finally, what is your age?"
+                        }
+                    },
+                    {
+                        "type": "msg_wait",
+                        "created_on": "2018-12-18T19:14:56.73068Z",
+                        "step_uuid": "a034eccc-581a-4b84-8a6f-37ed513b53d0"
+                    },
+                    {
+                        "type": "msg_received",
+                        "created_on": "2018-12-18T19:14:57.97173Z",
+                        "step_uuid": "a034eccc-581a-4b84-8a6f-37ed513b53d0",
+                        "msg": {
+                            "uuid": "fc7f9830-ec40-4a43-b92e-6eb04750c119",
+                            "text": "37"
+                        }
+                    },
+                    {
+                        "type": "run_result_changed",
+                        "created_on": "2018-12-18T19:14:57.973844Z",
+                        "step_uuid": "a034eccc-581a-4b84-8a6f-37ed513b53d0",
+                        "name": "Age",
+                        "value": "37",
+                        "category": "numeric",
+                        "input": "37"
+                    },
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-12-18T19:14:57.974455Z",
+                        "step_uuid": "94106b99-9e4d-4bfa-9feb-dcd780d7bf89",
+                        "field": {
+                            "key": "years",
+                            "name": "Years"
+                        },
+                        "value": {
+                            "text": "37",
+                            "number": 37
+                        }
+                    },
+                    {
+                        "type": "msg_created",
+                        "created_on": "2018-12-18T19:14:57.975302Z",
+                        "step_uuid": "94106b99-9e4d-4bfa-9feb-dcd780d7bf89",
+                        "msg": {
+                            "uuid": "388e5968-57c8-4795-b4bf-d73916aa5f45",
+                            "text": "Thanks Fred. You are 37 and your phone number is 097 912 3488"
+                        }
+                    }
+                ],
+                "results": {
+                    "age": {
+                        "name": "Age",
+                        "value": "37",
+                        "category": "numeric",
+                        "node_uuid": "52a6784b-f51f-42c7-8c6a-3e5ec42603bb",
+                        "input": "37",
+                        "created_on": "2018-12-18T19:14:57.972203Z"
+                    },
+                    "name": {
+                        "name": "Name",
+                        "value": "Fred",
+                        "category": "All Responses",
+                        "node_uuid": "39fe1ce0-7dee-445e-9945-48c72a05cef5",
+                        "input": "Fred",
+                        "created_on": "2018-12-18T19:14:55.288827Z"
+                    },
+                    "phone": {
+                        "name": "Phone",
+                        "value": "+593979123488",
+                        "category": "phone",
+                        "node_uuid": "1a7612b5-777d-4af3-a657-077c46f242d9",
+                        "input": "+593979123488",
+                        "created_on": "2018-12-18T19:14:56.721077Z"
+                    }
+                },
+                "status": "completed",
+                "created_on": "2018-12-18T19:14:53.711676Z",
+                "modified_on": "2018-12-18T19:14:57.975537Z",
+                "expires_on": "2018-12-25T19:14:57.97142Z",
+                "exited_on": "2018-12-18T19:14:57.975537Z"
+            }
+        ],
+        "status": "completed",
+        "input": {
+            "type": "msg",
+            "uuid": "fc7f9830-ec40-4a43-b92e-6eb04750c119",
+            "created_on": "2018-12-18T19:14:57.971277Z",
+            "urn": "",
+            "text": "37"
+        }
+    },
+    "events": [
+        {
+            "type": "msg_created",
+            "created_on": "2018-12-18T19:14:53.711924Z",
+            "step_uuid": "a6c7ff4d-b23f-450a-ac16-da870f6f73be",
+            "msg": {
+                "uuid": "c7c3e345-dcb9-487d-9102-b1cbc7deacf1",
+                "text": "Hi there. What's your name?"
+            }
+        },
+        {
+            "type": "msg_wait",
+            "created_on": "2018-12-18T19:14:53.712575Z",
+            "step_uuid": "dd2c2662-437f-480c-93e5-a5150ca67d1f"
+        },
+        {
+            "type": "msg_received",
+            "created_on": "2018-12-18T19:14:55.288681Z",
+            "step_uuid": "dd2c2662-437f-480c-93e5-a5150ca67d1f",
+            "msg": {
+                "uuid": "2dcb9bbc-46f7-4bc6-afe9-3887209402cc",
+                "text": "Fred"
+            }
+        },
+        {
+            "type": "run_result_changed",
+            "created_on": "2018-12-18T19:14:55.289221Z",
+            "step_uuid": "dd2c2662-437f-480c-93e5-a5150ca67d1f",
+            "name": "Name",
+            "value": "Fred",
+            "category": "All Responses",
+            "input": "Fred"
+        },
+        {
+            "type": "contact_name_changed",
+            "created_on": "2018-12-18T19:14:55.289471Z",
+            "step_uuid": "1d0cc3ea-f5c6-409f-af1f-a9bd26c1a367",
+            "name": "Fred"
+        },
+        {
+            "type": "msg_created",
+            "created_on": "2018-12-18T19:14:55.289645Z",
+            "step_uuid": "1d0cc3ea-f5c6-409f-af1f-a9bd26c1a367",
+            "msg": {
+                "uuid": "b6fbd0e6-35ce-495a-b3f0-8c5f9852452f",
+                "text": "Thanks Fred. What's your phone number?"
+            }
+        },
+        {
+            "type": "msg_wait",
+            "created_on": "2018-12-18T19:14:55.290128Z",
+            "step_uuid": "16c63d0d-2eaa-4a60-bc9c-b9358b8739f0"
+        },
+        {
+            "type": "msg_received",
+            "created_on": "2018-12-18T19:14:56.720739Z",
+            "step_uuid": "16c63d0d-2eaa-4a60-bc9c-b9358b8739f0",
+            "msg": {
+                "uuid": "ca87bcce-f113-4ad2-9c5b-96efbc0d6248",
+                "text": "+593979123488"
+            }
+        },
+        {
+            "type": "run_result_changed",
+            "created_on": "2018-12-18T19:14:56.721229Z",
+            "step_uuid": "16c63d0d-2eaa-4a60-bc9c-b9358b8739f0",
+            "name": "Phone",
+            "value": "+593979123488",
+            "category": "phone",
+            "input": "+593979123488"
+        },
+        {
+            "type": "contact_urns_changed",
+            "created_on": "2018-12-18T19:14:56.730115Z",
+            "step_uuid": "dac7fb6e-5e9d-4793-be36-b5e8756a6f6b",
+            "urns": [
+                "tel:+593979123488"
+            ]
+        },
+        {
+            "type": "contact_groups_changed",
+            "created_on": "2018-12-18T19:14:56.730233Z",
+            "step_uuid": "dac7fb6e-5e9d-4793-be36-b5e8756a6f6b",
+            "groups_added": [
+                {
+                    "uuid": "933dfd73-b5f3-4a8a-95ed-e9cfa6dd70f2",
+                    "name": "Old Testers"
+                }
+            ]
+        },
+        {
+            "type": "msg_created",
+            "created_on": "2018-12-18T19:14:56.730535Z",
+            "step_uuid": "dac7fb6e-5e9d-4793-be36-b5e8756a6f6b",
+            "msg": {
+                "uuid": "0c578642-8236-4b71-94a8-5f1db5bd3764",
+                "text": "Finally, what is your age?"
+            }
+        },
+        {
+            "type": "msg_wait",
+            "created_on": "2018-12-18T19:14:56.73068Z",
+            "step_uuid": "a034eccc-581a-4b84-8a6f-37ed513b53d0"
+        },
+        {
+            "type": "msg_received",
+            "created_on": "2018-12-18T19:14:57.97173Z",
+            "step_uuid": "a034eccc-581a-4b84-8a6f-37ed513b53d0",
+            "msg": {
+                "uuid": "fc7f9830-ec40-4a43-b92e-6eb04750c119",
+                "text": "37"
+            }
+        },
+        {
+            "type": "run_result_changed",
+            "created_on": "2018-12-18T19:14:57.973844Z",
+            "step_uuid": "a034eccc-581a-4b84-8a6f-37ed513b53d0",
+            "name": "Age",
+            "value": "37",
+            "category": "numeric",
+            "input": "37"
+        },
+        {
+            "type": "contact_field_changed",
+            "created_on": "2018-12-18T19:14:57.974455Z",
+            "step_uuid": "94106b99-9e4d-4bfa-9feb-dcd780d7bf89",
+            "field": {
+                "key": "years",
+                "name": "Years"
+            },
+            "value": {
+                "text": "37",
+                "number": 37
+            }
+        },
+        {
+            "type": "msg_created",
+            "created_on": "2018-12-18T19:14:57.975302Z",
+            "step_uuid": "94106b99-9e4d-4bfa-9feb-dcd780d7bf89",
+            "msg": {
+                "uuid": "388e5968-57c8-4795-b4bf-d73916aa5f45",
+                "text": "Thanks Fred. You are 37 and your phone number is 097 912 3488"
+            }
+        }
+    ],
+    "modifiers": [
+        {
+            "type": "name",
+            "name": "Fred"
+        },
+        {
+            "type": "urn",
+            "urn": "tel:+593979123488",
+            "modification": "append"
+        },
+        {
+            "type": "groups",
+            "groups": [
+                {
+                    "uuid": "933dfd73-b5f3-4a8a-95ed-e9cfa6dd70f2",
+                    "name": "Old Testers"
+                }
+            ],
+            "modification": "add"
+        },
+        {
+            "type": "field",
+            "field": {
+                "key": "years",
+                "name": "Years"
+            },
+            "value": {
+                "text": "37",
+                "number": 37
+            }
+        }
+    ]
+}

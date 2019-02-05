@@ -174,7 +174,7 @@ func StartFlowBatch(
 		// for each run in our sessions, set the start id
 		for _, s := range sessions {
 			for _, r := range s.Runs() {
-				r.StartID = batch.StartID()
+				r.SetStartID(batch.StartID())
 			}
 		}
 		return nil

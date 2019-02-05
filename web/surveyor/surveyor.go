@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/goflow/assets"
+
 	"github.com/nyaruka/goflow/flows/actions/modifiers"
 
 	"github.com/nyaruka/gocommon/urns"
@@ -71,12 +73,12 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// read our session
-	assets, err := models.NewSessionAssets(org)
+	sa, err := models.NewSessionAssets(org)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error building session assets")
 	}
 
-	fs, err := engine.ReadSession(assets, engine.NewDefaultConfig(), httpClient, request.Session)
+	fs, err := engine.ReadSession(sa, engine.NewDefaultConfig(), httpClient, request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading session")
 	}
@@ -94,7 +96,12 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// and our modifiers
 	contactModifiers := make([]flows.Modifier, 0, len(request.Modifiers))
 	for _, m := range request.Modifiers {
-		modifier, err := modifiers.ReadModifier(assets, m)
+		modifier, err := modifiers.ReadModifier(sa, m, assets.IgnoreMissing)
+
+		// if this modifier turned into a no-op, ignore
+		if err == modifiers.ErrNoModifier {
+			continue
+		}
 		if err != nil {
 			return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling modifier: %s", string(m))
 		}
@@ -108,7 +115,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// create / fetch our contact based on the highest priority URN
-	contactID, err := models.CreateContact(ctx, s.DB, org, assets, urn)
+	contactID, err := models.CreateContact(ctx, s.DB, org, sa, urn)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 	}
@@ -123,7 +130,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// load our flow contact
-	flowContact, err := contacts[0].FlowContact(org, assets)
+	flowContact, err := contacts[0].FlowContact(org, sa)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading flow contact")
 	}
@@ -135,7 +142,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// run through each contact modifier, applying it to our contact
 	for _, m := range contactModifiers {
-		m.Apply(org.Env(), assets, flowContact, appender)
+		m.Apply(org.Env(), sa, flowContact, appender)
 	}
 
 	// set this updated contact on our session
@@ -184,8 +191,8 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	response := &submitResponse{}
-	response.Session.ID = sessions[0].ID
-	response.Session.Status = sessions[0].Status
+	response.Session.ID = sessions[0].ID()
+	response.Session.Status = sessions[0].Status()
 	response.Contact.ID = flowContact.ID()
 	response.Contact.UUID = flowContact.UUID()
 
