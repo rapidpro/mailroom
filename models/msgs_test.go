@@ -56,6 +56,7 @@ func TestMsgs(t *testing.T) {
 		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now)
 
 		if err == nil {
+			assert.False(t, tc.HasErr)
 			err = InsertMessages(ctx, tx, []*Msg{msg})
 			assert.NoError(t, err)
 			assert.Equal(t, orgID, msg.OrgID())
@@ -64,7 +65,11 @@ func TestMsgs(t *testing.T) {
 			assert.Equal(t, tc.Channel, msg.Channel())
 			assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
 			assert.Equal(t, tc.URN, msg.URN())
-			assert.Equal(t, tc.ContactURNID, msg.ContactURNID())
+			if tc.ContactURNID != NilURNID {
+				assert.Equal(t, tc.ContactURNID, *msg.ContactURNID())
+			} else {
+				assert.Nil(t, msg.ContactURNID())
+			}
 			assert.Equal(t, tc.Metadata, msg.Metadata())
 			assert.Equal(t, tc.MsgCount, msg.MsgCount())
 			assert.Equal(t, now, msg.CreatedOn())

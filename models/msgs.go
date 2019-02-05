@@ -108,35 +108,61 @@ type Msg struct {
 	channel *Channel
 }
 
-func (m *Msg) ID() flows.MsgID                  { return m.m.ID }
-func (m *Msg) UUID() flows.MsgUUID              { return m.m.UUID }
-func (m *Msg) Channel() *Channel                { return m.channel }
-func (m *Msg) Text() string                     { return m.m.Text }
-func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
-func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
-func (m *Msg) ModifiedOn() time.Time            { return m.m.ModifiedOn }
-func (m *Msg) SentOn() time.Time                { return m.m.SentOn }
-func (m *Msg) QueuedOn() time.Time              { return m.m.QueuedOn }
-func (m *Msg) Direction() MsgDirection          { return m.m.Direction }
-func (m *Msg) Status() MsgStatus                { return m.m.Status }
-func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
-func (m *Msg) MsgType() MsgType                 { return m.m.MsgType }
-func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
-func (m *Msg) NextAttempt() time.Time           { return m.m.NextAttempt }
-func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
-func (m *Msg) Metadata() types.JSONText         { return m.m.Metadata }
-func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
-func (m *Msg) ChannelID() *ChannelID            { return m.m.ChannelID }
-func (m *Msg) ChannelUUID() assets.ChannelUUID  { return m.m.ChannelUUID }
-func (m *Msg) ConnectionID() *ConnectionID      { return m.m.ConnectionID }
-func (m *Msg) URN() urns.URN                    { return m.m.URN }
-func (m *Msg) URNAuth() string                  { return m.m.URNAuth }
-func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
-func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
-func (m *Msg) ContactID() flows.ContactID       { return m.m.ContactID }
-func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
+func (m *Msg) ID() flows.MsgID                 { return m.m.ID }
+func (m *Msg) UUID() flows.MsgUUID             { return m.m.UUID }
+func (m *Msg) Channel() *Channel               { return m.channel }
+func (m *Msg) Text() string                    { return m.m.Text }
+func (m *Msg) HighPriority() bool              { return m.m.HighPriority }
+func (m *Msg) CreatedOn() time.Time            { return m.m.CreatedOn }
+func (m *Msg) ModifiedOn() time.Time           { return m.m.ModifiedOn }
+func (m *Msg) SentOn() time.Time               { return m.m.SentOn }
+func (m *Msg) QueuedOn() time.Time             { return m.m.QueuedOn }
+func (m *Msg) Direction() MsgDirection         { return m.m.Direction }
+func (m *Msg) Status() MsgStatus               { return m.m.Status }
+func (m *Msg) Visibility() MsgVisibility       { return m.m.Visibility }
+func (m *Msg) MsgType() MsgType                { return m.m.MsgType }
+func (m *Msg) ErrorCount() int                 { return m.m.ErrorCount }
+func (m *Msg) NextAttempt() time.Time          { return m.m.NextAttempt }
+func (m *Msg) ExternalID() null.String         { return m.m.ExternalID }
+func (m *Msg) Metadata() types.JSONText        { return m.m.Metadata }
+func (m *Msg) MsgCount() int                   { return m.m.MsgCount }
+func (m *Msg) ChannelID() *ChannelID           { return m.m.ChannelID }
+func (m *Msg) ChannelUUID() assets.ChannelUUID { return m.m.ChannelUUID }
+func (m *Msg) ConnectionID() *ConnectionID     { return m.m.ConnectionID }
+func (m *Msg) URN() urns.URN                   { return m.m.URN }
+func (m *Msg) URNAuth() string                 { return m.m.URNAuth }
+func (m *Msg) OrgID() OrgID                    { return m.m.OrgID }
+func (m *Msg) TopupID() TopupID                { return m.m.TopupID }
+func (m *Msg) ContactID() flows.ContactID      { return m.m.ContactID }
+func (m *Msg) ContactURNID() *URNID            { return m.m.ContactURNID }
+
 func (m *Msg) SetTopup(topupID TopupID)         { m.m.TopupID = topupID }
 func (m *Msg) SetChannelID(channelID ChannelID) { m.m.ChannelID = &channelID }
+func (m *Msg) SetURN(urn urns.URN) error {
+	// noop for nil urn
+	if urn == urns.NilURN {
+		return nil
+	}
+
+	m.m.URN = urn
+
+	// set our ID if we have one
+	urnInt := GetURNInt(urn, "id")
+	if urnInt == 0 {
+		return errors.Errorf("missing urn id on urn: %s", urn)
+	}
+
+	urnID := URNID(urnInt)
+	m.m.ContactURNID = &urnID
+
+	// set URN auth info if we have any (this is used when queuing later on)
+	urnAuth := getURNAuth(urn)
+	if !urnAuth.IsZero() {
+		m.m.URNAuth = urnAuth.String
+	}
+
+	return nil
+}
 
 func (m *Msg) Attachments() []flows.Attachment {
 	attachments := make([]flows.Attachment, len(m.m.Attachments))
@@ -161,6 +187,7 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, creat
 	msg := &Msg{}
 	m := &msg.m
 
+	msg.SetURN(in.URN())
 	m.UUID = in.UUID()
 	m.Text = in.Text()
 	m.Direction = DirectionIn
@@ -174,7 +201,6 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, creat
 
 	connID := conn.ID()
 	m.ConnectionID = &connID
-	m.URN = in.URN()
 
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
@@ -195,6 +221,7 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 	msg := &Msg{}
 	m := &msg.m
 
+	msg.SetURN(out.URN())
 	m.UUID = out.UUID()
 	m.Text = out.Text()
 	m.HighPriority = false
@@ -228,7 +255,13 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 // NewOutgoingMsg creates an outgoing message for the passed in flow message. Note that this message is created in a queued state!
 func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	msg := &Msg{}
+
 	m := &msg.m
+	err := msg.SetURN(out.URN())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error setting msg urn")
+	}
+
 	m.UUID = out.UUID()
 	m.Text = out.Text()
 	m.HighPriority = true
@@ -276,12 +309,6 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, ou
 		m.Metadata = metadataJSON
 	}
 
-	// set URN auth info if we have any (this is used when queuing later on)
-	urnAuth := getURNAuth(out.URN())
-	if !urnAuth.IsZero() {
-		m.URNAuth = urnAuth.String
-	}
-
 	// calculate msg count
 	if m.URN.Scheme() == urns.TelScheme {
 		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
@@ -297,6 +324,7 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, in
 	msg := &Msg{}
 	m := &msg.m
 
+	msg.SetURN(in.URN())
 	m.UUID = in.UUID()
 	m.Text = in.Text()
 	m.Direction = DirectionIn
@@ -305,18 +333,9 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, in
 	m.MsgType = TypeFlow
 	m.ContactID = contactID
 
-	m.URN = in.URN()
-
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
-
-	// get the id of our URN
-	urnInt := GetURNInt(in.URN(), "id")
-	if urnInt != 0 {
-		urnID := URNID(urnInt)
-		m.ContactURNID = &urnID
-	}
 
 	if channel != nil {
 		msg.SetChannelID(channel.ID())
