@@ -1,3 +1,7 @@
+v0.0.78
+----------
+ * update tests
+
 v0.0.77
 ----------
  * add session type to session
