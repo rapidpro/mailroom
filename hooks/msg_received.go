@@ -15,7 +15,7 @@ func init() {
 	models.RegisterEventHook(events.TypeMsgReceived, handleMsgReceived)
 }
 
-// handleMsgMsgReceived takes care of creating the incoming message for surveyor flows
+// handleMsgReceived takes care of creating the incoming message for surveyor flows, it is a noop for all other flows
 func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.MsgReceivedEvent)
 
@@ -33,7 +33,7 @@ func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mo
 
 	msg := models.NewIncomingMsg(org.OrgID(), nil, session.ContactID(), &event.Msg, event.CreatedOn())
 
-	// register to have this message committed
+	// we'll commit this message with all the others
 	session.AddPreCommitEvent(commitMessagesHook, msg)
 	return nil
 }

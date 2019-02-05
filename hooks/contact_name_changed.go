@@ -27,7 +27,7 @@ func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for s, e := range sessions {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactNameChangedEvent)
-		updates = append(updates, &nameUpdate{int64(s.ContactID()), event.Name})
+		updates = append(updates, &nameUpdate{s.ContactID(), event.Name})
 	}
 
 	// do our update
@@ -49,8 +49,8 @@ func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 
 // struct used for our bulk insert
 type nameUpdate struct {
-	ContactID int64  `db:"id"`
-	Name      string `db:"name"`
+	ContactID flows.ContactID `db:"id"`
+	Name      string          `db:"name"`
 }
 
 const updateContactNameSQL = `
