@@ -88,7 +88,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	event := e.(*events.ContactGroupsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":   session.ContactUUID(),
-		"session_id":     session.ID,
+		"session_id":     session.ID(),
 		"groups_removed": len(event.GroupsRemoved),
 		"groups_added":   len(event.GroupsAdded),
 	}).Debug("changing contact groups")
@@ -106,7 +106,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		}
 
 		hookEvent := &models.GroupRemove{
-			ContactID: session.Contact().ID(),
+			ContactID: session.ContactID(),
 			GroupID:   group.ID(),
 		}
 
@@ -130,7 +130,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 		// add our add event
 		hookEvent := &models.GroupAdd{
-			ContactID: session.Contact().ID(),
+			ContactID: session.ContactID(),
 			GroupID:   group.ID(),
 		}
 

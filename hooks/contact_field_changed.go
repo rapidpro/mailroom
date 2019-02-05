@@ -36,7 +36,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 				logrus.WithFields(logrus.Fields{
 					"field_key":  event.Field.Key,
 					"field_name": event.Field.Name,
-					"session_id": session.ID,
+					"session_id": session.ID(),
 				}).Debug("unable to find field with key, ignoring")
 				continue
 			}
