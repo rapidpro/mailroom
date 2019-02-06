@@ -7,6 +7,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/models"
@@ -165,6 +166,9 @@ func StartFlowBatch(
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
 		if batch.Parent() != nil {
 			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.Parent())
+		}
+		if batch.Extra() != nil {
+			return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, types.JSONToXValue(batch.Extra()))
 		}
 		return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
 	}

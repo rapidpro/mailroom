@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -95,22 +96,36 @@ func TestBatchStart(t *testing.T) {
 	contactIDs := []flows.ContactID{models.CathyID, models.BobID}
 
 	tcs := []struct {
+		Flow          models.FlowID
 		Restart       bool
 		IncludeActive bool
+		Extra         json.RawMessage
+		Msg           string
 		Count         int
 		TotalCount    int
 	}{
-		{true, true, 2, 2},
-		{false, true, 0, 2},
-		{false, false, 0, 2},
-		{true, false, 2, 4},
+		{models.SingleMessageFlowID, true, true, nil, "Hey, how are you?", 2, 2},
+		{models.SingleMessageFlowID, false, true, nil, "Hey, how are you?", 0, 2},
+		{models.SingleMessageFlowID, false, false, nil, "Hey, how are you?", 0, 2},
+		{models.SingleMessageFlowID, true, false, nil, "Hey, how are you?", 2, 4},
+		{
+			Flow:          models.IncomingExtraFlowID,
+			Restart:       true,
+			IncludeActive: false,
+			Extra:         json.RawMessage([]byte(`{"name":"Fred", "age":33}`)),
+			Msg:           "Great to meet you Fred. Your age is 33.",
+			Count:         2,
+			TotalCount:    2,
+		},
 	}
+
+	last := time.Now()
 
 	for i, tc := range tcs {
 		start := models.NewFlowStart(
-			models.NewStartID(1), models.OrgID(1), models.MessagingFlow, models.SingleMessageFlowID,
+			models.NewStartID(1), models.OrgID(1), models.MessagingFlow, tc.Flow,
 			nil, contactIDs, nil, false, tc.Restart, tc.IncludeActive,
-			nil,
+			nil, tc.Extra,
 		)
 		batch := start.CreateBatch(contactIDs)
 		batch.SetIsLast(true)
@@ -121,8 +136,8 @@ func TestBatchStart(t *testing.T) {
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
-			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
-			[]interface{}{pq.Array(contactIDs)}, tc.TotalCount, "%d: unexpected number of sessions", i,
+			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND created_on > $2`,
+			[]interface{}{pq.Array(contactIDs), last}, tc.Count, "%d: unexpected number of sessions", i,
 		)
 
 		testsuite.AssertQueryCount(t, db,
@@ -130,15 +145,17 @@ func TestBatchStart(t *testing.T) {
 			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 			AND session_id IS NOT NULL`,
-			[]interface{}{pq.Array(contactIDs), models.SingleMessageFlowID}, tc.TotalCount, "%d: unexpected number of runs", i,
+			[]interface{}{pq.Array(contactIDs), tc.Flow}, tc.TotalCount, "%d: unexpected number of runs", i,
 		)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
-			AND text = 'Hey, how are you?' AND org_id = 1 AND status = 'Q' 
-			AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $2`,
-			[]interface{}{pq.Array(contactIDs), models.TwilioChannelID}, tc.TotalCount, "%d: unexpected number of messages", i,
+			AND text = $2 AND org_id = 1 AND status = 'Q' 
+			AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $3`,
+			[]interface{}{pq.Array(contactIDs), tc.Msg, models.TwilioChannelID}, tc.TotalCount, "%d: unexpected number of messages", i,
 		)
+
+		last = time.Now()
 	}
 }
 

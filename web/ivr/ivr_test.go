@@ -79,7 +79,7 @@ func TestIVR(t *testing.T) {
 
 	// create a flow start for cathy
 	startID := insertStart(db, utils.NewUUID(), models.IVRFlowID, true, true)
-	start := models.NewFlowStart(startID, models.Org1, models.IVRFlow, models.IVRFlowID, nil, []flows.ContactID{models.CathyID}, nil, false, true, true, nil)
+	start := models.NewFlowStart(startID, models.Org1, models.IVRFlow, models.IVRFlowID, nil, []flows.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
 
 	// call our master starter
 	err := starts.CreateFlowBatches(ctx, db, rp, start)

@@ -66,7 +66,7 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 				models.NilStartID, org.OrgID(), flow.FlowType(), flow.ID(),
 				groups, contactIDs, event.URNs, event.CreateContact,
 				true, true,
-				event.RunSummary,
+				event.RunSummary, nil,
 			)
 
 			taskQ := mailroom.HandlerQueue

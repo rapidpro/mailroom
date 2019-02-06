@@ -53,6 +53,7 @@ type FlowStartBatch struct {
 		ContactIDs []flows.ContactID `json:"contact_ids"`
 
 		Parent json.RawMessage `json:"parent,omitempty"`
+		Extra  json.RawMessage `json:"extra,omitempty"`
 
 		RestartParticipants bool `json:"restart_participants"`
 		IncludeActive       bool `json:"include_active"`
@@ -71,6 +72,7 @@ func (b *FlowStartBatch) IsLast() bool                  { return b.b.IsLast }
 func (b *FlowStartBatch) SetIsLast(last bool)           { b.b.IsLast = last }
 
 func (b *FlowStartBatch) Parent() json.RawMessage { return b.b.Parent }
+func (b *FlowStartBatch) Extra() json.RawMessage  { return b.b.Extra }
 
 func (b *FlowStartBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -92,6 +94,7 @@ type FlowStart struct {
 		IncludeActive       bool `json:"include_active"`
 
 		Parent json.RawMessage `json:"parent,omitempty"`
+		Extra  json.RawMessage `json:"extra,omitempty"`
 	}
 }
 
@@ -107,6 +110,7 @@ func (s *FlowStart) RestartParticipants() bool     { return s.s.RestartParticipa
 func (s *FlowStart) IncludeActive() bool           { return s.s.IncludeActive }
 
 func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
+func (s *FlowStart) Extra() json.RawMessage  { return s.s.Extra }
 
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
@@ -125,7 +129,7 @@ func FlowIDForStart(ctx context.Context, db Queryer, orgID OrgID, startID StartI
 func NewFlowStart(
 	startID StartID, orgID OrgID, flowType FlowType, flowID FlowID,
 	groupIDs []GroupID, contactIDs []flows.ContactID, urns []urns.URN, createContact bool,
-	restartParticipants bool, includeActive bool, parent json.RawMessage) *FlowStart {
+	restartParticipants bool, includeActive bool, parent json.RawMessage, extra json.RawMessage) *FlowStart {
 
 	s := &FlowStart{}
 	s.s.StartID = startID
@@ -139,6 +143,7 @@ func NewFlowStart(
 	s.s.RestartParticipants = restartParticipants
 	s.s.IncludeActive = includeActive
 	s.s.Parent = parent
+	s.s.Extra = extra
 
 	return s
 }
@@ -154,5 +159,6 @@ func (s *FlowStart) CreateBatch(contactIDs []flows.ContactID) *FlowStartBatch {
 	b.b.RestartParticipants = s.RestartParticipants()
 	b.b.IncludeActive = s.IncludeActive()
 	b.b.Parent = s.Parent()
+	b.b.Extra = s.Extra()
 	return b
 }
