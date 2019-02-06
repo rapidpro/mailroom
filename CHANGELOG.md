@@ -1,3 +1,7 @@
+v0.0.80
+----------
+ * pass pointer for run insertion
+
 v0.0.79
 ----------
  * use xml comments in twilio responses for info messages instead of xml element
