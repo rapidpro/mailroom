@@ -1,3 +1,8 @@
+v0.0.81
+----------
+ * log requests when throwing ivr errors
+ * don't add attachment domain to geo msg attachments
+
 v0.0.80
 ----------
  * pass pointer for run insertion
