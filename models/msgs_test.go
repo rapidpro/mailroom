@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
@@ -82,5 +83,25 @@ func TestMsgs(t *testing.T) {
 			}
 		}
 		tx.Rollback()
+	}
+}
+
+func TestNormalizeAttachment(t *testing.T) {
+	config.Mailroom.AttachmentDomain = "foo.bar.com"
+	defer func() { config.Mailroom.AttachmentDomain = "" }()
+
+	tcs := []struct {
+		raw        string
+		normalized string
+	}{
+		{"geo:-2.90875,-79.0117686", "geo:-2.90875,-79.0117686"},
+		{"image/jpeg:http://files.com/test.jpg", "image/jpeg:http://files.com/test.jpg"},
+		{"image/jpeg:https://files.com/test.jpg", "image/jpeg:https://files.com/test.jpg"},
+		{"image/jpeg:test.jpg", "image/jpeg:https://foo.bar.com/test.jpg"},
+		{"image/jpeg:/test.jpg", "image/jpeg:https://foo.bar.com/test.jpg"},
+	}
+
+	for _, tc := range tcs {
+		assert.Equal(t, tc.normalized, string(NormalizeAttachment(flows.Attachment(tc.raw))))
 	}
 }
