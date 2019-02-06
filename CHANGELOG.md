@@ -1,3 +1,7 @@
+v0.0.82
+----------
+ * add extra to starts, pass into trigger, add test
+
 v0.0.81
 ----------
  * log requests when throwing ivr errors
