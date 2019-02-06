@@ -503,12 +503,12 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for _, r := range s.Runs() {
 		modified, found := s.seenRuns[r.UUID()]
 		if !found {
-			newRuns = append(newRuns, r.r)
+			newRuns = append(newRuns, &r.r)
 			continue
 		}
 
 		if r.ModifiedOn().After(modified) {
-			updatedRuns = append(updatedRuns, r.r)
+			updatedRuns = append(updatedRuns, &r.r)
 			continue
 		}
 	}
