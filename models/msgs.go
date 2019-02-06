@@ -354,6 +354,11 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID flows.ContactID, in
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
 func NormalizeAttachment(attachment flows.Attachment) flows.Attachment {
+	// don't try to modify geo type attachments which are just coordinates
+	if attachment.ContentType() == "geo" {
+		return attachment
+	}
+
 	url := attachment.URL()
 	if !strings.HasPrefix(url, "http") {
 		if strings.HasPrefix(url, "/") {
