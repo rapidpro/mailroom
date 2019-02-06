@@ -94,7 +94,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 			conn,
 		)
 		if err != nil {
-			logrus.WithError(err).Error("error writing ivr channel log")
+			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
 		}
 	}()
 
@@ -171,7 +171,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	// try to handle this event
 	session, err := handler.HandleChannelEvent(ctx, s.DB, s.RP, models.MOCallEventType, event, hook)
 	if err != nil {
-		logrus.WithError(err).Error("error handling incoming call")
+		logrus.WithError(err).WithField("http_request", r).Error("error handling incoming call")
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "error handling incoming call"))
 	}
 
@@ -202,7 +202,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	// try to handle it, this time looking for a missed call event
 	session, err = handler.HandleChannelEvent(ctx, s.DB, s.RP, models.MOMissEventType, event, nil)
 	if err != nil {
-		logrus.WithError(err).Error("error handling missed call")
+		logrus.WithError(err).WithField("http_request", r).Error("error handling missed call")
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "error handling missed call"))
 	}
 
@@ -301,7 +301,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 			conn,
 		)
 		if err != nil {
-			logrus.WithError(err).Error("error writing ivr channel log")
+			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
 		}
 	}()
 
@@ -388,7 +388,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 
 	// had an error? mark our connection as errored and log it
 	if err != nil {
-		logrus.WithError(err).Error("error while handling IVR")
+		logrus.WithError(err).WithField("http_request", r).Error("error while handling IVR")
 		return ivr.WriteErrorResponse(ctx, s.DB, client, conn, w, err)
 	}
 
@@ -483,7 +483,7 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, rawW http
 			conn,
 		)
 		if err != nil {
-			logrus.WithError(err).Error("error writing ivr channel log")
+			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
 		}
 	}()
 
@@ -494,7 +494,7 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, rawW http
 
 	// had an error? mark our connection as errored and log it
 	if err != nil {
-		logrus.WithError(err).Error("error while handling status")
+		logrus.WithError(err).WithField("http_request", r).Error("error while handling status")
 		return ivr.WriteErrorResponse(ctx, s.DB, client, conn, w, err)
 	}
 
