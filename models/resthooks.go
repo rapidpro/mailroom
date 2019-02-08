@@ -13,8 +13,6 @@ import (
 // ResthookID is our type for the database id of a resthook
 type ResthookID int64
 
-const NilResthookID = ResthookID(0)
-
 // Resthook is the mailroom type for resthooks
 type Resthook struct {
 	r struct {
