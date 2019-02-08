@@ -15,7 +15,6 @@ func TestWebhookResults(t *testing.T) {
 
 	tcs := []struct {
 		OrgID       OrgID
-		ResthookID  ResthookID
 		ContactID   flows.ContactID
 		URL         string
 		Request     string
@@ -24,12 +23,12 @@ func TestWebhookResults(t *testing.T) {
 		Duration    time.Duration
 		RequestTime int
 	}{
-		{Org1, NilResthookID, CathyID, "http://foo.bar", "GET http://foo.bar", 200, "hello world", time.Millisecond * 1501, 1501},
-		{Org1, NilResthookID, BobID, "http://foo.bar", "GET http://foo.bar", 200, "hello world", time.Millisecond * 1502, 1502},
+		{Org1, CathyID, "http://foo.bar", "GET http://foo.bar", 200, "hello world", time.Millisecond * 1501, 1501},
+		{Org1, BobID, "http://foo.bar", "GET http://foo.bar", 200, "hello world", time.Millisecond * 1502, 1502},
 	}
 
 	for _, tc := range tcs {
-		r := NewWebhookResult(tc.OrgID, tc.ResthookID, tc.ContactID, tc.URL, tc.Request, tc.StatusCode, tc.Response, tc.Duration, time.Now())
+		r := NewWebhookResult(tc.OrgID, tc.ContactID, tc.URL, tc.Request, tc.StatusCode, tc.Response, tc.Duration, time.Now())
 		err := InsertWebhookResults(ctx, db, []*WebhookResult{r})
 		assert.NoError(t, err)
 		assert.NotZero(t, r.ID())
