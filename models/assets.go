@@ -391,3 +391,12 @@ func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
 func (a *OrgAssets) Resthooks() ([]assets.Resthook, error) {
 	return a.resthooks, nil
 }
+
+func (a *OrgAssets) ResthookBySlug(slug string) *Resthook {
+	for _, hook := range a.resthooks {
+		if hook.Slug() == slug {
+			return hook.(*Resthook)
+		}
+	}
+	return nil
+}

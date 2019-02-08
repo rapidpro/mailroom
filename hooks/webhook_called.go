@@ -86,6 +86,16 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 		session.AddPreCommitEvent(unsubscribeResthookHook, unsub)
 	}
 
+	// figure out our resthook id if any
+	resthookID := models.NilResthookID
+	if event.Resthook != "" {
+		hook := org.ResthookBySlug(event.Resthook)
+		if hook == nil {
+			return errors.Errorf("unable to find resthook with slug: %s", event.Resthook)
+		}
+		resthookID = hook.ID()
+	}
+
 	// if this is a connection error, use that as our response
 	response := event.Response
 	if event.Status == flows.WebhookStatusConnectionError {
@@ -94,7 +104,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 
 	// create a result for this call
 	result := models.NewWebhookResult(
-		org.OrgID(), session.ContactID(),
+		org.OrgID(), resthookID, session.ContactID(),
 		event.URL, event.Request,
 		event.StatusCode, response,
 		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),

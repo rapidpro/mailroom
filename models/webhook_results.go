@@ -19,6 +19,7 @@ type WebhookResult struct {
 		Response    string          `db:"response"`
 		RequestTime int             `db:"request_time"`
 		ContactID   flows.ContactID `db:"contact_id"`
+		ResthookID  *ResthookID     `db:"resthook_id"`
 		OrgID       OrgID           `db:"org_id"`
 		CreatedOn   time.Time       `db:"created_on"`
 	}
@@ -28,7 +29,7 @@ func (r *WebhookResult) ID() ResultID { return r.r.ID }
 
 // NewWebhookResult creates a new webhook result with the passed in parameters
 func NewWebhookResult(
-	orgID OrgID, contactID flows.ContactID,
+	orgID OrgID, resthookID ResthookID, contactID flows.ContactID,
 	url string, request string, statusCode int, response string,
 	elapsed time.Duration, createdOn time.Time) *WebhookResult {
 	result := &WebhookResult{}
@@ -42,6 +43,10 @@ func NewWebhookResult(
 	r.Response = response
 	r.RequestTime = int(elapsed / time.Millisecond)
 	r.CreatedOn = createdOn
+
+	if resthookID != NilResthookID {
+		r.ResthookID = &resthookID
+	}
 
 	return result
 }
@@ -59,7 +64,7 @@ func InsertWebhookResults(ctx context.Context, db Queryer, results []*WebhookRes
 
 const insertWebhookResultsSQL = `
 INSERT INTO
-api_webhookresult( org_id,  contact_id,  url,  request,  status_code,  response,  request_time,  created_on)
-	   	   VALUES(:org_id, :contact_id, :url, :request, :status_code, :response, :request_time, :created_on)
+api_webhookresult( org_id,  resthook_id,  contact_id,  url,  request,  status_code,  response,  request_time,  created_on)
+	   	   VALUES(:org_id, :resthook_id, :contact_id, :url, :request, :status_code, :response, :request_time, :created_on)
 RETURNING id
 `
