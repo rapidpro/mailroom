@@ -14,9 +14,9 @@ require (
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.0.2
-	github.com/jmoiron/sqlx v0.0.0-20180614180643-0dae4fefe7c0
+	github.com/jmoiron/sqlx v1.2.0
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect
-	github.com/lib/pq v0.0.0-20181016162627-9eb73efc1fcc
+	github.com/lib/pq v1.0.0
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v0.2.0
