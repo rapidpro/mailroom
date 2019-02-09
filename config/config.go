@@ -19,6 +19,8 @@ type Config struct {
 	BatchWorkers   int `help:"the number of go routines that will be used to handle batch events"`
 	HandlerWorkers int `help:"the number of go routines that will be used to handle messages"`
 
+	MaxValueLength int `help:"the maximum size in characters for contact field values and run result values"`
+
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
 
@@ -50,6 +52,7 @@ func NewMailroomConfig() *Config {
 		LogLevel:       "error",
 		Version:        "Dev",
 		SMTPServer:     "",
+		MaxValueLength: 640,
 
 		S3Endpoint:         "https://s3.amazonaws.com",
 		S3Region:           "us-east-1",

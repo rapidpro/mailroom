@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -52,8 +53,11 @@ func (o *Org) DefaultCountry() utils.Country { return o.env.DefaultCountry() }
 // Now returns the current time in the current timezone for this org
 func (o *Org) Now() time.Time { return o.env.Now() }
 
-// Extension returns the extension for this org
+// Extension returns the extension with the passed in name for this org
 func (o *Org) Extension(name string) json.RawMessage { return o.env.Extension(name) }
+
+// MaxValueLength returns our max value length for contact fields and run results
+func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
 
 // Equal return whether we are equal to the passed in environment
 func (o *Org) Equal(env utils.Environment) bool { return o.env.Equal(env) }
@@ -88,7 +92,7 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 
 	org := &Org{}
 	var orgJSON, orgConfig json.RawMessage
-	rows, err := db.Query(selectOrgEnvironment, orgID)
+	rows, err := db.Query(selectOrgEnvironment, orgID, config.Mailroom.MaxValueLength)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}
@@ -130,6 +134,7 @@ SELECT id, config, ROW_TO_JSON(o) FROM (SELECT
 		WHEN TRUE THEN 'urns'
 		WHEN FALSE THEN 'none'
 	END) redaction_policy,
+	$2::int as max_value_length,
 	COALESCE(language, '') as default_language,
 	(SELECT 
 		CASE
