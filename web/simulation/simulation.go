@@ -9,13 +9,14 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
@@ -28,10 +29,6 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(handleResume))
 }
 
-var (
-	httpClient = utils.NewHTTPClient("mailroom")
-)
-
 type flowDefinition struct {
 	UUID             assets.FlowUUID `json:"uuid"                validate:"required"`
 	Definition       json.RawMessage `json:"definition"`
@@ -39,8 +36,11 @@ type flowDefinition struct {
 }
 
 type sessionRequest struct {
-	OrgID models.OrgID     `json:"org_id"  validate:"required"`
-	Flows []flowDefinition `json:"flows"`
+	OrgID  models.OrgID     `json:"org_id"  validate:"required"`
+	Flows  []flowDefinition `json:"flows"`
+	Assets struct {
+		Channels []*types.Channel `json:"channels"`
+	} `json:"assets"`
 }
 
 type sessionResponse struct {
@@ -57,7 +57,8 @@ type sessionResponse struct {
 //        "definition": "goflow definition",
 //        "legacy_definition": "legacy definition",
 //     },.. ],
-//     "trigger": {...}
+//     "trigger": {...},
+//     "assets": {...}
 //   }
 //
 type startRequest struct {
@@ -107,13 +108,18 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 		}
 	}
 
+	// populate any test channels
+	for _, channel := range request.Assets.Channels {
+		org.AddTestChannel(channel)
+	}
+
 	// build our session
 	sa, err := models.NewSessionAssets(org)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
 	}
 
-	session := engine.NewSession(sa, engine.NewDefaultConfig(), httpClient)
+	session := goflow.Engine().NewSession(sa)
 
 	// read our trigger
 	trigger, err := triggers.ReadTrigger(sa, request.Trigger, assets.IgnoreMissing)
@@ -147,7 +153,8 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 //        "legacy_definition": "legacy definition",
 //     },.. ],
 //     "session": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "runs": [...], ...},
-//     "resume": {...}
+//     "resume": {...},
+//     "assets": {...}
 //   }
 //
 type resumeRequest struct {
@@ -178,13 +185,18 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		}
 	}
 
+	// populate any test channels
+	for _, channel := range request.Assets.Channels {
+		org.AddTestChannel(channel)
+	}
+
 	// build our session
 	sa, err := models.NewSessionAssets(org)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	session, err := engine.ReadSession(sa, engine.NewDefaultConfig(), httpClient, request.Session, assets.IgnoreMissing)
+	session, err := goflow.Engine().ReadSession(sa, request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

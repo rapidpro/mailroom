@@ -260,6 +260,12 @@ func (a *OrgAssets) ChannelByID(channelID ChannelID) *Channel {
 	return a.channelsByID[channelID]
 }
 
+// AddTestChannel adds a test channel to our org, this is only used in session assets during simulation
+func (a *OrgAssets) AddTestChannel(channel assets.Channel) {
+	a.channels = append(a.channels, channel)
+	// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
+}
+
 func (a *OrgAssets) Fields() ([]assets.Field, error) {
 	return a.fields, nil
 }

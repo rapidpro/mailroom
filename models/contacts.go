@@ -146,7 +146,7 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 	}
 
 	// create our flow contact
-	contact, err := flows.NewContactFromAssets(
+	contact, err := flows.NewContact(
 		session,
 		c.uuid,
 		c.id,

@@ -12,9 +12,9 @@ import (
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	null "gopkg.in/guregu/null.v3"
@@ -394,8 +394,8 @@ RETURNING id
 `
 
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
-func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment, client *utils.HTTPClient) (flows.Session, error) {
-	session, err := engine.ReadSession(sa, engine.NewDefaultConfig(), client, json.RawMessage(s.s.Output), assets.IgnoreMissing)
+func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment) (flows.Session, error) {
+	session, err := goflow.Engine().ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to unmarshal session")
 	}
