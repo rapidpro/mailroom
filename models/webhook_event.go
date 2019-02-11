@@ -55,6 +55,10 @@ RETURNING id
 
 // InsertWebhookEvents inserts the passed in webhook events, assigning them ids
 func InsertWebhookEvents(ctx context.Context, db Queryer, events []*WebhookEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+
 	is := make([]interface{}, len(events))
 	for i := range events {
 		is[i] = &events[i].e

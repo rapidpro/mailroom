@@ -77,6 +77,11 @@ func TestWebhookCalled(t *testing.T) {
 					Args:  []interface{}{models.GeorgeID},
 					Count: 3,
 				},
+				SQLAssertion{
+					SQL:   "select count(*) from api_webhookevent where org_id = $1",
+					Args:  []interface{}{models.Org1},
+					Count: 2,
+				},
 			},
 		},
 	}
