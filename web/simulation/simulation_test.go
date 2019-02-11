@@ -50,18 +50,6 @@ const (
 			},
 			"triggered_on": "2000-01-01T00:00:00.000000000-00:00",
 			"type": "manual"
-		},
-		"assets": {
-			"channels": [
-				{
-					"uuid": "440099cf-200c-4d45-a8e7-4a564f4a0e8b",
-					"name": "Test Channel",
-					"address": "+18005551212",
-					"schemes": ["tel"],
-					"roles": ["send", "receive", "call"],
-					"country": "US"
-				}
-			]
 		}
 	}`
 
