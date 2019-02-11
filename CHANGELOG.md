@@ -1,3 +1,9 @@
+v0.0.84
+----------
+ * write webhook events even in simulation case
+ * add max value to env
+ * add models and tests for webhook events, update libs
+
 v0.0.83
 ----------
  * associate webhook results with resthook ids
