@@ -1,3 +1,7 @@
+v0.0.85
+----------
+ * allow channels to be set in simulations
+
 v0.0.84
 ----------
  * write webhook events even in simulation case
