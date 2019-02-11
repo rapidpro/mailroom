@@ -91,6 +91,18 @@ const (
             "resumed_on": "2000-01-01T00:00:00.000000000-00:00",
             "type": "msg"
 		},
+		"assets": {
+			"channels": [
+				{
+					"uuid": "440099cf-200c-4d45-a8e7-4a564f4a0e8b",
+					"name": "Test Channel",
+					"address": "+18005551212",
+					"schemes": ["tel"],
+					"roles": ["send", "receive", "call"],
+					"country": "US"
+				}
+			]
+		},
 		"session": $$SESSION$$
 	}`
 
@@ -104,6 +116,7 @@ const (
 				"destination": null,
 				"uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
 				"actions": [{
+					"uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf",
 					"msg": {
 						"eng": "Hello world"
 					},
@@ -127,6 +140,93 @@ const (
 		"include_ui": true
 	}
 	`
+
+	customStartBody = `
+	{
+		"org_id": 1,
+		"trigger": {
+			"contact": {
+				"created_on": "2000-01-01T00:00:00.000000000-00:00",
+				"fields": {},
+				"id": 1234567,
+				"language": "eng",
+				"name": "Ben Haggerty",
+				"timezone": "America/Guayaquil",
+				"urns": [
+					"tel:+12065551212"
+				],
+				"uuid": "ba96bf7f-bc2a-4873-a7c7-254d1927c4e3"
+			},
+			"environment": {
+				"allowed_languages": [
+					"eng",
+					"fra"
+				],
+				"date_format": "YYYY-MM-DD",
+				"default_language": "eng",
+				"time_format": "hh:mm",
+				"timezone": "America/Los_Angeles"
+			},
+			"msg": {
+				"uuid": "2d611e17-fb22-457f-b802-b8f7ec5cda5b",
+				"channel": {"uuid": "440099cf-200c-4d45-a8e7-4a564f4a0e8b", "name": "Test Channel"},
+				"urn": "tel:+12065551212",
+				"text": "hi there"
+			},
+			"flow": {
+				"name": "Favorites",
+				"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+			},
+			"triggered_on": "2000-01-01T00:00:00.000000000-00:00",
+			"type": "msg"
+		},
+		"flows": [
+			{
+				"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85",
+				"legacy_definition": {
+					"base_language": "eng",
+					"action_sets": [{
+						"y": 0,
+						"x": 100,
+						"destination": null,
+						"uuid": "87edb79e-f46c-4970-bcd3-c715dfededb7",
+						"actions": [{
+							"uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf",
+							"msg": {
+								"eng": "Your channel is @channel.name"
+							},
+							"type": "reply"
+						}],
+						"exit_uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+					}],
+					"version": 8,
+					"flow_type": "F",
+					"entry": "87edb79e-f46c-4970-bcd3-c715dfededb7",
+					"rule_sets": [],
+					"metadata": {
+						"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85",
+						"expires": 10080,
+						"revision": 1,
+						"id": 41049,
+						"name": "No ruleset flow",
+						"saved_on": "2015-11-20T11:02:19.790131Z"
+					}
+				}
+			}
+		],
+		"assets": {
+			"channels": [
+				{
+					"uuid": "440099cf-200c-4d45-a8e7-4a564f4a0e8b",
+					"name": "Test Channel",
+					"address": "+12065551441",
+					"schemes": ["tel"],
+					"roles": ["send", "receive", "call"],
+					"country": "US"
+				}
+			]
+		}
+	}`
 )
 
 func TestServer(t *testing.T) {
@@ -143,7 +243,6 @@ func TestServer(t *testing.T) {
 	time.Sleep(time.Second)
 
 	defer server.Stop()
-	// TODO: test custom flow definitions
 	startSession := ""
 
 	tcs := []struct {
@@ -157,6 +256,9 @@ func TestServer(t *testing.T) {
 		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
 		{"/mr/sim/resume", "GET", "", 405, "illegal"},
 		{"/mr/sim/resume", "POST", resumeBody, 200, "Good choice, I like Blue too! What is your favorite beer?"},
+
+		{"/mr/sim/start", "POST", customStartBody, 200, "Your channel is Test Channel"},
+
 		{"/mr/flow/migrate", "GET", "", 405, "illegal"},
 		{"/mr/flow/migrate", "POST", minLegacyDef, 200, `"type": "send_msg"`},
 	}

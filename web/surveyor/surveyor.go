@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
@@ -22,10 +23,6 @@ import (
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/surveyor/submit", web.RequireUserToken(handleSubmit))
 }
-
-var (
-	httpClient = utils.NewHTTPClient("mailroom")
-)
 
 // Represents a surveyor submission
 //
@@ -78,7 +75,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error building session assets")
 	}
 
-	fs, err := engine.ReadSession(sa, engine.NewDefaultConfig(), httpClient, request.Session, assets.IgnoreMissing)
+	fs, err := goflow.Engine().ReadSession(sa, request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading session")
 	}

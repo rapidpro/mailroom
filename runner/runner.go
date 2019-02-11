@@ -8,25 +8,18 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
-
-	"github.com/nyaruka/goflow/flows/engine"
 )
 
 const (
 	commitTimeout     = 15 * time.Second
 	postCommitTimeout = 30 * time.Second
-)
-
-var (
-	httpClient = utils.NewHTTPClient("mailroom")
 )
 
 // NewStartOptions creates and returns the default start options to be used for flow starts
@@ -66,7 +59,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	start := time.Now()
 
 	// build our flow session
-	fs, err := session.FlowSession(sa, org.Env(), httpClient)
+	fs, err := session.FlowSession(sa, org.Env())
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to create session from output")
 	}
@@ -431,7 +424,7 @@ func StartFlowForContacts(
 
 	for _, trigger := range triggers {
 		// create the session for this flow and run
-		session := engine.NewSession(assets, engine.NewDefaultConfig(), httpClient)
+		session := goflow.Engine().NewSession(assets)
 
 		// start our flow
 		log := log.WithField("contact_uuid", trigger.Contact().UUID())
