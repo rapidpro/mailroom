@@ -30,6 +30,7 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, utils.DateFormatDayMonthYear, org.DateFormat())
 	assert.Equal(t, utils.TimeFormatHourMinute, org.TimeFormat())
 	assert.Equal(t, utils.RedactionPolicyNone, org.RedactionPolicy())
+	assert.Equal(t, 640, org.MaxValueLength())
 	assert.Equal(t, string(utils.Country("US")), string(org.DefaultCountry()))
 	tz, _ := time.LoadLocation("America/Los_Angeles")
 	assert.Equal(t, tz, org.Timezone())

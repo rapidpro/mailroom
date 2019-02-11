@@ -14,13 +14,13 @@ require (
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.0.2
-	github.com/jmoiron/sqlx v0.0.0-20180614180643-0dae4fefe7c0
+	github.com/jmoiron/sqlx v1.2.0
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect
-	github.com/lib/pq v0.0.0-20181016162627-9eb73efc1fcc
+	github.com/lib/pq v1.0.0
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v0.2.0
-	github.com/nyaruka/goflow v0.27.0
+	github.com/nyaruka/goflow v0.27.3
 	github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/onsi/ginkgo v1.7.0 // indirect

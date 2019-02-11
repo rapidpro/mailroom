@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/legacy"
@@ -64,6 +65,26 @@ type startRequest struct {
 	Trigger json.RawMessage `json:"trigger" validate:"required"`
 }
 
+// handleSimulationEvents takes care of updating our db with any events needed during simulation
+func handleSimulationEvents(ctx context.Context, db models.Queryer, org *models.OrgAssets, es []flows.Event) error {
+	// nicpottier: this could be refactored into something more similar to how we handle normal events (ie hooks) if
+	// we see ourselves taking actions for more than just webhook events
+	wes := make([]*models.WebhookEvent, 0)
+	for _, e := range es {
+		if e.Type() == events.TypeResthookCalled {
+			rec := e.(*events.ResthookCalledEvent)
+			resthook := org.ResthookBySlug(rec.Resthook)
+			if resthook != nil {
+				we := models.NewWebhookEvent(org.OrgID(), resthook.ID(), string(rec.Payload), rec.CreatedOn())
+				wes = append(wes, we)
+			}
+		}
+	}
+
+	// noop in the case of no events
+	return models.InsertWebhookEvents(ctx, db, wes)
+}
+
 // handles a request to /start
 func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &startRequest{}
@@ -106,6 +127,11 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", request.OrgID).Debug("start simulation complete")
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
+	}
+
+	err = handleSimulationEvents(ctx, s.DB, org, sprint.Events())
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
 
 	return &sessionResponse{Session: session, Events: sprint.Events()}, http.StatusOK, nil
@@ -173,6 +199,11 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	sprint, err := session.Resume(resume)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
+	}
+
+	err = handleSimulationEvents(ctx, s.DB, org, sprint.Events())
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
 
 	return &sessionResponse{Session: session, Events: sprint.Events()}, http.StatusOK, nil

@@ -143,6 +143,15 @@ func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []int
 		}
 	}
 
+	// iterate our remaining rows
+	for rows.Next() {
+	}
+
+	// check for any error
+	if rows.Err() != nil {
+		return errors.Wrapf(rows.Err(), "error in row cursor")
+	}
+
 	logrus.WithField("elapsed", time.Since(start)).WithField("rows", len(vs)).Infof("%s bulk sql complete", label)
 
 	return nil
