@@ -1,3 +1,7 @@
+v0.0.87
+----------
+ * fix ContactID mismatch
+
 v0.0.86
 ----------
  * grab contact locks when starting
