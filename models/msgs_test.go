@@ -29,7 +29,7 @@ func TestMsgs(t *testing.T) {
 		ChannelUUID  assets.ChannelUUID
 		Channel      *Channel
 		Text         string
-		ContactID    flows.ContactID
+		ContactID    ContactID
 		URN          urns.URN
 		ContactURNID URNID
 		Attachments  flows.AttachmentList

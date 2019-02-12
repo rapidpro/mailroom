@@ -49,8 +49,8 @@ func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 
 // struct used for our bulk update
 type languageUpdate struct {
-	ContactID flows.ContactID `db:"id"`
-	Language  string          `db:"language"`
+	ContactID models.ContactID `db:"id"`
+	Language  string           `db:"language"`
 }
 
 const updateContactLanguageSQL = `

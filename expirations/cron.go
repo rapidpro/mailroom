@@ -150,7 +150,7 @@ const selectExpiredRunsSQL = `
 type RunExpiration struct {
 	OrgID      models.OrgID     `db:"org_id"`
 	FlowID     models.FlowID    `db:"flow_id"`
-	ContactID  flows.ContactID  `db:"contact_id"`
+	ContactID  models.ContactID `db:"contact_id"`
 	RunID      models.FlowRunID `db:"run_id"`
 	ParentUUID *flows.RunUUID   `db:"parent_uuid"`
 	SessionID  models.SessionID `db:"session_id"`

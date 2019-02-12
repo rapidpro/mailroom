@@ -8,7 +8,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
@@ -47,7 +46,7 @@ func handleSendBroadcast(ctx context.Context, mr *mailroom.Mailroom, task *queue
 // CreateBroadcastBatches takes our master broadcast and creates batches of broadcast sends for all the unique contacts
 func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.Broadcast) error {
 	// we are building a set of contact ids, start with the explicit ones
-	contactIDs := make(map[flows.ContactID]bool)
+	contactIDs := make(map[models.ContactID]bool)
 	for _, id := range bcast.ContactIDs() {
 		contactIDs[id] = true
 	}
@@ -73,8 +72,8 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 		return errors.Wrapf(err, "error getting contact ids for urns")
 	}
 
-	urnContacts := make(map[flows.ContactID]urns.URN)
-	repeatedContacts := make(map[flows.ContactID]urns.URN)
+	urnContacts := make(map[models.ContactID]urns.URN)
+	repeatedContacts := make(map[models.ContactID]urns.URN)
 
 	q := mailroom.BatchQueue
 
@@ -95,7 +94,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	rc := rp.Get()
 	defer rc.Close()
 
-	contacts := make([]flows.ContactID, 0, 100)
+	contacts := make([]models.ContactID, 0, 100)
 
 	// utility functions for queueing the current set of contacts
 	queueBatch := func(isLast bool) {
@@ -118,7 +117,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 		if err != nil {
 			logrus.WithError(err).Error("error while queuing broadcast batch")
 		}
-		contacts = make([]flows.ContactID, 0, 100)
+		contacts = make([]models.ContactID, 0, 100)
 	}
 
 	// build up batches of contacts to start

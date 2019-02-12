@@ -5,7 +5,6 @@ import (
 
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
-	null "gopkg.in/guregu/null.v3"
 )
 
 func TestTopups(t *testing.T) {
@@ -27,7 +26,7 @@ func TestTopups(t *testing.T) {
 		Remaining int
 	}{
 		{Org1, NilTopupID, 0},
-		{Org2, TopupID(null.NewInt(2, true)), 2},
+		{Org2, TopupID(2), 2},
 	}
 
 	for _, tc := range tcs {
@@ -48,8 +47,8 @@ func TestTopups(t *testing.T) {
 		TopupID TopupID
 	}{
 		{Org1, NilTopupID},
-		{Org2, TopupID(null.NewInt(2, true))},
-		{Org2, TopupID(null.NewInt(2, true))},
+		{Org2, TopupID(2)},
+		{Org2, TopupID(2)},
 		{Org2, NilTopupID},
 	}
 

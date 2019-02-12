@@ -118,7 +118,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// load that contact to get the current groups and UUID
-	contacts, err := models.LoadContacts(ctx, s.DB, org, []flows.ContactID{contactID})
+	contacts, err := models.LoadContacts(ctx, s.DB, org, []models.ContactID{contactID})
 	if err == nil && len(contacts) == 0 {
 		err = errors.Errorf("no contacts loaded")
 	}

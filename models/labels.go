@@ -6,7 +6,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -96,6 +95,6 @@ ON CONFLICT
 
 // MsgLabelAdd represents a single label that should be added to a message
 type MsgLabelAdd struct {
-	MsgID   flows.MsgID `db:"msg_id"`
-	LabelID LabelID     `db:"label_id"`
+	MsgID   MsgID   `db:"msg_id"`
+	LabelID LabelID `db:"label_id"`
 }

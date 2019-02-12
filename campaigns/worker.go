@@ -8,7 +8,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/marker"
@@ -85,7 +84,7 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 		),
 	)
 
-	contactMap := make(map[flows.ContactID]*models.EventFire)
+	contactMap := make(map[models.ContactID]*models.EventFire)
 	for _, fire := range fires {
 		contactMap[fire.ContactID] = fire
 	}

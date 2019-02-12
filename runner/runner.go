@@ -209,9 +209,9 @@ func FireCampaignEvents(
 
 	start := time.Now()
 
-	contactIDs := make([]flows.ContactID, 0, len(fires))
-	fireMap := make(map[flows.ContactID]*models.EventFire, len(fires))
-	skippedContacts := make(map[flows.ContactID]*models.EventFire, len(fires))
+	contactIDs := make([]models.ContactID, 0, len(fires))
+	fireMap := make(map[models.ContactID]*models.EventFire, len(fires))
+	skippedContacts := make(map[models.ContactID]*models.EventFire, len(fires))
 	for _, f := range fires {
 		contactIDs = append(contactIDs, f.ContactID)
 		fireMap[f.ContactID] = f
@@ -276,7 +276,7 @@ func FireCampaignEvents(
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
-		delete(skippedContacts, contact.ID())
+		delete(skippedContacts, models.ContactID(contact.ID()))
 		return triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event)
 	}
 
@@ -287,7 +287,7 @@ func FireCampaignEvents(
 		// build up our list of event fire ids based on the session contact ids
 		fires := make([]*models.EventFire, 0, len(sessions))
 		for _, s := range sessions {
-			fire, found := fireMap[s.Contact().ID()]
+			fire, found := fireMap[s.ContactID()]
 			if !found {
 				return errors.Errorf("unable to find associated event fire for contact %d", s.Contact().ID())
 			}
@@ -300,7 +300,7 @@ func FireCampaignEvents(
 		}
 
 		// mark those as cleared
-		skippedContacts = make(map[flows.ContactID]*models.EventFire)
+		skippedContacts = make(map[models.ContactID]*models.EventFire)
 
 		// bulk update those event fires
 		return models.MarkEventsFired(ctx, tx, fires, fired)
@@ -332,14 +332,14 @@ func FireCampaignEvents(
 // StartFlow runs the passed in flow for the passed in contact
 func StartFlow(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets,
-	flow *models.Flow, contactIDs []flows.ContactID, options *StartOptions) ([]*models.Session, error) {
+	flow *models.Flow, contactIDs []models.ContactID, options *StartOptions) ([]*models.Session, error) {
 
 	if len(contactIDs) == 0 {
 		return nil, nil
 	}
 
 	// figures out which contacts need to be excluded if any
-	exclude := make(map[flows.ContactID]bool, 5)
+	exclude := make(map[models.ContactID]bool, 5)
 
 	// filter out anybody who has has a flow run in this flow if appropriate
 	if !options.RestartParticipants {
@@ -366,7 +366,7 @@ func StartFlow(
 	}
 
 	// filter into our final list of contacts
-	includedContacts := make([]flows.ContactID, 0, len(contactIDs))
+	includedContacts := make([]models.ContactID, 0, len(contactIDs))
 	for _, c := range contactIDs {
 		if !exclude[c] {
 			includedContacts = append(includedContacts, c)

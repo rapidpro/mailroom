@@ -44,7 +44,7 @@ func TestMsgEvents(t *testing.T) {
 	models.FlushCache()
 
 	tcs := []struct {
-		ContactID flows.ContactID
+		ContactID models.ContactID
 		URN       urns.URN
 		URNID     models.URNID
 		Message   string
@@ -140,7 +140,7 @@ func TestChannelEvents(t *testing.T) {
 
 	tcs := []struct {
 		EventType models.ChannelEventType
-		ContactID flows.ContactID
+		ContactID models.ContactID
 		URNID     models.URNID
 		OrgID     models.OrgID
 		ChannelID models.ChannelID
@@ -208,7 +208,7 @@ func TestTimedEvents(t *testing.T) {
 
 	tcs := []struct {
 		EventType string
-		ContactID flows.ContactID
+		ContactID models.ContactID
 		URN       urns.URN
 		URNID     models.URNID
 		Message   string

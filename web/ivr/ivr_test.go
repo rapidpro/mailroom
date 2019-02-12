@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
@@ -34,7 +33,7 @@ import (
 func insertStart(db *sqlx.DB, uuid utils.UUID, flowID models.FlowID, restartParticipants bool, includeActive bool) models.StartID {
 	// note we don't bother with the many to many for contacts and groups in our testing
 	var startID models.StartID
-	err := db.Get(&startID.Int64,
+	err := db.Get(&startID,
 		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, 
 									 contact_count, status, created_by_id, flow_id, modified_by_id)
 							VALUES(TRUE, now(), now(), $1, $2, $3, 0, 'S', 1, $4, 1) RETURNING id;`, uuid, restartParticipants, includeActive, flowID)
@@ -42,7 +41,6 @@ func insertStart(db *sqlx.DB, uuid utils.UUID, flowID models.FlowID, restartPart
 	if err != nil {
 		panic(err)
 	}
-	startID.Valid = true
 	logrus.WithField("start", startID).Info("inserted start")
 	return startID
 }
@@ -79,7 +77,7 @@ func TestIVR(t *testing.T) {
 
 	// create a flow start for cathy
 	startID := insertStart(db, utils.NewUUID(), models.IVRFlowID, true, true)
-	start := models.NewFlowStart(startID, models.Org1, models.IVRFlow, models.IVRFlowID, nil, []flows.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
+	start := models.NewFlowStart(startID, models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
 
 	// call our master starter
 	err := starts.CreateFlowBatches(ctx, db, rp, start)

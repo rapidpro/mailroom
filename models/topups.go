@@ -2,21 +2,22 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // TopupID is our type for topup ids, which can be null
 type TopupID null.Int
 
 // NilTopupID is our nil value for topup id
-var NilTopupID = TopupID(null.NewInt(0, false))
+var NilTopupID = TopupID(0)
 
 const (
 	// also check lua script if modifying these
@@ -34,7 +35,7 @@ func DecrementOrgCredits(ctx context.Context, db sqlx.Queryer, rc redis.Conn, or
 
 	// we found an active topup, return it
 	if topups[0] > 0 {
-		return TopupID(null.NewInt(int64(topups[0]), true)), err
+		return TopupID(topups[0]), nil
 	}
 
 	// no active topup found, lets calculate it
@@ -51,8 +52,8 @@ func DecrementOrgCredits(ctx context.Context, db sqlx.Queryer, rc redis.Conn, or
 	// got one? then cache it
 	expireSeconds := -int(time.Since(topup.Expiration) / time.Second)
 	if expireSeconds > 0 && topup.Remaining-amount > 0 {
-		rc.Send("SETEX", fmt.Sprintf(redisActiveTopupKey, orgID), expireSeconds, topup.ID.Int64)
-		_, err := rc.Do("SETEX", fmt.Sprintf(redisCreditsRemainingKey, orgID, topup.ID.Int64), expireSeconds, topup.Remaining-amount)
+		rc.Send("SETEX", fmt.Sprintf(redisActiveTopupKey, orgID), expireSeconds, topup.ID)
+		_, err := rc.Do("SETEX", fmt.Sprintf(redisCreditsRemainingKey, orgID, topup.ID), expireSeconds, topup.Remaining-amount)
 		if err != nil {
 			// an error here isn't the end of the world, log it and move on
 			logrus.WithError(err).Errorf("error setting active topup in redis for org: %d", orgID)
@@ -138,3 +139,23 @@ ORDER BY
 	t.expires_on ASC, t.id ASC
 LIMIT 1
 `
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i TopupID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *TopupID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i TopupID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *TopupID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
+}

@@ -7,7 +7,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
 	"github.com/nyaruka/mailroom/handler"
@@ -117,7 +116,7 @@ const timedoutSessionsSQL = `
 type Timeout struct {
 	OrgID     models.OrgID     `db:"org_id"`
 	FlowID    models.FlowID    `db:"flow_id"`
-	ContactID flows.ContactID  `db:"contact_id"`
+	ContactID models.ContactID `db:"contact_id"`
 	SessionID models.SessionID `db:"session_id"`
 	TimeoutOn time.Time        `db:"timeout_on"`
 }

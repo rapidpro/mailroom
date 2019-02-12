@@ -7,11 +7,11 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// GroupID is our type for group ids
 type GroupID int
 
 // Group is our mailroom type for contact groups
@@ -95,8 +95,8 @@ func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*Group
 
 // GroupRemove is our struct to track group removals
 type GroupRemove struct {
-	ContactID flows.ContactID `db:"contact_id"`
-	GroupID   GroupID         `db:"group_id"`
+	ContactID ContactID `db:"contact_id"`
+	GroupID   GroupID   `db:"group_id"`
 }
 
 const removeContactsFromGroupsSQL = `
@@ -131,8 +131,8 @@ func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) erro
 
 // GroupAdd is our struct to track a final group additions
 type GroupAdd struct {
-	ContactID flows.ContactID `db:"contact_id"`
-	GroupID   GroupID         `db:"group_id"`
+	ContactID ContactID `db:"contact_id"`
+	GroupID   GroupID   `db:"group_id"`
 }
 
 const addContactsToGroupsSQL = `
@@ -145,7 +145,7 @@ ON CONFLICT
 `
 
 // ContactIDsForGroupIDs returns the unique contacts that are in the passed in groups
-func ContactIDsForGroupIDs(ctx context.Context, tx Queryer, groupIDs []GroupID) ([]flows.ContactID, error) {
+func ContactIDsForGroupIDs(ctx context.Context, tx Queryer, groupIDs []GroupID) ([]ContactID, error) {
 	// now add all the ids for our groups
 	rows, err := tx.QueryxContext(ctx, `SELECT DISTINCT(contact_id) FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(groupIDs))
 	if err != nil {
@@ -153,8 +153,8 @@ func ContactIDsForGroupIDs(ctx context.Context, tx Queryer, groupIDs []GroupID) 
 	}
 	defer rows.Close()
 
-	contactIDs := make([]flows.ContactID, 0, 10)
-	var contactID flows.ContactID
+	contactIDs := make([]ContactID, 0, 10)
+	var contactID ContactID
 	for rows.Next() {
 		err := rows.Scan(&contactID)
 		if err != nil {

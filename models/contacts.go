@@ -2,13 +2,14 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/lib/pq"
-	null "gopkg.in/guregu/null.v3"
+	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
@@ -20,17 +21,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// URNID is our type for urn ids, which can be null
+type URNID null.Int
+
+// ContactID is our type for contact ids, which can be null
+type ContactID null.Int
+
 const (
-	NilContactID   = flows.ContactID(0)
 	topURNPriority = 1000
+
+	NilURNID     = URNID(0)
+	NilContactID = ContactID(0)
 )
 
-type URNID int
-
-var NilURNID = URNID(0)
-
 // LoadContacts loads a set of contacts for the passed in ids
-func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []flows.ContactID) ([]*Contact, error) {
+func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []ContactID) ([]*Contact, error) {
 	start := time.Now()
 
 	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids))
@@ -48,7 +53,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []flows.C
 		}
 
 		contact := &Contact{
-			id:         e.ID,
+			id:         ContactID(e.ID),
 			uuid:       e.UUID,
 			name:       e.Name,
 			language:   e.Language,
@@ -109,14 +114,14 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []flows.C
 }
 
 // ContactIDsFromReferences queries the contacts for the passed in org, returning the contact ids for the references
-func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, refs []*flows.ContactReference) ([]flows.ContactID, error) {
+func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, refs []*flows.ContactReference) ([]ContactID, error) {
 	// build our list of UUIDs
 	uuids := make([]interface{}, len(refs))
 	for i := range refs {
 		uuids[i] = refs[i].UUID
 	}
 
-	ids := make([]flows.ContactID, 0, len(refs))
+	ids := make([]ContactID, 0, len(refs))
 	rows, err := tx.QueryxContext(ctx,
 		`SELECT id FROM contacts_contact WHERE org_id = $1 AND uuid = ANY($2) AND is_active = TRUE`,
 		org.OrgID(), pq.Array(uuids),
@@ -126,7 +131,7 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	}
 	defer rows.Close()
 
-	var id flows.ContactID
+	var id ContactID
 	for rows.Next() {
 		err := rows.Scan(&id)
 		if err != nil {
@@ -149,7 +154,7 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 	contact, err := flows.NewContact(
 		session,
 		c.uuid,
-		c.id,
+		flows.ContactID(c.id),
 		c.name,
 		c.language,
 		org.Env().Timezone(),
@@ -188,7 +193,7 @@ func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
 
 // Contact is our mailroom struct that represents a contact
 type Contact struct {
-	id         flows.ContactID
+	id         ContactID
 	uuid       flows.ContactUUID
 	name       string
 	language   utils.Language
@@ -201,7 +206,7 @@ type Contact struct {
 	createdOn  time.Time
 }
 
-func (c *Contact) ID() flows.ContactID             { return c.id }
+func (c *Contact) ID() ContactID                   { return c.id }
 func (c *Contact) UUID() flows.ContactUUID         { return c.uuid }
 func (c *Contact) Name() string                    { return c.name }
 func (c *Contact) Language() utils.Language        { return c.language }
@@ -264,7 +269,7 @@ func (u *ContactURN) AsURN(org *OrgAssets) (urns.URN, error) {
 
 // contactEnvelope is our JSON structure for a contact as read from the database
 type contactEnvelope struct {
-	ID         flows.ContactID                   `json:"id"`
+	ID         ContactID                         `json:"id"`
 	UUID       flows.ContactUUID                 `json:"uuid"`
 	Name       string                            `json:"name"`
 	Language   utils.Language                    `json:"language"`
@@ -335,9 +340,9 @@ WHERE
 
 // ContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
 // the passed in URNs with the ids of the contacts.
-func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, us []urns.URN) (map[urns.URN]flows.ContactID, error) {
+func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, us []urns.URN) (map[urns.URN]ContactID, error) {
 	// build a map of our urns to contact id
-	urnMap := make(map[urns.URN]flows.ContactID, len(us))
+	urnMap := make(map[urns.URN]ContactID, len(us))
 
 	// and another map from URN identity to the passed in URN
 	urnIdentities := make(map[urns.URN]urns.URN, len(us))
@@ -367,7 +372,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 
 	for rows.Next() {
 		var urn urns.URN
-		var id flows.ContactID
+		var id ContactID
 
 		err := rows.Scan(&id, &urn)
 		if err != nil {
@@ -396,7 +401,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 				if !found {
 					return nil, errors.Wrapf(err, "unable to find original URN from identity")
 				}
-				urnMap[original] = id
+				urnMap[original] = ContactID(id)
 			}
 		}
 	}
@@ -406,7 +411,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 }
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
-func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, urn urns.URN) (flows.ContactID, error) {
+func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, urn urns.URN) (ContactID, error) {
 	// we have a URN, first try to look up the URN
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -414,7 +419,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	}
 
 	// first insert our contact
-	var contactID flows.ContactID
+	var contactID ContactID
 	err = tx.GetContext(ctx, &contactID,
 		`INSERT INTO 
 		contacts_contact
@@ -430,7 +435,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	}
 
 	// handler for when we insert the URN or commit, we try to look the contact up instead
-	handleURNError := func(err error) (flows.ContactID, error) {
+	handleURNError := func(err error) (ContactID, error) {
 		if pqErr, ok := err.(*pq.Error); ok {
 			// if this was a duplicate URN, we should be able to select this contact instead
 			if pqErr.Code.Name() == "unique_violation" {
@@ -462,7 +467,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	}
 
 	// load a full contact so that we can calculate dynamic groups
-	contacts, err := LoadContacts(ctx, tx, org, []flows.ContactID{contactID})
+	contacts, err := LoadContacts(ctx, tx, org, []ContactID{contactID})
 	if err != nil {
 		return NilContactID, errors.Wrapf(err, "error loading new contact")
 	}
@@ -548,7 +553,7 @@ func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, con
 			return errors.Errorf("added to unknown group: %s", a.UUID())
 		}
 		groupAdds = append(groupAdds, &GroupAdd{
-			ContactID: contact.ID(),
+			ContactID: ContactID(contact.ID()),
 			GroupID:   group.ID(),
 		})
 
@@ -569,7 +574,7 @@ func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, con
 			return errors.Wrapf(err, "removed from an unknown group: %s", r.UUID())
 		}
 		groupRemoves = append(groupRemoves, &GroupRemove{
-			ContactID: contact.ID(),
+			ContactID: ContactID(contact.ID()),
 			GroupID:   group.ID(),
 		})
 	}
@@ -579,7 +584,7 @@ func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, con
 	}
 
 	// clear any unfired campaign events for this contact
-	err = DeleteUnfiredContactEvents(ctx, tx, contact.ID())
+	err = DeleteUnfiredContactEvents(ctx, tx, ContactID(contact.ID()))
 	if err != nil {
 		return errors.Wrapf(err, "error deleting unfired events for contact")
 	}
@@ -597,7 +602,7 @@ func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, con
 
 			if scheduled != nil {
 				fireAdds = append(fireAdds, &FireAdd{
-					ContactID: contact.ID(),
+					ContactID: ContactID(contact.ID()),
 					EventID:   ce.ID(),
 					Scheduled: *scheduled,
 				})
@@ -616,7 +621,7 @@ func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, con
 
 // StopContact stops the contact with the passed in id, removing them from all groups and setting
 // their state to stopped.
-func StopContact(ctx context.Context, tx *sqlx.Tx, orgID OrgID, contactID flows.ContactID) error {
+func StopContact(ctx context.Context, tx *sqlx.Tx, orgID OrgID, contactID ContactID) error {
 	// delete the contact from all groups
 	_, err := tx.ExecContext(ctx, deleteAllContactGroupsSQL, orgID, contactID)
 	if err != nil {
@@ -717,7 +722,7 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAs
 	c.urns = append(c.urns, newURNs...)
 
 	change := &ContactURNsChanged{
-		ContactID: c.ID(),
+		ContactID: ContactID(c.ID()),
 		URNs:      c.urns,
 	}
 
@@ -727,7 +732,7 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAs
 		return errors.Wrapf(err, "error updating urns for contact")
 	}
 
-	err = UpdateContactModifiedOn(ctx, tx, []flows.ContactID{c.ID()})
+	err = UpdateContactModifiedOn(ctx, tx, []ContactID{c.ID()})
 	if err != nil {
 		return errors.Wrapf(err, "error updating modified on on contact")
 	}
@@ -748,14 +753,14 @@ func GetURNInt(urn urns.URN, key string) int {
 func getURNAuth(urn urns.URN) null.String {
 	values, err := urn.Query()
 	if err != nil {
-		return null.NewString("", false)
+		return null.NullString
 	}
 
 	value := values.Get("auth")
 	if value == "" {
-		return null.NewString("", false)
+		return null.NullString
 	}
-	return null.NewString(value, true)
+	return null.String(value)
 }
 
 func GetURNChannelID(org *OrgAssets, urn urns.URN) *ChannelID {
@@ -811,7 +816,7 @@ func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urn
 }
 
 // UpdateContactModifiedOn updates modified on on the passed in contact
-func UpdateContactModifiedOn(ctx context.Context, tx Queryer, contactIDs []flows.ContactID) error {
+func UpdateContactModifiedOn(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
 	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
 	return err
 }
@@ -904,9 +909,9 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 		}
 		defer rows.Close()
 
-		orphanedIDs := make([]flows.ContactID, 0, len(inserts))
+		orphanedIDs := make([]ContactID, 0, len(inserts))
 		for rows.Next() {
-			var contactID flows.ContactID
+			var contactID ContactID
 			err := rows.Scan(&contactID)
 			if err != nil {
 				return errors.Wrapf(err, "error reading orphaned contacts")
@@ -958,14 +963,14 @@ WHERE
 
 // urnInsert is our object that represents a single contact URN addition
 type urnInsert struct {
-	ContactID flows.ContactID `db:"contact_id"`
-	Identity  string          `db:"identity"`
-	Path      string          `db:"path"`
-	Display   *string         `db:"display"`
-	Auth      *string         `db:"auth"`
-	Scheme    string          `db:"scheme"`
-	Priority  int             `db:"priority"`
-	OrgID     OrgID           `db:"org_id"`
+	ContactID ContactID `db:"contact_id"`
+	Identity  string    `db:"identity"`
+	Path      string    `db:"path"`
+	Display   *string   `db:"display"`
+	Auth      *string   `db:"auth"`
+	Scheme    string    `db:"scheme"`
+	Priority  int       `db:"priority"`
+	OrgID     OrgID     `db:"org_id"`
 }
 
 const insertContactURNsSQL = `
@@ -982,7 +987,47 @@ DO
 
 // ContactURNsChanged represents the new status of URNs for a contact
 type ContactURNsChanged struct {
-	ContactID flows.ContactID
+	ContactID ContactID
 	OrgID     OrgID
 	URNs      []urns.URN
+}
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i URNID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *URNID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i URNID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *URNID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
+}
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i ContactID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *ContactID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i ContactID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *ContactID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
 }

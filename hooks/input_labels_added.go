@@ -59,12 +59,12 @@ func handleInputLabelsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 			return errors.Errorf("unable to find label with UUID: %s", l.UUID)
 		}
 
-		if session.IncomingMsgID().IsZero() {
+		if session.IncomingMsgID() == models.NilMsgID {
 			return errors.Errorf("cannot add label, no incoming message for session: %d", session.ID())
 		}
 
 		session.AddPreCommitEvent(commitAddedLabelsHook, &models.MsgLabelAdd{
-			MsgID:   flows.MsgID(session.IncomingMsgID().Int64),
+			MsgID:   session.IncomingMsgID(),
 			LabelID: label.ID(),
 		})
 	}

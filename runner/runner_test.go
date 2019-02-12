@@ -34,7 +34,7 @@ func TestCampaignStarts(t *testing.T) {
 	now := time.Now()
 	db.MustExec(`INSERT INTO campaigns_eventfire(contact_id, event_id, scheduled) VALUES($2, $1, $4),($3, $1, $4);`, models.RemindersEvent2ID, models.CathyID, models.BobID, now)
 
-	contacts := []flows.ContactID{models.CathyID, models.BobID}
+	contacts := []models.ContactID{models.CathyID, models.BobID}
 	fires := []*models.EventFire{
 		&models.EventFire{
 			FireID:    1,
@@ -93,7 +93,7 @@ func TestBatchStart(t *testing.T) {
 		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', $2, 1, 1)`, utils.NewUUID(), models.SingleMessageFlowID)
 
 	// and our batch object
-	contactIDs := []flows.ContactID{models.CathyID, models.BobID}
+	contactIDs := []models.ContactID{models.CathyID, models.BobID}
 
 	tcs := []struct {
 		Flow          models.FlowID
@@ -123,7 +123,7 @@ func TestBatchStart(t *testing.T) {
 
 	for i, tc := range tcs {
 		start := models.NewFlowStart(
-			models.NewStartID(1), models.OrgID(1), models.MessagingFlow, tc.Flow,
+			models.StartID(1), models.OrgID(1), models.MessagingFlow, tc.Flow,
 			nil, contactIDs, nil, false, tc.Restart, tc.IncludeActive,
 			nil, tc.Extra,
 		)
@@ -175,7 +175,7 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{models.CathyID})
+	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{models.CathyID})
 	assert.NoError(t, err)
 
 	contact, err := contacts[0].FlowContact(org, sa)

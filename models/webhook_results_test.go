@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +14,7 @@ func TestWebhookResults(t *testing.T) {
 
 	tcs := []struct {
 		OrgID       OrgID
-		ContactID   flows.ContactID
+		ContactID   ContactID
 		URL         string
 		Request     string
 		StatusCode  int
