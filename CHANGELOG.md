@@ -1,3 +1,8 @@
+v0.0.86
+----------
+ * grab contact locks when starting
+ * move to nyaruka/null null ints and strings
+
 v0.0.85
 ----------
  * allow channels to be set in simulations
