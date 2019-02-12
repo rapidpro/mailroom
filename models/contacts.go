@@ -986,3 +986,8 @@ type ContactURNsChanged struct {
 	OrgID     OrgID
 	URNs      []urns.URN
 }
+
+// ContactLock returns the lock key for a particular contact, used with locker
+func ContactLock(orgID OrgID, contactID flows.ContactID) string {
+	return fmt.Sprintf("c:%d:%d", orgID, contactID)
+}

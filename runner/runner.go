@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -384,23 +385,81 @@ func StartFlow(
 		return nil, errors.Wrapf(err, "error starting flow, unable to load assets")
 	}
 
-	// load all our contacts
-	contacts, err := models.LoadContacts(ctx, db, org, includedContacts)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error loading contacts to start")
-	}
+	// we now need to grab locks for our contacts so that they are never in two starts or handles at the
+	// same time we try to grab locks for up to five minutes, but do it in batches where we wait for one
+	// second per contact to prevent deadlocks
+	sessions := make([]*models.Session, 0, len(includedContacts))
+	remaining := includedContacts
+	start := time.Now()
 
-	// ok, we've filtered our contacts, build our triggers
-	triggers := make([]flows.Trigger, 0, len(includedContacts))
-	for _, c := range contacts {
-		contact, err := c.FlowContact(org, assets)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error creating flow contact")
+	// map of locks we've released
+	released := make(map[string]bool)
+
+	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {
+		locked := make([]flows.ContactID, 0, len(remaining))
+		locks := make([]string, 0, len(remaining))
+		skipped := make([]flows.ContactID, 0, 5)
+
+		// try up to a second to get a lock for a contact
+		for _, contactID := range remaining {
+			lockID := models.ContactLock(org.OrgID(), contactID)
+			lock, err := locker.GrabLock(rp, lockID, time.Minute*5, time.Second)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error attempting to grab lock")
+			}
+			if lock == "" {
+				skipped = append(skipped, contactID)
+				continue
+			}
+			locked = append(locked, contactID)
+			locks = append(locks, lock)
+
+			// defer unlocking if we exit due to error
+			defer func() {
+				if !released[lockID] {
+					locker.ReleaseLock(rp, lockID, lock)
+				}
+			}()
 		}
-		triggers = append(triggers, options.TriggerBuilder(contact))
+
+		// load our locked contacts
+		contacts, err := models.LoadContacts(ctx, db, org, locked)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading contacts to start")
+		}
+
+		// ok, we've filtered our contacts, build our triggers
+		triggers := make([]flows.Trigger, 0, len(locked))
+		for _, c := range contacts {
+			contact, err := c.FlowContact(org, assets)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error creating flow contact")
+			}
+			triggers = append(triggers, options.TriggerBuilder(contact))
+		}
+
+		ss, err := StartFlowForContacts(ctx, db, rp, org, assets, triggers, options.CommitHook, options.Interrupt)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error starting flow for contacts")
+		}
+
+		// append all the sessions that were started
+		for _, s := range ss {
+			sessions = append(sessions, s)
+		}
+
+		// release all our locks
+		for i := range locked {
+			lockID := models.ContactLock(org.OrgID(), locked[i])
+			locker.ReleaseLock(rp, lockID, locks[i])
+			released[lockID] = true
+		}
+
+		// skipped are now our remaining
+		remaining = skipped
 	}
 
-	return StartFlowForContacts(ctx, db, rp, org, assets, triggers, options.CommitHook, options.Interrupt)
+	return sessions, nil
 }
 
 // StartFlowForContacts runs the passed in flow for the passed in contact

@@ -78,17 +78,18 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 	}
 
 	// acquire the lock for this contact
-	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)
-	lock, err := locker.GrabLock(rp, contactQ, time.Minute*5, time.Minute*5)
+	lockID := models.ContactLock(models.OrgID(task.OrgID), eventTask.ContactID)
+	lock, err := locker.GrabLock(rp, lockID, time.Minute*5, time.Minute*5)
 	if err != nil {
 		return errors.Wrapf(err, "error acquiring lock for contact %d", eventTask.ContactID)
 	}
 	if lock == "" {
 		return errors.Errorf("unable to acquire lock for contact %d in timeout period, skipping", eventTask.ContactID)
 	}
-	defer locker.ReleaseLock(rp, contactQ, lock)
+	defer locker.ReleaseLock(rp, lockID, lock)
 
 	// read all the events for this contact, one by one
+	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)
 	for {
 		// pop the next event off this contacts queue
 		rc := rp.Get()
