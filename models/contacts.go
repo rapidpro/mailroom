@@ -1031,3 +1031,8 @@ func (i ContactID) Value() (driver.Value, error) {
 func (i *ContactID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
 }
+
+// ContactLock returns the lock key for a particular contact, used with locker
+func ContactLock(orgID OrgID, contactID flows.ContactID) string {
+	return fmt.Sprintf("c:%d:%d", orgID, contactID)
+}
