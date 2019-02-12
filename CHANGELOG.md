@@ -1,3 +1,7 @@
+v0.0.88
+----------
+ * better logging of event in case of error during handling
+
 v0.0.87
 ----------
  * fix ContactID mismatch
