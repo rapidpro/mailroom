@@ -110,7 +110,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 		contactEvent := &queue.Task{}
 		err = json.Unmarshal([]byte(event), contactEvent)
 		if err != nil {
-			return errors.Wrapf(err, "error unmarshalling contact event")
+			return errors.Wrapf(err, "error unmarshalling contact event: %s", event)
 		}
 
 		// hand off to the appropriate handler
@@ -120,7 +120,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			evt := &StopEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling stop event")
+				return errors.Wrapf(err, "error unmarshalling stop event: %s", event)
 			}
 			err = handleStopEvent(ctx, db, rp, evt)
 
@@ -128,7 +128,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			evt := &models.ChannelEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling channel event")
+				return errors.Wrapf(err, "error unmarshalling channel event: %s", event)
 			}
 			// TODO: we should just have courier include event type in its json
 			_, err = HandleChannelEvent(ctx, db, rp, models.ChannelEventType(contactEvent.Type), evt, nil)
@@ -137,7 +137,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			msg := &MsgEvent{}
 			err = json.Unmarshal(contactEvent.Task, msg)
 			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling msg event")
+				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
 			}
 			err = handleMsgEvent(ctx, db, rp, msg)
 
@@ -145,7 +145,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			evt := &TimedEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling timeout event")
+				return errors.Wrapf(err, "error unmarshalling timeout event: %s", event)
 			}
 			err = handleTimedEvent(ctx, db, rp, contactEvent.Type, evt)
 
@@ -155,7 +155,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 
 		// if we get an error processing an event, stop processing and return that
 		if err != nil {
-			return errors.Wrapf(err, "error handling contact event")
+			return errors.Wrapf(err, "error handling contact event: %s", event)
 		}
 	}
 }
