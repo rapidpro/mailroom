@@ -1033,6 +1033,6 @@ func (i *ContactID) Scan(value interface{}) error {
 }
 
 // ContactLock returns the lock key for a particular contact, used with locker
-func ContactLock(orgID OrgID, contactID flows.ContactID) string {
+func ContactLock(orgID OrgID, contactID ContactID) string {
 	return fmt.Sprintf("c:%d:%d", orgID, contactID)
 }

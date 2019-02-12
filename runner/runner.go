@@ -396,9 +396,9 @@ func StartFlow(
 	released := make(map[string]bool)
 
 	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {
-		locked := make([]flows.ContactID, 0, len(remaining))
+		locked := make([]models.ContactID, 0, len(remaining))
 		locks := make([]string, 0, len(remaining))
-		skipped := make([]flows.ContactID, 0, 5)
+		skipped := make([]models.ContactID, 0, 5)
 
 		// try up to a second to get a lock for a contact
 		for _, contactID := range remaining {
