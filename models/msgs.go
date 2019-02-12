@@ -271,7 +271,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 	m.Status = MsgStatusQueued
 	m.Visibility = VisibilityVisible
 	m.MsgType = TypeFlow
-	m.ContactID = ContactID(contactID)
+	m.ContactID = contactID
 	m.URN = out.URN()
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
@@ -333,7 +333,7 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
 	m.MsgType = TypeFlow
-	m.ContactID = ContactID(contactID)
+	m.ContactID = contactID
 
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
