@@ -17,7 +17,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/handler"
 	"github.com/nyaruka/mailroom/ivr"
@@ -330,7 +329,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, s.DB, org, []flows.ContactID{conn.ContactID()})
+	contacts, err := models.LoadContacts(ctx, s.DB, org, []models.ContactID{conn.ContactID()})
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "no such contact"))
 	}

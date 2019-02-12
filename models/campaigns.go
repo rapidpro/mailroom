@@ -354,7 +354,7 @@ WHERE
 type EventFire struct {
 	FireID    FireID          `db:"fire_id"`
 	EventID   CampaignEventID `db:"event_id"`
-	ContactID flows.ContactID `db:"contact_id"`
+	ContactID ContactID       `db:"contact_id"`
 	Scheduled time.Time       `db:"scheduled"`
 	Fired     *time.Time      `db:"fired"`
 }
@@ -437,12 +437,12 @@ IN (
 `
 
 type FireDelete struct {
-	ContactID flows.ContactID `db:"contact_id"`
+	ContactID ContactID       `db:"contact_id"`
 	EventID   CampaignEventID `db:"event_id"`
 }
 
 // DeleteUnfiredContactEvents deletes all unfired event fires for the passed in contact
-func DeleteUnfiredContactEvents(ctx context.Context, tx Queryer, contactID flows.ContactID) error {
+func DeleteUnfiredContactEvents(ctx context.Context, tx Queryer, contactID ContactID) error {
 	_, err := tx.ExecContext(ctx, `DELETE FROM campaigns_eventfire WHERE contact_id = $1 AND fired IS NULL`, contactID)
 	if err != nil {
 		return errors.Wrapf(err, "error deleting unfired contact events")
@@ -472,7 +472,7 @@ const insertEventFiresSQL = `
 `
 
 type FireAdd struct {
-	ContactID flows.ContactID `db:"contact_id"`
+	ContactID ContactID       `db:"contact_id"`
 	EventID   CampaignEventID `db:"event_id"`
 	Scheduled time.Time       `db:"scheduled"`
 }

@@ -27,7 +27,7 @@ func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 	// build up our list of all adds and removes
 	adds := make([]*models.GroupAdd, 0, len(sessions))
 	removes := make([]*models.GroupRemove, 0, len(sessions))
-	changed := make(map[flows.ContactID]bool, len(sessions))
+	changed := make(map[models.ContactID]bool, len(sessions))
 
 	// we remove from our groups at once, build up our list
 	for _, events := range sessions {
@@ -69,7 +69,7 @@ func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 	}
 
 	// build the list of all contact ids changed, we'll update modified_on for them
-	changedIDs := make([]flows.ContactID, 0, len(changed))
+	changedIDs := make([]models.ContactID, 0, len(changed))
 	for c := range changed {
 		changedIDs = append(changedIDs, c)
 	}

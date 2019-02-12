@@ -3,8 +3,6 @@ package models
 import (
 	"context"
 	"time"
-
-	"github.com/nyaruka/goflow/flows"
 )
 
 type ResultID int64
@@ -12,15 +10,15 @@ type ResultID int64
 // WebhookResult represents a result of a webhook or resthook call
 type WebhookResult struct {
 	r struct {
-		ID          ResultID        `db:"id"`
-		URL         string          `db:"url"`
-		Request     string          `db:"request"`
-		StatusCode  int             `db:"status_code"`
-		Response    string          `db:"response"`
-		RequestTime int             `db:"request_time"`
-		ContactID   flows.ContactID `db:"contact_id"`
-		OrgID       OrgID           `db:"org_id"`
-		CreatedOn   time.Time       `db:"created_on"`
+		ID          ResultID  `db:"id"`
+		URL         string    `db:"url"`
+		Request     string    `db:"request"`
+		StatusCode  int       `db:"status_code"`
+		Response    string    `db:"response"`
+		RequestTime int       `db:"request_time"`
+		ContactID   ContactID `db:"contact_id"`
+		OrgID       OrgID     `db:"org_id"`
+		CreatedOn   time.Time `db:"created_on"`
 	}
 }
 
@@ -28,7 +26,7 @@ func (r *WebhookResult) ID() ResultID { return r.r.ID }
 
 // NewWebhookResult creates a new webhook result with the passed in parameters
 func NewWebhookResult(
-	orgID OrgID, contactID flows.ContactID,
+	orgID OrgID, contactID ContactID,
 	url string, request string, statusCode int, response string,
 	elapsed time.Duration, createdOn time.Time) *WebhookResult {
 	result := &WebhookResult{}

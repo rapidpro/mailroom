@@ -8,9 +8,9 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 type ChannelID int
@@ -65,7 +65,7 @@ func (c *Channel) TPS() int { return c.c.TPS }
 func (c *Channel) Address() string { return c.c.Address }
 
 // Country returns the contry code for this channel
-func (c *Channel) Country() string { return c.c.Country.String }
+func (c *Channel) Country() string { return string(c.c.Country) }
 
 // Schemes returns the schemes this channel supports
 func (c *Channel) Schemes() []string { return c.c.Schemes }

@@ -236,7 +236,7 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 	// create our callback
 	form := url.Values{
 		"connection": []string{fmt.Sprintf("%d", conn.ID())},
-		"start":      []string{fmt.Sprintf("%d", conn.StartID().Int64)},
+		"start":      []string{fmt.Sprintf("%d", conn.StartID())},
 		"action":     []string{"start"},
 		"urn":        []string{telURN.String()},
 	}
@@ -322,12 +322,12 @@ func StartIVRFlow(
 	// get the flow for our start
 	flowID, err := models.FlowIDForStart(ctx, db, org.OrgID(), startID)
 	if err != nil {
-		return errors.Wrapf(err, "unable to load start: %d", startID.Int64)
+		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
 
 	flow, err := org.FlowByID(flowID)
 	if err != nil {
-		return errors.Wrapf(err, "unable to load flow: %d", startID.Int64)
+		return errors.Wrapf(err, "unable to load flow: %d", startID)
 	}
 
 	// build our session assets
@@ -565,7 +565,7 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 		// get the flow for our start
 		flowID, err := models.FlowIDForStart(ctx, db, org.OrgID(), conn.StartID())
 		if err != nil {
-			return errors.Wrapf(err, "unable to load start: %d", conn.StartID().Int64)
+			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())
 		}
 
 		flow, err := org.FlowByID(flowID)

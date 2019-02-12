@@ -6,7 +6,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
 )
 
@@ -61,7 +60,7 @@ type ChannelConnection struct {
 		RetryCount     int                 `json:"retry_count"     db:"retry_count"`
 		NextAttempt    *time.Time          `json:"next_attempt"    db:"next_attempt"`
 		ChannelID      ChannelID           `json:"channel_id"      db:"channel_id"`
-		ContactID      flows.ContactID     `json:"contact_id"      db:"contact_id"`
+		ContactID      ContactID           `json:"contact_id"      db:"contact_id"`
 		ContactURNID   URNID               `json:"contact_urn_id"  db:"contact_urn_id"`
 		OrgID          OrgID               `json:"org_id"          db:"org_id"`
 		ErrorCount     int                 `json:"error_count"     db:"error_count"`
@@ -69,15 +68,15 @@ type ChannelConnection struct {
 	}
 }
 
-func (c *ChannelConnection) ID() ConnectionID           { return c.c.ID }
-func (c *ChannelConnection) Status() ConnectionStatus   { return c.c.Status }
-func (c *ChannelConnection) NextAttempt() *time.Time    { return c.c.NextAttempt }
-func (c *ChannelConnection) ExternalID() string         { return c.c.ExternalID }
-func (c *ChannelConnection) OrgID() OrgID               { return c.c.OrgID }
-func (c *ChannelConnection) ContactID() flows.ContactID { return c.c.ContactID }
-func (c *ChannelConnection) ContactURNID() URNID        { return c.c.ContactURNID }
-func (c *ChannelConnection) ChannelID() ChannelID       { return c.c.ChannelID }
-func (c *ChannelConnection) StartID() StartID           { return c.c.StartID }
+func (c *ChannelConnection) ID() ConnectionID         { return c.c.ID }
+func (c *ChannelConnection) Status() ConnectionStatus { return c.c.Status }
+func (c *ChannelConnection) NextAttempt() *time.Time  { return c.c.NextAttempt }
+func (c *ChannelConnection) ExternalID() string       { return c.c.ExternalID }
+func (c *ChannelConnection) OrgID() OrgID             { return c.c.OrgID }
+func (c *ChannelConnection) ContactID() ContactID     { return c.c.ContactID }
+func (c *ChannelConnection) ContactURNID() URNID      { return c.c.ContactURNID }
+func (c *ChannelConnection) ChannelID() ChannelID     { return c.c.ChannelID }
+func (c *ChannelConnection) StartID() StartID         { return c.c.StartID }
 
 const insertConnectionSQL = `
 INSERT INTO
@@ -121,7 +120,7 @@ RETURNING
 `
 
 // InsertIVRConnection creates a new IVR session for the passed in org, channel and contact, inserting it
-func InsertIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelID ChannelID, startID StartID, contactID flows.ContactID, urnID URNID,
+func InsertIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelID ChannelID, startID StartID, contactID ContactID, urnID URNID,
 	direction ConnectionDirection, status ConnectionStatus, externalID string) (*ChannelConnection, error) {
 
 	connection := &ChannelConnection{}
@@ -152,11 +151,11 @@ func InsertIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelI
 	}
 
 	// add a many to many for our start if set
-	if !startID.IsZero() {
+	if startID != NilStartID {
 		_, err := db.ExecContext(
 			ctx,
 			`INSERT INTO flows_flowstart_connections(flowstart_id, channelconnection_id) VALUES($1, $2) ON CONFLICT DO NOTHING`,
-			startID.Int64, c.ID,
+			startID, c.ID,
 		)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to add start association for channelconnection")

@@ -5,7 +5,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 )
@@ -18,7 +17,7 @@ var contactModifiedHook = &ContactModifiedHook{}
 // Apply squashes and updates modified_on on all the contacts passed in
 func (h *ContactModifiedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// our list of contact ids
-	contactIDs := make([]flows.ContactID, 0, len(sessions))
+	contactIDs := make([]models.ContactID, 0, len(sessions))
 	for session := range sessions {
 		contactIDs = append(contactIDs, session.ContactID())
 	}

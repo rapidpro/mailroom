@@ -105,13 +105,13 @@ func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 }
 
 type FieldDelete struct {
-	ContactID flows.ContactID  `db:"contact_id"`
+	ContactID models.ContactID `db:"contact_id"`
 	FieldUUID models.FieldUUID `db:"field_uuid"`
 }
 
 type FieldUpdate struct {
-	ContactID flows.ContactID `db:"contact_id"`
-	Updates   string          `db:"updates"`
+	ContactID models.ContactID `db:"contact_id"`
+	Updates   string           `db:"updates"`
 }
 
 type FieldValue struct {

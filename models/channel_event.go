@@ -7,7 +7,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
-	"github.com/nyaruka/goflow/flows"
 )
 
 type ChannelEventType string
@@ -27,7 +26,7 @@ type ChannelEvent struct {
 		EventType ChannelEventType   `json:"event_type"   db:"event_type"`
 		OrgID     OrgID              `json:"org_id"       db:"org_id"`
 		ChannelID ChannelID          `json:"channel_id"   db:"channel_id"`
-		ContactID flows.ContactID    `json:"contact_id"   db:"contact_id"`
+		ContactID ContactID          `json:"contact_id"   db:"contact_id"`
 		URNID     URNID              `json:"urn_id"       db:"contact_urn_id"`
 		Extra     types.NullJSONText `json:"extra"        db:"extra"`
 
@@ -40,12 +39,12 @@ type ChannelEvent struct {
 	}
 }
 
-func (e *ChannelEvent) ID() ChannelEventID         { return e.e.ID }
-func (e *ChannelEvent) ContactID() flows.ContactID { return e.e.ContactID }
-func (e *ChannelEvent) URNID() URNID               { return e.e.URNID }
-func (e *ChannelEvent) OrgID() OrgID               { return e.e.OrgID }
-func (e *ChannelEvent) ChannelID() ChannelID       { return e.e.ChannelID }
-func (e *ChannelEvent) IsNewContact() bool         { return e.e.NewContact }
+func (e *ChannelEvent) ID() ChannelEventID   { return e.e.ID }
+func (e *ChannelEvent) ContactID() ContactID { return e.e.ContactID }
+func (e *ChannelEvent) URNID() URNID         { return e.e.URNID }
+func (e *ChannelEvent) OrgID() OrgID         { return e.e.OrgID }
+func (e *ChannelEvent) ChannelID() ChannelID { return e.e.ChannelID }
+func (e *ChannelEvent) IsNewContact() bool   { return e.e.NewContact }
 
 func (e *ChannelEvent) Extra() map[string]string {
 	extra := make(map[string]string)
@@ -80,7 +79,7 @@ func (e *ChannelEvent) Insert(ctx context.Context, db *sqlx.DB) error {
 }
 
 // NewChannelEvent creates a new channel event for the passed in parameters, returning it
-func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelID, contactID flows.ContactID, urnID URNID, extra map[string]string, isNewContact bool) *ChannelEvent {
+func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelID, contactID ContactID, urnID URNID, extra map[string]string, isNewContact bool) *ChannelEvent {
 	event := &ChannelEvent{}
 	e := &event.e
 

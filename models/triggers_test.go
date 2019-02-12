@@ -42,7 +42,7 @@ func TestTriggers(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	contactIDs := []flows.ContactID{CathyID, GeorgeID}
+	contactIDs := []ContactID{CathyID, GeorgeID}
 	contacts, err := LoadContacts(ctx, db, org, contactIDs)
 	assert.NoError(t, err)
 

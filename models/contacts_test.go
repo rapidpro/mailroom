@@ -31,7 +31,7 @@ func TestContacts(t *testing.T) {
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, GeorgeID)
 	db.MustExec(`UPDATE contacts_contact SET is_active = FALSE WHERE id = $1`, AlexandriaID)
 
-	modelContacts, err := LoadContacts(ctx, db, org, []flows.ContactID{CathyID, GeorgeID, BobID, AlexandriaID})
+	modelContacts, err := LoadContacts(ctx, db, org, []ContactID{CathyID, GeorgeID, BobID, AlexandriaID})
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(modelContacts))
 
@@ -82,7 +82,7 @@ func TestContacts(t *testing.T) {
 		                          VALUES(1, $1, 'tel', '+250788373393', 'tel:+250788373373', 10)`, BobID)
 
 	// reload the contact
-	modelContacts, err = LoadContacts(ctx, db, org, []flows.ContactID{BobID})
+	modelContacts, err = LoadContacts(ctx, db, org, []ContactID{BobID})
 	assert.NoError(t, err)
 
 	// set our preferred channel again
@@ -117,12 +117,12 @@ func TestContactsFromURN(t *testing.T) {
 	tcs := []struct {
 		OrgID     OrgID
 		URN       urns.URN
-		ContactID flows.ContactID
+		ContactID ContactID
 	}{
 		{Org1, CathyURN, CathyID},
 		{Org1, urns.URN(CathyURN.String() + "?foo=bar"), CathyID},
-		{Org1, urns.URN("telegram:12345678"), flows.ContactID(maxContactID + 1)},
-		{Org1, urns.URN("telegram:12345678"), flows.ContactID(maxContactID + 1)},
+		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 1)},
+		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 1)},
 	}
 
 	org, err := GetOrgAssets(ctx, db, Org1)
@@ -154,13 +154,13 @@ func TestCreateContact(t *testing.T) {
 	tcs := []struct {
 		OrgID     OrgID
 		URN       urns.URN
-		ContactID flows.ContactID
+		ContactID ContactID
 	}{
 		{Org1, CathyURN, CathyID},
 		{Org1, urns.URN(CathyURN.String() + "?foo=bar"), CathyID},
-		{Org1, urns.URN("telegram:12345678"), flows.ContactID(maxContactID + 3)},
-		{Org1, urns.URN("telegram:12345678"), flows.ContactID(maxContactID + 3)},
-		{Org1, urns.NilURN, flows.ContactID(maxContactID + 5)},
+		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
+		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
+		{Org1, urns.NilURN, ContactID(maxContactID + 5)},
 	}
 
 	org, err := GetOrgAssets(ctx, db, Org1)

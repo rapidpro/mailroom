@@ -49,8 +49,8 @@ func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 
 // struct used for our bulk insert
 type nameUpdate struct {
-	ContactID flows.ContactID `db:"id"`
-	Name      string          `db:"name"`
+	ContactID models.ContactID `db:"id"`
+	Name      string           `db:"name"`
 }
 
 const updateContactNameSQL = `

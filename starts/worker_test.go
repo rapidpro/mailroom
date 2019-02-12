@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom"
 	_ "github.com/nyaruka/mailroom/hooks"
@@ -41,7 +40,7 @@ func TestStarts(t *testing.T) {
 	tcs := []struct {
 		FlowID              models.FlowID
 		GroupIDs            []models.GroupID
-		ContactIDs          []flows.ContactID
+		ContactIDs          []models.ContactID
 		RestartParticipants bool
 		IncludeActive       bool
 		Queue               string
@@ -50,12 +49,12 @@ func TestStarts(t *testing.T) {
 		TotalCount          int
 	}{
 		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, nil, false, false, mailroom.BatchQueue, 121, 2, 121},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []flows.ContactID{models.CathyID}, false, false, mailroom.BatchQueue, 121, 2, 0},
-		{models.SingleMessageFlowID, nil, []flows.ContactID{models.CathyID}, true, true, mailroom.HandlerQueue, 1, 1, 1},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []flows.ContactID{models.BobID}, false, false, mailroom.BatchQueue, 122, 2, 1},
-		{models.SingleMessageFlowID, nil, []flows.ContactID{models.BobID}, false, false, mailroom.HandlerQueue, 1, 1, 0},
-		{models.SingleMessageFlowID, nil, []flows.ContactID{models.BobID}, false, true, mailroom.HandlerQueue, 1, 1, 0},
-		{models.SingleMessageFlowID, nil, []flows.ContactID{models.BobID}, true, true, mailroom.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.CathyID}, false, false, mailroom.BatchQueue, 121, 2, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.CathyID}, true, true, mailroom.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.BobID}, false, false, mailroom.BatchQueue, 122, 2, 1},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, false, false, mailroom.HandlerQueue, 1, 1, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, false, true, mailroom.HandlerQueue, 1, 1, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, true, true, mailroom.HandlerQueue, 1, 1, 1},
 	}
 
 	for i, tc := range tcs {
@@ -64,7 +63,7 @@ func TestStarts(t *testing.T) {
 
 		// handle our start task
 		start := models.NewFlowStart(
-			models.NewStartID(startID), models.Org1, models.MessagingFlow, tc.FlowID,
+			models.StartID(startID), models.Org1, models.MessagingFlow, tc.FlowID,
 			tc.GroupIDs, tc.ContactIDs, nil, false,
 			tc.RestartParticipants, tc.IncludeActive,
 			nil, nil,

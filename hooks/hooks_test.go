@@ -22,12 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	httpClient = utils.NewHTTPClient("mailroom")
-)
-
-type ContactActionMap map[flows.ContactID][]flows.Action
-type ContactMsgMap map[flows.ContactID]*flows.MsgIn
+type ContactActionMap map[models.ContactID][]flows.Action
+type ContactMsgMap map[models.ContactID]*flows.MsgIn
 
 type HookTestCase struct {
 	Actions       ContactActionMap
@@ -132,7 +128,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	return flow
 }
 
-func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID flows.ContactID, urn urns.URN, urnID models.URNID, text string) *flows.MsgIn {
+func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *flows.MsgIn {
 	msgUUID := flows.MsgUUID(utils.NewUUID())
 	var msgID flows.MsgID
 
@@ -174,7 +170,7 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		options := runner.NewStartOptions()
 		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
 			for _, s := range sessions {
-				msg := tc.Msgs[s.Contact().ID()]
+				msg := tc.Msgs[s.ContactID()]
 				if msg != nil {
 					s.SetIncomingMsg(msg.ID(), "")
 				}
@@ -182,15 +178,14 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 			return nil
 		}
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
-			msg := tc.Msgs[contact.ID()]
+			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
 				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
-			} else {
-				return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil)
 			}
+			return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil)
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, org, flow, []flows.ContactID{models.CathyID, models.BobID, models.GeorgeID}, options)
+		_, err = runner.StartFlow(ctx, db, rp, org, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID}, options)
 		assert.NoError(t, err)
 
 		// now check our assertions

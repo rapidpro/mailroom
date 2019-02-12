@@ -36,7 +36,7 @@ func init() {
 }
 
 // AddHandleTask adds a single task for the passed in contact
-func AddHandleTask(rc redis.Conn, contactID flows.ContactID, task *queue.Task) error {
+func AddHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task) error {
 	// marshal our task
 	taskJSON, err := json.Marshal(task)
 	if err != nil {
@@ -170,7 +170,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{event.ContactID})
+	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{event.ContactID})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
@@ -264,7 +264,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{event.ContactID()})
+	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{event.ContactID()})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contact")
 	}
@@ -409,7 +409,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, org, []flows.ContactID{event.ContactID})
+	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{event.ContactID})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
@@ -560,11 +560,11 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 }
 
 type HandleEventTask struct {
-	ContactID flows.ContactID `json:"contact_id"`
+	ContactID models.ContactID `json:"contact_id"`
 }
 
 type TimedEvent struct {
-	ContactID flows.ContactID  `json:"contact_id"`
+	ContactID models.ContactID `json:"contact_id"`
 	OrgID     models.OrgID     `json:"org_id"`
 	SessionID models.SessionID `json:"session_id"`
 	RunID     models.FlowRunID `json:"run_id,omitempty"`
@@ -572,7 +572,7 @@ type TimedEvent struct {
 }
 
 type MsgEvent struct {
-	ContactID     flows.ContactID    `json:"contact_id"`
+	ContactID     models.ContactID   `json:"contact_id"`
 	OrgID         models.OrgID       `json:"org_id"`
 	ChannelID     models.ChannelID   `json:"channel_id"`
 	MsgID         flows.MsgID        `json:"msg_id"`
@@ -586,12 +586,12 @@ type MsgEvent struct {
 }
 
 type StopEvent struct {
-	ContactID flows.ContactID `json:"contact_id"`
-	OrgID     models.OrgID    `json:"org_id"`
+	ContactID models.ContactID `json:"contact_id"`
+	OrgID     models.OrgID     `json:"org_id"`
 }
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event
-func newTimedTask(eventType string, orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
+func newTimedTask(eventType string, orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
 	event := &TimedEvent{
 		OrgID:     orgID,
 		ContactID: contactID,
@@ -614,11 +614,11 @@ func newTimedTask(eventType string, orgID models.OrgID, contactID flows.ContactI
 }
 
 // NewTimeoutTask creates a new event task for the passed in timeout event
-func NewTimeoutTask(orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
+func NewTimeoutTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
 	return newTimedTask(TimeoutEventType, orgID, contactID, sessionID, models.NilFlowRunID, time)
 }
 
 // NewExpirationTask creates a new event task for the passed in expiration event
-func NewExpirationTask(orgID models.OrgID, contactID flows.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
+func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
 	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, runID, time)
 }

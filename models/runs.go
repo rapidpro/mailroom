@@ -15,9 +15,9 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 )
 
 type SessionCommitHook func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, []*Session) error
@@ -44,12 +44,12 @@ var sessionStatusMap = map[flows.SessionStatus]SessionStatus{
 	flows.SessionStatusWaiting:   SessionStatusWaiting,
 }
 
-type ExitType null.String
+type ExitType = null.String
 
 var (
-	ExitInterrupted = ExitType(null.NewString("I", true))
-	ExitCompleted   = ExitType(null.NewString("C", true))
-	ExitExpired     = ExitType(null.NewString("E", true))
+	ExitInterrupted = ExitType("I")
+	ExitCompleted   = ExitType("C")
+	ExitExpired     = ExitType("E")
 )
 
 var keptEvents = map[string]bool{
@@ -60,22 +60,22 @@ var keptEvents = map[string]bool{
 // Session is the mailroom type for a FlowSession
 type Session struct {
 	s struct {
-		ID            SessionID       `db:"id"`
-		SessionType   FlowType        `db:"session_type"`
-		Status        SessionStatus   `db:"status"`
-		Responded     bool            `db:"responded"`
-		Output        string          `db:"output"`
-		ContactID     flows.ContactID `db:"contact_id"`
-		OrgID         OrgID           `db:"org_id"`
-		CreatedOn     time.Time       `db:"created_on"`
-		EndedOn       *time.Time      `db:"ended_on"`
-		TimeoutOn     *time.Time      `db:"timeout_on"`
-		WaitStartedOn *time.Time      `db:"wait_started_on"`
-		CurrentFlowID *FlowID         `db:"current_flow_id"`
-		ConnectionID  *ConnectionID   `db:"connection_id"`
+		ID            SessionID     `db:"id"`
+		SessionType   FlowType      `db:"session_type"`
+		Status        SessionStatus `db:"status"`
+		Responded     bool          `db:"responded"`
+		Output        string        `db:"output"`
+		ContactID     ContactID     `db:"contact_id"`
+		OrgID         OrgID         `db:"org_id"`
+		CreatedOn     time.Time     `db:"created_on"`
+		EndedOn       *time.Time    `db:"ended_on"`
+		TimeoutOn     *time.Time    `db:"timeout_on"`
+		WaitStartedOn *time.Time    `db:"wait_started_on"`
+		CurrentFlowID *FlowID       `db:"current_flow_id"`
+		ConnectionID  *ConnectionID `db:"connection_id"`
 	}
 
-	incomingMsgID      null.Int
+	incomingMsgID      MsgID
 	incomingExternalID string
 
 	// any channel connection associated with this flow session
@@ -103,7 +103,7 @@ func (s *Session) SessionType() FlowType         { return s.s.SessionType }
 func (s *Session) Status() SessionStatus         { return s.s.Status }
 func (s *Session) Responded() bool               { return s.s.Responded }
 func (s *Session) Output() string                { return s.s.Output }
-func (s *Session) ContactID() flows.ContactID    { return s.s.ContactID }
+func (s *Session) ContactID() ContactID          { return s.s.ContactID }
 func (s *Session) OrgID() OrgID                  { return s.s.OrgID }
 func (s *Session) CreatedOn() time.Time          { return s.s.CreatedOn }
 func (s *Session) EndedOn() *time.Time           { return s.s.EndedOn }
@@ -111,7 +111,7 @@ func (s *Session) TimeoutOn() *time.Time         { return s.s.TimeoutOn }
 func (s *Session) WaitStartedOn() *time.Time     { return s.s.WaitStartedOn }
 func (s *Session) CurrentFlowID() *FlowID        { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID   { return s.s.ConnectionID }
-func (s *Session) IncomingMsgID() null.Int       { return s.incomingMsgID }
+func (s *Session) IncomingMsgID() MsgID          { return s.incomingMsgID }
 func (s *Session) IncomingMsgExternalID() string { return s.incomingExternalID }
 
 // ContactUUID returns the UUID of our contact
@@ -161,7 +161,7 @@ func (s *Session) AddPostCommitEvent(hook EventCommitHook, event interface{}) {
 
 // SetIncomingMsg set the incoming message that this session should be associated with in this sprint
 func (s *Session) SetIncomingMsg(id flows.MsgID, externalID string) {
-	s.incomingMsgID = null.NewInt(int64(id), true)
+	s.incomingMsgID = MsgID(id)
 	s.incomingExternalID = externalID
 }
 
@@ -284,7 +284,7 @@ func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session
 	s.SessionType = sessionType
 	s.Responded = false
 	s.Output = string(output)
-	s.ContactID = fs.Contact().ID()
+	s.ContactID = ContactID(fs.Contact().ID())
 	s.OrgID = org.OrgID()
 	s.CreatedOn = fs.Runs()[0].CreatedOn()
 
@@ -780,8 +780,8 @@ func newRun(org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error
 
 // FindFlowStartedOverlap returns the list of contact ids which overlap with those passed in and which
 // have been in the flow passed in.
-func FindFlowStartedOverlap(ctx context.Context, db *sqlx.DB, flowID FlowID, contacts []flows.ContactID) ([]flows.ContactID, error) {
-	var overlap []flows.ContactID
+func FindFlowStartedOverlap(ctx context.Context, db *sqlx.DB, flowID FlowID, contacts []ContactID) ([]ContactID, error) {
+	var overlap []ContactID
 	err := db.SelectContext(ctx, &overlap, flowStartedOverlapSQL, pq.Array(contacts), flowID)
 	return overlap, err
 }
@@ -800,8 +800,8 @@ WHERE
 
 // FindActiveRunOverlap returns the list of contact ids which overlap with those passed in which are
 // active in any other flows.
-func FindActiveRunOverlap(ctx context.Context, db *sqlx.DB, contacts []flows.ContactID) ([]flows.ContactID, error) {
-	var overlap []flows.ContactID
+func FindActiveRunOverlap(ctx context.Context, db *sqlx.DB, contacts []ContactID) ([]ContactID, error) {
+	var overlap []ContactID
 	err := db.SelectContext(ctx, &overlap, activeRunOverlapSQL, pq.Array(contacts))
 	return overlap, err
 }

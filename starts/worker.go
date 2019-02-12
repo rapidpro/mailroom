@@ -49,7 +49,7 @@ func handleFlowStart(ctx context.Context, mr *mailroom.Mailroom, task *queue.Tas
 // CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
 func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *models.FlowStart) error {
 	// we are building a set of contact ids, start with the explicit ones
-	contactIDs := make(map[flows.ContactID]bool)
+	contactIDs := make(map[models.ContactID]bool)
 	for _, id := range start.ContactIDs() {
 		contactIDs[id] = true
 	}
@@ -105,7 +105,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 	}
 	defer rows.Close()
 
-	var contactID flows.ContactID
+	var contactID models.ContactID
 	for rows.Next() {
 		err := rows.Scan(&contactID)
 		if err != nil {
@@ -129,7 +129,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 		taskType = mailroom.StartIVRFlowBatchType
 	}
 
-	contacts := make([]flows.ContactID, 0, 100)
+	contacts := make([]models.ContactID, 0, 100)
 	queueBatch := func(last bool) {
 		batch := start.CreateBatch(contacts)
 		batch.SetIsLast(last)
@@ -138,7 +138,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 			// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
 			logrus.WithError(err).WithField("start_id", start.StartID).Error("error while queuing start")
 		}
-		contacts = make([]flows.ContactID, 0, 100)
+		contacts = make([]models.ContactID, 0, 100)
 	}
 
 	// build up batches of contacts to start

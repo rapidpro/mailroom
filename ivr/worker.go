@@ -7,7 +7,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
@@ -40,7 +39,7 @@ func HandleFlowStartBatch(ctx context.Context, config *config.Config, db *sqlx.D
 	defer cancel()
 
 	// contacts we will exclude either because they are in a flow or have already been in this one
-	exclude := make(map[flows.ContactID]bool, 5)
+	exclude := make(map[models.ContactID]bool, 5)
 
 	// filter out anybody who has has a flow run in this flow if appropriate
 	if !batch.RestartParticipants() {
@@ -67,7 +66,7 @@ func HandleFlowStartBatch(ctx context.Context, config *config.Config, db *sqlx.D
 	}
 
 	// filter into our final list of contacts
-	contactIDs := make([]flows.ContactID, 0, len(batch.ContactIDs()))
+	contactIDs := make([]models.ContactID, 0, len(batch.ContactIDs()))
 	for _, c := range batch.ContactIDs() {
 		if !exclude[c] {
 			contactIDs = append(contactIDs, c)
@@ -98,7 +97,7 @@ func HandleFlowStartBatch(ctx context.Context, config *config.Config, db *sqlx.D
 			"elapsed":     time.Since(start),
 			"contact_id":  contact.ID(),
 			"status":      session.Status(),
-			"start_id":    batch.StartID().Int64,
+			"start_id":    batch.StartID(),
 			"external_id": session.ExternalID(),
 		}).Debug("requested call for contact")
 	}

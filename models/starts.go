@@ -2,27 +2,20 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
-	null "gopkg.in/guregu/null.v3"
 )
 
 // StartID is our type for flow start ids
-type StartID struct {
-	null.Int
-}
+type StartID null.Int
 
 // NilStartID is our constant for a nil start id
-var NilStartID = StartID{null.NewInt(0, false)}
-
-// NewStartID creates a new start id for the passed in int
-func NewStartID(id int) StartID {
-	return StartID{null.NewInt(int64(id), true)}
-}
+var NilStartID = StartID(0)
 
 // MarkStartComplete sets the status for the passed in flow start
 func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error {
@@ -46,11 +39,11 @@ func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contact
 // FlowStartBatch represents a single flow batch that needs to be started
 type FlowStartBatch struct {
 	b struct {
-		StartID    StartID           `json:"start_id"`
-		OrgID      OrgID             `json:"org_id"`
-		FlowID     FlowID            `json:"flow_id"`
-		FlowType   FlowType          `json:"flow_type"`
-		ContactIDs []flows.ContactID `json:"contact_ids"`
+		StartID    StartID     `json:"start_id"`
+		OrgID      OrgID       `json:"org_id"`
+		FlowID     FlowID      `json:"flow_id"`
+		FlowType   FlowType    `json:"flow_type"`
+		ContactIDs []ContactID `json:"contact_ids"`
 
 		Parent json.RawMessage `json:"parent,omitempty"`
 		Extra  json.RawMessage `json:"extra,omitempty"`
@@ -62,14 +55,14 @@ type FlowStartBatch struct {
 	}
 }
 
-func (b *FlowStartBatch) StartID() StartID              { return b.b.StartID }
-func (b *FlowStartBatch) OrgID() OrgID                  { return b.b.OrgID }
-func (b *FlowStartBatch) FlowID() FlowID                { return b.b.FlowID }
-func (b *FlowStartBatch) ContactIDs() []flows.ContactID { return b.b.ContactIDs }
-func (b *FlowStartBatch) RestartParticipants() bool     { return b.b.RestartParticipants }
-func (b *FlowStartBatch) IncludeActive() bool           { return b.b.IncludeActive }
-func (b *FlowStartBatch) IsLast() bool                  { return b.b.IsLast }
-func (b *FlowStartBatch) SetIsLast(last bool)           { b.b.IsLast = last }
+func (b *FlowStartBatch) StartID() StartID          { return b.b.StartID }
+func (b *FlowStartBatch) OrgID() OrgID              { return b.b.OrgID }
+func (b *FlowStartBatch) FlowID() FlowID            { return b.b.FlowID }
+func (b *FlowStartBatch) ContactIDs() []ContactID   { return b.b.ContactIDs }
+func (b *FlowStartBatch) RestartParticipants() bool { return b.b.RestartParticipants }
+func (b *FlowStartBatch) IncludeActive() bool       { return b.b.IncludeActive }
+func (b *FlowStartBatch) IsLast() bool              { return b.b.IsLast }
+func (b *FlowStartBatch) SetIsLast(last bool)       { b.b.IsLast = last }
 
 func (b *FlowStartBatch) Parent() json.RawMessage { return b.b.Parent }
 func (b *FlowStartBatch) Extra() json.RawMessage  { return b.b.Extra }
@@ -85,10 +78,10 @@ type FlowStart struct {
 		FlowID   FlowID   `json:"flow_id"`
 		FlowType FlowType `json:"flow_type"`
 
-		GroupIDs      []GroupID         `json:"group_ids,omitempty"`
-		ContactIDs    []flows.ContactID `json:"contact_ids,omitempty"`
-		URNs          []urns.URN        `json:"urns,omitempty"`
-		CreateContact bool              `json:"create_contact"`
+		GroupIDs      []GroupID   `json:"group_ids,omitempty"`
+		ContactIDs    []ContactID `json:"contact_ids,omitempty"`
+		URNs          []urns.URN  `json:"urns,omitempty"`
+		CreateContact bool        `json:"create_contact"`
 
 		RestartParticipants bool `json:"restart_participants"`
 		IncludeActive       bool `json:"include_active"`
@@ -98,16 +91,16 @@ type FlowStart struct {
 	}
 }
 
-func (s *FlowStart) StartID() StartID              { return s.s.StartID }
-func (s *FlowStart) OrgID() OrgID                  { return s.s.OrgID }
-func (s *FlowStart) FlowID() FlowID                { return s.s.FlowID }
-func (s *FlowStart) FlowType() FlowType            { return s.s.FlowType }
-func (s *FlowStart) GroupIDs() []GroupID           { return s.s.GroupIDs }
-func (s *FlowStart) ContactIDs() []flows.ContactID { return s.s.ContactIDs }
-func (s *FlowStart) URNs() []urns.URN              { return s.s.URNs }
-func (s *FlowStart) CreateContact() bool           { return s.s.CreateContact }
-func (s *FlowStart) RestartParticipants() bool     { return s.s.RestartParticipants }
-func (s *FlowStart) IncludeActive() bool           { return s.s.IncludeActive }
+func (s *FlowStart) StartID() StartID          { return s.s.StartID }
+func (s *FlowStart) OrgID() OrgID              { return s.s.OrgID }
+func (s *FlowStart) FlowID() FlowID            { return s.s.FlowID }
+func (s *FlowStart) FlowType() FlowType        { return s.s.FlowType }
+func (s *FlowStart) GroupIDs() []GroupID       { return s.s.GroupIDs }
+func (s *FlowStart) ContactIDs() []ContactID   { return s.s.ContactIDs }
+func (s *FlowStart) URNs() []urns.URN          { return s.s.URNs }
+func (s *FlowStart) CreateContact() bool       { return s.s.CreateContact }
+func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants }
+func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
 
 func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
 func (s *FlowStart) Extra() json.RawMessage  { return s.s.Extra }
@@ -128,7 +121,7 @@ func FlowIDForStart(ctx context.Context, db Queryer, orgID OrgID, startID StartI
 // NewFlowStart creates a new flow start objects for the passed in parameters
 func NewFlowStart(
 	startID StartID, orgID OrgID, flowType FlowType, flowID FlowID,
-	groupIDs []GroupID, contactIDs []flows.ContactID, urns []urns.URN, createContact bool,
+	groupIDs []GroupID, contactIDs []ContactID, urns []urns.URN, createContact bool,
 	restartParticipants bool, includeActive bool, parent json.RawMessage, extra json.RawMessage) *FlowStart {
 
 	s := &FlowStart{}
@@ -149,7 +142,7 @@ func NewFlowStart(
 }
 
 // CreateBatch creates a batch for this start using the passed in contact ids
-func (s *FlowStart) CreateBatch(contactIDs []flows.ContactID) *FlowStartBatch {
+func (s *FlowStart) CreateBatch(contactIDs []ContactID) *FlowStartBatch {
 	b := &FlowStartBatch{}
 	b.b.StartID = s.StartID()
 	b.b.OrgID = s.OrgID()
@@ -161,4 +154,24 @@ func (s *FlowStart) CreateBatch(contactIDs []flows.ContactID) *FlowStartBatch {
 	b.b.Parent = s.Parent()
 	b.b.Extra = s.Extra()
 	return b
+}
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i StartID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *StartID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i StartID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *StartID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
 }
