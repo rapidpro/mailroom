@@ -559,10 +559,15 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 	// read our status and duration from our client
 	status, duration := client.StatusForRequest(r)
 
-	// if we errored, mark ourselves appropriately
+	// if we errored schedule a retry if appropriate
 	if status == models.ConnectionStatusErrored {
-		// on errors, we need to look up the flow to know how long to wait before retrying
-		// get the flow for our start
+		// no associated start? this is a permanent failure
+		if conn.StartID() == models.NilStartID {
+			conn.MarkFailed(ctx, db, time.Now())
+			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: F"))
+		}
+
+		// on errors we need to look up the flow to know how long to wait before retrying
 		flowID, err := models.FlowIDForStart(ctx, db, org.OrgID(), conn.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())

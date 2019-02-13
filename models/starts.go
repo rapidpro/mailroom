@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// StartID is our type for flow start ids
+// StartID is our type for flow start idst
 type StartID null.Int
 
 // NilStartID is our constant for a nil start id
@@ -113,7 +113,7 @@ func FlowIDForStart(ctx context.Context, db Queryer, orgID OrgID, startID StartI
 	flowID := FlowID(0)
 	err := db.GetContext(ctx, &flowID, `SELECT flow_id FROM flows_flowstart WHERE id = $1 AND is_active = TRUE`, startID)
 	if err != nil {
-		return flowID, errors.Wrapf(err, "unable to load flow for start")
+		return flowID, errors.Wrapf(err, "unable to load flow for start: %d", startID)
 	}
 	return flowID, nil
 }
