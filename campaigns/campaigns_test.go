@@ -1,7 +1,6 @@
 package campaigns
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -14,12 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(m *testing.M) {
-	testsuite.Reset()
-	os.Exit(m.Run())
-}
-
 func TestCampaigns(t *testing.T) {
+	testsuite.Reset()
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 	rc := testsuite.RC()
@@ -51,6 +46,7 @@ func TestCampaigns(t *testing.T) {
 }
 
 func TestIVRCampaigns(t *testing.T) {
+	testsuite.Reset()
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 	rc := testsuite.RC()
