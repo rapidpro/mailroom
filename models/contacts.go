@@ -621,7 +621,7 @@ func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, con
 
 // StopContact stops the contact with the passed in id, removing them from all groups and setting
 // their state to stopped.
-func StopContact(ctx context.Context, tx *sqlx.Tx, orgID OrgID, contactID ContactID) error {
+func StopContact(ctx context.Context, tx Queryer, orgID OrgID, contactID ContactID) error {
 	// delete the contact from all groups
 	_, err := tx.ExecContext(ctx, deleteAllContactGroupsSQL, orgID, contactID)
 	if err != nil {
@@ -649,7 +649,7 @@ DELETE FROM
 	contacts_contactgroup_contacts
 WHERE
 	contact_id = $2 AND
-	contactgroup_id = (SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type = 'U')
+	contactgroup_id = ANY(SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type = 'U')
 `
 
 const deleteAllContactTriggersSQL = `

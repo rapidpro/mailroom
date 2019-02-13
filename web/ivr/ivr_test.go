@@ -107,7 +107,14 @@ func TestIVR(t *testing.T) {
 		StatusCode   int
 		Contains     string
 	}{
-		{"start", models.TwilioChannelUUID, models.ConnectionID(1), nil, 200, "Hello there. Please enter one or two."},
+		{
+			Action:       "start",
+			ChannelUUID:  models.TwilioChannelUUID,
+			ConnectionID: models.ConnectionID(1),
+			Form:         nil,
+			StatusCode:   200,
+			Contains:     "Hello there. Please enter one or two.",
+		},
 		{
 			Action:       "resume",
 			ChannelUUID:  models.TwilioChannelUUID,
@@ -168,6 +175,30 @@ func TestIVR(t *testing.T) {
 			StatusCode: 200,
 			Contains:   "status updated: D",
 		},
+		{
+			Action:       "incoming",
+			ChannelUUID:  models.TwilioChannelUUID,
+			ConnectionID: models.ConnectionID(2),
+			Form: url.Values{
+				"CallSid":    []string{"Call2"},
+				"CallStatus": []string{"completed"},
+				"Caller":     []string{"+12065551212"},
+			},
+			StatusCode: 200,
+			Contains:   "missed call handled",
+		},
+		{
+			Action:       "status",
+			ChannelUUID:  models.TwilioChannelUUID,
+			ConnectionID: models.ConnectionID(2),
+			Form: url.Values{
+				"CallSid":      []string{"Call2"},
+				"CallStatus":   []string{"failed"},
+				"CallDuration": []string{"50"},
+			},
+			StatusCode: 200,
+			Contains:   "<!--status updated: F-->",
+		},
 	}
 
 	for i, tc := range tcs {
@@ -178,6 +209,9 @@ func TestIVR(t *testing.T) {
 		url := fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/handle", tc.ChannelUUID) + "?" + form.Encode()
 		if tc.Action == "status" {
 			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/status", tc.ChannelUUID)
+		}
+		if tc.Action == "incoming" {
+			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/incoming", tc.ChannelUUID)
 		}
 		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(tc.Form.Encode()))
 		assert.NoError(t, err)
@@ -219,6 +253,12 @@ func TestIVR(t *testing.T) {
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
 		[]interface{}{models.CathyID},
 		6,
+	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`,
+		[]interface{}{},
+		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,

@@ -174,4 +174,14 @@ func TestCreateContact(t *testing.T) {
 		assert.NoError(t, err, "%d: error creating contact", i)
 		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
 	}
+
+	// stop kathy
+	err = StopContact(ctx, db, Org1, CathyID)
+	assert.NoError(t, err)
+
+	// verify she's only in the stopped group
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, []interface{}{CathyID}, 1)
+
+	// verify she's stopped
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE AND is_active = TRUE and is_blocked = FALSE`, []interface{}{CathyID}, 1)
 }
