@@ -1,3 +1,7 @@
+v0.0.92
+----------
+ * reset db between tests
+
 v0.0.91
 ----------
  * mark event fires as fired when starting ivr flows
