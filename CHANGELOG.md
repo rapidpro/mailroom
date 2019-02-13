@@ -1,3 +1,7 @@
+v0.0.89
+----------
+ * fix contact stopping, fix error on status for missed calls
+
 v0.0.88
 ----------
  * better logging of event in case of error during handling
