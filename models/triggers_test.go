@@ -28,6 +28,7 @@ func insertTrigger(t *testing.T, db *sqlx.DB, active bool, flowID FlowID, trigge
 }
 
 func TestTriggers(t *testing.T) {
+	testsuite.Reset()
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
