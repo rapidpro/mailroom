@@ -89,11 +89,11 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 		contactMap[fire.ContactID] = fire
 	}
 
-	sessions, err := runner.FireCampaignEvents(ctx, db, rp, eventTask.OrgID, fires, eventTask.FlowUUID, event)
+	started, err := runner.FireCampaignEvents(ctx, db, rp, eventTask.OrgID, fires, eventTask.FlowUUID, event)
 
 	// remove all the contacts that were started
-	for _, session := range sessions {
-		delete(contactMap, session.ContactID())
+	for _, contactID := range started {
+		delete(contactMap, contactID)
 	}
 
 	// what remains in our contact map are fires that failed for some reason, umark these

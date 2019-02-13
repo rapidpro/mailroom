@@ -99,19 +99,21 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 	}
 
 	// now add all the ids for our groups
-	rows, err := db.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.GroupIDs()))
-	if err != nil {
-		return errors.Wrapf(err, "error selecting contacts for groups")
-	}
-	defer rows.Close()
-
-	var contactID models.ContactID
-	for rows.Next() {
-		err := rows.Scan(&contactID)
+	if len(start.GroupIDs()) > 0 {
+		rows, err := db.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.GroupIDs()))
 		if err != nil {
-			return errors.Wrapf(err, "error scanning contact id")
+			return errors.Wrapf(err, "error selecting contacts for groups")
 		}
-		contactIDs[contactID] = true
+		defer rows.Close()
+
+		var contactID models.ContactID
+		for rows.Next() {
+			err := rows.Scan(&contactID)
+			if err != nil {
+				return errors.Wrapf(err, "error scanning contact id")
+			}
+			contactIDs[contactID] = true
+		}
 	}
 
 	rc := rp.Get()
@@ -136,7 +138,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 		err = queue.AddTask(rc, q, taskType, int(start.OrgID()), batch, queue.DefaultPriority)
 		if err != nil {
 			// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
-			logrus.WithError(err).WithField("start_id", start.StartID).Error("error while queuing start")
+			logrus.WithError(err).WithField("start_id", start.ID()).Error("error while queuing start")
 		}
 		contacts = make([]models.ContactID, 0, 100)
 	}
@@ -155,7 +157,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 	}
 
 	// mark our start as started
-	err = models.MarkStartStarted(ctx, db, start.StartID(), len(contactIDs))
+	err = models.MarkStartStarted(ctx, db, start.ID(), len(contactIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error marking start as started")
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 )
@@ -73,25 +74,26 @@ func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarsha
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
 	s struct {
-		StartID  StartID  `json:"start_id"`
-		OrgID    OrgID    `json:"org_id"`
-		FlowID   FlowID   `json:"flow_id"`
-		FlowType FlowType `json:"flow_type"`
+		ID       StartID    `json:"start_id"   db:"id"`
+		UUID     utils.UUID `                  db:"uuid"`
+		OrgID    OrgID      `json:"org_id"     db:"org_id"`
+		FlowID   FlowID     `json:"flow_id"    db:"flow_id"`
+		FlowType FlowType   `json:"flow_type"`
 
 		GroupIDs      []GroupID   `json:"group_ids,omitempty"`
 		ContactIDs    []ContactID `json:"contact_ids,omitempty"`
 		URNs          []urns.URN  `json:"urns,omitempty"`
 		CreateContact bool        `json:"create_contact"`
 
-		RestartParticipants bool `json:"restart_participants"`
-		IncludeActive       bool `json:"include_active"`
+		RestartParticipants bool `json:"restart_participants" db:"restart_participants"`
+		IncludeActive       bool `json:"include_active"       db:"include_active"`
 
 		Parent json.RawMessage `json:"parent,omitempty"`
-		Extra  json.RawMessage `json:"extra,omitempty"`
+		Extra  json.RawMessage `json:"extra,omitempty"  db:"extra"`
 	}
 }
 
-func (s *FlowStart) StartID() StartID          { return s.s.StartID }
+func (s *FlowStart) ID() StartID               { return s.s.ID }
 func (s *FlowStart) OrgID() OrgID              { return s.s.OrgID }
 func (s *FlowStart) FlowID() FlowID            { return s.s.FlowID }
 func (s *FlowStart) FlowType() FlowType        { return s.s.FlowType }
@@ -125,7 +127,8 @@ func NewFlowStart(
 	restartParticipants bool, includeActive bool, parent json.RawMessage, extra json.RawMessage) *FlowStart {
 
 	s := &FlowStart{}
-	s.s.StartID = startID
+	s.s.ID = startID
+	s.s.UUID = utils.NewUUID()
 	s.s.OrgID = orgID
 	s.s.FlowType = flowType
 	s.s.FlowID = flowID
@@ -141,10 +144,64 @@ func NewFlowStart(
 	return s
 }
 
+type startContacts struct {
+	StartID   StartID   `db:"start_id"`
+	ContactID ContactID `db:"contact_id"`
+}
+
+// InsertFlowStart inserts a flow start with the passed in parameters
+func InsertFlowStart(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID, flowType FlowType,
+	contactIDs []ContactID, restartParticipants bool, includeActive bool) (*FlowStart, error) {
+	start := &FlowStart{}
+	s := &start.s
+
+	s.UUID = utils.NewUUID()
+	s.OrgID = orgID
+	s.FlowID = flowID
+	s.FlowType = flowType
+	s.ContactIDs = contactIDs
+	s.RestartParticipants = restartParticipants
+	s.IncludeActive = includeActive
+
+	// insert our start
+	err := BulkSQL(ctx, "inserting flow start", db, insertStartSQL, []interface{}{s})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting new flow start for flow: %d", flowID)
+	}
+
+	// create our many to many for our contacts
+	scs := make([]interface{}, len(contactIDs))
+	for i := range contactIDs {
+		scs[i] = &startContacts{s.ID, contactIDs[i]}
+	}
+
+	// insert our many to many
+	err = BulkSQL(ctx, "inserting flow start contacts", db, insertStartContactsSQL, scs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting flow start contacts for flow: %d", flowID)
+	}
+
+	return start, nil
+}
+
+const insertStartSQL = `
+INSERT INTO
+	flows_flowstart(is_active, created_on, modified_on,  uuid,  restart_participants,  include_active, contact_count, status,  flow_id)
+			 VALUES(TRUE     , NOW()     , NOW()      , :uuid, :restart_participants, :include_active, 0            , 'P'   , :flow_id)
+RETURNING
+	id
+`
+
+const insertStartContactsSQL = `
+INSERT INTO
+	flows_flowstart_contacts(flowstart_id,  contact_id)
+	                  VALUES(:start_id   , :contact_id)
+`
+
 // CreateBatch creates a batch for this start using the passed in contact ids
 func (s *FlowStart) CreateBatch(contactIDs []ContactID) *FlowStartBatch {
 	b := &FlowStartBatch{}
-	b.b.StartID = s.StartID()
+	b.b.StartID = s.ID()
 	b.b.OrgID = s.OrgID()
 	b.b.FlowID = s.FlowID()
 	b.b.FlowType = s.FlowType()

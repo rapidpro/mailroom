@@ -11,9 +11,11 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
+	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/queue"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -202,7 +204,7 @@ func StartFlowBatch(
 func FireCampaignEvents(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
 	orgID models.OrgID, fires []*models.EventFire, flowUUID assets.FlowUUID,
-	event *triggers.CampaignEvent) ([]*models.Session, error) {
+	event *triggers.CampaignEvent) ([]models.ContactID, error) {
 
 	if len(fires) == 0 {
 		return nil, nil
@@ -274,6 +276,28 @@ func FireCampaignEvents(
 		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())
 	}
 
+	// if this is an ivr flow, we need to create a task to perform the start there
+	if dbFlow.FlowType() == models.IVRFlow {
+		// TODO: this would probably be better done in a transaction..
+		start, err := models.InsertFlowStart(ctx, db, org.OrgID(), dbFlow.ID(), dbFlow.FlowType(), contactIDs, true, true)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error inserting ivr flow start")
+		}
+
+		// create our batch of all our contacts
+		task := start.CreateBatch(contactIDs)
+		task.SetIsLast(true)
+
+		// queue this to our ivr starter, it will take care of creating the connections then calling back in
+		rc := rp.Get()
+		defer rc.Close()
+		err = queue.AddTask(rc, mailroom.BatchQueue, mailroom.StartIVRFlowBatchType, int(org.OrgID()), task, queue.HighPriority)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating ivr flow start")
+		}
+		return contactIDs, nil
+	}
+
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
@@ -327,7 +351,12 @@ func FireCampaignEvents(
 	librato.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
 	librato.Gauge("mr.campaign_event_count", float64(len(sessions)))
 
-	return sessions, nil
+	// build the list of contacts actually started
+	startedContacts := make([]models.ContactID, len(sessions))
+	for i := range sessions {
+		startedContacts[i] = sessions[i].ContactID()
+	}
+	return startedContacts, nil
 }
 
 // StartFlow runs the passed in flow for the passed in contact
