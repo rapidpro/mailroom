@@ -1,3 +1,7 @@
+v0.0.90
+----------
+ * allow ivr flows to be started via campaigns
+
 v0.0.89
 ----------
  * fix contact stopping, fix error on status for missed calls
