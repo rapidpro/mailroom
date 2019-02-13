@@ -82,6 +82,9 @@ func TestIVRCampaigns(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart_contacts WHERE contact_id = $1 AND flowstart_id = 1;`, []interface{}{models.CathyID}, 1)
 	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart_contacts WHERE contact_id = $1 AND flowstart_id = 1;`, []interface{}{models.GeorgeID}, 1)
 
+	// event should be marked as fired
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from campaigns_eventfire WHERE event_id = $1 AND fired IS NOT NULL;`, []interface{}{models.RemindersEvent1ID}, 2)
+
 	// pop our next task, should be the start
 	task, err = queue.PopNextTask(rc, mailroom.BatchQueue)
 	assert.NoError(t, err)

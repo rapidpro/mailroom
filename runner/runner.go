@@ -278,10 +278,27 @@ func FireCampaignEvents(
 
 	// if this is an ivr flow, we need to create a task to perform the start there
 	if dbFlow.FlowType() == models.IVRFlow {
-		// TODO: this would probably be better done in a transaction..
-		start, err := models.InsertFlowStart(ctx, db, org.OrgID(), dbFlow.ID(), dbFlow.FlowType(), contactIDs, true, true)
+		tx, _ := db.BeginTxx(ctx, nil)
+
+		// insert our start
+		start, err := models.InsertFlowStart(ctx, tx, org.OrgID(), dbFlow.ID(), dbFlow.FlowType(), contactIDs, true, true)
 		if err != nil {
+			tx.Rollback()
 			return nil, errors.Wrapf(err, "error inserting ivr flow start")
+		}
+
+		// mark our events as fired
+		err = models.MarkEventsFired(ctx, tx, fires, time.Now())
+		if err != nil {
+			tx.Rollback()
+			return nil, errors.Wrapf(err, "error marking events as fired")
+		}
+
+		// commit our transaction
+		err = tx.Commit()
+		if err != nil {
+			tx.Rollback()
+			return nil, errors.Wrapf(err, "error committing transaction for ivr flow starts")
 		}
 
 		// create our batch of all our contacts
@@ -293,8 +310,9 @@ func FireCampaignEvents(
 		defer rc.Close()
 		err = queue.AddTask(rc, mailroom.BatchQueue, mailroom.StartIVRFlowBatchType, int(org.OrgID()), task, queue.HighPriority)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error creating ivr flow start")
+			return nil, errors.Wrapf(err, "error queuing ivr flow start")
 		}
+
 		return contactIDs, nil
 	}
 
