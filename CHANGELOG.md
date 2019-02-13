@@ -1,3 +1,7 @@
+v0.0.91
+----------
+ * mark event fires as fired when starting ivr flows
+
 v0.0.90
 ----------
  * allow ivr flows to be started via campaigns
