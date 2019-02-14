@@ -437,33 +437,27 @@ func MarkMessagesQueued(ctx context.Context, tx *sqlx.Tx, msgs []*Msg) error {
 
 // MarkMessagesQueued marks the passed in messages as queued
 func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status MsgStatus) error {
-	ids := make([]int, len(msgs))
-	for i, m := range msgs {
-		ids[i] = int(m.m.ID)
+	is := make([]interface{}, len(msgs))
+	for i, msg := range msgs {
+		m := &msg.m
+		m.Status = status
+		is[i] = m
 	}
 
-	q, vs, err := sqlx.In(updateMsgStatusSQL, ids, status)
-	if err != nil {
-		return errors.Wrap(err, "error preparing query for updating message status")
-	}
-	q = tx.Rebind(q)
-
-	_, err = tx.ExecContext(ctx, q, vs...)
-	if err != nil {
-		return errors.Wrap(err, "error updating message status")
-	}
-
-	return nil
+	return BulkSQL(ctx, "updating message status", tx, updateMsgStatusSQL, is)
 }
 
 const updateMsgStatusSQL = `
 UPDATE 
 	msgs_msg
-SET 
-	status = $1, 
-	modified_on = NOW()
+SET
+	status = m.status
+FROM (
+	VALUES(:id, :status)
+) AS
+	m(id, status)
 WHERE
-	id IN (?)
+	msgs_msg.id = m.id::int
 `
 
 // BroadcastTranslation is the translation for the passed in language
