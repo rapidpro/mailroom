@@ -1,3 +1,8 @@
+v0.0.93
+----------
+ * dont queue messages with no topup assigned, latest goflow
+ * try to derive content type for webhook payloads
+
 v0.0.92
 ----------
  * reset db between tests
