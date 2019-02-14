@@ -438,9 +438,10 @@ func MarkMessagesQueued(ctx context.Context, tx *sqlx.Tx, msgs []*Msg) error {
 // MarkMessagesQueued marks the passed in messages as queued
 func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status MsgStatus) error {
 	is := make([]interface{}, len(msgs))
-	for i := range msgs {
-		msgs[i].m.Status = status
-		is[i] = msgs[i].m
+	for i, msg := range msgs {
+		m := &msg.m
+		m.Status = status
+		is[i] = m
 	}
 
 	return BulkSQL(ctx, "updating message status", tx, updateMsgStatusSQL, is)
