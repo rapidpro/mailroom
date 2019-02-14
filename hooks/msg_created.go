@@ -30,32 +30,52 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 	rc := rp.Get()
 	defer rc.Close()
 
+	// messages that need to be marked as pending
+	pending := make([]*models.Msg, 0, 1)
+
+	// for each session gather all our messages
 	for s, args := range sessions {
-		// create our message array
-		msgs := make([]*models.Msg, len(args))
-		for i, m := range args {
-			msgs[i] = m.(*models.Msg)
-		}
-
-		// if our session has a timeout, set it on our last message
-		if s.Timeout() != nil && s.WaitStartedOn() != nil {
-			msgs[len(msgs)-1].SetTimeout(s.ID(), *s.WaitStartedOn(), *s.Timeout())
-		}
-
-		log := log.WithField("messages", msgs).WithField("session", s.ID)
-
-		err := courier.QueueMessages(rc, msgs)
-
-		// not being able to queue a message isn't the end of the world, log but don't return an error
-		if err != nil {
-			log.WithError(err).Error("error queuing message")
-
-			// in the case of errors we do want to change the messages back to pending however so they
-			// get queued later. (for the common case messages are only inserted and queued, without a status update)
-			err = models.MarkMessagesPending(ctx, tx, msgs)
-			if err != nil {
-				log.WithError(err).Error("error marking message as pending")
+		// walk through our messages, separate by whether they have a topup
+		msgs := make([]*models.Msg, 0, len(args))
+		for _, m := range args {
+			msg := m.(*models.Msg)
+			if msg.TopupID() != models.NilTopupID {
+				msgs = append(msgs, msg)
+			} else {
+				pending = append(pending, msg)
 			}
+		}
+
+		// if there are messages to send, do so
+		if len(msgs) > 0 {
+			// if our session has a timeout, set it on our last message
+			if s.Timeout() != nil && s.WaitStartedOn() != nil {
+				msgs[len(msgs)-1].SetTimeout(s.ID(), *s.WaitStartedOn(), *s.Timeout())
+			}
+
+			log := log.WithField("messages", msgs).WithField("session", s.ID)
+
+			err := courier.QueueMessages(rc, msgs)
+
+			// not being able to queue a message isn't the end of the world, log but don't return an error
+			if err != nil {
+				log.WithError(err).Error("error queuing message")
+
+				// in the case of errors we do want to change the messages back to pending however so they
+				// get queued later. (for the common case messages are only inserted and queued, without a status update)
+				for _, msg := range msgs {
+					pending = append(pending, msg)
+				}
+			}
+		}
+	}
+
+	// any messages that didn't get sent should be moved back to pending (they are queued at creation to save an
+	// update in the common case)
+	if len(pending) > 0 {
+		err := models.MarkMessagesPending(ctx, tx, pending)
+		if err != nil {
+			log.WithError(err).Error("error marking message as pending")
 		}
 	}
 
