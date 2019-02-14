@@ -333,7 +333,6 @@ LEFT JOIN (
 ) u ON c.id = u.contact_id
 WHERE 
 	c.id = ANY($1) AND
-	is_test = FALSE AND
 	is_active = TRUE
 ) r;
 `
