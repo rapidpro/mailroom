@@ -1,3 +1,7 @@
+v0.0.94
+----------
+ * fix for duplicate fields deletion in single flow only applying one
+
 v0.0.93
 ----------
  * dont queue messages with no topup assigned, latest goflow
