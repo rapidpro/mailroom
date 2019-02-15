@@ -7,11 +7,17 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/testsuite"
 )
 
 func TestContactFieldChanged(t *testing.T) {
 	gender := assets.NewFieldReference("gender", "Gender")
 	age := assets.NewFieldReference("age", "Age")
+
+	db := testsuite.DB()
+
+	// populate some field values on alexandria
+	db.Exec(`UPDATE contacts_contact SET fields = '{"903f51da-2717-47c7-a0d3-f2f32877013d": {"text":"34"}, "3a5891e4-756e-4dc9-8e12-b7a766168824": {"text":"female"}}' WHERE id = $1`, models.AlexandriaID)
 
 	tcs := []HookTestCase{
 		HookTestCase{
@@ -30,6 +36,10 @@ func TestContactFieldChanged(t *testing.T) {
 					actions.NewSetContactFieldAction(newActionUUID(), gender, ""),
 					actions.NewSetContactFieldAction(newActionUUID(), gender, "Male"),
 					actions.NewSetContactFieldAction(newActionUUID(), age, "Old"),
+				},
+				models.AlexandriaID: []flows.Action{
+					actions.NewSetContactFieldAction(newActionUUID(), age, ""),
+					actions.NewSetContactFieldAction(newActionUUID(), gender, ""),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
@@ -66,6 +76,11 @@ func TestContactFieldChanged(t *testing.T) {
 				SQLAssertion{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
 					Args:  []interface{}{models.BobID, "unknown"},
+					Count: 1,
+				},
+				SQLAssertion{
+					SQL:   `select count(*) from contacts_contact where id = $1 AND fields = '{}'`,
+					Args:  []interface{}{models.AlexandriaID},
 					Count: 1,
 				},
 			},

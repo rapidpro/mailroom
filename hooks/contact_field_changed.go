@@ -26,7 +26,7 @@ var commitFieldChangesHook = &CommitFieldChangesHook{}
 func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// our list of updates
 	fieldUpdates := make([]interface{}, 0, len(sessions))
-	fieldDeletes := make([]interface{}, 0)
+	fieldDeletes := make(map[models.FieldUUID][]interface{})
 	for session, es := range sessions {
 		updates := make(map[models.FieldUUID]*flows.Value, len(es))
 		for _, e := range es {
@@ -48,7 +48,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 		for k, v := range updates {
 			if v == nil || v.Text.Native() == "" {
 				delete(updates, k)
-				fieldDeletes = append(fieldDeletes, &FieldDelete{
+				fieldDeletes[k] = append(fieldDeletes[k], &FieldDelete{
 					ContactID: session.ContactID(),
 					FieldUUID: k,
 				})
@@ -69,8 +69,9 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 	}
 
 	// first apply our deletes
-	if len(fieldDeletes) > 0 {
-		err := models.BulkSQL(ctx, "deleting contact field values", tx, deleteContactFieldsSQL, fieldDeletes)
+	// in pg9.6 we need to do this as one query per field type, in pg10 we can rewrite this to be a single query
+	for _, fds := range fieldDeletes {
+		err := models.BulkSQL(ctx, "deleting contact field values", tx, deleteContactFieldsSQL, fds)
 		if err != nil {
 			return errors.Wrapf(err, "error deleting contact fields")
 		}
