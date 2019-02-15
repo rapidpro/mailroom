@@ -11,7 +11,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/models"
@@ -278,41 +277,13 @@ func FireCampaignEvents(
 
 	// if this is an ivr flow, we need to create a task to perform the start there
 	if dbFlow.FlowType() == models.IVRFlow {
-		tx, _ := db.BeginTxx(ctx, nil)
-
-		// insert our start
-		start, err := models.InsertFlowStart(ctx, tx, org.OrgID(), dbFlow.ID(), dbFlow.FlowType(), contactIDs, true, true)
+		// Trigger our IVR flow start
+		err := TriggerIVRFlow(ctx, db, rp, org.OrgID(), dbFlow.ID(), contactIDs, func(ctx context.Context, tx *sqlx.Tx) error {
+			return models.MarkEventsFired(ctx, tx, fires, time.Now())
+		})
 		if err != nil {
-			tx.Rollback()
-			return nil, errors.Wrapf(err, "error inserting ivr flow start")
+			return nil, errors.Wrapf(err, "error triggering ivr flow start")
 		}
-
-		// mark our events as fired
-		err = models.MarkEventsFired(ctx, tx, fires, time.Now())
-		if err != nil {
-			tx.Rollback()
-			return nil, errors.Wrapf(err, "error marking events as fired")
-		}
-
-		// commit our transaction
-		err = tx.Commit()
-		if err != nil {
-			tx.Rollback()
-			return nil, errors.Wrapf(err, "error committing transaction for ivr flow starts")
-		}
-
-		// create our batch of all our contacts
-		task := start.CreateBatch(contactIDs)
-		task.SetIsLast(true)
-
-		// queue this to our ivr starter, it will take care of creating the connections then calling back in
-		rc := rp.Get()
-		defer rc.Close()
-		err = queue.AddTask(rc, mailroom.BatchQueue, mailroom.StartIVRFlowBatchType, int(org.OrgID()), task, queue.HighPriority)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error queuing ivr flow start")
-		}
-
 		return contactIDs, nil
 	}
 
@@ -684,4 +655,47 @@ func StartFlowForContacts(
 	// figure out both average and total for total execution and commit time for our flows
 	log.WithField("elapsed", time.Since(start)).WithField("count", len(dbSessions)).Info("flow started, sessions created")
 	return dbSessions, nil
+}
+
+type DBHook func(ctx context.Context, tx *sqlx.Tx) error
+
+// TriggerIVRFlow will create a new flow start with the passed in flow and set of contacts. This will cause us to
+// request calls to start, which once we get the callback will trigger our actual flow to start.
+func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID models.OrgID, flowID models.FlowID, contactIDs []models.ContactID, hook DBHook) error {
+	tx, _ := db.BeginTxx(ctx, nil)
+
+	// insert our start
+	start, err := models.InsertFlowStart(ctx, tx, orgID, flowID, models.IVRFlow, contactIDs, true, true)
+	if err != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error inserting ivr flow start")
+	}
+
+	// call our hook
+	err = hook(ctx, tx)
+	if err != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error while calling db hook")
+	}
+
+	// commit our transaction
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error committing transaction for ivr flow starts")
+	}
+
+	// create our batch of all our contacts
+	task := start.CreateBatch(contactIDs)
+	task.SetIsLast(true)
+
+	// queue this to our ivr starter, it will take care of creating the connections then calling back in
+	rc := rp.Get()
+	defer rc.Close()
+	err = queue.AddTask(rc, queue.BatchQueue, queue.StartIVRFlowBatch, int(orgID), task, queue.HighPriority)
+	if err != nil {
+		return errors.Wrapf(err, "error queuing ivr flow start")
+	}
+
+	return nil
 }

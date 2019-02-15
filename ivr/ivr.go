@@ -300,7 +300,6 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 
 // WriteErrorResponse marks the passed in connection as errored and writes the appropriate error response to our writer
 func WriteErrorResponse(ctx context.Context, db *sqlx.DB, client Client, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
-	// TODO: mark our session as complete as well
 	err := conn.MarkFailed(ctx, db, time.Now())
 	if err != nil {
 		logrus.WithError(err).Error("error when trying to mark connection as errored")
@@ -403,7 +402,7 @@ func ResumeIVRFlow(
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
-	session, err := models.ActiveSessionForContact(ctx, db, org, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, org, models.IVRFlow, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading session for contact")
 	}

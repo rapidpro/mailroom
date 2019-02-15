@@ -4,8 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/mailroom"
-
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -32,7 +30,7 @@ func TestCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// then actually work on the event
-	task, err := queue.PopNextTask(rc, mailroom.BatchQueue)
+	task, err := queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
@@ -65,7 +63,7 @@ func TestIVRCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// then actually work on the event
-	task, err := queue.PopNextTask(rc, mailroom.BatchQueue)
+	task, err := queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
@@ -82,9 +80,9 @@ func TestIVRCampaigns(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from campaigns_eventfire WHERE event_id = $1 AND fired IS NOT NULL;`, []interface{}{models.RemindersEvent1ID}, 2)
 
 	// pop our next task, should be the start
-	task, err = queue.PopNextTask(rc, mailroom.BatchQueue)
+	task, err = queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
-	assert.Equal(t, task.Type, mailroom.StartIVRFlowBatchType)
+	assert.Equal(t, task.Type, queue.StartIVRFlowBatch)
 }

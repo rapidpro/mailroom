@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -93,7 +92,7 @@ func TestMsgEvents(t *testing.T) {
 		err = AddHandleTask(rc, tc.ContactID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
-		task, err = queue.PopNextTask(rc, mailroom.HandlerQueue)
+		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
 		err = handleContactEvent(ctx, db, rp, task)
@@ -170,7 +169,7 @@ func TestChannelEvents(t *testing.T) {
 		err = AddHandleTask(rc, tc.ContactID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
-		task, err = queue.PopNextTask(rc, mailroom.HandlerQueue)
+		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
 		err = handleContactEvent(ctx, db, rp, task)
@@ -282,7 +281,7 @@ func TestTimedEvents(t *testing.T) {
 		err := AddHandleTask(rc, tc.ContactID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
-		task, err = queue.PopNextTask(rc, mailroom.HandlerQueue)
+		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
 		err = handleContactEvent(ctx, db, rp, task)

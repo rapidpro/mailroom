@@ -328,8 +328,8 @@ func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session
 }
 
 // ActiveSessionForContact returns the active session for the passed in contact, if any
-func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *flows.Contact) (*Session, error) {
-	rows, err := db.QueryxContext(ctx, selectLastSessionSQL, contact.ID())
+func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, sessionType FlowType, contact *flows.Contact) (*Session, error) {
+	rows, err := db.QueryxContext(ctx, selectLastSessionSQL, sessionType, contact.ID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting active session")
 	}
@@ -372,7 +372,8 @@ SELECT
 FROM 
 	flows_flowsession
 WHERE
-	contact_id = $1 AND
+    session_type = $1 AND
+	contact_id = $2 AND
 	status = 'W'
 ORDER BY
 	created_on DESC

@@ -21,8 +21,8 @@ const (
 )
 
 func init() {
-	mailroom.AddTaskFunction(mailroom.SendBroadcastType, handleSendBroadcast)
-	mailroom.AddTaskFunction(mailroom.SendBroadcastBatchType, handleSendBroadcastBatch)
+	mailroom.AddTaskFunction(queue.SendBroadcast, handleSendBroadcast)
+	mailroom.AddTaskFunction(queue.SendBroadcastBatch, handleSendBroadcastBatch)
 }
 
 // handleSendBroadcast creates all the batches of contacts that need to be sent to
@@ -31,7 +31,7 @@ func handleSendBroadcast(ctx context.Context, mr *mailroom.Mailroom, task *queue
 	defer cancel()
 
 	// decode our task body
-	if task.Type != mailroom.SendBroadcastType {
+	if task.Type != queue.SendBroadcast {
 		return errors.Errorf("unknown event type passed to send worker: %s", task.Type)
 	}
 	broadcast := &models.Broadcast{}
@@ -75,11 +75,11 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	urnContacts := make(map[models.ContactID]urns.URN)
 	repeatedContacts := make(map[models.ContactID]urns.URN)
 
-	q := mailroom.BatchQueue
+	q := queue.BatchQueue
 
 	// two or fewer contacts? queue to our handler queue for sending
 	if len(contactIDs) <= 2 {
-		q = mailroom.HandlerQueue
+		q = queue.HandlerQueue
 	}
 
 	// we want to remove contacts that are also present in URN sends, these will be a special case in our last batch
@@ -113,7 +113,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 			batch.SetURNs(urnContacts)
 		}
 
-		err = queue.AddTask(rc, q, mailroom.SendBroadcastBatchType, int(bcast.OrgID()), batch, queue.DefaultPriority)
+		err = queue.AddTask(rc, q, queue.SendBroadcastBatch, int(bcast.OrgID()), batch, queue.DefaultPriority)
 		if err != nil {
 			logrus.WithError(err).Error("error while queuing broadcast batch")
 		}
@@ -140,7 +140,7 @@ func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *
 	defer cancel()
 
 	// decode our task body
-	if task.Type != mailroom.SendBroadcastBatchType {
+	if task.Type != queue.SendBroadcastBatch {
 		return errors.Errorf("unknown event type passed to send worker: %s", task.Type)
 	}
 	broadcast := &models.BroadcastBatch{}

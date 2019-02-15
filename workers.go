@@ -9,21 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// task types
-const (
-	StartFlowType = "start_flow"
-
-	SendBroadcastType      = "send_broadcast"
-	SendBroadcastBatchType = "send_broadcast_batch"
-
-	FireCampaignEventType = "fire_campaign_event"
-
-	HandleContactEvent = "handle_contact_event"
-
-	StartFlowBatchType    = "start_flow_batch"
-	StartIVRFlowBatchType = "start_ivr_flow_batch"
-)
-
 // Foreman takes care of managing our set of workers and assigns msgs for each to send
 type Foreman struct {
 	mr               *Mailroom

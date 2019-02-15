@@ -31,6 +31,33 @@ const (
 
 	// LowPriority is the lowest priority for tasks
 	LowPriority = Priority(+10000000)
+
+	// BatchQueue is our queue for batch tasks, most things that operate on more than one cotact at a time
+	BatchQueue = "batch"
+
+	// HandlerQueue is our queue for message handling or other tasks related to just one contact
+	HandlerQueue = "handler"
+
+	// SendBroadcast is our type for sending a broadcast
+	SendBroadcast = "send_broadcast"
+
+	// SendBroadcastBatch is our type for sending a broadcast batch
+	SendBroadcastBatch = "send_broadcast_batch"
+
+	// FireCampaignEvent is our type for firing a campaign event
+	FireCampaignEvent = "fire_campaign_event"
+
+	// HandleContactEvent is our task for event handling
+	HandleContactEvent = "handle_contact_event"
+
+	// StartFlow is our task type to start a flow
+	StartFlow = "start_flow"
+
+	// StartFlowBatch is our task for starting a flow batch
+	StartFlowBatch = "start_flow_batch"
+
+	// StartIVRFlowBatch is our task for starting an ivr batch
+	StartIVRFlowBatch = "start_ivr_flow_batch"
 )
 
 // AddTask adds the passed in task to our queue for execution

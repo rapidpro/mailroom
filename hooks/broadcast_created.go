@@ -7,7 +7,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/pkg/errors"
@@ -44,16 +43,16 @@ func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 				return errors.Wrapf(err, "error creating broadcast")
 			}
 
-			taskQ := mailroom.HandlerQueue
+			taskQ := queue.HandlerQueue
 			priority := queue.DefaultPriority
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
 			if len(bcast.GroupIDs()) > 0 {
-				taskQ = mailroom.BatchQueue
+				taskQ = queue.BatchQueue
 				priority = queue.HighPriority
 			}
 
-			err = queue.AddTask(rc, taskQ, mailroom.SendBroadcastType, int(org.OrgID()), bcast, priority)
+			err = queue.AddTask(rc, taskQ, queue.SendBroadcast, int(org.OrgID()), bcast, priority)
 			if err != nil {
 				return errors.Wrapf(err, "error queuing broadcast")
 			}

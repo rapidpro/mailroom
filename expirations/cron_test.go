@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/handler"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/marker"
@@ -77,7 +76,7 @@ func TestExpirations(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.GeorgeID}, 0)
 
 	// should have created one task
-	task, err := queue.PopNextTask(rc, mailroom.HandlerQueue)
+	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
@@ -90,7 +89,7 @@ func TestExpirations(t *testing.T) {
 	assert.Equal(t, models.GeorgeID, eventTask.ContactID)
 
 	// no other tasks
-	task, err = queue.PopNextTask(rc, mailroom.HandlerQueue)
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	assert.Nil(t, task)
 }

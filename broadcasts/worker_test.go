@@ -11,7 +11,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -67,14 +66,14 @@ func TestBroadcasts(t *testing.T) {
 		BatchCount   int
 		MsgCount     int
 	}{
-		{basic, eng, doctorsOnly, nil, nil, mailroom.BatchQueue, 2, 121},
-		{basic, eng, doctorsOnly, georgeOnly, nil, mailroom.BatchQueue, 2, 121},
-		{basic, eng, nil, georgeOnly, nil, mailroom.HandlerQueue, 1, 0},
-		{basic, eng, doctorsOnly, cathyOnly, nil, mailroom.BatchQueue, 2, 121},
-		{basic, eng, nil, cathyOnly, nil, mailroom.HandlerQueue, 1, 1},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, mailroom.HandlerQueue, 1, 1},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, mailroom.HandlerQueue, 1, 2},
-		{basic, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, mailroom.HandlerQueue, 1, 1},
+		{basic, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121},
+		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121},
+		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0},
+		{basic, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121},
+		{basic, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1},
+		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1},
+		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2},
+		{basic, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1},
 	}
 
 	lastNow := time.Now()
@@ -100,7 +99,7 @@ func TestBroadcasts(t *testing.T) {
 			}
 
 			count++
-			assert.Equal(t, mailroom.SendBroadcastBatchType, task.Type)
+			assert.Equal(t, queue.SendBroadcastBatch, task.Type)
 			batch := &models.BroadcastBatch{}
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)

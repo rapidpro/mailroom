@@ -7,7 +7,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/pkg/errors"
@@ -69,16 +68,16 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 				event.RunSummary, nil,
 			)
 
-			taskQ := mailroom.HandlerQueue
+			taskQ := queue.HandlerQueue
 			priority := queue.DefaultPriority
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
 			if len(start.GroupIDs()) > 0 {
-				taskQ = mailroom.BatchQueue
+				taskQ = queue.BatchQueue
 				priority = queue.HighPriority
 			}
 
-			err = queue.AddTask(rc, taskQ, mailroom.StartFlowType, int(org.OrgID()), start, priority)
+			err = queue.AddTask(rc, taskQ, queue.StartFlow, int(org.OrgID()), start, priority)
 			if err != nil {
 				return errors.Wrapf(err, "error queuing flow start")
 			}

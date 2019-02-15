@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -37,7 +36,7 @@ func TestBroadcastCreated(t *testing.T) {
 			},
 			Assertions: []Assertion{
 				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
-					task, err := queue.PopNextTask(rc, mailroom.HandlerQueue)
+					task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)
 					bcast := models.Broadcast{}

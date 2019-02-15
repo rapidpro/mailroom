@@ -6,7 +6,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -48,13 +47,13 @@ func TestStarts(t *testing.T) {
 		BatchCount          int
 		TotalCount          int
 	}{
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, nil, false, false, mailroom.BatchQueue, 121, 2, 121},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.CathyID}, false, false, mailroom.BatchQueue, 121, 2, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.CathyID}, true, true, mailroom.HandlerQueue, 1, 1, 1},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.BobID}, false, false, mailroom.BatchQueue, 122, 2, 1},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, false, false, mailroom.HandlerQueue, 1, 1, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, false, true, mailroom.HandlerQueue, 1, 1, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, true, true, mailroom.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, nil, false, false, queue.BatchQueue, 121, 2, 121},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.CathyID}, false, false, queue.BatchQueue, 121, 2, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.CathyID}, true, true, queue.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.BobID}, false, false, queue.BatchQueue, 122, 2, 1},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, false, false, queue.HandlerQueue, 1, 1, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, false, true, queue.HandlerQueue, 1, 1, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, true, true, queue.HandlerQueue, 1, 1, 1},
 	}
 
 	for i, tc := range tcs {
@@ -82,7 +81,7 @@ func TestStarts(t *testing.T) {
 			}
 
 			count++
-			assert.Equal(t, mailroom.StartFlowBatchType, task.Type)
+			assert.Equal(t, queue.StartFlowBatch, task.Type)
 			batch := &models.FlowStartBatch{}
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
