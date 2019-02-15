@@ -671,11 +671,13 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 		return errors.Wrapf(err, "error inserting ivr flow start")
 	}
 
-	// call our hook
-	err = hook(ctx, tx)
-	if err != nil {
-		tx.Rollback()
-		return errors.Wrapf(err, "error while calling db hook")
+	// call our hook if we have one
+	if hook != nil {
+		err = hook(ctx, tx)
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error while calling db hook")
+		}
 	}
 
 	// commit our transaction
