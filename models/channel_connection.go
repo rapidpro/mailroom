@@ -228,7 +228,7 @@ FROM
 WHERE
 	cc.channel_id = $1 AND
 	cc.connection_type = $2 AND
-	cc.external_id = $3 AND
+	cc.external_id = $3
 `
 
 // SelectChannelConnectionByExternalID loads a channel connection by id
