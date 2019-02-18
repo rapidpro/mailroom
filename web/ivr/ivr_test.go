@@ -121,6 +121,18 @@ func TestIVR(t *testing.T) {
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
 				"wait_type":  []string{"gather"},
+				"timeout":    []string{"true"},
+			},
+			StatusCode: 200,
+			Contains:   "Sorry, that is not one or two, try again.",
+		},
+		{
+			Action:       "resume",
+			ChannelUUID:  models.TwilioChannelUUID,
+			ConnectionID: models.ConnectionID(1),
+			Form: url.Values{
+				"CallStatus": []string{"in-progress"},
+				"wait_type":  []string{"gather"},
 				"Digits":     []string{"1"},
 			},
 			StatusCode: 200,
@@ -251,7 +263,7 @@ func TestIVR(t *testing.T) {
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
 		[]interface{}{models.CathyID},
-		6,
+		7,
 	)
 
 	testsuite.AssertQueryCount(t, db,
@@ -263,6 +275,6 @@ func TestIVR(t *testing.T) {
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`,
 		[]interface{}{models.CathyID},
-		4,
+		5,
 	)
 }

@@ -407,12 +407,16 @@ func ResumeIVRFlow(
 		return errors.Wrapf(err, "error loading session for contact")
 	}
 
+	if session == nil {
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("no active IVR session for contact"))
+	}
+
 	if session.ConnectionID() == nil {
 		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
 	}
 
 	if *session.ConnectionID() != conn.ID() {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d does not match connetion: %d", session.ID(), *session.ConnectionID()))
+		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
 	}
 
 	// preprocess this request
