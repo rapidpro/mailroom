@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/handler"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/marker"
@@ -37,7 +36,7 @@ func TestTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should have created one task
-	task, err := queue.PopNextTask(rc, mailroom.HandlerQueue)
+	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
@@ -50,7 +49,7 @@ func TestTimeouts(t *testing.T) {
 	assert.Equal(t, models.CathyID, eventTask.ContactID)
 
 	// no other
-	task, err = queue.PopNextTask(rc, mailroom.HandlerQueue)
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	assert.Nil(t, task)
 }

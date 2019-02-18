@@ -13,7 +13,6 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -84,7 +83,7 @@ func TestIVR(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should have one task in our ivr queue
-	task, err := queue.PopNextTask(rc, mailroom.HandlerQueue)
+	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	batch := &models.FlowStartBatch{}
 	err = json.Unmarshal(task.Task, batch)

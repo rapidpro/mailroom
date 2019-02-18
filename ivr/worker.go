@@ -16,12 +16,12 @@ import (
 )
 
 func init() {
-	mailroom.AddTaskFunction(mailroom.StartIVRFlowBatchType, handleFlowStartTask)
+	mailroom.AddTaskFunction(queue.StartIVRFlowBatch, handleFlowStartTask)
 }
 
 func handleFlowStartTask(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
 	// decode our task body
-	if task.Type != mailroom.StartIVRFlowBatchType {
+	if task.Type != queue.StartIVRFlowBatch {
 		return errors.Errorf("unknown event type passed to ivr worker: %s", task.Type)
 	}
 	batch := &models.FlowStartBatch{}

@@ -24,8 +24,8 @@ const (
 )
 
 func init() {
-	mailroom.AddTaskFunction(mailroom.StartFlowType, handleFlowStart)
-	mailroom.AddTaskFunction(mailroom.StartFlowBatchType, handleFlowStartBatch)
+	mailroom.AddTaskFunction(queue.StartFlow, handleFlowStart)
+	mailroom.AddTaskFunction(queue.StartFlowBatch, handleFlowStartBatch)
 }
 
 // handleFlowStart creates all the batches of contacts to start in a flow
@@ -34,7 +34,7 @@ func handleFlowStart(ctx context.Context, mr *mailroom.Mailroom, task *queue.Tas
 	defer cancel()
 
 	// decode our task body
-	if task.Type != mailroom.StartFlowType {
+	if task.Type != queue.StartFlow {
 		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
 	}
 	startTask := &models.FlowStart{}
@@ -120,15 +120,15 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 	defer rc.Close()
 
 	// by default we start in the batch queue unless we have two or fewer contacts
-	q := mailroom.BatchQueue
+	q := queue.BatchQueue
 	if len(contactIDs) <= 2 {
-		q = mailroom.HandlerQueue
+		q = queue.HandlerQueue
 	}
 
 	// task is different if we are an IVR flow
-	taskType := mailroom.StartFlowBatchType
+	taskType := queue.StartFlowBatch
 	if start.FlowType() == models.IVRFlow {
-		taskType = mailroom.StartIVRFlowBatchType
+		taskType = queue.StartIVRFlowBatch
 	}
 
 	contacts := make([]models.ContactID, 0, 100)
@@ -171,7 +171,7 @@ func handleFlowStartBatch(ctx context.Context, mr *mailroom.Mailroom, task *queu
 	defer cancel()
 
 	// decode our task body
-	if task.Type != mailroom.StartFlowBatchType {
+	if task.Type != queue.StartFlowBatch {
 		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
 	}
 	startBatch := &models.FlowStartBatch{}

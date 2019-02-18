@@ -74,7 +74,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 			task.FireIDs = fireIDs[:batchSize]
 			fireIDs = fireIDs[batchSize:]
 
-			err = queue.AddTask(rc, mailroom.BatchQueue, mailroom.FireCampaignEventType, int(task.OrgID), task, queue.DefaultPriority)
+			err = queue.AddTask(rc, queue.BatchQueue, queue.FireCampaignEvent, int(task.OrgID), task, queue.DefaultPriority)
 			if err != nil {
 				return errors.Wrap(err, "error queuing task")
 			}

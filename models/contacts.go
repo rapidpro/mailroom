@@ -98,7 +98,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 		for _, u := range e.URNs {
 			urn, err := u.AsURN(org)
 			if err != nil {
-				logrus.Error("invalid URN, ignoring")
+				logrus.WithField("urn", urn).WithField("org_id", org.OrgID()).WithField("contact_id", contact.id).Error("invalid URN, ignoring")
 				continue
 			}
 			contactURNs = append(contactURNs, urn)

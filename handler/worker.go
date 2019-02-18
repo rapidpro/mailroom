@@ -32,7 +32,7 @@ const (
 )
 
 func init() {
-	mailroom.AddTaskFunction(mailroom.HandleContactEvent, handleEvent)
+	mailroom.AddTaskFunction(queue.HandleContactEvent, handleEvent)
 }
 
 // AddHandleTask adds a single task for the passed in contact
@@ -54,7 +54,7 @@ func AddHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task) 
 	contactTask := &HandleEventTask{ContactID: contactID}
 
 	// then add a handle task for that contact
-	err = queue.AddTask(rc, mailroom.HandlerQueue, mailroom.HandleContactEvent, task.OrgID, contactTask, queue.DefaultPriority)
+	err = queue.AddTask(rc, queue.HandlerQueue, queue.HandleContactEvent, task.OrgID, contactTask, queue.DefaultPriority)
 	if err != nil {
 		return errors.Wrapf(err, "error adding handle event task")
 	}
@@ -195,7 +195,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	}
 
 	// get the active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, db, org, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, org, models.MessagingFlow, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}
@@ -250,7 +250,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 }
 
 // HandleChannelEvent is called for channel events
-func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType models.ChannelEventType, event *models.ChannelEvent, hook models.SessionCommitHook) (*models.Session, error) {
+func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
 	org, err := models.GetOrgAssets(ctx, db, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
@@ -338,6 +338,15 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		return nil, nil
 	}
 
+	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
+	if flow.FlowType() == models.IVRFlow && conn == nil {
+		err = runner.TriggerIVRFlow(ctx, db, rp, org.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error while triggering ivr flow")
+		}
+		return nil, nil
+	}
+
 	// create our parameters, we just convert this from JSON
 	// TODO: this is done because a nil XJSONObject doesn't know how to marshal itself, goflow could fix
 	params := types.NewXJSONObject([]byte("{}"))
@@ -363,6 +372,18 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
+	}
+
+	// if we have a channel connection we set the connection on the session before our event hooks fire
+	// so that IVR messages can be created with the right connection reference
+	var hook models.SessionCommitHook
+	if conn != nil {
+		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+			for _, session := range sessions {
+				session.SetChannelConnection(conn)
+			}
+			return nil
+		}
 	}
 
 	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{flowTrigger}, hook, true)
@@ -478,7 +499,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	trigger := models.FindMatchingMsgTrigger(org, contact, event.Text)
 
 	// get any active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, db, org, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, org, models.MessagingFlow, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}
