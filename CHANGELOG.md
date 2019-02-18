@@ -1,3 +1,11 @@
+v0.0.96
+----------
+ * set timeout when no message has been sent in a session
+
+v0.0.95
+----------
+ * latest goflow
+
 v0.0.94
 ----------
  * fix for duplicate fields deletion in single flow only applying one

@@ -316,13 +316,8 @@ func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session
 		}
 	}
 
-	// set our timeout if we have a wait
-	if fs.Wait() != nil && fs.Wait().Timeout() != nil {
-		seconds := time.Duration(*fs.Wait().Timeout()) * time.Second
-		session.timeout = &seconds
-		now := time.Now()
-		s.WaitStartedOn = &now
-	}
+	// calculate our timeout if any
+	session.calculateTimeout(fs, sprint)
 
 	return session, nil
 }
@@ -410,6 +405,44 @@ func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment) (fl
 	return session, nil
 }
 
+// calculates how our timeout should be set, we leave it blank if we send any outgoing messages
+// as courier will set it for us. if no message has been sent, then we set it immediately
+// TODO: this is probably easier to reason about by adding a new pre-write hook for events which
+// coult clear the timeout themselves on msg_created
+func (s *Session) calculateTimeout(fs flows.Session, sprint flows.Sprint) {
+	// if we are on a wait and it has a timeout
+	if fs.Wait() != nil && fs.Wait().Timeout() != nil {
+		now := time.Now()
+		s.s.WaitStartedOn = &now
+
+		// figure out if we sent any messages
+		msgCreated := false
+		for _, e := range sprint.Events() {
+			if e.Type() == events.TypeMsgCreated {
+				msgCreated = true
+				break
+			}
+		}
+
+		// make a duration of the seconds for our timeout
+		seconds := time.Duration(*fs.Wait().Timeout()) * time.Second
+
+		if msgCreated {
+			// if we created a message in this sprint, don't set our timeout on yet, but set
+			// our timeout in seconds for passing to courier
+			s.timeout = &seconds
+		} else {
+			// no message was created, set our timeout directly
+			timeoutOn := now.Add(seconds)
+			s.s.TimeoutOn = &timeoutOn
+		}
+	} else {
+		s.s.WaitStartedOn = nil
+		s.s.TimeoutOn = nil
+		s.timeout = nil
+	}
+}
+
 // WriteUpdatedSession updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
 func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
 	// make sure we have our seen runs
@@ -441,22 +474,12 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 		s.runs = append(s.runs, run)
 	}
 
-	// clear out timeout on, that will be set when we get a callback from courier
-	s.s.TimeoutOn = nil
-	s.s.WaitStartedOn = nil
+	// calculate our new timeout
+	s.calculateTimeout(fs, sprint)
 
 	// set our sprint and wait
 	s.sprint = sprint
 	s.wait = fs.Wait()
-
-	// but set our timeout in seconds
-	s.timeout = nil
-	if fs.Wait() != nil && fs.Wait().Timeout() != nil {
-		seconds := time.Duration(*fs.Wait().Timeout()) * time.Second
-		s.timeout = &seconds
-		now := time.Now()
-		s.s.WaitStartedOn = &now
-	}
 
 	// run through our runs to figure out our current flow
 	for _, r := range fs.Runs() {
