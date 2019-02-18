@@ -13,8 +13,6 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
@@ -159,16 +157,8 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "error creating ivr connection"))
 	}
 
-	// we set the connection on the session before our event hooks fire so that IVR messages can be created with the right connection reference
-	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
-		for _, session := range sessions {
-			session.SetChannelConnection(conn)
-		}
-		return nil
-	}
-
 	// try to handle this event
-	session, err := handler.HandleChannelEvent(ctx, s.DB, s.RP, models.MOCallEventType, event, hook)
+	session, err := handler.HandleChannelEvent(ctx, s.DB, s.RP, models.MOCallEventType, event, conn)
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error handling incoming call")
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "error handling incoming call"))
@@ -195,8 +185,6 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "error inserting channel event"))
 	}
-
-	// TODO: should this create a task to do this handling? (would allow for missed call IVR callbacks)
 
 	// try to handle it, this time looking for a missed call event
 	session, err = handler.HandleChannelEvent(ctx, s.DB, s.RP, models.MOMissEventType, event, nil)

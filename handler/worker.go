@@ -250,7 +250,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 }
 
 // HandleChannelEvent is called for channel events
-func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType models.ChannelEventType, event *models.ChannelEvent, hook models.SessionCommitHook) (*models.Session, error) {
+func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
 	org, err := models.GetOrgAssets(ctx, db, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
@@ -339,7 +339,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
-	if flow.FlowType() == models.IVRFlow {
+	if flow.FlowType() == models.IVRFlow && conn == nil {
 		err = runner.TriggerIVRFlow(ctx, db, rp, org.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error while triggering ivr flow")
@@ -372,6 +372,18 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
+	}
+
+	// if we have a channel connection we set the connection on the session before our event hooks fire
+	// so that IVR messages can be created with the right connection reference
+	var hook models.SessionCommitHook
+	if conn != nil {
+		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+			for _, session := range sessions {
+				session.SetChannelConnection(conn)
+			}
+			return nil
+		}
 	}
 
 	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{flowTrigger}, hook, true)
