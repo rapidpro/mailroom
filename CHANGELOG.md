@@ -1,3 +1,7 @@
+v0.0.99
+----------
+ * latest goflow, make sure expirations aren't honored for inactive runs in cases of races
+
 v0.0.98
 ----------
  * latest goflow engine, change invalid urns to warn
