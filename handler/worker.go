@@ -216,7 +216,12 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 			return errors.Wrapf(err, "unable to load expiration for run")
 		}
 
-		if !expiration.Equal(event.Time) {
+		if expiration == nil {
+			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, run no longer active")
+			return nil
+		}
+
+		if expiration != nil && !expiration.Equal(event.Time) {
 			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, has been updated")
 			return nil
 		}
@@ -224,7 +229,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		resume = resumes.NewRunExpirationResume(org.Env(), contact)
 	case TimeoutEventType:
 		if session.TimeoutOn() == nil {
-			log.WithField("session_id", session.ID).Info("ignoring session timeout, has no timeout set")
+			log.WithField("session_id", session.ID()).Info("ignoring session timeout, has no timeout set")
 			return nil
 		}
 

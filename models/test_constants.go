@@ -65,7 +65,10 @@ var SurveyorFlowUUID = assets.FlowUUID("ed8cf8d4-a42c-4ce1-a7e3-44a2918e3cec")
 var IncomingExtraFlowID = FlowID(10006)
 var IncomingExtraFlowUUID = assets.FlowUUID("376d3de6-7f0e-408c-80d6-b1919738bc80")
 
-var CampaignFlowID = FlowID(10007)
+var ParentTimeoutID = FlowID(10007)
+var ParentTimeoutUUID = assets.FlowUUID("81c0f323-7e06-4e0c-a960-19c20f17117c")
+
+var CampaignFlowID = FlowID(10009)
 var CampaignFlowUUID = assets.FlowUUID("3a92a964-3a8d-420b-9206-2cd9d884ac30")
 
 var DoctorRemindersCampaignUUID = CampaignUUID("72aa12c5-cc11-4bc7-9406-044047845c70")

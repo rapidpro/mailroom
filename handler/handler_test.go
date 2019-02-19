@@ -229,6 +229,18 @@ func TestTimedEvents(t *testing.T) {
 
 		// we won't get a response as we will be out of the flow
 		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "mutzig", "", models.TwitterChannelID, models.Org1},
+
+		// start the parent expiration flow
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "parent", "Child", models.TwitterChannelID, models.Org1},
+
+		// respond, should bring us out
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "hi", "Completed", models.TwitterChannelID, models.Org1},
+
+		// expiring our child should be a no op
+		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "child", "", models.TwitterChannelID, models.Org1},
+
+		// respond one last time, should be done
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "done", "Ended", models.TwitterChannelID, models.Org1},
 	}
 
 	last := time.Now()
@@ -264,6 +276,9 @@ func TestTimedEvents(t *testing.T) {
 			var expiration time.Time
 			if tc.Message == "bad" {
 				expiration = time.Now()
+			} else if tc.Message == "child" {
+				db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE session_id = $1 AND is_active = FALSE`, sessionID)
+				db.Get(&runID, `SELECT id FROM flows_flowrun WHERE session_id = $1 AND is_active = FALSE`, sessionID)
 			} else {
 				expiration = runExpiration
 			}

@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"crypto/md5"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -841,14 +842,17 @@ WHERE
 	is_active = TRUE
 `
 
-// RunExpiration looks up the run expiration for the passed in run
-func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (time.Time, error) {
+// RunExpiration looks up the run expiration for the passed in run, can return nil if the run is no longer active
+func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (*time.Time, error) {
 	var expiration time.Time
-	err := db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE id = $1`, runID)
-	if err != nil {
-		return expiration, errors.Wrapf(err, "unable to select expiration for run: %d", runID)
+	err := db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE id = $1 AND is_active = TRUE`, runID)
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
-	return expiration, nil
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to select expiration for run: %d", runID)
+	}
+	return &expiration, nil
 }
 
 // ExitSessions marks the passed in sessions as completed, also doing so for all associated runs
