@@ -1,3 +1,7 @@
+v0.0.106
+----------
+ * more travis attempts
+
 v0.0.105
 ----------
  * try different condition
