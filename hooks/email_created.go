@@ -27,7 +27,7 @@ type SendEmailsHook struct{}
 var sendEmailsHook = &SendEmailsHook{}
 
 const (
-	configSMTPServer = "SMTP_SERVER"
+	configSMTPServer = "smtp_server"
 )
 
 // Apply sends all our emails

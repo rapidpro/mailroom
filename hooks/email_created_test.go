@@ -12,7 +12,7 @@ import (
 func TestEmailCreated(t *testing.T) {
 	// configure mailtrap for our org
 	db := testsuite.DB()
-	db.MustExec(`UPDATE orgs_org SET config = '{"SMTP_SERVER": "smtp://24f335c64dbc28:d7966a553e76f6@smtp.mailtrap.io:2525/?from=mailroom@foo.bar"}' WHERE id = 1;`)
+	db.MustExec(`UPDATE orgs_org SET config = '{"smtp_server": "smtp://24f335c64dbc28:d7966a553e76f6@smtp.mailtrap.io:2525/?from=mailroom@foo.bar"}' WHERE id = 1;`)
 
 	tcs := []HookTestCase{
 		HookTestCase{
