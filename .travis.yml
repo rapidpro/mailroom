@@ -11,8 +11,7 @@ env:
     - GO111MODULE=on
   matrix:
     include:
-    - env: PGDB=9.6
-      env: RELEASE=true
+    - env: PGDB=9.6 RELEASE=true
     - env: PGDB=10
 
 services:
