@@ -1,3 +1,7 @@
+v0.0.107
+----------
+ * process incoming TWIML events even if a call is completed
+
 v0.0.106
 ----------
  * more travis attempts
