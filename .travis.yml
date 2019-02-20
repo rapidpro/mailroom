@@ -10,8 +10,10 @@ env:
   global:
     - GO111MODULE=on
   matrix:
-    - PGDB=10
-    - PGDB=9.6
+    include:
+    - PGDB: 9.6
+      env: RELEASE=true
+    - PGDB: 10
 
 services:
   - redis-server
@@ -55,5 +57,5 @@ deploy:
     script: curl -sL https://git.io/goreleaser | bash
     on:
       tags: true
-      condition: $TRAVIS_OS_NAME = linux
+      condition: $TRAVIS_OS_NAME = linux AND $RELEASE
 
