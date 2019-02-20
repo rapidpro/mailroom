@@ -1,3 +1,7 @@
+v0.0.101
+----------
+ * use lowercase smtp_config org config
+
 v0.0.100
 ----------
  * latest goflow with tls renegotation
