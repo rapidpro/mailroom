@@ -1,3 +1,7 @@
+v0.0.100
+----------
+ * latest goflow with tls renegotation
+
 v0.0.99
 ----------
  * latest goflow, make sure expirations aren't honored for inactive runs in cases of races
