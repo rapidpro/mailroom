@@ -11,9 +11,9 @@ env:
     - GO111MODULE=on
   matrix:
     include:
-    - PGDB: 9.6
+    - env: PGDB=9.6
       env: RELEASE=true
-    - PGDB: 10
+    - env: PGDB=10
 
 services:
   - redis-server
