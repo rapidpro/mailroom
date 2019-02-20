@@ -435,12 +435,10 @@ func ResumeIVRFlow(
 	if err != nil {
 		// call has ended, so will our session
 		if err == CallEndedError {
-			err = models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitCompleted, time.Now())
+
 			if err != nil {
 				return errors.Wrapf(err, "error marking sessions complete")
 			}
-
-			return client.WriteEmptyResponse(w, "call ended, ignoring resume")
 		}
 
 		return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "error finding input for request"))
@@ -547,10 +545,22 @@ func ResumeIVRFlow(
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}
 
-	// have our client output our session status
-	err = client.WriteSessionResponse(session, resumeURL, r, w)
-	if err != nil {
-		return errors.Wrapf(err, "error writing ivr response for resume")
+	// make sure our call is still happening
+	status, _ := client.StatusForRequest(r)
+
+	if status == models.ConnectionStatusInProgress {
+		// have our client output our session status
+		err = client.WriteSessionResponse(session, resumeURL, r, w)
+		if err != nil {
+			return errors.Wrapf(err, "error writing ivr response for resume")
+		}
+	} else {
+		err = models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitCompleted, time.Now())
+		if err != nil {
+			logrus.WithError(err).Error("error closing session")
+		}
+
+		return client.WriteEmptyResponse(w, "call ended, ignoring resume")
 	}
 
 	return nil

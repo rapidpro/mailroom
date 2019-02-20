@@ -188,13 +188,6 @@ func (c *client) HangupCall(client *http.Client, callID string) error {
 
 // InputForRequest returns the input for the passed in request, if any
 func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
-	// this call isn't active, thats an error
-	logrus.WithField("form", r.Form).Info("twilio form")
-	r.ParseForm()
-	if r.Form.Get("CallStatus") != "in-progress" {
-		return "", ivr.NilAttachment, ivr.CallEndedError
-	}
-
 	// this could be a timeout, in which case we return nothing at all
 	timeout := r.Form.Get("timeout")
 	if timeout == "true" {

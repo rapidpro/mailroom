@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/models"
@@ -106,6 +107,8 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			return errors.Wrapf(err, "error popping contact event")
 		}
 
+		start := time.Now()
+
 		// decode our event, this is a normal task at its top level
 		contactEvent := &queue.Task{}
 		err = json.Unmarshal([]byte(event), contactEvent)
@@ -157,6 +160,9 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 		if err != nil {
 			return errors.Wrapf(err, "error handling contact event: %s", event)
 		}
+
+		// log our processing time to librato
+		librato.Gauge(fmt.Sprintf("mr.%s", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
 	}
 }
 
