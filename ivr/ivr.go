@@ -386,11 +386,6 @@ func ResumeIVRFlow(
 	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
-	// connection isn't in progress, that's an error
-	if conn.Status() != models.ConnectionStatusInProgress {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("connection in invalid status: %s", conn.Status()))
-	}
-
 	// build our session assets
 	sa, err := models.GetSessionAssets(org)
 	if err != nil {
