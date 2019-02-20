@@ -1,3 +1,7 @@
+v0.0.104
+----------
+ * use env for testing
+
 v0.0.103
 ----------
  * test release
