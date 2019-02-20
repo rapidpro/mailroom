@@ -1,3 +1,7 @@
+v0.0.102
+----------
+ * try only releasing on 9.6 matrix
+
 v0.0.101
 ----------
  * use lowercase smtp_config org config
