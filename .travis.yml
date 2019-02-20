@@ -10,7 +10,6 @@ env:
   global:
     - GO111MODULE=on
   matrix:
-    include:
     - env: PGDB=9.6 RELEASE=true
     - env: PGDB=10
 
