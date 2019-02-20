@@ -1,3 +1,7 @@
+v0.0.108
+----------
+ * allow resume when we have completed connection status (due to race)
+
 v0.0.107
 ----------
  * process incoming TWIML events even if a call is completed
