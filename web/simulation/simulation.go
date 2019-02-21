@@ -127,7 +127,7 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 	return triggerFlow(ctx, s.DB, org, sa, trigger)
 }
 
-// triggerFlow creates a new session with the passed in trigger, returning the new session
+// triggerFlow creates a new session with the passed in trigger, returning our standard response
 func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, sa flows.SessionAssets, trigger flows.Trigger) (interface{}, int, error) {
 	session := goflow.Engine().NewSession(sa)
 

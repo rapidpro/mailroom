@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/stretchr/testify/assert"
@@ -85,6 +86,59 @@ const (
                     "uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91"
                 },
                 "text": "I like blue!",
+                "urn": "tel:+12065551212",
+                "uuid": "9bf91c2b-ce58-4cef-aacc-281e03f69ab5"
+            },
+            "resumed_on": "2000-01-01T00:00:00.000000000-00:00",
+            "type": "msg"
+		},
+		"assets": {
+			"channels": [
+				{
+					"uuid": "440099cf-200c-4d45-a8e7-4a564f4a0e8b",
+					"name": "Test Channel",
+					"address": "+18005551212",
+					"schemes": ["tel"],
+					"roles": ["send", "receive", "call"],
+					"country": "US"
+				}
+			]
+		},
+		"session": $$SESSION$$
+	}`
+
+	triggerResumeBody = `
+	{
+		"org_id": 1,
+		"resume": {
+			"contact": {
+                "created_on": "2000-01-01T00:00:00.000000000-00:00",
+                "fields": {},
+                "id": 1234567,
+                "language": "eng",
+                "name": "Ben Haggerty",
+                "timezone": "America/Guayaquil",
+                "urns": [
+                    "tel:+12065551212"
+                ],
+                "uuid": "ba96bf7f-bc2a-4873-a7c7-254d1927c4e3"
+            },
+            "environment": {
+                "allowed_languages": [
+                    "eng",
+                    "fra"
+                ],
+                "date_format": "YYYY-MM-DD",
+                "default_language": "eng",
+                "time_format": "hh:mm",
+                "timezone": "America/New_York"
+            },
+            "msg": {
+                "channel": {
+                    "name": "Twitter",
+                    "uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91"
+                },
+                "text": "trigger",
                 "urn": "tel:+12065551212",
                 "uuid": "9bf91c2b-ce58-4cef-aacc-281e03f69ab5"
             },
@@ -245,6 +299,14 @@ func TestServer(t *testing.T) {
 	defer server.Stop()
 	startSession := ""
 
+	// add a trigger for our campaign flow
+	db.MustExec(
+		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
+		VALUES(TRUE, now(), now(), 'trigger', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`,
+		models.CampaignFlowID,
+	)
+
 	tcs := []struct {
 		URL      string
 		Method   string
@@ -261,13 +323,16 @@ func TestServer(t *testing.T) {
 
 		{"/mr/flow/migrate", "GET", "", 405, "illegal"},
 		{"/mr/flow/migrate", "POST", minLegacyDef, 200, `"type": "send_msg"`},
+
+		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
+		{"/mr/sim/resume", "POST", triggerResumeBody, 200, "it is time to consult with your patients"},
 	}
 
 	for i, tc := range tcs {
 		var body io.Reader
 
 		// in the case of a resume, we have to sub in our session body from our start
-		if tc.Body == resumeBody {
+		if tc.Body == resumeBody || tc.Body == triggerResumeBody {
 			tc.Body = strings.Replace(tc.Body, "$$SESSION$$", startSession, -1)
 		}
 
