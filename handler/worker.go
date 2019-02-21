@@ -554,17 +554,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 		// trigger flow is still active, start it
 		if flow != nil && !flow.IsArchived() {
-			// start them in the triggered flow, interrupting their current flow/session
-			var match *triggers.KeywordMatch
-
-			// if our trigger is on a keyword, populate the type
-			if trigger.Keyword() != "" {
-				match = &triggers.KeywordMatch{
-					Type:    trigger.KeywordMatchType(),
-					Keyword: trigger.Keyword(),
-				}
-			}
-			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, match)
+			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
 
 			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
