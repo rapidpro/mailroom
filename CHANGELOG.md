@@ -1,3 +1,7 @@
+v0.0.111
+----------
+ * process triggers in simulation
+
 v0.0.110
 ----------
  * latest goflow, more date tweaks
