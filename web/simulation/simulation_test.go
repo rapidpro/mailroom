@@ -299,11 +299,19 @@ func TestServer(t *testing.T) {
 	defer server.Stop()
 	startSession := ""
 
-	// add a trigger for our campaign flow
+	// add a trigger for our campaign flow with 'trigger'
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
 		VALUES(TRUE, now(), now(), 'trigger', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`,
+		models.CampaignFlowID,
+	)
+
+	// also add a catch all
+	db.MustExec(
+		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
+		VALUES(TRUE, now(), now(), NULL, false, $1, 'C', NULL, 1, 1, 1, 0) RETURNING id`,
 		models.CampaignFlowID,
 	)
 
