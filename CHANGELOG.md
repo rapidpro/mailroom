@@ -1,3 +1,7 @@
+v0.0.112
+----------
+ * dont trigger on catch alls if we are in a flow
+
 v0.0.111
 ----------
  * process triggers in simulation
