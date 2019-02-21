@@ -1,3 +1,9 @@
+v0.0.109
+----------
+ * latest goflow
+ * add xdate type
+ * fix NPE when referencing @child or @parent
+
 v0.0.108
 ----------
  * allow resume when we have completed connection status (due to race)
