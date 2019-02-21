@@ -56,10 +56,19 @@ func (t *Trigger) GroupIDs() []GroupID      { return t.t.GroupIDs }
 func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 	if t.t.MatchType == MatchFirst {
 		return triggers.KeywordMatchTypeFirstWord
-	} else {
-		return triggers.KeywordMatchTypeOnlyWord
 	}
-	return triggers.KeywordMatchType("")
+	return triggers.KeywordMatchTypeOnlyWord
+}
+
+// Match returns the match for this trigger, if any
+func (t *Trigger) Match() *triggers.KeywordMatch {
+	if t.Keyword() != "" {
+		return &triggers.KeywordMatch{
+			Type:    t.KeywordMatchType(),
+			Keyword: t.Keyword(),
+		}
+	}
+	return nil
 }
 
 func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, error) {

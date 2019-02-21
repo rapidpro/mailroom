@@ -6,8 +6,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/flows"
@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -119,23 +118,26 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
 	}
 
-	session := goflow.Engine().NewSession(sa)
-
 	// read our trigger
 	trigger, err := triggers.ReadTrigger(sa, request.Trigger, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
 
+	return triggerFlow(ctx, s.DB, org, sa, trigger)
+}
+
+// triggerFlow creates a new session with the passed in trigger, returning our standard response
+func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, sa flows.SessionAssets, trigger flows.Trigger) (interface{}, int, error) {
+	session := goflow.Engine().NewSession(sa)
+
 	// start our flow
-	start := time.Now()
 	sprint, err := session.Start(trigger)
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", request.OrgID).Debug("start simulation complete")
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
 
-	err = handleSimulationEvents(ctx, s.DB, org, sprint.Events())
+	err = handleSimulationEvents(ctx, db, org, sprint.Events())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
@@ -205,6 +207,37 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	resume, err := resumes.ReadResume(sa, request.Resume, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
+	}
+
+	// if this is a msg resume we want to check whether it might be caught by a trigger
+	if resume.Type() == resumes.TypeMsg {
+		msgResume := resume.(*resumes.MsgResume)
+		trigger := models.FindMatchingMsgTrigger(org, msgResume.Contact(), msgResume.Msg().Text())
+		if trigger != nil {
+			var flow *models.Flow
+			for _, r := range session.Runs() {
+				if r.Status() == flows.RunStatusWaiting {
+					f, _ := org.Flow(r.Flow().UUID())
+					if f != nil {
+						flow = f.(*models.Flow)
+					}
+					break
+				}
+			}
+
+			// we don't have a current flow or the current flow doesn't ignore triggers
+			if flow == nil || !flow.IgnoreTriggers() {
+				triggeredFlow, err := org.FlowByID(trigger.FlowID())
+				if err != nil {
+					return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load triggered flow")
+				}
+
+				if triggeredFlow != nil && !triggeredFlow.IsArchived() {
+					trigger := triggers.NewMsgTrigger(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
+					return triggerFlow(ctx, s.DB, org, sa, trigger)
+				}
+			}
+		}
 	}
 
 	// resume our session
