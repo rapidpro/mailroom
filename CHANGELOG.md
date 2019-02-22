@@ -1,3 +1,7 @@
+v0.0.116
+----------
+ * audit transaction rollbacks, bit less logging
+
 v0.0.115
 ----------
  * allow resumes on completed sessions (noops if msg isn't trigger)
