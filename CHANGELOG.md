@@ -1,3 +1,7 @@
+v0.0.117
+----------
+ * add stats package to log queue size, db connections every minute
+
 v0.0.116
 ----------
  * audit transaction rollbacks, bit less logging
