@@ -45,10 +45,10 @@ type Config struct {
 func NewMailroomConfig() *Config {
 	return &Config{
 		DB:             "postgres://temba:temba@localhost/temba?sslmode=disable",
-		DBPoolSize:     8,
+		DBPoolSize:     16,
 		Redis:          "redis://localhost:6379/15",
 		BatchWorkers:   4,
-		HandlerWorkers: 128,
+		HandlerWorkers: 32,
 		LogLevel:       "error",
 		Version:        "Dev",
 		SMTPServer:     "",

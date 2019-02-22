@@ -33,6 +33,11 @@ func StartStatsCron(mr *mailroom.Mailroom) error {
 	return nil
 }
 
+var (
+	waitDuration time.Duration
+	waitCount    int64
+)
+
 // dumpStats calculates a bunch of stats every minute and both logs them and posts them to librato
 func dumpStats(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	// get our DB status
@@ -42,13 +47,13 @@ func dumpStats(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string
 	defer rc.Close()
 
 	// calculate size of batch queue
-	batchSize, err := redis.Int(rc.Do("zcard", queue.BatchQueue))
+	batchSize, err := queue.Size(rc, queue.BatchQueue)
 	if err != nil {
 		logrus.WithError(err).Error("error calculating batch queue size")
 	}
 
 	// and size of handler queue
-	handlerSize, err := redis.Int(rc.Do("zcard", queue.HandlerQueue))
+	handlerSize, err := queue.Size(rc, queue.HandlerQueue)
 	if err != nil {
 		logrus.WithError(err).Error("error calculating handler queue size")
 	}
@@ -56,8 +61,8 @@ func dumpStats(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string
 	logrus.WithFields(logrus.Fields{
 		"db_idle":      stats.Idle,
 		"db_busy":      stats.InUse,
-		"db_waiting":   stats.WaitCount,
-		"db_wait":      stats.WaitDuration,
+		"db_waiting":   stats.WaitCount - waitCount,
+		"db_wait":      stats.WaitDuration - waitDuration,
 		"batch_size":   batchSize,
 		"handler_size": handlerSize,
 	}).Info("current stats")
@@ -67,6 +72,9 @@ func dumpStats(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string
 	librato.Gauge("mr.db_idle", float64(stats.Idle))
 	librato.Gauge("mr.db_waiting", float64(stats.WaitCount))
 	librato.Gauge("mr.db_wait_ms", float64(stats.WaitDuration/time.Millisecond))
+
+	waitCount = stats.WaitCount
+	waitDuration = stats.WaitDuration
 
 	return nil
 }

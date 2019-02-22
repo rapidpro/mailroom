@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/pkg/errors"
 )
 
 // Task is a utility struct for encoding a task
@@ -59,6 +60,27 @@ const (
 	// StartIVRFlowBatch is our task for starting an ivr batch
 	StartIVRFlowBatch = "start_ivr_flow_batch"
 )
+
+// Size returns the number of tasks for the passed in queue
+func Size(rc redis.Conn, queue string) (int, error) {
+	// get all the active queues
+	queues, err := redis.Ints(rc.Do("zrange", fmt.Sprintf(activePattern, queue), 0, -1))
+	if err != nil {
+		return 0, errors.Wrapf(err, "error getting active queues for: %s", queue)
+	}
+
+	// add up each
+	size := 0
+	for _, q := range queues {
+		count, err := redis.Int(rc.Do("zcard", fmt.Sprintf(queuePattern, queue, q)))
+		if err != nil {
+			return 0, errors.Wrapf(err, "error getting size of: %d", q)
+		}
+		size += count
+	}
+
+	return size, nil
+}
 
 // AddTask adds the passed in task to our queue for execution
 func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task interface{}, priority Priority) error {

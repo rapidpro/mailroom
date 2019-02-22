@@ -22,24 +22,25 @@ func TestQueues(t *testing.T) {
 		TaskType  string
 		Task      string
 		Priority  Priority
+		Size      int
 	}{
-		{"test", 1, "campaign", "task1", DefaultPriority},
-		{"test", 1, "campaign", "task1", popPriority},
-		{"test", 1, "campaign", "", popPriority},
-		{"test", 1, "campaign", "task1", DefaultPriority},
-		{"test", 1, "campaign", "task2", DefaultPriority},
-		{"test", 2, "campaign", "task3", DefaultPriority},
-		{"test", 2, "campaign", "task4", DefaultPriority},
-		{"test", 1, "campaign", "task5", DefaultPriority},
-		{"test", 2, "campaign", "task6", DefaultPriority},
-		{"test", 1, "campaign", "task1", popPriority},
-		{"test", 2, "campaign", "task3", popPriority},
-		{"test", 1, "campaign", "task2", popPriority},
-		{"test", 2, "campaign", "task4", popPriority},
-		{"test", 2, "campaign", "", markCompletePriority},
-		{"test", 2, "campaign", "task6", popPriority},
-		{"test", 1, "campaign", "task5", popPriority},
-		{"test", 1, "campaign", "", popPriority},
+		{"test", 1, "campaign", "task1", DefaultPriority, 1},
+		{"test", 1, "campaign", "task1", popPriority, 0},
+		{"test", 1, "campaign", "", popPriority, 0},
+		{"test", 1, "campaign", "task1", DefaultPriority, 1},
+		{"test", 1, "campaign", "task2", DefaultPriority, 2},
+		{"test", 2, "campaign", "task3", DefaultPriority, 3},
+		{"test", 2, "campaign", "task4", DefaultPriority, 4},
+		{"test", 1, "campaign", "task5", DefaultPriority, 5},
+		{"test", 2, "campaign", "task6", DefaultPriority, 6},
+		{"test", 1, "campaign", "task1", popPriority, 5},
+		{"test", 2, "campaign", "task3", popPriority, 4},
+		{"test", 1, "campaign", "task2", popPriority, 3},
+		{"test", 2, "campaign", "task4", popPriority, 2},
+		{"test", 2, "campaign", "", markCompletePriority, 2},
+		{"test", 2, "campaign", "task6", popPriority, 1},
+		{"test", 1, "campaign", "task5", popPriority, 0},
+		{"test", 1, "campaign", "", popPriority, 0},
 	}
 
 	for i, tc := range tcs {
@@ -68,5 +69,9 @@ func TestQueues(t *testing.T) {
 		} else {
 			assert.NoError(t, AddTask(rc, tc.Queue, tc.TaskType, tc.TaskGroup, tc.Task, tc.Priority))
 		}
+
+		size, err := Size(rc, tc.Queue)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.Size, size, "%d: mismatch", i)
 	}
 }
