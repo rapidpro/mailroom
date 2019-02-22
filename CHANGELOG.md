@@ -1,3 +1,7 @@
+v0.0.115
+----------
+ * allow resumes on completed sessions (noops if msg isn't trigger)
+
 v0.0.114
 ----------
  * latest goflow, more date migrations
