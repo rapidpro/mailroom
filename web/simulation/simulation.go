@@ -240,6 +240,11 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		}
 	}
 
+	// if our session is already complete, then this is a no-op, return the session unchanged
+	if session.Status() != flows.SessionStatusWaiting {
+		return &sessionResponse{Session: session, Events: nil}, http.StatusOK, nil
+	}
+
 	// resume our session
 	sprint, err := session.Resume(resume)
 	if err != nil {

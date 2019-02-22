@@ -3,6 +3,7 @@ package simulation
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -297,7 +298,7 @@ func TestServer(t *testing.T) {
 	time.Sleep(time.Second)
 
 	defer server.Stop()
-	startSession := ""
+	session := ""
 
 	// add a trigger for our campaign flow with 'trigger'
 	db.MustExec(
@@ -334,14 +335,15 @@ func TestServer(t *testing.T) {
 
 		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
 		{"/mr/sim/resume", "POST", triggerResumeBody, 200, "it is time to consult with your patients"},
+		{"/mr/sim/resume", "POST", resumeBody, 200, "it is time to consult with your patients"},
 	}
 
 	for i, tc := range tcs {
 		var body io.Reader
 
 		// in the case of a resume, we have to sub in our session body from our start
-		if tc.Body == resumeBody || tc.Body == triggerResumeBody {
-			tc.Body = strings.Replace(tc.Body, "$$SESSION$$", startSession, -1)
+		if strings.Contains(tc.Body, "$$SESSION$$") {
+			tc.Body = strings.Replace(tc.Body, "$$SESSION$$", session, -1)
 		}
 
 		if tc.Body != "" {
@@ -359,13 +361,14 @@ func TestServer(t *testing.T) {
 		content, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
 
-		// if this was a start and the start was successful
-		if tc.Body == startBody && resp.StatusCode == 200 {
-			// save the start session for use in our resume
+		// if this was a success, save our session
+		if resp.StatusCode == 200 {
+			// save the session for use in a resume
 			parsed := make(map[string]interface{})
 			json.Unmarshal(content, &parsed)
 			sessionJSON, _ := json.Marshal(parsed["session"])
-			startSession = string(sessionJSON)
+			session = string(sessionJSON)
+			fmt.Println(session)
 		}
 
 		assert.True(t, strings.Contains(string(content), tc.Response), "%d: did not find string: %s in body: %s", i, tc.Response, string(content))
