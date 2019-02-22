@@ -1,3 +1,8 @@
+v0.0.118
+----------
+ * latest goflow nil is zero, text() for results
+ * tweaks to default connection / queue size, better stats
+
 v0.0.117
 ----------
  * add stats package to log queue size, db connections every minute
