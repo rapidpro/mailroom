@@ -34,8 +34,8 @@ func handleFlowStartTask(ctx context.Context, mr *mailroom.Mailroom, task *queue
 }
 
 // HandleFlowStartBatch starts a batch of contacts in an IVR flow
-func HandleFlowStartBatch(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, batch *models.FlowStartBatch) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, batch *models.FlowStartBatch) error {
+	ctx, cancel := context.WithTimeout(bg, time.Minute*5)
 	defer cancel()
 
 	// contacts we will exclude either because they are in a flow or have already been in this one
@@ -88,7 +88,10 @@ func HandleFlowStartBatch(ctx context.Context, config *config.Config, db *sqlx.D
 	// for each contacts, request a call start
 	for _, contact := range contacts {
 		start := time.Now()
+
+		ctx, cancel := context.WithTimeout(bg, time.Minute)
 		session, err := RequestCallStart(ctx, config, db, org, batch, contact)
+		cancel()
 		if err != nil {
 			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID())
 			continue
@@ -104,7 +107,7 @@ func HandleFlowStartBatch(ctx context.Context, config *config.Config, db *sqlx.D
 
 	// if this is a last batch, mark our start as started
 	if batch.IsLast() {
-		err := models.MarkStartComplete(ctx, db, batch.StartID())
+		err := models.MarkStartComplete(bg, db, batch.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "error trying to set batch as complete")
 		}

@@ -430,6 +430,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	)
 
 	if err != nil {
+		tx.Rollback()
 		return NilContactID, errors.Wrapf(err, "error inserting new contact")
 	}
 
@@ -468,17 +469,20 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	// load a full contact so that we can calculate dynamic groups
 	contacts, err := LoadContacts(ctx, tx, org, []ContactID{contactID})
 	if err != nil {
+		tx.Rollback()
 		return NilContactID, errors.Wrapf(err, "error loading new contact")
 	}
 
 	flowContact, err := contacts[0].FlowContact(org, assets)
 	if err != nil {
+		tx.Rollback()
 		return NilContactID, errors.Wrapf(err, "error creating flow contact")
 	}
 
 	// now calculate dynamic groups
 	err = CalculateDynamicGroups(ctx, tx, org, flowContact)
 	if err != nil {
+		tx.Rollback()
 		return NilContactID, errors.Wrapf(err, "error calculating dynamic groups")
 	}
 

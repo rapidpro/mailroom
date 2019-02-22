@@ -541,6 +541,7 @@ func StartFlowForContacts(
 	if interrupt {
 		err = models.InterruptContactRuns(txCTX, tx, contactIDs, start)
 		if err != nil {
+			tx.Rollback()
 			return nil, errors.Wrap(err, "error interrupting contacts")
 		}
 	}
@@ -548,6 +549,7 @@ func StartFlowForContacts(
 	// write our session to the db
 	dbSessions, err := models.WriteSessions(txCTX, tx, rp, org, sessions, sprints, hook)
 	if err != nil {
+		tx.Rollback()
 		return nil, errors.Wrapf(err, "error writing sessions")
 	}
 
