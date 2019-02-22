@@ -92,7 +92,7 @@ func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task inter
 		return err
 	}
 
-	payload := Task{
+	payload := &Task{
 		Type:     taskType,
 		OrgID:    orgID,
 		Task:     taskBody,

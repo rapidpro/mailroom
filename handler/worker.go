@@ -616,13 +616,13 @@ type StopEvent struct {
 }
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event
-func newTimedTask(eventType string, orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
+func newTimedTask(eventType string, orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, eventTime time.Time) *queue.Task {
 	event := &TimedEvent{
 		OrgID:     orgID,
 		ContactID: contactID,
 		SessionID: sessionID,
 		RunID:     runID,
-		Time:      time,
+		Time:      eventTime,
 	}
 	eventJSON, err := json.Marshal(event)
 	if err != nil {
@@ -630,9 +630,10 @@ func newTimedTask(eventType string, orgID models.OrgID, contactID models.Contact
 	}
 
 	task := &queue.Task{
-		Type:  eventType,
-		OrgID: int(orgID),
-		Task:  eventJSON,
+		Type:     eventType,
+		OrgID:    int(orgID),
+		Task:     eventJSON,
+		QueuedOn: time.Now(),
 	}
 
 	return task
