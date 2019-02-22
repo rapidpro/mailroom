@@ -12,9 +12,10 @@ import (
 
 // Task is a utility struct for encoding a task
 type Task struct {
-	Type  string          `json:"type"`
-	OrgID int             `json:"org_id"`
-	Task  json.RawMessage `json:"task"`
+	Type     string          `json:"type"`
+	OrgID    int             `json:"org_id"`
+	Task     json.RawMessage `json:"task"`
+	QueuedOn time.Time       `json:"queued_on"`
 }
 
 // Priority is the priority for the task
@@ -92,9 +93,10 @@ func AddTask(rc redis.Conn, queue string, taskType string, orgID int, task inter
 	}
 
 	payload := Task{
-		Type:  taskType,
-		OrgID: orgID,
-		Task:  taskBody,
+		Type:     taskType,
+		OrgID:    orgID,
+		Task:     taskBody,
+		QueuedOn: time.Now(),
 	}
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {

@@ -162,7 +162,10 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 		}
 
 		// log our processing time to librato
-		librato.Gauge(fmt.Sprintf("mr.%s", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
+		librato.Gauge(fmt.Sprintf("mr.%s_elapsed", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
+
+		// and total latency for this task since it was queued
+		librato.Gauge(fmt.Sprintf("mr.%s_latency", contactEvent.Type), float64(time.Since(task.QueuedOn))/float64(time.Second))
 	}
 }
 
