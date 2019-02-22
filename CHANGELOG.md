@@ -1,3 +1,8 @@
+v0.0.120
+----------
+ * latest goflow, fix date arith
+ * include queued on on self queued tasksk
+
 v0.0.119
 ----------
  * log relative wait and wait_ms to librato, not total
