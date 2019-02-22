@@ -1,3 +1,8 @@
+v0.0.119
+----------
+ * log relative wait and wait_ms to librato, not total
+ * record task latency to librato
+
 v0.0.118
 ----------
  * latest goflow nil is zero, text() for results
