@@ -269,8 +269,8 @@ func FireCampaignEvents(
 		options.Interrupt = false
 	case models.StartModeSkip:
 		options.IncludeActive = false
-		options.RestartParticipants = false
-		options.Interrupt = false
+		options.RestartParticipants = true
+		options.Interrupt = true
 	default:
 		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())
 	}
