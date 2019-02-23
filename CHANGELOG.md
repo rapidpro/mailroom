@@ -1,3 +1,7 @@
+v0.0.121
+----------
+ * proper settings for skip campaigns
+
 v0.0.120
 ----------
  * latest goflow, fix date arith
