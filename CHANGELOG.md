@@ -1,3 +1,9 @@
+v0.0.122
+----------
+ * fix for PROPER
+ * better time addition
+ * keep punctuation in remove_first_word
+
 v0.0.121
 ----------
  * proper settings for skip campaigns
