@@ -1,3 +1,7 @@
+v0.0.123
+----------
+ * latest goflow, deal with datetime + time additions
+
 v0.0.122
 ----------
  * fix for PROPER
