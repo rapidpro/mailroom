@@ -66,18 +66,20 @@ func TestMsgEvents(t *testing.T) {
 		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", models.Org2ChannelID, models.Org2},
 		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "george", "Thanks george, we are all done!", models.Org2ChannelID, models.Org2},
 		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "blargh", "Hey, how are you?", models.Org2ChannelID, models.Org2},
+
+		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
 	}
 
-	for i, tc := range tcs {
+	makeMsgTask := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *queue.Task {
 		event := &MsgEvent{
-			ContactID: tc.ContactID,
-			OrgID:     tc.OrgID,
-			ChannelID: tc.ChannelID,
+			ContactID: contactID,
+			OrgID:     orgID,
+			ChannelID: channelID,
 			MsgID:     flows.MsgID(1),
 			MsgUUID:   flows.MsgUUID(utils.NewUUID()),
-			URN:       tc.URN,
-			URNID:     tc.URNID,
-			Text:      tc.Message,
+			URN:       urn,
+			URNID:     urnID,
+			Text:      text,
 		}
 
 		eventJSON, err := json.Marshal(event)
@@ -85,11 +87,17 @@ func TestMsgEvents(t *testing.T) {
 
 		task := &queue.Task{
 			Type:  MsgEventType,
-			OrgID: int(tc.OrgID),
+			OrgID: int(orgID),
 			Task:  eventJSON,
 		}
 
-		err = AddHandleTask(rc, tc.ContactID, task)
+		return task
+	}
+
+	for i, tc := range tcs {
+		task := makeMsgTask(tc.OrgID, tc.ChannelID, tc.ContactID, tc.URN, tc.URNID, tc.Message)
+
+		err := AddHandleTask(rc, tc.ContactID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
@@ -103,6 +111,24 @@ func TestMsgEvents(t *testing.T) {
 		db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 ORDER BY id DESC LIMIT 1`, tc.ContactID)
 		assert.Equal(t, text, tc.Response, "%d: response: '%s' does not contain '%s'", i, text, tc.Response)
 	}
+
+	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
+	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, models.Org2FredID)
+	task := makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
+	AddHandleTask(rc, models.Org2FredID, task)
+
+	// should get requeued three times automatically, but each should be an error
+	for i := 0; i < 3; i++ {
+		task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
+		assert.NotNil(t, task)
+		err := handleContactEvent(ctx, db, rp, task)
+		assert.Error(t, err)
+	}
+
+	// on third error, no new task
+	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
+	assert.NoError(t, err)
+	assert.Nil(t, task)
 }
 
 func TestChannelEvents(t *testing.T) {

@@ -12,10 +12,11 @@ import (
 
 // Task is a utility struct for encoding a task
 type Task struct {
-	Type     string          `json:"type"`
-	OrgID    int             `json:"org_id"`
-	Task     json.RawMessage `json:"task"`
-	QueuedOn time.Time       `json:"queued_on"`
+	Type       string          `json:"type"`
+	OrgID      int             `json:"org_id"`
+	Task       json.RawMessage `json:"task"`
+	QueuedOn   time.Time       `json:"queued_on"`
+	ErrorCount int             `json:"error_count,omitempty"`
 }
 
 // Priority is the priority for the task
