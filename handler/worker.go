@@ -36,8 +36,14 @@ func init() {
 	mailroom.AddTaskFunction(queue.HandleContactEvent, handleEvent)
 }
 
-// AddHandleTask adds a single task for the passed in contact
+// AddHandleTask adds a single task for the passed in contact.
 func AddHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task) error {
+	return addHandleTask(rc, contactID, task, false)
+}
+
+// addHandleTask adds a single task for the passed in contact. `front` specifies whether the task
+// should be inserted in front of all other tasks for that contact
+func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, front bool) error {
 	// marshal our task
 	taskJSON, err := json.Marshal(task)
 	if err != nil {
@@ -46,7 +52,12 @@ func AddHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task) 
 
 	// first push the event on our contact queue
 	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, contactID)
-	_, err = redis.Int64(rc.Do("rpush", contactQ, string(taskJSON)))
+	if front {
+		_, err = redis.Int64(rc.Do("lpush", contactQ, string(taskJSON)))
+
+	} else {
+		_, err = redis.Int64(rc.Do("rpush", contactQ, string(taskJSON)))
+	}
 	if err != nil {
 		return errors.Wrapf(err, "error adding contact event")
 	}
@@ -156,16 +167,26 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
 		}
 
-		// if we get an error processing an event, stop processing and return that
-		if err != nil {
-			return errors.Wrapf(err, "error handling contact event: %s", event)
-		}
-
 		// log our processing time to librato
 		librato.Gauge(fmt.Sprintf("mr.%s_elapsed", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
 
 		// and total latency for this task since it was queued
 		librato.Gauge(fmt.Sprintf("mr.%s_latency", contactEvent.Type), float64(time.Since(task.QueuedOn))/float64(time.Second))
+
+		// if we get an error processing an event, requeue it for later and return our error
+		if err != nil {
+			contactEvent.ErrorCount++
+			if contactEvent.ErrorCount < 3 {
+				rc := rp.Get()
+				retryErr := addHandleTask(rc, eventTask.ContactID, contactEvent, true)
+				if retryErr != nil {
+					logrus.WithError(retryErr).WithField("event", event).Error("error requeuing errored contact event")
+				}
+				rc.Close()
+				return errors.Wrapf(err, "error handling contact event, retrying: %s", event)
+			}
+			return errors.Wrapf(err, "error handling contact event, permanent failure: %s", event)
+		}
 	}
 }
 
