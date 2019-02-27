@@ -183,7 +183,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 					logrus.WithError(retryErr).WithField("event", event).Error("error requeuing errored contact event")
 				}
 				rc.Close()
-				return errors.Wrapf(err, "error handling contact event, retrying: %s", event)
+				return errors.Wrapf(err, "error handling contact event, %d errors, retrying: %s", contactEvent.ErrorCount, event)
 			}
 			return errors.Wrapf(err, "error handling contact event, permanent failure: %s", event)
 		}
