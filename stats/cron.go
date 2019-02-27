@@ -69,6 +69,7 @@ func dumpStats(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string
 
 	librato.Gauge("mr.handler_queue", float64(handlerSize))
 	librato.Gauge("mr.batch_queue", float64(batchSize))
+	librato.Gauge("mr.db_busy", float64(stats.InUse))
 	librato.Gauge("mr.db_idle", float64(stats.Idle))
 	librato.Gauge("mr.db_waiting", float64(stats.WaitCount-waitCount))
 	librato.Gauge("mr.db_wait_ms", float64((stats.WaitDuration-waitDuration)/time.Millisecond))
