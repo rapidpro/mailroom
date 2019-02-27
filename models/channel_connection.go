@@ -47,7 +47,6 @@ const (
 type ChannelConnection struct {
 	c struct {
 		ID             ConnectionID        `json:"id"              db:"id"`
-		IsActive       bool                `json:"is_active"       db:"is_active"`
 		CreatedOn      time.Time           `json:"created_on"      db:"created_on"`
 		ModifiedOn     time.Time           `json:"modified_on"     db:"modified_on"`
 		ExternalID     string              `json:"external_id"     db:"external_id"`
@@ -82,7 +81,6 @@ const insertConnectionSQL = `
 INSERT INTO
 	channels_channelconnection
 (
-	is_active,
 	created_on,
 	modified_on,
 	external_id,
@@ -99,7 +97,6 @@ INSERT INTO
 )
 
 VALUES(
-	:is_active,
 	NOW(),
 	NOW(),
 	:external_id,
@@ -126,7 +123,6 @@ func InsertIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelI
 	connection := &ChannelConnection{}
 
 	c := &connection.c
-	c.IsActive = true
 	c.OrgID = orgID
 	c.ChannelID = channelID
 	c.ContactID = contactID
@@ -172,7 +168,6 @@ func InsertIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelI
 const selectConnectionSQL = `
 SELECT
 	cc.id as id, 
-	cc.is_active as is_active, 
 	cc.created_on as created_on, 
 	cc.modified_on as modified_on, 
 	cc.external_id as external_id,  
@@ -194,8 +189,7 @@ FROM
 	channels_channelconnection as cc
 	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
-	cc.id = $1 AND
-	cc.is_active = TRUE
+	cc.id = $1
 `
 
 // SelectChannelConnection loads a channel connection by id
@@ -211,7 +205,6 @@ func SelectChannelConnection(ctx context.Context, db Queryer, id ConnectionID) (
 const selectConnectionByExternalIDSQL = `
 SELECT
 	cc.id as id, 
-	cc.is_active as is_active, 
 	cc.created_on as created_on, 
 	cc.modified_on as modified_on, 
 	cc.external_id as external_id,  
@@ -235,8 +228,7 @@ FROM
 WHERE
 	cc.channel_id = $1 AND
 	cc.connection_type = $2 AND
-	cc.external_id = $3 AND
-	cc.is_active = TRUE
+	cc.external_id = $3
 `
 
 // SelectChannelConnectionByExternalID loads a channel connection by id
@@ -252,7 +244,6 @@ func SelectChannelConnectionByExternalID(ctx context.Context, db Queryer, channe
 const selectRetryConnectionsSQL = `
 SELECT
 	cc.id as id, 
-	cc.is_active as is_active, 
 	cc.created_on as created_on, 
 	cc.modified_on as modified_on, 
 	cc.external_id as external_id,  
@@ -275,7 +266,6 @@ FROM
 	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
 	cc.connection_type = 'V' AND
-	cc.is_active = TRUE AND
 	next_attempt < NOW() AND
 	(cc.status = 'E' OR cc.status = 'Q')
 ORDER BY 
@@ -448,7 +438,6 @@ SELECT
 FROM 
 	channels_channelconnection
 WHERE
-	is_active = TRUE AND
 	channel_id = $1 AND
 	(status = 'W' OR status = 'R' OR status = 'I')
 `
