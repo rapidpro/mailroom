@@ -1,3 +1,9 @@
+v0.0.125
+----------
+ * mention error count in error
+ * retry contact events up to three times
+ * remove use of is_active on channel connection
+
 v0.0.124
 ----------
  * use primary_language_id instead of interface language, allow empty runs
