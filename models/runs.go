@@ -215,7 +215,7 @@ type FlowRun struct {
 		// TODO: should this be a complex object that can read / write iself to the DB as JSON?
 		Events string `db:"events"`
 
-		CurrentNodeUUID flows.NodeUUID  `db:"current_node_uuid"`
+		CurrentNodeUUID null.String     `db:"current_node_uuid"`
 		ContactID       flows.ContactID `db:"contact_id"`
 		FlowID          FlowID          `db:"flow_id"`
 		OrgID           OrgID           `db:"org_id"`
@@ -716,11 +716,6 @@ RETURNING id
 // newRun writes the passed in flow run to our database, also applying any events in those runs as
 // appropriate. (IE, writing db messages etc..)
 func newRun(org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error) {
-	// no path is invalid
-	if len(fr.Path()) < 1 {
-		return nil, errors.Errorf("run must have at least one path segment")
-	}
-
 	// build our path elements
 	path := make([]Step, len(fr.Path()))
 	for i, p := range fr.Path() {
@@ -753,7 +748,9 @@ func newRun(org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error
 	r.StartID = NilStartID
 	r.OrgID = org.OrgID()
 	r.Path = string(pathJSON)
-	r.CurrentNodeUUID = path[len(path)-1].NodeUUID
+	if len(path) > 0 {
+		r.CurrentNodeUUID = null.String(path[len(path)-1].NodeUUID)
+	}
 	run.run = fr
 
 	// set our exit type if we exited

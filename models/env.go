@@ -135,16 +135,8 @@ SELECT id, config, ROW_TO_JSON(o) FROM (SELECT
 		WHEN FALSE THEN 'none'
 	END) redaction_policy,
 	$2::int as max_value_length,
-	COALESCE(language, '') as default_language,
-	(SELECT 
-		CASE
-			WHEN language IS NOT NULL THEN ARRAY_PREPEND(language, ARRAY_AGG(l.iso_code)) 
-			ELSE ARRAY_AGG(l.iso_code) 
-		END 
-		FROM (
-			SELECT iso_code FROM orgs_language WHERE org_id = o.id
-		) 
-	l) allowed_languages,
+	(SELECT iso_code FROM orgs_language WHERE id = o.primary_language_id) as default_language,
+	(SELECT ARRAY_AGG(iso_code) FROM orgs_language WHERE org_id = o.id) allowed_languages,
 	COALESCE((SELECT
 		country
 	FROM

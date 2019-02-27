@@ -19,9 +19,12 @@ func TestOrgs(t *testing.T) {
 
 	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", TwitterChannelID)
 	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", TwilioChannelID, NexmoChannelID)
-	tx.MustExec("UPDATE orgs_org SET language = 'eng' WHERE id = 2;")
 	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
-				                    VALUES(TRUE, NOW(), NOW(), 'French', 'fra', 1, 1, 2);`)
+									VALUES(TRUE, NOW(), NOW(), 'French', 'fra', 1, 1, 2);`)
+	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
+									VALUES(TRUE, NOW(), NOW(), 'English', 'eng', 1, 1, 2);`)
+
+	tx.MustExec("UPDATE orgs_org SET primary_language_id = 2 WHERE id = 2;")
 
 	org, err := loadOrg(ctx, tx, 1)
 	assert.NoError(t, err)
@@ -35,10 +38,12 @@ func TestOrgs(t *testing.T) {
 	tz, _ := time.LoadLocation("America/Los_Angeles")
 	assert.Equal(t, tz, org.Timezone())
 	assert.Equal(t, 0, len(org.AllowedLanguages()))
+	assert.Equal(t, utils.Language(""), org.DefaultLanguage())
 
 	org, err = loadOrg(ctx, tx, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, []utils.Language{"eng", "fra"}, org.AllowedLanguages())
+	assert.Equal(t, utils.Language("eng"), org.DefaultLanguage())
 
 	_, err = loadOrg(ctx, tx, 99)
 	assert.Error(t, err)
