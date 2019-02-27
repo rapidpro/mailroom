@@ -1,3 +1,7 @@
+v0.0.126
+----------
+ * create start objects for trigger sessions
+
 v0.0.125
 ----------
  * mention error count in error
