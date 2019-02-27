@@ -122,12 +122,11 @@ func FlowIDForStart(ctx context.Context, db Queryer, orgID OrgID, startID StartI
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
 func NewFlowStart(
-	startID StartID, orgID OrgID, flowType FlowType, flowID FlowID,
+	orgID OrgID, flowType FlowType, flowID FlowID,
 	groupIDs []GroupID, contactIDs []ContactID, urns []urns.URN, createContact bool,
 	restartParticipants bool, includeActive bool, parent json.RawMessage, extra json.RawMessage) *FlowStart {
 
 	s := &FlowStart{}
-	s.s.ID = startID
 	s.s.UUID = utils.NewUUID()
 	s.s.OrgID = orgID
 	s.s.FlowType = flowType
@@ -144,44 +143,64 @@ func NewFlowStart(
 	return s
 }
 
-type startContacts struct {
+type startContact struct {
 	StartID   StartID   `db:"start_id"`
 	ContactID ContactID `db:"contact_id"`
 }
 
-// InsertFlowStart inserts a flow start with the passed in parameters
-func InsertFlowStart(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID, flowType FlowType,
-	contactIDs []ContactID, restartParticipants bool, includeActive bool) (*FlowStart, error) {
-	start := &FlowStart{}
-	s := &start.s
+type startGroup struct {
+	StartID StartID `db:"start_id"`
+	GroupID GroupID `db:"contactgroup_id"`
+}
 
-	s.UUID = utils.NewUUID()
-	s.OrgID = orgID
-	s.FlowID = flowID
-	s.FlowType = flowType
-	s.ContactIDs = contactIDs
-	s.RestartParticipants = restartParticipants
-	s.IncludeActive = includeActive
+// InsertFlowStarts inserts all the passed in starts
+func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) error {
+	is := make([]interface{}, len(starts))
+	for i := range starts {
+		is[i] = &starts[i].s
+	}
 
-	// insert our start
-	err := BulkSQL(ctx, "inserting flow start", db, insertStartSQL, []interface{}{s})
+	// insert our starts
+	err := BulkSQL(ctx, "inserting flow start", db, insertStartSQL, is)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting new flow start for flow: %d", flowID)
+		return errors.Wrapf(err, "error inserting flow starts")
 	}
 
-	// create our many to many for our contacts
-	scs := make([]interface{}, len(contactIDs))
-	for i := range contactIDs {
-		scs[i] = &startContacts{s.ID, contactIDs[i]}
+	// build up all our contact associations
+	contacts := make([]interface{}, 0, len(starts))
+	for _, start := range starts {
+		for _, contactID := range start.ContactIDs() {
+			contacts = append(contacts, &startContact{
+				StartID:   start.ID(),
+				ContactID: contactID,
+			})
+		}
 	}
 
-	// insert our many to many
-	err = BulkSQL(ctx, "inserting flow start contacts", db, insertStartContactsSQL, scs)
+	// insert our contacts
+	err = BulkSQL(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting flow start contacts for flow: %d", flowID)
+		return errors.Wrapf(err, "error inserting flow start contacts for flow")
 	}
 
-	return start, nil
+	// build up all our group associations
+	groups := make([]interface{}, 0, len(starts))
+	for _, start := range starts {
+		for _, groupID := range start.GroupIDs() {
+			groups = append(groups, &startGroup{
+				StartID: start.ID(),
+				GroupID: groupID,
+			})
+		}
+	}
+
+	// insert our groups
+	err = BulkSQL(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting flow start groups for flow")
+	}
+
+	return nil
 }
 
 const insertStartSQL = `
@@ -194,8 +213,14 @@ RETURNING
 
 const insertStartContactsSQL = `
 INSERT INTO
-	flows_flowstart_contacts(flowstart_id,  contact_id)
-	                  VALUES(:start_id   , :contact_id)
+	flows_flowstart_contacts( flowstart_id,  contact_id)
+	                  VALUES(:start_id,     :contact_id)
+`
+
+const insertStartGroupsSQL = `
+INSERT INTO
+	flows_flowstart_groups( flowstart_id,  contactgroup_id)
+	                VALUES(:start_id,     :contactgroup_id)
 `
 
 // CreateBatch creates a batch for this start using the passed in contact ids

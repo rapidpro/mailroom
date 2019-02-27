@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/utils"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
@@ -13,14 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
-
-func insertStart(db *sqlx.DB, uuid utils.UUID, restartParticipants bool, includeActive bool) {
-	// note we don't bother with the many to many for contacts and groups in our testing
-	db.MustExec(
-		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, 
-									 contact_count, status, created_by_id, flow_id, modified_by_id)
-							VALUES(TRUE, now(), now(), $1, $2, $3, 0, 'S', 1, $4, 1)`, uuid, restartParticipants, includeActive, models.SingleMessageFlowID)
-}
 
 func TestStarts(t *testing.T) {
 	testsuite.Reset()
@@ -57,16 +48,14 @@ func TestStarts(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		startID := i + 1
-		insertStart(db, utils.NewUUID(), false, false)
-
 		// handle our start task
 		start := models.NewFlowStart(
-			models.StartID(startID), models.Org1, models.MessagingFlow, tc.FlowID,
+			models.Org1, models.MessagingFlow, tc.FlowID,
 			tc.GroupIDs, tc.ContactIDs, nil, false,
 			tc.RestartParticipants, tc.IncludeActive,
 			nil, nil,
 		)
+		models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 		err := CreateFlowBatches(ctx, db, rp, start)
 		assert.NoError(t, err)
 
@@ -95,10 +84,10 @@ func TestStarts(t *testing.T) {
 
 		// assert our count of total flow runs created
 		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun where flow_id = $1 AND start_id = $2 AND is_active = FALSE`,
-			[]interface{}{tc.FlowID, startID}, tc.TotalCount, "%d: unexpected total run count", i)
+			[]interface{}{tc.FlowID, start.ID()}, tc.TotalCount, "%d: unexpected total run count", i)
 
 		// flow start should be complete
 		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart where status = 'C' AND id = $1 AND contact_count = $2`,
-			[]interface{}{startID, tc.ContactCount}, 1, "%d: start status not set to complete", i)
+			[]interface{}{start.ID(), tc.ContactCount}, 1, "%d: start status not set to complete", i)
 	}
 }

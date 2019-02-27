@@ -116,7 +116,7 @@ func (f *Flow) IsArchived() bool { return f.f.IsArchived }
 // IgnoreTriggers returns whether this flow ignores triggers
 func (f *Flow) IgnoreTriggers() bool { return f.f.IgnoreTriggers }
 
-// FlowReference return a channel reference for this flow
+// FlowReference return a flow reference for this flow
 func (f *Flow) FlowReference() *assets.FlowReference {
 	return assets.NewFlowReference(f.UUID(), f.Name())
 }

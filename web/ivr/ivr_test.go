@@ -75,8 +75,8 @@ func TestIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy
-	startID := insertStart(db, utils.NewUUID(), models.IVRFlowID, true, true)
-	start := models.NewFlowStart(startID, models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
+	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
 	// call our master starter
 	err := starts.CreateFlowBatches(ctx, db, rp, start)
