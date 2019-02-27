@@ -1,3 +1,7 @@
+v0.0.127
+----------
+ * add db in use metric to librato
+
 v0.0.126
 ----------
  * create start objects for trigger sessions
