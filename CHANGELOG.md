@@ -1,3 +1,7 @@
+v0.0.124
+----------
+ * use primary_language_id instead of interface language, allow empty runs
+
 v0.0.123
 ----------
  * latest goflow, deal with datetime + time additions
