@@ -17,15 +17,51 @@ func init() {
 	models.RegisterEventHook(events.TypeSessionTriggered, handleSessionTriggered)
 }
 
-// StartSessionsHook is our hook to fire our session starts
-type StartSessionsHook struct{}
+// StartStartHook is our hook to fire our session starts
+type StartStartHook struct{}
 
-var startSessionsHook = &StartSessionsHook{}
+var startStartHook = &StartStartHook{}
+
+// InsertStartHook is our hook to fire insert our starts
+type InsertStartHook struct{}
+
+var insertStartHook = &InsertStartHook{}
 
 // Apply queues up our flow starts
-func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
+
+	// for each of our sessions
+	for _, es := range sessions {
+		for _, e := range es {
+			start := e.(*models.FlowStart)
+
+			taskQ := queue.HandlerQueue
+			priority := queue.DefaultPriority
+
+			// if we are starting groups, queue to our batch queue instead, but with high priority
+			if len(start.GroupIDs()) > 0 {
+				taskQ = queue.BatchQueue
+				priority = queue.HighPriority
+			}
+
+			err := queue.AddTask(rc, taskQ, queue.StartFlow, int(org.OrgID()), start, priority)
+			if err != nil {
+				return errors.Wrapf(err, "error queuing flow start")
+			}
+		}
+	}
+
+	return nil
+}
+
+// Apply inserts our starts
+func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+	rc := rp.Get()
+	defer rc.Close()
+
+	starts := make([]*models.FlowStart, 0, len(sessions))
 
 	// for each of our sessions
 	for s, es := range sessions {
@@ -46,11 +82,11 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 			flow := f.(*models.Flow)
 
 			// load our groups by uuid
-			groups := make([]models.GroupID, 0, len(event.Groups))
+			groupIDs := make([]models.GroupID, 0, len(event.Groups))
 			for i := range event.Groups {
 				group := org.GroupByUUID(event.Groups[i].UUID)
 				if group != nil {
-					groups = append(groups, group.ID())
+					groupIDs = append(groupIDs, group.ID())
 				}
 			}
 
@@ -62,26 +98,23 @@ func (h *StartSessionsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 
 			// create our start
 			start := models.NewFlowStart(
-				models.NilStartID, org.OrgID(), flow.FlowType(), flow.ID(),
-				groups, contactIDs, event.URNs, event.CreateContact,
+				org.OrgID(), flow.FlowType(), flow.ID(),
+				groupIDs, contactIDs, event.URNs, event.CreateContact,
 				true, true,
 				event.RunSummary, nil,
 			)
 
-			taskQ := queue.HandlerQueue
-			priority := queue.DefaultPriority
+			starts = append(starts, start)
 
-			// if we are starting groups, queue to our batch queue instead, but with high priority
-			if len(start.GroupIDs()) > 0 {
-				taskQ = queue.BatchQueue
-				priority = queue.HighPriority
-			}
-
-			err = queue.AddTask(rc, taskQ, queue.StartFlow, int(org.OrgID()), start, priority)
-			if err != nil {
-				return errors.Wrapf(err, "error queuing flow start")
-			}
+			// this will add our task for our start after we commit
+			s.AddPostCommitEvent(startStartHook, start)
 		}
+	}
+
+	// insert all our starts
+	err := models.InsertFlowStarts(ctx, tx, starts)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting flow starts for session triggers")
 	}
 
 	return nil
@@ -97,8 +130,7 @@ func handleSessionTriggered(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 		"flow_uuid":    event.Flow.UUID,
 	}).Debug("session triggered")
 
-	// schedule this for being started after our sessions are committed
-	session.AddPostCommitEvent(startSessionsHook, event)
+	session.AddPreCommitEvent(insertStartHook, event)
 
 	return nil
 }

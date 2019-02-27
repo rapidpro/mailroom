@@ -666,8 +666,11 @@ type DBHook func(ctx context.Context, tx *sqlx.Tx) error
 func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID models.OrgID, flowID models.FlowID, contactIDs []models.ContactID, hook DBHook) error {
 	tx, _ := db.BeginTxx(ctx, nil)
 
-	// insert our start
-	start, err := models.InsertFlowStart(ctx, tx, orgID, flowID, models.IVRFlow, contactIDs, true, true)
+	// create our start
+	start := models.NewFlowStart(orgID, models.IVRFlow, flowID, nil, contactIDs, nil, false, true, true, nil, nil)
+
+	// insert it
+	err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})
 	if err != nil {
 		tx.Rollback()
 		return errors.Wrapf(err, "error inserting ivr flow start")
