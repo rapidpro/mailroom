@@ -123,7 +123,7 @@ func (mr *Mailroom) Start() error {
 	// create our pool
 	redisPool := &redis.Pool{
 		Wait:        true,              // makes callers wait for a connection
-		MaxActive:   8,                 // only open this many concurrent connections at once
+		MaxActive:   36,                // only open this many concurrent connections at once
 		MaxIdle:     4,                 // only keep up to this many idle
 		IdleTimeout: 240 * time.Second, // how long to wait before reaping a connection
 		Dial: func() (redis.Conn, error) {
