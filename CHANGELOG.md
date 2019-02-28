@@ -1,3 +1,7 @@
+v0.0.132
+----------
+ * GC db connections after 30m, keep 8 around
+
 v0.0.131
 ----------
  * give ourselves 15 minutes per start
