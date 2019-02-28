@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -27,14 +28,7 @@ func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for s, e := range sessions {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactNameChangedEvent)
-
-		// trim to 128 runes
-		name := []rune(event.Name)
-		if len(name) > 128 {
-			name = name[:128]
-		}
-
-		updates = append(updates, &nameUpdate{s.ContactID(), string(name)})
+		updates = append(updates, &nameUpdate{s.ContactID(), fmt.Sprintf("%.128s", event.Name)})
 	}
 
 	// do our update
