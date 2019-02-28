@@ -1,3 +1,7 @@
+v0.0.129
+----------
+ * trim contact names to 128 chars
+
 v0.0.128
 ----------
  * up to 36 redis connections
