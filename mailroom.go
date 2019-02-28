@@ -101,8 +101,9 @@ func (mr *Mailroom) Start() error {
 
 	// configure our pool
 	mr.DB = db
-	mr.DB.SetMaxIdleConns(4)
+	mr.DB.SetMaxIdleConns(8)
 	mr.DB.SetMaxOpenConns(mr.Config.DBPoolSize)
+	mr.DB.SetConnMaxLifetime(time.Minute * 30)
 
 	// try connecting
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
