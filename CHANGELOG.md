@@ -1,3 +1,7 @@
+v0.0.130
+----------
+ * retry transaction on failures
+
 v0.0.129
 ----------
  * trim contact names to 128 chars
