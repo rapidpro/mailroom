@@ -1,3 +1,7 @@
+v0.0.131
+----------
+ * give ourselves 15 minutes per start
+
 v0.0.130
 ----------
  * retry transaction on failures
