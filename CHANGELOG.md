@@ -1,3 +1,7 @@
+v0.0.128
+----------
+ * up to 36 redis connections
+
 v0.0.127
 ----------
  * add db in use metric to librato
