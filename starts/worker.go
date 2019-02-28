@@ -167,7 +167,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 
 // HandleFlowStartBatch starts a batch of contacts in a flow
 func handleFlowStartBatch(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*15)
 	defer cancel()
 
 	// decode our task body
