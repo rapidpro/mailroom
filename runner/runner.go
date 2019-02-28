@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	commitTimeout     = 15 * time.Second
-	postCommitTimeout = 30 * time.Second
+	commitTimeout     = time.Minute
+	postCommitTimeout = time.Minute
 )
 
 // NewStartOptions creates and returns the default start options to be used for flow starts
@@ -548,17 +548,14 @@ func StartFlowForContacts(
 
 	// write our session to the db
 	dbSessions, err := models.WriteSessions(txCTX, tx, rp, org, sessions, sprints, hook)
-	if err != nil {
-		tx.Rollback()
-		return nil, errors.Wrapf(err, "error writing sessions")
-	}
-
-	// commit it at once
-	commitStart := time.Now()
-	err = tx.Commit()
-
 	if err == nil {
-		logrus.WithField("elapsed", time.Since(commitStart)).WithField("count", len(sessions)).Debug("sessions committed")
+		// commit it at once
+		commitStart := time.Now()
+		err = tx.Commit()
+
+		if err == nil {
+			logrus.WithField("elapsed", time.Since(commitStart)).WithField("count", len(sessions)).Debug("sessions committed")
+		}
 	}
 
 	// retry committing our sessions one at a time
