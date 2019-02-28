@@ -27,7 +27,14 @@ func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for s, e := range sessions {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactNameChangedEvent)
-		updates = append(updates, &nameUpdate{s.ContactID(), event.Name})
+
+		// trim to 128 runes
+		name := []rune(event.Name)
+		if len(name) > 128 {
+			name = name[:128]
+		}
+
+		updates = append(updates, &nameUpdate{s.ContactID(), string(name)})
 	}
 
 	// do our update

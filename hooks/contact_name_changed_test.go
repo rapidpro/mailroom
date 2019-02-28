@@ -19,6 +19,9 @@ func TestContactNameChanged(t *testing.T) {
 				models.GeorgeID: []flows.Action{
 					actions.NewSetContactNameAction(newActionUUID(), "Geoff Newman"),
 				},
+				models.AlexandriaID: []flows.Action{
+					actions.NewSetContactNameAction(newActionUUID(), "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
+				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
@@ -38,6 +41,11 @@ func TestContactNameChanged(t *testing.T) {
 				SQLAssertion{
 					SQL:   "select count(*) from contacts_contact where name = 'Geoff Newman' and id = $1",
 					Args:  []interface{}{models.GeorgeID},
+					Count: 1,
+				},
+				SQLAssertion{
+					SQL:   "select count(*) from contacts_contact where name = '😃2345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678' and id = $1",
+					Args:  []interface{}{models.AlexandriaID},
 					Count: 1,
 				},
 			},
