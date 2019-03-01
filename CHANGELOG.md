@@ -1,3 +1,7 @@
+v0.0.133
+----------
+ * mark fires as skipped when skipping
+
 v0.0.132
 ----------
  * GC db connections after 30m, keep 8 around
