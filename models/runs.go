@@ -820,23 +820,21 @@ WHERE
 	flow_id = $2
 `
 
-// FindActiveRunOverlap returns the list of contact ids which overlap with those passed in which are
-// active in any other flows.
-func FindActiveRunOverlap(ctx context.Context, db *sqlx.DB, contacts []ContactID) ([]ContactID, error) {
+// FindActiveSessionOverlap returns the list of contact ids which overlap with those passed in which are active in any other flows
+func FindActiveSessionOverlap(ctx context.Context, db *sqlx.DB, contacts []ContactID) ([]ContactID, error) {
 	var overlap []ContactID
-	err := db.SelectContext(ctx, &overlap, activeRunOverlapSQL, pq.Array(contacts))
+	err := db.SelectContext(ctx, &overlap, activeSessionOverlapSQL, pq.Array(contacts))
 	return overlap, err
 }
 
-// should hit perfect index flows_flowrun_contact_flow_created_on_id_idx
-const activeRunOverlapSQL = `
+const activeSessionOverlapSQL = `
 SELECT
 	DISTINCT(contact_id)
 FROM
-	flows_flowrun
+	flows_flowsession
 WHERE
 	contact_id = ANY($1) AND
-	is_active = TRUE
+	status = 'W'
 `
 
 // RunExpiration looks up the run expiration for the passed in run, can return nil if the run is no longer active
@@ -937,7 +935,6 @@ WHERE
 	id = ANY (SELECT id FROM flows_flowrun WHERE contact_id = ANY($1) AND is_active = TRUE)
 `
 
-// TODO: we probably should have an index for active sessions like this
 const interruptContactSessionsSQL = `
 UPDATE
 	flows_flowsession

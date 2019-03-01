@@ -32,7 +32,13 @@ func TestCampaignStarts(t *testing.T) {
 
 	// create our event fires
 	now := time.Now()
-	db.MustExec(`INSERT INTO campaigns_eventfire(contact_id, event_id, scheduled) VALUES($2, $1, $4),($3, $1, $4);`, models.RemindersEvent2ID, models.CathyID, models.BobID, now)
+	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, models.CathyID, models.BobID, models.AlexandriaID)
+
+	// create an active flowrun for Alexandria to test skipping
+	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on) VALUES('M', $1, $2, 'W', FALSE, NOW());`, models.Org1, models.AlexandriaID)
+
+	// set our event to skip
+	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)
 
 	contacts := []models.ContactID{models.CathyID, models.BobID}
 	fires := []*models.EventFire{
@@ -46,6 +52,12 @@ func TestCampaignStarts(t *testing.T) {
 			FireID:    2,
 			EventID:   models.RemindersEvent2ID,
 			ContactID: models.BobID,
+			Scheduled: now,
+		},
+		&models.EventFire{
+			FireID:    3,
+			EventID:   models.RemindersEvent2ID,
+			ContactID: models.AlexandriaID,
 			Scheduled: now,
 		},
 	}
@@ -78,7 +90,10 @@ func TestCampaignStarts(t *testing.T) {
 		`SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`, nil, 0)
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3`, []interface{}{models.CathyID, models.BobID, models.RemindersEvent2ID}, 2)
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, []interface{}{models.CathyID, models.BobID, models.RemindersEvent2ID}, 2)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{models.AlexandriaID, models.RemindersEvent2ID}, 1)
 }
 
 func TestBatchStart(t *testing.T) {

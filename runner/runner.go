@@ -43,7 +43,6 @@ type StartOptions struct {
 	IncludeActive bool
 
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
-	// (simple campaign events do not currently interrupt)
 	Interrupt bool
 
 	// CommitHook is the hook that will be called in the transaction where each session is written
@@ -245,15 +244,13 @@ func FireCampaignEvents(
 	}
 	dbFlow := flow.(*models.Flow)
 
-	// flow doesn't exist or is archived, skip
+	// flow doesn't exist or is archived, delete this event fire
 	if dbFlow == nil || dbFlow.IsArchived() {
-		tx, _ := db.BeginTxx(ctx, nil)
-		err := models.MarkEventsFired(ctx, tx, fires, time.Now())
+		err := models.DeleteEventFires(ctx, db, fires)
 		if err != nil {
-			tx.Rollback()
-			logrus.WithError(err).Error("error marking events as fired due to archived or inactive flow")
+			return nil, errors.Wrapf(err, "error deleting events for archived or inactive flow")
 		}
-		return nil, tx.Commit()
+		return nil, nil
 	}
 
 	// our start options are based on the start mode for our event
@@ -279,7 +276,7 @@ func FireCampaignEvents(
 	if dbFlow.FlowType() == models.IVRFlow {
 		// Trigger our IVR flow start
 		err := TriggerIVRFlow(ctx, db, rp, org.OrgID(), dbFlow.ID(), contactIDs, func(ctx context.Context, tx *sqlx.Tx) error {
-			return models.MarkEventsFired(ctx, tx, fires, time.Now())
+			return models.MarkEventsFired(ctx, tx, fires, time.Now(), models.FireResultFired)
 		})
 		if err != nil {
 			return nil, errors.Wrapf(err, "error triggering ivr flow start")
@@ -308,31 +305,41 @@ func FireCampaignEvents(
 			fires = append(fires, fire)
 		}
 
-		// also add in any contacts that were skipped
+		// mark those events as fired
+		err := models.MarkEventsFired(ctx, tx, fires, fired, models.FireResultFired)
+		if err != nil {
+			return errors.Wrapf(err, "error marking events fired")
+		}
+
+		// now build up our list of skipped contacts (no trigger was built for them)
+		fires = make([]*models.EventFire, 0, len(skippedContacts))
 		for _, e := range skippedContacts {
 			fires = append(fires, e)
 		}
 
-		// mark those as cleared
-		skippedContacts = make(map[models.ContactID]*models.EventFire)
+		// and mark those as skipped
+		err = models.MarkEventsFired(ctx, tx, fires, fired, models.FireResultSkipped)
+		if err != nil {
+			return errors.Wrapf(err, "error marking events skipped")
+		}
 
-		// bulk update those event fires
-		return models.MarkEventsFired(ctx, tx, fires, fired)
+		// clear those out
+		skippedContacts = make(map[models.ContactID]*models.EventFire)
+		return nil
 	}
 
 	sessions, err := StartFlow(ctx, db, rp, org, dbFlow, contactIDs, options)
 	if err != nil {
 		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
 	} else {
-		// make sure any skipped contacts are marked as fired
-		// this can occur if there were no sessions committed, so our hook above is never called
+		// make sure any skipped contacts are marked as fired this can occur if all fires were skipped
 		fires := make([]*models.EventFire, 0, len(sessions))
 		for _, e := range skippedContacts {
 			fires = append(fires, e)
 		}
-		err = models.MarkEventsFired(ctx, db, fires, fired)
+		err = models.MarkEventsFired(ctx, db, fires, fired, models.FireResultSkipped)
 		if err != nil {
-			logrus.WithField("fire_ids", fires).WithError(err).Errorf("error marking events as fired: %s", event)
+			logrus.WithField("fire_ids", fires).WithError(err).Errorf("error marking events as skipped: %s", event)
 		}
 	}
 
@@ -375,7 +382,7 @@ func StartFlow(
 	// filter out our list of contacts to only include those that should be started
 	if !options.IncludeActive {
 		// find all participants active in any flow
-		active, err := models.FindActiveRunOverlap(ctx, db, contactIDs)
+		active, err := models.FindActiveSessionOverlap(ctx, db, contactIDs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error finding other active flow: %d", flow.ID())
 		}

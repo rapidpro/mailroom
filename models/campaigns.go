@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -300,13 +301,13 @@ WHERE
 ) r;
 `
 
-// MarkEventsFired sets the fired date on all the passed in event fires and updates the associated
-// rows in the database
-func MarkEventsFired(ctx context.Context, tx Queryer, fires []*EventFire, fired time.Time) error {
+// MarkEventsFired updates the passed in event fires with the fired time and result
+func MarkEventsFired(ctx context.Context, tx Queryer, fires []*EventFire, fired time.Time, result EventFireResult) error {
 	// set fired on all our values
 	updates := make([]interface{}, 0, len(fires))
 	for _, f := range fires {
 		f.Fired = &fired
+		f.FiredResult = result
 		updates = append(updates, f)
 	}
 
@@ -317,11 +318,12 @@ const markEventsFired = `
 UPDATE 
 	campaigns_eventfire f
 SET
-	fired = r.fired::timestamp with time zone
+	fired = r.fired::timestamp with time zone,
+	fired_result = r.fired_result::varchar
 FROM (
-	VALUES(:fire_id, :fired)
+	VALUES(:fire_id, :fired, :fired_result)
 ) AS
-	r(fire_id, fired)
+	r(fire_id, fired, fired_result)
 WHERE
 	f.id = r.fire_id::int
 `
@@ -350,13 +352,25 @@ WHERE
 	fired IS NULL
 `
 
+// EventFireResult represents how a event fire was fired
+type EventFireResult = null.String
+
+const (
+	// FireResultFired means our flow was started
+	FireResultFired = "F"
+
+	// FireResultSkipped means our flow was skipped
+	FireResultSkipped = "S"
+)
+
 // EventFire represents a single campaign event fire for an event and contact
 type EventFire struct {
-	FireID    FireID          `db:"fire_id"`
-	EventID   CampaignEventID `db:"event_id"`
-	ContactID ContactID       `db:"contact_id"`
-	Scheduled time.Time       `db:"scheduled"`
-	Fired     *time.Time      `db:"fired"`
+	FireID      FireID          `db:"fire_id"`
+	EventID     CampaignEventID `db:"event_id"`
+	ContactID   ContactID       `db:"contact_id"`
+	Scheduled   time.Time       `db:"scheduled"`
+	Fired       *time.Time      `db:"fired"`
+	FiredResult EventFireResult `db:"fired_result"`
 }
 
 // LoadEventFires loads all the event fires with the passed in ids
