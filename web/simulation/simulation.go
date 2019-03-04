@@ -295,9 +295,8 @@ func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawM
 //   }
 //
 type migrateRequest struct {
-	Flow          json.RawMessage `json:"flow"            validate:"required"`
-	CollapseExits *bool           `json:"collapse_exits"`
-	IncludeUI     *bool           `json:"include_ui"`
+	Flow      json.RawMessage `json:"flow"            validate:"required"`
+	IncludeUI *bool           `json:"include_ui"`
 }
 
 func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
@@ -320,10 +319,9 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading legacy flow")
 	}
 
-	collapseExits := request.CollapseExits == nil || *request.CollapseExits
 	includeUI := request.IncludeUI == nil || *request.IncludeUI
 
-	flow, err := legacyFlow.Migrate(collapseExits, includeUI)
+	flow, err := legacyFlow.Migrate(true, includeUI)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error migrating legacy flow")
 	}
