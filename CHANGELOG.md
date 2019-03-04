@@ -1,3 +1,7 @@
+v0.0.134
+----------
+ * log channellogs even when we don't have a connection
+
 v0.0.133
 ----------
  * mark fires as skipped when skipping
