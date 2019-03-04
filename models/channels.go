@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type ChannelID int
+type ChannelID null.Int
 
 var NilChannelID = ChannelID(0)
 
@@ -169,4 +170,24 @@ func OrgIDForChannelUUID(ctx context.Context, db *sqlx.DB, channelUUID assets.Ch
 		return NilOrgID, errors.Wrapf(err, "no channel found with uuid: %s", channelUUID)
 	}
 	return orgID, nil
+}
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i ChannelID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *ChannelID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i ChannelID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *ChannelID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
 }
