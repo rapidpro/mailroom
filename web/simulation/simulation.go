@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/definition"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
@@ -24,9 +25,12 @@ import (
 
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/migrate", web.RequireAuthToken(handleMigrate))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/validate", web.RequireAuthToken(handleValidate))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(handleStart))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(handleResume))
 }
+
+const requestBytesLimit = 1048576
 
 type flowDefinition struct {
 	UUID             assets.FlowUUID `json:"uuid"                validate:"required"`
@@ -291,14 +295,14 @@ func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawM
 //   }
 //
 type migrateRequest struct {
-	Flow          json.RawMessage `json:"flow"`
+	Flow          json.RawMessage `json:"flow"            validate:"required"`
 	CollapseExits *bool           `json:"collapse_exits"`
 	IncludeUI     *bool           `json:"include_ui"`
 }
 
 func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	migrate := migrateRequest{}
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
+	request := &migrateRequest{}
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, requestBytesLimit))
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -307,25 +311,85 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return nil, http.StatusInternalServerError, err
 	}
 
-	if err := json.Unmarshal(body, &migrate); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling definition")
+	if err := utils.UnmarshalAndValidate(body, request); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling request")
 	}
 
-	if migrate.Flow == nil {
-		return nil, http.StatusBadRequest, errors.Errorf("missing flow element")
-	}
-
-	legacyFlow, err := legacy.ReadLegacyFlow(migrate.Flow)
+	legacyFlow, err := legacy.ReadLegacyFlow(request.Flow)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading legacy flow")
 	}
 
-	collapseExits := migrate.CollapseExits == nil || *migrate.CollapseExits
-	includeUI := migrate.IncludeUI == nil || *migrate.IncludeUI
+	collapseExits := request.CollapseExits == nil || *request.CollapseExits
+	includeUI := request.IncludeUI == nil || *request.IncludeUI
 
 	flow, err := legacyFlow.Migrate(collapseExits, includeUI)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error migrating legacy flow")
+	}
+
+	return flow, http.StatusOK, nil
+}
+
+// Validates a flow. If validation fails, we return the error. If it succeeds, we return
+// the valid definition which will now include extracted dependencies. The provided flow
+// definition can be in either legacy or new format, but the returned definition will
+// always be in the new format. Note that a invalid request to this endpoint will return
+// a 400 status code, but that a valid request with a flow that fails validation will return
+// a 422 status code.
+//
+//   {
+//     "org_id": 1,
+//     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]}
+//   }
+//
+type validateRequest struct {
+	OrgID models.OrgID    `json:"org_id" validate:"required"`
+	Flow  json.RawMessage `json:"flow"   validate:"required"`
+}
+
+func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &validateRequest{}
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, requestBytesLimit))
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	if err := r.Body.Close(); err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	if err := utils.UnmarshalAndValidate(body, request); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling request")
+	}
+
+	var flowDef = request.Flow
+
+	// migrate definition if it is in legacy format
+	if legacy.IsLegacyDefinition(flowDef) {
+		flowDef, err = legacy.MigrateLegacyDefinition(flowDef)
+	}
+
+	flow, err := definition.ReadFlow(flowDef)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	// grab our org
+	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	// build our session assets
+	sa, err := models.NewSessionAssets(org)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
+	}
+
+	// validate the flow against these assets
+	if err := flow.Validate(sa); err != nil {
+		return nil, http.StatusUnprocessableEntity, err
 	}
 
 	return flow, http.StatusOK, nil

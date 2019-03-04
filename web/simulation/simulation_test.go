@@ -282,6 +282,191 @@ const (
 			]
 		}
 	}`
+
+	validateWithValidLegacyFlow = `
+	{
+		"org_id": 1,
+		"flow": {
+			"entry": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+			"action_sets": [
+				{
+				"uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+				"x": 107,
+				"y": 0,
+				"destination": null,
+				"actions": [
+					{
+						"type": "add_group",
+						"uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+						"groups": [
+							{
+							"uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+							"name": "Testers"
+							}
+						]
+					},
+					{
+						"type": "reply",
+						"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+						"msg": {
+							"eng": "Your birthdate is @contact.birthdate"
+						},
+						"media": {},
+						"quick_replies": [],
+						"send_all": false
+					}
+				],
+				"exit_uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+				}
+			],
+			"rule_sets": [],
+			"base_language": "eng",
+			"flow_type": "M",
+			"version": "11.12",
+			"metadata": {
+				"expires": 10080,
+				"saved_on": "2019-03-04T17:37:06.873734Z",
+				"uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+				"name": "Valid Legacy Flow",
+				"revision": 106
+			}
+		}
+	}`
+
+	validateWithInvalidLegacyFlow = `
+	{
+		"org_id": 1,
+		"flow": {
+			"entry": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+			"action_sets": [
+				{
+				"uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+				"x": 107,
+				"y": 0,
+				"destination": null,
+				"actions": [
+					{
+						"type": "add_group",
+						"uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+						"groups": [
+							{
+							"uuid": "1465eb20-066d-4933-a8b4-62fe7b19fd39",
+							"name": "I Don't Exist"
+							}
+						]
+					},
+					{
+						"type": "reply",
+						"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+						"msg": {
+							"eng": "Your birthdate is @contact.birthdate"
+						},
+						"media": {},
+						"quick_replies": [],
+						"send_all": false
+					}
+				],
+				"exit_uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+				}
+			],
+			"rule_sets": [],
+			"base_language": "eng",
+			"flow_type": "M",
+			"version": "11.12",
+			"metadata": {
+				"expires": 10080,
+				"saved_on": "2019-03-04T17:37:06.873734Z",
+				"uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+				"name": "Valid Legacy Flow",
+				"revision": 106
+			}
+		}
+	}`
+
+	validateWithValidFlow = `
+	{
+		"org_id": 1,
+		"flow": {
+			"uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+			"name": "Valid Legacy Flow",
+			"spec_version": "12.0.0",
+			"language": "eng",
+			"type": "messaging",
+			"revision": 106,
+			"expire_after_minutes": 10080,
+			"localization": {},
+			"nodes": [
+				{
+					"uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+					"actions": [
+						{
+							"type": "add_contact_groups",
+							"uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+							"groups": [
+								{
+									"uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+									"name": "Testers"
+								}
+							]
+						},
+						{
+							"type": "send_msg",
+							"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+							"text": "Your birthdate is @contact.fields.birthdate"
+						}
+					],
+					"exits": [
+						{
+							"uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+						}
+					]
+				}
+			]
+		}
+	}`
+
+	validateWithInvalidFlow = `
+	{
+		"org_id": 1,
+		"flow": {
+			"uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+			"name": "Valid Legacy Flow",
+			"spec_version": "12.0.0",
+			"language": "eng",
+			"type": "messaging",
+			"revision": 106,
+			"expire_after_minutes": 10080,
+			"localization": {},
+			"nodes": [
+				{
+					"uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+					"actions": [
+						{
+							"type": "add_contact_groups",
+							"uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+							"groups": [
+								{
+									"uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+									"name": "Testers"
+								}
+							]
+						},
+						{
+							"type": "send_msg",
+							"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+							"text": "Your birthdate is @contact.fields.birthdate"
+						}
+					],
+					"exits": [
+						{
+							"uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699",
+							"destination_node_uuid": "55fbef81-4151-4589-9f0a-8e5c44f6b5a3"
+						}
+					]
+				}
+			]
+		}
+	}`
 )
 
 func TestServer(t *testing.T) {
@@ -336,6 +521,12 @@ func TestServer(t *testing.T) {
 		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
 		{"/mr/sim/resume", "POST", triggerResumeBody, 200, "it is time to consult with your patients"},
 		{"/mr/sim/resume", "POST", resumeBody, 200, "it is time to consult with your patients"},
+
+		{"/mr/flow/validate", "GET", "", 405, "illegal"},
+		{"/mr/flow/validate", "POST", validateWithValidLegacyFlow, 200, `"type": "send_msg"`},
+		{"/mr/flow/validate", "POST", validateWithInvalidLegacyFlow, 422, `"error": "missing dependencies: group[uuid=146`},
+		{"/mr/flow/validate", "POST", validateWithValidFlow, 200, `"type": "send_msg"`},
+		{"/mr/flow/validate", "POST", validateWithInvalidFlow, 422, `isn't a known node`},
 	}
 
 	for i, tc := range tcs {
