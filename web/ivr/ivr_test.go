@@ -277,4 +277,10 @@ func TestIVR(t *testing.T) {
 		[]interface{}{models.CathyID},
 		5,
 	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`,
+		[]interface{}{},
+		8,
+	)
 }

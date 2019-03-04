@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ChannelLogID is our type for a channel log id
 type ChannelLogID int64
 
 // ChannelLog is the mailroom struct that represents channel logs
@@ -29,6 +30,7 @@ type ChannelLog struct {
 	}
 }
 
+// ID returns the id of this channel log
 func (l *ChannelLog) ID() ChannelLogID { return l.l.ID }
 
 const insertChannelLogSQL = `
@@ -47,7 +49,7 @@ RETURNING
 // InsertChannelLog writes a channel log to the db returning the inserted log
 func InsertChannelLog(ctx context.Context, db *sqlx.DB,
 	desc string, isError bool, method string, url string, request []byte, status int, response []byte,
-	createdOn time.Time, elapsed time.Duration, conn *ChannelConnection) (*ChannelLog, error) {
+	createdOn time.Time, elapsed time.Duration, channel *Channel, conn *ChannelConnection) (*ChannelLog, error) {
 
 	log := &ChannelLog{}
 	l := &log.l
@@ -61,8 +63,11 @@ func InsertChannelLog(ctx context.Context, db *sqlx.DB,
 	l.Status = status
 	l.CreatedOn = createdOn
 	l.RequestTime = int(elapsed / time.Millisecond)
-	l.ChannelID = conn.ChannelID()
-	l.ConnectionID = conn.ID()
+	l.ChannelID = channel.ID()
+
+	if conn != nil {
+		l.ConnectionID = conn.ID()
+	}
 
 	err := BulkSQL(ctx, "insert channel log", db, insertChannelLogSQL, []interface{}{l})
 	if err != nil {
