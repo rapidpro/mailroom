@@ -239,6 +239,47 @@ const (
 			]
 		}
 	}`
+
+	validateWithValidFlowWithoutOrgID = `
+	{
+		"flow": {
+			"uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+			"name": "Valid Legacy Flow",
+			"spec_version": "12.0.0",
+			"language": "eng",
+			"type": "messaging",
+			"revision": 106,
+			"expire_after_minutes": 10080,
+			"localization": {},
+			"nodes": [
+				{
+					"uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+					"actions": [
+						{
+							"type": "add_contact_groups",
+							"uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+							"groups": [
+								{
+									"uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+									"name": "Testers"
+								}
+							]
+						},
+						{
+							"type": "send_msg",
+							"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+							"text": "Your birthdate is @contact.fields.birthdate"
+						}
+					],
+					"exits": [
+						{
+							"uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+						}
+					]
+				}
+			]
+		}
+	}`
 )
 
 func TestServer(t *testing.T) {
@@ -287,6 +328,7 @@ func TestServer(t *testing.T) {
 		{"/mr/flow/validate", "POST", validateWithInvalidLegacyFlow, 422, `"error": "missing dependencies: group[uuid=146`},
 		{"/mr/flow/validate", "POST", validateWithValidFlow, 200, `"type": "send_msg"`},
 		{"/mr/flow/validate", "POST", validateWithInvalidFlow, 422, `isn't a known node`},
+		{"/mr/flow/validate", "POST", validateWithValidFlowWithoutOrgID, 200, `"type": "send_msg"`},
 	}
 
 	for i, tc := range tcs {
