@@ -103,6 +103,9 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 	// migrate definition if it is in legacy format
 	if legacy.IsLegacyDefinition(flowDef) {
 		flowDef, err = legacy.MigrateLegacyDefinition(flowDef)
+		if err != nil {
+			return nil, http.StatusBadRequest, err
+		}
 	}
 
 	flow, err := definition.ReadFlow(flowDef)
