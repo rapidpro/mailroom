@@ -178,6 +178,10 @@ func (m *Msg) Attachments() []flows.Attachment {
 func (m *Msg) SetResponseTo(id MsgID, externalID string) {
 	m.m.ResponseToID = id
 	m.m.ResponseToExternalID = externalID
+
+	if id != NilMsgID || externalID != "" {
+		m.m.HighPriority = true
+	}
 }
 
 func (m *Msg) MarshalJSON() ([]byte, error) {
@@ -266,7 +270,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 
 	m.UUID = out.UUID()
 	m.Text = out.Text()
-	m.HighPriority = true
+	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
 	m.Visibility = VisibilityVisible

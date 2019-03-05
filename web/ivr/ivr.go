@@ -88,7 +88,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 			ctx, s.DB, desc, isError,
 			r.Method, url, requestTrace, w.Status(), responseTrace.Bytes(),
 			start, time.Since(start),
-			conn,
+			channel, conn,
 		)
 		if err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
@@ -265,6 +265,18 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 		return errors.Wrapf(err, "unable to load channel connection with id: %d", request.ConnectionID)
 	}
 
+	// load our org
+	org, err := models.GetOrgAssets(ctx, s.DB, conn.OrgID())
+	if err != nil {
+		return writeClientError(w, errors.Wrapf(err, "error loading org assets"))
+	}
+
+	// and our channel
+	channel := org.ChannelByID(conn.ChannelID())
+	if channel == nil {
+		return writeClientError(w, errors.Wrapf(err, "no active channel with id: %d", conn.ChannelID()))
+	}
+
 	// create a channel log for this request and connection
 	defer func() {
 		desc := "IVR event handled"
@@ -285,24 +297,12 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 			ctx, s.DB, desc, isError,
 			r.Method, url, requestTrace, w.Status(), responseTrace.Bytes(),
 			start, time.Since(start),
-			conn,
+			channel, conn,
 		)
 		if err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
 		}
 	}()
-
-	// load our org
-	org, err := models.GetOrgAssets(ctx, s.DB, conn.OrgID())
-	if err != nil {
-		return writeClientError(w, errors.Wrapf(err, "error loading org assets"))
-	}
-
-	// and our channel
-	channel := org.ChannelByID(conn.ChannelID())
-	if channel == nil {
-		return writeClientError(w, errors.Wrapf(err, "no active channel with id: %d", conn.ChannelID()))
-	}
 
 	// get the right kind of client
 	client, err := ivr.GetClient(channel)
@@ -467,7 +467,7 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, rawW http
 			ctx, s.DB, desc, isError,
 			r.Method, url, requestTrace, w.Status(), responseTrace.Bytes(),
 			start, time.Since(start),
-			conn,
+			channel, conn,
 		)
 		if err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")

@@ -135,7 +135,7 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 			ctx, db, desc, isError,
 			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody,
 			rt.StartedOn, rt.Elapsed,
-			conn,
+			channel, conn,
 		)
 
 		// log any error inserting our channel log, but try to continue
@@ -269,7 +269,7 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 			ctx, db, desc, isError,
 			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody,
 			rt.StartedOn, rt.Elapsed,
-			conn,
+			channel, conn,
 		)
 
 		// log any error inserting our channel log, but try to continue

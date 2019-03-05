@@ -2,14 +2,18 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 )
 
-type ConnectionID int64
+type ConnectionID null.Int
+
+const NilConnectionID = ConnectionID(0)
 
 type ConnectionStatus string
 
@@ -450,4 +454,24 @@ func ActiveChannelConnectionCount(ctx context.Context, db Queryer, id ChannelID)
 		return 0, errors.Wrapf(err, "unable to select active channel connection count")
 	}
 	return count, nil
+}
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i ConnectionID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *ConnectionID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i ConnectionID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *ConnectionID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
 }
