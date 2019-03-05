@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/goflow/utils"
@@ -65,9 +66,11 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 // Validates a flow. If validation fails, we return the error. If it succeeds, we return
 // the valid definition which will now include extracted dependencies. The provided flow
 // definition can be in either legacy or new format, but the returned definition will
-// always be in the new format. Note that a invalid request to this endpoint will return
-// a 400 status code, but that a valid request with a flow that fails validation will return
-// a 422 status code.
+// always be in the new format. `org_id` is optional and determines whether we load and
+// pass assets to the flow validation to find missing assets.
+//
+// Note that a invalid request to this endpoint will return a 400 status code, but that a
+// valid request with a flow that fails validation will return a 422 status code.
 //
 //   {
 //     "org_id": 1,
@@ -75,7 +78,7 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 //   }
 //
 type validateRequest struct {
-	OrgID models.OrgID    `json:"org_id" validate:"required"`
+	OrgID models.OrgID    `json:"org_id"`
 	Flow  json.RawMessage `json:"flow"   validate:"required"`
 }
 
@@ -95,6 +98,7 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 	}
 
 	var flowDef = request.Flow
+	var sa flows.SessionAssets
 
 	// migrate definition if it is in legacy format
 	if legacy.IsLegacyDefinition(flowDef) {
@@ -106,16 +110,17 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 		return nil, http.StatusBadRequest, err
 	}
 
-	// grab our org
-	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
-	if err != nil {
-		return nil, http.StatusBadRequest, err
-	}
+	// if we have an org ID, build a session assets for it
+	if request.OrgID != 0 {
+		org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
+		if err != nil {
+			return nil, http.StatusBadRequest, err
+		}
 
-	// build our session assets
-	sa, err := models.NewSessionAssets(org)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
+		sa, err = models.NewSessionAssets(org)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
+		}
 	}
 
 	// validate the flow against these assets
