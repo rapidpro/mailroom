@@ -161,41 +161,6 @@ const (
 		"session": $$SESSION$$
 	}`
 
-	minLegacyDef = `
-	{
-		"flow": {
-			"base_language": "eng",
-			"action_sets": [{
-				"y": 0,
-				"x": 100,
-				"destination": null,
-				"uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
-				"actions": [{
-					"uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf",
-					"msg": {
-						"eng": "Hello world"
-					},
-					"type": "reply"
-				}],
-				"exit_uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
-			}],
-			"version": 8,
-			"flow_type": "F",
-			"entry": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
-			"rule_sets": [],
-			"metadata": {
-				"uuid": "42362831-f376-4df1-b6d9-a80b102821d9",
-				"expires": 10080,
-				"revision": 1,
-				"id": 41049,
-				"name": "No ruleset flow",
-				"saved_on": "2015-11-20T11:02:19.790131Z"
-			}
-		},
-		"include_ui": true
-	}
-	`
-
 	customStartBody = `
 	{
 		"org_id": 1,
@@ -327,12 +292,7 @@ func TestServer(t *testing.T) {
 		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
 		{"/mr/sim/resume", "GET", "", 405, "illegal"},
 		{"/mr/sim/resume", "POST", resumeBody, 200, "Good choice, I like Blue too! What is your favorite beer?"},
-
 		{"/mr/sim/start", "POST", customStartBody, 200, "Your channel is Test Channel"},
-
-		{"/mr/flow/migrate", "GET", "", 405, "illegal"},
-		{"/mr/flow/migrate", "POST", minLegacyDef, 200, `"type": "send_msg"`},
-
 		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
 		{"/mr/sim/resume", "POST", triggerResumeBody, 200, "it is time to consult with your patients"},
 		{"/mr/sim/resume", "POST", resumeBody, 200, "it is time to consult with your patients"},
