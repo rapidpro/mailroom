@@ -16,7 +16,7 @@ const (
 	defaultPriority = 0
 )
 
-// QueueMessages queues a message to courier
+// QueueMessages queues messages to courier, these should all be for the same contact
 func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 	if len(msgs) == 0 {
 		return nil
@@ -34,6 +34,11 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 	// commits our batch to redis
 	commitBatch := func() error {
 		if len(batch) > 0 {
+			priority = defaultPriority
+			if batch[0].HighPriority() {
+				priority = highPriority
+			}
+
 			batchJSON, err := json.Marshal(batch)
 			if err != nil {
 				return err
@@ -81,11 +86,6 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 
 			currentChannel = msg.Channel()
 			batch = []*models.Msg{msg}
-
-			priority = defaultPriority
-			if msg.HighPriority() {
-				priority = highPriority
-			}
 		}
 	}
 

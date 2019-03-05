@@ -2,9 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -112,6 +114,11 @@ func TestMsgEvents(t *testing.T) {
 		assert.Equal(t, text, tc.Response, "%d: response: '%s' does not contain '%s'", i, text, tc.Response)
 	}
 
+	// should have 7 queued priority messages
+	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", models.Org2ChannelUUID)))
+	assert.NoError(t, err)
+	assert.Equal(t, 7, count)
+
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, models.Org2FredID)
 	task := makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
@@ -126,7 +133,7 @@ func TestMsgEvents(t *testing.T) {
 	}
 
 	// on third error, no new task
-	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	assert.Nil(t, task)
 }

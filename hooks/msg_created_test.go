@@ -1,12 +1,15 @@
 package hooks
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/stretchr/testify/assert"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 )
@@ -49,12 +52,12 @@ func TestMsgCreated(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND metadata = $2 AND response_to_id = $3",
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND metadata = $2 AND response_to_id = $3 AND high_priority = TRUE",
 					Args:  []interface{}{models.CathyID, `{"quick_replies":["yes","no"]}`, msg1.ID()},
 					Count: 2,
 				},
 				SQLAssertion{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello Attachments' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q'",
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello Attachments' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = FALSE",
 					Args:  []interface{}{models.GeorgeID, "image/png:https://foo.bar.com/images/image1.png"},
 					Count: 1,
 				},
@@ -68,6 +71,19 @@ func TestMsgCreated(t *testing.T) {
 	}
 
 	RunActionTestCases(t, tcs)
+
+	rc := testsuite.RP().Get()
+	defer rc.Close()
+
+	// Cathy should have 1 batch of queued messages at high priority
+	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", models.TwilioChannelUUID)))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	// Only one bulk for George
+	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", models.TwilioChannelUUID)))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
 }
 
 func TestNoTopup(t *testing.T) {
