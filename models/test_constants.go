@@ -96,6 +96,7 @@ var TestingLabelUUID = assets.LabelUUID("a6338cdc-7938-4437-8b05-2d5d785e3a08")
 
 var Org2 = OrgID(2)
 var Org2ChannelID = ChannelID(20000)
+var Org2ChannelUUID = assets.ChannelUUID("a89bc872-3763-4b95-91d9-31d4e56c6651")
 
 var Org2FredID = ContactID(20000)
 var Org2FredUUID = flows.ContactUUID("26d20b72-f7d8-44dc-87f2-aae046dbff95")
