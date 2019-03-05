@@ -3,8 +3,6 @@ package simulation
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/jmoiron/sqlx"
@@ -14,7 +12,6 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
@@ -23,7 +20,6 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/migrate", web.RequireAuthToken(handleMigrate))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(handleStart))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(handleResume))
 }
@@ -281,52 +277,4 @@ func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawM
 	}
 
 	return errors.Errorf("missing definition or legacy_definition for flow: %s", uuid)
-}
-
-// Migrates a legacy flow to the new flow definition specification
-//
-//   {
-//     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...},
-//     "include_ui": false
-//   }
-//
-type migrateRequest struct {
-	Flow          json.RawMessage `json:"flow"`
-	CollapseExits *bool           `json:"collapse_exits"`
-	IncludeUI     *bool           `json:"include_ui"`
-}
-
-func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	migrate := migrateRequest{}
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
-	if err != nil {
-		return nil, http.StatusBadRequest, err
-	}
-
-	if err := r.Body.Close(); err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-
-	if err := json.Unmarshal(body, &migrate); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling definition")
-	}
-
-	if migrate.Flow == nil {
-		return nil, http.StatusBadRequest, errors.Errorf("missing flow element")
-	}
-
-	legacyFlow, err := legacy.ReadLegacyFlow(migrate.Flow)
-	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading legacy flow")
-	}
-
-	collapseExits := migrate.CollapseExits == nil || *migrate.CollapseExits
-	includeUI := migrate.IncludeUI == nil || *migrate.IncludeUI
-
-	flow, err := legacyFlow.Migrate(collapseExits, includeUI)
-	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error migrating legacy flow")
-	}
-
-	return flow, http.StatusOK, nil
 }

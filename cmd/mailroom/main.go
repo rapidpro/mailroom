@@ -22,6 +22,7 @@ import (
 	_ "github.com/nyaruka/mailroom/stats"
 	_ "github.com/nyaruka/mailroom/timeouts"
 
+	_ "github.com/nyaruka/mailroom/web/flow"
 	_ "github.com/nyaruka/mailroom/web/ivr"
 	_ "github.com/nyaruka/mailroom/web/simulation"
 	_ "github.com/nyaruka/mailroom/web/surveyor"

@@ -57,7 +57,7 @@ func TestMain(m *testing.M) {
 func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.Flow {
 	exitUUIDs := make([]flows.ExitUUID, len(tc.Actions))
 	i := 0
-	for _ = range tc.Actions {
+	for range tc.Actions {
 		exitUUIDs[i] = flows.ExitUUID(utils.NewUUID())
 		i++
 	}
@@ -120,7 +120,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		flows.FlowTypeMessaging,
 		1,
 		300,
-		nil,
+		definition.NewLocalization(),
 		nodes,
 		nil,
 	)
