@@ -346,6 +346,12 @@ func StartIVRFlow(
 	connRef := flows.NewConnection(channel.ChannelReference(), urn)
 	trigger := triggers.NewManualVoiceTrigger(org.Env(), flowRef, contact, connRef, nil)
 
+	// mark our connection as started
+	err = conn.MarkStarted(ctx, db, time.Now())
+	if err != nil {
+		return errors.Wrapf(err, "error updating call status")
+	}
+
 	// we set the connection on the session before our event hooks fire so that IVR messages can be created with the right connection reference
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
 		for _, session := range sessions {
@@ -368,12 +374,6 @@ func StartIVRFlow(
 	err = client.WriteSessionResponse(sessions[0], resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for start")
-	}
-
-	// mark our connection as started
-	err = conn.MarkStarted(ctx, db, time.Now())
-	if err != nil {
-		return errors.Wrapf(err, "error updating call status")
 	}
 
 	return nil
@@ -535,16 +535,22 @@ func ResumeIVRFlow(
 		return nil
 	}
 
+	// make sure our call is still happening
+	status, _ := client.StatusForRequest(r)
+	if status != models.ConnectionStatusInProgress {
+		err := conn.UpdateStatus(ctx, db, status, 0, time.Now())
+		if err != nil {
+			return errors.Wrapf(err, "error updating status")
+		}
+	}
+
 	session, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}
 
-	// make sure our call is still happening
-	status, _ := client.StatusForRequest(r)
-
+	// if still active, write out our response
 	if status == models.ConnectionStatusInProgress {
-		// have our client output our session status
 		err = client.WriteSessionResponse(session, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for resume")
@@ -555,7 +561,7 @@ func ResumeIVRFlow(
 			logrus.WithError(err).Error("error closing session")
 		}
 
-		return client.WriteEmptyResponse(w, "call ended, ignoring resume")
+		return client.WriteEmptyResponse(w, "call completed")
 	}
 
 	return nil

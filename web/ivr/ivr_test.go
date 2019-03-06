@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -23,26 +22,10 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/jmoiron/sqlx"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/ivr/twilio"
 )
-
-func insertStart(db *sqlx.DB, uuid utils.UUID, flowID models.FlowID, restartParticipants bool, includeActive bool) models.StartID {
-	// note we don't bother with the many to many for contacts and groups in our testing
-	var startID models.StartID
-	err := db.Get(&startID,
-		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, 
-									 contact_count, status, created_by_id, flow_id, modified_by_id)
-							VALUES(TRUE, now(), now(), $1, $2, $3, 0, 'S', 1, $4, 1) RETURNING id;`, uuid, restartParticipants, includeActive, flowID)
-
-	if err != nil {
-		panic(err)
-	}
-	logrus.WithField("start", startID).Info("inserted start")
-	return startID
-}
 
 func TestIVR(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
@@ -74,15 +57,15 @@ func TestIVR(t *testing.T) {
 	// add auth tokens
 	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, models.TwilioChannelID)
 
-	// create a flow start for cathy
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
+	// create a flow start for cathy and george
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, nil)
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
 	// call our master starter
 	err := starts.CreateFlowBatches(ctx, db, rp, start)
 	assert.NoError(t, err)
 
-	// should have one task in our ivr queue
+	// start our task
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	batch := &models.FlowStartBatch{}
@@ -92,9 +75,15 @@ func TestIVR(t *testing.T) {
 	// request our call to start
 	err = ivr.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
+
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.CathyID, models.ConnectionStatusWired, "Call1"},
+		[]interface{}{batch.ContactIDs()[0], models.ConnectionStatusWired, "Call1"},
+		1,
+	)
+	testsuite.AssertQueryCount(t, db,
+		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		[]interface{}{batch.ContactIDs()[1], models.ConnectionStatusWired, "Call1"},
 		1,
 	)
 
@@ -187,9 +176,29 @@ func TestIVR(t *testing.T) {
 			Contains:   "status updated: D",
 		},
 		{
-			Action:       "incoming",
+			Action:       "start",
 			ChannelUUID:  models.TwilioChannelUUID,
 			ConnectionID: models.ConnectionID(2),
+			Form:         nil,
+			StatusCode:   200,
+			Contains:     "Hello there. Please enter one or two.",
+		},
+		{
+			Action:       "resume",
+			ChannelUUID:  models.TwilioChannelUUID,
+			ConnectionID: models.ConnectionID(2),
+			Form: url.Values{
+				"CallStatus": []string{"completed"},
+				"wait_type":  []string{"gather"},
+				"Digits":     []string{"56"},
+			},
+			StatusCode: 200,
+			Contains:   "<!--call completed-->",
+		},
+		{
+			Action:       "incoming",
+			ChannelUUID:  models.TwilioChannelUUID,
+			ConnectionID: models.ConnectionID(3),
 			Form: url.Values{
 				"CallSid":    []string{"Call2"},
 				"CallStatus": []string{"completed"},
@@ -201,7 +210,7 @@ func TestIVR(t *testing.T) {
 		{
 			Action:       "status",
 			ChannelUUID:  models.TwilioChannelUUID,
-			ConnectionID: models.ConnectionID(2),
+			ConnectionID: models.ConnectionID(3),
 			Form: url.Values{
 				"CallSid":      []string{"Call2"},
 				"CallStatus":   []string{"failed"},
@@ -283,4 +292,17 @@ func TestIVR(t *testing.T) {
 		[]interface{}{},
 		8,
 	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`,
+		[]interface{}{models.GeorgeID},
+		2,
+	)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`,
+		[]interface{}{models.GeorgeID},
+		1,
+	)
+
 }

@@ -70,6 +70,11 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 		return errors.Errorf("ivr sessions must have a channel connection set")
 	}
 
+	// if our call is no longer in progress, return
+	if conn.Status() != models.ConnectionStatusInProgress {
+		return nil
+	}
+
 	msg, err := models.NewOutgoingIVR(org.OrgID(), conn, event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing ivr say: %s", event.Msg.Text())
