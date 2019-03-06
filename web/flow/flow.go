@@ -114,7 +114,7 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 	}
 
 	// if we have an org ID, build a session assets for it
-	if request.OrgID != 0 {
+	if request.OrgID != models.NilOrgID {
 		org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
 		if err != nil {
 			return nil, http.StatusBadRequest, err
