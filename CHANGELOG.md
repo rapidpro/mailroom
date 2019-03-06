@@ -1,3 +1,7 @@
+v0.0.137
+----------
+ * Update to latest goflow
+
 v0.0.136
 ----------
  * Make org_id optional on /mr/flow/validate to validate a flow without assets
