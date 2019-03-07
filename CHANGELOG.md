@@ -1,3 +1,8 @@
+v0.0.138
+----------
+ * sync android channels when creating messages, refactor clearing timeouts
+ * dont create outgoing ivr messages (internally) when resuming a completed call
+
 v0.0.137
 ----------
  * Update to latest goflow
