@@ -4,6 +4,8 @@ github.com/antlr/antlr4 v0.0.0-20181218183534-70d9ddcd0a58 h1:d4XWEhUH2DAtqTwT0M
 github.com/antlr/antlr4 v0.0.0-20181218183534-70d9ddcd0a58/go.mod h1:T7PbCXFs94rrTttyxjbyT5+/1V8T2TYDejxUfHJjw1Y=
 github.com/apex/log v1.0.0 h1:5UWeZC54mWVtOGSCjtuvDPgY/o0QxmjQgvYZ27pLVGQ=
 github.com/apex/log v1.0.0/go.mod h1:yA770aXIDQrhVOIGurT/pVdfCpSq1GQV/auzMN5fzvY=
+github.com/appleboy/go-fcm v0.0.0-20190214153823-cfd5eac22a0f h1:qlMv6xr6XufzxNTAi9LqhWk8df+8DmUS8DLP5Q17saQ=
+github.com/appleboy/go-fcm v0.0.0-20190214153823-cfd5eac22a0f/go.mod h1:DeokSWAx9RKLcVXRodWJ0lpvHaMPfQx+cC/zODK7g8A=
 github.com/aws/aws-lambda-go v1.8.1/go.mod h1:zUsUQhAUjYzR8AuduJPCfhBuKWUaDbQiPOG+ouzmE1A=
 github.com/aws/aws-sdk-go v1.16.17 h1:hHRKZhoB4qEY17aGNp71UxQFyYpx6WZXGMUzx9y/A4w=
 github.com/aws/aws-sdk-go v1.16.17/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=

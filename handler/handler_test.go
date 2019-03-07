@@ -119,6 +119,12 @@ func TestMsgEvents(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 7, count)
 
+	// Fred's session should not have a timeout because courier will set it
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL AND wait_started_on IS NOT NULL`,
+		[]interface{}{models.Org2FredID}, 1,
+	)
+
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, models.Org2FredID)
 	task := makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")

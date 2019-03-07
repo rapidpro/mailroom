@@ -79,6 +79,16 @@ func RegisterEventHook(eventType string, handler EventHandler) {
 	eventHandlers[eventType] = handler
 }
 
+// RegisterPreWriteHook registers the passed in handler as being interested in the passed in type before session and run insertion
+func RegisterPreWriteHook(eventType string, handler EventHandler) {
+	// it's a bug if we try to register more than one handler for a type
+	_, found := preHandlers[eventType]
+	if found {
+		panic(errors.Errorf("duplicate handler being registered for type: %s", eventType))
+	}
+	preHandlers[eventType] = handler
+}
+
 // ApplyEvent applies the passed in event, IE, creates the db objects required etc..
 func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
 	handler, found := eventHandlers[e.Type()]
@@ -89,5 +99,19 @@ func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets
 	return handler(ctx, tx, rp, org, session, e)
 }
 
+// ApplyPreWriteEvent applies the passed in event before insertion or update, unlike normal event handlers it is not a requirement
+// that all types have a handler.
+func ApplyPreWriteEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
+	handler, found := preHandlers[e.Type()]
+	if !found {
+		return nil
+	}
+
+	return handler(ctx, tx, rp, org, session, e)
+}
+
 // our map of event type to internal handlers
 var eventHandlers = make(map[string]EventHandler)
+
+// our map of event type to pre insert handlers
+var preHandlers = make(map[string]EventHandler)
