@@ -36,6 +36,8 @@ type Config struct {
 	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
 
+	FCMKey string `help:"the FCM API key used to notify Android relayers to sync"`
+
 	AuthToken string `help:"the token clients will need to authenticate web requests"`
 	Address   string `help:"the address to bind our web server to"`
 	Port      int    `help:"the port to bind our web server to"`

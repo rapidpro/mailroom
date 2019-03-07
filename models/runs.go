@@ -109,6 +109,7 @@ func (s *Session) OrgID() OrgID                  { return s.s.OrgID }
 func (s *Session) CreatedOn() time.Time          { return s.s.CreatedOn }
 func (s *Session) EndedOn() *time.Time           { return s.s.EndedOn }
 func (s *Session) TimeoutOn() *time.Time         { return s.s.TimeoutOn }
+func (s *Session) ClearTimeoutOn()               { s.s.TimeoutOn = nil }
 func (s *Session) WaitStartedOn() *time.Time     { return s.s.WaitStartedOn }
 func (s *Session) CurrentFlowID() *FlowID        { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID   { return s.s.ConnectionID }
@@ -203,7 +204,6 @@ type FlowRun struct {
 		ExitedOn   *time.Time    `db:"exited_on"`
 		ExitType   ExitType      `db:"exit_type"`
 		ExpiresOn  *time.Time    `db:"expires_on"`
-		TimeoutOn  *time.Time    `db:"timeout_on"`
 		Responded  bool          `db:"responded"`
 
 		// TODO: should this be a complex object that can read / write iself to the DB as JSON?
@@ -406,37 +406,18 @@ func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment) (fl
 	return session, nil
 }
 
-// calculates how our timeout should be set, we leave it blank if we send any outgoing messages
-// as courier will set it for us. if no message has been sent, then we set it immediately
-// TODO: this is probably easier to reason about by adding a new pre-write hook for events which
-// coult clear the timeout themselves on msg_created
+// calculates the timeout value for this session based on our waits
 func (s *Session) calculateTimeout(fs flows.Session, sprint flows.Sprint) {
 	// if we are on a wait and it has a timeout
 	if fs.Wait() != nil && fs.Wait().Timeout() != nil {
 		now := time.Now()
 		s.s.WaitStartedOn = &now
 
-		// figure out if we sent any messages
-		msgCreated := false
-		for _, e := range sprint.Events() {
-			if e.Type() == events.TypeMsgCreated {
-				msgCreated = true
-				break
-			}
-		}
-
-		// make a duration of the seconds for our timeout
 		seconds := time.Duration(*fs.Wait().Timeout()) * time.Second
+		s.timeout = &seconds
 
-		if msgCreated {
-			// if we created a message in this sprint, don't set our timeout on yet, but set
-			// our timeout in seconds for passing to courier
-			s.timeout = &seconds
-		} else {
-			// no message was created, set our timeout directly
-			timeoutOn := now.Add(seconds)
-			s.s.TimeoutOn = &timeoutOn
-		}
+		timeoutOn := now.Add(seconds)
+		s.s.TimeoutOn = &timeoutOn
 	} else {
 		s.s.WaitStartedOn = nil
 		s.s.TimeoutOn = nil
@@ -503,6 +484,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 					break
 				}
 			}
+		}
+	}
+
+	// apply all our pre write events
+	for _, e := range sprint.Events() {
+		err := ApplyPreWriteEvent(ctx, tx, rp, org, s, e)
+		if err != nil {
+			return errors.Wrapf(err, "error applying event: %v", e)
 		}
 	}
 
@@ -638,6 +627,16 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 			}
 		} else {
 			incompleteSessionsI = append(incompleteSessionsI, &session.s)
+		}
+	}
+
+	// apply all our pre write events
+	for i := range ss {
+		for _, e := range sprints[i].Events() {
+			err := ApplyPreWriteEvent(ctx, tx, rp, org, sessions[i], e)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error applying event: %v", e)
+			}
 		}
 	}
 

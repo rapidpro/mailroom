@@ -6,10 +6,12 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 
 	"github.com/apex/log"
+	fcm "github.com/appleboy/go-fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
@@ -17,6 +19,7 @@ import (
 )
 
 func init() {
+	models.RegisterPreWriteHook(events.TypeMsgCreated, handlePreMsgCreated)
 	models.RegisterEventHook(events.TypeMsgCreated, handleMsgCreated)
 }
 
@@ -33,29 +36,38 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 	// messages that need to be marked as pending
 	pending := make([]*models.Msg, 0, 1)
 
+	// android channels that need to be notified to sync
+	androidChannels := make(map[*models.Channel]bool)
+
 	// for each session gather all our messages
 	for s, args := range sessions {
 		// walk through our messages, separate by whether they have a topup
-		msgs := make([]*models.Msg, 0, len(args))
+		courierMsgs := make([]*models.Msg, 0, len(args))
+
 		for _, m := range args {
 			msg := m.(*models.Msg)
 			if msg.TopupID() != models.NilTopupID {
-				msgs = append(msgs, msg)
+				channel := msg.Channel()
+				if channel.Type() == models.ChannelTypeAndroid {
+					androidChannels[channel] = true
+				} else {
+					courierMsgs = append(courierMsgs, msg)
+				}
 			} else {
 				pending = append(pending, msg)
 			}
 		}
 
-		// if there are messages to send, do so
-		if len(msgs) > 0 {
+		// if there are courier messages to send, do so
+		if len(courierMsgs) > 0 {
 			// if our session has a timeout, set it on our last message
 			if s.Timeout() != nil && s.WaitStartedOn() != nil {
-				msgs[len(msgs)-1].SetTimeout(s.ID(), *s.WaitStartedOn(), *s.Timeout())
+				courierMsgs[len(courierMsgs)-1].SetTimeout(s.ID(), *s.WaitStartedOn(), *s.Timeout())
 			}
 
-			log := log.WithField("messages", msgs).WithField("session", s.ID)
+			log := log.WithField("messages", courierMsgs).WithField("session", s.ID)
 
-			err := courier.QueueMessages(rc, msgs)
+			err := courier.QueueMessages(rc, courierMsgs)
 
 			// not being able to queue a message isn't the end of the world, log but don't return an error
 			if err != nil {
@@ -63,10 +75,37 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 
 				// in the case of errors we do want to change the messages back to pending however so they
 				// get queued later. (for the common case messages are only inserted and queued, without a status update)
-				for _, msg := range msgs {
+				for _, msg := range courierMsgs {
 					pending = append(pending, msg)
 				}
 			}
+		}
+	}
+
+	// if we have any android messages, trigger syncs for the unique channels
+	for channel := range androidChannels {
+		client, err := fcm.NewClient(config.Mailroom.FCMKey)
+		if err != nil {
+			log.WithError(err).Error("error initializing fcm client")
+			continue
+		}
+		fcmID := channel.ConfigValue(models.ChannelConfigFCMID, "")
+		if fcmID == "" {
+			log.WithError(err).Error("no fcm id for channel")
+			continue
+		}
+
+		sync := &fcm.Message{
+			To: fcmID,
+			Data: map[string]interface{}{
+				"msg": "sync",
+			},
+		}
+
+		_, err = client.Send(sync)
+		if err != nil {
+			// log failures but continue, relayer will sync on its own
+			log.WithError(err).WithField("channel_uuid", channel.UUID()).Error("error syncing channel")
 		}
 	}
 
@@ -147,7 +186,6 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 
 	// get our channel
 	var channel *models.Channel
-
 	if event.Msg.Channel() != nil {
 		channel = org.ChannelByUUID(event.Msg.Channel().UUID)
 		if channel == nil {
@@ -170,6 +208,41 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 	if session.SessionType() == models.MessagingFlow {
 		session.AddPostCommitEvent(sendMessagesHook, msg)
 	}
+
+	return nil
+}
+
+// handlePreMsgCreated clears our timeout on our session so that courier can send it when the message is sent, that will be set by courier when sent
+func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+	event := e.(*events.MsgCreatedEvent)
+
+	// we only clear timeouts on messaging flows
+	if session.SessionType() != models.MessagingFlow {
+		return nil
+	}
+
+	// get our channel
+	var channel *models.Channel
+
+	if event.Msg.Channel() != nil {
+		channel = org.ChannelByUUID(event.Msg.Channel().UUID)
+		if channel == nil {
+			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
+		}
+	}
+
+	// no channel? this is a no-op
+	if channel == nil {
+		return nil
+	}
+
+	// android channels get normal timeouts
+	if channel.Type() == models.ChannelTypeAndroid {
+		return nil
+	}
+
+	// everybody else gets their timeout cleared, will be set by courier
+	session.ClearTimeoutOn()
 
 	return nil
 }

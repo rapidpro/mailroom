@@ -2,6 +2,7 @@ module github.com/nyaruka/mailroom
 
 require (
 	github.com/apex/log v1.0.0
+	github.com/appleboy/go-fcm v0.0.0-20190214153823-cfd5eac22a0f
 	github.com/aws/aws-sdk-go v1.16.17
 	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44
 	github.com/certifi/gocertifi v0.0.0-20190105021004-abcd57078448 // indirect

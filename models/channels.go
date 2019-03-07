@@ -26,6 +26,8 @@ const (
 	ChannelConfigCallbackDomain = "callback_domain"
 
 	ChannelConfigMaxConcurrentEvents = "max_concurrent_events"
+
+	ChannelConfigFCMID = "FCM_ID"
 )
 
 // Channel is the mailroom struct that represents channels
