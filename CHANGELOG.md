@@ -1,3 +1,7 @@
+v0.0.140
+----------
+ * latest goflow, deal with missed mos
+
 v0.0.139
 ----------
  * Proper parameters for FCM syncing
