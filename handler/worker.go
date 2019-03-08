@@ -24,6 +24,7 @@ import (
 )
 
 const (
+	MOMissEventType          = string(models.MOMissEventType)
 	NewConversationEventType = "new_conversation"
 	ReferralEventType        = "referral"
 	StopEventType            = "stop_event"
@@ -138,7 +139,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			}
 			err = handleStopEvent(ctx, db, rp, evt)
 
-		case NewConversationEventType, ReferralEventType:
+		case NewConversationEventType, ReferralEventType, MOMissEventType:
 			evt := &models.ChannelEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
