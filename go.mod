@@ -2,12 +2,12 @@ module github.com/nyaruka/mailroom
 
 require (
 	github.com/apex/log v1.0.0
-	github.com/appleboy/go-fcm v0.0.0-20190214153823-cfd5eac22a0f
 	github.com/aws/aws-sdk-go v1.16.17
 	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44
 	github.com/certifi/gocertifi v0.0.0-20190105021004-abcd57078448 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/edganiukov/fcm v0.3.0
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-chi/chi v3.3.3+incompatible
 	github.com/go-mail/mail v0.0.0-20180301192024-63235f23494b

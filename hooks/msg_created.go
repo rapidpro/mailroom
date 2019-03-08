@@ -2,11 +2,12 @@ package hooks
 
 import (
 	"context"
+	"time"
 
 	"github.com/nyaruka/gocommon/urns"
 
 	"github.com/apex/log"
-	fcm "github.com/appleboy/go-fcm"
+	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
@@ -84,28 +85,39 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 
 	// if we have any android messages, trigger syncs for the unique channels
 	for channel := range androidChannels {
+		if config.Mailroom.FCMKey == "" {
+			logrus.Error("cannot trigger sync for android channel, FCM Key unset")
+			break
+		}
+
 		client, err := fcm.NewClient(config.Mailroom.FCMKey)
 		if err != nil {
-			log.WithError(err).Error("error initializing fcm client")
+			logrus.WithError(err).Error("error initializing fcm client")
 			continue
 		}
 		fcmID := channel.ConfigValue(models.ChannelConfigFCMID, "")
 		if fcmID == "" {
-			log.WithError(err).Error("no fcm id for channel")
+			logrus.WithError(err).Error("no fcm id for channel")
 			continue
 		}
 
 		sync := &fcm.Message{
-			To: fcmID,
+			Token:       fcmID,
+			Priority:    "high",
+			CollapseKey: "sync",
 			Data: map[string]interface{}{
 				"msg": "sync",
 			},
 		}
 
+		start := time.Now()
 		_, err = client.Send(sync)
+
 		if err != nil {
 			// log failures but continue, relayer will sync on its own
-			log.WithError(err).WithField("channel_uuid", channel.UUID()).Error("error syncing channel")
+			logrus.WithError(err).WithField("channel_uuid", channel.UUID()).Error("error syncing channel")
+		} else {
+			logrus.WithField("elapsed", time.Since(start)).WithField("channel_uuid", channel.UUID()).Info("android sync complete")
 		}
 	}
 
