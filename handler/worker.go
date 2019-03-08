@@ -25,6 +25,7 @@ import (
 
 const (
 	NewConversationEventType = "new_conversation"
+	WelcomeMessageEventType  = "welcome_message"
 	ReferralEventType        = "referral"
 	StopEventType            = "stop_event"
 	MsgEventType             = "msg_event"
@@ -138,7 +139,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			}
 			err = handleStopEvent(ctx, db, rp, evt)
 
-		case NewConversationEventType, ReferralEventType:
+		case NewConversationEventType, ReferralEventType, WelcomeMessageEventType:
 			evt := &models.ChannelEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
@@ -326,6 +327,9 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	case models.MOCallEventType:
 		trigger = models.FindMatchingMOCallTrigger(org, modelContact)
+
+	case models.WelcomeMessateEventType:
+		trigger = nil
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)

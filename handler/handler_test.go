@@ -187,6 +187,7 @@ func TestChannelEvents(t *testing.T) {
 	}{
 		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?"},
 		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, ""},
+		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, ""},
 		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, ""},
 		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "Pick a number between 1-10."},
 	}
