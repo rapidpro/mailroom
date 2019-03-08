@@ -1,3 +1,7 @@
+v0.0.139
+----------
+ * Proper parameters for FCM syncing
+
 v0.0.138
 ----------
  * sync android channels when creating messages, refactor clearing timeouts
