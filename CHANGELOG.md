@@ -1,3 +1,7 @@
+v0.0.141
+----------
+ * latest goflow, pass in attachment domain
+
 v0.0.140
 ----------
  * latest goflow, deal with missed mos
