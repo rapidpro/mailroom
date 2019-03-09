@@ -85,19 +85,21 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 
 	// if we have any android messages, trigger syncs for the unique channels
 	for channel := range androidChannels {
+		// no FCM key for this rapidpro install? break out but log
 		if config.Mailroom.FCMKey == "" {
 			logrus.Error("cannot trigger sync for android channel, FCM Key unset")
 			break
 		}
 
+		// no fcm id for this channel, noop, we can't trigger a sync
+		fcmID := channel.ConfigValue(models.ChannelConfigFCMID, "")
+		if fcmID == "" {
+			continue
+		}
+
 		client, err := fcm.NewClient(config.Mailroom.FCMKey)
 		if err != nil {
 			logrus.WithError(err).Error("error initializing fcm client")
-			continue
-		}
-		fcmID := channel.ConfigValue(models.ChannelConfigFCMID, "")
-		if fcmID == "" {
-			logrus.WithError(err).Error("no fcm id for channel")
 			continue
 		}
 
