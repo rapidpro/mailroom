@@ -1,3 +1,7 @@
+v0.0.142
+----------
+ * don't throw error when channel doesn't have FCM id
+
 v0.0.141
 ----------
  * latest goflow, pass in attachment domain
