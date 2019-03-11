@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/legacy"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -96,7 +97,7 @@ func (f *Flow) SetLegacyDefinition(legacyDefinition json.RawMessage) error {
 	}
 
 	// migrate forwards returning our final flow definition
-	newFlow, err := legacyFlow.Migrate(false, false)
+	newFlow, err := legacyFlow.Migrate(false, false, "https://"+config.Mailroom.AttachmentDomain)
 	if err != nil {
 		return errors.Wrapf(err, "error migrating flow: %s", legacyDefinition)
 	}

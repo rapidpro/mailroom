@@ -1,3 +1,19 @@
+v0.0.142
+----------
+ * don't throw error when channel doesn't have FCM id
+
+v0.0.141
+----------
+ * latest goflow, pass in attachment domain
+
+v0.0.140
+----------
+ * latest goflow, deal with missed mos
+
+v0.0.139
+----------
+ * Proper parameters for FCM syncing
+
 v0.0.138
 ----------
  * sync android channels when creating messages, refactor clearing timeouts

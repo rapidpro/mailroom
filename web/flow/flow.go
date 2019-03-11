@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/flows/definition"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
@@ -55,7 +56,7 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 
 	includeUI := request.IncludeUI == nil || *request.IncludeUI
 
-	flow, err := legacyFlow.Migrate(true, includeUI)
+	flow, err := legacyFlow.Migrate(true, includeUI, "https://"+config.Mailroom.AttachmentDomain)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error migrating legacy flow")
 	}
@@ -102,7 +103,7 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 
 	// migrate definition if it is in legacy format
 	if legacy.IsLegacyDefinition(flowDef) {
-		flowDef, err = legacy.MigrateLegacyDefinition(flowDef)
+		flowDef, err = legacy.MigrateLegacyDefinition(flowDef, "https://"+config.Mailroom.AttachmentDomain)
 		if err != nil {
 			return nil, http.StatusBadRequest, err
 		}
