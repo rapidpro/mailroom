@@ -26,6 +26,7 @@ import (
 const (
 	MOMissEventType          = string(models.MOMissEventType)
 	NewConversationEventType = "new_conversation"
+	WelcomeMessageEventType  = "welcome_message"
 	ReferralEventType        = "referral"
 	StopEventType            = "stop_event"
 	MsgEventType             = "msg_event"
@@ -139,7 +140,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			}
 			err = handleStopEvent(ctx, db, rp, evt)
 
-		case NewConversationEventType, ReferralEventType, MOMissEventType:
+		case NewConversationEventType, ReferralEventType, MOMissEventType, WelcomeMessageEventType:
 			evt := &models.ChannelEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
@@ -328,14 +329,11 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	case models.MOCallEventType:
 		trigger = models.FindMatchingMOCallTrigger(org, modelContact)
 
+	case models.WelcomeMessateEventType:
+		trigger = nil
+
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
-	}
-
-	// no trigger, noop, move on
-	if trigger == nil {
-		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).Info("ignoring event, no trigger found")
-		return nil, nil
 	}
 
 	// build session assets
@@ -361,6 +359,12 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to initialize new contact")
 		}
+	}
+
+	// no trigger, noop, move on
+	if trigger == nil {
+		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).Info("ignoring event, no trigger found")
+		return nil, nil
 	}
 
 	// load our flow

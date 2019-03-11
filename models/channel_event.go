@@ -14,6 +14,7 @@ type ChannelEventID int64
 
 const (
 	NewConversationEventType = ChannelEventType("new_conversation")
+	WelcomeMessateEventType  = ChannelEventType("welcome_message")
 	ReferralEventType        = ChannelEventType("referral")
 	MOMissEventType          = ChannelEventType("mo_miss")
 	MOCallEventType          = ChannelEventType("mo_call")
