@@ -335,12 +335,6 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
 	}
 
-	// no trigger, noop, move on
-	if trigger == nil {
-		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).Info("ignoring event, no trigger found")
-		return nil, nil
-	}
-
 	// build session assets
 	sa, err := models.GetSessionAssets(org)
 	if err != nil {
@@ -364,6 +358,12 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to initialize new contact")
 		}
+	}
+
+	// no trigger, noop, move on
+	if trigger == nil {
+		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).Info("ignoring event, no trigger found")
+		return nil, nil
 	}
 
 	// load our flow
