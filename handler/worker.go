@@ -146,7 +146,6 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling channel event: %s", event)
 			}
-			// TODO: we should just have courier include event type in its json
 			_, err = HandleChannelEvent(ctx, db, rp, models.ChannelEventType(contactEvent.Type), evt, nil)
 
 		case MsgEventType:

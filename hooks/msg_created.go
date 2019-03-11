@@ -119,7 +119,7 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 			// log failures but continue, relayer will sync on its own
 			logrus.WithError(err).WithField("channel_uuid", channel.UUID()).Error("error syncing channel")
 		} else {
-			logrus.WithField("elapsed", time.Since(start)).WithField("channel_uuid", channel.UUID()).Info("android sync complete")
+			logrus.WithField("elapsed", time.Since(start)).WithField("channel_uuid", channel.UUID()).Debug("android sync complete")
 		}
 	}
 
