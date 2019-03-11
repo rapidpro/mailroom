@@ -1,3 +1,7 @@
+v0.0.143
+----------
+ * add support to handle welcome message event as noop
+
 v0.0.142
 ----------
  * don't throw error when channel doesn't have FCM id
