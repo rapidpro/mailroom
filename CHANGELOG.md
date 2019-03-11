@@ -1,3 +1,7 @@
+v0.0.144
+----------
+ * latest goflow, fix date addition
+
 v0.0.143
 ----------
  * add support to handle welcome message event as noop
