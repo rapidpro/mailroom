@@ -142,6 +142,40 @@ func TestMsgEvents(t *testing.T) {
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	assert.Nil(t, task)
+
+	// mark Fred's flow as inactive
+	db.MustExec(`UPDATE flows_flow SET is_active = FALSE where id = $1`, models.Org2FavoritesFlowID)
+	models.FlushCache()
+
+	// try to resume now
+	task = makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
+	AddHandleTask(rc, models.Org2FredID, task)
+	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
+	assert.NotNil(t, task)
+	err = handleContactEvent(ctx, db, rp, task)
+	assert.NoError(t, err)
+
+	// should get our catch all trigger
+	text := ""
+	db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, models.Org2FredID)
+	assert.Equal(t, "Hey, how are you?", text)
+	previous := time.Now()
+
+	// and should have interrupted previous session
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) from flows_flowsession where contact_id = $1 and status ='I' and current_flow_id = $2`,
+		[]interface{}{models.Org2FredID, models.Org2FavoritesFlowID}, 1,
+	)
+
+	// trigger should also not start a new session
+	task = makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start")
+	AddHandleTask(rc, models.Org2FredID, task)
+	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
+	err = handleContactEvent(ctx, db, rp, task)
+	assert.NoError(t, err)
+
+	db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2 ORDER BY id DESC LIMIT 1`, models.Org2FredID, previous)
+	assert.Equal(t, "Hey, how are you?", text)
 }
 
 func TestChannelEvents(t *testing.T) {

@@ -35,7 +35,7 @@ func TestCampaignStarts(t *testing.T) {
 	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, models.CathyID, models.BobID, models.AlexandriaID)
 
 	// create an active flowrun for Alexandria to test skipping
-	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on) VALUES('M', $1, $2, 'W', FALSE, NOW());`, models.Org1, models.AlexandriaID)
+	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES('M', $1, $2, 'W', FALSE, NOW(), $3);`, models.Org1, models.AlexandriaID, models.FavoritesFlowID)
 
 	// set our event to skip
 	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)

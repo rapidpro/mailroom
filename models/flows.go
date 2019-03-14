@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"time"
 
@@ -12,11 +13,12 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-type FlowID int
+type FlowID null.Int
 
 type FlowType string
 
@@ -26,6 +28,8 @@ const (
 	SurveyorFlow  = FlowType("S")
 
 	FlowConfigIVRRetryMinutes = "ivr_retry"
+
+	NilFlowID = FlowID(0)
 )
 
 var FlowTypeMapping = map[flows.FlowType]FlowType{
@@ -43,7 +47,6 @@ type Flow struct {
 		Config         types.JSONText  `json:"config"`
 		FlowType       FlowType        `json:"flow_type"`
 		Definition     json.RawMessage `json:"definition"`
-		IsArchived     bool            `json:"is_archived"`
 		IgnoreTriggers bool            `json:"ignore_triggers"`
 	}
 }
@@ -111,9 +114,6 @@ func (f *Flow) SetLegacyDefinition(legacyDefinition json.RawMessage) error {
 	return nil
 }
 
-// IsArchived returns whether this flow is archived
-func (f *Flow) IsArchived() bool { return f.f.IsArchived }
-
 // IgnoreTriggers returns whether this flow ignores triggers
 func (f *Flow) IgnoreTriggers() bool { return f.f.IgnoreTriggers }
 
@@ -167,7 +167,6 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	id, 
 	uuid, 
 	name,
-	is_archived,
 	ignore_triggers,
 	flow_type,
 	coalesce(metadata, '{}')::jsonb as config,
@@ -201,7 +200,8 @@ LEFT JOIN (
 WHERE
     org_id = $1 AND
 	uuid = $2 AND
-	is_active = TRUE
+	is_active = TRUE AND
+	is_archived = FALSE
 ) r;`
 
 const selectFlowByIDSQL = `
@@ -209,7 +209,6 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	id, 
 	uuid, 
 	name,
-	is_archived,
 	ignore_triggers,
 	flow_type,
 	coalesce(metadata, '{}')::jsonb as config,
@@ -243,5 +242,26 @@ LEFT JOIN (
 WHERE
     org_id = $1 AND
 	id = $2 AND
-	is_active = TRUE
+	is_active = TRUE AND
+	is_archived = FALSE
 ) r;`
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i FlowID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *FlowID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i FlowID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *FlowID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
+}

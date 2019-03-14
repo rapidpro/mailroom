@@ -240,6 +240,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	// resume their flow based on the timed event
 	var resume flows.Resume
 	switch eventType {
+
 	case ExpirationEventType:
 		// check that our expiration is still the same
 		expiration, err := models.RunExpiration(ctx, db, event.RunID)
@@ -258,6 +259,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		}
 
 		resume = resumes.NewRunExpirationResume(org.Env(), contact)
+
 	case TimeoutEventType:
 		if session.TimeoutOn() == nil {
 			log.WithField("session_id", session.ID()).Info("ignoring session timeout, has no timeout set")
@@ -272,6 +274,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		}
 
 		resume = resumes.NewWaitTimeoutResume(org.Env(), contact)
+
 	default:
 		return errors.Errorf("unknown event type: %s", eventType)
 	}
@@ -368,13 +371,12 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	// load our flow
 	flow, err := org.FlowByID(trigger.FlowID())
-	if err != nil {
-		return nil, errors.Wrapf(err, "error loading flow for trigger")
+	if err == models.ErrNotFound {
+		return nil, nil
 	}
 
-	// didn't find it? no longer active, return
-	if flow == nil || flow.IsArchived() {
-		return nil, nil
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading flow for trigger")
 	}
 
 	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
@@ -545,8 +547,15 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 	// we have a session and it has an active flow, check whether we should honor triggers
 	var flow *models.Flow
-	if session != nil && session.CurrentFlowID() != nil {
-		flow, err = org.FlowByID(*session.CurrentFlowID())
+	if session != nil && session.CurrentFlowID() != models.NilFlowID {
+		flow, err = org.FlowByID(session.CurrentFlowID())
+
+		// flow this session is in is gone, interrupt our session and reset it
+		if err == models.ErrNotFound {
+			err = models.InterruptContactRuns(ctx, db, []flows.ContactID{contact.ID()}, time.Now())
+			session = nil
+		}
+
 		if err != nil {
 			return errors.Wrapf(err, "error loading flow for session")
 		}
@@ -572,16 +581,16 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
-	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || flow.IsArchived() || !flow.IgnoreTriggers())) ||
-		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil || flow.IsArchived())) {
+	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
+		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) {
 		// load our flow
 		flow, err := org.FlowByID(trigger.FlowID())
-		if err != nil {
+		if err != nil && err != models.ErrNotFound {
 			return errors.Wrapf(err, "error loading flow for trigger")
 		}
 
 		// trigger flow is still active, start it
-		if flow != nil && !flow.IsArchived() {
+		if flow != nil {
 			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
 
 			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, hook, true)
