@@ -72,7 +72,7 @@ type Session struct {
 		EndedOn       *time.Time    `db:"ended_on"`
 		TimeoutOn     *time.Time    `db:"timeout_on"`
 		WaitStartedOn *time.Time    `db:"wait_started_on"`
-		CurrentFlowID *FlowID       `db:"current_flow_id"`
+		CurrentFlowID FlowID        `db:"current_flow_id"`
 		ConnectionID  *ConnectionID `db:"connection_id"`
 	}
 
@@ -111,7 +111,7 @@ func (s *Session) EndedOn() *time.Time           { return s.s.EndedOn }
 func (s *Session) TimeoutOn() *time.Time         { return s.s.TimeoutOn }
 func (s *Session) ClearTimeoutOn()               { s.s.TimeoutOn = nil }
 func (s *Session) WaitStartedOn() *time.Time     { return s.s.WaitStartedOn }
-func (s *Session) CurrentFlowID() *FlowID        { return s.s.CurrentFlowID }
+func (s *Session) CurrentFlowID() FlowID         { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID   { return s.s.ConnectionID }
 func (s *Session) IncomingMsgID() MsgID          { return s.incomingMsgID }
 func (s *Session) IncomingMsgExternalID() string { return s.incomingExternalID }
@@ -312,8 +312,7 @@ func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session
 			if err != nil {
 				return nil, errors.Wrapf(err, "error loading current flow")
 			}
-			flowID := flow.(*Flow).ID()
-			s.CurrentFlowID = &flowID
+			s.CurrentFlowID = flow.(*Flow).ID()
 		}
 	}
 
@@ -354,19 +353,19 @@ const selectLastSessionSQL = `
 SELECT 
 	id, 
 	session_type,
-	status, 
-	responded, 
-	output, 
-	contact_id, 
-	org_id, 
-	created_on, 
-	ended_on, 
+	status,
+	responded,
+	output,
+	contact_id,
+	org_id,
+	created_on,
+	ended_on,
 	timeout_on,
 	wait_started_on,
-	current_flow_id, 
+	current_flow_id,
 	connection_id
 FROM 
-	flows_flowsession
+	flows_flowsession fs
 WHERE
     session_type = $1 AND
 	contact_id = $2 AND
@@ -471,8 +470,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 			if err != nil {
 				return errors.Wrapf(err, "error loading current flow")
 			}
-			flowID := flow.(*Flow).ID()
-			s.s.CurrentFlowID = &flowID
+			s.s.CurrentFlowID = flow.(*Flow).ID()
 		}
 
 		// if we haven't already been marked as responded, walk our runs looking for an input
@@ -830,10 +828,13 @@ const activeSessionOverlapSQL = `
 SELECT
 	DISTINCT(contact_id)
 FROM
-	flows_flowsession
+	flows_flowsession fs JOIN
+	flows_flow ff ON fs.current_flow_id = ff.id
 WHERE
-	contact_id = ANY($1) AND
-	status = 'W'
+	fs.contact_id = ANY($1) AND
+	fs.status = 'W' AND
+	ff.is_active = TRUE AND
+	ff.is_archived = FALSE
 `
 
 // RunExpiration looks up the run expiration for the passed in run, can return nil if the run is no longer active
@@ -901,7 +902,7 @@ WHERE
 `
 
 // InterruptContactRuns interrupts all runs and sesions that exist for the passed in list of contacts
-func InterruptContactRuns(ctx context.Context, tx *sqlx.Tx, contactIDs []flows.ContactID, now time.Time) error {
+func InterruptContactRuns(ctx context.Context, tx Queryer, contactIDs []flows.ContactID, now time.Time) error {
 	if len(contactIDs) == 0 {
 		return nil
 	}

@@ -61,6 +61,7 @@ type OrgAssets struct {
 
 var orgCache = cache.New(time.Hour, time.Minute*5)
 var assetCache = cache.New(5*time.Second, time.Minute*5)
+var ErrNotFound = errors.New("not found")
 
 const cacheTimeout = time.Second * 5
 const locationCacheTimeout = time.Hour
@@ -293,7 +294,7 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 	}
 
 	if dbFlow == nil {
-		return nil, errors.Errorf("no flow with uuid: %s", flowUUID)
+		return nil, ErrNotFound
 	}
 
 	a.flowCacheLock.Lock()
@@ -319,7 +320,7 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 	}
 
 	if dbFlow == nil {
-		return nil, errors.Errorf("no flow with id: %d", flowID)
+		return nil, ErrNotFound
 	}
 
 	a.flowCacheLock.Lock()

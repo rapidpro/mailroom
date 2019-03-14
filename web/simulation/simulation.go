@@ -224,11 +224,11 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 			// we don't have a current flow or the current flow doesn't ignore triggers
 			if flow == nil || (!flow.IgnoreTriggers() && trigger.TriggerType() == models.KeywordTriggerType) {
 				triggeredFlow, err := org.FlowByID(trigger.FlowID())
-				if err != nil {
+				if err != nil && err != models.ErrNotFound {
 					return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load triggered flow")
 				}
 
-				if triggeredFlow != nil && !triggeredFlow.IsArchived() {
+				if triggeredFlow != nil {
 					trigger := triggers.NewMsgTrigger(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
 					return triggerFlow(ctx, s.DB, org, sa, trigger)
 				}
