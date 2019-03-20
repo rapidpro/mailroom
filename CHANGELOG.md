@@ -1,3 +1,9 @@
+v0.0.147
+----------
+ * better sentry logging on task fails
+ * deal with inactive and archived flows in the same way
+ * latest goflow
+
 v0.0.146
 ----------
  * Latest goflow
