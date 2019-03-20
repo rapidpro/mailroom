@@ -130,12 +130,12 @@ func TestMsgEvents(t *testing.T) {
 	task := makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
 	AddHandleTask(rc, models.Org2FredID, task)
 
-	// should get requeued three times automatically, but each should be an error
+	// should get requeued three times automatically
 	for i := 0; i < 3; i++ {
 		task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NotNil(t, task)
 		err := handleContactEvent(ctx, db, rp, task)
-		assert.Error(t, err)
+		assert.NoError(t, err)
 	}
 
 	// on third error, no new task
