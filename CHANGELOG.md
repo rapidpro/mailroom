@@ -1,3 +1,7 @@
+v0.0.150
+----------
+ * latest goflow, don't try to validate missing flows
+
 v0.0.149
 ----------
  * add cron to retry unhandled messages
