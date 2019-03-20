@@ -1,3 +1,8 @@
+v0.0.149
+----------
+ * add cron to retry unhandled messages
+ * validate flows before resume or start
+
 v0.0.148
 ----------
  * dont log email sending errors to sentry
