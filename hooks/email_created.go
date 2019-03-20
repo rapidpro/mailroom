@@ -90,7 +90,7 @@ func (h *SendEmailsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 					"smtp_server": config,
 					"subject":     email.Subject,
 					"org_id":      org.OrgID(),
-				}).WithError(err).Error("error sending email")
+				}).WithError(err).Debug("error sending email")
 			}
 		}
 	}
