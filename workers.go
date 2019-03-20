@@ -180,7 +180,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 	if found {
 		err := taskFunc(context.Background(), w.foreman.mr, task)
 		if err != nil {
-			log.WithError(err).Error("error running task")
+			log.WithError(err).WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Error("error running task")
 		}
 	} else {
 		log.Error("unable to find function for task type")

@@ -176,17 +176,26 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 
 		// if we get an error processing an event, requeue it for later and return our error
 		if err != nil {
+			log := logrus.WithFields(logrus.Fields{
+				"org_id":     task.OrgID,
+				"contact_id": eventTask.ContactID,
+				"event":      event,
+			})
+
 			contactEvent.ErrorCount++
 			if contactEvent.ErrorCount < 3 {
 				rc := rp.Get()
 				retryErr := addHandleTask(rc, eventTask.ContactID, contactEvent, true)
 				if retryErr != nil {
-					logrus.WithError(retryErr).WithField("event", event).Error("error requeuing errored contact event")
+					logrus.WithError(retryErr).Error("error requeuing errored contact event")
 				}
 				rc.Close()
-				return errors.Wrapf(err, "error handling contact event, %d errors, retrying: %s", contactEvent.ErrorCount, event)
+
+				log.WithError(err).WithField("error_count", contactEvent.ErrorCount).Error("error handling contact event")
+				return nil
 			}
-			return errors.Wrapf(err, "error handling contact event, permanent failure: %s", event)
+			log.WithError(err).Error("error handling contact event, permanent failure")
+			return nil
 		}
 	}
 }
