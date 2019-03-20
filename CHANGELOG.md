@@ -1,3 +1,7 @@
+v0.0.151
+----------
+ * retry unhandled messages only once an hour
+
 v0.0.150
 ----------
  * latest goflow, don't try to validate missing flows
