@@ -59,6 +59,17 @@ type TriggerBuilder func(contact *flows.Contact) flows.Trigger
 func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, sa flows.SessionAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
 	start := time.Now()
 
+	// does the flow this session is part of still exist?
+	_, err := org.FlowByID(session.CurrentFlowID())
+	if err != nil {
+		// if this flow just isn't available anymore, log this error
+		if err == models.ErrNotFound {
+			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_id", session.ID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow in resume")
+			return nil, models.InterruptContactRuns(ctx, db, []flows.ContactID{resume.Contact().ID()}, time.Now())
+		}
+		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
+	}
+
 	// build our flow session
 	fs, err := session.FlowSession(sa, org.Env())
 	if err != nil {
@@ -146,14 +157,12 @@ func StartFlowBatch(
 
 	// try to load our flow
 	flow, err := org.FlowByID(batch.FlowID())
-	if err != nil {
-		return nil, errors.Wrapf(err, "error loading campaign flow: %d", batch.FlowID())
-	}
-
-	// flow is no longer active, skip
-	if flow == nil || flow.IsArchived() {
+	if err == models.ErrNotFound {
 		logrus.WithField("flow_uuid", flow.UUID()).Info("skipping flow start, flow no longer active or archived")
 		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading campaign flow: %d", batch.FlowID())
 	}
 
 	// this will build our trigger for each contact started
@@ -239,19 +248,17 @@ func FireCampaignEvents(
 
 	// try to load our flow
 	flow, err := org.Flow(flowUUID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error loading campaign flow: %s", flowUUID)
-	}
-	dbFlow := flow.(*models.Flow)
-
-	// flow doesn't exist or is archived, delete this event fire
-	if dbFlow == nil || dbFlow.IsArchived() {
+	if err == models.ErrNotFound {
 		err := models.DeleteEventFires(ctx, db, fires)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error deleting events for archived or inactive flow")
 		}
 		return nil, nil
 	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading campaign flow: %s", flowUUID)
+	}
+	dbFlow := flow.(*models.Flow)
 
 	// our start options are based on the start mode for our event
 	options := NewStartOptions()
@@ -330,7 +337,7 @@ func FireCampaignEvents(
 
 	sessions, err := StartFlow(ctx, db, rp, org, dbFlow, contactIDs, options)
 	if err != nil {
-		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", event)
+		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %v", event)
 	} else {
 		// make sure any skipped contacts are marked as fired this can occur if all fires were skipped
 		fires := make([]*models.EventFire, 0, len(sessions))
@@ -339,7 +346,7 @@ func FireCampaignEvents(
 		}
 		err = models.MarkEventsFired(ctx, db, fires, fired, models.FireResultSkipped)
 		if err != nil {
-			logrus.WithField("fire_ids", fires).WithError(err).Errorf("error marking events as skipped: %s", event)
+			logrus.WithField("fire_ids", fires).WithError(err).Errorf("error marking events as skipped: %v", event)
 		}
 	}
 

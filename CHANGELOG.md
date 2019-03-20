@@ -1,3 +1,11 @@
+v0.0.146
+----------
+ * Latest goflow
+
+v0.0.145
+----------
+ * Update to latest goflow
+
 v0.0.144
 ----------
  * latest goflow, fix date addition
