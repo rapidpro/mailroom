@@ -1,3 +1,7 @@
+v0.0.148
+----------
+ * dont log email sending errors to sentry
+
 v0.0.147
 ----------
  * better sentry logging on task fails
