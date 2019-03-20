@@ -19,6 +19,7 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -571,7 +572,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
-	msgIn.SetExternalID(event.MsgExternalID)
+	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
 
 	// build our hook to mark our message as handled
@@ -645,7 +646,7 @@ type MsgEvent struct {
 	ChannelID     models.ChannelID   `json:"channel_id"`
 	MsgID         flows.MsgID        `json:"msg_id"`
 	MsgUUID       flows.MsgUUID      `json:"msg_uuid"`
-	MsgExternalID string             `json:"msg_external_id"`
+	MsgExternalID null.String        `json:"msg_external_id"`
 	URN           urns.URN           `json:"urn"`
 	URNID         models.URNID       `json:"urn_id"`
 	Text          string             `json:"text"`

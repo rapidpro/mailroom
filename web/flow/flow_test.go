@@ -81,7 +81,7 @@ const (
 						"type": "reply",
 						"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
 						"msg": {
-							"eng": "Your birthdate is @contact.birthdate"
+							"eng": "Your birthdate is soon"
 						},
 						"media": {},
 						"quick_replies": [],
@@ -184,7 +184,7 @@ const (
 						{
 							"type": "send_msg",
 							"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
-							"text": "Your birthdate is @contact.fields.birthdate"
+							"text": "Your birthdate is soon"
 						}
 					],
 					"exits": [
@@ -325,7 +325,7 @@ func TestServer(t *testing.T) {
 		{"/mr/flow/migrate", "POST", minLegacyDef, 200, `"type": "send_msg"`},
 		{"/mr/flow/validate", "GET", "", 405, "illegal"},
 		{"/mr/flow/validate", "POST", validateWithValidLegacyFlow, 200, `"type": "send_msg"`},
-		{"/mr/flow/validate", "POST", validateWithInvalidLegacyFlow, 422, `"error": "missing dependencies: group[uuid=146`},
+		{"/mr/flow/validate", "POST", validateWithInvalidLegacyFlow, 422, `"error": "missing dependencies:`},
 		{"/mr/flow/validate", "POST", validateWithValidFlow, 200, `"type": "send_msg"`},
 		{"/mr/flow/validate", "POST", validateWithInvalidFlow, 422, `isn't a known node`},
 		{"/mr/flow/validate", "POST", validateWithValidFlowWithoutOrgID, 200, `"type": "send_msg"`},

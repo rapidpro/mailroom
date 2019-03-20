@@ -98,7 +98,7 @@ type Msg struct {
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
 		ResponseToID         MsgID              `db:"response_to_id"  json:"response_to_id"`
-		ResponseToExternalID string             `                     json:"response_to_external_id"`
+		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
 		URN                  urns.URN           `                     json:"urn"`
 		URNAuth              null.String        `                     json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
@@ -175,7 +175,7 @@ func (m *Msg) Attachments() []flows.Attachment {
 }
 
 // SetResponseTo set the incoming message that this session should be associated with in this sprint
-func (m *Msg) SetResponseTo(id MsgID, externalID string) {
+func (m *Msg) SetResponseTo(id MsgID, externalID null.String) {
 	m.m.ResponseToID = id
 	m.m.ResponseToExternalID = externalID
 

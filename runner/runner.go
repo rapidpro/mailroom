@@ -60,7 +60,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	start := time.Now()
 
 	// does the flow this session is part of still exist?
-	_, err := org.FlowByID(session.CurrentFlowID())
+	flow, err := org.FlowByID(session.CurrentFlowID())
 	if err != nil {
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
@@ -68,6 +68,17 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 			return nil, models.InterruptContactRuns(ctx, db, []flows.ContactID{resume.Contact().ID()}, time.Now())
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
+	}
+
+	// validate our flow
+	missing, err := sa.Validate(flow.UUID())
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid flow: %s, cannot resume", flow.UUID())
+	}
+
+	// log any missing references, this shouldn't happen and we should fix it
+	if len(missing) > 0 {
+		logrus.WithField("flow_uuid", flow.UUID()).WithField("missing", missing).Error("flow being resumed with missing dependencies")
 	}
 
 	// build our flow session
@@ -415,6 +426,17 @@ func StartFlow(
 	assets, err := models.GetSessionAssets(org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow, unable to load assets")
+	}
+
+	// validate our flow
+	missing, err := assets.Validate(flow.UUID())
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid flow: %s, cannot start", flow.UUID())
+	}
+
+	// log any missing references, this shouldn't happen and we should fix it
+	if len(missing) > 0 {
+		logrus.WithField("flow_uuid", flow.UUID()).WithField("missing", missing).Error("flow being started with missing dependencies")
 	}
 
 	// we now need to grab locks for our contacts so that they are never in two starts or handles at the

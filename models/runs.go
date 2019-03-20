@@ -77,7 +77,7 @@ type Session struct {
 	}
 
 	incomingMsgID      MsgID
-	incomingExternalID string
+	incomingExternalID null.String
 
 	// any channel connection associated with this flow session
 	channelConnection *ChannelConnection
@@ -99,22 +99,22 @@ type Session struct {
 	wait flows.Wait
 }
 
-func (s *Session) ID() SessionID                 { return s.s.ID }
-func (s *Session) SessionType() FlowType         { return s.s.SessionType }
-func (s *Session) Status() SessionStatus         { return s.s.Status }
-func (s *Session) Responded() bool               { return s.s.Responded }
-func (s *Session) Output() string                { return s.s.Output }
-func (s *Session) ContactID() ContactID          { return s.s.ContactID }
-func (s *Session) OrgID() OrgID                  { return s.s.OrgID }
-func (s *Session) CreatedOn() time.Time          { return s.s.CreatedOn }
-func (s *Session) EndedOn() *time.Time           { return s.s.EndedOn }
-func (s *Session) TimeoutOn() *time.Time         { return s.s.TimeoutOn }
-func (s *Session) ClearTimeoutOn()               { s.s.TimeoutOn = nil }
-func (s *Session) WaitStartedOn() *time.Time     { return s.s.WaitStartedOn }
-func (s *Session) CurrentFlowID() FlowID         { return s.s.CurrentFlowID }
-func (s *Session) ConnectionID() *ConnectionID   { return s.s.ConnectionID }
-func (s *Session) IncomingMsgID() MsgID          { return s.incomingMsgID }
-func (s *Session) IncomingMsgExternalID() string { return s.incomingExternalID }
+func (s *Session) ID() SessionID                      { return s.s.ID }
+func (s *Session) SessionType() FlowType              { return s.s.SessionType }
+func (s *Session) Status() SessionStatus              { return s.s.Status }
+func (s *Session) Responded() bool                    { return s.s.Responded }
+func (s *Session) Output() string                     { return s.s.Output }
+func (s *Session) ContactID() ContactID               { return s.s.ContactID }
+func (s *Session) OrgID() OrgID                       { return s.s.OrgID }
+func (s *Session) CreatedOn() time.Time               { return s.s.CreatedOn }
+func (s *Session) EndedOn() *time.Time                { return s.s.EndedOn }
+func (s *Session) TimeoutOn() *time.Time              { return s.s.TimeoutOn }
+func (s *Session) ClearTimeoutOn()                    { s.s.TimeoutOn = nil }
+func (s *Session) WaitStartedOn() *time.Time          { return s.s.WaitStartedOn }
+func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
+func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
+func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
+func (s *Session) IncomingMsgExternalID() null.String { return s.incomingExternalID }
 
 // ContactUUID returns the UUID of our contact
 func (s *Session) ContactUUID() flows.ContactUUID {
@@ -162,7 +162,7 @@ func (s *Session) AddPostCommitEvent(hook EventCommitHook, event interface{}) {
 }
 
 // SetIncomingMsg set the incoming message that this session should be associated with in this sprint
-func (s *Session) SetIncomingMsg(id flows.MsgID, externalID string) {
+func (s *Session) SetIncomingMsg(id flows.MsgID, externalID null.String) {
 	s.incomingMsgID = MsgID(id)
 	s.incomingExternalID = externalID
 }
