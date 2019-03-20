@@ -3,12 +3,14 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
+	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/pkg/errors"
@@ -17,6 +19,7 @@ import (
 
 const (
 	retryLock = "retry_msgs"
+	markerKey = "retried_msgs"
 )
 
 func init() {
@@ -67,10 +70,24 @@ func retryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName
 		var orgID models.OrgID
 		var contactID models.ContactID
 		var eventJSON string
+		var msgID models.MsgID
 
-		err = rows.Scan(&orgID, &contactID, &eventJSON)
+		err = rows.Scan(&orgID, &contactID, &msgID, &eventJSON)
 		if err != nil {
 			return errors.Wrapf(err, "error scanning msg row")
+		}
+
+		// our key is built such that we will only retry once an hour
+		key := fmt.Sprintf("%d_%d", msgID, time.Now().Hour())
+
+		dupe, err := marker.HasTask(rc, markerKey, key)
+		if err != nil {
+			return errors.Wrapf(err, "error checking for dupe retry")
+		}
+
+		// we already retried this, skip
+		if dupe {
+			continue
 		}
 
 		task := &queue.Task{
@@ -86,6 +103,12 @@ func retryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName
 			return errors.Wrapf(err, "error queuing retry for task")
 		}
 
+		// mark it as queued
+		err = marker.AddTask(rc, markerKey, key)
+		if err != nil {
+			return errors.Wrapf(err, "error marking task for retry")
+		}
+
 		retried++
 	}
 
@@ -94,7 +117,7 @@ func retryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName
 }
 
 const unhandledMsgsQuery = `
-SELECT org_id, contact_id, ROW_TO_JSON(r) FROM (SELECT
+SELECT org_id, contact_id, msg_id, ROW_TO_JSON(r) FROM (SELECT
 	m.contact_id as contact_id,
 	m.org_id as org_id, 
 	m.channel_id as channel_id,
