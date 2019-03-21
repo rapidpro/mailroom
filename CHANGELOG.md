@@ -1,3 +1,7 @@
+v0.0.152
+----------
+ * send messages for IVR flows as well
+
 v0.0.151
 ----------
  * retry unhandled messages only once an hour
