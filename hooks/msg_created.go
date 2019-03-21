@@ -218,8 +218,8 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 	// register to have this message committed
 	session.AddPreCommitEvent(commitMessagesHook, msg)
 
-	// we only send messaging messages
-	if session.SessionType() == models.MessagingFlow {
+	// don't send messages for surveyor flows
+	if session.SessionType() != models.SurveyorFlow {
 		session.AddPostCommitEvent(sendMessagesHook, msg)
 	}
 
