@@ -631,6 +631,12 @@ func StopContact(ctx context.Context, tx Queryer, orgID OrgID, contactID Contact
 		return errors.Wrapf(err, "error removing stopped contact from groups")
 	}
 
+	// remove all unfired campaign event fires
+	_, err = tx.ExecContext(ctx, deleteUnfiredEventsSQL, contactID)
+	if err != nil {
+		return errors.Wrapf(err, "error deleting unfired event fires")
+	}
+
 	// remove the contact from any triggers
 	// TODO: this could leave a trigger with no contacts or groups
 	_, err = tx.ExecContext(ctx, deleteAllContactTriggersSQL, contactID)
@@ -660,6 +666,14 @@ DELETE FROM
 	triggers_trigger_contacts
 WHERE
 	contact_id = $1
+`
+
+const deleteUnfiredEventsSQL = `
+DELETE FROM
+	campaigns_eventfire
+WHERE
+	contact_id = $1 AND
+	fired IS NULL
 `
 
 const markContactStoppedSQL = `

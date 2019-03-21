@@ -260,6 +260,50 @@ func TestChannelEvents(t *testing.T) {
 	}
 }
 
+func TestStopEvent(t *testing.T) {
+	testsuite.Reset()
+	db := testsuite.DB()
+	rp := testsuite.RP()
+	ctx := testsuite.CTX()
+
+	rc := rp.Get()
+	defer rc.Close()
+
+	// schedule an event for cathy and george
+	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, models.CathyID, models.GeorgeID, models.RemindersEvent1ID)
+
+	// and george to doctors group, cathy is already part of it
+	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, models.DoctorsGroupID, models.GeorgeID)
+
+	event := &StopEvent{OrgID: models.Org1, ContactID: models.CathyID}
+	eventJSON, err := json.Marshal(event)
+	task := &queue.Task{
+		Type:  StopEventType,
+		OrgID: int(models.Org1),
+		Task:  eventJSON,
+	}
+
+	err = AddHandleTask(rc, models.CathyID, task)
+	assert.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	assert.NoError(t, err, "error popping next task")
+
+	err = handleContactEvent(ctx, db, rp, task)
+	assert.NoError(t, err, "error when handling event")
+
+	// check that only george is in our group
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, models.CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, models.GeorgeID}, 1)
+
+	// that cathy is stopped
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{models.CathyID}, 1)
+
+	// and has no upcoming events
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{models.CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{models.GeorgeID}, 1)
+}
+
 func TestTimedEvents(t *testing.T) {
 	testsuite.Reset()
 	db := testsuite.DB()
