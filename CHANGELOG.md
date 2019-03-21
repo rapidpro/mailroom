@@ -1,3 +1,7 @@
+v0.0.153
+----------
+ * remove all unfired campaign event fires when stopping contacts
+
 v0.0.152
 ----------
  * send messages for IVR flows as well
