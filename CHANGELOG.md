@@ -1,3 +1,7 @@
+v0.0.156
+----------
+ * only interrupt sessions of the same type
+
 v0.0.155
 ----------
  * Update to latest goflow
