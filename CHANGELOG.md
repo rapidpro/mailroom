@@ -1,3 +1,7 @@
+v0.0.155
+----------
+ * Update to latest goflow
+
 v0.0.154
 ----------
  * more verbose logging when failing on run insert
