@@ -1,3 +1,7 @@
+v0.0.154
+----------
+ * more verbose logging when failing on run insert
+
 v0.0.153
 ----------
  * remove all unfired campaign event fires when stopping contacts
