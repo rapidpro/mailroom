@@ -34,8 +34,11 @@ func TestCampaignStarts(t *testing.T) {
 	now := time.Now()
 	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, models.CathyID, models.BobID, models.AlexandriaID)
 
-	// create an active flowrun for Alexandria to test skipping
+	// create an active session for Alexandria to test skipping
 	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES('M', $1, $2, 'W', FALSE, NOW(), $3);`, models.Org1, models.AlexandriaID, models.FavoritesFlowID)
+
+	// create an active voice call for Cathy to make sure it doesn't get interrupted or cause skipping
+	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES('V', $1, $2, 'W', FALSE, NOW(), $3);`, models.Org1, models.CathyID, models.IVRFlowID)
 
 	// set our event to skip
 	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)
@@ -94,6 +97,9 @@ func TestCampaignStarts(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{models.AlexandriaID, models.RemindersEvent2ID}, 1)
+
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, []interface{}{models.CathyID}, 1)
 }
 
 func TestBatchStart(t *testing.T) {
@@ -197,7 +203,7 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	trigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, nil, true)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
