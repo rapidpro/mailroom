@@ -2,12 +2,9 @@ package flow
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -112,33 +109,33 @@ const (
 			"entry": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
 			"action_sets": [
 				{
-				"uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
-				"x": 107,
-				"y": 0,
-				"destination": null,
-				"actions": [
-					{
-						"type": "add_group",
-						"uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
-						"groups": [
-							{
-							"uuid": "1465eb20-066d-4933-a8b4-62fe7b19fd39",
-							"name": "I Don't Exist"
-							}
-						]
-					},
-					{
-						"type": "reply",
-						"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
-						"msg": {
-							"eng": "Your birthdate is @contact.birthdate"
+					"uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+					"x": 107,
+					"y": 0,
+					"destination": null,
+					"actions": [
+						{
+							"type": "add_group",
+							"uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+							"groups": [
+								{
+								"uuid": "1465eb20-066d-4933-a8b4-62fe7b19fd39",
+								"name": "I Don't Exist"
+								}
+							]
 						},
-						"media": {},
-						"quick_replies": [],
-						"send_all": false
-					}
-				],
-				"exit_uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+						{
+							"type": "reply",
+							"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+							"msg": {
+								"eng": "Your birthdate is @contact.birthdate"
+							},
+							"media": {},
+							"quick_replies": [],
+							"send_all": false
+						}
+					],
+					"exit_uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
 				}
 			],
 			"rule_sets": [],
@@ -222,17 +219,12 @@ const (
 									"name": "Testers"
 								}
 							]
-						},
-						{
-							"type": "send_msg",
-							"uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
-							"text": "Your birthdate is @contact.fields.birthdate"
 						}
 					],
 					"exits": [
 						{
 							"uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699",
-							"destination_node_uuid": "55fbef81-4151-4589-9f0a-8e5c44f6b5a3"
+							"destination_uuid": "55fbef81-4151-4589-9f0a-8e5c44f6b5a3"
 						}
 					]
 				}
@@ -296,7 +288,6 @@ func TestServer(t *testing.T) {
 	time.Sleep(time.Second)
 
 	defer server.Stop()
-	session := ""
 
 	// add a trigger for our campaign flow with 'trigger'
 	db.MustExec(
@@ -348,17 +339,6 @@ func TestServer(t *testing.T) {
 
 		content, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
-
-		// if this was a success, save our session
-		if resp.StatusCode == 200 {
-			// save the session for use in a resume
-			parsed := make(map[string]interface{})
-			json.Unmarshal(content, &parsed)
-			sessionJSON, _ := json.Marshal(parsed["session"])
-			session = string(sessionJSON)
-			fmt.Println(session)
-		}
-
-		assert.True(t, strings.Contains(string(content), tc.Response), "%d: did not find string: %s in body: %s", i, tc.Response, string(content))
+		assert.Contains(t, string(content), tc.Response, "%d: response contains check failed", i)
 	}
 }

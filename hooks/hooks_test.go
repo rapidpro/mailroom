@@ -55,17 +55,21 @@ func TestMain(m *testing.M) {
 //
 // It returns the completed flow.
 func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.Flow {
+	categoryUUIDs := make([]flows.CategoryUUID, len(tc.Actions))
 	exitUUIDs := make([]flows.ExitUUID, len(tc.Actions))
 	i := 0
 	for range tc.Actions {
+		categoryUUIDs[i] = flows.CategoryUUID(utils.NewUUID())
 		exitUUIDs[i] = flows.ExitUUID(utils.NewUUID())
 		i++
 	}
+	defaultCategoryUUID := flows.CategoryUUID(utils.NewUUID())
 	defaultExitUUID := flows.ExitUUID(utils.NewUUID())
 
+	cases := make([]*routers.Case, len(tc.Actions))
+	categories := make([]*routers.Category, len(tc.Actions))
 	exits := make([]flows.Exit, len(tc.Actions))
 	exitNodes := make([]flows.Node, len(tc.Actions))
-	cases := make([]*routers.Case, len(tc.Actions))
 	i = 0
 	for cid, actions := range tc.Actions {
 		cases[i] = routers.NewCase(
@@ -73,7 +77,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 			"has_any_word",
 			[]string{fmt.Sprintf("%d", cid)},
 			false,
-			exitUUIDs[i],
+			categoryUUIDs[i],
 		)
 
 		exitNodes[i] = definition.NewNode(
@@ -81,24 +85,34 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 			actions,
 			nil,
 			nil,
-			nil,
+			[]flows.Exit{definition.NewExit(flows.ExitUUID(utils.NewUUID()), "")},
+		)
+
+		categories[i] = routers.NewCategory(
+			categoryUUIDs[i],
+			fmt.Sprintf("Contact %d", cid),
+			exitUUIDs[i],
 		)
 
 		exits[i] = definition.NewExit(
 			exitUUIDs[i],
 			exitNodes[i].UUID(),
-			fmt.Sprintf("Contact %d", cid),
 		)
 		i++
 	}
 
 	// create our router
-	router := routers.NewSwitchRouter(defaultExitUUID, "@contact.id", cases, "")
+	categories = append(categories, routers.NewCategory(
+		defaultCategoryUUID,
+		"Other",
+		defaultExitUUID,
+	))
 	exits = append(exits, definition.NewExit(
 		defaultExitUUID,
 		flows.NodeUUID(""),
-		"Other",
 	))
+
+	router := routers.NewSwitchRouter("", categories, "@contact.id", cases, defaultCategoryUUID)
 
 	// and our entry node
 	entry := definition.NewNode(
