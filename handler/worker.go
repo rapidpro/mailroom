@@ -437,7 +437,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{flowTrigger}, hook, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -562,7 +562,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 		// flow this session is in is gone, interrupt our session and reset it
 		if err == models.ErrNotFound {
-			err = models.InterruptContactRuns(ctx, db, []flows.ContactID{contact.ID()}, time.Now())
+			err = models.InterruptContactRuns(ctx, db, models.MessagingFlow, []flows.ContactID{contact.ID()}, time.Now())
 			session = nil
 		}
 
@@ -603,7 +603,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		if flow != nil {
 			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
 
-			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, []flows.Trigger{trigger}, hook, true)
+			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}

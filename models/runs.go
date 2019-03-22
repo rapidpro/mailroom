@@ -819,9 +819,9 @@ WHERE
 `
 
 // FindActiveSessionOverlap returns the list of contact ids which overlap with those passed in which are active in any other flows
-func FindActiveSessionOverlap(ctx context.Context, db *sqlx.DB, contacts []ContactID) ([]ContactID, error) {
+func FindActiveSessionOverlap(ctx context.Context, db *sqlx.DB, flowType FlowType, contacts []ContactID) ([]ContactID, error) {
 	var overlap []ContactID
-	err := db.SelectContext(ctx, &overlap, activeSessionOverlapSQL, pq.Array(contacts))
+	err := db.SelectContext(ctx, &overlap, activeSessionOverlapSQL, flowType, pq.Array(contacts))
 	return overlap, err
 }
 
@@ -832,10 +832,11 @@ FROM
 	flows_flowsession fs JOIN
 	flows_flow ff ON fs.current_flow_id = ff.id
 WHERE
-	fs.contact_id = ANY($1) AND
 	fs.status = 'W' AND
 	ff.is_active = TRUE AND
-	ff.is_archived = FALSE
+	ff.is_archived = FALSE AND
+	ff.flow_type = $1 AND
+	fs.contact_id = ANY($2)
 `
 
 // RunExpiration looks up the run expiration for the passed in run, can return nil if the run is no longer active
@@ -903,18 +904,18 @@ WHERE
 `
 
 // InterruptContactRuns interrupts all runs and sesions that exist for the passed in list of contacts
-func InterruptContactRuns(ctx context.Context, tx Queryer, contactIDs []flows.ContactID, now time.Time) error {
+func InterruptContactRuns(ctx context.Context, tx Queryer, sessionType FlowType, contactIDs []flows.ContactID, now time.Time) error {
 	if len(contactIDs) == 0 {
 		return nil
 	}
 
 	// first interrupt our runs
-	err := Exec(ctx, "interrupting contact runs", tx, interruptContactRunsSQL, pq.Array(contactIDs), now)
+	err := Exec(ctx, "interrupting contact runs", tx, interruptContactRunsSQL, sessionType, pq.Array(contactIDs), now)
 	if err != nil {
 		return err
 	}
 
-	err = Exec(ctx, "interrupting contact sessions", tx, interruptContactSessionsSQL, pq.Array(contactIDs), now)
+	err = Exec(ctx, "interrupting contact sessions", tx, interruptContactSessionsSQL, sessionType, pq.Array(contactIDs), now)
 	if err != nil {
 		return err
 	}
@@ -927,13 +928,23 @@ UPDATE
 	flows_flowrun
 SET
 	is_active = FALSE,
-	exited_on = $2,
+	exited_on = $3,
 	exit_type = 'I',
 	modified_on = NOW(),
 	child_context = NULL,
 	parent_context = NULL
 WHERE
-	id = ANY (SELECT id FROM flows_flowrun WHERE contact_id = ANY($1) AND is_active = TRUE)
+	id = ANY (
+		SELECT 
+		  fr.id 
+		FROM 
+		  flows_flowrun fr
+		  JOIN flows_flow ff ON fr.flow_id = ff.id
+		WHERE 
+		  fr.contact_id = ANY($2) AND 
+		  fr.is_active = TRUE AND
+		  ff.flow_type = $1
+		)
 `
 
 const interruptContactSessionsSQL = `
@@ -941,9 +952,9 @@ UPDATE
 	flows_flowsession
 SET
 	status = 'I',
-	ended_on = $2
+	ended_on = $3
 WHERE
-	id = ANY (SELECT id FROM flows_flowsession WHERE contact_id = ANY($1) AND status = 'W')
+	id = ANY (SELECT id FROM flows_flowsession WHERE session_type = $1 AND contact_id = ANY($2) AND status = 'W')
 `
 
 // ExpireRunsAndSessions expires all the passed in runs and sessions. Note this should only be called

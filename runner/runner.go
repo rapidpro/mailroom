@@ -65,7 +65,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
 			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_id", session.ID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow in resume")
-			return nil, models.InterruptContactRuns(ctx, db, []flows.ContactID{resume.Contact().ID()}, time.Now())
+			return nil, models.InterruptContactRuns(ctx, db, models.MessagingFlow, []flows.ContactID{resume.Contact().ID()}, time.Now())
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
 	}
@@ -400,7 +400,7 @@ func StartFlow(
 	// filter out our list of contacts to only include those that should be started
 	if !options.IncludeActive {
 		// find all participants active in any flow
-		active, err := models.FindActiveSessionOverlap(ctx, db, contactIDs)
+		active, err := models.FindActiveSessionOverlap(ctx, db, flow.FlowType(), contactIDs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error finding other active flow: %d", flow.ID())
 		}
@@ -492,7 +492,7 @@ func StartFlow(
 			triggers = append(triggers, options.TriggerBuilder(contact))
 		}
 
-		ss, err := StartFlowForContacts(ctx, db, rp, org, assets, triggers, options.CommitHook, options.Interrupt)
+		ss, err := StartFlowForContacts(ctx, db, rp, org, assets, flow, triggers, options.CommitHook, options.Interrupt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error starting flow for contacts")
 		}
@@ -519,14 +519,12 @@ func StartFlow(
 // StartFlowForContacts runs the passed in flow for the passed in contact
 func StartFlowForContacts(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets,
-	triggers []flows.Trigger, hook models.SessionCommitHook, interrupt bool) ([]*models.Session, error) {
+	flow *models.Flow, triggers []flows.Trigger, hook models.SessionCommitHook, interrupt bool) ([]*models.Session, error) {
 
 	// no triggers? nothing to do
 	if len(triggers) == 0 {
 		return nil, nil
 	}
-
-	flow := triggers[0].Flow()
 
 	start := time.Now()
 	log := logrus.WithField("flow_name", flow.Name).WithField("flow_uuid", flow.UUID)
@@ -575,7 +573,7 @@ func StartFlowForContacts(
 
 	// interrupt all our contacts if desired
 	if interrupt {
-		err = models.InterruptContactRuns(txCTX, tx, contactIDs, start)
+		err = models.InterruptContactRuns(txCTX, tx, flow.FlowType(), contactIDs, start)
 		if err != nil {
 			tx.Rollback()
 			return nil, errors.Wrap(err, "error interrupting contacts")
@@ -613,7 +611,7 @@ func StartFlowForContacts(
 
 			// interrupt this contact if appropriate
 			if interrupt {
-				err = models.InterruptContactRuns(txCTX, tx, []flows.ContactID{session.Contact().ID()}, start)
+				err = models.InterruptContactRuns(txCTX, tx, flow.FlowType(), []flows.ContactID{session.Contact().ID()}, start)
 				if err != nil {
 					tx.Rollback()
 					log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error interrupting contact")
