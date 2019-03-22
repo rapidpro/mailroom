@@ -56,7 +56,7 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 
 	includeUI := request.IncludeUI == nil || *request.IncludeUI
 
-	flow, err := legacyFlow.Migrate(true, includeUI, "https://"+config.Mailroom.AttachmentDomain)
+	flow, err := legacyFlow.Migrate(includeUI, "https://"+config.Mailroom.AttachmentDomain)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error migrating legacy flow")
 	}
