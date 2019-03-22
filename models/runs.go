@@ -536,6 +536,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// update all modified runs at once
 	err = BulkSQL(ctx, "update runs", tx, updateRunSQL, updatedRuns)
 	if err != nil {
+		logrus.WithError(err).WithField("session", string(output)).Error("error while updating runs for session")
 		return errors.Wrapf(err, "error updating runs")
 	}
 
