@@ -169,7 +169,7 @@ func StartFlowBatch(
 	// try to load our flow
 	flow, err := org.FlowByID(batch.FlowID())
 	if err == models.ErrNotFound {
-		logrus.WithField("flow_uuid", flow.UUID()).Info("skipping flow start, flow no longer active or archived")
+		logrus.WithField("flow_id", batch.FlowID()).Info("skipping flow start, flow no longer active or archived")
 		return nil, nil
 	}
 	if err != nil {
@@ -527,7 +527,7 @@ func StartFlowForContacts(
 	}
 
 	start := time.Now()
-	log := logrus.WithField("flow_name", flow.Name).WithField("flow_uuid", flow.UUID)
+	log := logrus.WithField("flow_name", flow.Name()).WithField("flow_uuid", flow.UUID())
 
 	// for each trigger start the flow
 	sessions := make([]flows.Session, 0, len(triggers))
