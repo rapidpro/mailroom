@@ -1,3 +1,7 @@
+v0.0.158
+----------
+ * fix campaigns based on created_on, fix panic when batch starts on archived flow
+
 v0.0.157
 ----------
  * Latest goflow
