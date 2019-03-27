@@ -1,3 +1,7 @@
+v0.0.160
+----------
+ * properly start IVR flows on msg triggers
+
 v0.0.159
 ----------
  * update to version 31
