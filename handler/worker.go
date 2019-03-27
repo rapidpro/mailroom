@@ -601,8 +601,19 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 		// trigger flow is still active, start it
 		if flow != nil {
-			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
+			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
+			if flow.FlowType() == models.IVRFlow {
+				err = runner.TriggerIVRFlow(ctx, db, rp, org.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, func(ctx context.Context, tx *sqlx.Tx) error {
+					return models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeFlow, topup)
+				})
+				if err != nil {
+					return errors.Wrapf(err, "error while triggering ivr flow")
+				}
+				return nil
+			}
 
+			// otherwise build the trigger and start the flow directly
+			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
 			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")

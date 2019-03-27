@@ -46,7 +46,7 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, "Cathy", contacts[0].Name())
 		assert.Equal(t, len(contacts[0].URNs()), 1)
 		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+250700000001?id=10000&priority=50")
-		assert.Equal(t, 1, contacts[0].Groups().Length())
+		assert.Equal(t, 1, contacts[0].Groups().Count())
 
 		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto"), contacts[0].Fields()["state"].TypedValue())
 		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto > Yabo > Kilgori"), contacts[0].Fields()["ward"].TypedValue())
@@ -58,12 +58,12 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, 2, len(contacts[1].URNs()))
 		assert.Equal(t, contacts[1].URNs()[0].String(), "whatsapp:250788373373?id=20121&priority=100")
 		assert.Equal(t, contacts[1].URNs()[1].String(), "tel:+250700000002?id=10001&priority=50")
-		assert.Equal(t, 0, contacts[1].Groups().Length())
+		assert.Equal(t, 0, contacts[1].Groups().Count())
 
 		assert.Equal(t, "George", contacts[2].Name())
 		assert.Equal(t, types.NewXNumber(decimal.RequireFromString("30")), contacts[2].Fields()["age"].TypedValue())
 		assert.Equal(t, 0, len(contacts[2].URNs()))
-		assert.Equal(t, 0, contacts[2].Groups().Length())
+		assert.Equal(t, 0, contacts[2].Groups().Count())
 	}
 
 	// change bob to have a preferred URN and channel of our telephone
