@@ -292,7 +292,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 	}
 	callR.From = Phone{Type: "phone", Number: rawFrom}
 
-	resp, err := c.makeRequest(client, http.MethodPut, baseURL, callR)
+	resp, err := c.makeRequest(client, http.MethodPost, baseURL, callR)
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
