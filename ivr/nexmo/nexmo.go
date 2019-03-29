@@ -409,7 +409,7 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 	}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
-		logrus.WithError(err).Error("error unmarshalling ncco status")
+		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
 		return models.ConnectionStatusErrored, 0
 	}
 
