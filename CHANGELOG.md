@@ -1,3 +1,7 @@
+v0.0.165
+----------
+ * fix for referral triggers with specific referrers matching others
+
 v0.0.164
 ----------
  * for nexmo, first look at URL param to see if call is ongong
