@@ -694,17 +694,12 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAs
 		return errors.Errorf("can't set preferred URN on contact with no URNs")
 	}
 
-	// no channel, that's an error
-	if channel == nil {
-		return errors.Errorf("can't set preferred channel to a nil channel")
-	}
-
-	// is this already our top URN
+	// is this already our top URN?
 	topURNID := URNID(GetURNInt(c.urns[0], "id"))
 	topChannelID := GetURNChannelID(org, c.urns[0])
 
 	// we are already the top URN, nothing to do
-	if topURNID == urnID && topChannelID != nil && *topChannelID == channel.ID() {
+	if topURNID == urnID && topChannelID != nil && channel != nil && *topChannelID == channel.ID() {
 		return nil
 	}
 

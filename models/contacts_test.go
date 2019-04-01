@@ -104,6 +104,16 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "tel:+250788373393?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "tel:+250700000002?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=998", bob.URNs()[2].String())
+
+	// calling with no channel is a noop on the channel
+	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, URNID(20122), nil)
+	assert.NoError(t, err)
+
+	bob, err = modelContacts[0].FlowContact(org, session)
+	assert.NoError(t, err)
+	assert.Equal(t, "tel:+250788373393?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
+	assert.Equal(t, "tel:+250700000002?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
+	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=998", bob.URNs()[2].String())
 }
 
 func TestContactsFromURN(t *testing.T) {

@@ -279,8 +279,6 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 	}
 
 	if err != nil {
-		logrus.WithError(err).Error("error placing outbound call")
-
 		// set our status as errored
 		err := conn.UpdateStatus(ctx, db, models.ConnectionStatusFailed, 0, time.Now())
 		if err != nil {
