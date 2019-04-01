@@ -1,3 +1,7 @@
+v0.0.166
+----------
+ * don't log to sentry on failed call starts (channellog created anyways), deal with channels disappering before handling
+
 v0.0.165
 ----------
  * fix for referral triggers with specific referrers matching others
