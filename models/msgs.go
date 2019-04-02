@@ -166,10 +166,10 @@ func (m *Msg) SetURN(urn urns.URN) error {
 	return nil
 }
 
-func (m *Msg) Attachments() []flows.Attachment {
-	attachments := make([]flows.Attachment, len(m.m.Attachments))
+func (m *Msg) Attachments() []utils.Attachment {
+	attachments := make([]utils.Attachment, len(m.m.Attachments))
 	for i := range m.m.Attachments {
-		attachments[i] = flows.Attachment(m.m.Attachments[i])
+		attachments[i] = utils.Attachment(m.m.Attachments[i])
 	}
 	return attachments
 }
@@ -359,7 +359,7 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
-func NormalizeAttachment(attachment flows.Attachment) flows.Attachment {
+func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
 	// don't try to modify geo type attachments which are just coordinates
 	if attachment.ContentType() == "geo" {
 		return attachment
@@ -373,7 +373,7 @@ func NormalizeAttachment(attachment flows.Attachment) flows.Attachment {
 			url = fmt.Sprintf("https://%s/%s", config.Mailroom.AttachmentDomain, url)
 		}
 	}
-	return flows.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
+	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
 }
 
 // SetTimeout sets the timeout for this message
@@ -467,7 +467,7 @@ WHERE
 // BroadcastTranslation is the translation for the passed in language
 type BroadcastTranslation struct {
 	Text         string             `json:"text"`
-	Attachments  []flows.Attachment `json:"attachments,omitempty"`
+	Attachments  []utils.Attachment `json:"attachments,omitempty"`
 	QuickReplies []string           `json:"quick_replies,omitempty"`
 }
 

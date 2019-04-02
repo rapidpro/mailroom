@@ -407,3 +407,7 @@ func (a *OrgAssets) ResthookBySlug(slug string) *Resthook {
 	}
 	return nil
 }
+
+func (a *OrgAssets) Templates() []*Template {
+	return nil
+}

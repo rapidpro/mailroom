@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -48,20 +49,20 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+250700000001?id=10000&priority=50")
 		assert.Equal(t, 1, contacts[0].Groups().Count())
 
-		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto"), contacts[0].Fields()["state"].TypedValue())
-		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto > Yabo > Kilgori"), contacts[0].Fields()["ward"].TypedValue())
-		assert.Equal(t, types.NewXText("F"), contacts[0].Fields()["gender"].TypedValue())
+		assert.Equal(t, utils.LocationPath("Nigeria > Sokoto"), contacts[0].Fields()["state"].QueryValue())
+		assert.Equal(t, utils.LocationPath("Nigeria > Sokoto > Yabo > Kilgori"), contacts[0].Fields()["ward"].QueryValue())
+		assert.Equal(t, types.NewXText("F"), contacts[0].Fields()["gender"].QueryValue())
 		assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
 
 		assert.Equal(t, "Bob", contacts[1].Name())
-		assert.NotNil(t, contacts[1].Fields()["joined"].TypedValue())
+		assert.NotNil(t, contacts[1].Fields()["joined"].QueryValue())
 		assert.Equal(t, 2, len(contacts[1].URNs()))
 		assert.Equal(t, contacts[1].URNs()[0].String(), "whatsapp:250788373373?id=20121&priority=100")
 		assert.Equal(t, contacts[1].URNs()[1].String(), "tel:+250700000002?id=10001&priority=50")
 		assert.Equal(t, 0, contacts[1].Groups().Count())
 
 		assert.Equal(t, "George", contacts[2].Name())
-		assert.Equal(t, types.NewXNumber(decimal.RequireFromString("30")), contacts[2].Fields()["age"].TypedValue())
+		assert.Equal(t, types.NewXNumber(decimal.RequireFromString("30")), contacts[2].Fields()["age"].QueryValue())
 		assert.Equal(t, 0, len(contacts[2].URNs()))
 		assert.Equal(t, 0, contacts[2].Groups().Count())
 	}

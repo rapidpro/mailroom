@@ -223,9 +223,9 @@ type fieldValueEnvelope struct {
 	Text     types.XText        `json:"text"`
 	Datetime *types.XDateTime   `json:"datetime,omitempty"`
 	Number   *types.XNumber     `json:"number,omitempty"`
-	State    flows.LocationPath `json:"state,omitempty"`
-	District flows.LocationPath `json:"district,omitempty"`
-	Ward     flows.LocationPath `json:"ward,omitempty"`
+	State    utils.LocationPath `json:"state,omitempty"`
+	District utils.LocationPath `json:"district,omitempty"`
+	Ward     utils.LocationPath `json:"ward,omitempty"`
 }
 
 type ContactURN struct {
