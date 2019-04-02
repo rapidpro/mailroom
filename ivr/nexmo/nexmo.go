@@ -347,7 +347,7 @@ type NCCOInput struct {
 }
 
 // InputForRequest returns the input for the passed in request, if any
-func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
+func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
 	// parse our input
 	input := &NCCOInput{}
 	bb, err := ioutil.ReadAll(r.Body)
@@ -382,7 +382,7 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 			return "", ivr.NilAttachment, nil
 		}
 		logrus.WithField("recording_url", recordingURL).Info("input found recording")
-		return "", flows.Attachment("audio:" + recordingURL), nil
+		return "", utils.Attachment("audio:" + recordingURL), nil
 	default:
 		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
 	}

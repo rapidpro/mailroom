@@ -158,7 +158,7 @@ func (e *CampaignEvent) ScheduleForContact(tz *time.Location, now time.Time, con
 		}
 
 		// get the typed value
-		typed := value.TypedValue()
+		typed := value.QueryValue()
 		s, isTime := typed.(types.XDateTime)
 
 		// nil or not a date? move on

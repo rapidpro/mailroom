@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/locker"
@@ -661,7 +662,7 @@ type MsgEvent struct {
 	URN           urns.URN           `json:"urn"`
 	URNID         models.URNID       `json:"urn_id"`
 	Text          string             `json:"text"`
-	Attachments   []flows.Attachment `json:"attachments"`
+	Attachments   []utils.Attachment `json:"attachments"`
 	NewContact    bool               `json:"new_contact"`
 }
 

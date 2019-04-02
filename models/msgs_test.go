@@ -32,7 +32,7 @@ func TestMsgs(t *testing.T) {
 		ContactID    ContactID
 		URN          urns.URN
 		ContactURNID URNID
-		Attachments  flows.AttachmentList
+		Attachments  utils.AttachmentList
 		QuickReplies []string
 		Metadata     sqlx_types.JSONText
 		MsgCount     int
@@ -43,7 +43,7 @@ func TestMsgs(t *testing.T) {
 		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
 			nil, []string{"yes", "no"}, sqlx_types.JSONText(`{"quick_replies":["yes","no"]}`), 1, false},
 		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
-			flows.AttachmentList([]flows.Attachment{flows.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, sqlx_types.JSONText(nil), 2, false},
+			utils.AttachmentList([]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, sqlx_types.JSONText(nil), 2, false},
 	}
 
 	now := time.Now()
@@ -102,6 +102,6 @@ func TestNormalizeAttachment(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assert.Equal(t, tc.normalized, string(NormalizeAttachment(flows.Attachment(tc.raw))))
+		assert.Equal(t, tc.normalized, string(NormalizeAttachment(utils.Attachment(tc.raw))))
 	}
 }

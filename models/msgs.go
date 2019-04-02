@@ -681,7 +681,7 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), t.Text, t.Attachments, t.QuickReplies)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), t.Text, t.Attachments, t.QuickReplies, nil)
 		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
