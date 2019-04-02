@@ -1,3 +1,7 @@
+v0.0.167
+----------
+ * better testing of ivr for nexmo and twitter
+
 v0.0.166
 ----------
  * don't log to sentry on failed call starts (channellog created anyways), deal with channels disappering before handling
