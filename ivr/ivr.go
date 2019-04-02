@@ -35,12 +35,16 @@ type CallID string
 const (
 	NilCallID     = CallID("")
 	NilAttachment = flows.Attachment("")
+
+	// Our user agent
+	userAgent = "Mailroom/"
+
+	// ErrorMessage that is spoken to an IVR user if an error occurs
+	ErrorMessage = "An error has occurred, please try again later."
 )
 
-const userAgent = "Mailroom/"
-
-// Message that is spoken to an IVR user if an error occurs
-const ErrorMessage = "An error has occurred, please try again later."
+// WriteAttachments controls whether we write attachments, used during unit testing
+var WriteAttachments = true
 
 // CallEndedError is our constant error for when a call has ended
 var CallEndedError = fmt.Errorf("call ended")
@@ -187,6 +191,18 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	callChannel := ca.GetForURN(urn, assets.ChannelRoleCall)
 	if callChannel == nil {
 		// can't start call, no channel that can call
+		return nil, nil
+	}
+
+	hasCall := false
+	for _, role := range callChannel.Roles() {
+		if role == assets.ChannelRoleCall {
+			hasCall = true
+			break
+		}
+	}
+
+	if !hasCall {
 		return nil, nil
 	}
 
@@ -483,13 +499,15 @@ func ResumeIVRFlow(
 			path = fmt.Sprintf("/%s", path)
 		}
 
-		// write to S3
-		logrus.WithField("path", path).Info("** uploading s3 file")
-		url, err := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, contentType, body)
-		if err != nil {
-			return errors.Wrapf(err, "unable to write attachment to s3")
+		if WriteAttachments {
+			// write to S3
+			logrus.WithField("path", path).Info("** uploading s3 file")
+			url, err := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, contentType, body)
+			if err != nil {
+				return errors.Wrapf(err, "unable to write attachment to s3")
+			}
+			attachment = flows.Attachment(contentType + ":" + url)
 		}
-		attachment = flows.Attachment(contentType + ":" + url)
 	}
 
 	attachments := []flows.Attachment{}

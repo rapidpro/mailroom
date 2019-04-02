@@ -34,12 +34,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// BaseURL for Nexmo calls, public so our main IVR test can change it
+var BaseURL = `https://api.nexmo.com/v1/calls`
+
+// IgnoreSignatures sets whether we ignore signatures (for unit tests)
+var IgnoreSignatures = false
+
 const (
 	nexmoChannelType = models.ChannelType("NX")
 
-	baseURL = `https://api.nexmo.com/v1/calls`
-
-	inputTimeout = 10
+	gatherTimeout = 30
+	recordTimeout = 600
 
 	appIDConfig      = "nexmo_app_id"
 	privateKeyConfig = "nexmo_app_private_key"
@@ -82,7 +87,7 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 
 	return &client{
 		channel:    channel,
-		baseURL:    baseURL,
+		baseURL:    BaseURL,
 		appID:      appID,
 		privateKey: privateKey,
 	}, nil
@@ -292,7 +297,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 	}
 	callR.From = Phone{Type: "phone", Number: rawFrom}
 
-	resp, err := c.makeRequest(client, http.MethodPost, baseURL, callR)
+	resp, err := c.makeRequest(client, http.MethodPost, BaseURL, callR)
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
@@ -318,7 +323,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 		return ivr.NilCallID, errors.Errorf("call status returned as failed")
 	}
 
-	logrus.WithField("body", body).WithField("status", resp.StatusCode).Debug("requested call")
+	logrus.WithField("body", string(body)).WithField("status", resp.StatusCode).Debug("requested call")
 
 	return ivr.CallID(call.UUID), nil
 }
@@ -326,7 +331,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 // HangupCall asks Nexmo to hang up the call that is passed in
 func (c *client) HangupCall(client *http.Client, callID string) error {
 	hangupBody := map[string]string{"action": "hangup"}
-	url := baseURL + "/" + callID
+	url := BaseURL + "/" + callID
 	resp, err := c.makeRequest(client, http.MethodPut, url, hangupBody)
 	if err != nil {
 		return errors.Wrapf(err, "error trying to hangup call")
@@ -436,6 +441,10 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
 func (c *client) ValidateRequestSignature(r *http.Request) error {
+	if IgnoreSignatures {
+		return nil
+	}
+
 	// only validate handling calls, we can't verify others
 	if !strings.HasSuffix(r.URL.Path, "handle") {
 		return nil
@@ -628,11 +637,12 @@ type Input struct {
 }
 
 type Record struct {
-	Action      string   `json:"action"`
-	EndOnKey    string   `json:"endOnKey,omitempty"`
-	Timeout     int      `json:"timeOut,omitempty"`
-	EventURL    []string `json:"eventUrl"`
-	EventMethod string   `json:"eventMethod"`
+	Action       string   `json:"action"`
+	EndOnKey     string   `json:"endOnKey,omitempty"`
+	Timeout      int      `json:"timeOut,omitempty"`
+	EndOnSilence int      `json:"endOnSilence,omitempty"`
+	EventURL     []string `json:"eventUrl"`
+	EventMethod  string   `json:"eventMethod"`
 }
 
 func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
@@ -651,7 +661,7 @@ func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Ev
 			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
 			input := &Input{
 				Action:       "input",
-				Timeout:      inputTimeout,
+				Timeout:      gatherTimeout,
 				SubmitOnHash: true,
 				EventURL:     []string{eventURL},
 				EventMethod:  http.MethodPost,
@@ -675,10 +685,12 @@ func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Ev
 			eventURL := resumeURL + "&wait_type=recording_url&recording_uuid=" + recordingUUID
 			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
 			record := &Record{
-				Action:      "record",
-				EventURL:    []string{eventURL},
-				EventMethod: http.MethodPost,
-				EndOnKey:    "#",
+				Action:       "record",
+				EventURL:     []string{eventURL},
+				EventMethod:  http.MethodPost,
+				EndOnKey:     "#",
+				Timeout:      recordTimeout,
+				EndOnSilence: 5,
 			}
 			waitActions = append(waitActions, record)
 
