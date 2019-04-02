@@ -96,13 +96,21 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID())
 			continue
 		}
+		if session == nil {
+			logrus.WithFields(logrus.Fields{
+				"elapsed":    time.Since(start),
+				"contact_id": contact.ID(),
+				"start_id":   batch.StartID(),
+			}).Info("call start skipped, no suitable channel")
+			continue
+		}
 		logrus.WithFields(logrus.Fields{
 			"elapsed":     time.Since(start),
 			"contact_id":  contact.ID(),
 			"status":      session.Status(),
 			"start_id":    batch.StartID(),
 			"external_id": session.ExternalID(),
-		}).Debug("requested call for contact")
+		}).Info("requested call for contact")
 	}
 
 	// if this is a last batch, mark our start as started
