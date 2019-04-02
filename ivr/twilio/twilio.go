@@ -43,7 +43,8 @@ const (
 
 	statusFailed = "failed"
 
-	inputTimeout = 120
+	gatherTimeout = 30
+	recordTimeout = 600
 
 	accountSIDConfig = "account_sid"
 	authTokenConfig  = "auth_token"
@@ -399,8 +400,9 @@ type Gather struct {
 }
 
 type Record struct {
-	XMLName string `xml:"Record"`
-	Action  string `xml:"action,attr,omitempty"`
+	XMLName   string `xml:"Record"`
+	Action    string `xml:"action,attr,omitempty"`
+	MaxLength int    `xml:"maxLength,attr,omitempty"`
 }
 
 type Response struct {
@@ -440,7 +442,7 @@ func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string
 			gather := &Gather{
 				Action:   resumeURL,
 				Commands: commands,
-				Timeout:  inputTimeout,
+				Timeout:  gatherTimeout,
 			}
 			if hint.Count != nil {
 				gather.NumDigits = *hint.Count
@@ -451,7 +453,7 @@ func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string
 
 		case *hints.AudioHint:
 			resumeURL = resumeURL + "&wait_type=record"
-			commands = append(commands, Record{Action: resumeURL})
+			commands = append(commands, Record{Action: resumeURL, MaxLength: recordTimeout})
 			commands = append(commands, Redirect{URL: resumeURL + "&empty=true"})
 			r.Commands = commands
 

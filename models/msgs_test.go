@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,7 @@ func TestMsgs(t *testing.T) {
 		ContactID    ContactID
 		URN          urns.URN
 		ContactURNID URNID
-		Attachments  utils.AttachmentList
+		Attachments  []utils.Attachment
 		QuickReplies []string
 		Metadata     sqlx_types.JSONText
 		MsgCount     int
@@ -43,7 +44,7 @@ func TestMsgs(t *testing.T) {
 		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
 			nil, []string{"yes", "no"}, sqlx_types.JSONText(`{"quick_replies":["yes","no"]}`), 1, false},
 		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
-			utils.AttachmentList([]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, sqlx_types.JSONText(nil), 2, false},
+			[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}, nil, sqlx_types.JSONText(nil), 2, false},
 	}
 
 	now := time.Now()
@@ -53,7 +54,7 @@ func TestMsgs(t *testing.T) {
 		tx, err := db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies)
+		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil)
 		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now)
 
 		if err == nil {
