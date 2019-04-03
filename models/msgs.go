@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/types"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
@@ -91,7 +90,7 @@ type Msg struct {
 		NextAttempt          time.Time          `db:"next_attempt"    json:"next_attempt"`
 		ExternalID           null.String        `db:"external_id"     json:"external_id"`
 		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
-		Metadata             types.JSONText     `db:"metadata"        json:"metadata"`
+		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
 		ChannelID            *ChannelID         `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
 		ConnectionID         *ConnectionID      `db:"connection_id"`
@@ -115,33 +114,33 @@ type Msg struct {
 	channel *Channel
 }
 
-func (m *Msg) ID() flows.MsgID                 { return m.m.ID }
-func (m *Msg) UUID() flows.MsgUUID             { return m.m.UUID }
-func (m *Msg) Channel() *Channel               { return m.channel }
-func (m *Msg) Text() string                    { return m.m.Text }
-func (m *Msg) HighPriority() bool              { return m.m.HighPriority }
-func (m *Msg) CreatedOn() time.Time            { return m.m.CreatedOn }
-func (m *Msg) ModifiedOn() time.Time           { return m.m.ModifiedOn }
-func (m *Msg) SentOn() time.Time               { return m.m.SentOn }
-func (m *Msg) QueuedOn() time.Time             { return m.m.QueuedOn }
-func (m *Msg) Direction() MsgDirection         { return m.m.Direction }
-func (m *Msg) Status() MsgStatus               { return m.m.Status }
-func (m *Msg) Visibility() MsgVisibility       { return m.m.Visibility }
-func (m *Msg) MsgType() MsgType                { return m.m.MsgType }
-func (m *Msg) ErrorCount() int                 { return m.m.ErrorCount }
-func (m *Msg) NextAttempt() time.Time          { return m.m.NextAttempt }
-func (m *Msg) ExternalID() null.String         { return m.m.ExternalID }
-func (m *Msg) Metadata() types.JSONText        { return m.m.Metadata }
-func (m *Msg) MsgCount() int                   { return m.m.MsgCount }
-func (m *Msg) ChannelID() *ChannelID           { return m.m.ChannelID }
-func (m *Msg) ChannelUUID() assets.ChannelUUID { return m.m.ChannelUUID }
-func (m *Msg) ConnectionID() *ConnectionID     { return m.m.ConnectionID }
-func (m *Msg) URN() urns.URN                   { return m.m.URN }
-func (m *Msg) URNAuth() null.String            { return m.m.URNAuth }
-func (m *Msg) OrgID() OrgID                    { return m.m.OrgID }
-func (m *Msg) TopupID() TopupID                { return m.m.TopupID }
-func (m *Msg) ContactID() ContactID            { return m.m.ContactID }
-func (m *Msg) ContactURNID() *URNID            { return m.m.ContactURNID }
+func (m *Msg) ID() flows.MsgID                  { return m.m.ID }
+func (m *Msg) UUID() flows.MsgUUID              { return m.m.UUID }
+func (m *Msg) Channel() *Channel                { return m.channel }
+func (m *Msg) Text() string                     { return m.m.Text }
+func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
+func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
+func (m *Msg) ModifiedOn() time.Time            { return m.m.ModifiedOn }
+func (m *Msg) SentOn() time.Time                { return m.m.SentOn }
+func (m *Msg) QueuedOn() time.Time              { return m.m.QueuedOn }
+func (m *Msg) Direction() MsgDirection          { return m.m.Direction }
+func (m *Msg) Status() MsgStatus                { return m.m.Status }
+func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
+func (m *Msg) MsgType() MsgType                 { return m.m.MsgType }
+func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
+func (m *Msg) NextAttempt() time.Time           { return m.m.NextAttempt }
+func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
+func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
+func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
+func (m *Msg) ChannelID() *ChannelID            { return m.m.ChannelID }
+func (m *Msg) ChannelUUID() assets.ChannelUUID  { return m.m.ChannelUUID }
+func (m *Msg) ConnectionID() *ConnectionID      { return m.m.ConnectionID }
+func (m *Msg) URN() urns.URN                    { return m.m.URN }
+func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
+func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
+func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
+func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
+func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 
 func (m *Msg) SetTopup(topupID TopupID)         { m.m.TopupID = topupID }
 func (m *Msg) SetChannelID(channelID ChannelID) { m.m.ChannelID = &channelID }
@@ -303,16 +302,16 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		}
 	}
 
-	// if we have quick replies, populate our metadata
-	if len(out.QuickReplies()) > 0 {
+	// populate metadata if we have any
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil {
 		metadata := make(map[string]interface{})
-		metadata["quick_replies"] = out.QuickReplies()
-
-		metadataJSON, err := json.Marshal(metadata)
-		if err != nil {
-			return nil, errors.Wrap(err, "error marshalling quick replies")
+		if len(out.QuickReplies()) > 0 {
+			metadata["quick_replies"] = out.QuickReplies()
 		}
-		m.Metadata = metadataJSON
+		if out.Templating() != nil {
+			metadata["templating"] = out.Templating()
+		}
+		m.Metadata = null.NewMap(metadata)
 	}
 
 	// calculate msg count

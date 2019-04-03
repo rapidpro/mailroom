@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	sqlx_types "github.com/jmoiron/sqlx/types"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -35,16 +34,16 @@ func TestMsgs(t *testing.T) {
 		ContactURNID URNID
 		Attachments  []utils.Attachment
 		QuickReplies []string
-		Metadata     sqlx_types.JSONText
+		Metadata     map[string]interface{}
 		MsgCount     int
 		HasErr       bool
 	}{
 		{chanUUID, channel, "missing urn id", CathyID, urns.URN("tel:+250700000001"), URNID(0),
-			nil, nil, sqlx_types.JSONText(nil), 1, true},
+			nil, nil, map[string]interface{}{}, 1, true},
 		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
-			nil, []string{"yes", "no"}, sqlx_types.JSONText(`{"quick_replies":["yes","no"]}`), 1, false},
+			nil, []string{"yes", "no"}, map[string]interface{}{"quick_replies": []string{"yes", "no"}}, 1, false},
 		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
-			[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}, nil, sqlx_types.JSONText(nil), 2, false},
+			[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}, nil, map[string]interface{}{}, 2, false},
 	}
 
 	now := time.Now()

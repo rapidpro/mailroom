@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 )
@@ -30,9 +31,17 @@ func TestMsgCreated(t *testing.T) {
 	// delete all URNs for bob
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, models.BobID)
 
-	// TODO: test replying to a newly added URN
+	// change alexandrias URN to a twitter URN and set her language to eng so that a template gets used for her
+	db.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:12345', path='12345', scheme='twitter' WHERE contact_id = $1`, models.AlexandriaID)
+	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, models.AlexandriaID)
 
 	msg1 := createIncomingMsg(db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start")
+
+	templateAction := actions.NewSendMsgAction(newActionUUID(), "Template time", nil, nil, false)
+	templateAction.Templating = &actions.Templating{
+		Template:  &assets.TemplateReference{assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), "revive_issue"},
+		Variables: []string{"@contact.name", "tooth"},
+	}
 
 	tcs := []HookTestCase{
 		HookTestCase{
@@ -45,6 +54,9 @@ func TestMsgCreated(t *testing.T) {
 				},
 				models.BobID: []flows.Action{
 					actions.NewSendMsgAction(newActionUUID(), "No URNs", nil, nil, false),
+				},
+				models.AlexandriaID: []flows.Action{
+					templateAction,
 				},
 			},
 			Msgs: ContactMsgMap{
@@ -66,6 +78,16 @@ func TestMsgCreated(t *testing.T) {
 					Args:  []interface{}{models.BobID},
 					Count: 0,
 				},
+				SQLAssertion{
+					SQL: "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND text = $2 AND metadata = $3 AND direction = 'O' AND status = 'Q' AND channel_id = $4",
+					Args: []interface{}{
+						models.AlexandriaID,
+						`Hi Alexandia, are you still experiencing problems with tooth?`,
+						`{"templating":{"template":{"uuid":"9c22b594-fcab-4b29-9bcb-ce4404894a80","name":"revive_issue"},"language":"eng","variables":["Alexandia","tooth"]}}`,
+						models.TwitterChannelID,
+					},
+					Count: 1,
+				},
 			},
 		},
 	}
@@ -80,7 +102,7 @@ func TestMsgCreated(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
-	// Only one bulk for George
+	// One bulk for George
 	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", models.TwilioChannelUUID)))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
