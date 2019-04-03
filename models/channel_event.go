@@ -29,7 +29,7 @@ type ChannelEvent struct {
 		ChannelID ChannelID        `json:"channel_id"   db:"channel_id"`
 		ContactID ContactID        `json:"contact_id"   db:"contact_id"`
 		URNID     URNID            `json:"urn_id"       db:"contact_urn_id"`
-		Extra     null.StringMap   `json:"extra"        db:"extra"`
+		Extra     null.Map         `json:"extra"        db:"extra"`
 
 		// only in JSON representation
 		NewContact bool `json:"new_contact"`
@@ -47,8 +47,12 @@ func (e *ChannelEvent) OrgID() OrgID         { return e.e.OrgID }
 func (e *ChannelEvent) ChannelID() ChannelID { return e.e.ChannelID }
 func (e *ChannelEvent) IsNewContact() bool   { return e.e.NewContact }
 
-func (e *ChannelEvent) Extra() map[string]string {
+func (e *ChannelEvent) Extra() map[string]interface{} {
 	return e.e.Extra.Map()
+}
+
+func (e *ChannelEvent) ExtraValue(key string) string {
+	return e.e.Extra.GetString(key, "")
 }
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
@@ -76,7 +80,7 @@ func (e *ChannelEvent) Insert(ctx context.Context, db *sqlx.DB) error {
 }
 
 // NewChannelEvent creates a new channel event for the passed in parameters, returning it
-func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelID, contactID ContactID, urnID URNID, extra map[string]string, isNewContact bool) *ChannelEvent {
+func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelID, contactID ContactID, urnID URNID, extra map[string]interface{}, isNewContact bool) *ChannelEvent {
 	event := &ChannelEvent{}
 	e := &event.e
 
@@ -88,7 +92,7 @@ func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelI
 	e.NewContact = isNewContact
 
 	if extra != nil {
-		e.Extra = null.NewStringMap(extra)
+		e.Extra = null.NewMap(extra)
 	}
 
 	now := time.Now()

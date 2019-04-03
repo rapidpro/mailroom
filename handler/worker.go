@@ -333,7 +333,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		trigger = models.FindMatchingNewConversationTrigger(org, channel)
 
 	case models.ReferralEventType:
-		trigger = models.FindMatchingReferralTrigger(org, channel, event.Extra()["referrer_id"])
+		trigger = models.FindMatchingReferralTrigger(org, channel, event.ExtraValue("referrer_id"))
 
 	case models.MOMissEventType:
 		trigger = models.FindMatchingMissedCallTrigger(org)

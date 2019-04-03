@@ -229,7 +229,7 @@ func TestChannelEvents(t *testing.T) {
 		URNID     models.URNID
 		OrgID     models.OrgID
 		ChannelID models.ChannelID
-		Extra     map[string]string
+		Extra     map[string]interface{}
 		Response  string
 	}{
 		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?"},
