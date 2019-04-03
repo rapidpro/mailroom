@@ -84,7 +84,6 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 			flows.NodeUUID(utils.NewUUID()),
 			actions,
 			nil,
-			nil,
 			[]flows.Exit{definition.NewExit(flows.ExitUUID(utils.NewUUID()), "")},
 		)
 
@@ -112,12 +111,11 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		flows.NodeUUID(""),
 	))
 
-	router := routers.NewSwitchRouter("", categories, "@contact.id", cases, defaultCategoryUUID)
+	router := routers.NewSwitchRouter(nil, "", categories, "@contact.id", cases, defaultCategoryUUID)
 
 	// and our entry node
 	entry := definition.NewNode(
 		flows.NodeUUID(utils.NewUUID()),
-		nil,
 		nil,
 		router,
 		exits,

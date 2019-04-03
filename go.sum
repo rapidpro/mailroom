@@ -78,6 +78,8 @@ github.com/nyaruka/goflow v0.31.3 h1:cjI3Y48/9s9S5Wln2GwcJQVd9W0pnTSsAuZMFtGIck4
 github.com/nyaruka/goflow v0.31.3/go.mod h1:YERdR5vNv4C4jG1NBSvf/MsgtMy8ooUa9Bxs3GrTmf4=
 github.com/nyaruka/goflow v0.32.0 h1:3x/zts5RxC51BRo7XHLqpw1BSX24CcPMY5ltCZ0+/ms=
 github.com/nyaruka/goflow v0.32.0/go.mod h1:IMktU/eAl8TdrqCjHBKseHzJY6Vb52RjLIo4tYmTMR4=
+github.com/nyaruka/goflow v0.32.1 h1:3UtWEoZIsmxZUfzOrkAZQFBgJVxXHXJYtys4BzlYk6w=
+github.com/nyaruka/goflow v0.32.1/go.mod h1:IMktU/eAl8TdrqCjHBKseHzJY6Vb52RjLIo4tYmTMR4=
 github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8 h1:TOvxy0u6LNTWP3gwbdNVCiByXJupr9ATFdzBnBJ2TY8=
 github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8/go.mod h1:huVocfMEHkttMHD4hSr/wjWNyTx/YMzwwajVzV2bq+0=
 github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d h1:hyp9u36KIwbTCo2JAJ+TuJcJBc+UZzEig7RI/S5Dvkc=
