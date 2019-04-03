@@ -375,7 +375,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	// no trigger, noop, move on
 	if trigger == nil {
-		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).Info("ignoring event, no trigger found")
+		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).WithField("extra", event.Extra()).Info("ignoring channel event, no trigger found")
 		return nil, nil
 	}
 
