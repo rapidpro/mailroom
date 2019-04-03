@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/types"
+	"github.com/nyaruka/null"
 )
 
 type ChannelEventType string
@@ -23,13 +23,13 @@ const (
 // ChannelEvent represents an event that occurred associated with a channel, such as a referral, missed call, etc..
 type ChannelEvent struct {
 	e struct {
-		ID        ChannelEventID     `json:"id"           db:"id"`
-		EventType ChannelEventType   `json:"event_type"   db:"event_type"`
-		OrgID     OrgID              `json:"org_id"       db:"org_id"`
-		ChannelID ChannelID          `json:"channel_id"   db:"channel_id"`
-		ContactID ContactID          `json:"contact_id"   db:"contact_id"`
-		URNID     URNID              `json:"urn_id"       db:"contact_urn_id"`
-		Extra     types.NullJSONText `json:"extra"        db:"extra"`
+		ID        ChannelEventID   `json:"id"           db:"id"`
+		EventType ChannelEventType `json:"event_type"   db:"event_type"`
+		OrgID     OrgID            `json:"org_id"       db:"org_id"`
+		ChannelID ChannelID        `json:"channel_id"   db:"channel_id"`
+		ContactID ContactID        `json:"contact_id"   db:"contact_id"`
+		URNID     URNID            `json:"urn_id"       db:"contact_urn_id"`
+		Extra     null.StringMap   `json:"extra"        db:"extra"`
 
 		// only in JSON representation
 		NewContact bool `json:"new_contact"`
@@ -48,11 +48,7 @@ func (e *ChannelEvent) ChannelID() ChannelID { return e.e.ChannelID }
 func (e *ChannelEvent) IsNewContact() bool   { return e.e.NewContact }
 
 func (e *ChannelEvent) Extra() map[string]string {
-	extra := make(map[string]string)
-	if e.e.Extra.Valid {
-		json.Unmarshal(json.RawMessage(e.e.Extra.JSONText), &extra)
-	}
-	return extra
+	return e.e.Extra.Map()
 }
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
@@ -92,9 +88,7 @@ func NewChannelEvent(eventType ChannelEventType, orgID OrgID, channelID ChannelI
 	e.NewContact = isNewContact
 
 	if extra != nil {
-		extraBytes, _ := json.Marshal(extra)
-		e.Extra.Valid = true
-		e.Extra.JSONText = extraBytes
+		e.Extra = null.NewStringMap(extra)
 	}
 
 	now := time.Now()

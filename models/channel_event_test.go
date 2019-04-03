@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/nyaruka/mailroom/testsuite"
@@ -24,4 +25,12 @@ func TestChannelEvents(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotZero(t, e2.ID())
 	assert.Equal(t, e2.Extra(), map[string]string{"referral_id": "foobar"})
+
+	asJSON, err := json.Marshal(e2)
+	assert.NoError(t, err)
+
+	e3 := &ChannelEvent{}
+	err = json.Unmarshal(asJSON, e3)
+	assert.NoError(t, err)
+	assert.Equal(t, e2.Extra(), e3.Extra())
 }
