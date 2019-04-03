@@ -302,7 +302,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
 
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != http.StatusCreated {
 		return ivr.NilCallID, errors.Errorf("received non 200 status for call start: %d", resp.StatusCode)
 	}
 
