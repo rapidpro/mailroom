@@ -1,3 +1,7 @@
+v0.0.171
+----------
+ * latest gocommon, phonenumbers
+
 v0.0.170
 ----------
  * switch to using generic map interface for extra on channel events
