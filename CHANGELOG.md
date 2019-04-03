@@ -1,3 +1,7 @@
+v0.0.169
+----------
+ * move to using our own null.StringMap so channel events are decoded properly
+
 v0.0.168
 ----------
  * print extra when ignoring event
