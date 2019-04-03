@@ -11,7 +11,10 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/go-playground/validator.v9"
 )
+
+var validate = validator.New()
 
 func readJSONRow(rows *sqlx.Rows, destination interface{}) error {
 	var jsonBlob string
@@ -23,6 +26,12 @@ func readJSONRow(rows *sqlx.Rows, destination interface{}) error {
 	err = json.Unmarshal([]byte(jsonBlob), destination)
 	if err != nil {
 		return errors.Wrap(err, "error unmarshalling row json")
+	}
+
+	// validate our final struct
+	err = validate.Struct(destination)
+	if err != nil {
+		return errors.Wrapf(err, "failed validation for json: %s", jsonBlob)
 	}
 
 	return nil

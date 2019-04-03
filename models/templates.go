@@ -15,19 +15,19 @@ import (
 type Template struct {
 	t struct {
 		Name         string                 `json:"name"          validate:"required"`
-		UUID         utils.UUID             `json:"uuid"          validate:"required"`
-		Translations []*TemplateTranslation `json:"translations"`
+		UUID         assets.TemplateUUID    `json:"uuid"          validate:"required"`
+		Translations []*TemplateTranslation `json:"translations"  validate:"dive"`
 	}
 }
 
-func (t *Template) Name() string     { return t.t.Name }
-func (t *Template) UUID() utils.UUID { return t.t.UUID }
-func (t *Template) Translation() []*TemplateTranslation {
-	trs := make([]*TemplateTranslation, len(t.t.Translations))
+func (t *Template) Name() string              { return t.t.Name }
+func (t *Template) UUID() assets.TemplateUUID { return t.t.UUID }
+func (t *Template) Translations() []assets.TemplateTranslation {
+	trs := make([]assets.TemplateTranslation, len(t.t.Translations))
 	for i := range trs {
 		trs[i] = t.t.Translations[i]
 	}
-	return t.t.Translations
+	return trs
 }
 
 // UnmarshalJSON is our unmarshaller for json data
@@ -38,9 +38,10 @@ func (t *Template) MarshalJSON() ([]byte, error) { return json.Marshal(t.t) }
 
 type TemplateTranslation struct {
 	t struct {
-		Channel  assets.ChannelReference `json:"channel"  validate:"required"`
-		Language utils.Language          `json:"language" validate:"required"`
-		Content  string                  `json:"content"  validate"required"`
+		Channel       assets.ChannelReference `json:"channel"         validate:"required"`
+		Language      utils.Language          `json:"language"        validate:"required"`
+		Content       string                  `json:"content"         validate:"required"`
+		VariableCount int                     `json:"variable_count"`
 	}
 }
 
@@ -53,9 +54,10 @@ func (t *TemplateTranslation) MarshalJSON() ([]byte, error) { return json.Marsha
 func (t *TemplateTranslation) Channel() assets.ChannelReference { return t.t.Channel }
 func (t *TemplateTranslation) Language() utils.Language         { return t.t.Language }
 func (t *TemplateTranslation) Content() string                  { return t.t.Content }
+func (t *TemplateTranslation) VariableCount() int               { return t.t.VariableCount }
 
 // loads the templates for the passed in org
-func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Template, error) {
+func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Template, error) {
 	start := time.Now()
 
 	rows, err := db.Queryx(selectTemplatesSQL, orgID)
@@ -64,7 +66,7 @@ func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Templa
 	}
 	defer rows.Close()
 
-	templates := make([]*Template, 0)
+	templates := make([]assets.Template, 0)
 	for rows.Next() {
 		template := &Template{}
 		err = readJSONRow(rows, &template.t)
@@ -84,23 +86,25 @@ const selectTemplatesSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.name as name, 
 	t.uuid as uuid, 
-	(SELECT ROW_TO_JSON(tr) FROM (
+	(SELECT ARRAY_TO_JSON(ARRAY_AGG(ROW_TO_JSON(tr))) FROM (
 		SELECT
 			tr.language as language,
 			tr.content as content,
+			tr.variable_count as variable_count,
 			JSON_BUILD_OBJECT('uuid', c.uuid, 'name', c.name) as channel
 		FROM
 			templates_templatetranslation tr
 			JOIN channels_channel c ON tr.channel_id = c.id
 		WHERE 
 			tr.is_active = TRUE AND
-			tr.template_id = t.id
-	)) as translations
+			tr.status = 'A' AND
+			tr.template_id = t.id AND
+			c.is_active = TRUE
+	) tr) as translations
 FROM 
 	templates_template t
 WHERE 
-	org_id = $1 AND 
-	is_active = TRUE
+	org_id = $1 
 ORDER BY 
 	name ASC
 ) r;

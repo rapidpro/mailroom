@@ -53,6 +53,7 @@ type OrgAssets struct {
 	labelsByUUID map[assets.LabelUUID]*Label
 
 	resthooks []assets.Resthook
+	templates []assets.Template
 	triggers  []*Trigger
 
 	locations        []assets.LocationHierarchy
@@ -168,6 +169,11 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	o.triggers, err = loadTriggers(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading triggers for org %d", orgID)
+	}
+
+	o.templates, err = loadTemplates(ctx, db, orgID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading templates for org %d", orgID)
 	}
 
 	// cache locations for an hour
@@ -409,5 +415,5 @@ func (a *OrgAssets) ResthookBySlug(slug string) *Resthook {
 }
 
 func (a *OrgAssets) Templates() ([]assets.Template, error) {
-	return nil, nil
+	return a.templates, nil
 }
