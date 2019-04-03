@@ -1,3 +1,7 @@
+v0.0.170
+----------
+ * switch to using generic map interface for extra on channel events
+
 v0.0.169
 ----------
  * move to using our own null.StringMap so channel events are decoded properly
