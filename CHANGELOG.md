@@ -1,3 +1,23 @@
+v0.0.171
+----------
+ * latest gocommon, phonenumbers
+
+v0.0.170
+----------
+ * switch to using generic map interface for extra on channel events
+
+v0.0.169
+----------
+ * move to using our own null.StringMap so channel events are decoded properly
+
+v0.0.168
+----------
+ * print extra when ignoring event
+
+v0.0.167
+----------
+ * better testing of ivr for nexmo and twitter
+
 v0.0.166
 ----------
  * don't log to sentry on failed call starts (channellog created anyways), deal with channels disappering before handling
