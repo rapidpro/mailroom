@@ -7,8 +7,8 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/waits"
-	"github.com/nyaruka/goflow/flows/waits/hints"
+	"github.com/nyaruka/goflow/flows/routers/waits"
+	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 
