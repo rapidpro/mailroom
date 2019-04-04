@@ -1,3 +1,7 @@
+v0.0.174
+----------
+ * fix dot lookup on nil values
+
 v0.0.173
 ----------
  * better logging in case of panic
