@@ -1,3 +1,7 @@
+v0.0.172
+----------
+ * latest goflow, add support for templates
+
 v0.0.171
 ----------
  * latest gocommon, phonenumbers
