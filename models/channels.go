@@ -82,6 +82,9 @@ func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
 // Parent returns a reference to the parent channel of this channel (if any)
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
 
+// Config returns the config for this channel
+func (c *Channel) Config() map[string]interface{} { return c.c.Config }
+
 // ConfigValue returns the config value for the passed in key
 func (c *Channel) ConfigValue(key string, def string) string {
 	value := c.c.Config[key]

@@ -194,14 +194,7 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 		return nil, nil
 	}
 
-	hasCall := false
-	for _, role := range callChannel.Roles() {
-		if role == assets.ChannelRoleCall {
-			hasCall = true
-			break
-		}
-	}
-
+	hasCall := callChannel.HasRole(assets.ChannelRoleCall)
 	if !hasCall {
 		return nil, nil
 	}

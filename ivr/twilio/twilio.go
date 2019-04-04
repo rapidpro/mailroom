@@ -75,7 +75,7 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 	accountSID := channel.ConfigValue(accountSIDConfig, "")
 	authToken := channel.ConfigValue(authTokenConfig, "")
 	if accountSID == "" || authToken == "" {
-		return nil, errors.Errorf("missing auth_token or account_sid on channel config")
+		return nil, errors.Errorf("missing auth_token or account_sid on channel config: %v for channel: %s", channel.Config(), channel.UUID())
 	}
 	baseURL := channel.ConfigValue(baseURLConfig, BaseURL)
 
