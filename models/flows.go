@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/buger/jsonparser"
 	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/types"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/legacy"
@@ -44,7 +42,7 @@ type Flow struct {
 		ID             FlowID          `json:"id"`
 		UUID           assets.FlowUUID `json:"uuid"`
 		Name           string          `json:"name"`
-		Config         types.JSONText  `json:"config"`
+		Config         null.Map        `json:"config"`
 		FlowType       FlowType        `json:"flow_type"`
 		Definition     json.RawMessage `json:"definition"`
 		IgnoreTriggers bool            `json:"ignore_triggers"`
@@ -74,21 +72,18 @@ func (f *Flow) SetDefinition(definition json.RawMessage) {
 // IntConfigValue returns the value for the key passed in as an int. If the value
 // is not an integer or is not present then the defaultValue is returned
 func (f *Flow) IntConfigValue(key string, defaultValue int64) int64 {
-	value, err := jsonparser.GetInt(f.f.Config, key)
-	if err != nil {
-		return defaultValue
+	value := f.f.Config.Get(key, defaultValue)
+	fv, isFloat := value.(float64)
+	if isFloat {
+		return int64(fv)
 	}
-	return value
+	return defaultValue
 }
 
 // StringConfigValue returns the value for the key passed in as a string. If the value
 // is not a string or is not present then the defaultValue is returned
 func (f *Flow) StringConfigValue(key string, defaultValue string) string {
-	value, err := jsonparser.GetString(f.f.Config, key)
-	if err != nil {
-		return defaultValue
-	}
-	return value
+	return f.f.Config.GetString(key, defaultValue)
 }
 
 // SetLegacyDefinition sets our definition from the passed in legacy definition

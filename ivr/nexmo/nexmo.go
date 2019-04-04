@@ -25,8 +25,8 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/waits"
-	"github.com/nyaruka/goflow/flows/waits/hints"
+	"github.com/nyaruka/goflow/flows/routers/waits"
+	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
@@ -302,7 +302,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
 
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != http.StatusCreated {
 		return ivr.NilCallID, errors.Errorf("received non 200 status for call start: %d", resp.StatusCode)
 	}
 
@@ -352,7 +352,7 @@ type NCCOInput struct {
 }
 
 // InputForRequest returns the input for the passed in request, if any
-func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
+func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
 	// parse our input
 	input := &NCCOInput{}
 	bb, err := ioutil.ReadAll(r.Body)
@@ -387,7 +387,7 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 			return "", ivr.NilAttachment, nil
 		}
 		logrus.WithField("recording_url", recordingURL).Info("input found recording")
-		return "", flows.Attachment("audio:" + recordingURL), nil
+		return "", utils.Attachment("audio:" + recordingURL), nil
 	default:
 		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
 	}
@@ -645,12 +645,12 @@ type Record struct {
 	EventMethod  string   `json:"eventMethod"`
 }
 
-func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
+func (c *client) responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 
 	if w != nil {
-		msgWait, isMsgWait := w.(*waits.MsgWait)
+		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
 		if !isMsgWait {
 			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
 		}

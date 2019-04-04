@@ -34,7 +34,7 @@ type CallID string
 
 const (
 	NilCallID     = CallID("")
-	NilAttachment = flows.Attachment("")
+	NilAttachment = utils.Attachment("")
 
 	// Our user agent
 	userAgent = "Mailroom/"
@@ -82,7 +82,7 @@ type Client interface {
 
 	WriteEmptyResponse(w http.ResponseWriter, msg string) error
 
-	InputForRequest(r *http.Request) (string, flows.Attachment, error)
+	InputForRequest(r *http.Request) (string, utils.Attachment, error)
 
 	StatusForRequest(r *http.Request) (models.ConnectionStatus, int)
 
@@ -499,13 +499,13 @@ func ResumeIVRFlow(
 			if err != nil {
 				return errors.Wrapf(err, "unable to write attachment to s3")
 			}
-			attachment = flows.Attachment(contentType + ":" + url)
+			attachment = utils.Attachment(contentType + ":" + url)
 		}
 	}
 
-	attachments := []flows.Attachment{}
+	attachments := []utils.Attachment{}
 	if attachment != NilAttachment {
-		attachments = []flows.Attachment{attachment}
+		attachments = []utils.Attachment{attachment}
 	}
 
 	msgIn := flows.NewMsgIn(msgUUID, urn, channel.ChannelReference(), input, attachments)

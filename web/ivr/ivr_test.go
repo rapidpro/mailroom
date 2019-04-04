@@ -38,8 +38,16 @@ func TestTwilioIVR(t *testing.T) {
 		r.ParseForm()
 		logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("form", r.Form).Info("test server called")
 		if strings.HasSuffix(r.URL.String(), "Calls.json") {
-			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{"sid": "Call1"}`))
+			to := r.Form.Get("To")
+			if to == "+250700000001" {
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte(`{"sid": "Call1"}`))
+			} else if to == "+250700000003" {
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte(`{"sid": "Call2"}`))
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
 		}
 		if strings.HasSuffix(r.URL.String(), "recording.mp3") {
 			w.WriteHeader(http.StatusOK)
@@ -79,12 +87,12 @@ func TestTwilioIVR(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{batch.ContactIDs()[0], models.ConnectionStatusWired, "Call1"},
+		[]interface{}{models.CathyID, models.ConnectionStatusWired, "Call1"},
 		1,
 	)
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{batch.ContactIDs()[1], models.ConnectionStatusWired, "Call1"},
+		[]interface{}{models.GeorgeID, models.ConnectionStatusWired, "Call2"},
 		1,
 	)
 
@@ -326,10 +334,24 @@ func TestNexmoIVR(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte{})
 		} else {
+			type CallForm struct {
+				To []struct {
+					Number int64 `json:"number`
+				} `json:"to"`
+			}
 			body, _ := ioutil.ReadAll(r.Body)
 			logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).Info("test server called")
-			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{ "uuid": "Call1","status": "started","direction": "outbound","conversation_uuid": "Conversation1"}`))
+			form := &CallForm{}
+			json.Unmarshal(body, form)
+			if form.To[0].Number == 250700000001 {
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte(`{ "uuid": "Call1","status": "started","direction": "outbound","conversation_uuid": "Conversation1"}`))
+			} else if form.To[0].Number == 250700000003 {
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte(`{ "uuid": "Call2","status": "started","direction": "outbound","conversation_uuid": "Conversation2"}`))
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
 		}
 	}))
 	defer ts.Close()
@@ -364,12 +386,12 @@ func TestNexmoIVR(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{batch.ContactIDs()[0], models.ConnectionStatusWired, "Call1"},
+		[]interface{}{models.CathyID, models.ConnectionStatusWired, "Call1"},
 		1,
 	)
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{batch.ContactIDs()[1], models.ConnectionStatusWired, "Call1"},
+		[]interface{}{models.GeorgeID, models.ConnectionStatusWired, "Call2"},
 		1,
 	)
 
@@ -470,7 +492,7 @@ func TestNexmoIVR(t *testing.T) {
 			Action:       "start",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(2),
-			Body:         `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
+			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
 			Contains:     "Hello there. Please enter one or two.",
 		},
@@ -481,7 +503,7 @@ func TestNexmoIVR(t *testing.T) {
 			Form: url.Values{
 				"wait_type": []string{"gather"},
 			},
-			Body:       `{"dtmf":"1","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
+			Body:       `{"dtmf":"1","timed_out":false,"uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
 			StatusCode: 200,
 			Contains:   "Great! You said One.",
 		},
@@ -489,7 +511,7 @@ func TestNexmoIVR(t *testing.T) {
 			Action:       "status",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(2),
-			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
+			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call2","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
 			Contains:     "status updated: D",
 		},
@@ -497,7 +519,7 @@ func TestNexmoIVR(t *testing.T) {
 			Action:       "incoming",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(3),
-			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
+			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call3","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
 			Contains:     "missed call handled",
 		},
@@ -505,7 +527,7 @@ func TestNexmoIVR(t *testing.T) {
 			Action:       "status",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(3),
-			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call2","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
+			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call3","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
 			Contains:     "status updated: F",
 		},

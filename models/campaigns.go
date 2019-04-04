@@ -8,7 +8,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/null"
@@ -158,15 +157,15 @@ func (e *CampaignEvent) ScheduleForContact(tz *time.Location, now time.Time, con
 		}
 
 		// get the typed value
-		typed := value.TypedValue()
-		s, isTime := typed.(types.XDateTime)
+		typed := value.QueryValue()
+		t, isTime := typed.(time.Time)
 
 		// nil or not a date? move on
 		if !isTime {
 			return nil, nil
 		}
 
-		start = s.Native()
+		start = t
 	}
 
 	// calculate our next fire

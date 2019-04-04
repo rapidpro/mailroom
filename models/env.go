@@ -97,8 +97,10 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}
 	defer rows.Close()
+	if !rows.Next() {
+		return nil, errors.Errorf("no org with id: %d", orgID)
+	}
 
-	rows.Next()
 	err = rows.Scan(&org.id, &orgConfig, &orgJSON)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error scanning org: %d", orgID)

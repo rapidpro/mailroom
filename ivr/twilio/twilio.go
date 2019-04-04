@@ -21,8 +21,9 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/waits"
-	"github.com/nyaruka/goflow/flows/waits/hints"
+	"github.com/nyaruka/goflow/flows/routers/waits"
+	"github.com/nyaruka/goflow/flows/routers/waits/hints"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
@@ -188,7 +189,7 @@ func (c *client) HangupCall(client *http.Client, callID string) error {
 }
 
 // InputForRequest returns the input for the passed in request, if any
-func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
+func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
 	// this could be a timeout, in which case we return nothing at all
 	timeout := r.Form.Get("timeout")
 	if timeout == "true" {
@@ -205,13 +206,13 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 	waitType := r.Form.Get("wait_type")
 	switch waitType {
 	case "gather":
-		return r.Form.Get("Digits"), flows.Attachment(""), nil
+		return r.Form.Get("Digits"), utils.Attachment(""), nil
 	case "record":
 		url := r.Form.Get("RecordingUrl")
 		if url == "" {
 			return "", ivr.NilAttachment, nil
 		}
-		return "", flows.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
+		return "", utils.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
 	default:
 		// TODO: need to download this attachment locally
 		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
@@ -411,7 +412,7 @@ type Response struct {
 	Commands []interface{} `xml:",innerxml"`
 }
 
-func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
+func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 
@@ -430,7 +431,7 @@ func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string
 	}
 
 	if w != nil {
-		msgWait, isMsgWait := w.(*waits.MsgWait)
+		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
 		if !isMsgWait {
 			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
 		}
