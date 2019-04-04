@@ -1,3 +1,7 @@
+v0.0.173
+----------
+ * better logging in case of panic
+
 v0.0.172
 ----------
  * latest goflow, add support for templates
