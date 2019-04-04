@@ -31,7 +31,7 @@ func TestResponseForSprint(t *testing.T) {
 
 	tcs := []struct {
 		Events   []flows.Event
-		Wait     flows.Wait
+		Wait     flows.ActivatedWait
 		Expected string
 	}{
 		{
@@ -59,17 +59,17 @@ func TestResponseForSprint(t *testing.T) {
 		},
 		{
 			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "enter a number", nil, nil, nil))},
-			waits.NewMsgWait(nil, hints.NewFixedDigitsHint(1)),
+			waits.NewActivatedMsgWait(nil, hints.NewFixedDigitsHint(1)),
 			`<Response><Gather numDigits="1" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
 		},
 		{
 			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "enter a number, then press #", nil, nil, nil))},
-			waits.NewMsgWait(nil, hints.NewTerminatedDigitsHint("#")),
+			waits.NewActivatedMsgWait(nil, hints.NewTerminatedDigitsHint("#")),
 			`<Response><Gather finishOnKey="#" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number, then press #</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
 		},
 		{
 			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "say something", nil, nil, nil))},
-			waits.NewMsgWait(nil, hints.NewAudioHint()),
+			waits.NewActivatedMsgWait(nil, hints.NewAudioHint()),
 			`<Response><Say>say something</Say><Record action="http://temba.io/resume?session=1&amp;wait_type=record" maxLength="600"></Record><Redirect>http://temba.io/resume?session=1&amp;wait_type=record&amp;empty=true</Redirect></Response>`,
 		},
 	}

@@ -645,12 +645,12 @@ type Record struct {
 	EventMethod  string   `json:"eventMethod"`
 }
 
-func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
+func (c *client) responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 
 	if w != nil {
-		msgWait, isMsgWait := w.(*waits.MsgWait)
+		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
 		if !isMsgWait {
 			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
 		}

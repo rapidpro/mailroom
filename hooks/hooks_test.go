@@ -76,7 +76,6 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 			utils.NewUUID(),
 			"has_any_word",
 			[]string{fmt.Sprintf("%d", cid)},
-			false,
 			categoryUUIDs[i],
 		)
 

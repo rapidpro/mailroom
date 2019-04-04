@@ -412,7 +412,7 @@ type Response struct {
 	Commands []interface{} `xml:",innerxml"`
 }
 
-func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
+func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 
@@ -431,7 +431,7 @@ func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string
 	}
 
 	if w != nil {
-		msgWait, isMsgWait := w.(*waits.MsgWait)
+		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
 		if !isMsgWait {
 			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
 		}
