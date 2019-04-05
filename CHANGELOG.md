@@ -1,3 +1,7 @@
+v0.0.176
+----------
+ * fix issue with timeouts and followup splits
+
 v0.0.175
 ----------
  * latest goflow, log all errors to session
