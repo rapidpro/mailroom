@@ -22,6 +22,8 @@ type FlowID null.Int
 type FlowType string
 
 const (
+	GoFlowMajorVersion = 12
+
 	IVRFlow       = FlowType("V")
 	MessagingFlow = FlowType("M")
 	SurveyorFlow  = FlowType("S")
@@ -36,9 +38,6 @@ var FlowTypeMapping = map[flows.FlowType]FlowType{
 	flows.FlowTypeVoice:            IVRFlow,
 	flows.FlowTypeMessagingOffline: SurveyorFlow,
 }
-
-// which flow versions are legacy and need migration
-var legacyFlowVersions, _ = semver.NewConstraint("< v12")
 
 // Flow is the mailroom type for a flow
 type Flow struct {
@@ -160,8 +159,7 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg int
 	}
 
 	// if this is a legacy definition, then we migrate forwards
-	isLegacy, _ := legacyFlowVersions.Validate(version)
-	if isLegacy {
+	if version.Major() < GoFlowMajorVersion {
 		err = flow.SetLegacyDefinition(flow.f.Definition)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error setting flow definition from legacy")
