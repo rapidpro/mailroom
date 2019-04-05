@@ -1,3 +1,7 @@
+v0.0.175
+----------
+ * latest goflow, log all errors to session
+
 v0.0.174
 ----------
  * fix dot lookup on nil values
