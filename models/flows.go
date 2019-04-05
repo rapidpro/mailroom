@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/Masterminds/semver"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -36,6 +37,9 @@ var FlowTypeMapping = map[flows.FlowType]FlowType{
 	flows.FlowTypeMessagingOffline: SurveyorFlow,
 }
 
+// which flow versions are legacy and need migration
+var legacyFlowVersions, _ = semver.NewConstraint("< v12")
+
 // Flow is the mailroom type for a flow
 type Flow struct {
 	f struct {
@@ -43,6 +47,7 @@ type Flow struct {
 		UUID           assets.FlowUUID `json:"uuid"`
 		Name           string          `json:"name"`
 		Config         null.Map        `json:"config"`
+		Version        string          `json:"version"`
 		FlowType       FlowType        `json:"flow_type"`
 		Definition     json.RawMessage `json:"definition"`
 		IgnoreTriggers bool            `json:"ignore_triggers"`
@@ -63,6 +68,9 @@ func (f *Flow) Definition() json.RawMessage { return f.f.Definition }
 
 // FlowType return the type of flow this is
 func (f *Flow) FlowType() FlowType { return f.f.FlowType }
+
+// Version returns the version this flow was authored in
+func (f *Flow) Version() string { return f.f.Version }
 
 // SetDefinition sets our definition from the passed in new definition format
 func (f *Flow) SetDefinition(definition json.RawMessage) {
@@ -146,10 +154,18 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg int
 		return nil, errors.Wrapf(err, "error reading flow definition by: %s", arg)
 	}
 
-	// our definition is really a legacy definition, set it from that
-	err = flow.SetLegacyDefinition(flow.f.Definition)
+	version, err := semver.NewVersion(flow.Version())
 	if err != nil {
-		return nil, errors.Wrapf(err, "error setting flow definition from legacy")
+		return nil, errors.Wrapf(err, "unable to parse flow version: %s", flow.Version())
+	}
+
+	// if this is a legacy definition, then we migrate forwards
+	isLegacy, _ := legacyFlowVersions.Validate(version)
+	if isLegacy {
+		err = flow.SetLegacyDefinition(flow.f.Definition)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error setting flow definition from legacy")
+		}
 	}
 
 	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("flow", arg).Debug("loaded flow")
@@ -164,6 +180,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	name,
 	ignore_triggers,
 	flow_type,
+	fr.spec_version as version,
 	coalesce(metadata, '{}')::jsonb as config,
 	definition::jsonb || 
 		jsonb_build_object(
@@ -180,7 +197,8 @@ FROM
 	flows_flow f
 LEFT JOIN (
 	SELECT 
-		flow_id, 
+		flow_id,
+		spec_version, 
 		definition, 
 		revision
 	FROM 
@@ -206,6 +224,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	name,
 	ignore_triggers,
 	flow_type,
+	fr.spec_version as version,
 	coalesce(metadata, '{}')::jsonb as config,
 	definition::jsonb || 
 		jsonb_build_object(
@@ -223,6 +242,7 @@ FROM
 LEFT JOIN (
 	SELECT 
 		flow_id, 
+		spec_version,
 		definition, 
 		revision
 	FROM 

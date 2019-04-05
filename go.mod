@@ -1,6 +1,7 @@
 module github.com/nyaruka/mailroom
 
 require (
+	github.com/Masterminds/semver v1.4.2
 	github.com/apex/log v1.0.0
 	github.com/aws/aws-sdk-go v1.16.17
 	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44
