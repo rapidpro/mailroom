@@ -1,3 +1,7 @@
+v0.0.177
+----------
+ * dont migrate flows that are version 12 or above
+
 v0.0.176
 ----------
  * fix issue with timeouts and followup splits
