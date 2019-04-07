@@ -1,3 +1,7 @@
+v0.0.178
+----------
+ * add option to enable / disable retrying pending messages
+
 v0.0.177
 ----------
  * dont migrate flows that are version 12 or above
