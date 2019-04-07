@@ -19,6 +19,8 @@ type Config struct {
 	BatchWorkers   int `help:"the number of go routines that will be used to handle batch events"`
 	HandlerWorkers int `help:"the number of go routines that will be used to handle messages"`
 
+	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
+
 	MaxValueLength int `help:"the maximum size in characters for contact field values and run result values"`
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
@@ -64,6 +66,8 @@ func NewMailroomConfig() *Config {
 		S3ForcePathStyle:   false,
 		AWSAccessKeyID:     "missing_aws_access_key_id",
 		AWSSecretAccessKey: "missing_aws_secret_access_key",
+
+		RetryPendingMessages: true,
 
 		Address: "localhost",
 		Port:    8090,

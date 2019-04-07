@@ -9,6 +9,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/cron"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
@@ -40,6 +41,10 @@ func StartRetryCron(mr *mailroom.Mailroom) error {
 
 // retryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
 func retryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+	if !config.Mailroom.RetryPendingMessages {
+		return nil
+	}
+
 	log := logrus.WithField("comp", "handler_retrier").WithField("lock", lockValue)
 	start := time.Now()
 
