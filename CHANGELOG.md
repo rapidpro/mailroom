@@ -1,3 +1,7 @@
+v0.0.179
+----------
+ * Latest goflow
+
 v0.0.178
 ----------
  * add option to enable / disable retrying pending messages
