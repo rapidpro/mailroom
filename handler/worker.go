@@ -400,14 +400,13 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// create our parameters, we just convert this from JSON
-	// TODO: this is done because a nil XJSONObject doesn't know how to marshal itself, goflow could fix
-	params := types.NewXJSONObject([]byte("{}"))
+	var params types.XValue
 	if event.Extra() != nil {
 		asJSON, err := json.Marshal(event.Extra())
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to marshal extra from channel event")
 		}
-		params = types.NewXJSONObject(asJSON)
+		params = types.JSONToXValue(asJSON)
 	}
 
 	// build our flow trigger
