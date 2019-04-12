@@ -4,15 +4,15 @@ v0.0.182
 
 v0.0.181
 ----------
- * Latest goflow
+ * Update to goflow v0.33.8 (expressions refactor)
 
 v0.0.180
 ----------
- * Latest goflow
+ * Update to goflow v0.33.7
 
 v0.0.179
 ----------
- * Latest goflow
+ * Update to goflow v0.33.6
 
 v0.0.178
 ----------
