@@ -1,3 +1,7 @@
+v0.0.185
+----------
+ * assign topups to broadcast messages
+
 v0.0.184
 ----------
  * Update to goflow v0.34.1
