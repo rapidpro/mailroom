@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
@@ -561,7 +562,7 @@ func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
 func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, sa flows.SessionAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, org *OrgAssets, sa flows.SessionAssets, bcast *BroadcastBatch) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
 	broadcastURNs := bcast.URNs()
 
@@ -712,6 +713,21 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 			if m2 != nil && m2.URN() != msg.URN() {
 				msgs = append(msgs, m2)
 			}
+		}
+	}
+
+	// get a topup to assign to our messages
+	rc := rp.Get()
+	topup, err := DecrementOrgCredits(ctx, db, rc, org.OrgID(), len(msgs))
+	rc.Close()
+	if err != nil {
+		return nil, errors.Wrapf(err, "error finding active topup")
+	}
+
+	// if we have an active topup, assign it to our messages
+	if topup != NilTopupID {
+		for _, m := range msgs {
+			m.SetTopup(topup)
 		}
 	}
 

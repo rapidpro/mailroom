@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -26,7 +25,9 @@ const (
 	redisCreditsRemainingKey = `org:%d:cache:credits_remaining:%d`
 )
 
-func DecrementOrgCredits(ctx context.Context, db sqlx.Queryer, rc redis.Conn, orgID OrgID, amount int) (TopupID, error) {
+// DecrementOrgCredits decrements the credits by the passed amount for the passed in org, passing back the id
+// of the topup that should be assigned to the messages using those credits.
+func DecrementOrgCredits(ctx context.Context, db Queryer, rc redis.Conn, orgID OrgID, amount int) (TopupID, error) {
 	// no matter what we decrement our org credit
 	topups, err := redis.Ints(decrementCreditLua.Do(rc, orgID, amount))
 	if err != nil {
@@ -91,9 +92,9 @@ return {activeTopup, remaining}
 `)
 
 // calculateActiveTopup loads the active topup for the passed in org
-func calculateActiveTopup(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Topup, error) {
+func calculateActiveTopup(ctx context.Context, db Queryer, orgID OrgID) (*Topup, error) {
 	topup := &Topup{}
-	rows, err := db.Queryx(selectActiveTopup, orgID)
+	rows, err := db.QueryxContext(ctx, selectActiveTopup, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading active topup for org: %d", orgID)
 	}
