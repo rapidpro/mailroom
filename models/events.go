@@ -91,6 +91,11 @@ func RegisterPreWriteHook(eventType string, handler EventHandler) {
 
 // ApplyEvent applies the passed in event, IE, creates the db objects required etc..
 func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
+	// if this session is errored, don't apply any hooks
+	if session.Status() == SessionStatusErrored {
+		return nil
+	}
+
 	handler, found := eventHandlers[e.Type()]
 	if !found {
 		return errors.Errorf("unable to find handler for event type: %s", e.Type())
@@ -102,6 +107,11 @@ func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets
 // ApplyPreWriteEvent applies the passed in event before insertion or update, unlike normal event handlers it is not a requirement
 // that all types have a handler.
 func ApplyPreWriteEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
+	// if this session is errored, don't apply any hooks
+	if session.Status() == SessionStatusErrored {
+		return nil
+	}
+
 	handler, found := preHandlers[e.Type()]
 	if !found {
 		return nil
