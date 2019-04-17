@@ -113,7 +113,7 @@ func TestBroadcasts(t *testing.T) {
 
 		// assert our count of total msgs created
 		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1`,
+			`SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL`,
 			[]interface{}{lastNow}, tc.MsgCount, "%d: unexpected msg count", i)
 
 		lastNow = time.Now()

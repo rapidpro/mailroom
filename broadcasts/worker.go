@@ -165,7 +165,7 @@ func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast 
 	}
 
 	// create this batch of messages
-	msgs, err := models.CreateBroadcastMessages(ctx, db, org, sa, bcast)
+	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, org, sa, bcast)
 	if err != nil {
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
