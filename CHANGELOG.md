@@ -1,3 +1,8 @@
+v0.0.186
+----------
+ * Update to goflow v0.36.0
+ * Dont apply events on errored sessions
+
 v0.0.185
 ----------
  * assign topups to broadcast messages
