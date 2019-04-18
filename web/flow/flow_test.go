@@ -157,8 +157,8 @@ const (
 		"org_id": 1,
 		"flow": {
 			"uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
-			"name": "Valid Legacy Flow",
-			"spec_version": "12.0.0",
+			"name": "Valid Flow",
+			"spec_version": "13.0.0",
 			"language": "eng",
 			"type": "messaging",
 			"revision": 106,
@@ -199,8 +199,8 @@ const (
 		"org_id": 1,
 		"flow": {
 			"uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
-			"name": "Valid Legacy Flow",
-			"spec_version": "12.0.0",
+			"name": "Invalid Flow",
+			"spec_version": "13.0.0",
 			"language": "eng",
 			"type": "messaging",
 			"revision": 106,
@@ -236,8 +236,8 @@ const (
 	{
 		"flow": {
 			"uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
-			"name": "Valid Legacy Flow",
-			"spec_version": "12.0.0",
+			"name": "Valid Flow",
+			"spec_version": "13.0.0",
 			"language": "eng",
 			"type": "messaging",
 			"revision": 106,
