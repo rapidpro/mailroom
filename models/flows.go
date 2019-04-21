@@ -183,10 +183,11 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	definition::jsonb || 
 		jsonb_build_object(
 			'flow_type', f.flow_type, 
+			'expire_after_minutes', f.expires_after_minutes,
 			'metadata', jsonb_build_object(
 				'uuid', f.uuid, 
 				'id', f.id,
-				'name', f.name, 
+				'name', f.name,
 				'revision', revision, 
 				'expires', f.expires_after_minutes
 			)
@@ -227,11 +228,12 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	definition::jsonb || 
 		jsonb_build_object(
 			'flow_type', f.flow_type, 
+			'expire_after_minutes', f.expires_after_minutes,
 			'metadata', jsonb_build_object(
 				'uuid', f.uuid, 
 				'id', f.id,
-				'name', f.name, 
-				'revision', revision, 
+				'name', f.name,
+				'revision', revision,
 				'expires', f.expires_after_minutes
 			)
 	) as definition
