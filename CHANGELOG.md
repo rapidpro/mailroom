@@ -1,3 +1,7 @@
+v0.0.187
+----------
+ * override expire_after_minutes on saved definition with flow setting
+
 v0.0.186
 ----------
  * Update to goflow v0.36.0
