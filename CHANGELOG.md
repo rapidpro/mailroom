@@ -1,3 +1,7 @@
+v0.0.188
+----------
+ * latest goflow, accept text/javascript webhooks
+
 v0.0.187
 ----------
  * override expire_after_minutes on saved definition with flow setting
