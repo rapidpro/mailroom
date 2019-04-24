@@ -1,3 +1,7 @@
+v0.0.189
+----------
+ * Update to goflow v0.37.1
+
 v0.0.188
 ----------
  * latest goflow, accept text/javascript webhooks
