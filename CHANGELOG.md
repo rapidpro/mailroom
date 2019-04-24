@@ -1,3 +1,7 @@
+v0.0.190
+----------
+ * goflow v37.2, fixes text_slice unicode issues
+
 v0.0.189
 ----------
  * Update to goflow v0.37.1
