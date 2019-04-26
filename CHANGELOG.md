@@ -1,3 +1,7 @@
+v0.0.191
+----------
+ * override name and uuid in definition with db settings
+
 v0.0.190
 ----------
  * goflow v37.2, fixes text_slice unicode issues
