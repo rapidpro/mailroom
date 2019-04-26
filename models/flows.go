@@ -182,6 +182,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	coalesce(metadata, '{}')::jsonb as config,
 	definition::jsonb || 
 		jsonb_build_object(
+			'name', f.name,
+			'uuid', f.uuid,
 			'flow_type', f.flow_type, 
 			'expire_after_minutes', f.expires_after_minutes,
 			'metadata', jsonb_build_object(
@@ -227,6 +229,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	coalesce(metadata, '{}')::jsonb as config,
 	definition::jsonb || 
 		jsonb_build_object(
+			'name', f.name,
+			'uuid', f.uuid,
 			'flow_type', f.flow_type, 
 			'expire_after_minutes', f.expires_after_minutes,
 			'metadata', jsonb_build_object(
