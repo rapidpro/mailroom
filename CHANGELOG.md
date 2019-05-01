@@ -1,3 +1,7 @@
+v0.0.192
+----------
+ * latest goflow engine
+
 v0.0.191
 ----------
  * override name and uuid in definition with db settings
