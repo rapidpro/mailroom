@@ -1,3 +1,7 @@
+v0.0.195
+----------
+ * Update to goflow v0.38.3 and remove satori/uuid dependency
+
 v0.0.194
 ----------
  * Update to goflow v0.38.2
