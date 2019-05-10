@@ -1,3 +1,7 @@
+v0.0.200
+----------
+ * adjust test for not stripping slashes
+
 v0.0.199
 ----------
  * deal with non-slash ending docs urls
