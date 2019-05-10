@@ -1,3 +1,7 @@
+v0.0.199
+----------
+ * deal with non-slash ending docs urls
+
 v0.0.198
 ----------
  * add docs webapp
