@@ -48,6 +48,8 @@ script:
 after_success:
   - bash <(curl -s https://codecov.io/bash)
   - rm coverage.text
+  - export GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2)
+  - curl https://codeload.github.com/nyaruka/goflow/tar.gz/$GOFLOW_VERSION | tar -zx --strip=1 "*/docs/*"
 
 deploy:
   - provider: script

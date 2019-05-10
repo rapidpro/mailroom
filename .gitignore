@@ -8,6 +8,7 @@ mailroom
 dist
 .vscode
 .envrc
+docs/*
 
 # Test binary, build with `go test -c`
 *.test
