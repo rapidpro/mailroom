@@ -76,7 +76,6 @@ func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redi
 
 	//  set up our middlewares
 	router.Use(middleware.DefaultCompress)
-	router.Use(middleware.StripSlashes)
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(panicRecovery)

@@ -10,8 +10,16 @@ import (
 var docServer http.Handler
 
 func init() {
-	docServer = http.StripPrefix("/docs/", http.FileServer(http.Dir("docs")))
-	web.RegisterRoute(http.MethodGet, "/docs*", handleDocs)
+	docServer = http.StripPrefix("/mr/docs", http.FileServer(http.Dir("docs")))
+
+	// redirect non slashed docs to slashed version so relative URLs work
+	web.RegisterRoute(http.MethodGet, "/mr/docs", func(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
+		http.Redirect(rawW, r, "/mr/docs/", 301)
+		return nil
+	})
+
+	// all slashed docs are served by our static dir
+	web.RegisterRoute(http.MethodGet, "/mr/docs/*", handleDocs)
 }
 
 func handleDocs(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
