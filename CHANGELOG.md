@@ -1,3 +1,7 @@
+v0.0.197
+----------
+ * tweak tar arguments
+
 v0.0.196
 ----------
  * test build with docs
