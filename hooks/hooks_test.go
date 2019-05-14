@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type ContactActionMap map[models.ContactID][]flows.Action
@@ -124,7 +125,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	nodes = append(nodes, exitNodes...)
 
 	// we have our nodes, lets create our flow
-	flow := definition.NewFlow(
+	flow, err := definition.NewFlow(
 		uuid,
 		"Test Flow",
 		utils.Language("eng"),
@@ -135,6 +136,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		nodes,
 		nil,
 	)
+	require.NoError(t, err)
 
 	return flow
 }

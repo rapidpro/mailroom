@@ -109,9 +109,10 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 		}
 	}
 
+	// try to read the flow definition which will fail if it's invalid
 	flow, err := definition.ReadFlow(flowDef)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return nil, http.StatusUnprocessableEntity, err
 	}
 
 	// if we have an org ID, build a session assets for it
@@ -125,11 +126,11 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
 		}
-	}
 
-	// validate the flow against these assets
-	if err := flow.Validate(sa); err != nil {
-		return nil, http.StatusUnprocessableEntity, err
+		// inspect the flow against these assets
+		if err := flow.Inspect(sa); err != nil {
+			return nil, http.StatusUnprocessableEntity, err
+		}
 	}
 
 	return flow, http.StatusOK, nil
