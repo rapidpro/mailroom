@@ -126,11 +126,11 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
 		}
+	}
 
-		// inspect the flow against these assets
-		if err := flow.Inspect(sa); err != nil {
-			return nil, http.StatusUnprocessableEntity, err
-		}
+	// inspect the flow to get dependecies, results etc
+	if err := flow.Inspect(sa); err != nil {
+		return nil, http.StatusUnprocessableEntity, err
 	}
 
 	return flow, http.StatusOK, nil
