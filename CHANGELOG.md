@@ -1,3 +1,7 @@
+v0.0.201
+----------
+ * Update to goflow v0.39.3 to handle malformed single message flows from campaign events
+
 v0.0.200
 ----------
  * adjust test for not stripping slashes
