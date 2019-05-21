@@ -105,7 +105,7 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 	if legacy.IsLegacyDefinition(flowDef) {
 		flowDef, err = legacy.MigrateLegacyDefinition(flowDef, "https://"+config.Mailroom.AttachmentDomain)
 		if err != nil {
-			return nil, http.StatusBadRequest, err
+			return nil, http.StatusUnprocessableEntity, err
 		}
 	}
 
