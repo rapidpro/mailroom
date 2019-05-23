@@ -65,6 +65,7 @@ func TestServer(t *testing.T) {
 		{"/mr/flow/validate", "POST", "testdata/validate_invalid.json", 422, `isn't a known node`},
 		{"/mr/flow/validate", "POST", "testdata/validate_valid_without_assets.json", 200, `"type": "send_msg"`},
 		{"/mr/flow/validate", "POST", "testdata/validate_legacy_single_msg.json", 200, `"type": "send_msg"`},
+		{"/mr/flow/clone", "POST", "testdata/clone_valid.json", 200, `"type": "send_msg"`},
 	}
 
 	for _, tc := range tcs {
