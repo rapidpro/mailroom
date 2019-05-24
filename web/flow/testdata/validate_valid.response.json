@@ -1,14 +1,8 @@
 {
-    "_dependencies": {
-        "groups": [
-            {
-                "name": "Testers",
-                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
-            }
-        ]
-    },
-    "_results": [],
-    "_waiting_exits": [],
+    "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+    "revision": 106,
+    "spec_version": "13.0.0",
+    "type": "messaging",
     "expire_after_minutes": 10080,
     "language": "eng",
     "localization": {},
@@ -40,8 +34,26 @@
             "uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642"
         }
     ],
-    "revision": 106,
-    "spec_version": "13.0.0",
-    "type": "messaging",
-    "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517"
+    "_ui": {
+        "nodes": {
+            "6fde1a09-3997-47dd-aff0-92e8aff3a642": {
+                "position": {
+                    "left": 100,
+                    "top": 0
+                },
+                "type": "execute_actions"
+            }
+        },
+        "stickies": {}
+    },
+    "_dependencies": {
+        "groups": [
+            {
+                "name": "Testers",
+                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+            }
+        ]
+    },
+    "_results": [],
+    "_waiting_exits": []
 }

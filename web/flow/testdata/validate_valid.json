@@ -35,6 +35,18 @@
                     }
                 ]
             }
-        ]
+        ],
+        "_ui": {
+            "nodes": {
+                "6fde1a09-3997-47dd-aff0-92e8aff3a642": {
+                    "position": {
+                        "left": 100,
+                        "top": 0
+                    },
+                    "type": "execute_actions"
+                }
+            },
+            "stickies": {}
+        }
     }
 }

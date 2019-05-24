@@ -1,4 +1,8 @@
 {
+    "uuid": "1cf84575-ee14-4253-88b6-e3675c04a066",
+    "revision": 106,
+    "spec_version": "13.0.0",
+    "type": "messaging",
     "expire_after_minutes": 10080,
     "language": "eng",
     "localization": {},
@@ -30,8 +34,16 @@
             "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d"
         }
     ],
-    "revision": 106,
-    "spec_version": "13.0.0",
-    "type": "messaging",
-    "uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"
+    "_ui": {
+        "nodes": {
+            "1ae96956-4b34-433e-8d1a-f05fe6923d6d": {
+                "position": {
+                    "left": 100,
+                    "top": 0
+                },
+                "type": "execute_actions"
+            }
+        },
+        "stickies": {}
+    }
 }
