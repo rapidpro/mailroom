@@ -3,8 +3,6 @@ package flow
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows"
@@ -29,31 +27,23 @@ func init() {
 // Migrates a legacy flow to the new flow definition specification
 //
 //   {
-//     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...},
-//     "include_ui": false
+//     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...}
 //   }
 //
 type migrateRequest struct {
 	Flow      json.RawMessage `json:"flow"            validate:"required"`
-	IncludeUI *bool           `json:"include_ui"`
+	IncludeUI *bool           `json:"include_ui"` // ignored
 }
 
 func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &migrateRequest{}
-	if err := readRequest(r, request); err != nil {
-		return nil, http.StatusBadRequest, err
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
-	legacyFlow, err := legacy.ReadLegacyFlow(request.Flow)
+	flow, err := readFlow(request.Flow)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading legacy flow")
-	}
-
-	includeUI := request.IncludeUI == nil || *request.IncludeUI
-
-	flow, err := legacyFlow.Migrate(includeUI, "https://"+config.Mailroom.AttachmentDomain)
-	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error migrating legacy flow")
+		return nil, http.StatusUnprocessableEntity, err
 	}
 
 	return flow, http.StatusOK, nil
@@ -80,23 +70,11 @@ type validateRequest struct {
 
 func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &validateRequest{}
-	if err := readRequest(r, request); err != nil {
-		return nil, http.StatusBadRequest, err
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
-	var flowDef = request.Flow
-	var err error
-
-	// migrate definition if it is in legacy format
-	if legacy.IsLegacyDefinition(flowDef) {
-		flowDef, err = legacy.MigrateLegacyDefinition(flowDef, "https://"+config.Mailroom.AttachmentDomain)
-		if err != nil {
-			return nil, http.StatusUnprocessableEntity, err
-		}
-	}
-
-	// try to read the flow definition which will fail if it's invalid
-	flow, err := definition.ReadFlow(flowDef)
+	flow, err := readFlow(request.Flow)
 	if err != nil {
 		return nil, http.StatusUnprocessableEntity, err
 	}
@@ -130,19 +108,17 @@ type inspectRequest struct {
 
 func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &inspectRequest{}
-	if err := readRequest(r, request); err != nil {
-		return nil, http.StatusBadRequest, err
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
-	// try to read the flow definition which will fail if it's invalid
+	// try to read the flow definition
 	flow, err := definition.ReadFlow(request.Flow)
 	if err != nil {
 		return nil, http.StatusUnprocessableEntity, err
 	}
 
-	info := flow.Inspect()
-
-	return info, http.StatusOK, nil
+	return flow.Inspect(), http.StatusOK, nil
 }
 
 // Clones a flow, replacing all UUIDs with either the given mapping or new random UUIDs.
@@ -166,11 +142,11 @@ type cloneRequest struct {
 
 func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &cloneRequest{}
-	if err := readRequest(r, request); err != nil {
-		return nil, http.StatusBadRequest, err
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
-	// try to read the flow definition which will fail if it's invalid
+	// try to read the flow definition
 	flow, err := definition.ReadFlow(request.Flow)
 	if err != nil {
 		return nil, http.StatusUnprocessableEntity, err
@@ -189,21 +165,29 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 	return clone, http.StatusOK, nil
 }
 
-func readRequest(r *http.Request, request interface{}) error {
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, web.MaxRequestBytes))
-	if err != nil {
-		return err
+func readFlow(flowDef json.RawMessage) (flows.Flow, error) {
+	var flow flows.Flow
+	var err error
+
+	if legacy.IsLegacyDefinition(flowDef) {
+		// migrate definition if it is in legacy format
+		legacyFlow, err := legacy.ReadLegacyFlow(flowDef)
+		if err != nil {
+			return nil, err
+		}
+
+		flow, err = legacyFlow.Migrate(true, "https://"+config.Mailroom.AttachmentDomain)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		flow, err = definition.ReadFlow(flowDef)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if err := r.Body.Close(); err != nil {
-		return err
-	}
-
-	if err := utils.UnmarshalAndValidate(body, request); err != nil {
-		return errors.Wrapf(err, "error unmarshalling request")
-	}
-
-	return nil
+	return flow, nil
 }
 
 func validate(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.Flow) (int, error) {
