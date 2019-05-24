@@ -127,14 +127,19 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
 		}
+
+		if err := flow.Validate(sa, nil); err != nil {
+			return nil, http.StatusUnprocessableEntity, err
+		}
 	}
 
-	// inspect the flow to get dependecies, results etc
-	if err := flow.Inspect(sa); err != nil {
-		return nil, http.StatusUnprocessableEntity, err
+	// this endpoint returns inspection results inside the definition
+	result, err := flow.MarshalWithInfo()
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to marshal flow")
 	}
 
-	return flow, http.StatusOK, nil
+	return json.RawMessage(result), http.StatusOK, nil
 }
 
 // Clones a flow.
