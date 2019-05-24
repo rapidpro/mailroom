@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/goflow/test"
+	"github.com/nyaruka/goflow/utils"
+
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/stretchr/testify/assert"
@@ -32,53 +34,48 @@ func TestServer(t *testing.T) {
 	time.Sleep(time.Second)
 
 	defer server.Stop()
-
-	// add a trigger for our campaign flow with 'trigger'
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'trigger', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`,
-		models.CampaignFlowID,
-	)
-
-	// also add a catch all
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), NULL, false, $1, 'C', NULL, 1, 1, 1, 0) RETURNING id`,
-		models.CampaignFlowID,
-	)
+	defer utils.SetUUIDGenerator(utils.DefaultUUIDGenerator)
 
 	tcs := []struct {
-		URL      string
-		Method   string
-		BodyFile string
-		Status   int
-		Response string
+		URL          string
+		Method       string
+		BodyFile     string
+		Status       int
+		Response     string
+		ResponseFile string
 	}{
-		{"/mr/flow/migrate", "GET", "", 405, "illegal"},
-		{"/mr/flow/migrate", "POST", "testdata/migrate_minimal_legacy.json", 200, `"type": "send_msg"`},
-		{"/mr/flow/validate", "GET", "", 405, "illegal"},
-		{"/mr/flow/validate", "POST", "testdata/validate_valid_legacy.json", 200, `"type": "send_msg"`},
-		{"/mr/flow/validate", "POST", "testdata/validate_invalid_legacy.json", 422, `"error": "missing dependencies:`},
-		{"/mr/flow/validate", "POST", "testdata/validate_valid.json", 200, `"type": "send_msg"`},
-		{"/mr/flow/validate", "POST", "testdata/validate_invalid.json", 422, `isn't a known node`},
-		{"/mr/flow/validate", "POST", "testdata/validate_valid_without_assets.json", 200, `"type": "send_msg"`},
-		{"/mr/flow/validate", "POST", "testdata/validate_legacy_single_msg.json", 200, `"type": "send_msg"`},
-		{"/mr/flow/clone", "POST", "testdata/clone_valid.json", 200, `"type": "send_msg"`},
+		{URL: "/mr/flow/migrate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
+		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_minimal_legacy.json", Status: 200, ResponseFile: "migrate_minimal_legacy.response.json"},
+		{URL: "/mr/flow/validate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
+		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid_legacy.json", Status: 200, ResponseFile: "validate_valid_legacy.response.json"},
+		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid_legacy.json", Status: 422, ResponseFile: "validate_invalid_legacy.response.json"},
+		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid.json", Status: 200, ResponseFile: "validate_valid.response.json"},
+		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid.json", Status: 422, ResponseFile: "validate_invalid.response.json"},
+		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid_without_assets.json", Status: 200, ResponseFile: "validate_valid_without_assets.response.json"},
+		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_legacy_single_msg.json", Status: 200, ResponseFile: "validate_legacy_single_msg.response.json"},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid.json", Status: 200, ResponseFile: "clone_valid.response.json"},
 	}
 
 	for _, tc := range tcs {
+		utils.SetUUIDGenerator(utils.NewSeededUUID4Generator(12345))
+
 		testID := fmt.Sprintf("%s %s %s", tc.Method, tc.URL, tc.BodyFile)
-		var body io.Reader
+		var requestBody io.Reader
+		var expectedRespBody []byte
 		var err error
 
 		if tc.BodyFile != "" {
-			body, err = os.Open(tc.BodyFile)
+			requestBody, err = os.Open("testdata/" + tc.BodyFile)
 			require.NoError(t, err, "unable to open %s", tc.BodyFile)
 		}
+		if tc.ResponseFile != "" {
+			expectedRespBody, err = ioutil.ReadFile("testdata/" + tc.ResponseFile)
+			require.NoError(t, err, "unable to read %s", tc.ResponseFile)
+		} else {
+			expectedRespBody = []byte(tc.Response)
+		}
 
-		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.URL, body)
+		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.URL, requestBody)
 		assert.NoError(t, err, "error creating request in %s", testID)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -88,6 +85,6 @@ func TestServer(t *testing.T) {
 		require.NoError(t, err, "error reading body in %s", testID)
 
 		assert.Equal(t, tc.Status, resp.StatusCode, "unexpected status in %s (response=%s)", testID, content)
-		assert.Contains(t, string(content), tc.Response, "response mismatch in ", testID)
+		test.AssertEqualJSON(t, expectedRespBody, content, "response mismatch in %s", testID)
 	}
 }
