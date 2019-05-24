@@ -27,9 +27,10 @@
                         ]
                     },
                     {
-                        "type": "send_msg",
+                        "type": "set_run_result",
                         "uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
-                        "text": "Your birthdate is soon"
+                        "name": "Answer",
+                        "value": "Yes"
                     }
                 ],
                 "exits": [

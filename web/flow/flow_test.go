@@ -46,6 +46,7 @@ func TestServer(t *testing.T) {
 	}{
 		{URL: "/mr/flow/migrate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_minimal_legacy.json", Status: 200, ResponseFile: "migrate_minimal_legacy.response.json"},
+
 		{URL: "/mr/flow/validate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid_legacy.json", Status: 200, ResponseFile: "validate_valid_legacy.response.json"},
 		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid_legacy.json", Status: 422, ResponseFile: "validate_invalid_legacy.response.json"},
@@ -53,7 +54,15 @@ func TestServer(t *testing.T) {
 		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid.json", Status: 422, ResponseFile: "validate_invalid.response.json"},
 		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid_without_assets.json", Status: 200, ResponseFile: "validate_valid_without_assets.response.json"},
 		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_legacy_single_msg.json", Status: 200, ResponseFile: "validate_legacy_single_msg.response.json"},
+
+		{URL: "/mr/flow/inspect", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
+		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid.json", Status: 200, ResponseFile: "inspect_valid.response.json"},
+
+		{URL: "/mr/flow/clone", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid.json", Status: 200, ResponseFile: "clone_valid.response.json"},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_struct_invalid.json", Status: 422, Response: `{"error": "unable to read node: field 'uuid' is required"}`},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_missing_dep_mapping.json", Status: 422, Response: `{"error": "missing dependencies: group[uuid=59d74b86-3e2f-4a93-aece-b05d2fdcde0c,name=Testers]"}`},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid_bad_org.json", Status: 400, Response: `{"error": "error loading environment for org 167733: no org with id: 167733"}`},
 	}
 
 	for _, tc := range tcs {

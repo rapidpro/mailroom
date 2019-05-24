@@ -1,12 +1,8 @@
 {
-    "uuid": "1cf84575-ee14-4253-88b6-e3675c04a066",
-    "name": "Valid Flow",
-    "revision": 106,
-    "spec_version": "13.0.0",
-    "type": "messaging",
     "expire_after_minutes": 10080,
     "language": "eng",
     "localization": {},
+    "name": "Valid Flow",
     "nodes": [
         {
             "actions": [
@@ -14,7 +10,7 @@
                     "groups": [
                         {
                             "name": "Testers",
-                            "uuid": "ebe441b4-c581-4b03-b544-5695cfe29bc1"
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
                         }
                     ],
                     "type": "add_contact_groups",
@@ -33,5 +29,9 @@
             ],
             "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d"
         }
-    ]
+    ],
+    "revision": 106,
+    "spec_version": "13.0.0",
+    "type": "messaging",
+    "uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"
 }
