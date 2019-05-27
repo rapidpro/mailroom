@@ -37,12 +37,13 @@ func TestServer(t *testing.T) {
 	defer utils.SetUUIDGenerator(utils.DefaultUUIDGenerator)
 
 	tcs := []struct {
-		URL          string
-		Method       string
-		BodyFile     string
-		Status       int
-		Response     string
-		ResponseFile string
+		URL             string
+		Method          string
+		BodyFile        string
+		Status          int
+		Response        string
+		ResponseFile    string
+		ResponsePattern string
 	}{
 		{URL: "/mr/flow/migrate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_minimal_legacy.json", Status: 200, ResponseFile: "migrate_minimal_legacy.response.json"},
@@ -59,29 +60,23 @@ func TestServer(t *testing.T) {
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid.json", Status: 200, ResponseFile: "inspect_valid.response.json"},
 
 		{URL: "/mr/flow/clone", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
-		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid.json", Status: 200, ResponseFile: "clone_valid.response.json"},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid.json", Status: 200, ResponsePattern: `"uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_struct_invalid.json", Status: 422, Response: `{"error": "unable to read node: field 'uuid' is required"}`},
-		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_missing_dep_mapping.json", Status: 422, Response: `{"error": "missing dependencies: group[uuid=59d74b86-3e2f-4a93-aece-b05d2fdcde0c,name=Testers]"}`},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_missing_dep_mapping.json", Status: 422, ResponsePattern: `group\[uuid=[-0-9a-f]{36},name=Testers\]`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid_bad_org.json", Status: 400, Response: `{"error": "error loading environment for org 167733: no org with id: 167733"}`},
 	}
 
 	for _, tc := range tcs {
-		utils.SetUUIDGenerator(utils.NewSeededUUID4Generator(12345))
+		utils.SetUUIDGenerator(test.NewSeededUUIDGenerator(123456))
+		time.Sleep(1 * time.Second)
 
 		testID := fmt.Sprintf("%s %s %s", tc.Method, tc.URL, tc.BodyFile)
 		var requestBody io.Reader
-		var expectedRespBody []byte
 		var err error
 
 		if tc.BodyFile != "" {
 			requestBody, err = os.Open("testdata/" + tc.BodyFile)
 			require.NoError(t, err, "unable to open %s", tc.BodyFile)
-		}
-		if tc.ResponseFile != "" {
-			expectedRespBody, err = ioutil.ReadFile("testdata/" + tc.ResponseFile)
-			require.NoError(t, err, "unable to read %s", tc.ResponseFile)
-		} else {
-			expectedRespBody = []byte(tc.Response)
 		}
 
 		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.URL, requestBody)
@@ -94,6 +89,16 @@ func TestServer(t *testing.T) {
 		require.NoError(t, err, "error reading body in %s", testID)
 
 		assert.Equal(t, tc.Status, resp.StatusCode, "unexpected status in %s (response=%s)", testID, content)
-		test.AssertEqualJSON(t, expectedRespBody, content, "response mismatch in %s", testID)
+
+		if tc.ResponseFile != "" {
+			expectedRespBody, err := ioutil.ReadFile("testdata/" + tc.ResponseFile)
+			require.NoError(t, err, "unable to read %s", tc.ResponseFile)
+
+			test.AssertEqualJSON(t, expectedRespBody, content, "response mismatch in %s", testID)
+		} else if tc.ResponsePattern != "" {
+			assert.Regexp(t, tc.ResponsePattern, string(content), "response mismatch in %s", testID)
+		} else {
+			test.AssertEqualJSON(t, []byte(tc.Response), content, "response mismatch in %s", testID)
+		}
 	}
 }
