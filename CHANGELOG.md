@@ -1,3 +1,8 @@
+v0.0.202
+----------
+ * Update to goflow v0.41.0
+ * Add /flow/clone and /flow/inspect endpoints
+
 v0.0.201
 ----------
  * Update to goflow v0.39.3 to handle malformed single message flows from campaign events
