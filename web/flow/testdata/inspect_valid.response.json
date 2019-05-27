@@ -1,0 +1,17 @@
+{
+    "dependencies": {
+        "groups": [
+            {
+                "name": "Testers",
+                "uuid": "ebe441b4-c581-4b03-b544-5695cfe29bc1"
+            }
+        ]
+    },
+    "results": [
+        {
+            "key": "answer",
+            "name": "Answer"
+        }
+    ],
+    "waiting_exits": []
+}

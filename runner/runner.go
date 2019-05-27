@@ -734,7 +734,7 @@ func validateFlow(sa flows.SessionAssets, uuid assets.FlowUUID) error {
 
 	// check for missing assets and log
 	missingDeps := make([]string, 0)
-	err = flow.InspectRecursively(sa, func(r assets.Reference) {
+	err = flow.ValidateRecursive(sa, func(r assets.Reference) {
 		missingDeps = append(missingDeps, r.String())
 	})
 
