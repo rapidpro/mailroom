@@ -102,7 +102,7 @@ func (f *Flow) SetLegacyDefinition(legacyDefinition json.RawMessage) error {
 	}
 
 	// migrate forwards returning our final flow definition
-	newFlow, err := legacyFlow.Migrate(false, "https://"+config.Mailroom.AttachmentDomain)
+	newFlow, err := legacyFlow.Migrate("https://" + config.Mailroom.AttachmentDomain)
 	if err != nil {
 		return errors.Wrapf(err, "error migrating flow: %s", legacyDefinition)
 	}

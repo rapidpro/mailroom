@@ -176,7 +176,7 @@ func readFlow(flowDef json.RawMessage) (flows.Flow, error) {
 			return nil, err
 		}
 
-		flow, err = legacyFlow.Migrate(true, "https://"+config.Mailroom.AttachmentDomain)
+		flow, err = legacyFlow.Migrate("https://" + config.Mailroom.AttachmentDomain)
 		if err != nil {
 			return nil, err
 		}
