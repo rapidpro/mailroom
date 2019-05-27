@@ -53,11 +53,15 @@ func TestServer(t *testing.T) {
 		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid_legacy.json", Status: 422, ResponseFile: "validate_invalid_legacy.response.json"},
 		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid.json", Status: 200, ResponseFile: "validate_valid.response.json"},
 		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid.json", Status: 422, ResponseFile: "validate_invalid.response.json"},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid_without_assets.json", Status: 200, ResponseFile: "validate_valid_without_assets.response.json"},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_legacy_single_msg.json", Status: 200, ResponseFile: "validate_legacy_single_msg.response.json"},
 
 		{URL: "/mr/flow/inspect", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
+		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid_legacy.json", Status: 200, ResponseFile: "inspect_valid_legacy.response.json"},
+		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_invalid_legacy.json", Status: 422, ResponseFile: "inspect_invalid_legacy.response.json"},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid.json", Status: 200, ResponseFile: "inspect_valid.response.json"},
+		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_invalid.json", Status: 422, ResponseFile: "inspect_invalid.response.json"},
+		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid_without_org.json", Status: 200, ResponseFile: "inspect_valid_without_org.response.json"},
+		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_invalid_without_org.json", Status: 200, ResponseFile: "inspect_invalid_without_org.response.json"},
+		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_legacy_single_msg.json", Status: 200, ResponseFile: "inspect_legacy_single_msg.response.json"},
 
 		{URL: "/mr/flow/clone", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid.json", Status: 200, ResponsePattern: `"uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"`},

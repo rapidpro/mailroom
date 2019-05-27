@@ -1,11 +1,8 @@
 {
-    "dependency_mapping": {
-        "8f107d42-7416-4cf2-9a51-9490361ad517": "1cf84575-ee14-4253-88b6-e3675c04a066",
-        "ebe441b4-c581-4b03-b544-5695cfe29bc1": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
-    },
+    "validate_with_org_id": 1,
     "flow": {
         "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
-        "name": "Valid Flow",
+        "name": "Invalid Flow",
         "spec_version": "13.0.0",
         "language": "eng",
         "type": "messaging",
@@ -25,21 +22,15 @@
                                 "name": "Testers"
                             }
                         ]
-                    },
-                    {
-                        "type": "set_run_result",
-                        "uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
-                        "name": "Answer",
-                        "value": "Yes"
                     }
                 ],
                 "exits": [
                     {
-                        "uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+                        "uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699",
+                        "destination_uuid": "55fbef81-4151-4589-9f0a-8e5c44f6b5a3"
                     }
                 ]
             }
         ]
-    },
-    "validate_with_org_id": 1
+    }
 }
