@@ -1,3 +1,8 @@
+v0.0.203
+----------
+ * Update to goflow v0.41.1
+ * The /flow/inspect endpoint should do optional validation
+
 v0.0.202
 ----------
  * Update to goflow v0.41.0
