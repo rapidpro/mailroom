@@ -1,8 +1,4 @@
 {
-    "dependency_mapping": {
-        "8f107d42-7416-4cf2-9a51-9490361ad517": "1cf84575-ee14-4253-88b6-e3675c04a066",
-        "ebe441b4-c581-4b03-b544-5695cfe29bc1": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
-    },
     "flow": {
         "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
         "name": "Valid Flow",
@@ -21,16 +17,15 @@
                         "uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
                         "groups": [
                             {
-                                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
-                                "name": "Testers"
+                                "uuid": "e484d7b8-aada-4b63-b498-4ba4fbcafbc7",
+                                "name": "No such group"
                             }
                         ]
                     },
                     {
-                        "type": "set_run_result",
+                        "type": "send_msg",
                         "uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
-                        "name": "Answer",
-                        "value": "Yes"
+                        "text": "Your birthdate is @contact.fields.birthdate"
                     }
                 ],
                 "exits": [
@@ -40,6 +35,5 @@
                 ]
             }
         ]
-    },
-    "validate_with_org_id": 1
+    }
 }
