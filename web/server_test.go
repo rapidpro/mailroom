@@ -40,8 +40,8 @@ func TestServer(t *testing.T) {
 		{"/arst", "GET", "", 404, "not found"},
 		{"/", "POST", "", 405, "illegal"},
 		{"/", "GET", "", 200, "mailroom"},
-		{"/mr", "POST", "", 405, "illegal"},
-		{"/mr", "GET", "", 200, "mailroom"},
+		{"/mr/", "POST", "", 405, "illegal"},
+		{"/mr/", "GET", "", 200, "mailroom"},
 	}
 
 	for i, tc := range tcs {
