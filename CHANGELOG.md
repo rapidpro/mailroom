@@ -1,3 +1,7 @@
+v0.0.205
+----------
+ * update test for endpoint
+
 v0.0.204
 ----------
  * latest goflow, fixing migration for relative attachments with no media
