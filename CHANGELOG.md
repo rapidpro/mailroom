@@ -1,3 +1,7 @@
+v0.0.204
+----------
+ * latest goflow, fixing migration for relative attachments with no media
+
 v0.0.203
 ----------
  * Update to goflow v0.41.1
