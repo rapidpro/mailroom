@@ -86,7 +86,7 @@ func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redi
 	router.NotFound(s.WrapJSONHandler(handle404))
 	router.MethodNotAllowed(s.WrapJSONHandler(handle405))
 	router.Get("/", s.WrapJSONHandler(handleIndex))
-	router.Get("/mr", s.WrapJSONHandler(handleIndex))
+	router.Get("/mr/", s.WrapJSONHandler(handleIndex))
 
 	// add any registered json routes
 	for _, route := range jsonRoutes {
