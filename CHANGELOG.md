@@ -1,3 +1,7 @@
+v0.0.206
+----------
+ * Update to goflow v0.41.3
+
 v0.0.205
 ----------
  * update test for endpoint
