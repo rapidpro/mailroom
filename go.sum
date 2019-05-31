@@ -70,6 +70,8 @@ github.com/nyaruka/goflow v0.41.1 h1:zk2l72LnTDKdAfvkYFLW4Ix5diISGejqRhcAmd3ke68
 github.com/nyaruka/goflow v0.41.1/go.mod h1:QitrAujTi7Mc75aVIoCpAmFsfO794+ljo9QNGt7qSHY=
 github.com/nyaruka/goflow v0.41.2 h1:8BOZnt6AYg8Ma9jiq00HRdEWkr+n1Kg/GwS3tdCHZ8k=
 github.com/nyaruka/goflow v0.41.2/go.mod h1:QitrAujTi7Mc75aVIoCpAmFsfO794+ljo9QNGt7qSHY=
+github.com/nyaruka/goflow v0.41.4 h1:7wd4YUcs6Yc5ARklUbQJsjTt2Y2b9cAXN7KU73qENEY=
+github.com/nyaruka/goflow v0.41.4/go.mod h1:iXSKo55sE8PnlC8mu3YQmFbgU1Cv1sMsyiWGZ9cY0KU=
 github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8 h1:TOvxy0u6LNTWP3gwbdNVCiByXJupr9ATFdzBnBJ2TY8=
 github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8/go.mod h1:huVocfMEHkttMHD4hSr/wjWNyTx/YMzwwajVzV2bq+0=
 github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d h1:hyp9u36KIwbTCo2JAJ+TuJcJBc+UZzEig7RI/S5Dvkc=
@@ -81,6 +83,8 @@ github.com/nyaruka/phonenumbers v1.0.35 h1:ZOXkPjBMVBTVwaNYyUGJHN1fCiwrcTgsY4SVe
 github.com/nyaruka/phonenumbers v1.0.35/go.mod h1:Hhae+eypC1YKMaQlBJUCGZDzBrIHHNWhJX1xG/8sOC8=
 github.com/nyaruka/phonenumbers v1.0.39 h1:HWPNVjzeivp20l07tPentbhEXJYiXCd+YigOPaOCPP0=
 github.com/nyaruka/phonenumbers v1.0.39/go.mod h1:Hhae+eypC1YKMaQlBJUCGZDzBrIHHNWhJX1xG/8sOC8=
+github.com/nyaruka/phonenumbers v1.0.41 h1:loSZuHtv1khLKGkWS0J2gnAxDqWr2TOrvX79DPZMPbY=
+github.com/nyaruka/phonenumbers v1.0.41/go.mod h1:Hhae+eypC1YKMaQlBJUCGZDzBrIHHNWhJX1xG/8sOC8=
 github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaRUnok+kx1WdO15EQc=
 github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
 github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=

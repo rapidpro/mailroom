@@ -21,11 +21,10 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.0.0
-	github.com/nyaruka/goflow v0.41.2
+	github.com/nyaruka/goflow v0.41.4
 	github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.1.1
-	github.com/nyaruka/phonenumbers v1.0.39 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.8.1
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
