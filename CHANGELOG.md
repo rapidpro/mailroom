@@ -1,3 +1,7 @@
+v1.0.0
+----------
+ * Update to goflow v0.41.6
+
 v0.0.208
 ----------
  * latest goflow with UI cloning fix
