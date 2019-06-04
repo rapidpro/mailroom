@@ -21,7 +21,8 @@ type Config struct {
 
 	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
 
-	MaxValueLength int `help:"the maximum size in characters for contact field values and run result values"`
+	MaxValueLength    int `help:"the maximum size in characters for contact field values and run result values"`
+	MaxStepsPerSprint int `help:"the maximum number of steps allowed per engine sprint"`
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
@@ -48,15 +49,16 @@ type Config struct {
 // NewMailroomConfig returns a new default configuration object
 func NewMailroomConfig() *Config {
 	return &Config{
-		DB:             "postgres://temba:temba@localhost/temba?sslmode=disable",
-		DBPoolSize:     36,
-		Redis:          "redis://localhost:6379/15",
-		BatchWorkers:   4,
-		HandlerWorkers: 32,
-		LogLevel:       "error",
-		Version:        "Dev",
-		SMTPServer:     "",
-		MaxValueLength: 640,
+		DB:                "postgres://temba:temba@localhost/temba?sslmode=disable",
+		DBPoolSize:        36,
+		Redis:             "redis://localhost:6379/15",
+		BatchWorkers:      4,
+		HandlerWorkers:    32,
+		LogLevel:          "error",
+		Version:           "Dev",
+		SMTPServer:        "",
+		MaxValueLength:    640,
+		MaxStepsPerSprint: 100,
 
 		S3Endpoint:         "https://s3.amazonaws.com",
 		S3Region:           "us-east-1",
