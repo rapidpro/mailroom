@@ -1,3 +1,7 @@
+v1.0.2
+----------
+ * Make max number of steps configurable
+
 v1.0.1
 ----------
  * Update to latest goflow v0.41.7
