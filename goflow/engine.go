@@ -11,7 +11,10 @@ import (
 // Engine returns the global engine for use in mailroom
 func Engine() flows.Engine {
 	engInit.Do(func() {
-		eng = engine.NewBuilder().WithDefaultUserAgent("RapidProMailroom/" + config.Mailroom.Version).Build()
+		eng = engine.NewBuilder().
+			WithDefaultUserAgent("RapidProMailroom/" + config.Mailroom.Version).
+			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
+			Build()
 	})
 
 	return eng
