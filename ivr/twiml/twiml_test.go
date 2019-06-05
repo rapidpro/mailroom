@@ -1,4 +1,4 @@
-package twilio
+package twiml
 
 import (
 	"encoding/xml"

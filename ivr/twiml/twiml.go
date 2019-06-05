@@ -1,4 +1,4 @@
-package twilio
+package twiml
 
 import (
 	"bytes"
@@ -30,11 +30,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// BaseURL is our default base URL for TWIML channels (public for testing overriding)
 var BaseURL = `https://api.twilio.com`
+
+// IgnoreSignatures controls whether we ignore signatures (public for testing overriding)
 var IgnoreSignatures = false
 
 const (
-	twilioChannelType = models.ChannelType("T")
+	twilioChannelType     = models.ChannelType("T")
+	twimlChannelType      = models.ChannelType("TW")
+	signalWireChannelType = models.ChannelType("SW")
 
 	callPath   = `/2010-04-01/Accounts/{AccountSID}/Calls.json`
 	hangupPath = `/2010-04-01/Accounts/{AccountSID}/Calls/{SID}.json`
@@ -48,7 +53,9 @@ const (
 
 	accountSIDConfig = "account_sid"
 	authTokenConfig  = "auth_token"
-	baseURLConfig    = "send_url"
+
+	sendURLConfig = "send_url"
+	baseURLConfig = "base_url"
 
 	errorBody = `<?xml version="1.0" encoding="UTF-8"?>
 	<Response>
@@ -61,14 +68,17 @@ const (
 var indentMarshal = true
 
 type client struct {
-	channel    *models.Channel
-	baseURL    string
-	accountSID string
-	authToken  string
+	channel      *models.Channel
+	baseURL      string
+	accountSID   string
+	authToken    string
+	validateSigs bool
 }
 
 func init() {
+	ivr.RegisterClientType(twimlChannelType, NewClientFromChannel)
 	ivr.RegisterClientType(twilioChannelType, NewClientFromChannel)
+	ivr.RegisterClientType(signalWireChannelType, NewClientFromChannel)
 }
 
 // NewClientFromChannel creates a new Twilio IVR client for the passed in account and and auth token
@@ -78,13 +88,14 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 	if accountSID == "" || authToken == "" {
 		return nil, errors.Errorf("missing auth_token or account_sid on channel config: %v for channel: %s", channel.Config(), channel.UUID())
 	}
-	baseURL := channel.ConfigValue(baseURLConfig, BaseURL)
+	baseURL := channel.ConfigValue(baseURLConfig, channel.ConfigValue(sendURLConfig, BaseURL))
 
 	return &client{
-		channel:    channel,
-		baseURL:    baseURL,
-		accountSID: accountSID,
-		authToken:  authToken,
+		channel:      channel,
+		baseURL:      baseURL,
+		accountSID:   accountSID,
+		authToken:    authToken,
+		validateSigs: channel.Type() != signalWireChannelType,
 	}, nil
 }
 
@@ -246,7 +257,7 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
 func (c *client) ValidateRequestSignature(r *http.Request) error {
 	// shortcut for testing
-	if IgnoreSignatures {
+	if IgnoreSignatures || !c.validateSigs {
 		return nil
 	}
 

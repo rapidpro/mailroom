@@ -25,7 +25,7 @@ import (
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/ivr/nexmo"
-	"github.com/nyaruka/mailroom/ivr/twilio"
+	"github.com/nyaruka/mailroom/ivr/twiml"
 )
 
 func TestTwilioIVR(t *testing.T) {
@@ -55,8 +55,8 @@ func TestTwilioIVR(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	twilio.BaseURL = ts.URL
-	twilio.IgnoreSignatures = true
+	twiml.BaseURL = ts.URL
+	twiml.IgnoreSignatures = true
 
 	wg := &sync.WaitGroup{}
 	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, wg)
