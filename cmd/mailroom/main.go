@@ -29,7 +29,7 @@ import (
 	_ "github.com/nyaruka/mailroom/web/surveyor"
 
 	_ "github.com/nyaruka/mailroom/ivr/nexmo"
-	_ "github.com/nyaruka/mailroom/ivr/twilio"
+	_ "github.com/nyaruka/mailroom/ivr/twiml"
 )
 
 var version = "Dev"
