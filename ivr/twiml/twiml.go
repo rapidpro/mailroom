@@ -225,7 +225,6 @@ func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, err
 		}
 		return "", utils.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
 	default:
-		// TODO: need to download this attachment locally
 		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
 	}
 }

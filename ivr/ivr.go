@@ -437,7 +437,6 @@ func ResumeIVRFlow(
 	if err != nil {
 		// call has ended, so will our session
 		if err == CallEndedError {
-
 			if err != nil {
 				return errors.Wrapf(err, "error marking sessions complete")
 			}
