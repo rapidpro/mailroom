@@ -1,3 +1,7 @@
+v1.0.4
+----------
+ * also treat initiated as in progress
+
 v1.0.3
 ----------
  * handle signalwire and twiml IVR calls
