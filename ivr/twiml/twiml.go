@@ -235,10 +235,10 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 	status := r.Form.Get("CallStatus")
 	switch status {
 
-	case "queued", "initiated", "ringing":
+	case "queued", "ringing":
 		return models.ConnectionStatusWired, 0
 
-	case "in-progress":
+	case "in-progress", "initiated":
 		return models.ConnectionStatusInProgress, 0
 
 	case "completed":
