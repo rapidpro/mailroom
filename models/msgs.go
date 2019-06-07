@@ -510,23 +510,35 @@ func (b *Broadcast) GroupIDs() []GroupID                                    { re
 func (b *Broadcast) URNs() []urns.URN                                       { return b.b.URNs }
 func (b *Broadcast) OrgID() OrgID                                           { return b.b.OrgID }
 func (b *Broadcast) Translations() map[utils.Language]*BroadcastTranslation { return b.b.Translations }
-
-func (b *Broadcast) TemplateState() TemplateState         { return b.b.TemplateState }
-func (b *Broadcast) SetTemplateState(state TemplateState) { b.b.TemplateState = state }
+func (b *Broadcast) TemplateState() TemplateState                           { return b.b.TemplateState }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
+// NewBroadcast creates a new broadcast with the passed in parameters
+func NewBroadcast(
+	orgID OrgID, id BroadcastID, translations map[utils.Language]*BroadcastTranslation,
+	state TemplateState, baseLanguage utils.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID) *Broadcast {
+
+	bcast := &Broadcast{}
+	bcast.b.OrgID = orgID
+	bcast.b.BroadcastID = id
+	bcast.b.TemplateState = state
+	bcast.b.BaseLanguage = baseLanguage
+	bcast.b.GroupIDs = groupIDs
+	bcast.b.ContactIDs = contactIDs
+	bcast.b.URNs = urns
+	bcast.b.Translations = translations
+
+	return bcast
+}
+
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
-	bcast := &Broadcast{}
-	bcast.b.TemplateState = TemplateStateEvaluated
-	bcast.b.OrgID = org.OrgID()
-	bcast.b.BaseLanguage = event.BaseLanguage
-	bcast.b.URNs = event.URNs
-	bcast.b.Translations = make(map[utils.Language]*BroadcastTranslation)
+	// converst our translations to our type
+	translations := make(map[utils.Language]*BroadcastTranslation)
 	for l, t := range event.Translations {
-		bcast.b.Translations[l] = &BroadcastTranslation{
+		translations[l] = &BroadcastTranslation{
 			Text:         t.Text,
 			Attachments:  t.Attachments,
 			QuickReplies: t.QuickReplies,
@@ -538,19 +550,17 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 	if err != nil {
 		return nil, errors.Wrapf(err, "error resolving contact references")
 	}
-	bcast.b.ContactIDs = contactIDs
 
 	// and our groups
-	groups := make([]GroupID, 0, len(event.Groups))
+	groupIDs := make([]GroupID, 0, len(event.Groups))
 	for i := range event.Groups {
 		group := org.GroupByUUID(event.Groups[i].UUID)
 		if group != nil {
-			groups = append(groups, group.ID())
+			groupIDs = append(groupIDs, group.ID())
 		}
 	}
-	bcast.b.GroupIDs = groups
 
-	return bcast, nil
+	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
@@ -803,7 +813,7 @@ func MarkBroadcastSent(ctx context.Context, db *sqlx.DB, id BroadcastID) error {
 		return nil
 	}
 
-	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = "S", modified_on = now() WHERE id = $1`, id)
+	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
 	if err != nil {
 		return errors.Wrapf(err, "error setting broadcast with id %d as sent", id)
 	}

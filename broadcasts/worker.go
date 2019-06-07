@@ -150,21 +150,21 @@ func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *
 	}
 
 	// try to send the batch
-	err = SendBroadcastBatch(ctx, mr.DB, mr.RP, broadcast)
-
-	// if this is the last batch, mark the broadcast as sent (we do this even in the error case above)
-	if broadcast.IsLast() {
-		statusErr := models.MarkBroadcastSent(ctx, mr.DB, broadcast.BroadcastID())
-		if statusErr != nil {
-			logrus.WithError(statusErr).Error("error marking broadcast as sent")
-		}
-	}
-
-	return err
+	return SendBroadcastBatch(ctx, mr.DB, mr.RP, broadcast)
 }
 
 // SendBroadcastBatch sends the passed in broadcast batch
 func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.BroadcastBatch) error {
+	// always set our broadcast as sent if it is our last
+	defer func() {
+		if bcast.IsLast() {
+			err := models.MarkBroadcastSent(ctx, db, bcast.BroadcastID())
+			if err != nil {
+				logrus.WithError(err).Error("error marking broadcast as sent")
+			}
+		}
+	}()
+
 	org, err := models.GetOrgAssets(ctx, db, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
