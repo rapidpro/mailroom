@@ -149,7 +149,18 @@ func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *
 		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
 	}
 
-	return SendBroadcastBatch(ctx, mr.DB, mr.RP, broadcast)
+	// try to send the batch
+	err = SendBroadcastBatch(ctx, mr.DB, mr.RP, broadcast)
+
+	// if this is the last batch, mark the broadcast as sent (we do this even in the error case above)
+	if broadcast.IsLast() {
+		statusErr := models.MarkBroadcastSent(ctx, mr.DB, broadcast.BroadcastID())
+		if statusErr != nil {
+			logrus.WithError(statusErr).Error("error marking broadcast as sent")
+		}
+	}
+
+	return err
 }
 
 // SendBroadcastBatch sends the passed in broadcast batch
