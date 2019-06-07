@@ -149,11 +149,22 @@ func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *
 		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
 	}
 
+	// try to send the batch
 	return SendBroadcastBatch(ctx, mr.DB, mr.RP, broadcast)
 }
 
 // SendBroadcastBatch sends the passed in broadcast batch
 func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.BroadcastBatch) error {
+	// always set our broadcast as sent if it is our last
+	defer func() {
+		if bcast.IsLast() {
+			err := models.MarkBroadcastSent(ctx, db, bcast.BroadcastID())
+			if err != nil {
+				logrus.WithError(err).Error("error marking broadcast as sent")
+			}
+		}
+	}()
+
 	org, err := models.GetOrgAssets(ctx, db, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
