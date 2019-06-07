@@ -13,8 +13,11 @@ import (
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/excellent"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/legacy/expressions"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
@@ -69,6 +72,14 @@ const (
 	MsgStatusErrored      = MsgStatus("E")
 	MsgStatusFailed       = MsgStatus("F")
 	MsgStatusResent       = MsgStatus("R")
+)
+
+type TemplateState string
+
+const (
+	TemplateStateEvaluated   = TemplateState("evaluated")
+	TemplateStateLegacy      = TemplateState("legacy")
+	TemplateStateUnevaluated = TemplateState("unevaluated")
 )
 
 // Msg is our type for mailroom messages
@@ -474,12 +485,13 @@ type BroadcastTranslation struct {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		Translations map[utils.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage utils.Language                           `json:"base_language"`
-		URNs         []urns.URN                               `json:"urns,omitempty"`
-		ContactIDs   []ContactID                              `json:"contact_ids,omitempty"`
-		GroupIDs     []GroupID                                `json:"group_ids,omitempty"`
-		OrgID        OrgID                                    `json:"org_id"`
+		Translations  map[utils.Language]*BroadcastTranslation `json:"translations"`
+		TemplateState TemplateState                            `json:"template_state"`
+		BaseLanguage  utils.Language                           `json:"base_language"`
+		URNs          []urns.URN                               `json:"urns,omitempty"`
+		ContactIDs    []ContactID                              `json:"contact_ids,omitempty"`
+		GroupIDs      []GroupID                                `json:"group_ids,omitempty"`
+		OrgID         OrgID                                    `json:"org_id"`
 	}
 }
 
@@ -489,12 +501,16 @@ func (b *Broadcast) URNs() []urns.URN                                       { re
 func (b *Broadcast) OrgID() OrgID                                           { return b.b.OrgID }
 func (b *Broadcast) Translations() map[utils.Language]*BroadcastTranslation { return b.b.Translations }
 
+func (b *Broadcast) TemplateState() TemplateState         { return b.b.TemplateState }
+func (b *Broadcast) SetTemplateState(state TemplateState) { b.b.TemplateState = state }
+
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
 	bcast := &Broadcast{}
+	bcast.b.TemplateState = TemplateStateEvaluated
 	bcast.b.OrgID = org.OrgID()
 	bcast.b.BaseLanguage = event.BaseLanguage
 	bcast.b.URNs = event.URNs
@@ -531,6 +547,7 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 	batch := &BroadcastBatch{}
 	batch.b.BaseLanguage = b.b.BaseLanguage
 	batch.b.Translations = b.b.Translations
+	batch.b.TemplateState = b.b.TemplateState
 	batch.b.OrgID = b.b.OrgID
 	batch.b.ContactIDs = contactIDs
 	return batch
@@ -539,12 +556,13 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {
 	b struct {
-		Translations map[utils.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage utils.Language                           `json:"base_language"`
-		URNs         map[ContactID]urns.URN                   `json:"urns,omitempty"`
-		ContactIDs   []ContactID                              `json:"contact_ids,omitempty"`
-		IsLast       bool                                     `json:"is_last"`
-		OrgID        OrgID                                    `json:"org_id"`
+		Translations  map[utils.Language]*BroadcastTranslation `json:"translations"`
+		BaseLanguage  utils.Language                           `json:"base_language"`
+		TemplateState TemplateState                            `json:"template_state"`
+		URNs          map[ContactID]urns.URN                   `json:"urns,omitempty"`
+		ContactIDs    []ContactID                              `json:"contact_ids,omitempty"`
+		IsLast        bool                                     `json:"is_last"`
+		OrgID         OrgID                                    `json:"org_id"`
 	}
 }
 
@@ -555,6 +573,7 @@ func (b *BroadcastBatch) OrgID() OrgID                        { return b.b.OrgID
 func (b *BroadcastBatch) Translations() map[utils.Language]*BroadcastTranslation {
 	return b.b.Translations
 }
+func (b *BroadcastBatch) TemplateState() TemplateState { return b.b.TemplateState }
 func (b *BroadcastBatch) BaseLanguage() utils.Language { return b.b.BaseLanguage }
 func (b *BroadcastBatch) IsLast() bool                 { return b.b.IsLast }
 func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
@@ -680,8 +699,31 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 			return nil, nil
 		}
 
+		template := ""
+
+		// if this is a legacy template, migrate it forward
+		if bcast.TemplateState() == TemplateStateLegacy {
+			template, _ = expressions.MigrateTemplate(t.Text, nil)
+		} else if bcast.TemplateState() == TemplateStateUnevaluated {
+			template = t.Text
+		}
+
+		text := t.Text
+
+		// if we have a template, evaluate it
+		if template != "" {
+			contactCtx := flows.Context(org.Env(), contact)
+			templateCtx := types.NewXObject(map[string]types.XValue{"contact": contactCtx})
+			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template)
+		}
+
+		// don't do anything if we have no text or attachments
+		if text == "" && len(t.Attachments) == 0 {
+			return nil, nil
+		}
+
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), t.Text, t.Attachments, t.QuickReplies, nil)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil)
 		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")

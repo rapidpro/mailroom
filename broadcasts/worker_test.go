@@ -38,6 +38,22 @@ func TestBroadcasts(t *testing.T) {
 		},
 	}
 
+	legacy := map[utils.Language]*events.BroadcastTranslation{
+		eng: &events.BroadcastTranslation{
+			Text:         "hi @(PROPER(contact.name))",
+			Attachments:  nil,
+			QuickReplies: nil,
+		},
+	}
+
+	template := map[utils.Language]*events.BroadcastTranslation{
+		eng: &events.BroadcastTranslation{
+			Text:         "hi @(title(contact.name))",
+			Attachments:  nil,
+			QuickReplies: nil,
+		},
+	}
+
 	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
 	doctorsOnly := []*assets.GroupReference{doctors}
 
@@ -57,23 +73,28 @@ func TestBroadcasts(t *testing.T) {
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
-		Translations map[utils.Language]*events.BroadcastTranslation
-		BaseLanguage utils.Language
-		Groups       []*assets.GroupReference
-		Contacts     []*flows.ContactReference
-		URNs         []urns.URN
-		Queue        string
-		BatchCount   int
-		MsgCount     int
+		Translations  map[utils.Language]*events.BroadcastTranslation
+		TemplateState models.TemplateState
+		BaseLanguage  utils.Language
+		Groups        []*assets.GroupReference
+		Contacts      []*flows.ContactReference
+		URNs          []urns.URN
+		Queue         string
+		BatchCount    int
+		MsgCount      int
+		MsgText       string
 	}{
-		{basic, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121},
-		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121},
-		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0},
-		{basic, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121},
-		{basic, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2},
-		{basic, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1},
+		{basic, models.TemplateStateEvaluated, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{basic, models.TemplateStateEvaluated, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{basic, models.TemplateStateEvaluated, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world"},
+		{basic, models.TemplateStateEvaluated, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{basic, models.TemplateStateEvaluated, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
+		{basic, models.TemplateStateEvaluated, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
+		{basic, models.TemplateStateEvaluated, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world"},
+		{basic, models.TemplateStateEvaluated, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world"},
+
+		{legacy, models.TemplateStateLegacy, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy"},
+		{template, models.TemplateStateUnevaluated, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy"},
 	}
 
 	lastNow := time.Now()
@@ -83,6 +104,7 @@ func TestBroadcasts(t *testing.T) {
 		// handle our start task
 		event := events.NewBroadcastCreatedEvent(tc.Translations, tc.BaseLanguage, tc.URNs, tc.Contacts, tc.Groups)
 		bcast, err := models.NewBroadcastFromEvent(ctx, db, org, event)
+		bcast.SetTemplateState(tc.TemplateState)
 		assert.NoError(t, err)
 
 		err = CreateBroadcastBatches(ctx, db, rp, bcast)
@@ -113,8 +135,8 @@ func TestBroadcasts(t *testing.T) {
 
 		// assert our count of total msgs created
 		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL`,
-			[]interface{}{lastNow}, tc.MsgCount, "%d: unexpected msg count", i)
+			`SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`,
+			[]interface{}{lastNow, tc.MsgText}, tc.MsgCount, "%d: unexpected msg count", i)
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
