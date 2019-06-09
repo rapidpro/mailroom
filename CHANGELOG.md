@@ -1,3 +1,8 @@
+v1.0.6
+----------
+ * evaluate templates in broadcasts, including legacy ones
+ * mark broadcast as sent when the last batch is sent
+
 v1.0.5
 ----------
  * SignalWire IVR handling
