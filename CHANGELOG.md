@@ -1,3 +1,7 @@
+v1.0.7
+----------
+ * update to latest gocommon, check channel is nil when determining what to send
+
 v1.0.6
 ----------
  * evaluate templates in broadcasts, including legacy ones
