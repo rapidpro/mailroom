@@ -1,3 +1,7 @@
+v2.0.0
+----------
+ * remove references to unused fields
+
 v1.0.7
 ----------
  * update to latest gocommon, check channel is nil when determining what to send
