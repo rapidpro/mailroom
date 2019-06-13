@@ -106,7 +106,6 @@ const timedoutSessionsSQL = `
 	WHERE 
 		status = 'W' AND 
 		timeout_on < NOW() AND
-		o.flow_server_enabled = TRUE AND
 		connection_id IS NULL
 	ORDER BY 
 		timeout_on ASC
