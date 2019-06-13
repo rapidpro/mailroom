@@ -422,9 +422,9 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	err = tx.GetContext(ctx, &contactID,
 		`INSERT INTO 
 		contacts_contact
-			(org_id, is_active, is_blocked, is_test, is_stopped, uuid, created_on, modified_on, created_by_id, modified_by_id, name) 
+			(org_id, is_active, is_blocked, is_stopped, uuid, created_on, modified_on, created_by_id, modified_by_id, name) 
 		VALUES
-			($1, TRUE, FALSE, FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
+			($1, TRUE, FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
 		RETURNING id`,
 		org.OrgID(), utils.NewUUID(),
 	)

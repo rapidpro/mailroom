@@ -31,7 +31,6 @@ func TestExpirations(t *testing.T) {
 
 	// need to create a session that has an expired timeout
 	db := testsuite.DB()
-	db.MustExec(`UPDATE orgs_org SET flow_server_enabled=TRUE WHERE id = 1;`)
 
 	// create a few sessions
 	var s1, s2 models.SessionID
