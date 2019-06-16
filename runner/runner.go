@@ -741,7 +741,7 @@ func validateFlow(sa flows.SessionAssets, uuid assets.FlowUUID) error {
 	// one day we might error if we encounter missing dependencies but for now it's too common so log them
 	// to help us find whatever problem is creating them
 	if len(missingDeps) > 0 {
-		logrus.WithField("flow_uuid", flow.UUID()).WithField("missing", missingDeps).Error("flow being started with missing dependencies")
+		logrus.WithField("flow_uuid", flow.UUID()).WithField("missing", missingDeps).Warn("flow being started with missing dependencies")
 	}
 
 	return nil
