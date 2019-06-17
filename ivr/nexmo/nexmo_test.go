@@ -9,8 +9,8 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/test"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -91,7 +91,7 @@ func TestResponseForSprint(t *testing.T) {
 		{
 			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "enter a number, then press #", nil, nil, nil))},
 			waits.NewActivatedMsgWait(nil, hints.NewTerminatedDigitsHint("#")),
-			`[{"action":"talk","text":"enter a number, then press #","bargeIn":true},{"action":"input","submitOnHash":true,"timeOut":30,"eventUrl":["http://temba.io/resume?session=1\u0026wait_type=gather\u0026sig=OjsMUDhaBTUVLq1e6I4cM0SKYpk%3D"],"eventMethod":"POST"}]`,
+			`[{"action":"talk","text":"enter a number, then press #","bargeIn":true},{"action":"input","maxDigits":20,"submitOnHash":true,"timeOut":30,"eventUrl":["http://temba.io/resume?session=1\u0026wait_type=gather\u0026sig=OjsMUDhaBTUVLq1e6I4cM0SKYpk%3D"],"eventMethod":"POST"}]`,
 		},
 		{
 			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "say something", nil, nil, nil))},
