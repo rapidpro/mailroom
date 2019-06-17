@@ -666,8 +666,11 @@ func (c *client) responseForSprint(resumeURL string, w flows.ActivatedWait, es [
 				EventURL:     []string{eventURL},
 				EventMethod:  http.MethodPost,
 			}
+			// limit our digits if asked to
 			if hint.Count != nil {
 				input.MaxDigits = *hint.Count
+			} else {
+				input.MaxDigits = 20
 			}
 			waitActions = append(waitActions, input)
 
