@@ -1,3 +1,7 @@
+v2.0.2
+----------
+ * override default max digits of 4 for nexmo gathers
+
 v2.0.1
 ----------
  * change missing dependencies to a warning instead of an error (that is logged to sentry)
