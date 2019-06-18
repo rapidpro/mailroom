@@ -1,3 +1,7 @@
+v2.0.3
+----------
+ * Update to goflow v0.41.8
+
 v2.0.2
 ----------
  * override default max digits of 4 for nexmo gathers
