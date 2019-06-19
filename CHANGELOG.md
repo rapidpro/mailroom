@@ -1,3 +1,7 @@
+v2.0.4
+----------
+ * Update to goflow v0.41.9
+
 v2.0.3
 ----------
  * Update to goflow v0.41.8
