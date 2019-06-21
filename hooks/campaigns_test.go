@@ -6,6 +6,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 )
@@ -15,6 +16,13 @@ func TestCampaigns(t *testing.T) {
 
 	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
 	joined := assets.NewFieldReference("joined", "Joined")
+
+	// insert an event on our campaign that is based on created on
+	testsuite.DB().MustExec(
+		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
+											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
+									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
+		utils.NewUUID(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID)
 
 	// init their values
 	testsuite.DB().MustExec(
@@ -30,6 +38,7 @@ func TestCampaigns(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
+					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
 					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewSetContactFieldAction(newActionUUID(), joined, ""),
@@ -49,12 +58,12 @@ func TestCampaigns(t *testing.T) {
 				SQLAssertion{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{models.CathyID},
-					Count: 0,
+					Count: 1,
 				},
 				SQLAssertion{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{models.BobID},
-					Count: 2,
+					Count: 3,
 				},
 				SQLAssertion{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,

@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type ContactActionMap map[models.ContactID][]flows.Action
@@ -76,14 +77,12 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 			utils.NewUUID(),
 			"has_any_word",
 			[]string{fmt.Sprintf("%d", cid)},
-			false,
 			categoryUUIDs[i],
 		)
 
 		exitNodes[i] = definition.NewNode(
 			flows.NodeUUID(utils.NewUUID()),
 			actions,
-			nil,
 			nil,
 			[]flows.Exit{definition.NewExit(flows.ExitUUID(utils.NewUUID()), "")},
 		)
@@ -112,12 +111,11 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		flows.NodeUUID(""),
 	))
 
-	router := routers.NewSwitchRouter("", categories, "@contact.id", cases, defaultCategoryUUID)
+	router := routers.NewSwitchRouter(nil, "", categories, "@contact.id", cases, defaultCategoryUUID)
 
 	// and our entry node
 	entry := definition.NewNode(
 		flows.NodeUUID(utils.NewUUID()),
-		nil,
 		nil,
 		router,
 		exits,
@@ -127,7 +125,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	nodes = append(nodes, exitNodes...)
 
 	// we have our nodes, lets create our flow
-	flow := definition.NewFlow(
+	flow, err := definition.NewFlow(
 		uuid,
 		"Test Flow",
 		utils.Language("eng"),
@@ -138,6 +136,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		nodes,
 		nil,
 	)
+	require.NoError(t, err)
 
 	return flow
 }

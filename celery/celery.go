@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/nyaruka/goflow/utils"
+
 	"github.com/gomodule/redigo/redis"
-	uuid "github.com/satori/go.uuid"
 )
 
 // allows queuing a task to celery (with a redis backend)
@@ -45,8 +46,8 @@ func QueueTask(rc redis.Conn, queueName string, taskName string, args interface{
 	}
 
 	body := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(defaultBody, string(argJSON))))
-	taskUUID := uuid.NewV4().String()
-	deliveryTag := uuid.NewV4().String()
+	taskUUID := string(utils.NewUUID())
+	deliveryTag := string(utils.NewUUID())
 
 	task := Task{
 		Body: body,
@@ -69,7 +70,7 @@ func QueueTask(rc redis.Conn, queueName string, taskName string, args interface{
 		Properties: TaskProperties{
 			BodyEncoding:  "base64",
 			CorrelationID: taskUUID,
-			ReplyTo:       uuid.NewV4().String(),
+			ReplyTo:       string(utils.NewUUID()),
 			DeliveryMode:  2,
 			DeliveryTag:   deliveryTag,
 			DeliveryInfo: TaskDeliveryInfo{

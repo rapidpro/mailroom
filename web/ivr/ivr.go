@@ -141,7 +141,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	}
 
 	// we first create an incoming call channel event and see if that matches
-	event := models.NewChannelEvent(models.MOCallEventType, org.OrgID(), channel.ID(), contactID, urnID, map[string]string{}, false)
+	event := models.NewChannelEvent(models.MOCallEventType, org.OrgID(), channel.ID(), contactID, urnID, nil, false)
 
 	externalID, err := client.CallIDForRequest(r)
 	if err != nil {

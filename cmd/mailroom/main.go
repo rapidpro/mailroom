@@ -22,13 +22,14 @@ import (
 	_ "github.com/nyaruka/mailroom/stats"
 	_ "github.com/nyaruka/mailroom/timeouts"
 
+	_ "github.com/nyaruka/mailroom/web/docs"
 	_ "github.com/nyaruka/mailroom/web/flow"
 	_ "github.com/nyaruka/mailroom/web/ivr"
 	_ "github.com/nyaruka/mailroom/web/simulation"
 	_ "github.com/nyaruka/mailroom/web/surveyor"
 
 	_ "github.com/nyaruka/mailroom/ivr/nexmo"
-	_ "github.com/nyaruka/mailroom/ivr/twilio"
+	_ "github.com/nyaruka/mailroom/ivr/twiml"
 )
 
 var version = "Dev"

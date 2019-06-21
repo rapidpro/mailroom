@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -46,24 +45,24 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, "Cathy", contacts[0].Name())
 		assert.Equal(t, len(contacts[0].URNs()), 1)
 		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+250700000001?id=10000&priority=50")
-		assert.Equal(t, 1, contacts[0].Groups().Length())
+		assert.Equal(t, 1, contacts[0].Groups().Count())
 
-		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto"), contacts[0].Fields()["state"].TypedValue())
-		assert.Equal(t, flows.LocationPath("Nigeria > Sokoto > Yabo > Kilgori"), contacts[0].Fields()["ward"].TypedValue())
-		assert.Equal(t, types.NewXText("F"), contacts[0].Fields()["gender"].TypedValue())
+		assert.Equal(t, "Sokoto", contacts[0].Fields()["state"].QueryValue())
+		assert.Equal(t, "Kilgori", contacts[0].Fields()["ward"].QueryValue())
+		assert.Equal(t, "F", contacts[0].Fields()["gender"].QueryValue())
 		assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
 
 		assert.Equal(t, "Bob", contacts[1].Name())
-		assert.NotNil(t, contacts[1].Fields()["joined"].TypedValue())
+		assert.NotNil(t, contacts[1].Fields()["joined"].QueryValue())
 		assert.Equal(t, 2, len(contacts[1].URNs()))
 		assert.Equal(t, contacts[1].URNs()[0].String(), "whatsapp:250788373373?id=20121&priority=100")
 		assert.Equal(t, contacts[1].URNs()[1].String(), "tel:+250700000002?id=10001&priority=50")
-		assert.Equal(t, 0, contacts[1].Groups().Length())
+		assert.Equal(t, 0, contacts[1].Groups().Count())
 
 		assert.Equal(t, "George", contacts[2].Name())
-		assert.Equal(t, types.NewXNumber(decimal.RequireFromString("30")), contacts[2].Fields()["age"].TypedValue())
+		assert.Equal(t, decimal.RequireFromString("30"), contacts[2].Fields()["age"].QueryValue())
 		assert.Equal(t, 0, len(contacts[2].URNs()))
-		assert.Equal(t, 0, contacts[2].Groups().Length())
+		assert.Equal(t, 0, contacts[2].Groups().Count())
 	}
 
 	// change bob to have a preferred URN and channel of our telephone
@@ -97,6 +96,16 @@ func TestContacts(t *testing.T) {
 
 	// no op this time
 	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, URNID(20122), channel)
+	assert.NoError(t, err)
+
+	bob, err = modelContacts[0].FlowContact(org, session)
+	assert.NoError(t, err)
+	assert.Equal(t, "tel:+250788373393?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
+	assert.Equal(t, "tel:+250700000002?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
+	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=998", bob.URNs()[2].String())
+
+	// calling with no channel is a noop on the channel
+	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, URNID(20122), nil)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[0].FlowContact(org, session)

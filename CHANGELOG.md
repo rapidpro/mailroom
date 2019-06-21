@@ -1,3 +1,275 @@
+v2.0.6
+----------
+ * Update to goflow v0.41.11
+
+v2.0.5
+----------
+ * Update to goflow v0.41.10
+
+v2.0.4
+----------
+ * Update to goflow v0.41.9
+
+v2.0.3
+----------
+ * Update to goflow v0.41.8
+
+v2.0.2
+----------
+ * override default max digits of 4 for nexmo gathers
+
+v2.0.1
+----------
+ * change missing dependencies to a warning instead of an error (that is logged to sentry)
+
+v2.0.0
+----------
+ * remove references to unused fields
+
+v1.0.7
+----------
+ * update to latest gocommon, check channel is nil when determining what to send
+
+v1.0.6
+----------
+ * evaluate templates in broadcasts, including legacy ones
+ * mark broadcast as sent when the last batch is sent
+
+v1.0.5
+----------
+ * SignalWire IVR handling
+
+v1.0.4
+----------
+ * also treat initiated as in progress
+
+v1.0.3
+----------
+ * handle signalwire and twiml IVR calls
+
+v1.0.2
+----------
+ * Make max number of steps configurable
+
+v1.0.1
+----------
+ * Update to latest goflow v0.41.7
+
+v1.0.0
+----------
+ * Update to goflow v0.41.6
+
+v0.0.208
+----------
+ * latest goflow with UI cloning fix
+
+v0.0.207
+----------
+ * latest goflow with has phone test
+
+v0.0.206
+----------
+ * Update to goflow v0.41.3
+
+v0.0.205
+----------
+ * update test for endpoint
+
+v0.0.204
+----------
+ * latest goflow, fixing migration for relative attachments with no media
+
+v0.0.203
+----------
+ * Update to goflow v0.41.1
+ * The /flow/inspect endpoint should do optional validation
+
+v0.0.202
+----------
+ * Update to goflow v0.41.0
+ * Add /flow/clone and /flow/inspect endpoints
+
+v0.0.201
+----------
+ * Update to goflow v0.39.3 to handle malformed single message flows from campaign events
+
+v0.0.200
+----------
+ * adjust test for not stripping slashes
+
+v0.0.199
+----------
+ * deal with non-slash ending docs urls
+
+v0.0.198
+----------
+ * add docs webapp
+
+v0.0.197
+----------
+ * tweak tar arguments
+
+v0.0.196
+----------
+ * test build with docs
+
+v0.0.195
+----------
+ * Update to goflow v0.38.3 and remove satori/uuid dependency
+
+v0.0.194
+----------
+ * Update to goflow v0.38.2
+
+v0.0.193
+----------
+ * Update to goflow v0.38.0
+
+v0.0.192
+----------
+ * latest goflow engine
+
+v0.0.191
+----------
+ * override name and uuid in definition with db settings
+
+v0.0.190
+----------
+ * goflow v37.2, fixes text_slice unicode issues
+
+v0.0.189
+----------
+ * Update to goflow v0.37.1
+
+v0.0.188
+----------
+ * latest goflow, accept text/javascript webhooks
+
+v0.0.187
+----------
+ * override expire_after_minutes on saved definition with flow setting
+
+v0.0.186
+----------
+ * Update to goflow v0.36.0
+ * Dont apply events on errored sessions
+
+v0.0.185
+----------
+ * assign topups to broadcast messages
+
+v0.0.184
+----------
+ * Update to goflow v0.34.1
+
+v0.0.183
+----------
+ * Update to goflow v0.34.0
+
+v0.0.182
+----------
+ * Update to goflow v0.33.9
+
+v0.0.181
+----------
+ * Update to goflow v0.33.8 (expressions refactor)
+
+v0.0.180
+----------
+ * Update to goflow v0.33.7
+
+v0.0.179
+----------
+ * Update to goflow v0.33.6
+
+v0.0.178
+----------
+ * add option to enable / disable retrying pending messages
+
+v0.0.177
+----------
+ * dont migrate flows that are version 12 or above
+
+v0.0.176
+----------
+ * fix issue with timeouts and followup splits
+
+v0.0.175
+----------
+ * latest goflow, log all errors to session
+
+v0.0.174
+----------
+ * fix dot lookup on nil values
+
+v0.0.173
+----------
+ * better logging in case of panic
+
+v0.0.172
+----------
+ * latest goflow, add support for templates
+
+v0.0.171
+----------
+ * latest gocommon, phonenumbers
+
+v0.0.170
+----------
+ * switch to using generic map interface for extra on channel events
+
+v0.0.169
+----------
+ * move to using our own null.StringMap so channel events are decoded properly
+
+v0.0.168
+----------
+ * print extra when ignoring event
+
+v0.0.167
+----------
+ * better testing of ivr for nexmo and twitter
+
+v0.0.166
+----------
+ * don't log to sentry on failed call starts (channellog created anyways), deal with channels disappering before handling
+
+v0.0.165
+----------
+ * fix for referral triggers with specific referrers matching others
+
+v0.0.164
+----------
+ * for nexmo, first look at URL param to see if call is ongong
+
+v0.0.163
+----------
+ * update method for nexmo call creation
+
+v0.0.162
+----------
+ * Latest goflow
+
+v0.0.161
+----------
+ * latest goflow
+
+v0.0.160
+----------
+ * properly start IVR flows on msg triggers
+
+v0.0.159
+----------
+ * update to version 31
+
+v0.0.158
+----------
+ * fix campaigns based on created_on, fix panic when batch starts on archived flow
+
+v0.0.157
+----------
+ * Latest goflow
+
 v0.0.156
 ----------
  * only interrupt sessions of the same type

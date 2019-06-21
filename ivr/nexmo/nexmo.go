@@ -25,8 +25,8 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/waits"
-	"github.com/nyaruka/goflow/flows/waits/hints"
+	"github.com/nyaruka/goflow/flows/routers/waits"
+	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
@@ -34,12 +34,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// BaseURL for Nexmo calls, public so our main IVR test can change it
+var BaseURL = `https://api.nexmo.com/v1/calls`
+
+// IgnoreSignatures sets whether we ignore signatures (for unit tests)
+var IgnoreSignatures = false
+
 const (
 	nexmoChannelType = models.ChannelType("NX")
 
-	baseURL = `https://api.nexmo.com/v1/calls`
-
-	inputTimeout = 10
+	gatherTimeout = 30
+	recordTimeout = 600
 
 	appIDConfig      = "nexmo_app_id"
 	privateKeyConfig = "nexmo_app_private_key"
@@ -82,7 +87,7 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 
 	return &client{
 		channel:    channel,
-		baseURL:    baseURL,
+		baseURL:    BaseURL,
 		appID:      appID,
 		privateKey: privateKey,
 	}, nil
@@ -292,12 +297,12 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 	}
 	callR.From = Phone{Type: "phone", Number: rawFrom}
 
-	resp, err := c.makeRequest(client, http.MethodPut, baseURL, callR)
+	resp, err := c.makeRequest(client, http.MethodPost, BaseURL, callR)
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
 
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != http.StatusCreated {
 		return ivr.NilCallID, errors.Errorf("received non 200 status for call start: %d", resp.StatusCode)
 	}
 
@@ -318,7 +323,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 		return ivr.NilCallID, errors.Errorf("call status returned as failed")
 	}
 
-	logrus.WithField("body", body).WithField("status", resp.StatusCode).Debug("requested call")
+	logrus.WithField("body", string(body)).WithField("status", resp.StatusCode).Debug("requested call")
 
 	return ivr.CallID(call.UUID), nil
 }
@@ -326,7 +331,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 // HangupCall asks Nexmo to hang up the call that is passed in
 func (c *client) HangupCall(client *http.Client, callID string) error {
 	hangupBody := map[string]string{"action": "hangup"}
-	url := baseURL + "/" + callID
+	url := BaseURL + "/" + callID
 	resp, err := c.makeRequest(client, http.MethodPut, url, hangupBody)
 	if err != nil {
 		return errors.Wrapf(err, "error trying to hangup call")
@@ -347,7 +352,7 @@ type NCCOInput struct {
 }
 
 // InputForRequest returns the input for the passed in request, if any
-func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
+func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
 	// parse our input
 	input := &NCCOInput{}
 	bb, err := ioutil.ReadAll(r.Body)
@@ -382,7 +387,7 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 			return "", ivr.NilAttachment, nil
 		}
 		logrus.WithField("recording_url", recordingURL).Info("input found recording")
-		return "", flows.Attachment("audio:" + recordingURL), nil
+		return "", utils.Attachment("audio:" + recordingURL), nil
 	default:
 		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
 	}
@@ -396,6 +401,11 @@ type StatusRequest struct {
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
 func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
+	// this is a resume, call is in progress, no need to look at the body
+	if r.Form.Get("action") == "resume" {
+		return models.ConnectionStatusInProgress, 0
+	}
+
 	status := &StatusRequest{}
 	bb, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -404,7 +414,7 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 	}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
-		logrus.WithError(err).Error("error unmarshalling ncco status")
+		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
 		return models.ConnectionStatusErrored, 0
 	}
 
@@ -431,6 +441,10 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
 func (c *client) ValidateRequestSignature(r *http.Request) error {
+	if IgnoreSignatures {
+		return nil
+	}
+
 	// only validate handling calls, we can't verify others
 	if !strings.HasSuffix(r.URL.Path, "handle") {
 		return nil
@@ -623,19 +637,20 @@ type Input struct {
 }
 
 type Record struct {
-	Action      string   `json:"action"`
-	EndOnKey    string   `json:"endOnKey,omitempty"`
-	Timeout     int      `json:"timeOut,omitempty"`
-	EventURL    []string `json:"eventUrl"`
-	EventMethod string   `json:"eventMethod"`
+	Action       string   `json:"action"`
+	EndOnKey     string   `json:"endOnKey,omitempty"`
+	Timeout      int      `json:"timeOut,omitempty"`
+	EndOnSilence int      `json:"endOnSilence,omitempty"`
+	EventURL     []string `json:"eventUrl"`
+	EventMethod  string   `json:"eventMethod"`
 }
 
-func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
+func (c *client) responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 
 	if w != nil {
-		msgWait, isMsgWait := w.(*waits.MsgWait)
+		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
 		if !isMsgWait {
 			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
 		}
@@ -646,13 +661,16 @@ func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Ev
 			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
 			input := &Input{
 				Action:       "input",
-				Timeout:      inputTimeout,
+				Timeout:      gatherTimeout,
 				SubmitOnHash: true,
 				EventURL:     []string{eventURL},
 				EventMethod:  http.MethodPost,
 			}
+			// limit our digits if asked to
 			if hint.Count != nil {
 				input.MaxDigits = *hint.Count
+			} else {
+				input.MaxDigits = 20
 			}
 			waitActions = append(waitActions, input)
 
@@ -670,10 +688,12 @@ func (c *client) responseForSprint(resumeURL string, w flows.Wait, es []flows.Ev
 			eventURL := resumeURL + "&wait_type=recording_url&recording_uuid=" + recordingUUID
 			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
 			record := &Record{
-				Action:      "record",
-				EventURL:    []string{eventURL},
-				EventMethod: http.MethodPost,
-				EndOnKey:    "#",
+				Action:       "record",
+				EventURL:     []string{eventURL},
+				EventMethod:  http.MethodPost,
+				EndOnKey:     "#",
+				Timeout:      recordTimeout,
+				EndOnSilence: 5,
 			}
 			waitActions = append(waitActions, record)
 
