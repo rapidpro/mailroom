@@ -9,7 +9,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -95,7 +95,7 @@ func (c *MockClient) WriteEmptyResponse(w http.ResponseWriter, msg string) error
 	return nil
 }
 
-func (c *MockClient) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
+func (c *MockClient) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
 	return "", NilAttachment, nil
 }
 

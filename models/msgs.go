@@ -8,13 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/types"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/excellent"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/legacy/expressions"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
@@ -55,8 +58,10 @@ const (
 
 type MsgStatus string
 
-type BroadcastID int64
+// BroadcastID is our internal type for broadcast ids, which can be null/0
+type BroadcastID null.Int
 
+// NilBroadcastID is our constant for a nil broadcast id
 const NilBroadcastID = BroadcastID(0)
 
 const (
@@ -71,10 +76,21 @@ const (
 	MsgStatusResent       = MsgStatus("R")
 )
 
+// TemplateState represents what state are templates are in, either already evaluated, not evaluated or
+// that they are unevaluated legacy templates
+type TemplateState string
+
+const (
+	TemplateStateEvaluated   = TemplateState("evaluated")
+	TemplateStateLegacy      = TemplateState("legacy")
+	TemplateStateUnevaluated = TemplateState("unevaluated")
+)
+
 // Msg is our type for mailroom messages
 type Msg struct {
 	m struct {
 		ID                   flows.MsgID        `db:"id"              json:"id"`
+		BroadcastID          BroadcastID        `db:"broadcast_id"    json:"broadcast_id,omitempty"`
 		UUID                 flows.MsgUUID      `db:"uuid"            json:"uuid"`
 		Text                 string             `db:"text"            json:"text"`
 		HighPriority         bool               `db:"high_priority"   json:"high_priority"`
@@ -91,8 +107,8 @@ type Msg struct {
 		NextAttempt          time.Time          `db:"next_attempt"    json:"next_attempt"`
 		ExternalID           null.String        `db:"external_id"     json:"external_id"`
 		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
-		Metadata             types.JSONText     `db:"metadata"        json:"metadata"`
-		ChannelID            *ChannelID         `db:"channel_id"      json:"channel_id"`
+		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
+		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
 		ConnectionID         *ConnectionID      `db:"connection_id"`
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
@@ -115,36 +131,39 @@ type Msg struct {
 	channel *Channel
 }
 
-func (m *Msg) ID() flows.MsgID                 { return m.m.ID }
-func (m *Msg) UUID() flows.MsgUUID             { return m.m.UUID }
-func (m *Msg) Channel() *Channel               { return m.channel }
-func (m *Msg) Text() string                    { return m.m.Text }
-func (m *Msg) HighPriority() bool              { return m.m.HighPriority }
-func (m *Msg) CreatedOn() time.Time            { return m.m.CreatedOn }
-func (m *Msg) ModifiedOn() time.Time           { return m.m.ModifiedOn }
-func (m *Msg) SentOn() time.Time               { return m.m.SentOn }
-func (m *Msg) QueuedOn() time.Time             { return m.m.QueuedOn }
-func (m *Msg) Direction() MsgDirection         { return m.m.Direction }
-func (m *Msg) Status() MsgStatus               { return m.m.Status }
-func (m *Msg) Visibility() MsgVisibility       { return m.m.Visibility }
-func (m *Msg) MsgType() MsgType                { return m.m.MsgType }
-func (m *Msg) ErrorCount() int                 { return m.m.ErrorCount }
-func (m *Msg) NextAttempt() time.Time          { return m.m.NextAttempt }
-func (m *Msg) ExternalID() null.String         { return m.m.ExternalID }
-func (m *Msg) Metadata() types.JSONText        { return m.m.Metadata }
-func (m *Msg) MsgCount() int                   { return m.m.MsgCount }
-func (m *Msg) ChannelID() *ChannelID           { return m.m.ChannelID }
-func (m *Msg) ChannelUUID() assets.ChannelUUID { return m.m.ChannelUUID }
-func (m *Msg) ConnectionID() *ConnectionID     { return m.m.ConnectionID }
-func (m *Msg) URN() urns.URN                   { return m.m.URN }
-func (m *Msg) URNAuth() null.String            { return m.m.URNAuth }
-func (m *Msg) OrgID() OrgID                    { return m.m.OrgID }
-func (m *Msg) TopupID() TopupID                { return m.m.TopupID }
-func (m *Msg) ContactID() ContactID            { return m.m.ContactID }
-func (m *Msg) ContactURNID() *URNID            { return m.m.ContactURNID }
+func (m *Msg) ID() flows.MsgID                  { return m.m.ID }
+func (m *Msg) BroadcastID() BroadcastID         { return m.m.BroadcastID }
+func (m *Msg) UUID() flows.MsgUUID              { return m.m.UUID }
+func (m *Msg) Channel() *Channel                { return m.channel }
+func (m *Msg) Text() string                     { return m.m.Text }
+func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
+func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
+func (m *Msg) ModifiedOn() time.Time            { return m.m.ModifiedOn }
+func (m *Msg) SentOn() time.Time                { return m.m.SentOn }
+func (m *Msg) QueuedOn() time.Time              { return m.m.QueuedOn }
+func (m *Msg) Direction() MsgDirection          { return m.m.Direction }
+func (m *Msg) Status() MsgStatus                { return m.m.Status }
+func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
+func (m *Msg) MsgType() MsgType                 { return m.m.MsgType }
+func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
+func (m *Msg) NextAttempt() time.Time           { return m.m.NextAttempt }
+func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
+func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
+func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
+func (m *Msg) ChannelID() ChannelID             { return m.m.ChannelID }
+func (m *Msg) ChannelUUID() assets.ChannelUUID  { return m.m.ChannelUUID }
+func (m *Msg) ConnectionID() *ConnectionID      { return m.m.ConnectionID }
+func (m *Msg) URN() urns.URN                    { return m.m.URN }
+func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
+func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
+func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
+func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
+func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 
-func (m *Msg) SetTopup(topupID TopupID)         { m.m.TopupID = topupID }
-func (m *Msg) SetChannelID(channelID ChannelID) { m.m.ChannelID = &channelID }
+func (m *Msg) SetTopup(topupID TopupID)               { m.m.TopupID = topupID }
+func (m *Msg) SetChannelID(channelID ChannelID)       { m.m.ChannelID = channelID }
+func (m *Msg) SetBroadcastID(broadcastID BroadcastID) { m.m.BroadcastID = broadcastID }
+
 func (m *Msg) SetURN(urn urns.URN) error {
 	// noop for nil urn
 	if urn == urns.NilURN {
@@ -166,10 +185,10 @@ func (m *Msg) SetURN(urn urns.URN) error {
 	return nil
 }
 
-func (m *Msg) Attachments() []flows.Attachment {
-	attachments := make([]flows.Attachment, len(m.m.Attachments))
+func (m *Msg) Attachments() []utils.Attachment {
+	attachments := make([]utils.Attachment, len(m.m.Attachments))
 	for i := range m.m.Attachments {
-		attachments[i] = flows.Attachment(m.m.Attachments[i])
+		attachments[i] = utils.Attachment(m.m.Attachments[i])
 	}
 	return attachments
 }
@@ -303,16 +322,16 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		}
 	}
 
-	// if we have quick replies, populate our metadata
-	if len(out.QuickReplies()) > 0 {
+	// populate metadata if we have any
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil {
 		metadata := make(map[string]interface{})
-		metadata["quick_replies"] = out.QuickReplies()
-
-		metadataJSON, err := json.Marshal(metadata)
-		if err != nil {
-			return nil, errors.Wrap(err, "error marshalling quick replies")
+		if len(out.QuickReplies()) > 0 {
+			metadata["quick_replies"] = out.QuickReplies()
 		}
-		m.Metadata = metadataJSON
+		if out.Templating() != nil {
+			metadata["templating"] = out.Templating()
+		}
+		m.Metadata = null.NewMap(metadata)
 	}
 
 	// calculate msg count
@@ -359,7 +378,7 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
-func NormalizeAttachment(attachment flows.Attachment) flows.Attachment {
+func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
 	// don't try to modify geo type attachments which are just coordinates
 	if attachment.ContentType() == "geo" {
 		return attachment
@@ -373,7 +392,7 @@ func NormalizeAttachment(attachment flows.Attachment) flows.Attachment {
 			url = fmt.Sprintf("https://%s/%s", config.Mailroom.AttachmentDomain, url)
 		}
 	}
-	return flows.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
+	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
 }
 
 // SetTimeout sets the timeout for this message
@@ -397,10 +416,10 @@ const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, connection_id, response_to_id,
-		 contact_id, contact_urn_id, org_id, topup_id)
+		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :connection_id, :response_to_id,
-		 :contact_id, :contact_urn_id, :org_id, :topup_id)
+		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id)
 RETURNING 
 	id as id, 
 	now() as modified_on,
@@ -467,40 +486,59 @@ WHERE
 // BroadcastTranslation is the translation for the passed in language
 type BroadcastTranslation struct {
 	Text         string             `json:"text"`
-	Attachments  []flows.Attachment `json:"attachments,omitempty"`
+	Attachments  []utils.Attachment `json:"attachments,omitempty"`
 	QuickReplies []string           `json:"quick_replies,omitempty"`
 }
 
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		Translations map[utils.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage utils.Language                           `json:"base_language"`
-		URNs         []urns.URN                               `json:"urns,omitempty"`
-		ContactIDs   []ContactID                              `json:"contact_ids,omitempty"`
-		GroupIDs     []GroupID                                `json:"group_ids,omitempty"`
-		OrgID        OrgID                                    `json:"org_id"`
+		BroadcastID   BroadcastID                              `json:"broadcast_id,omitempty"`
+		Translations  map[utils.Language]*BroadcastTranslation `json:"translations"`
+		TemplateState TemplateState                            `json:"template_state"`
+		BaseLanguage  utils.Language                           `json:"base_language"`
+		URNs          []urns.URN                               `json:"urns,omitempty"`
+		ContactIDs    []ContactID                              `json:"contact_ids,omitempty"`
+		GroupIDs      []GroupID                                `json:"group_ids,omitempty"`
+		OrgID         OrgID                                    `json:"org_id"`
 	}
 }
 
+func (b *Broadcast) BroadcastID() BroadcastID                               { return b.b.BroadcastID }
 func (b *Broadcast) ContactIDs() []ContactID                                { return b.b.ContactIDs }
 func (b *Broadcast) GroupIDs() []GroupID                                    { return b.b.GroupIDs }
 func (b *Broadcast) URNs() []urns.URN                                       { return b.b.URNs }
 func (b *Broadcast) OrgID() OrgID                                           { return b.b.OrgID }
 func (b *Broadcast) Translations() map[utils.Language]*BroadcastTranslation { return b.b.Translations }
+func (b *Broadcast) TemplateState() TemplateState                           { return b.b.TemplateState }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
+// NewBroadcast creates a new broadcast with the passed in parameters
+func NewBroadcast(
+	orgID OrgID, id BroadcastID, translations map[utils.Language]*BroadcastTranslation,
+	state TemplateState, baseLanguage utils.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID) *Broadcast {
+
+	bcast := &Broadcast{}
+	bcast.b.OrgID = orgID
+	bcast.b.BroadcastID = id
+	bcast.b.TemplateState = state
+	bcast.b.BaseLanguage = baseLanguage
+	bcast.b.GroupIDs = groupIDs
+	bcast.b.ContactIDs = contactIDs
+	bcast.b.URNs = urns
+	bcast.b.Translations = translations
+
+	return bcast
+}
+
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
-	bcast := &Broadcast{}
-	bcast.b.OrgID = org.OrgID()
-	bcast.b.BaseLanguage = event.BaseLanguage
-	bcast.b.URNs = event.URNs
-	bcast.b.Translations = make(map[utils.Language]*BroadcastTranslation)
+	// converst our translations to our type
+	translations := make(map[utils.Language]*BroadcastTranslation)
 	for l, t := range event.Translations {
-		bcast.b.Translations[l] = &BroadcastTranslation{
+		translations[l] = &BroadcastTranslation{
 			Text:         t.Text,
 			Attachments:  t.Attachments,
 			QuickReplies: t.QuickReplies,
@@ -512,25 +550,25 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 	if err != nil {
 		return nil, errors.Wrapf(err, "error resolving contact references")
 	}
-	bcast.b.ContactIDs = contactIDs
 
 	// and our groups
-	groups := make([]GroupID, 0, len(event.Groups))
+	groupIDs := make([]GroupID, 0, len(event.Groups))
 	for i := range event.Groups {
 		group := org.GroupByUUID(event.Groups[i].UUID)
 		if group != nil {
-			groups = append(groups, group.ID())
+			groupIDs = append(groupIDs, group.ID())
 		}
 	}
-	bcast.b.GroupIDs = groups
 
-	return bcast, nil
+	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 	batch := &BroadcastBatch{}
+	batch.b.BroadcastID = b.b.BroadcastID
 	batch.b.BaseLanguage = b.b.BaseLanguage
 	batch.b.Translations = b.b.Translations
+	batch.b.TemplateState = b.b.TemplateState
 	batch.b.OrgID = b.b.OrgID
 	batch.b.ContactIDs = contactIDs
 	return batch
@@ -539,15 +577,18 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {
 	b struct {
-		Translations map[utils.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage utils.Language                           `json:"base_language"`
-		URNs         map[ContactID]urns.URN                   `json:"urns,omitempty"`
-		ContactIDs   []ContactID                              `json:"contact_ids,omitempty"`
-		IsLast       bool                                     `json:"is_last"`
-		OrgID        OrgID                                    `json:"org_id"`
+		BroadcastID   BroadcastID                              `json:"broadcast_id,omitempty"`
+		Translations  map[utils.Language]*BroadcastTranslation `json:"translations"`
+		BaseLanguage  utils.Language                           `json:"base_language"`
+		TemplateState TemplateState                            `json:"template_state"`
+		URNs          map[ContactID]urns.URN                   `json:"urns,omitempty"`
+		ContactIDs    []ContactID                              `json:"contact_ids,omitempty"`
+		IsLast        bool                                     `json:"is_last"`
+		OrgID         OrgID                                    `json:"org_id"`
 	}
 }
 
+func (b *BroadcastBatch) BroadcastID() BroadcastID            { return b.b.BroadcastID }
 func (b *BroadcastBatch) ContactIDs() []ContactID             { return b.b.ContactIDs }
 func (b *BroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.URNs }
 func (b *BroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
@@ -555,6 +596,7 @@ func (b *BroadcastBatch) OrgID() OrgID                        { return b.b.OrgID
 func (b *BroadcastBatch) Translations() map[utils.Language]*BroadcastTranslation {
 	return b.b.Translations
 }
+func (b *BroadcastBatch) TemplateState() TemplateState { return b.b.TemplateState }
 func (b *BroadcastBatch) BaseLanguage() utils.Language { return b.b.BaseLanguage }
 func (b *BroadcastBatch) IsLast() bool                 { return b.b.IsLast }
 func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
@@ -562,7 +604,7 @@ func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
 func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, sa flows.SessionAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, org *OrgAssets, sa flows.SessionAssets, bcast *BroadcastBatch) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
 	broadcastURNs := bcast.URNs()
 
@@ -680,9 +722,33 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 			return nil, nil
 		}
 
+		template := ""
+
+		// if this is a legacy template, migrate it forward
+		if bcast.TemplateState() == TemplateStateLegacy {
+			template, _ = expressions.MigrateTemplate(t.Text, nil)
+		} else if bcast.TemplateState() == TemplateStateUnevaluated {
+			template = t.Text
+		}
+
+		text := t.Text
+
+		// if we have a template, evaluate it
+		if template != "" {
+			contactCtx := flows.Context(org.Env(), contact)
+			templateCtx := types.NewXObject(map[string]types.XValue{"contact": contactCtx})
+			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template)
+		}
+
+		// don't do anything if we have no text or attachments
+		if text == "" && len(t.Attachments) == 0 {
+			return nil, nil
+		}
+
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), t.Text, t.Attachments, t.QuickReplies)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil)
 		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now())
+		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
@@ -716,6 +782,21 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 		}
 	}
 
+	// get a topup to assign to our messages
+	rc := rp.Get()
+	topup, err := DecrementOrgCredits(ctx, db, rc, org.OrgID(), len(msgs))
+	rc.Close()
+	if err != nil {
+		return nil, errors.Wrapf(err, "error finding active topup")
+	}
+
+	// if we have an active topup, assign it to our messages
+	if topup != NilTopupID {
+		for _, m := range msgs {
+			m.SetTopup(topup)
+		}
+	}
+
 	// insert them in a single request
 	err = InsertMessages(ctx, db, msgs)
 	if err != nil {
@@ -724,6 +805,22 @@ func CreateBroadcastMessages(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 
 	return msgs, nil
 }
+
+// MarkBroadcastSent marks the passed in broadcast as sent
+func MarkBroadcastSent(ctx context.Context, db *sqlx.DB, id BroadcastID) error {
+	// noop if it is a nil id
+	if id == NilBroadcastID {
+		return nil
+	}
+
+	_, err := db.ExecContext(ctx, `UPDATE msgs_broadcast SET status = 'S', modified_on = now() WHERE id = $1`, id)
+	if err != nil {
+		return errors.Wrapf(err, "error setting broadcast with id %d as sent", id)
+	}
+	return nil
+}
+
+// NilID implementations
 
 // MarshalJSON marshals into JSON. 0 values will become null
 func (i MsgID) MarshalJSON() ([]byte, error) {
@@ -742,5 +839,25 @@ func (i MsgID) Value() (driver.Value, error) {
 
 // Scan scans from the db value. null values become 0
 func (i *MsgID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
+}
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i BroadcastID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *BroadcastID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i BroadcastID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *BroadcastID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
 }

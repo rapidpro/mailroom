@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/locker"
@@ -333,7 +334,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		trigger = models.FindMatchingNewConversationTrigger(org, channel)
 
 	case models.ReferralEventType:
-		trigger = models.FindMatchingReferralTrigger(org, channel, event.Extra()["referrer_id"])
+		trigger = models.FindMatchingReferralTrigger(org, channel, event.ExtraValue("referrer_id"))
 
 	case models.MOMissEventType:
 		trigger = models.FindMatchingMissedCallTrigger(org)
@@ -375,7 +376,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	// no trigger, noop, move on
 	if trigger == nil {
-		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).Info("ignoring event, no trigger found")
+		logrus.WithField("channel_id", event.ChannelID()).WithField("event_type", eventType).WithField("extra", event.Extra()).Info("ignoring channel event, no trigger found")
 		return nil, nil
 	}
 
@@ -399,14 +400,13 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// create our parameters, we just convert this from JSON
-	// TODO: this is done because a nil XJSONObject doesn't know how to marshal itself, goflow could fix
-	params := types.NewXJSONObject([]byte("{}"))
+	var params types.XValue
 	if event.Extra() != nil {
 		asJSON, err := json.Marshal(event.Extra())
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to marshal extra from channel event")
 		}
-		params = types.NewXJSONObject(asJSON)
+		params = types.JSONToXValue(asJSON)
 	}
 
 	// build our flow trigger
@@ -601,8 +601,19 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 		// trigger flow is still active, start it
 		if flow != nil {
-			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
+			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
+			if flow.FlowType() == models.IVRFlow {
+				err = runner.TriggerIVRFlow(ctx, db, rp, org.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, func(ctx context.Context, tx *sqlx.Tx) error {
+					return models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeFlow, topup)
+				})
+				if err != nil {
+					return errors.Wrapf(err, "error while triggering ivr flow")
+				}
+				return nil
+			}
 
+			// otherwise build the trigger and start the flow directly
+			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
 			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
@@ -650,7 +661,7 @@ type MsgEvent struct {
 	URN           urns.URN           `json:"urn"`
 	URNID         models.URNID       `json:"urn_id"`
 	Text          string             `json:"text"`
-	Attachments   []flows.Attachment `json:"attachments"`
+	Attachments   []utils.Attachment `json:"attachments"`
 	NewContact    bool               `json:"new_contact"`
 }
 

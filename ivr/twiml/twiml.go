@@ -1,4 +1,4 @@
-package twilio
+package twiml
 
 import (
 	"bytes"
@@ -21,19 +21,25 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/waits"
-	"github.com/nyaruka/goflow/flows/waits/hints"
+	"github.com/nyaruka/goflow/flows/routers/waits"
+	"github.com/nyaruka/goflow/flows/routers/waits/hints"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// BaseURL is our default base URL for TWIML channels (public for testing overriding)
 var BaseURL = `https://api.twilio.com`
+
+// IgnoreSignatures controls whether we ignore signatures (public for testing overriding)
 var IgnoreSignatures = false
 
 const (
-	twilioChannelType = models.ChannelType("T")
+	twilioChannelType     = models.ChannelType("T")
+	twimlChannelType      = models.ChannelType("TW")
+	signalWireChannelType = models.ChannelType("SW")
 
 	callPath   = `/2010-04-01/Accounts/{AccountSID}/Calls.json`
 	hangupPath = `/2010-04-01/Accounts/{AccountSID}/Calls/{SID}.json`
@@ -42,11 +48,14 @@ const (
 
 	statusFailed = "failed"
 
-	inputTimeout = 120
+	gatherTimeout = 30
+	recordTimeout = 600
 
 	accountSIDConfig = "account_sid"
 	authTokenConfig  = "auth_token"
-	baseURLConfig    = "send_url"
+
+	sendURLConfig = "send_url"
+	baseURLConfig = "base_url"
 
 	errorBody = `<?xml version="1.0" encoding="UTF-8"?>
 	<Response>
@@ -59,14 +68,17 @@ const (
 var indentMarshal = true
 
 type client struct {
-	channel    *models.Channel
-	baseURL    string
-	accountSID string
-	authToken  string
+	channel      *models.Channel
+	baseURL      string
+	accountSID   string
+	authToken    string
+	validateSigs bool
 }
 
 func init() {
+	ivr.RegisterClientType(twimlChannelType, NewClientFromChannel)
 	ivr.RegisterClientType(twilioChannelType, NewClientFromChannel)
+	ivr.RegisterClientType(signalWireChannelType, NewClientFromChannel)
 }
 
 // NewClientFromChannel creates a new Twilio IVR client for the passed in account and and auth token
@@ -74,15 +86,16 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 	accountSID := channel.ConfigValue(accountSIDConfig, "")
 	authToken := channel.ConfigValue(authTokenConfig, "")
 	if accountSID == "" || authToken == "" {
-		return nil, errors.Errorf("missing auth_token or account_sid on channel config")
+		return nil, errors.Errorf("missing auth_token or account_sid on channel config: %v for channel: %s", channel.Config(), channel.UUID())
 	}
-	baseURL := channel.ConfigValue(baseURLConfig, BaseURL)
+	baseURL := channel.ConfigValue(baseURLConfig, channel.ConfigValue(sendURLConfig, BaseURL))
 
 	return &client{
-		channel:    channel,
-		baseURL:    baseURL,
-		accountSID: accountSID,
-		authToken:  authToken,
+		channel:      channel,
+		baseURL:      baseURL,
+		accountSID:   accountSID,
+		authToken:    authToken,
+		validateSigs: channel.Type() != signalWireChannelType,
 	}, nil
 }
 
@@ -187,7 +200,7 @@ func (c *client) HangupCall(client *http.Client, callID string) error {
 }
 
 // InputForRequest returns the input for the passed in request, if any
-func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, error) {
+func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
 	// this could be a timeout, in which case we return nothing at all
 	timeout := r.Form.Get("timeout")
 	if timeout == "true" {
@@ -204,15 +217,14 @@ func (c *client) InputForRequest(r *http.Request) (string, flows.Attachment, err
 	waitType := r.Form.Get("wait_type")
 	switch waitType {
 	case "gather":
-		return r.Form.Get("Digits"), flows.Attachment(""), nil
+		return r.Form.Get("Digits"), utils.Attachment(""), nil
 	case "record":
 		url := r.Form.Get("RecordingUrl")
 		if url == "" {
 			return "", ivr.NilAttachment, nil
 		}
-		return "", flows.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
+		return "", utils.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
 	default:
-		// TODO: need to download this attachment locally
 		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
 	}
 }
@@ -222,10 +234,10 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 	status := r.Form.Get("CallStatus")
 	switch status {
 
-	case "queued", "initiated", "ringing":
+	case "queued", "ringing":
 		return models.ConnectionStatusWired, 0
 
-	case "in-progress":
+	case "in-progress", "initiated":
 		return models.ConnectionStatusInProgress, 0
 
 	case "completed":
@@ -244,7 +256,7 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
 func (c *client) ValidateRequestSignature(r *http.Request) error {
 	// shortcut for testing
-	if IgnoreSignatures {
+	if IgnoreSignatures || !c.validateSigs {
 		return nil
 	}
 
@@ -398,8 +410,9 @@ type Gather struct {
 }
 
 type Record struct {
-	XMLName string `xml:"Record"`
-	Action  string `xml:"action,attr,omitempty"`
+	XMLName   string `xml:"Record"`
+	Action    string `xml:"action,attr,omitempty"`
+	MaxLength int    `xml:"maxLength,attr,omitempty"`
 }
 
 type Response struct {
@@ -409,7 +422,7 @@ type Response struct {
 	Commands []interface{} `xml:",innerxml"`
 }
 
-func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string, error) {
+func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 
@@ -428,7 +441,7 @@ func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string
 	}
 
 	if w != nil {
-		msgWait, isMsgWait := w.(*waits.MsgWait)
+		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
 		if !isMsgWait {
 			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
 		}
@@ -439,7 +452,7 @@ func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string
 			gather := &Gather{
 				Action:   resumeURL,
 				Commands: commands,
-				Timeout:  inputTimeout,
+				Timeout:  gatherTimeout,
 			}
 			if hint.Count != nil {
 				gather.NumDigits = *hint.Count
@@ -450,7 +463,7 @@ func responseForSprint(resumeURL string, w flows.Wait, es []flows.Event) (string
 
 		case *hints.AudioHint:
 			resumeURL = resumeURL + "&wait_type=record"
-			commands = append(commands, Record{Action: resumeURL})
+			commands = append(commands, Record{Action: resumeURL, MaxLength: recordTimeout})
 			commands = append(commands, Redirect{URL: resumeURL + "&empty=true"})
 			r.Commands = commands
 

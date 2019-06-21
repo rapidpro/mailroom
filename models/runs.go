@@ -96,7 +96,7 @@ type Session struct {
 	sprint flows.Sprint
 
 	// we also keep around a reference to the wait (if any)
-	wait flows.Wait
+	wait flows.ActivatedWait
 }
 
 func (s *Session) ID() SessionID                      { return s.s.ID }
@@ -137,7 +137,7 @@ func (s *Session) Sprint() flows.Sprint {
 }
 
 // Wait returns the wait associated with this session (if any)
-func (s *Session) Wait() flows.Wait {
+func (s *Session) Wait() flows.ActivatedWait {
 	return s.wait
 }
 
@@ -408,11 +408,11 @@ func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment) (fl
 // calculates the timeout value for this session based on our waits
 func (s *Session) calculateTimeout(fs flows.Session, sprint flows.Sprint) {
 	// if we are on a wait and it has a timeout
-	if fs.Wait() != nil && fs.Wait().Timeout() != nil {
+	if fs.Wait() != nil && fs.Wait().TimeoutSeconds() != nil {
 		now := time.Now()
 		s.s.WaitStartedOn = &now
 
-		seconds := time.Duration(*fs.Wait().Timeout()) * time.Second
+		seconds := time.Duration(*fs.Wait().TimeoutSeconds()) * time.Second
 		s.timeout = &seconds
 
 		timeoutOn := now.Add(seconds)

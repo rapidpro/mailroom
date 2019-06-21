@@ -47,8 +47,8 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 
 		for _, m := range args {
 			msg := m.(*models.Msg)
-			if msg.TopupID() != models.NilTopupID {
-				channel := msg.Channel()
+			channel := msg.Channel()
+			if msg.TopupID() != models.NilTopupID && channel != nil {
 				if channel.Type() == models.ChannelTypeAndroid {
 					androidChannels[channel] = true
 				} else {

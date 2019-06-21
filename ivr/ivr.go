@@ -34,13 +34,17 @@ type CallID string
 
 const (
 	NilCallID     = CallID("")
-	NilAttachment = flows.Attachment("")
+	NilAttachment = utils.Attachment("")
+
+	// Our user agent
+	userAgent = "Mailroom/"
+
+	// ErrorMessage that is spoken to an IVR user if an error occurs
+	ErrorMessage = "An error has occurred, please try again later."
 )
 
-const userAgent = "Mailroom/"
-
-// Message that is spoken to an IVR user if an error occurs
-const ErrorMessage = "An error has occurred, please try again later."
+// WriteAttachments controls whether we write attachments, used during unit testing
+var WriteAttachments = true
 
 // CallEndedError is our constant error for when a call has ended
 var CallEndedError = fmt.Errorf("call ended")
@@ -78,7 +82,7 @@ type Client interface {
 
 	WriteEmptyResponse(w http.ResponseWriter, msg string) error
 
-	InputForRequest(r *http.Request) (string, flows.Attachment, error)
+	InputForRequest(r *http.Request) (string, utils.Attachment, error)
 
 	StatusForRequest(r *http.Request) (models.ConnectionStatus, int)
 
@@ -190,6 +194,11 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 		return nil, nil
 	}
 
+	hasCall := callChannel.HasRole(assets.ChannelRoleCall)
+	if !hasCall {
+		return nil, nil
+	}
+
 	// get the channel for this URN
 	channel := callChannel.Asset().(*models.Channel)
 
@@ -279,8 +288,6 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 	}
 
 	if err != nil {
-		logrus.WithError(err).Error("error placing outbound call")
-
 		// set our status as errored
 		err := conn.UpdateStatus(ctx, db, models.ConnectionStatusFailed, 0, time.Now())
 		if err != nil {
@@ -430,7 +437,6 @@ func ResumeIVRFlow(
 	if err != nil {
 		// call has ended, so will our session
 		if err == CallEndedError {
-
 			if err != nil {
 				return errors.Wrapf(err, "error marking sessions complete")
 			}
@@ -485,18 +491,20 @@ func ResumeIVRFlow(
 			path = fmt.Sprintf("/%s", path)
 		}
 
-		// write to S3
-		logrus.WithField("path", path).Info("** uploading s3 file")
-		url, err := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, contentType, body)
-		if err != nil {
-			return errors.Wrapf(err, "unable to write attachment to s3")
+		if WriteAttachments {
+			// write to S3
+			logrus.WithField("path", path).Info("** uploading s3 file")
+			url, err := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, contentType, body)
+			if err != nil {
+				return errors.Wrapf(err, "unable to write attachment to s3")
+			}
+			attachment = utils.Attachment(contentType + ":" + url)
 		}
-		attachment = flows.Attachment(contentType + ":" + url)
 	}
 
-	attachments := []flows.Attachment{}
+	attachments := []utils.Attachment{}
 	if attachment != NilAttachment {
-		attachments = []flows.Attachment{attachment}
+		attachments = []utils.Attachment{attachment}
 	}
 
 	msgIn := flows.NewMsgIn(msgUUID, urn, channel.ChannelReference(), input, attachments)
