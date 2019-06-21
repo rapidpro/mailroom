@@ -31,19 +31,18 @@ func init() {
 //   }
 //
 type migrateRequest struct {
-	Flow      json.RawMessage `json:"flow"            validate:"required"`
-	IncludeUI *bool           `json:"include_ui"` // ignored
+	Flow json.RawMessage `json:"flow" validate:"required"`
 }
 
 func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &migrateRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	flow, err := readFlow(request.Flow)
 	if err != nil {
-		return nil, http.StatusUnprocessableEntity, err
+		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	return flow, http.StatusOK, nil
@@ -71,19 +70,19 @@ type validateRequest struct {
 func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &validateRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	flow, err := readFlow(request.Flow)
 	if err != nil {
-		return nil, http.StatusUnprocessableEntity, err
+		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	// if we have an org ID, do asset validation
 	if request.OrgID != models.NilOrgID {
-		status, err := validate(s.CTX, s.DB, request.OrgID, flow)
-		if err != nil {
-			return nil, status, err
+		result, status, err := validate(s.CTX, s.DB, request.OrgID, flow)
+		if result != nil || err != nil {
+			return result, status, err
 		}
 	}
 
@@ -113,19 +112,19 @@ type inspectRequest struct {
 func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &inspectRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	flow, err := readFlow(request.Flow)
 	if err != nil {
-		return nil, http.StatusUnprocessableEntity, err
+		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	// if we have an org ID, do asset validation
 	if request.ValidateWithOrgID != models.NilOrgID {
-		status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, flow)
-		if err != nil {
-			return nil, status, err
+		result, status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, flow)
+		if result != nil || err != nil {
+			return result, status, err
 		}
 	}
 
@@ -154,28 +153,29 @@ type cloneRequest struct {
 func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &cloneRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// try to read the flow definition
 	flow, err := definition.ReadFlow(request.Flow)
 	if err != nil {
-		return nil, http.StatusUnprocessableEntity, err
+		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	clone := flow.Clone(request.DependencyMapping)
 
 	// if we have an org ID, do asset validation on the new clone
 	if request.ValidateWithOrgID != models.NilOrgID {
-		status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, clone)
-		if err != nil {
-			return nil, status, err
+		result, status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, clone)
+		if result != nil || err != nil {
+			return result, status, err
 		}
 	}
 
 	return clone, http.StatusOK, nil
 }
 
+// reads a flow from the given JSON, migrating it if it's in legacy format
 func readFlow(flowDef json.RawMessage) (flows.Flow, error) {
 	var flow flows.Flow
 	var err error
@@ -201,20 +201,20 @@ func readFlow(flowDef json.RawMessage) (flows.Flow, error) {
 	return flow, nil
 }
 
-func validate(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.Flow) (int, error) {
+func validate(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.Flow) (interface{}, int, error) {
 	org, err := models.NewOrgAssets(ctx, db, orgID, nil)
 	if err != nil {
-		return http.StatusBadRequest, err
+		return nil, 0, err
 	}
 
 	sa, err := models.NewSessionAssets(org)
 	if err != nil {
-		return http.StatusInternalServerError, errors.Wrapf(err, "unable build session assets")
+		return nil, 0, err
 	}
 
 	if err := flow.Validate(sa, nil); err != nil {
-		return http.StatusUnprocessableEntity, err
+		return errors.Wrapf(err, "flow failed validation"), http.StatusUnprocessableEntity, nil
 	}
 
-	return 0, nil
+	return nil, 0, nil
 }
