@@ -18,13 +18,15 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect
 	github.com/lib/pq v1.0.0
+	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.0.1
-	github.com/nyaruka/goflow v0.41.14
+	github.com/nyaruka/goflow v0.41.15
 	github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.1.1
+	github.com/olivere/elastic v6.2.21+incompatible
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.8.1
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24

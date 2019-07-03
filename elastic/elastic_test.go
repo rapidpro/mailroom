@@ -24,11 +24,11 @@ func (r *MockRegistry) LookupField(key string) *Field {
 	}
 
 	if field.Category == Scheme && r.IsAnon {
-		return &Field{key, Unavailable, TextType, ""}
+		return &Field{key, Unavailable, Text, ""}
 	}
 
 	if field.Category == Implicit && r.IsAnon {
-		return &Field{"name_id", Implicit, TextType, ""}
+		return &Field{"name_id", Implicit, Text, ""}
 	}
 
 	return field
@@ -37,22 +37,22 @@ func (r *MockRegistry) LookupField(key string) *Field {
 func TestElasticQuery(t *testing.T) {
 	registry := &MockRegistry{
 		Fields: map[string]*Field{
-			"name":       &Field{"name", ContactAttribute, TextType, ""},
-			"id":         &Field{"id", ContactAttribute, TextType, ""},
-			"language":   &Field{"language", ContactAttribute, TextType, ""},
-			"created_on": &Field{"created_on", ContactAttribute, DateTimeType, ""},
+			"name":       &Field{"name", ContactAttribute, Text, ""},
+			"id":         &Field{"id", ContactAttribute, Text, ""},
+			"language":   &Field{"language", ContactAttribute, Text, ""},
+			"created_on": &Field{"created_on", ContactAttribute, DateTime, ""},
 
-			"age":      &Field{"age", ContactField, NumberType, "6b6a43fa-a26d-4017-bede-328bcdd5c93b"},
-			"color":    &Field{"color", ContactField, TextType, "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"},
-			"dob":      &Field{"dob", ContactField, DateTimeType, "cbd3fc0e-9b74-4207-a8c7-248082bb4572"},
-			"state":    &Field{"state", ContactField, StateType, "67663ad1-3abc-42dd-a162-09df2dea66ec"},
-			"district": &Field{"district", ContactField, DistrictType, "54c72635-d747-4e45-883c-099d57dd998e"},
-			"ward":     &Field{"ward", ContactField, WardType, "fde8f740-c337-421b-8abb-83b954897c80"},
+			"age":      &Field{"age", ContactField, Number, "6b6a43fa-a26d-4017-bede-328bcdd5c93b"},
+			"color":    &Field{"color", ContactField, Text, "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"},
+			"dob":      &Field{"dob", ContactField, DateTime, "cbd3fc0e-9b74-4207-a8c7-248082bb4572"},
+			"state":    &Field{"state", ContactField, State, "67663ad1-3abc-42dd-a162-09df2dea66ec"},
+			"district": &Field{"district", ContactField, District, "54c72635-d747-4e45-883c-099d57dd998e"},
+			"ward":     &Field{"ward", ContactField, Ward, "fde8f740-c337-421b-8abb-83b954897c80"},
 
-			"tel":      &Field{"tel", Scheme, TextType, ""},
-			"whatsapp": &Field{"whatsapp", Scheme, TextType, ""},
+			"tel":      &Field{"tel", Scheme, Text, ""},
+			"whatsapp": &Field{"whatsapp", Scheme, Text, ""},
 
-			"*": &Field{"name_tel", Implicit, TextType, ""},
+			"*": &Field{"name_tel", Implicit, Text, ""},
 		},
 	}
 

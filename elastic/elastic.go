@@ -22,12 +22,12 @@ const Implicit = FieldCategory("implicit")
 
 type FieldType string
 
-const TextType = FieldType("text")
-const DateTimeType = FieldType("datetime")
-const NumberType = FieldType("number")
-const StateType = FieldType("state")
-const DistrictType = FieldType("district")
-const WardType = FieldType("ward")
+const Text = FieldType("text")
+const DateTime = FieldType("datetime")
+const Number = FieldType("number")
+const State = FieldType("state")
+const District = FieldType("district")
+const Ward = FieldType("ward")
 
 type Field struct {
 	Key      string
@@ -99,7 +99,7 @@ func ConditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 	} else if field.Category == ContactField {
 		fieldQuery := q.NewTermQuery("fields.field", field.UUID)
 
-		if field.Type == TextType {
+		if field.Type == Text {
 			value := strings.ToLower(c.Value())
 			if c.Comparator() == "=" {
 				query = q.NewTermQuery("fields.text", value)
@@ -116,7 +116,7 @@ func ConditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 
 			return q.NewBoolQuery().Must(fieldQuery, query), nil
 
-		} else if field.Type == NumberType {
+		} else if field.Type == Number {
 			value, err := decimal.NewFromString(c.Value())
 			if err != nil {
 				return nil, errors.Errorf("can't convert '%s' to a number", c.Value())
@@ -138,7 +138,7 @@ func ConditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 
 			return q.NewBoolQuery().Must(fieldQuery, query), nil
 
-		} else if field.Type == DateTimeType {
+		} else if field.Type == DateTime {
 			value, err := utils.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to parse datetime: %s", c.Value())
@@ -161,15 +161,15 @@ func ConditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 
 			return q.NewBoolQuery().Must(fieldQuery, query), nil
 
-		} else if field.Type == StateType || field.Type == DistrictType || field.Type == WardType {
+		} else if field.Type == State || field.Type == District || field.Type == Ward {
 			value := strings.ToLower(c.Value())
 			var name = ""
 
-			if field.Type == WardType {
+			if field.Type == Ward {
 				name = "fields.ward"
-			} else if field.Type == DistrictType {
+			} else if field.Type == District {
 				name = "fields.district"
-			} else if field.Type == StateType {
+			} else if field.Type == State {
 				name = "fields.state"
 			}
 			name += "_keyword"
