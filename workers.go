@@ -161,7 +161,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 		panicLog := recover()
 		if panicLog != nil {
 			debug.PrintStack()
-			log.Errorf("panic handling task: %s", panicLog)
+			log.WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Errorf("panic handling task: %s", panicLog)
 		}
 
 		// mark our task as complete

@@ -71,14 +71,9 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	}
 
 	// validate our flow
-	missing, err := sa.Validate(flow.UUID())
+	err = validateFlow(sa, flow.UUID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "invalid flow: %s, cannot resume", flow.UUID())
-	}
-
-	// log any missing references, this shouldn't happen and we should fix it
-	if len(missing) > 0 {
-		logrus.WithField("flow_uuid", flow.UUID()).WithField("missing", missing).Error("flow being resumed with missing dependencies")
 	}
 
 	// build our flow session
@@ -169,7 +164,7 @@ func StartFlowBatch(
 	// try to load our flow
 	flow, err := org.FlowByID(batch.FlowID())
 	if err == models.ErrNotFound {
-		logrus.WithField("flow_uuid", flow.UUID()).Info("skipping flow start, flow no longer active or archived")
+		logrus.WithField("flow_id", batch.FlowID()).Info("skipping flow start, flow no longer active or archived")
 		return nil, nil
 	}
 	if err != nil {
@@ -423,20 +418,15 @@ func StartFlow(
 	}
 
 	// build our session assets
-	assets, err := models.GetSessionAssets(org)
+	sa, err := models.GetSessionAssets(org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow, unable to load assets")
 	}
 
 	// validate our flow
-	missing, err := assets.Validate(flow.UUID())
+	err = validateFlow(sa, flow.UUID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "invalid flow: %s, cannot start", flow.UUID())
-	}
-
-	// log any missing references, this shouldn't happen and we should fix it
-	if len(missing) > 0 {
-		logrus.WithField("flow_uuid", flow.UUID()).WithField("missing", missing).Error("flow being started with missing dependencies")
 	}
 
 	// we now need to grab locks for our contacts so that they are never in two starts or handles at the
@@ -485,14 +475,14 @@ func StartFlow(
 		// ok, we've filtered our contacts, build our triggers
 		triggers := make([]flows.Trigger, 0, len(locked))
 		for _, c := range contacts {
-			contact, err := c.FlowContact(org, assets)
+			contact, err := c.FlowContact(org, sa)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating flow contact")
 			}
 			triggers = append(triggers, options.TriggerBuilder(contact))
 		}
 
-		ss, err := StartFlowForContacts(ctx, db, rp, org, assets, flow, triggers, options.CommitHook, options.Interrupt)
+		ss, err := StartFlowForContacts(ctx, db, rp, org, sa, flow, triggers, options.CommitHook, options.Interrupt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error starting flow for contacts")
 		}
@@ -527,20 +517,18 @@ func StartFlowForContacts(
 	}
 
 	start := time.Now()
-	log := logrus.WithField("flow_name", flow.Name).WithField("flow_uuid", flow.UUID)
+	log := logrus.WithField("flow_name", flow.Name()).WithField("flow_uuid", flow.UUID())
 
 	// for each trigger start the flow
 	sessions := make([]flows.Session, 0, len(triggers))
 	sprints := make([]flows.Sprint, 0, len(triggers))
 
 	for _, trigger := range triggers {
-		// create the session for this flow and run
-		session := goflow.Engine().NewSession(assets)
-
-		// start our flow
+		// start our flow session
 		log := log.WithField("contact_uuid", trigger.Contact().UUID())
 		start := time.Now()
-		sprint, err := session.Start(trigger)
+
+		session, sprint, err := goflow.Engine().NewSession(assets, trigger)
 		if err != nil {
 			log.WithError(err).Errorf("error starting flow")
 			continue
@@ -733,6 +721,27 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 	err = queue.AddTask(rc, queue.BatchQueue, queue.StartIVRFlowBatch, int(orgID), task, queue.HighPriority)
 	if err != nil {
 		return errors.Wrapf(err, "error queuing ivr flow start")
+	}
+
+	return nil
+}
+
+func validateFlow(sa flows.SessionAssets, uuid assets.FlowUUID) error {
+	flow, err := sa.Flows().Get(uuid)
+	if err != nil {
+		return errors.Wrapf(err, "invalid flow: %s, cannot start", flow.UUID())
+	}
+
+	// check for missing assets and log
+	missingDeps := make([]string, 0)
+	err = flow.ValidateRecursive(sa, func(r assets.Reference) {
+		missingDeps = append(missingDeps, r.String())
+	})
+
+	// one day we might error if we encounter missing dependencies but for now it's too common so log them
+	// to help us find whatever problem is creating them
+	if len(missingDeps) > 0 {
+		logrus.WithField("flow_uuid", flow.UUID()).WithField("missing", missingDeps).Warn("flow being started with missing dependencies")
 	}
 
 	return nil

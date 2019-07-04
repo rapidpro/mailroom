@@ -223,9 +223,9 @@ type fieldValueEnvelope struct {
 	Text     types.XText        `json:"text"`
 	Datetime *types.XDateTime   `json:"datetime,omitempty"`
 	Number   *types.XNumber     `json:"number,omitempty"`
-	State    flows.LocationPath `json:"state,omitempty"`
-	District flows.LocationPath `json:"district,omitempty"`
-	Ward     flows.LocationPath `json:"ward,omitempty"`
+	State    utils.LocationPath `json:"state,omitempty"`
+	District utils.LocationPath `json:"district,omitempty"`
+	Ward     utils.LocationPath `json:"ward,omitempty"`
 }
 
 type ContactURN struct {
@@ -422,9 +422,9 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 	err = tx.GetContext(ctx, &contactID,
 		`INSERT INTO 
 		contacts_contact
-			(org_id, is_active, is_blocked, is_test, is_stopped, uuid, created_on, modified_on, created_by_id, modified_by_id, name) 
+			(org_id, is_active, is_blocked, is_stopped, uuid, created_on, modified_on, created_by_id, modified_by_id, name) 
 		VALUES
-			($1, TRUE, FALSE, FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
+			($1, TRUE, FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
 		RETURNING id`,
 		org.OrgID(), utils.NewUUID(),
 	)
@@ -694,17 +694,12 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAs
 		return errors.Errorf("can't set preferred URN on contact with no URNs")
 	}
 
-	// no channel, that's an error
-	if channel == nil {
-		return errors.Errorf("can't set preferred channel to a nil channel")
-	}
-
-	// is this already our top URN
+	// is this already our top URN?
 	topURNID := URNID(GetURNInt(c.urns[0], "id"))
 	topChannelID := GetURNChannelID(org, c.urns[0])
 
 	// we are already the top URN, nothing to do
-	if topURNID == urnID && topChannelID != nil && *topChannelID == channel.ID() {
+	if topURNID == urnID && topChannelID != nil && channel != nil && *topChannelID == channel.ID() {
 		return nil
 	}
 

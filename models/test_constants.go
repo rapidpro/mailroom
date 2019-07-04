@@ -86,6 +86,8 @@ var TestersGroupUUID = assets.GroupUUID("5e9d8fab-5e7e-4f51-b533-261af5dea70d")
 var AgeFieldUUID = FieldUUID("903f51da-2717-47c7-a0d3-f2f32877013d")
 var GenderFieldUUID = FieldUUID("3a5891e4-756e-4dc9-8e12-b7a766168824")
 
+var CreatedOnFieldID = FieldID(2)
+
 var ReportingLabelID = LabelID(10000)
 var ReportingLabelUUID = assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698")
 

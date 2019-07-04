@@ -8,7 +8,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/null"
@@ -38,6 +37,9 @@ type OffsetUnit string
 type StartMode string
 
 const (
+	// CreatedOnKey
+	CreatedOnKey = "created_on"
+
 	// OffsetMinute means our offset is in minutes
 	OffsetMinute = OffsetUnit("M")
 
@@ -125,6 +127,10 @@ func (e *CampaignEvent) QualifiesByGroup(contact *flows.Contact) bool {
 
 // QualifiesByField returns whether the passed in contact qualifies for this event by group membership
 func (e *CampaignEvent) QualifiesByField(contact *flows.Contact) bool {
+	if e.RelativeToKey() == CreatedOnKey {
+		return true
+	}
+
 	value := contact.Fields()[e.RelativeToKey()]
 	return value != nil
 }
@@ -136,25 +142,34 @@ func (e *CampaignEvent) ScheduleForContact(tz *time.Location, now time.Time, con
 		return nil, nil
 	}
 
-	// get our value for the event
-	value := contact.Fields()[e.RelativeToKey()]
+	var start time.Time
 
-	// no value? move on
-	if value == nil {
-		return nil, nil
-	}
+	// created on is a special case
+	if e.RelativeToKey() == CreatedOnKey {
+		start = contact.CreatedOn()
+	} else {
+		// everything else is just a normal field
+		value := contact.Fields()[e.RelativeToKey()]
 
-	// get the typed value
-	typed := value.TypedValue()
-	start, isTime := typed.(types.XDateTime)
+		// no value? move on
+		if value == nil {
+			return nil, nil
+		}
 
-	// nil or not a date? move on
-	if !isTime {
-		return nil, nil
+		// get the typed value
+		typed := value.QueryValue()
+		t, isTime := typed.(time.Time)
+
+		// nil or not a date? move on
+		if !isTime {
+			return nil, nil
+		}
+
+		start = t
 	}
 
 	// calculate our next fire
-	scheduled, err := e.ScheduleForTime(tz, now, start.Native())
+	scheduled, err := e.ScheduleForTime(tz, now, start)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error calculating offset for start: %s and event: %d", start, e.ID())
 	}

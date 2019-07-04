@@ -1,12 +1,12 @@
 module github.com/nyaruka/mailroom
 
 require (
+	github.com/Masterminds/semver v1.4.2
 	github.com/apex/log v1.0.0
 	github.com/aws/aws-sdk-go v1.16.17
 	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44
 	github.com/certifi/gocertifi v0.0.0-20190105021004-abcd57078448 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/edganiukov/fcm v0.3.0
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-chi/chi v3.3.3+incompatible
@@ -20,15 +20,13 @@ require (
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
-	github.com/nyaruka/gocommon v0.2.0
-	github.com/nyaruka/goflow v0.30.2
+	github.com/nyaruka/gocommon v1.0.1
+	github.com/nyaruka/goflow v0.41.11
 	github.com/nyaruka/librato v0.0.0-20180827155909-cacc769357b8
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
-	github.com/nyaruka/null v1.0.3
-	github.com/nyaruka/phonenumbers v1.0.36 // indirect
+	github.com/nyaruka/null v1.1.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.8.1
-	github.com/satori/go.uuid v1.2.0
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
 	github.com/sirupsen/logrus v1.3.0
 	github.com/stretchr/testify v1.3.0

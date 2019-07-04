@@ -4,7 +4,7 @@ dist: trusty
 language: go
 
 go:
-  - "1.11"
+  - "1.12"
 
 env:
   global:
@@ -48,6 +48,10 @@ script:
 after_success:
   - bash <(curl -s https://codecov.io/bash)
   - rm coverage.text
+
+before_deploy:
+  - export GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2)
+  - curl https://codeload.github.com/nyaruka/goflow/tar.gz/$GOFLOW_VERSION | tar --wildcards --strip=1 -zx "*/docs/*"
 
 deploy:
   - provider: script

@@ -21,7 +21,6 @@ func TestCampaigns(t *testing.T) {
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
 	db := testsuite.DB()
-	db.MustExec(`UPDATE flows_flow SET flow_server_enabled=TRUE WHERE id = $1;`, models.FavoritesFlowID)
 	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, models.CathyID, models.GeorgeID, models.RemindersEvent1ID)
 	time.Sleep(10 * time.Millisecond)
 
@@ -53,7 +52,6 @@ func TestIVRCampaigns(t *testing.T) {
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
 	db := testsuite.DB()
-	db.MustExec(`UPDATE flows_flow SET flow_server_enabled=TRUE WHERE id = $1;`, models.IVRFlowID)
 	db.MustExec(`UPDATE campaigns_campaignevent SET flow_id = $1 WHERE id = $2`, models.IVRFlowID, models.RemindersEvent1ID)
 	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, models.CathyID, models.GeorgeID, models.RemindersEvent1ID)
 	time.Sleep(10 * time.Millisecond)

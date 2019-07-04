@@ -29,6 +29,8 @@ const (
 
 	MatchFirst = "F"
 	MatchOnly  = "O"
+
+	NilTriggerID = TriggerID(0)
 )
 
 // Trigger represents a trigger in an organization
@@ -166,16 +168,19 @@ func FindMatchingReferralTrigger(org *OrgAssets, channel *Channel, referrerID st
 	for _, t := range org.Triggers() {
 		if t.TriggerType() == ReferralTriggerType {
 			// matches referrer id? that takes top precedence, return right away
-			if referrerID != "" && referrerID == t.ReferrerID() {
+			if referrerID != "" && referrerID == t.ReferrerID() && (t.ChannelID() == NilChannelID || t.ChannelID() == channel.ID()) {
 				return t
 			}
 
-			// matches channel? that is a good match
-			if t.ChannelID() == channel.ID() {
-				match = t
-			} else if match == nil && t.ChannelID() == NilChannelID {
-				// otherwise if we haven't been set yet, pick that
-				match = t
+			// if this trigger has no referrer id, maybe we match by channel
+			if t.ReferrerID() == "" {
+				// matches channel? that is a good match
+				if t.ChannelID() == channel.ID() {
+					match = t
+				} else if match == nil && t.ChannelID() == NilChannelID {
+					// otherwise if we haven't been set yet, pick that
+					match = t
+				}
 			}
 		}
 	}

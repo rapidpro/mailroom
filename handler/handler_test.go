@@ -42,6 +42,11 @@ func TestMsgEvents(t *testing.T) {
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
 		VALUES(TRUE, now(), now(), '', false, $1, 'C', 'O', 1, 1, 2, 0) RETURNING id`, models.Org2SingleMessageFlowID)
 
+	db.MustExec(
+		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
+		VALUES(TRUE, now(), now(), 'ivr', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`, models.IVRFlowID)
+
 	models.FlushCache()
 
 	tcs := []struct {
@@ -70,6 +75,8 @@ func TestMsgEvents(t *testing.T) {
 		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "blargh", "Hey, how are you?", models.Org2ChannelID, models.Org2},
 
 		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
+
+		{models.BobID, models.BobURN, models.BobURNID, "ivr", "", models.TwitterChannelID, models.Org1},
 	}
 
 	makeMsgTask := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *queue.Task {
@@ -114,6 +121,12 @@ func TestMsgEvents(t *testing.T) {
 		assert.Equal(t, text, tc.Response, "%d: response: '%s' does not contain '%s'", i, text, tc.Response)
 	}
 
+	// should have one remaining IVR task to handle for Bob
+	task, err := queue.PopNextTask(rc, queue.BatchQueue)
+	assert.NoError(t, err)
+	assert.NotNil(t, task)
+	assert.Equal(t, queue.StartIVRFlowBatch, task.Type)
+
 	// should have 7 queued priority messages
 	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", models.Org2ChannelUUID)))
 	assert.NoError(t, err)
@@ -127,7 +140,7 @@ func TestMsgEvents(t *testing.T) {
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, models.Org2FredID)
-	task := makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
+	task = makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
 	AddHandleTask(rc, models.Org2FredID, task)
 
 	// should get requeued three times automatically
@@ -216,7 +229,7 @@ func TestChannelEvents(t *testing.T) {
 		URNID     models.URNID
 		OrgID     models.OrgID
 		ChannelID models.ChannelID
-		Extra     map[string]string
+		Extra     map[string]interface{}
 		Response  string
 	}{
 		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?"},

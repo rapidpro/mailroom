@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	sqlx_types "github.com/jmoiron/sqlx/types"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
@@ -32,18 +32,18 @@ func TestMsgs(t *testing.T) {
 		ContactID    ContactID
 		URN          urns.URN
 		ContactURNID URNID
-		Attachments  flows.AttachmentList
+		Attachments  []utils.Attachment
 		QuickReplies []string
-		Metadata     sqlx_types.JSONText
+		Metadata     map[string]interface{}
 		MsgCount     int
 		HasErr       bool
 	}{
 		{chanUUID, channel, "missing urn id", CathyID, urns.URN("tel:+250700000001"), URNID(0),
-			nil, nil, sqlx_types.JSONText(nil), 1, true},
+			nil, nil, map[string]interface{}{}, 1, true},
 		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
-			nil, []string{"yes", "no"}, sqlx_types.JSONText(`{"quick_replies":["yes","no"]}`), 1, false},
+			nil, []string{"yes", "no"}, map[string]interface{}{"quick_replies": []string{"yes", "no"}}, 1, false},
 		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
-			flows.AttachmentList([]flows.Attachment{flows.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}), nil, sqlx_types.JSONText(nil), 2, false},
+			[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}, nil, map[string]interface{}{}, 2, false},
 	}
 
 	now := time.Now()
@@ -53,7 +53,7 @@ func TestMsgs(t *testing.T) {
 		tx, err := db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies)
+		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil)
 		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now)
 
 		if err == nil {
@@ -102,6 +102,6 @@ func TestNormalizeAttachment(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assert.Equal(t, tc.normalized, string(NormalizeAttachment(flows.Attachment(tc.raw))))
+		assert.Equal(t, tc.normalized, string(NormalizeAttachment(utils.Attachment(tc.raw))))
 	}
 }
