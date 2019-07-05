@@ -65,9 +65,9 @@ func TestServer(t *testing.T) {
 
 		{URL: "/mr/flow/clone", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid.json", Status: 200, ResponsePattern: `"uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"`},
-		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_struct_invalid.json", Status: 422, Response: `{"error": "unable to read node: field 'uuid' is required"}`},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_struct_invalid.json", Status: 422, Response: `{"error": "unable to read flow: unable to read node: field 'uuid' is required"}`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_missing_dep_mapping.json", Status: 422, ResponsePattern: `group\[uuid=[-0-9a-f]{36},name=Testers\]`},
-		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid_bad_org.json", Status: 400, Response: `{"error": "error loading environment for org 167733: no org with id: 167733"}`},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid_bad_org.json", Status: 500, Response: `{"error": "error loading environment for org 167733: no org with id: 167733"}`},
 	}
 
 	for _, tc := range tcs {
