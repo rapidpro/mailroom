@@ -557,7 +557,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// gather all our pre commit events, group them by hook and apply them
 	err = ApplyPreEventHooks(ctx, tx, rp, org, []*Session{s})
 	if err != nil {
-		return errors.Wrapf(err, "error applying pre commit hooks")
+		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
 
 	return nil
@@ -695,7 +695,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	// gather all our pre commit events, group them by hook
 	err = ApplyPreEventHooks(ctx, tx, rp, org, sessions)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error applying pre commit hooks")
+		return nil, errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
 
 	// return our session
