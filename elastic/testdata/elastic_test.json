@@ -1,5 +1,10 @@
 [
     {
+        "label": "valid empty color",
+        "search": "color!=\"\"",
+        "query": ""
+    },
+    {
         "label": "valid text =",
         "search": "color=red",
         "query": {
@@ -358,8 +363,10 @@
         "search": "7979",
         "is_anon": true,
         "query": {
-            "term": {
-                "ids": 7979
+            "ids": {
+                "values": [
+                    "7979"
+                ]
             }
         }
     },
@@ -583,8 +590,10 @@
         "label": "valid id =",
         "search": "id=123",
         "query": {
-            "term": {
-                "ids": "123"
+            "ids": {
+                "values": [
+                    "123"
+                ]
             }
         }
     },
@@ -702,15 +711,24 @@
     },
     {
         "label": "valid tel =",
-        "search": "tel!=12345",
+        "search": "tel=12345",
         "query": {
             "nested": {
                 "path": "urns",
                 "query": {
-                    "match_phrase": {
-                        "urns.path": {
-                            "query": "12345"
-                        }
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "urns.path.keyword": "12345"
+                                }
+                            },
+                            {
+                                "term": {
+                                    "urns.scheme": "tel"
+                                }
+                            }
+                        ]
                     }
                 }
             }
@@ -719,14 +737,30 @@
     {
         "label": "valid tel !=",
         "search": "tel!=12345",
+        "error": "unknown scheme comparator: !="
+    },
+    {
+        "label": "valid tel ~",
+        "search": "tel~12345",
         "query": {
             "nested": {
                 "path": "urns",
                 "query": {
-                    "match_phrase": {
-                        "urns.path": {
-                            "query": "12345"
-                        }
+                    "bool": {
+                        "must": [
+                            {
+                                "match_phrase": {
+                                    "urns.path": {
+                                        "query": "12345"
+                                    }
+                                }
+                            },
+                            {
+                                "term": {
+                                    "urns.scheme": "tel"
+                                }
+                            }
+                        ]
                     }
                 }
             }

@@ -12,23 +12,46 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// FieldCategory is our type for the category of field this is
 type FieldCategory string
 
+// ContactAttribute is a system attribute of the contact, such as id, name or language
 const ContactAttribute = FieldCategory("attribute")
+
+// ContactField is a user created field on a contact
 const ContactField = FieldCategory("field")
+
+// Scheme is a URN scheme
 const Scheme = FieldCategory("scheme")
+
+// Unavailable means this field is not available for querying, such as schemes on anon orgs
 const Unavailable = FieldCategory("unavailable")
+
+// Implicit is used when no explicit query is asked for
 const Implicit = FieldCategory("implicit")
 
+// FieldType represents the type of the data for an elastic field
 type FieldType string
 
+// Text is our FieldType for text fields
 const Text = FieldType("text")
+
+// DateTime is our FieldType for date time fields
 const DateTime = FieldType("datetime")
+
+// Number is our FieldType for number fields
 const Number = FieldType("number")
+
+// State is our FieldType for state fields
 const State = FieldType("state")
+
+// District is our FieldType for district fields
 const District = FieldType("district")
+
+// Ward is our field type for ward fields
 const Ward = FieldType("ward")
 
+// Field represents a field that elastic can search against
 type Field struct {
 	Key      string
 	Category FieldCategory
@@ -41,20 +64,21 @@ type FieldRegistry interface {
 	LookupField(key string) *Field
 }
 
+// ToElasticQuery converts a contactql query to an Elastic query
 func ToElasticQuery(env utils.Environment, registry FieldRegistry, node contactql.QueryNode) (q.Query, error) {
 	switch n := node.(type) {
 	case *contactql.ContactQuery:
 		return ToElasticQuery(env, registry, n.Root())
 	case *contactql.BoolCombination:
-		return BoolCombinationToElasticQuery(env, registry, n)
+		return boolCombinationToElasticQuery(env, registry, n)
 	case *contactql.Condition:
-		return ConditionToElasticQuery(env, registry, n)
+		return conditionToElasticQuery(env, registry, n)
 	default:
 		return nil, errors.Errorf("unknown type converting to elastic query: %v", n)
 	}
 }
 
-func BoolCombinationToElasticQuery(env utils.Environment, registry FieldRegistry, combination *contactql.BoolCombination) (q.Query, error) {
+func boolCombinationToElasticQuery(env utils.Environment, registry FieldRegistry, combination *contactql.BoolCombination) (q.Query, error) {
 	queries := make([]q.Query, len(combination.Children()))
 	for i, child := range combination.Children() {
 		childQuery, err := ToElasticQuery(env, registry, child)
@@ -71,7 +95,7 @@ func BoolCombinationToElasticQuery(env utils.Environment, registry FieldRegistry
 	return q.NewBoolQuery().Should(queries...), nil
 }
 
-func ConditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *contactql.Condition) (q.Query, error) {
+func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *contactql.Condition) (q.Query, error) {
 	field := registry.LookupField(c.Key())
 	if field == nil {
 		return nil, errors.Errorf("unable to find field: %s", c.Key())
@@ -90,7 +114,7 @@ func ConditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 
 		} else if field.Key == "name_id" {
 			if number != 0 {
-				return q.NewTermQuery("ids", number), nil
+				return q.NewIdsQuery().Ids(c.Value()), nil
 			}
 			return q.NewMatchQuery("name", c.Value()), nil
 		} else {
@@ -208,7 +232,7 @@ func ConditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 			}
 		} else if field.Key == "id" {
 			if c.Comparator() == "=" {
-				return q.NewTermQuery("ids", value), nil
+				return q.NewIdsQuery().Ids(value), nil
 			}
 			return nil, fmt.Errorf("unknown comparator for id: %s", c.Comparator())
 		} else if field.Key == "language" {
@@ -246,9 +270,15 @@ func ConditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 		value := strings.ToLower(c.Value())
 
 		if c.Comparator() == "=" {
-			return q.NewNestedQuery("urns", q.NewTermQuery("urns.path.keyword", value)), nil
-		} else if c.Comparator() == "!=" {
-			return q.NewNestedQuery("urns", q.NewMatchPhraseQuery("urns.path", value)), nil
+			return q.NewNestedQuery("urns", q.NewBoolQuery().Must(
+				q.NewTermQuery("urns.path.keyword", value),
+				q.NewTermQuery("urns.scheme", field.Key)),
+			), nil
+		} else if c.Comparator() == "~" {
+			return q.NewNestedQuery("urns", q.NewBoolQuery().Must(
+				q.NewMatchPhraseQuery("urns.path", value),
+				q.NewTermQuery("urns.scheme", field.Key)),
+			), nil
 		} else {
 			return nil, fmt.Errorf("unknown scheme comparator: %s", c.Comparator())
 		}
