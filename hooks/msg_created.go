@@ -190,7 +190,7 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 		return nil
 	}
 
-	// messaging flows must have urn id set on them, if not, go look it up
+	// messages in messaging flows must have urn id set on them, if not, go look it up
 	if session.SessionType() == models.MessagingFlow {
 		urn := event.Msg.URN()
 		if models.GetURNInt(urn, "id") == 0 {
