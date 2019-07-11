@@ -582,6 +582,8 @@ func StartFlowForContacts(
 
 	// retry committing our sessions one at a time
 	if err != nil {
+		logrus.WithError(err).Debug("failed committing bulk transaction, retrying one at a time")
+
 		tx.Rollback()
 
 		// we failed writing our sessions in one go, try one at a time
