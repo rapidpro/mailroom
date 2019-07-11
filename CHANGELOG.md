@@ -1,3 +1,7 @@
+v2.0.11
+----------
+ * deal with brand new URNs when sending messages
+
 v2.0.10
 ----------
  * Update to goflow v0.41.16
