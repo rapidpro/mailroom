@@ -36,11 +36,11 @@ type FieldType string
 // Text is our FieldType for text fields
 const Text = FieldType("text")
 
-// DateTime is our FieldType for date time fields
-const DateTime = FieldType("datetime")
-
 // Number is our FieldType for number fields
 const Number = FieldType("number")
+
+// DateTime is our FieldType for date time fields
+const DateTime = FieldType("datetime")
 
 // State is our FieldType for state fields
 const State = FieldType("state")
@@ -123,6 +123,20 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 	} else if field.Category == ContactField {
 		fieldQuery := q.NewTermQuery("fields.field", field.UUID)
 
+		// special cases for set/unset
+		if (c.Comparator() == "=" || c.Comparator() == "!=") && c.Value() == "" {
+			query = q.NewNestedQuery("fields", q.NewBoolQuery().Must(
+				fieldQuery,
+				q.NewExistsQuery("fields."+string(field.Type)),
+			))
+
+			// if we are looking for unset, inverse our query
+			if c.Comparator() == "=" {
+				query = q.NewBoolQuery().MustNot(query)
+			}
+			return query, nil
+		}
+
 		if field.Type == Text {
 			value := strings.ToLower(c.Value())
 			if c.Comparator() == "=" {
@@ -135,7 +149,7 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 				)
 				return q.NewBoolQuery().MustNot(q.NewNestedQuery("fields", query)), nil
 			} else {
-				return nil, fmt.Errorf("unknown text comparator: %s", c.Comparator())
+				return nil, fmt.Errorf("unsupported text comparator: %s", c.Comparator())
 			}
 
 			return q.NewBoolQuery().Must(fieldQuery, query), nil
@@ -157,7 +171,7 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 			} else if c.Comparator() == "<=" {
 				query = q.NewRangeQuery("fields.number").Lte(value)
 			} else {
-				return nil, fmt.Errorf("unknown number comparator: %s", c.Comparator())
+				return nil, fmt.Errorf("unsupported number comparator: %s", c.Comparator())
 			}
 
 			return q.NewBoolQuery().Must(fieldQuery, query), nil
@@ -180,7 +194,7 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 			} else if c.Comparator() == "<=" {
 				query = q.NewRangeQuery("fields.datetime").Lt(end)
 			} else {
-				return nil, fmt.Errorf("unknown datetime comparator: %s", c.Comparator())
+				return nil, fmt.Errorf("unsupported datetime comparator: %s", c.Comparator())
 			}
 
 			return q.NewBoolQuery().Must(fieldQuery, query), nil
@@ -210,15 +224,29 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 					),
 				), nil
 			} else {
-				return nil, fmt.Errorf("unknown location comparator: %s", c.Comparator())
+				return nil, fmt.Errorf("unsupported location comparator: %s", c.Comparator())
 			}
 
 			return q.NewBoolQuery().Must(fieldQuery, query), nil
 		} else {
-			return nil, fmt.Errorf("unknown contact field type: %s", field.Type)
+			return nil, fmt.Errorf("unsupported contact field type: %s", field.Type)
 		}
 	} else if field.Category == ContactAttribute {
 		value := strings.ToLower(c.Value())
+
+		// special case for set/unset for name and language
+		if (c.Comparator() == "=" || c.Comparator() == "!=") && (field.Key == "name" || field.Key == "language") && value == "" {
+			query = q.NewBoolQuery().Must(
+				q.NewExistsQuery("name"),
+				q.NewBoolQuery().MustNot(q.NewTermQuery("name.keyword", "")),
+			)
+
+			if c.Comparator() == "=" {
+				query = q.NewBoolQuery().MustNot(query)
+			}
+
+			return query, nil
+		}
 
 		if field.Key == "name" {
 			if c.Comparator() == "=" {
@@ -228,20 +256,20 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 			} else if c.Comparator() == "!=" {
 				return q.NewBoolQuery().MustNot(q.NewTermQuery("name.keyword", c.Value())), nil
 			} else {
-				return nil, fmt.Errorf("unknown name query comparator: %s", c.Comparator())
+				return nil, fmt.Errorf("unsupported name query comparator: %s", c.Comparator())
 			}
 		} else if field.Key == "id" {
 			if c.Comparator() == "=" {
 				return q.NewIdsQuery().Ids(value), nil
 			}
-			return nil, fmt.Errorf("unknown comparator for id: %s", c.Comparator())
+			return nil, fmt.Errorf("unsupported comparator for id: %s", c.Comparator())
 		} else if field.Key == "language" {
 			if c.Comparator() == "=" {
 				return q.NewTermQuery("language", value), nil
 			} else if c.Comparator() == "!=" {
 				return q.NewBoolQuery().MustNot(q.NewTermQuery("language", value)), nil
 			} else {
-				return nil, fmt.Errorf("unknown language comparator: %s", c.Comparator())
+				return nil, fmt.Errorf("unsupported language comparator: %s", c.Comparator())
 			}
 		} else if field.Key == "created_on" {
 			value, err := utils.DateTimeFromString(env, c.Value(), false)
@@ -261,13 +289,25 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 			} else if c.Comparator() == "<=" {
 				return q.NewRangeQuery("created_on").Lt(end), nil
 			} else {
-				return nil, fmt.Errorf("unknown created_on comparator: %s", c.Comparator())
+				return nil, fmt.Errorf("unsupported created_on comparator: %s", c.Comparator())
 			}
 		} else {
-			return nil, fmt.Errorf("unknown contact attribute: %s", field.Key)
+			return nil, fmt.Errorf("unsupported contact attribute: %s", field.Key)
 		}
 	} else if field.Category == Scheme {
 		value := strings.ToLower(c.Value())
+
+		// special case for set/unset
+		if (c.Comparator() == "=" || c.Comparator() == "!=") && value == "" {
+			query = q.NewNestedQuery("urns", q.NewBoolQuery().Must(
+				q.NewTermQuery("urns.scheme", field.Key),
+				q.NewExistsQuery("urns.path"),
+			))
+			if c.Comparator() == "=" {
+				query = q.NewBoolQuery().MustNot(query)
+			}
+			return query, nil
+		}
 
 		if c.Comparator() == "=" {
 			return q.NewNestedQuery("urns", q.NewBoolQuery().Must(
@@ -280,11 +320,11 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 				q.NewTermQuery("urns.scheme", field.Key)),
 			), nil
 		} else {
-			return nil, fmt.Errorf("unknown scheme comparator: %s", c.Comparator())
+			return nil, fmt.Errorf("unsupported scheme comparator: %s", c.Comparator())
 		}
 	} else if field.Category == Unavailable {
-		return q.NewTermQuery("ids", "-1"), nil
+		return q.NewIdsQuery().Ids("-1"), nil
 	}
 
-	return nil, errors.Errorf("unknown category type: %s", field.Category)
+	return nil, errors.Errorf("unsupported category type: %s", field.Category)
 }

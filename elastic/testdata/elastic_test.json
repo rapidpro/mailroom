@@ -1,8 +1,57 @@
 [
     {
-        "label": "valid empty color",
+        "label": "valid text is set",
         "search": "color!=\"\"",
-        "query": ""
+        "query": {
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"
+                                }
+                            },
+                            {
+                                "exists": {
+                                    "field": "fields.text"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid text is unset",
+        "search": "color=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "fields.field": "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"
+                                        }
+                                    },
+                                    {
+                                        "exists": {
+                                            "field": "fields.text"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
     },
     {
         "label": "valid text =",
@@ -61,12 +110,76 @@
     {
         "label": "invalid text >",
         "search": "color > red",
-        "error": "unknown text comparator: >"
+        "error": "unsupported text comparator: >"
     },
     {
         "label": "invalid text <",
         "search": "color < red",
-        "error": "unknown text comparator: <"
+        "error": "unsupported text comparator: <"
+    },
+    {
+        "label": "invalid text < \"\"",
+        "search": "color < \"\"",
+        "error": "unsupported text comparator: <"
+    },
+    {
+        "label": "invalid text > \"\"",
+        "search": "color > \"\"",
+        "error": "unsupported text comparator: >"
+    },
+    {
+        "label": "valid number is set",
+        "search": "age!=\"\"",
+        "query": {
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                }
+                            },
+                            {
+                                "exists": {
+                                    "field": "fields.number"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid number is unset",
+        "search": "age=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                        }
+                                    },
+                                    {
+                                        "exists": {
+                                            "field": "fields.number"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
     },
     {
         "label": "valid number =",
@@ -193,7 +306,7 @@
     {
         "label": "invalid number !=",
         "search": "age!=10",
-        "error": "unknown number comparator: !="
+        "error": "unsupported number comparator: !="
     },
     {
         "label": "invalid number operand",
@@ -208,7 +321,66 @@
     {
         "label": "invalid datetime operator",
         "search": "dob!=2018-06-23",
-        "error": "unknown datetime comparator: !="
+        "error": "unsupported datetime comparator: !="
+    },
+    {
+        "label": "invalid number >",
+        "search": "age > \"\"",
+        "error": "can't convert '' to a number"
+    },
+    {
+        "label": "valid date is set",
+        "search": "dob!=\"\"",
+        "query": {
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                }
+                            },
+                            {
+                                "exists": {
+                                    "field": "fields.datetime"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid date is unset",
+        "search": "dob=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                        }
+                                    },
+                                    {
+                                        "exists": {
+                                            "field": "fields.datetime"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
     },
     {
         "label": "valid date =",
@@ -387,6 +559,60 @@
         }
     },
     {
+        "label": "valid state is set",
+        "search": "state!=\"\"",
+        "query": {
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "67663ad1-3abc-42dd-a162-09df2dea66ec"
+                                }
+                            },
+                            {
+                                "exists": {
+                                    "field": "fields.state"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid state is unset",
+        "search": "state=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "fields.field": "67663ad1-3abc-42dd-a162-09df2dea66ec"
+                                        }
+                                    },
+                                    {
+                                        "exists": {
+                                            "field": "fields.state"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
         "label": "valid state =",
         "search": "state=washington",
         "query": {
@@ -438,7 +664,61 @@
     {
         "label": "invalid state <",
         "search": "state<washington",
-        "error": "unknown location comparator: <"
+        "error": "unsupported location comparator: <"
+    },
+    {
+        "label": "valid district is set",
+        "search": "district!=\"\"",
+        "query": {
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "54c72635-d747-4e45-883c-099d57dd998e"
+                                }
+                            },
+                            {
+                                "exists": {
+                                    "field": "fields.district"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid district is unset",
+        "search": "district=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "fields.field": "54c72635-d747-4e45-883c-099d57dd998e"
+                                        }
+                                    },
+                                    {
+                                        "exists": {
+                                            "field": "fields.district"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
     },
     {
         "label": "valid district =",
@@ -492,7 +772,61 @@
     {
         "label": "invalid district <",
         "search": "district<chelan",
-        "error": "unknown location comparator: <"
+        "error": "unsupported location comparator: <"
+    },
+    {
+        "label": "valid ward is set",
+        "search": "ward!=\"\"",
+        "query": {
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "fde8f740-c337-421b-8abb-83b954897c80"
+                                }
+                            },
+                            {
+                                "exists": {
+                                    "field": "fields.ward"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid ward is unset",
+        "search": "ward=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "fields.field": "fde8f740-c337-421b-8abb-83b954897c80"
+                                        }
+                                    },
+                                    {
+                                        "exists": {
+                                            "field": "fields.ward"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
     },
     {
         "label": "valid ward =",
@@ -546,7 +880,7 @@
     {
         "label": "invalid ward <",
         "search": "ward<stevens",
-        "error": "unknown location comparator: <"
+        "error": "unsupported location comparator: <"
     },
     {
         "label": "valid name =",
@@ -554,6 +888,58 @@
         "query": {
             "term": {
                 "name.keyword": "chef"
+            }
+        }
+    },
+    {
+        "label": "valid name is unset",
+        "search": "name=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "bool": {
+                        "must": [
+                            {
+                                "exists": {
+                                    "field": "name"
+                                }
+                            },
+                            {
+                                "bool": {
+                                    "must_not": {
+                                        "term": {
+                                            "name.keyword": ""
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid name is set",
+        "search": "name!=\"\"",
+        "query": {
+            "bool": {
+                "must": [
+                    {
+                        "exists": {
+                            "field": "name"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "must_not": {
+                                "term": {
+                                    "name.keyword": ""
+                                }
+                            }
+                        }
+                    }
+                ]
             }
         }
     },
@@ -584,7 +970,7 @@
     {
         "label": "invalid name >",
         "search": "name>chef",
-        "error": "unknown name query comparator: >"
+        "error": "unsupported name query comparator: >"
     },
     {
         "label": "valid id =",
@@ -600,7 +986,59 @@
     {
         "label": "invalid id !=",
         "search": "id!=123",
-        "error": "unknown comparator for id: !="
+        "error": "unsupported comparator for id: !="
+    },
+    {
+        "label": "valid language is unset",
+        "search": "language=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "bool": {
+                        "must": [
+                            {
+                                "exists": {
+                                    "field": "name"
+                                }
+                            },
+                            {
+                                "bool": {
+                                    "must_not": {
+                                        "term": {
+                                            "name.keyword": ""
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid language is set",
+        "search": "language!=\"\"",
+        "query": {
+            "bool": {
+                "must": [
+                    {
+                        "exists": {
+                            "field": "name"
+                        }
+                    },
+                    {
+                        "bool": {
+                            "must_not": {
+                                "term": {
+                                    "name.keyword": ""
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        }
     },
     {
         "label": "valid language =",
@@ -627,7 +1065,7 @@
     {
         "label": "invalid language >",
         "search": "language>dog",
-        "error": "unknown language comparator: >"
+        "error": "unsupported language comparator: >"
     },
     {
         "label": "valid created_on >",
@@ -702,12 +1140,66 @@
     {
         "label": "invalid created_on !=",
         "search": "created_on!=2018-06-23",
-        "error": "unknown created_on comparator: !="
+        "error": "unsupported created_on comparator: !="
     },
     {
         "label": "invalid created_on operand",
         "search": "created_on<dog",
         "error": "unable to parse datetime: dog: string 'dog' couldn't be parsed as a date"
+    },
+    {
+        "label": "valid tel is set",
+        "search": "tel!=\"\"",
+        "query": {
+            "nested": {
+                "path": "urns",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "urns.scheme": "tel"
+                                }
+                            },
+                            {
+                                "exists": {
+                                    "field": "urns.path"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid tel is unset",
+        "search": "tel=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "urns",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "urns.scheme": "tel"
+                                        }
+                                    },
+                                    {
+                                        "exists": {
+                                            "field": "urns.path"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
     },
     {
         "label": "valid tel =",
@@ -737,7 +1229,7 @@
     {
         "label": "valid tel !=",
         "search": "tel!=12345",
-        "error": "unknown scheme comparator: !="
+        "error": "unsupported scheme comparator: !="
     },
     {
         "label": "valid tel ~",
@@ -769,22 +1261,24 @@
     {
         "label": "invalid tel >",
         "search": "tel>12345",
-        "error": "unknown scheme comparator: >"
+        "error": "unsupported scheme comparator: >"
     },
     {
         "label": "tel on anon org (should this be error?)",
         "search": "tel=12345",
         "is_anon": true,
         "query": {
-            "term": {
-                "ids": "-1"
+            "ids": {
+                "values": [
+                    "-1"
+                ]
             }
         }
     },
     {
-        "label": "unknown field",
-        "search": "unknown=12345",
-        "error": "unable to find field: unknown"
+        "label": "unsupported field",
+        "search": "unsupported=12345",
+        "error": "unable to find field: unsupported"
     },
     {
         "label": "bool and",
