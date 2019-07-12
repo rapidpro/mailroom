@@ -180,7 +180,7 @@ func (m *Msg) SetURN(urn urns.URN) error {
 
 	urnID := URNID(urnInt)
 	m.m.ContactURNID = &urnID
-	m.m.URNAuth = getURNAuth(urn)
+	m.m.URNAuth = GetURNAuth(urn)
 
 	return nil
 }
@@ -282,10 +282,6 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 	msg := &Msg{}
 
 	m := &msg.m
-	err := msg.SetURN(out.URN())
-	if err != nil {
-		return nil, errors.Wrapf(err, "error setting msg urn")
-	}
 
 	m.UUID = out.UUID()
 	m.Text = out.Text()
@@ -295,25 +291,22 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 	m.Visibility = VisibilityVisible
 	m.MsgType = TypeFlow
 	m.ContactID = contactID
-	m.URN = out.URN()
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
+	err := msg.SetURN(out.URN())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error setting msg urn")
+	}
+
 	if channel != nil {
 		m.ChannelUUID = channel.UUID()
 		msg.SetChannelID(channel.ID())
+		msg.channel = channel
 	}
+
 	m.MsgCount = 1
-
-	// get the id of our URN
-	urnInt := GetURNInt(out.URN(), "id")
-	if urnInt != 0 {
-		urnID := URNID(urnInt)
-		m.ContactURNID = &urnID
-	}
-
-	msg.channel = channel
 
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {

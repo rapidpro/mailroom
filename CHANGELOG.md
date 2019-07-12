@@ -1,3 +1,12 @@
+v2.0.11
+----------
+ * deal with brand new URNs when sending messages
+
+v2.0.10
+----------
+ * Update to goflow v0.41.16
+ * Fix endpoints so we don't hard error for expected requests
+
 v2.0.9
 ----------
  * Update to goflow v0.41.14

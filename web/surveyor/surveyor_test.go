@@ -108,6 +108,7 @@ func TestSurveyor(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
+		testID := fmt.Sprintf("%s[token=%s]", tc.File, tc.Token)
 		path := filepath.Join("testdata", tc.File)
 		submission, err := ioutil.ReadFile(path)
 		assert.NoError(t, err)
@@ -122,10 +123,10 @@ func TestSurveyor(t *testing.T) {
 		}
 
 		resp, err := http.DefaultClient.Do(req)
-		assert.Equal(t, tc.StatusCode, resp.StatusCode)
+		assert.Equal(t, tc.StatusCode, resp.StatusCode, "unexpected status code for %s", testID)
 
 		body, _ := ioutil.ReadAll(resp.Body)
-		assert.Containsf(t, string(body), tc.Contains, "%d does not contain expected body", i)
+		assert.Containsf(t, string(body), tc.Contains, "%s does not contain expected body", testID)
 
 		id, _ := jsonparser.GetInt(body, "contact", "id")
 		args.ContactID = flows.ContactID(id)
