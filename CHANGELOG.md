@@ -1,3 +1,11 @@
+v2.0.13
+----------
+ * fix leaking DB connections causing mailroom deadlock under certain loads
+
+v2.0.12
+----------
+ * Update to goflow v0.41.18
+
 v2.0.11
 ----------
  * deal with brand new URNs when sending messages
