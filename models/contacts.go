@@ -506,6 +506,9 @@ func URNForURN(ctx context.Context, tx Queryer, org *OrgAssets, u urns.URN) (urn
 		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE identity = $1 AND org_id = $2) r;`,
 		u.Identity(), org.OrgID(),
 	)
+	if err != nil {
+		return urns.NilURN, errors.Errorf("error selecting URN: %s", u.Identity())
+	}
 	defer rows.Close()
 
 	if !rows.Next() {
@@ -564,6 +567,11 @@ func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urn
 		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE id = $1) r;`,
 		urnID,
 	)
+	if err != nil {
+		return urns.NilURN, errors.Errorf("error selecting URN ID: %d", urnID)
+	}
+	defer rows.Close()
+
 	if !rows.Next() {
 		return urns.NilURN, errors.Errorf("no urn with id: %d", urnID)
 	}
