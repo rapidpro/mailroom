@@ -141,6 +141,7 @@ func InsertIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelI
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting new channel connection")
 	}
+	defer rows.Close()
 
 	rows.Next()
 

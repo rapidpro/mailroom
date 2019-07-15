@@ -136,10 +136,10 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 			o.is_active = TRUE AND
 			u.is_active = TRUE
 		`, token)
-
 		if err != nil {
 			return errors.Wrapf(err, "error looking up authorization header"), http.StatusUnauthorized, nil
 		}
+		defer rows.Close()
 
 		if !rows.Next() {
 			return errors.Errorf("invalid authorization header"), http.StatusUnauthorized, nil
