@@ -152,7 +152,7 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 				return nil, fmt.Errorf("unsupported text comparator: %s", c.Comparator())
 			}
 
-			return q.NewBoolQuery().Must(fieldQuery, query), nil
+			return q.NewNestedQuery("fields", q.NewBoolQuery().Must(fieldQuery, query)), nil
 
 		} else if field.Type == Number {
 			value, err := decimal.NewFromString(c.Value())
@@ -174,7 +174,7 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 				return nil, fmt.Errorf("unsupported number comparator: %s", c.Comparator())
 			}
 
-			return q.NewBoolQuery().Must(fieldQuery, query), nil
+			return q.NewNestedQuery("fields", q.NewBoolQuery().Must(fieldQuery, query)), nil
 
 		} else if field.Type == DateTime {
 			value, err := utils.DateTimeFromString(env, c.Value(), false)
@@ -197,7 +197,7 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 				return nil, fmt.Errorf("unsupported datetime comparator: %s", c.Comparator())
 			}
 
-			return q.NewBoolQuery().Must(fieldQuery, query), nil
+			return q.NewNestedQuery("fields", q.NewBoolQuery().Must(fieldQuery, query)), nil
 
 		} else if field.Type == State || field.Type == District || field.Type == Ward {
 			value := strings.ToLower(c.Value())
@@ -227,7 +227,7 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 				return nil, fmt.Errorf("unsupported location comparator: %s", c.Comparator())
 			}
 
-			return q.NewBoolQuery().Must(fieldQuery, query), nil
+			return q.NewNestedQuery("fields", q.NewBoolQuery().Must(fieldQuery, query)), nil
 		} else {
 			return nil, fmt.Errorf("unsupported contact field type: %s", field.Type)
 		}

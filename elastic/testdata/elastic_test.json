@@ -57,19 +57,24 @@
         "label": "valid text =",
         "search": "color=red",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"
-                        }
-                    },
-                    {
-                        "term": {
-                            "fields.text": "red"
-                        }
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"
+                                }
+                            },
+                            {
+                                "term": {
+                                    "fields.text": "red"
+                                }
+                            }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -185,21 +190,26 @@
         "label": "valid number =",
         "search": "age=10",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
-                        }
-                    },
-                    {
-                        "match": {
-                            "fields.number": {
-                                "query": "10"
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                }
+                            },
+                            {
+                                "match": {
+                                    "fields.number": {
+                                        "query": "10"
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -207,24 +217,29 @@
         "label": "valid number <=",
         "search": "age<=10",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields.number": {
-                                "from": null,
-                                "include_lower": true,
-                                "include_upper": true,
-                                "to": "10"
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields.number": {
+                                        "from": null,
+                                        "include_lower": true,
+                                        "include_upper": true,
+                                        "to": "10"
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -232,24 +247,29 @@
         "label": "valid number >=",
         "search": "age>=10",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields.number": {
-                                "from": "10",
-                                "include_lower": true,
-                                "include_upper": true,
-                                "to": null
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields.number": {
+                                        "from": "10",
+                                        "include_lower": true,
+                                        "include_upper": true,
+                                        "to": null
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -257,24 +277,29 @@
         "label": "valid number <",
         "search": "age<10",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields_number": {
-                                "from": null,
-                                "include_lower": true,
-                                "include_upper": false,
-                                "to": "10"
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields_number": {
+                                        "from": null,
+                                        "include_lower": true,
+                                        "include_upper": false,
+                                        "to": "10"
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -282,24 +307,29 @@
         "label": "valid number >",
         "search": "age>10",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields.number": {
-                                "from": "10",
-                                "include_lower": false,
-                                "include_upper": true,
-                                "to": null
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields.number": {
+                                        "from": "10",
+                                        "include_lower": false,
+                                        "include_upper": true,
+                                        "to": null
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -386,24 +416,29 @@
         "label": "valid date =",
         "search": "dob=2018-06-23",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields.datetime": {
-                                "from": "2018-06-23T00:00:00-04:00",
-                                "include_lower": true,
-                                "include_upper": false,
-                                "to": "2018-06-24T00:00:00-04:00"
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields.datetime": {
+                                        "from": "2018-06-23T00:00:00-04:00",
+                                        "include_lower": true,
+                                        "include_upper": false,
+                                        "to": "2018-06-24T00:00:00-04:00"
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -411,24 +446,29 @@
         "label": "valid date >",
         "search": "dob>2018-06-23",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields.datetime": {
-                                "from": "2018-06-24T00:00:00-04:00",
-                                "include_lower": true,
-                                "include_upper": true,
-                                "to": null
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields.datetime": {
+                                        "from": "2018-06-24T00:00:00-04:00",
+                                        "include_lower": true,
+                                        "include_upper": true,
+                                        "to": null
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -436,24 +476,29 @@
         "label": "valid date >=",
         "search": "dob>=2018-06-23",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields.datetime": {
-                                "from": "2018-06-23T00:00:00-04:00",
-                                "include_lower": true,
-                                "include_upper": true,
-                                "to": null
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields.datetime": {
+                                        "from": "2018-06-23T00:00:00-04:00",
+                                        "include_lower": true,
+                                        "include_upper": true,
+                                        "to": null
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -461,24 +506,29 @@
         "label": "valid date <",
         "search": "dob<2018-06-23",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields.datetime": {
-                                "from": null,
-                                "include_lower": true,
-                                "include_upper": false,
-                                "to": "2018-06-23T00:00:00-04:00"
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields.datetime": {
+                                        "from": null,
+                                        "include_lower": true,
+                                        "include_upper": false,
+                                        "to": "2018-06-23T00:00:00-04:00"
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -486,24 +536,29 @@
         "label": "valid date <=",
         "search": "dob<=2018-06-23",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
-                        }
-                    },
-                    {
-                        "range": {
-                            "fields.datetime": {
-                                "from": null,
-                                "include_lower": true,
-                                "include_upper": false,
-                                "to": "2018-06-24T00:00:00-04:00"
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                }
+                            },
+                            {
+                                "range": {
+                                    "fields.datetime": {
+                                        "from": null,
+                                        "include_lower": true,
+                                        "include_upper": false,
+                                        "to": "2018-06-24T00:00:00-04:00"
+                                    }
+                                }
                             }
-                        }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -616,19 +671,24 @@
         "label": "valid state =",
         "search": "state=washington",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "67663ad1-3abc-42dd-a162-09df2dea66ec"
-                        }
-                    },
-                    {
-                        "term": {
-                            "fields.state_keyword": "washington"
-                        }
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "67663ad1-3abc-42dd-a162-09df2dea66ec"
+                                }
+                            },
+                            {
+                                "term": {
+                                    "fields.state_keyword": "washington"
+                                }
+                            }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -724,19 +784,24 @@
         "label": "valid district =",
         "search": "district=chelan",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "54c72635-d747-4e45-883c-099d57dd998e"
-                        }
-                    },
-                    {
-                        "term": {
-                            "fields.district_keyword": "chelan"
-                        }
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "54c72635-d747-4e45-883c-099d57dd998e"
+                                }
+                            },
+                            {
+                                "term": {
+                                    "fields.district_keyword": "chelan"
+                                }
+                            }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -832,19 +897,24 @@
         "label": "valid ward =",
         "search": "ward=stevens",
         "query": {
-            "bool": {
-                "must": [
-                    {
-                        "term": {
-                            "fields.field": "fde8f740-c337-421b-8abb-83b954897c80"
-                        }
-                    },
-                    {
-                        "term": {
-                            "fields.ward_keyword": "stevens"
-                        }
+            "nested": {
+                "path": "fields",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "fields.field": "fde8f740-c337-421b-8abb-83b954897c80"
+                                }
+                            },
+                            {
+                                "term": {
+                                    "fields.ward_keyword": "stevens"
+                                }
+                            }
+                        ]
                     }
-                ]
+                }
             }
         }
     },
@@ -1287,40 +1357,50 @@
             "bool": {
                 "must": [
                     {
-                        "bool": {
-                            "must": [
-                                {
-                                    "term": {
-                                        "fields.field": "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"
-                                    }
-                                },
-                                {
-                                    "term": {
-                                        "fields.text": "red"
-                                    }
+                        "nested": {
+                            "path": "fields",
+                            "query": {
+                                "bool": {
+                                    "must": [
+                                        {
+                                            "term": {
+                                                "fields.field": "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"
+                                            }
+                                        },
+                                        {
+                                            "term": {
+                                                "fields.text": "red"
+                                            }
+                                        }
+                                    ]
                                 }
-                            ]
+                            }
                         }
                     },
                     {
-                        "bool": {
-                            "must": [
-                                {
-                                    "term": {
-                                        "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
-                                    }
-                                },
-                                {
-                                    "range": {
-                                        "fields.number": {
-                                            "from": "10",
-                                            "include_lower": false,
-                                            "include_upper": true,
-                                            "to": null
+                        "nested": {
+                            "path": "fields",
+                            "query": {
+                                "bool": {
+                                    "must": [
+                                        {
+                                            "term": {
+                                                "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                            }
+                                        },
+                                        {
+                                            "range": {
+                                                "fields.number": {
+                                                    "from": "10",
+                                                    "include_lower": false,
+                                                    "include_upper": true,
+                                                    "to": null
+                                                }
+                                            }
                                         }
-                                    }
+                                    ]
                                 }
-                            ]
+                            }
                         }
                     }
                 ]
@@ -1334,40 +1414,50 @@
             "bool": {
                 "should": [
                     {
-                        "bool": {
-                            "must": [
-                                {
-                                    "term": {
-                                        "fields.field": "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"
-                                    }
-                                },
-                                {
-                                    "term": {
-                                        "fields.text": "red"
-                                    }
+                        "nested": {
+                            "path": "fields",
+                            "query": {
+                                "bool": {
+                                    "must": [
+                                        {
+                                            "term": {
+                                                "fields.field": "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"
+                                            }
+                                        },
+                                        {
+                                            "term": {
+                                                "fields.text": "red"
+                                            }
+                                        }
+                                    ]
                                 }
-                            ]
+                            }
                         }
                     },
                     {
-                        "bool": {
-                            "must": [
-                                {
-                                    "term": {
-                                        "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
-                                    }
-                                },
-                                {
-                                    "range": {
-                                        "fields.number": {
-                                            "from": "10",
-                                            "include_lower": false,
-                                            "include_upper": true,
-                                            "to": null
+                        "nested": {
+                            "path": "fields",
+                            "query": {
+                                "bool": {
+                                    "must": [
+                                        {
+                                            "term": {
+                                                "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                            }
+                                        },
+                                        {
+                                            "range": {
+                                                "fields.number": {
+                                                    "from": "10",
+                                                    "include_lower": false,
+                                                    "include_upper": true,
+                                                    "to": null
+                                                }
+                                            }
                                         }
-                                    }
+                                    ]
                                 }
-                            ]
+                            }
                         }
                     }
                 ]
