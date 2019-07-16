@@ -31,7 +31,7 @@ import (
 func TestTwilioIVR(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
 	rc := rp.Get()
-	defer rc.Close()
+	defer rc.Close() 
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +71,7 @@ func TestTwilioIVR(t *testing.T) {
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, start)
+	err := starts.CreateFlowBatches(ctx, db, rp, nil, start)
 	assert.NoError(t, err)
 
 	// start our task
@@ -82,7 +82,7 @@ func TestTwilioIVR(t *testing.T) {
 	assert.NoError(t, err)
 
 	// request our call to start
-	err = ivr.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
+	err = ivr.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch) 
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db,
@@ -370,7 +370,7 @@ func TestNexmoIVR(t *testing.T) {
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, start)
+	err := starts.CreateFlowBatches(ctx, db, rp, nil, start)
 	assert.NoError(t, err)
 
 	// start our task

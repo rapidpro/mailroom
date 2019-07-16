@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"io"
 	"net/url"
 	"strconv"
 	"time"
@@ -14,9 +15,12 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/search"
+	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -141,6 +145,58 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 		ids = append(ids, id)
 	}
 	return ids, nil
+}
+
+// ContactIDsForQuery returns the ids of all the contacts that match the passed in query
+func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAssets, query string) ([]ContactID, error) {
+	if client == nil {
+		return nil, errors.Errorf("no elastic client available, check your configuration")
+	}
+
+	// parse our query
+	cql, err := contactql.ParseQuery(query)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing contactql query: %s", query)
+	}
+
+	// turn into elastic query
+	eq, err := search.ToElasticQuery(org.Env(), org, cql)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+	}
+
+	// filter by org, active, blocked and stopped
+	eq = elastic.NewBoolQuery().Must(
+		eq,
+		elastic.NewTermQuery("org_id", org.OrgID()),
+		elastic.NewTermQuery("is_active", true),
+		elastic.NewTermQuery("is_blocked", false),
+		elastic.NewTermQuery("is_stopped", false),
+	)
+
+	ids := make([]ContactID, 0, 100)
+
+	// iterate across our results, building up our contact ids
+	scroll := client.Scroll("contacts").Index("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	scroll = scroll.KeepAlive("15m").Size(100000).Query(eq).FetchSource(false)
+	for {
+		results, err := scroll.Do(ctx)
+		if err == io.EOF {
+			return ids, nil
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scrolling through results for search: %s", query)
+		}
+
+		for _, hit := range results.Hits.Hits {
+			id, err := strconv.Atoi(hit.Id)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
+			}
+
+			ids = append(ids, ContactID(id))
+		}
+	}
 }
 
 // FlowContact converts our mailroom contact into a flow contact for use in the engine

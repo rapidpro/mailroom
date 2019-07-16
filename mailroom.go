@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/s3utils"
 	"github.com/nyaruka/mailroom/web"
+	"github.com/olivere/elastic"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -47,10 +48,11 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	Config   *config.Config
-	DB       *sqlx.DB
-	RP       *redis.Pool
-	S3Client s3iface.S3API
+	Config        *config.Config
+	DB            *sqlx.DB
+	RP            *redis.Pool
+	ElasticClient *elastic.Client
+	S3Client      s3iface.S3API
 
 	Quit      chan bool
 	CTX       context.Context
@@ -182,6 +184,12 @@ func (mr *Mailroom) Start() error {
 		log.Info("s3 bucket ok")
 	}
 
+	// initialize our elastic client
+	mr.ElasticClient, err = elastic.NewClient(elastic.SetURL(mr.Config.Elastic))
+	if err != nil {
+		log.WithError(err).Error("unable to sniff elastic cluster, check configuration")
+	}
+
 	for _, initFunc := range initFunctions {
 		initFunc(mr)
 	}
@@ -219,6 +227,7 @@ func (mr *Mailroom) Stop() error {
 	mr.webserver.Stop()
 
 	mr.WaitGroup.Wait()
+	mr.ElasticClient.Stop()
 	logrus.Info("mailroom stopped")
 	return nil
 }

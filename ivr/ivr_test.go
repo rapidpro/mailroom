@@ -35,7 +35,7 @@ func TestIVR(t *testing.T) {
 	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, start)
+	err := starts.CreateFlowBatches(ctx, db, rp, nil, start)
 	assert.NoError(t, err)
 
 	// should have one task in our ivr queue

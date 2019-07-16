@@ -45,6 +45,7 @@ type FlowStartBatch struct {
 		FlowID     FlowID      `json:"flow_id"`
 		FlowType   FlowType    `json:"flow_type"`
 		ContactIDs []ContactID `json:"contact_ids"`
+		Search     string      `json:"search"`
 
 		Parent json.RawMessage `json:"parent,omitempty"`
 		Extra  json.RawMessage `json:"extra,omitempty"`
@@ -80,10 +81,12 @@ type FlowStart struct {
 		FlowID   FlowID     `json:"flow_id"    db:"flow_id"`
 		FlowType FlowType   `json:"flow_type"`
 
-		GroupIDs      []GroupID   `json:"group_ids,omitempty"`
-		ContactIDs    []ContactID `json:"contact_ids,omitempty"`
-		URNs          []urns.URN  `json:"urns,omitempty"`
-		CreateContact bool        `json:"create_contact"`
+		GroupIDs   []GroupID   `json:"group_ids,omitempty"`
+		ContactIDs []ContactID `json:"contact_ids,omitempty"`
+		Query      string      `json:"query,omitempty"`
+		URNs       []urns.URN  `json:"urns,omitempty"`
+
+		CreateContact bool `json:"create_contact"`
 
 		RestartParticipants bool `json:"restart_participants" db:"restart_participants"`
 		IncludeActive       bool `json:"include_active"       db:"include_active"`
@@ -101,6 +104,7 @@ func (s *FlowStart) GroupIDs() []GroupID       { return s.s.GroupIDs }
 func (s *FlowStart) ContactIDs() []ContactID   { return s.s.ContactIDs }
 func (s *FlowStart) URNs() []urns.URN          { return s.s.URNs }
 func (s *FlowStart) CreateContact() bool       { return s.s.CreateContact }
+func (s *FlowStart) Query() string             { return s.s.Query }
 func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants }
 func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
 

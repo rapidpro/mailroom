@@ -15,6 +15,7 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -43,27 +44,26 @@ func handleFlowStart(ctx context.Context, mr *mailroom.Mailroom, task *queue.Tas
 		return errors.Wrapf(err, "error unmarshalling flow start task: %s", string(task.Task))
 	}
 
-	return CreateFlowBatches(ctx, mr.DB, mr.RP, startTask)
+	return CreateFlowBatches(ctx, mr.DB, mr.RP, mr.ElasticClient, startTask)
 }
 
 // CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
-func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *models.FlowStart) error {
+func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *elastic.Client, start *models.FlowStart) error {
 	// we are building a set of contact ids, start with the explicit ones
 	contactIDs := make(map[models.ContactID]bool)
 	for _, id := range start.ContactIDs() {
 		contactIDs[id] = true
 	}
 
-	var org *models.OrgAssets
 	var assets flows.SessionAssets
-	var err error
+
+	org, err := models.GetOrgAssets(ctx, db, start.OrgID())
+	if err != nil {
+		return errors.Wrapf(err, "error loading org assets")
+	}
 
 	// look up any contacts by URN
 	if len(start.URNs()) > 0 {
-		org, err = models.GetOrgAssets(ctx, db, start.OrgID())
-		if err != nil {
-			return errors.Wrapf(err, "error loading org assets")
-		}
 		assets, err = models.GetSessionAssets(org)
 		if err != nil {
 			return errors.Wrapf(err, "error loading session assets")
@@ -112,6 +112,18 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, start *
 			if err != nil {
 				return errors.Wrapf(err, "error scanning contact id")
 			}
+			contactIDs[contactID] = true
+		}
+	}
+
+	// finally, if we have a query, add the contacts that match that as well
+	if start.Query() != "" {
+		matches, err := models.ContactIDsForQuery(ctx, ec, org, start.Query())
+		if err != nil {
+			return errors.Wrapf(err, "error performing search for start: %d", start.ID())
+		}
+
+		for _, contactID := range matches {
 			contactIDs[contactID] = true
 		}
 	}

@@ -1,4 +1,4 @@
-package elastic
+package search
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ type MockRegistry struct {
 	IsAnon bool
 }
 
-func (r *MockRegistry) LookupField(key string) *Field {
+func (r *MockRegistry) LookupSearchField(key string) *Field {
 	field := r.Fields[key]
 	if field == nil {
 		return field

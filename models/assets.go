@@ -4,14 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/search"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 )
@@ -416,4 +420,55 @@ func (a *OrgAssets) ResthookBySlug(slug string) *Resthook {
 
 func (a *OrgAssets) Templates() ([]assets.Template, error) {
 	return a.templates, nil
+}
+
+// LookupField satisfies the elastic.FieldRegistry interface
+func (a *OrgAssets) LookupSearchField(key string) *search.Field {
+	key = strings.ToLower(key)
+	field := &search.Field{
+		Key: key,
+	}
+
+	policy := a.Org().RedactionPolicy()
+
+	// is this a scheme?
+	if urns.IsValidScheme(key) {
+		if policy == utils.RedactionPolicyURNs {
+			field.Category = search.Unavailable
+		} else {
+			field.Category = search.Scheme
+		}
+		return field
+	}
+
+	// is this an implicit field?
+	if key == contactql.ImplicitKey {
+		field.Category = search.Implicit
+		if policy == utils.RedactionPolicyURNs {
+			field.Key = search.NameID
+		} else {
+			field.Key = search.NameTel
+		}
+		return field
+	}
+
+	// is this a contact attribute?
+	if search.IsContactAttribute(key) {
+		field.Category = search.ContactAttribute
+		return field
+	}
+
+	// ok, that's all our built in fields, let's check contact fields
+	f := a.FieldByKey(key)
+
+	// not found
+	if f == nil {
+		return nil
+	}
+
+	// populate our elastic field
+	field.Category = search.ContactField
+	field.UUID = utils.UUID(f.UUID())
+	field.Type = search.FieldType(f.Type())
+	return field
 }
