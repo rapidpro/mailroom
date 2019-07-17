@@ -137,8 +137,8 @@ func TestBroadcastTask(t *testing.T) {
 	// insert a broadcast so we can check it is being set to sent
 	var legacyID models.BroadcastID
 	err = db.Get(&legacyID,
-		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, purged, send_all, created_by_id, modified_by_id, org_id)
-							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, FALSE, 1, 1, 1) RETURNING id`)
+		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id)
+							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, 1, 1, 1) RETURNING id`)
 	assert.NoError(t, err)
 
 	evaluated := map[utils.Language]*models.BroadcastTranslation{
