@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/types"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/null"
@@ -88,8 +89,8 @@ type FlowStart struct {
 		RestartParticipants bool `json:"restart_participants" db:"restart_participants"`
 		IncludeActive       bool `json:"include_active"       db:"include_active"`
 
-		Parent json.RawMessage `json:"parent,omitempty"`
-		Extra  json.RawMessage `json:"extra,omitempty"  db:"extra"`
+		Parent json.RawMessage    `json:"parent,omitempty"`
+		Extra  types.NullJSONText `json:"extra,omitempty"  db:"extra"`
 	}
 }
 
@@ -105,19 +106,19 @@ func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants 
 func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
 
 func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
-func (s *FlowStart) Extra() json.RawMessage  { return s.s.Extra }
+func (s *FlowStart) Extra() json.RawMessage  { return json.RawMessage(s.s.Extra.JSONText) }
 
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
 
-// FlowIDForStart looks up the flow id for the passed in flow start
-func FlowIDForStart(ctx context.Context, db Queryer, orgID OrgID, startID StartID) (FlowID, error) {
-	flowID := FlowID(0)
-	err := db.GetContext(ctx, &flowID, `SELECT flow_id FROM flows_flowstart WHERE id = $1 AND is_active = TRUE`, startID)
+// GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and extra
+func GetFlowStartAttributes(ctx context.Context, db Queryer, orgID OrgID, startID StartID) (*FlowStart, error) {
+	start := &FlowStart{}
+	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra FROM flows_flowstart WHERE id = $1 AND is_active = TRUE`, startID)
 	if err != nil {
-		return flowID, errors.Wrapf(err, "unable to load flow for start: %d", startID)
+		return nil, errors.Wrapf(err, "unable to load start attributes for id: %d", startID)
 	}
-	return flowID, nil
+	return start, nil
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
@@ -138,7 +139,10 @@ func NewFlowStart(
 	s.s.RestartParticipants = restartParticipants
 	s.s.IncludeActive = includeActive
 	s.s.Parent = parent
-	s.s.Extra = extra
+	s.s.Extra = types.NullJSONText{
+		JSONText: types.JSONText(extra),
+		Valid:    len(extra) > 0,
+	}
 
 	return s
 }
@@ -205,8 +209,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(is_active, created_on, modified_on,  uuid,  restart_participants,  include_active, contact_count, status,  flow_id)
-			 VALUES(TRUE     , NOW()     , NOW()      , :uuid, :restart_participants, :include_active, 0            , 'P'   , :flow_id)
+	flows_flowstart(is_active, created_on, modified_on,  uuid,  restart_participants,  include_active, contact_count, status,  flow_id, extra)
+			 VALUES(TRUE     , NOW()     , NOW()      , :uuid, :restart_participants, :include_active, 0            , 'P'   , :flow_id, :extra)
 RETURNING
 	id
 `

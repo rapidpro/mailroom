@@ -67,7 +67,7 @@ func TestTwilioIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy and george
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, nil)
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, json.RawMessage(`{"ref_id":"123"}`))
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
 	// call our master starter
@@ -110,7 +110,7 @@ func TestTwilioIVR(t *testing.T) {
 			ConnectionID: models.ConnectionID(1),
 			Form:         nil,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two.",
+			Contains:     "Hello there. Please enter one or two. Your reference id is 123",
 		},
 		{
 			Action:       "resume",
