@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/envs"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -39,7 +40,7 @@ func (t *Template) MarshalJSON() ([]byte, error) { return json.Marshal(t.t) }
 type TemplateTranslation struct {
 	t struct {
 		Channel       assets.ChannelReference `json:"channel"         validate:"required"`
-		Language      utils.Language          `json:"language"        validate:"required"`
+		Language      envs.Language           `json:"language"        validate:"required"`
 		Content       string                  `json:"content"         validate:"required"`
 		VariableCount int                     `json:"variable_count"`
 	}
@@ -52,7 +53,7 @@ func (t *TemplateTranslation) UnmarshalJSON(data []byte) error { return json.Unm
 func (t *TemplateTranslation) MarshalJSON() ([]byte, error) { return json.Marshal(t.t) }
 
 func (t *TemplateTranslation) Channel() assets.ChannelReference { return t.t.Channel }
-func (t *TemplateTranslation) Language() utils.Language         { return t.t.Language }
+func (t *TemplateTranslation) Language() envs.Language          { return t.t.Language }
 func (t *TemplateTranslation) Content() string                  { return t.t.Content }
 func (t *TemplateTranslation) VariableCount() int               { return t.t.VariableCount }
 

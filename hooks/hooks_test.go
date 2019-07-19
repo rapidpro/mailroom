@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
 	"github.com/nyaruka/goflow/flows/routers"
@@ -19,6 +18,9 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/testsuite"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -128,7 +130,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	flow, err := definition.NewFlow(
 		uuid,
 		"Test Flow",
-		utils.Language("eng"),
+		envs.Language("eng"),
 		flows.FlowTypeMessaging,
 		1,
 		300,

@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/config"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -16,10 +17,10 @@ type OrgID int
 
 const NilOrgID = OrgID(0)
 
-// Org is mailroom's type for RapidPro orgs. It also implements the utils.Environment interface for GoFlow
+// Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
 type Org struct {
 	id     OrgID
-	env    utils.Environment
+	env    envs.Environment
 	config map[string]interface{}
 }
 
@@ -27,28 +28,28 @@ type Org struct {
 func (o *Org) ID() OrgID { return o.id }
 
 // DateFormat returns the date format for this org
-func (o *Org) DateFormat() utils.DateFormat { return o.env.DateFormat() }
+func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
 
 // NumberFormat returns the date format for this org
-func (o *Org) NumberFormat() *utils.NumberFormat { return utils.DefaultNumberFormat }
+func (o *Org) NumberFormat() *envs.NumberFormat { return envs.DefaultNumberFormat }
 
 // TimeFormat returns the time format for this org
-func (o *Org) TimeFormat() utils.TimeFormat { return o.env.TimeFormat() }
+func (o *Org) TimeFormat() envs.TimeFormat { return o.env.TimeFormat() }
 
 // Timezone returns the timezone for this org
 func (o *Org) Timezone() *time.Location { return o.env.Timezone() }
 
 // DefaultLanguage returns the primary language for this org
-func (o *Org) DefaultLanguage() utils.Language { return o.env.DefaultLanguage() }
+func (o *Org) DefaultLanguage() envs.Language { return o.env.DefaultLanguage() }
 
 // AllowedLanguages returns the list of supported languages for this org
-func (o *Org) AllowedLanguages() []utils.Language { return o.env.AllowedLanguages() }
+func (o *Org) AllowedLanguages() []envs.Language { return o.env.AllowedLanguages() }
 
 // RedactionPolicy returns the redaction policy (are we anonymous) for this org
-func (o *Org) RedactionPolicy() utils.RedactionPolicy { return o.env.RedactionPolicy() }
+func (o *Org) RedactionPolicy() envs.RedactionPolicy { return o.env.RedactionPolicy() }
 
 // DefaultCountry returns the default country for this organization (mostly used for number parsing)
-func (o *Org) DefaultCountry() utils.Country { return o.env.DefaultCountry() }
+func (o *Org) DefaultCountry() envs.Country { return o.env.DefaultCountry() }
 
 // Now returns the current time in the current timezone for this org
 func (o *Org) Now() time.Time { return o.env.Now() }
@@ -60,7 +61,7 @@ func (o *Org) Extension(name string) json.RawMessage { return o.env.Extension(na
 func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
 
 // Equal return whether we are equal to the passed in environment
-func (o *Org) Equal(env utils.Environment) bool { return o.env.Equal(env) }
+func (o *Org) Equal(env envs.Environment) bool { return o.env.Equal(env) }
 
 // MarshalJSON is our custom marshaller so that our inner env get output
 func (o *Org) MarshalJSON() ([]byte, error) {
@@ -106,7 +107,7 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 		return nil, errors.Wrapf(err, "error scanning org: %d", orgID)
 	}
 
-	org.env, err = utils.ReadEnvironment(orgJSON)
+	org.env, err = envs.ReadEnvironment(orgJSON)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling org json: %s", orgJSON)
 	}

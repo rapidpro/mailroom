@@ -9,9 +9,9 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/goflow/utils"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 )
@@ -251,7 +251,7 @@ func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
 
-func (a *OrgAssets) Env() utils.Environment { return a.env }
+func (a *OrgAssets) Env() envs.Environment { return a.env }
 
 func (a *OrgAssets) Org() *Org { return a.env }
 

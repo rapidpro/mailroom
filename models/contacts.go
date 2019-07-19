@@ -8,15 +8,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/lib/pq"
-	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/null"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -197,7 +198,7 @@ type Contact struct {
 	id         ContactID
 	uuid       flows.ContactUUID
 	name       string
-	language   utils.Language
+	language   envs.Language
 	isStopped  bool
 	isBlocked  bool
 	fields     map[string]*flows.Value
@@ -210,7 +211,7 @@ type Contact struct {
 func (c *Contact) ID() ContactID                   { return c.id }
 func (c *Contact) UUID() flows.ContactUUID         { return c.uuid }
 func (c *Contact) Name() string                    { return c.name }
-func (c *Contact) Language() utils.Language        { return c.language }
+func (c *Contact) Language() envs.Language         { return c.language }
 func (c *Contact) IsStopped() bool                 { return c.isStopped }
 func (c *Contact) IsBlocked() bool                 { return c.isBlocked }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
@@ -273,7 +274,7 @@ type contactEnvelope struct {
 	ID         ContactID                         `json:"id"`
 	UUID       flows.ContactUUID                 `json:"uuid"`
 	Name       string                            `json:"name"`
-	Language   utils.Language                    `json:"language"`
+	Language   envs.Language                     `json:"language"`
 	IsStopped  bool                              `json:"is_stopped"`
 	IsBlocked  bool                              `json:"is_blocked"`
 	Fields     map[FieldUUID]*fieldValueEnvelope `json:"fields"`

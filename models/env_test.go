@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,20 +31,20 @@ func TestOrgs(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, OrgID(1), org.ID())
-	assert.Equal(t, utils.DateFormatDayMonthYear, org.DateFormat())
-	assert.Equal(t, utils.TimeFormatHourMinute, org.TimeFormat())
-	assert.Equal(t, utils.RedactionPolicyNone, org.RedactionPolicy())
+	assert.Equal(t, envs.DateFormatDayMonthYear, org.DateFormat())
+	assert.Equal(t, envs.TimeFormatHourMinute, org.TimeFormat())
+	assert.Equal(t, envs.RedactionPolicyNone, org.RedactionPolicy())
 	assert.Equal(t, 640, org.MaxValueLength())
-	assert.Equal(t, string(utils.Country("US")), string(org.DefaultCountry()))
+	assert.Equal(t, string(envs.Country("US")), string(org.DefaultCountry()))
 	tz, _ := time.LoadLocation("America/Los_Angeles")
 	assert.Equal(t, tz, org.Timezone())
 	assert.Equal(t, 0, len(org.AllowedLanguages()))
-	assert.Equal(t, utils.Language(""), org.DefaultLanguage())
+	assert.Equal(t, envs.Language(""), org.DefaultLanguage())
 
 	org, err = loadOrg(ctx, tx, 2)
 	assert.NoError(t, err)
-	assert.Equal(t, []utils.Language{"eng", "fra"}, org.AllowedLanguages())
-	assert.Equal(t, utils.Language("eng"), org.DefaultLanguage())
+	assert.Equal(t, []envs.Language{"eng", "fra"}, org.AllowedLanguages())
+	assert.Equal(t, envs.Language("eng"), org.DefaultLanguage())
 
 	_, err = loadOrg(ctx, tx, 99)
 	assert.Error(t, err)
