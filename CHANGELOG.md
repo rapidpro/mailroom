@@ -1,3 +1,8 @@
+v2.0.15
+----------
+ * Update to goflow v0.42.0
+ * Update test db to remove msgs_broadcast.purged
+
 v2.0.14
 ----------
  * load extra for start and include when starting IVR calls
