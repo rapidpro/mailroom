@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -111,7 +111,7 @@ func TestBatchStart(t *testing.T) {
 	// create a start object
 	db.MustExec(
 		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, contact_count, status, flow_id, created_by_id, modified_by_id)
-		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', $2, 1, 1)`, utils.NewUUID(), models.SingleMessageFlowID)
+		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', $2, 1, 1)`, uuids.New(), models.SingleMessageFlowID)
 
 	// and our batch object
 	contactIDs := []models.ContactID{models.CathyID, models.BobID}
@@ -240,7 +240,7 @@ func TestContactRuns(t *testing.T) {
 	session := sessions[0]
 	for i, tc := range tcs {
 		// answer our first question
-		msg := flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), models.CathyURN, nil, tc.Message, nil)
+		msg := flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, tc.Message, nil)
 		msg.SetID(10)
 		resume := resumes.NewMsgResume(org.Env(), contact, msg)
 

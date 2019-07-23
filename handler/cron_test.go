@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
@@ -40,7 +40,7 @@ func TestRetryMsgs(t *testing.T) {
 		db.MustExec(
 			`INSERT INTO msgs_msg(uuid, org_id, channel_id, contact_id, contact_urn_id, text, direction, status, created_on, visibility, msg_count, error_count, next_attempt) 
 						   VALUES($1,   $2,     $3,         $4,         $5,             $6,   $7,        $8,     $9,         'V',        1,         0,           NOW())`,
-			utils.NewUUID(), models.Org1, models.TwilioChannelID, models.CathyID, models.CathyURNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
+			uuids.New(), models.Org1, models.TwilioChannelID, models.CathyID, models.CathyURNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
 	}
 
 	err = retryPendingMsgs(ctx, db, rp, "test", "test")

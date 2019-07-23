@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/flows/definition"
 	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
@@ -145,7 +146,7 @@ func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interfa
 //   }
 //
 type cloneRequest struct {
-	DependencyMapping map[utils.UUID]utils.UUID `json:"dependency_mapping"`
+	DependencyMapping map[uuids.UUID]uuids.UUID `json:"dependency_mapping"`
 	Flow              json.RawMessage           `json:"flow" validate:"required"`
 	ValidateWithOrgID models.OrgID              `json:"validate_with_org_id"`
 }
