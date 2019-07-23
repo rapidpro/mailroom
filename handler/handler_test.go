@@ -6,14 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -85,7 +86,7 @@ func TestMsgEvents(t *testing.T) {
 			OrgID:     orgID,
 			ChannelID: channelID,
 			MsgID:     flows.MsgID(1),
-			MsgUUID:   flows.MsgUUID(utils.NewUUID()),
+			MsgUUID:   flows.MsgUUID(uuids.New()),
 			URN:       urn,
 			URNID:     urnID,
 			Text:      text,
@@ -389,7 +390,7 @@ func TestTimedEvents(t *testing.T) {
 				OrgID:     tc.OrgID,
 				ChannelID: tc.ChannelID,
 				MsgID:     flows.MsgID(1),
-				MsgUUID:   flows.MsgUUID(utils.NewUUID()),
+				MsgUUID:   flows.MsgUUID(uuids.New()),
 				URN:       tc.URN,
 				URNID:     tc.URNID,
 				Text:      tc.Message,

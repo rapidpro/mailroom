@@ -18,18 +18,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/buger/jsonparser"
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
+
+	"github.com/buger/jsonparser"
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -684,7 +686,7 @@ func (c *client) responseForSprint(resumeURL string, w flows.ActivatedWait, es [
 			// with a 1 second timeout in the script that will get called / repeated until the UUID is
 			// populated at which time we will actually continue.
 
-			recordingUUID := string(utils.NewUUID())
+			recordingUUID := string(uuids.New())
 			eventURL := resumeURL + "&wait_type=recording_url&recording_uuid=" + recordingUUID
 			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
 			record := &Record{
