@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 )
@@ -76,7 +76,7 @@ func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarsha
 type FlowStart struct {
 	s struct {
 		ID       StartID    `json:"start_id"   db:"id"`
-		UUID     utils.UUID `                  db:"uuid"`
+		UUID     uuids.UUID `                  db:"uuid"`
 		OrgID    OrgID      `json:"org_id"     db:"org_id"`
 		FlowID   FlowID     `json:"flow_id"    db:"flow_id"`
 		FlowType FlowType   `json:"flow_type"`
@@ -128,7 +128,7 @@ func NewFlowStart(
 	restartParticipants bool, includeActive bool, parent json.RawMessage, extra json.RawMessage) *FlowStart {
 
 	s := &FlowStart{}
-	s.s.UUID = utils.NewUUID()
+	s.s.UUID = uuids.New()
 	s.s.OrgID = orgID
 	s.s.FlowType = flowType
 	s.s.FlowID = flowID

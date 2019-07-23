@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 
 	"github.com/nyaruka/goflow/flows"
@@ -21,7 +22,7 @@ func TestResponseForSprint(t *testing.T) {
 	indentMarshal = false
 
 	urn := urns.URN("tel:+12067799294")
-	channelRef := assets.NewChannelReference(assets.ChannelUUID(utils.NewUUID()), "Twilio Channel")
+	channelRef := assets.NewChannelReference(assets.ChannelUUID(uuids.New()), "Twilio Channel")
 
 	resumeURL := "http://temba.io/resume?session=1"
 

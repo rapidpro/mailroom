@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -428,7 +429,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 		VALUES
 			($1, TRUE, FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
 		RETURNING id`,
-		org.OrgID(), utils.NewUUID(),
+		org.OrgID(), uuids.New(),
 	)
 
 	if err != nil {

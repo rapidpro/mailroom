@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/goflow/utils"
-
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +34,7 @@ func TestServer(t *testing.T) {
 	time.Sleep(time.Second)
 
 	defer server.Stop()
-	defer utils.SetUUIDGenerator(utils.DefaultUUIDGenerator)
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	tcs := []struct {
 		URL             string
@@ -71,7 +71,7 @@ func TestServer(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		utils.SetUUIDGenerator(test.NewSeededUUIDGenerator(123456))
+		uuids.SetGenerator(uuids.NewSeededGenerator(123456))
 		time.Sleep(1 * time.Second)
 
 		testID := fmt.Sprintf("%s %s %s", tc.Method, tc.URL, tc.BodyFile)
