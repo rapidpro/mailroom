@@ -251,7 +251,7 @@ func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
 
-func (a *OrgAssets) Env() envs.Environment { return a.env }
+func (a *OrgAssets) Env() utils.Environment { return a.env }
 
 func (a *OrgAssets) Org() *Org { return a.env }
 
