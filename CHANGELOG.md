@@ -1,3 +1,41 @@
+v2.0.15
+----------
+ * Update to goflow v0.42.0
+ * Update test db to remove msgs_broadcast.purged
+
+v2.0.14
+----------
+ * load extra for start and include when starting IVR calls
+
+v2.0.13
+----------
+ * fix leaking DB connections causing mailroom deadlock under certain loads
+
+v2.0.12
+----------
+ * Update to goflow v0.41.18
+
+v2.0.11
+----------
+ * deal with brand new URNs when sending messages
+
+v2.0.10
+----------
+ * Update to goflow v0.41.16
+ * Fix endpoints so we don't hard error for expected requests
+
+v2.0.9
+----------
+ * Update to goflow v0.41.14
+
+v2.0.8
+----------
+ * Update to goflow v0.41.13
+
+v2.0.7
+----------
+ * Update to goflow v0.41.12
+
 v2.0.6
 ----------
  * Update to goflow v0.41.11

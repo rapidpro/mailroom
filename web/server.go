@@ -113,7 +113,7 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 	return func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
 		token := r.Header.Get("authorization")
 		if !strings.HasPrefix(token, "Token ") {
-			return nil, http.StatusUnauthorized, errors.New("missing authorization header")
+			return errors.New("missing authorization header"), http.StatusUnauthorized, nil
 		}
 
 		// pull out the actual token
@@ -136,20 +136,20 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 			o.is_active = TRUE AND
 			u.is_active = TRUE
 		`, token)
-
 		if err != nil {
-			return nil, http.StatusUnauthorized, errors.Wrapf(err, "error looking up authorization header")
+			return errors.Wrapf(err, "error looking up authorization header"), http.StatusUnauthorized, nil
 		}
+		defer rows.Close()
 
 		if !rows.Next() {
-			return nil, http.StatusUnauthorized, errors.Errorf("invalid authorization header")
+			return errors.Errorf("invalid authorization header"), http.StatusUnauthorized, nil
 		}
 
 		var userID int64
 		var orgID models.OrgID
 		err = rows.Scan(&userID, &orgID)
 		if err != nil {
-			return nil, http.StatusServiceUnavailable, errors.Wrapf(err, "error scanning auth row")
+			return nil, 0, errors.Wrapf(err, "error scanning auth row")
 		}
 
 		// we are authenticated set our user id ang org id on our context and call our sub handler
@@ -164,7 +164,7 @@ func RequireAuthToken(handler JSONHandler) JSONHandler {
 	return func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
 		auth := r.Header.Get("authorization")
 		if s.Config.AuthToken != "" && fmt.Sprintf("Token %s", s.Config.AuthToken) != auth {
-			return nil, http.StatusUnauthorized, fmt.Errorf("invalid or missing authorization header, denying")
+			return fmt.Errorf("invalid or missing authorization header, denying"), http.StatusUnauthorized, nil
 		}
 
 		// we are authenticated, call our chain
@@ -178,9 +178,15 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 		w.Header().Set("Content-type", "application/json")
 
 		value, status, err := handler(r.Context(), s, r)
+
+		// handler errored (a hard error)
 		if err != nil {
-			value = map[string]string{
-				"error": err.Error(),
+			value = errorAsResponse(err)
+		} else {
+			// handler returned an error to use as a the response
+			asError, isError := value.(error)
+			if isError {
+				value = errorAsResponse(asError)
 			}
 		}
 
@@ -194,7 +200,7 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 
 		if err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error handling request")
-			w.WriteHeader(status)
+			w.WriteHeader(http.StatusInternalServerError)
 			w.Write(serialized)
 			return
 		}
@@ -214,10 +220,7 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 
 		logrus.WithError(err).WithField("http_request", r).Error("error handling request")
 		w.WriteHeader(http.StatusInternalServerError)
-		value := map[string]string{
-			"error": err.Error(),
-		}
-		serialized, _ := json.Marshal(value)
+		serialized, _ := json.Marshal(errorAsResponse(err))
 		w.Write(serialized)
 		return
 	}
@@ -261,11 +264,11 @@ func handleIndex(ctx context.Context, s *Server, r *http.Request) (interface{}, 
 }
 
 func handle404(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
-	return nil, http.StatusNotFound, errors.Errorf("not found: %s", r.URL.String())
+	return errors.Errorf("not found: %s", r.URL.String()), http.StatusNotFound, nil
 }
 
 func handle405(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
-	return nil, http.StatusMethodNotAllowed, errors.Errorf("illegal method: %s", r.Method)
+	return errors.Errorf("illegal method: %s", r.Method), http.StatusMethodNotAllowed, nil
 }
 
 type Server struct {
@@ -278,4 +281,10 @@ type Server struct {
 	wg *sync.WaitGroup
 
 	httpServer *http.Server
+}
+
+func errorAsResponse(err error) interface{} {
+	return map[string]string{
+		"error": err.Error(),
+	}
 }

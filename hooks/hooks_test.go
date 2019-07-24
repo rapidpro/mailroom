@@ -7,18 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
 	"github.com/nyaruka/goflow/flows/routers"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/testsuite"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +44,7 @@ type SQLAssertion struct {
 }
 
 func newActionUUID() flows.ActionUUID {
-	return flows.ActionUUID(utils.NewUUID())
+	return flows.ActionUUID(uuids.New())
 }
 
 func TestMain(m *testing.M) {
@@ -60,12 +62,12 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	exitUUIDs := make([]flows.ExitUUID, len(tc.Actions))
 	i := 0
 	for range tc.Actions {
-		categoryUUIDs[i] = flows.CategoryUUID(utils.NewUUID())
-		exitUUIDs[i] = flows.ExitUUID(utils.NewUUID())
+		categoryUUIDs[i] = flows.CategoryUUID(uuids.New())
+		exitUUIDs[i] = flows.ExitUUID(uuids.New())
 		i++
 	}
-	defaultCategoryUUID := flows.CategoryUUID(utils.NewUUID())
-	defaultExitUUID := flows.ExitUUID(utils.NewUUID())
+	defaultCategoryUUID := flows.CategoryUUID(uuids.New())
+	defaultExitUUID := flows.ExitUUID(uuids.New())
 
 	cases := make([]*routers.Case, len(tc.Actions))
 	categories := make([]*routers.Category, len(tc.Actions))
@@ -74,17 +76,17 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	i = 0
 	for cid, actions := range tc.Actions {
 		cases[i] = routers.NewCase(
-			utils.NewUUID(),
+			uuids.New(),
 			"has_any_word",
 			[]string{fmt.Sprintf("%d", cid)},
 			categoryUUIDs[i],
 		)
 
 		exitNodes[i] = definition.NewNode(
-			flows.NodeUUID(utils.NewUUID()),
+			flows.NodeUUID(uuids.New()),
 			actions,
 			nil,
-			[]flows.Exit{definition.NewExit(flows.ExitUUID(utils.NewUUID()), "")},
+			[]flows.Exit{definition.NewExit(flows.ExitUUID(uuids.New()), "")},
 		)
 
 		categories[i] = routers.NewCategory(
@@ -115,7 +117,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 
 	// and our entry node
 	entry := definition.NewNode(
-		flows.NodeUUID(utils.NewUUID()),
+		flows.NodeUUID(uuids.New()),
 		nil,
 		router,
 		exits,
@@ -128,7 +130,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	flow, err := definition.NewFlow(
 		uuid,
 		"Test Flow",
-		utils.Language("eng"),
+		envs.Language("eng"),
 		flows.FlowTypeMessaging,
 		1,
 		300,
@@ -142,7 +144,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 }
 
 func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *flows.MsgIn {
-	msgUUID := flows.MsgUUID(utils.NewUUID())
+	msgUUID := flows.MsgUUID(uuids.New())
 	var msgID flows.MsgID
 
 	err := db.Get(&msgID,
@@ -170,7 +172,7 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 
 	// reuse id from one of our real flows
 	flowID := models.FavoritesFlowID
-	flowUUID := assets.FlowUUID(utils.NewUUID())
+	flowUUID := assets.FlowUUID(uuids.New())
 
 	for i, tc := range tcs {
 		// build our flow for this test case

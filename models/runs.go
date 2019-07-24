@@ -8,15 +8,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/null"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -390,7 +391,7 @@ RETURNING id
 `
 
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
-func (s *Session) FlowSession(sa flows.SessionAssets, env utils.Environment) (flows.Session, error) {
+func (s *Session) FlowSession(sa flows.SessionAssets, env envs.Environment) (flows.Session, error) {
 	session, err := goflow.Engine().ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to unmarshal session")
@@ -557,7 +558,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// gather all our pre commit events, group them by hook and apply them
 	err = ApplyPreEventHooks(ctx, tx, rp, org, []*Session{s})
 	if err != nil {
-		return errors.Wrapf(err, "error applying pre commit hooks")
+		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
 
 	return nil
@@ -695,7 +696,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	// gather all our pre commit events, group them by hook
 	err = ApplyPreEventHooks(ctx, tx, rp, org, sessions)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error applying pre commit hooks")
+		return nil, errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
 
 	// return our session

@@ -5,16 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/assets"
-
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/utils"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,8 +29,8 @@ func TestBroadcastEvents(t *testing.T) {
 	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	eng := utils.Language("eng")
-	basic := map[utils.Language]*events.BroadcastTranslation{
+	eng := envs.Language("eng")
+	basic := map[envs.Language]*events.BroadcastTranslation{
 		eng: &events.BroadcastTranslation{
 			Text:         "hello world",
 			Attachments:  nil,
@@ -57,8 +57,8 @@ func TestBroadcastEvents(t *testing.T) {
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
-		Translations map[utils.Language]*events.BroadcastTranslation
-		BaseLanguage utils.Language
+		Translations map[envs.Language]*events.BroadcastTranslation
+		BaseLanguage envs.Language
 		Groups       []*assets.GroupReference
 		Contacts     []*flows.ContactReference
 		URNs         []urns.URN
@@ -132,16 +132,16 @@ func TestBroadcastTask(t *testing.T) {
 
 	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
-	eng := utils.Language("eng")
+	eng := envs.Language("eng")
 
 	// insert a broadcast so we can check it is being set to sent
 	var legacyID models.BroadcastID
 	err = db.Get(&legacyID,
-		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, purged, send_all, created_by_id, modified_by_id, org_id)
-							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, FALSE, 1, 1, 1) RETURNING id`)
+		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id)
+							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, 1, 1, 1) RETURNING id`)
 	assert.NoError(t, err)
 
-	evaluated := map[utils.Language]*models.BroadcastTranslation{
+	evaluated := map[envs.Language]*models.BroadcastTranslation{
 		eng: &models.BroadcastTranslation{
 			Text:         "hello world",
 			Attachments:  nil,
@@ -149,7 +149,7 @@ func TestBroadcastTask(t *testing.T) {
 		},
 	}
 
-	legacy := map[utils.Language]*models.BroadcastTranslation{
+	legacy := map[envs.Language]*models.BroadcastTranslation{
 		eng: &models.BroadcastTranslation{
 			Text:         "hi @(PROPER(contact.name)) legacy",
 			Attachments:  nil,
@@ -157,7 +157,7 @@ func TestBroadcastTask(t *testing.T) {
 		},
 	}
 
-	template := map[utils.Language]*models.BroadcastTranslation{
+	template := map[envs.Language]*models.BroadcastTranslation{
 		eng: &models.BroadcastTranslation{
 			Text:         "hi @(title(contact.name)) goflow",
 			Attachments:  nil,
@@ -175,9 +175,9 @@ func TestBroadcastTask(t *testing.T) {
 
 	tcs := []struct {
 		BroadcastID   models.BroadcastID
-		Translations  map[utils.Language]*models.BroadcastTranslation
+		Translations  map[envs.Language]*models.BroadcastTranslation
 		TemplateState models.TemplateState
-		BaseLanguage  utils.Language
+		BaseLanguage  envs.Language
 		GroupIDs      []models.GroupID
 		ContactIDs    []models.ContactID
 		URNs          []urns.URN

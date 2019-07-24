@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +26,7 @@ func TestStarts(t *testing.T) {
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
 	db.MustExec(
 		`INSERT INTO flows_flowrun(uuid, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id)
-		                    VALUES($1, TRUE, now(), now(), FALSE, $2, $3, 1);`, utils.NewUUID(), models.GeorgeID, models.SingleMessageFlowID)
+		                    VALUES($1, TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), models.GeorgeID, models.SingleMessageFlowID)
 
 	tcs := []struct {
 		FlowID              models.FlowID

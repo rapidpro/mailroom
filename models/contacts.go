@@ -8,15 +8,17 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/lib/pq"
-	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/null"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -28,7 +30,8 @@ type URNID null.Int
 type ContactID null.Int
 
 const (
-	topURNPriority = 1000
+	topURNPriority     = 1000
+	defaultURNPriority = 0
 
 	NilURNID     = URNID(0)
 	NilContactID = ContactID(0)
@@ -196,7 +199,7 @@ type Contact struct {
 	id         ContactID
 	uuid       flows.ContactUUID
 	name       string
-	language   utils.Language
+	language   envs.Language
 	isStopped  bool
 	isBlocked  bool
 	fields     map[string]*flows.Value
@@ -209,7 +212,7 @@ type Contact struct {
 func (c *Contact) ID() ContactID                   { return c.id }
 func (c *Contact) UUID() flows.ContactUUID         { return c.uuid }
 func (c *Contact) Name() string                    { return c.name }
-func (c *Contact) Language() utils.Language        { return c.language }
+func (c *Contact) Language() envs.Language         { return c.language }
 func (c *Contact) IsStopped() bool                 { return c.isStopped }
 func (c *Contact) IsBlocked() bool                 { return c.isBlocked }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
@@ -272,7 +275,7 @@ type contactEnvelope struct {
 	ID         ContactID                         `json:"id"`
 	UUID       flows.ContactUUID                 `json:"uuid"`
 	Name       string                            `json:"name"`
-	Language   utils.Language                    `json:"language"`
+	Language   envs.Language                     `json:"language"`
 	IsStopped  bool                              `json:"is_stopped"`
 	IsBlocked  bool                              `json:"is_blocked"`
 	Fields     map[FieldUUID]*fieldValueEnvelope `json:"fields"`
@@ -426,7 +429,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 		VALUES
 			($1, TRUE, FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
 		RETURNING id`,
-		org.OrgID(), utils.NewUUID(),
+		org.OrgID(), uuids.New(),
 	)
 
 	if err != nil {
@@ -457,7 +460,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 				(org_id, identity, path, scheme, display, auth, priority, channel_id, contact_id)
 			VALUES
 				($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			org.OrgID(), urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), getURNAuth(urn), topURNPriority, nil, contactID,
+			org.OrgID(), urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), GetURNAuth(urn), topURNPriority, nil, contactID,
 		)
 
 		if err != nil {
@@ -505,6 +508,11 @@ func URNForURN(ctx context.Context, tx Queryer, org *OrgAssets, u urns.URN) (urn
 		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE identity = $1 AND org_id = $2) r;`,
 		u.Identity(), org.OrgID(),
 	)
+	if err != nil {
+		return urns.NilURN, errors.Errorf("error selecting URN: %s", u.Identity())
+	}
+	defer rows.Close()
+
 	if !rows.Next() {
 		return urns.NilURN, errors.Errorf("no urn with identity: %s", u.Identity())
 	}
@@ -514,7 +522,42 @@ func URNForURN(ctx context.Context, tx Queryer, org *OrgAssets, u urns.URN) (urn
 		return urns.NilURN, errors.Wrapf(err, "error loading contact urn")
 	}
 
+	if rows.Next() {
+		return urns.NilURN, errors.Wrapf(err, "more than one URN returned for identity query")
+	}
+
 	return urn.AsURN(org)
+}
+
+// GetOrCreateURN will look up a URN by identity, creating it if needbe and associating it with the contact
+func GetOrCreateURN(ctx context.Context, tx Queryer, org *OrgAssets, contactID ContactID, u urns.URN) (urns.URN, error) {
+	// first try to get it directly
+	urn, _ := URNForURN(ctx, tx, org, u)
+
+	// found it? we are done
+	if urn != urns.NilURN {
+		return urn, nil
+	}
+
+	// otherwise we need to insert it
+	insert := &urnInsert{
+		ContactID: contactID,
+		Identity:  u.Identity().String(),
+		Path:      u.Path(),
+		Display:   null.String(u.Display()),
+		Auth:      GetURNAuth(u),
+		Scheme:    u.Scheme(),
+		Priority:  defaultURNPriority,
+		OrgID:     org.OrgID(),
+	}
+
+	_, err := tx.NamedExecContext(ctx, insertContactURNsSQL, insert)
+	if err != nil {
+		return urns.NilURN, errors.Wrapf(err, "error inserting new urn: %s", u)
+	}
+
+	// do a lookup once more
+	return URNForURN(ctx, tx, org, u)
 }
 
 // URNForID will return a URN for the passed in ID including all the special query parameters
@@ -526,6 +569,11 @@ func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urn
 		`SELECT row_to_json(r) FROM (SELECT id, scheme, path, display, auth, channel_id, priority FROM contacts_contacturn WHERE id = $1) r;`,
 		urnID,
 	)
+	if err != nil {
+		return urns.NilURN, errors.Errorf("error selecting URN ID: %d", urnID)
+	}
+	defer rows.Close()
+
 	if !rows.Next() {
 		return urns.NilURN, errors.Errorf("no urn with id: %d", urnID)
 	}
@@ -699,7 +747,7 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAs
 	topChannelID := GetURNChannelID(org, c.urns[0])
 
 	// we are already the top URN, nothing to do
-	if topURNID == urnID && topChannelID != nil && channel != nil && *topChannelID == channel.ID() {
+	if topURNID == urnID && topChannelID != NilChannelID && channel != nil && topChannelID == channel.ID() {
 		return nil
 	}
 
@@ -762,7 +810,7 @@ func GetURNInt(urn urns.URN, key string) int {
 	return value
 }
 
-func getURNAuth(urn urns.URN) null.String {
+func GetURNAuth(urn urns.URN) null.String {
 	values, err := urn.Query()
 	if err != nil {
 		return null.NullString
@@ -775,23 +823,22 @@ func getURNAuth(urn urns.URN) null.String {
 	return null.String(value)
 }
 
-func GetURNChannelID(org *OrgAssets, urn urns.URN) *ChannelID {
+func GetURNChannelID(org *OrgAssets, urn urns.URN) ChannelID {
 	values, err := urn.Query()
 	if err != nil {
-		return nil
+		return NilChannelID
 	}
 
 	channelUUID := values.Get("channel")
 	if channelUUID == "" {
-		return nil
+		return NilChannelID
 	}
 
 	channel := org.ChannelByUUID(assets.ChannelUUID(channelUUID))
 	if channel != nil {
-		channelID := channel.ID()
-		return &channelID
+		return channel.ID()
 	}
-	return nil
+	return NilChannelID
 }
 
 func GetURNID(urn urns.URN) URNID {
@@ -851,12 +898,6 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 
 		// for each of our urns
 		for _, urn := range change.URNs {
-			// parse our query
-			query, err := urn.Query()
-			if err != nil {
-				return errors.Wrapf(err, "error parsing query for urn: %s", urn)
-			}
-
 			// figure out if we have a channel
 			channelID := GetURNChannelID(org, urn)
 
@@ -871,26 +912,13 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 					Priority:  priority,
 				})
 			} else {
-				// otherwise this is a new URN insert
-				var display *string
-				if urn.Display() != "" {
-					d := urn.Display()
-					display = &d
-				}
-
-				var auth *string
-				if len(query["auth"]) > 0 {
-					a := query["auth"][0]
-					auth = &a
-				}
-
 				// new URN, add it instead
 				inserts = append(inserts, &urnInsert{
 					ContactID: change.ContactID,
 					Identity:  urn.Identity().String(),
 					Path:      urn.Path(),
-					Display:   display,
-					Auth:      auth,
+					Display:   null.String(urn.Display()),
+					Auth:      GetURNAuth(urn),
 					Scheme:    urn.Scheme(),
 					Priority:  priority,
 					OrgID:     org.OrgID(),
@@ -954,9 +982,9 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 
 // urnUpdate is our object that represents a single contact URN update
 type urnUpdate struct {
-	URNID     URNID      `db:"id"`
-	ChannelID *ChannelID `db:"channel_id"`
-	Priority  int        `db:"priority"`
+	URNID     URNID     `db:"id"`
+	ChannelID ChannelID `db:"channel_id"`
+	Priority  int       `db:"priority"`
 }
 
 const updateContactURNsSQL = `
@@ -975,14 +1003,14 @@ WHERE
 
 // urnInsert is our object that represents a single contact URN addition
 type urnInsert struct {
-	ContactID ContactID `db:"contact_id"`
-	Identity  string    `db:"identity"`
-	Path      string    `db:"path"`
-	Display   *string   `db:"display"`
-	Auth      *string   `db:"auth"`
-	Scheme    string    `db:"scheme"`
-	Priority  int       `db:"priority"`
-	OrgID     OrgID     `db:"org_id"`
+	ContactID ContactID   `db:"contact_id"`
+	Identity  string      `db:"identity"`
+	Path      string      `db:"path"`
+	Display   null.String `db:"display"`
+	Auth      null.String `db:"auth"`
+	Scheme    string      `db:"scheme"`
+	Priority  int         `db:"priority"`
+	OrgID     OrgID       `db:"org_id"`
 }
 
 const insertContactURNsSQL = `

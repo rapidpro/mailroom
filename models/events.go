@@ -33,7 +33,7 @@ func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *O
 	for hook, args := range preHooks {
 		err := hook.Apply(ctx, tx, rp, org, args)
 		if err != nil {
-			return errors.Wrapf(err, "error applying pre commit hook: %v", hook)
+			return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 		}
 	}
 

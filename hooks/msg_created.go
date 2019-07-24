@@ -190,11 +190,16 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 		return nil
 	}
 
-	// messaging flows must have urn id set on them, assert that
+	// messages in messaging flows must have urn id set on them, if not, go look it up
 	if session.SessionType() == models.MessagingFlow {
-		urnInt := models.GetURNInt(event.Msg.URN(), "id")
-		if urnInt == 0 {
-			return errors.Errorf("attempt to create messaging message with 0 id URN")
+		urn := event.Msg.URN()
+		if models.GetURNInt(urn, "id") == 0 {
+			urn, err := models.GetOrCreateURN(ctx, tx, org, session.ContactID(), event.Msg.URN())
+			if err != nil {
+				return errors.Wrapf(err, "unable to get or create URN: %s", event.Msg.URN())
+			}
+			// update our Msg with our full URN
+			event.Msg.SetURN(urn)
 		}
 	}
 
