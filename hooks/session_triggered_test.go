@@ -49,7 +49,7 @@ func TestSessionTriggered(t *testing.T) {
 					Count: 1,
 				},
 				SQLAssertion{
-					SQL:   "select count(*) from flows_flowstart where flow_id = $1 AND status = 'P'",
+					SQL:   "select count(*) from flows_flowstart where flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL;",
 					Args:  []interface{}{models.SingleMessageFlowID},
 					Count: 1,
 				},

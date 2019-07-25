@@ -56,7 +56,10 @@ func TestStarts(t *testing.T) {
 			tc.RestartParticipants, tc.IncludeActive,
 			nil, nil,
 		)
+
 		models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+		assert.NoError(t, err)
+
 		err := CreateFlowBatches(ctx, db, rp, nil, start)
 		assert.NoError(t, err)
 
