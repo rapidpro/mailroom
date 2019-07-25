@@ -68,10 +68,11 @@ func TestTwilioIVR(t *testing.T) {
 
 	// create a flow start for cathy and george
 	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, json.RawMessage(`{"ref_id":"123"}`))
-	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+	err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+	assert.NoError(t, err)
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, start)
+	err = starts.CreateFlowBatches(ctx, db, rp, start)
 	assert.NoError(t, err)
 
 	// start our task
