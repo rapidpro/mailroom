@@ -67,11 +67,14 @@ func TestTwilioIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy and george
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, json.RawMessage(`{"ref_id":"123"}`))
-	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+250700000001?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
+
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, parentSummary, nil)
+	err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+	assert.NoError(t, err)
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, start)
+	err = starts.CreateFlowBatches(ctx, db, rp, start)
 	assert.NoError(t, err)
 
 	// start our task
@@ -110,7 +113,7 @@ func TestTwilioIVR(t *testing.T) {
 			ConnectionID: models.ConnectionID(1),
 			Form:         nil,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two. Your reference id is 123",
+			Contains:     "Hello there. Please enter one or two.  This flow was triggered by Cathy",
 		},
 		{
 			Action:       "resume",
@@ -366,7 +369,8 @@ func TestNexmoIVR(t *testing.T) {
 	nexmo.IgnoreSignatures = true
 
 	// create a flow start for cathy and george
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, nil)
+	extra := json.RawMessage(`{"ref_id":"123"}`)
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, extra)
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
 	// call our master starter
@@ -410,7 +414,7 @@ func TestNexmoIVR(t *testing.T) {
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two.",
+			Contains:     "Hello there. Please enter one or two. Your reference id is 123",
 		},
 		{
 			Action:       "resume",

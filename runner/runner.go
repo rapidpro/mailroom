@@ -173,8 +173,8 @@ func StartFlowBatch(
 
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
-		if batch.Parent() != nil {
-			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.Parent())
+		if batch.ParentSummary() != nil {
+			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.ParentSummary())
 		}
 		if batch.Extra() != nil {
 			return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, types.JSONToXValue(batch.Extra()))
