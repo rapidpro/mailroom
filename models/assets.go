@@ -12,9 +12,10 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/search"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
@@ -255,7 +256,7 @@ func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
 
-func (a *OrgAssets) Env() utils.Environment { return a.env }
+func (a *OrgAssets) Env() envs.Environment { return a.env }
 
 func (a *OrgAssets) Org() *Org { return a.env }
 
@@ -433,7 +434,7 @@ func (a *OrgAssets) LookupSearchField(key string) *search.Field {
 
 	// is this a scheme?
 	if urns.IsValidScheme(key) {
-		if policy == utils.RedactionPolicyURNs {
+		if policy == envs.RedactionPolicyURNs {
 			field.Category = search.Unavailable
 		} else {
 			field.Category = search.Scheme
@@ -444,7 +445,7 @@ func (a *OrgAssets) LookupSearchField(key string) *search.Field {
 	// is this an implicit field?
 	if key == contactql.ImplicitKey {
 		field.Category = search.Implicit
-		if policy == utils.RedactionPolicyURNs {
+		if policy == envs.RedactionPolicyURNs {
 			field.Key = search.NameID
 		} else {
 			field.Key = search.NameTel
@@ -468,7 +469,7 @@ func (a *OrgAssets) LookupSearchField(key string) *search.Field {
 
 	// populate our elastic field
 	field.Category = search.ContactField
-	field.UUID = utils.UUID(f.UUID())
+	field.UUID = uuids.UUID(f.UUID())
 	field.Type = search.FieldType(f.Type())
 	return field
 }

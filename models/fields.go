@@ -6,7 +6,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -15,7 +15,7 @@ import (
 type FieldID int
 
 // FieldUUID is our type for the UUID of a field
-type FieldUUID utils.UUID
+type FieldUUID uuids.UUID
 
 // Field is our mailroom type for contact field types
 type Field struct {

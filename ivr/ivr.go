@@ -12,20 +12,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/httputils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/s3utils"
+
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -326,12 +329,12 @@ func StartIVRFlow(
 	}
 
 	// get the flow for our start
-	flowID, err := models.FlowIDForStart(ctx, db, org.OrgID(), startID)
+	start, err := models.GetFlowStartAttributes(ctx, db, org.OrgID(), startID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
 
-	flow, err := org.FlowByID(flowID)
+	flow, err := org.FlowByID(start.FlowID())
 	if err != nil {
 		return errors.Wrapf(err, "unable to load flow: %d", startID)
 	}
@@ -351,7 +354,7 @@ func StartIVRFlow(
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	connRef := flows.NewConnection(channel.ChannelReference(), urn)
-	trigger := triggers.NewManualVoiceTrigger(org.Env(), flowRef, contact, connRef, nil)
+	trigger := triggers.NewManualVoiceTrigger(org.Env(), flowRef, contact, connRef, types.JSONToXValue(start.Extra()))
 
 	// mark our connection as started
 	err = conn.MarkStarted(ctx, db, time.Now())
@@ -446,7 +449,7 @@ func ResumeIVRFlow(
 	}
 
 	// our msg UUID
-	msgUUID := flows.MsgUUID(utils.NewUUID())
+	msgUUID := flows.MsgUUID(uuids.New())
 
 	// we have an attachment, download it locally
 	if attachment != NilAttachment {
@@ -590,14 +593,14 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 		}
 
 		// on errors we need to look up the flow to know how long to wait before retrying
-		flowID, err := models.FlowIDForStart(ctx, db, org.OrgID(), conn.StartID())
+		start, err := models.GetFlowStartAttributes(ctx, db, org.OrgID(), conn.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())
 		}
 
-		flow, err := org.FlowByID(flowID)
+		flow, err := org.FlowByID(start.FlowID())
 		if err != nil {
-			return errors.Wrapf(err, "unable to load flow: %d", flowID)
+			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}
 
 		retryWait := time.Minute * time.Duration(flow.IntConfigValue(models.FlowConfigIVRRetryMinutes, models.ConnectionRetryWait))

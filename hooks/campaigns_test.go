@@ -6,7 +6,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 )
@@ -22,7 +22,7 @@ func TestCampaigns(t *testing.T) {
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
-		utils.NewUUID(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID)
+		uuids.New(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID)
 
 	// init their values
 	testsuite.DB().MustExec(

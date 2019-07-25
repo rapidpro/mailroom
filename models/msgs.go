@@ -13,6 +13,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -486,32 +487,32 @@ type BroadcastTranslation struct {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                              `json:"broadcast_id,omitempty"`
-		Translations  map[utils.Language]*BroadcastTranslation `json:"translations"`
-		TemplateState TemplateState                            `json:"template_state"`
-		BaseLanguage  utils.Language                           `json:"base_language"`
-		URNs          []urns.URN                               `json:"urns,omitempty"`
-		ContactIDs    []ContactID                              `json:"contact_ids,omitempty"`
-		GroupIDs      []GroupID                                `json:"group_ids,omitempty"`
-		OrgID         OrgID                                    `json:"org_id"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
+		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+		TemplateState TemplateState                           `json:"template_state"`
+		BaseLanguage  envs.Language                           `json:"base_language"`
+		URNs          []urns.URN                              `json:"urns,omitempty"`
+		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
+		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
+		OrgID         OrgID                                   `json:"org_id"`
 	}
 }
 
-func (b *Broadcast) BroadcastID() BroadcastID                               { return b.b.BroadcastID }
-func (b *Broadcast) ContactIDs() []ContactID                                { return b.b.ContactIDs }
-func (b *Broadcast) GroupIDs() []GroupID                                    { return b.b.GroupIDs }
-func (b *Broadcast) URNs() []urns.URN                                       { return b.b.URNs }
-func (b *Broadcast) OrgID() OrgID                                           { return b.b.OrgID }
-func (b *Broadcast) Translations() map[utils.Language]*BroadcastTranslation { return b.b.Translations }
-func (b *Broadcast) TemplateState() TemplateState                           { return b.b.TemplateState }
+func (b *Broadcast) BroadcastID() BroadcastID                              { return b.b.BroadcastID }
+func (b *Broadcast) ContactIDs() []ContactID                               { return b.b.ContactIDs }
+func (b *Broadcast) GroupIDs() []GroupID                                   { return b.b.GroupIDs }
+func (b *Broadcast) URNs() []urns.URN                                      { return b.b.URNs }
+func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
+func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { return b.b.Translations }
+func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(
-	orgID OrgID, id BroadcastID, translations map[utils.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage utils.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID) *Broadcast {
+	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID) *Broadcast {
 
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
@@ -529,7 +530,7 @@ func NewBroadcast(
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
 	// converst our translations to our type
-	translations := make(map[utils.Language]*BroadcastTranslation)
+	translations := make(map[envs.Language]*BroadcastTranslation)
 	for l, t := range event.Translations {
 		translations[l] = &BroadcastTranslation{
 			Text:         t.Text,
@@ -570,14 +571,14 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {
 	b struct {
-		BroadcastID   BroadcastID                              `json:"broadcast_id,omitempty"`
-		Translations  map[utils.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage  utils.Language                           `json:"base_language"`
-		TemplateState TemplateState                            `json:"template_state"`
-		URNs          map[ContactID]urns.URN                   `json:"urns,omitempty"`
-		ContactIDs    []ContactID                              `json:"contact_ids,omitempty"`
-		IsLast        bool                                     `json:"is_last"`
-		OrgID         OrgID                                    `json:"org_id"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
+		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+		BaseLanguage  envs.Language                           `json:"base_language"`
+		TemplateState TemplateState                           `json:"template_state"`
+		URNs          map[ContactID]urns.URN                  `json:"urns,omitempty"`
+		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
+		IsLast        bool                                    `json:"is_last"`
+		OrgID         OrgID                                   `json:"org_id"`
 	}
 }
 
@@ -586,11 +587,11 @@ func (b *BroadcastBatch) ContactIDs() []ContactID             { return b.b.Conta
 func (b *BroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.URNs }
 func (b *BroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
 func (b *BroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
-func (b *BroadcastBatch) Translations() map[utils.Language]*BroadcastTranslation {
+func (b *BroadcastBatch) Translations() map[envs.Language]*BroadcastTranslation {
 	return b.b.Translations
 }
 func (b *BroadcastBatch) TemplateState() TemplateState { return b.b.TemplateState }
-func (b *BroadcastBatch) BaseLanguage() utils.Language { return b.b.BaseLanguage }
+func (b *BroadcastBatch) BaseLanguage() envs.Language  { return b.b.BaseLanguage }
 func (b *BroadcastBatch) IsLast() bool                 { return b.b.IsLast }
 func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
 
@@ -683,7 +684,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		//   2) org default language
 		//   3) broadcast base language
 		lang := contact.Language()
-		if lang != utils.NilLanguage {
+		if lang != envs.NilLanguage {
 			found := false
 			for _, l := range org.Env().AllowedLanguages() {
 				if l == lang {
@@ -692,7 +693,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 				}
 			}
 			if !found {
-				lang = utils.NilLanguage
+				lang = envs.NilLanguage
 			}
 		}
 

@@ -9,7 +9,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -25,10 +25,10 @@ type CampaignID int
 type CampaignEventID int
 
 // CampaignUUID is our type for campaign UUIDs
-type CampaignUUID utils.UUID
+type CampaignUUID uuids.UUID
 
 // CampaignEventUUID is our type for campaign event UUIDs
-type CampaignEventUUID utils.UUID
+type CampaignEventUUID uuids.UUID
 
 // OffsetUnit defines what time unit our offset is in
 type OffsetUnit string

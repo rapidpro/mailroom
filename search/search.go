@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/nyaruka/goflow/contactql"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -86,7 +88,7 @@ type Field struct {
 	Key      string
 	Category FieldCategory
 	Type     FieldType
-	UUID     utils.UUID
+	UUID   	 uuids.UUID
 }
 
 // FieldRegistry provides an interface for looking up queryable fields
@@ -95,7 +97,7 @@ type FieldRegistry interface {
 }
 
 // ToElasticQuery converts a contactql query to an Elastic query
-func ToElasticQuery(env utils.Environment, registry FieldRegistry, node contactql.QueryNode) (elastic.Query, error) {
+func ToElasticQuery(env envs.Environment, registry FieldRegistry, node contactql.QueryNode) (elastic.Query, error) {
 	switch n := node.(type) {
 	case *contactql.ContactQuery:
 		return ToElasticQuery(env, registry, n.Root())
@@ -108,7 +110,7 @@ func ToElasticQuery(env utils.Environment, registry FieldRegistry, node contactq
 	}
 }
 
-func boolCombinationToElasticQuery(env utils.Environment, registry FieldRegistry, combination *contactql.BoolCombination) (elastic.Query, error) {
+func boolCombinationToElasticQuery(env envs.Environment, registry FieldRegistry, combination *contactql.BoolCombination) (elastic.Query, error) {
 	queries := make([]elastic.Query, len(combination.Children()))
 	for i, child := range combination.Children() {
 		childQuery, err := ToElasticQuery(env, registry, child)
@@ -125,7 +127,7 @@ func boolCombinationToElasticQuery(env utils.Environment, registry FieldRegistry
 	return elastic.NewBoolQuery().Should(queries...), nil
 }
 
-func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *contactql.Condition) (elastic.Query, error) {
+func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *contactql.Condition) (elastic.Query, error) {
 	field := registry.LookupSearchField(c.Key())
 	if field == nil {
 		return nil, errors.Errorf("unable to find field: %s", c.Key())
@@ -207,11 +209,11 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
 
 		} else if field.Type == DateTime {
-			value, err := utils.DateTimeFromString(env, c.Value(), false)
+			value, err := envs.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to parse datetime: %s", c.Value())
 			}
-			start, end := utils.DateToUTCRange(value, value.Location())
+			start, end := dates.DayToUTCRange(value, value.Location())
 
 			if c.Comparator() == "=" {
 				query = elastic.NewRangeQuery("fields.datetime").Gte(start).Lt(end)
@@ -302,11 +304,11 @@ func conditionToElasticQuery(env utils.Environment, registry FieldRegistry, c *c
 				return nil, fmt.Errorf("unsupported language comparator: %s", c.Comparator())
 			}
 		} else if field.Key == CreatedOnAttribute {
-			value, err := utils.DateTimeFromString(env, c.Value(), false)
+			value, err := envs.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to parse datetime: %s", c.Value())
 			}
-			start, end := utils.DateToUTCRange(value, value.Location())
+			start, end := dates.DayToUTCRange(value, value.Location())
 
 			if c.Comparator() == "=" {
 				return elastic.NewRangeQuery("created_on").Gte(start).Lt(end), nil
