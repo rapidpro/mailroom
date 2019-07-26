@@ -351,6 +351,14 @@ func StartIVRFlow(
 		return errors.Wrapf(err, "error loading flow contact")
 	}
 
+	var params *types.XObject
+	if len(start.Extra()) > 0 {
+		params, err = types.ReadXObject(start.Extra())
+		if err != nil {
+			return errors.Wrap(err, "unable to read JSON from flow start extra")
+		}
+	}
+
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	connRef := flows.NewConnection(channel.ChannelReference(), urn)
@@ -359,7 +367,7 @@ func StartIVRFlow(
 	if len(start.ParentSummary()) > 0 {
 		trigger = triggers.NewFlowActionVoiceTrigger(org.Env(), flowRef, contact, connRef, start.ParentSummary())
 	} else {
-		trigger = triggers.NewManualVoiceTrigger(org.Env(), flowRef, contact, connRef, types.JSONToXValue(start.Extra()))
+		trigger = triggers.NewManualVoiceTrigger(org.Env(), flowRef, contact, connRef, params)
 	}
 
 	// mark our connection as started
