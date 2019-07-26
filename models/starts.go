@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/types"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
@@ -47,8 +46,8 @@ type FlowStartBatch struct {
 		FlowType   FlowType    `json:"flow_type"`
 		ContactIDs []ContactID `json:"contact_ids"`
 
-		Parent json.RawMessage `json:"parent,omitempty"`
-		Extra  json.RawMessage `json:"extra,omitempty"`
+		ParentSummary null.JSON `json:"parent_summary,omitempty"`
+		Extra         null.JSON `json:"extra,omitempty"`
 
 		RestartParticipants bool `json:"restart_participants"`
 		IncludeActive       bool `json:"include_active"`
@@ -66,8 +65,8 @@ func (b *FlowStartBatch) IncludeActive() bool       { return b.b.IncludeActive }
 func (b *FlowStartBatch) IsLast() bool              { return b.b.IsLast }
 func (b *FlowStartBatch) SetIsLast(last bool)       { b.b.IsLast = last }
 
-func (b *FlowStartBatch) Parent() json.RawMessage { return b.b.Parent }
-func (b *FlowStartBatch) Extra() json.RawMessage  { return b.b.Extra }
+func (b *FlowStartBatch) ParentSummary() json.RawMessage { return json.RawMessage(b.b.ParentSummary) }
+func (b *FlowStartBatch) Extra() json.RawMessage         { return json.RawMessage(b.b.Extra) }
 
 func (b *FlowStartBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -89,8 +88,8 @@ type FlowStart struct {
 		RestartParticipants bool `json:"restart_participants" db:"restart_participants"`
 		IncludeActive       bool `json:"include_active"       db:"include_active"`
 
-		Parent json.RawMessage    `json:"parent,omitempty"`
-		Extra  types.NullJSONText `json:"extra,omitempty"  db:"extra"`
+		Extra         null.JSON `json:"extra,omitempty"          db:"extra"`
+		ParentSummary null.JSON `json:"parent_summary,omitempty" db:"parent_summary"`
 	}
 }
 
@@ -105,8 +104,8 @@ func (s *FlowStart) CreateContact() bool       { return s.s.CreateContact }
 func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants }
 func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
 
-func (s *FlowStart) Parent() json.RawMessage { return s.s.Parent }
-func (s *FlowStart) Extra() json.RawMessage  { return json.RawMessage(s.s.Extra.JSONText) }
+func (s *FlowStart) ParentSummary() json.RawMessage { return json.RawMessage(s.s.ParentSummary) }
+func (s *FlowStart) Extra() json.RawMessage         { return json.RawMessage(s.s.Extra) }
 
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
@@ -114,7 +113,7 @@ func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and extra
 func GetFlowStartAttributes(ctx context.Context, db Queryer, orgID OrgID, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
-	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra FROM flows_flowstart WHERE id = $1 AND is_active = TRUE`, startID)
+	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra, parent_summary FROM flows_flowstart WHERE id = $1`, startID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load start attributes for id: %d", startID)
 	}
@@ -138,11 +137,8 @@ func NewFlowStart(
 	s.s.CreateContact = createContact
 	s.s.RestartParticipants = restartParticipants
 	s.s.IncludeActive = includeActive
-	s.s.Parent = parent
-	s.s.Extra = types.NullJSONText{
-		JSONText: types.JSONText(extra),
-		Valid:    len(extra) > 0,
-	}
+	s.s.ParentSummary = null.JSON(parent)
+	s.s.Extra = null.JSON(extra)
 
 	return s
 }
@@ -209,8 +205,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(is_active, created_on, modified_on,  uuid,  restart_participants,  include_active, contact_count, status,  flow_id, extra)
-			 VALUES(TRUE     , NOW()     , NOW()      , :uuid, :restart_participants, :include_active, 0            , 'P'   , :flow_id, :extra)
+	flows_flowstart(created_on,  uuid,  restart_participants,  include_active, status,  flow_id,  extra,  parent_summary)
+			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, 'P'   , :flow_id, :extra, :parent_summary)
 RETURNING
 	id
 `
@@ -237,8 +233,8 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID) *FlowStartBatch {
 	b.b.ContactIDs = contactIDs
 	b.b.RestartParticipants = s.RestartParticipants()
 	b.b.IncludeActive = s.IncludeActive()
-	b.b.Parent = s.Parent()
-	b.b.Extra = s.Extra()
+	b.b.ParentSummary = null.JSON(s.ParentSummary())
+	b.b.Extra = null.JSON(s.Extra())
 	return b
 }
 

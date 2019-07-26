@@ -70,7 +70,7 @@ func TestIVRCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should now have a flow start created
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart WHERE flow_id = $1 AND flow_id = $2 AND status = 'P' AND is_active = TRUE;`, []interface{}{models.IVRFlowID, models.IVRFlowID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart WHERE flow_id = $1 AND flow_id = $2 AND status = 'P';`, []interface{}{models.IVRFlowID, models.IVRFlowID}, 1)
 	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart_contacts WHERE contact_id = $1 AND flowstart_id = 1;`, []interface{}{models.CathyID}, 1)
 	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart_contacts WHERE contact_id = $1 AND flowstart_id = 1;`, []interface{}{models.GeorgeID}, 1)
 

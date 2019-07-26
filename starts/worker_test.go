@@ -56,8 +56,10 @@ func TestStarts(t *testing.T) {
 			tc.RestartParticipants, tc.IncludeActive,
 			nil, nil,
 		)
-		models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
-		err := CreateFlowBatches(ctx, db, rp, start)
+		err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+		assert.NoError(t, err)
+
+		err = CreateFlowBatches(ctx, db, rp, start)
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
