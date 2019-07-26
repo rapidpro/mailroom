@@ -406,11 +406,9 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to marshal extra from channel event")
 		}
-		if len(asJSON) > 0 {
-			params, err = types.ReadXObject(asJSON)
-			if err != nil {
-				return nil, errors.Wrapf(err, "unable to read extra from channel event")
-			}
+		params, err = types.ReadXObject(asJSON)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to read extra from channel event")
 		}
 	}
 
