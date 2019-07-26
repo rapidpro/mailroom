@@ -46,8 +46,8 @@ func TestStarts(t *testing.T) {
 		ContactIDs          []models.ContactID
 		Query               string
 		QueryResponse       string
-		RestartParticipants bool
-		IncludeActive       bool
+		RestartParticipants models.RestartParticipants
+		IncludeActive       models.IncludeActive
 		Queue               string
 		ContactCount        int
 		BatchCount          int
@@ -93,12 +93,11 @@ func TestStarts(t *testing.T) {
 		mes.NextResponse = tc.QueryResponse
 
 		// handle our start task
-		start := models.NewFlowStart(
-			models.Org1, models.MessagingFlow, tc.FlowID,
-			tc.GroupIDs, tc.ContactIDs, nil, tc.Query, false,
-			tc.RestartParticipants, tc.IncludeActive,
-			nil, nil,
-		)
+		start := models.
+			NewFlowStart(models.Org1, models.MessagingFlow, tc.FlowID, tc.RestartParticipants, tc.IncludeActive).
+			WithGroupIDs(tc.GroupIDs).
+			WithContactIDs(tc.ContactIDs).
+			WithQuery(tc.Query)
 
 		err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 		assert.NoError(t, err)

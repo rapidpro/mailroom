@@ -37,10 +37,10 @@ func NewStartOptions() *StartOptions {
 // StartOptions define the various parameters that can be used when starting a flow
 type StartOptions struct {
 	// RestartParticipants should be true if the flow start should restart participants already in this flow
-	RestartParticipants bool
+	RestartParticipants models.RestartParticipants
 
 	// IncludeActive should be true if we want to interrupt people active in other flows (including this one)
-	IncludeActive bool
+	IncludeActive models.IncludeActive
 
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
@@ -688,7 +688,9 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 	tx, _ := db.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.NewFlowStart(orgID, models.IVRFlow, flowID, nil, contactIDs, nil, "", false, true, true, nil, nil)
+	start := models.
+		NewFlowStart(orgID, models.IVRFlow, flowID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs(contactIDs)
 
 	// insert it
 	err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})

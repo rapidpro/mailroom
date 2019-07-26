@@ -18,6 +18,18 @@ type StartID null.Int
 // NilStartID is our constant for a nil start id
 var NilStartID = StartID(0)
 
+// RestartParticipants is our type for the bool of restarting participatants
+type RestartParticipants bool
+
+const DoRestartParticipants = RestartParticipants(true)
+const DontRestartParticipants = RestartParticipants(false)
+
+// IncludeActive is our type for the bool of whether to include active contacts
+type IncludeActive bool
+
+const DoIncludeActive = IncludeActive(true)
+const DontIncludeActive = IncludeActive(false)
+
 // MarkStartComplete sets the status for the passed in flow start
 func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error {
 	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C' WHERE id = $1", startID)
@@ -49,21 +61,21 @@ type FlowStartBatch struct {
 		ParentSummary null.JSON `json:"parent_summary,omitempty"`
 		Extra         null.JSON `json:"extra,omitempty"`
 
-		RestartParticipants bool `json:"restart_participants"`
-		IncludeActive       bool `json:"include_active"`
+		RestartParticipants RestartParticipants `json:"restart_participants"`
+		IncludeActive       IncludeActive       `json:"include_active"`
 
 		IsLast bool `json:"is_last,omitempty"`
 	}
 }
 
-func (b *FlowStartBatch) StartID() StartID          { return b.b.StartID }
-func (b *FlowStartBatch) OrgID() OrgID              { return b.b.OrgID }
-func (b *FlowStartBatch) FlowID() FlowID            { return b.b.FlowID }
-func (b *FlowStartBatch) ContactIDs() []ContactID   { return b.b.ContactIDs }
-func (b *FlowStartBatch) RestartParticipants() bool { return b.b.RestartParticipants }
-func (b *FlowStartBatch) IncludeActive() bool       { return b.b.IncludeActive }
-func (b *FlowStartBatch) IsLast() bool              { return b.b.IsLast }
-func (b *FlowStartBatch) SetIsLast(last bool)       { b.b.IsLast = last }
+func (b *FlowStartBatch) StartID() StartID                         { return b.b.StartID }
+func (b *FlowStartBatch) OrgID() OrgID                             { return b.b.OrgID }
+func (b *FlowStartBatch) FlowID() FlowID                           { return b.b.FlowID }
+func (b *FlowStartBatch) ContactIDs() []ContactID                  { return b.b.ContactIDs }
+func (b *FlowStartBatch) RestartParticipants() RestartParticipants { return b.b.RestartParticipants }
+func (b *FlowStartBatch) IncludeActive() IncludeActive             { return b.b.IncludeActive }
+func (b *FlowStartBatch) IsLast() bool                             { return b.b.IsLast }
+func (b *FlowStartBatch) SetIsLast(last bool)                      { b.b.IsLast = last }
 
 func (b *FlowStartBatch) ParentSummary() json.RawMessage { return json.RawMessage(b.b.ParentSummary) }
 func (b *FlowStartBatch) Extra() json.RawMessage         { return json.RawMessage(b.b.Extra) }
@@ -87,28 +99,63 @@ type FlowStart struct {
 
 		CreateContact bool `json:"create_contact"`
 
-		RestartParticipants bool `json:"restart_participants" db:"restart_participants"`
-		IncludeActive       bool `json:"include_active"       db:"include_active"`
+		RestartParticipants RestartParticipants `json:"restart_participants" db:"restart_participants"`
+		IncludeActive       IncludeActive       `json:"include_active"       db:"include_active"`
 
 		Extra         null.JSON `json:"extra,omitempty"          db:"extra"`
 		ParentSummary null.JSON `json:"parent_summary,omitempty" db:"parent_summary"`
 	}
 }
 
-func (s *FlowStart) ID() StartID               { return s.s.ID }
-func (s *FlowStart) OrgID() OrgID              { return s.s.OrgID }
-func (s *FlowStart) FlowID() FlowID            { return s.s.FlowID }
-func (s *FlowStart) FlowType() FlowType        { return s.s.FlowType }
-func (s *FlowStart) GroupIDs() []GroupID       { return s.s.GroupIDs }
-func (s *FlowStart) ContactIDs() []ContactID   { return s.s.ContactIDs }
-func (s *FlowStart) URNs() []urns.URN          { return s.s.URNs }
-func (s *FlowStart) Query() string             { return string(s.s.Query) }
-func (s *FlowStart) CreateContact() bool       { return s.s.CreateContact }
-func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants }
-func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
+func (s *FlowStart) ID() StartID        { return s.s.ID }
+func (s *FlowStart) OrgID() OrgID       { return s.s.OrgID }
+func (s *FlowStart) FlowID() FlowID     { return s.s.FlowID }
+func (s *FlowStart) FlowType() FlowType { return s.s.FlowType }
+
+func (s *FlowStart) GroupIDs() []GroupID { return s.s.GroupIDs }
+func (s *FlowStart) WithGroupIDs(groupIDs []GroupID) *FlowStart {
+	s.s.GroupIDs = groupIDs
+	return s
+}
+
+func (s *FlowStart) ContactIDs() []ContactID { return s.s.ContactIDs }
+func (s *FlowStart) WithContactIDs(contactIDs []ContactID) *FlowStart {
+	s.s.ContactIDs = contactIDs
+	return s
+}
+
+func (s *FlowStart) URNs() []urns.URN { return s.s.URNs }
+func (s *FlowStart) WithURNs(us []urns.URN) *FlowStart {
+	s.s.URNs = us
+	return s
+}
+
+func (s *FlowStart) Query() string { return string(s.s.Query) }
+func (s *FlowStart) WithQuery(query string) *FlowStart {
+	s.s.Query = null.String(query)
+	return s
+}
+
+func (s *FlowStart) RestartParticipants() RestartParticipants { return s.s.RestartParticipants }
+func (s *FlowStart) IncludeActive() IncludeActive             { return s.s.IncludeActive }
+
+func (s *FlowStart) CreateContact() bool { return s.s.CreateContact }
+func (s *FlowStart) WithCreateContact(create bool) *FlowStart {
+	s.s.CreateContact = create
+	return s
+}
 
 func (s *FlowStart) ParentSummary() json.RawMessage { return json.RawMessage(s.s.ParentSummary) }
-func (s *FlowStart) Extra() json.RawMessage         { return json.RawMessage(s.s.Extra) }
+func (s *FlowStart) WithParentSummary(sum json.RawMessage) *FlowStart {
+	s.s.ParentSummary = null.JSON(sum)
+	return s
+}
+
+func (s *FlowStart) Extra() json.RawMessage { return json.RawMessage(s.s.Extra) }
+func (s *FlowStart) WithExtra(extra json.RawMessage) *FlowStart {
+	s.s.Extra = null.JSON(extra)
+	return s
+}
 
 func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) }
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
@@ -124,25 +171,14 @@ func GetFlowStartAttributes(ctx context.Context, db Queryer, orgID OrgID, startI
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
-func NewFlowStart(
-	orgID OrgID, flowType FlowType, flowID FlowID,
-	groupIDs []GroupID, contactIDs []ContactID, urns []urns.URN, query string, createContact bool,
-	restartParticipants bool, includeActive bool, parent json.RawMessage, extra json.RawMessage) *FlowStart {
-
+func NewFlowStart(orgID OrgID, flowType FlowType, flowID FlowID, restartParticipants RestartParticipants, includeActive IncludeActive) *FlowStart {
 	s := &FlowStart{}
 	s.s.UUID = uuids.New()
 	s.s.OrgID = orgID
 	s.s.FlowType = flowType
 	s.s.FlowID = flowID
-	s.s.GroupIDs = groupIDs
-	s.s.ContactIDs = contactIDs
-	s.s.URNs = urns
-	s.s.Query = null.String(query)
-	s.s.CreateContact = createContact
 	s.s.RestartParticipants = restartParticipants
 	s.s.IncludeActive = includeActive
-	s.s.ParentSummary = null.JSON(parent)
-	s.s.Extra = null.JSON(extra)
 
 	return s
 }
