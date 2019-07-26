@@ -688,8 +688,7 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 	tx, _ := db.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.
-		NewFlowStart(orgID, models.IVRFlow, flowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(orgID, models.IVRFlow, flowID, models.DoRestartParticipants, models.DoIncludeActive).
 		WithContactIDs(contactIDs)
 
 	// insert it
