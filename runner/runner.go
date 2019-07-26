@@ -688,7 +688,7 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 	tx, _ := db.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.NewFlowStart(orgID, models.IVRFlow, flowID, nil, contactIDs, nil, false, true, true, nil, nil)
+	start := models.NewFlowStart(orgID, models.IVRFlow, flowID, nil, contactIDs, nil, "", false, true, true, nil, nil)
 
 	// insert it
 	err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})

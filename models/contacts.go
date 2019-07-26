@@ -179,8 +179,8 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	ids := make([]ContactID, 0, 100)
 
 	// iterate across our results, building up our contact ids
-	scroll := client.Scroll("contacts").Index("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
-	scroll = scroll.KeepAlive("15m").Size(100000).Query(eq).FetchSource(false)
+	scroll := client.Scroll("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	scroll = scroll.KeepAlive("15m").Size(10000).Query(eq).FetchSource(false)
 	for {
 		results, err := scroll.Do(ctx)
 		if err == io.EOF {

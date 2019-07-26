@@ -32,7 +32,7 @@ func TestIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID}, nil, "", false, true, true, nil, nil)
 
 	// call our master starter
 	err := starts.CreateFlowBatches(ctx, db, rp, nil, start)

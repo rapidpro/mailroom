@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/contactql"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -72,7 +72,7 @@ func TestElasticQuery(t *testing.T) {
 	assert.NoError(t, err)
 
 	ny, _ := time.LoadLocation("America/New_York")
-	env := utils.NewEnvironmentBuilder().WithTimezone(ny).Build()
+	env := envs.NewEnvironmentBuilder().WithTimezone(ny).Build()
 
 	for _, tc := range tcs {
 		registry.IsAnon = tc.IsAnon

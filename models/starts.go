@@ -45,7 +45,6 @@ type FlowStartBatch struct {
 		FlowID     FlowID      `json:"flow_id"`
 		FlowType   FlowType    `json:"flow_type"`
 		ContactIDs []ContactID `json:"contact_ids"`
-		Search     string      `json:"search"`
 
 		ParentSummary null.JSON `json:"parent_summary,omitempty"`
 		Extra         null.JSON `json:"extra,omitempty"`
@@ -83,8 +82,8 @@ type FlowStart struct {
 
 		GroupIDs   []GroupID   `json:"group_ids,omitempty"`
 		ContactIDs []ContactID `json:"contact_ids,omitempty"`
-		Query      string      `json:"query,omitempty"`
 		URNs       []urns.URN  `json:"urns,omitempty"`
+		Query      null.String `json:"query,omitempty"        db:"query"`
 
 		CreateContact bool `json:"create_contact"`
 
@@ -103,8 +102,8 @@ func (s *FlowStart) FlowType() FlowType        { return s.s.FlowType }
 func (s *FlowStart) GroupIDs() []GroupID       { return s.s.GroupIDs }
 func (s *FlowStart) ContactIDs() []ContactID   { return s.s.ContactIDs }
 func (s *FlowStart) URNs() []urns.URN          { return s.s.URNs }
+func (s *FlowStart) Query() string             { return string(s.s.Query) }
 func (s *FlowStart) CreateContact() bool       { return s.s.CreateContact }
-func (s *FlowStart) Query() string             { return s.s.Query }
 func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants }
 func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
 
@@ -127,7 +126,7 @@ func GetFlowStartAttributes(ctx context.Context, db Queryer, orgID OrgID, startI
 // NewFlowStart creates a new flow start objects for the passed in parameters
 func NewFlowStart(
 	orgID OrgID, flowType FlowType, flowID FlowID,
-	groupIDs []GroupID, contactIDs []ContactID, urns []urns.URN, createContact bool,
+	groupIDs []GroupID, contactIDs []ContactID, urns []urns.URN, query string, createContact bool,
 	restartParticipants bool, includeActive bool, parent json.RawMessage, extra json.RawMessage) *FlowStart {
 
 	s := &FlowStart{}
@@ -138,6 +137,7 @@ func NewFlowStart(
 	s.s.GroupIDs = groupIDs
 	s.s.ContactIDs = contactIDs
 	s.s.URNs = urns
+	s.s.Query = null.String(query)
 	s.s.CreateContact = createContact
 	s.s.RestartParticipants = restartParticipants
 	s.s.IncludeActive = includeActive

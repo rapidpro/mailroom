@@ -99,7 +99,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			// create our start
 			start := models.NewFlowStart(
 				org.OrgID(), flow.FlowType(), flow.ID(),
-				groupIDs, contactIDs, event.URNs, event.CreateContact,
+				groupIDs, contactIDs, event.URNs, "", event.CreateContact,
 				true, true,
 				event.RunSummary, nil,
 			)
