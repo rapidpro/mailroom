@@ -7,8 +7,8 @@ import (
 
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/goflow/utils/dates"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -88,7 +88,7 @@ type Field struct {
 	Key      string
 	Category FieldCategory
 	Type     FieldType
-	UUID   	 uuids.UUID
+	UUID     uuids.UUID
 }
 
 // FieldRegistry provides an interface for looking up queryable fields
@@ -140,7 +140,10 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 
 		if field.Key == NameTel {
 			if number != 0 {
-				return elastic.NewNestedQuery("urns", elastic.NewMatchPhraseQuery("urns.path", number)), nil
+				return elastic.NewNestedQuery("urns", elastic.NewBoolQuery().Must(
+					elastic.NewTermQuery("urns.path.keyword", number),
+					elastic.NewTermQuery("urns.scheme", field.Key)),
+				), nil
 			}
 			return elastic.NewMatchQuery("name", c.Value()), nil
 

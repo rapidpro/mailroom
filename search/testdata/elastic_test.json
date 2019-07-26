@@ -604,10 +604,19 @@
             "nested": {
                 "path": "urns",
                 "query": {
-                    "match_phrase": {
-                        "urns.path": {
-                            "query": 7979
-                        }
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "urns.path.keyword": 7979
+                                }
+                            },
+                            {
+                                "term": {
+                                    "urns.scheme": "name_tel"
+                                }
+                            }
+                        ]
                     }
                 }
             }
