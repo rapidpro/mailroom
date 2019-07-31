@@ -1,3 +1,8 @@
+v2.0.17
+----------
+ * Update to goflow v0.45.0
+ * Write UUID field on flows_flowsession
+
 v2.0.16
 ----------
  * write/read parent summary on flow starts
