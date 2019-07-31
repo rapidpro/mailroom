@@ -400,13 +400,16 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// create our parameters, we just convert this from JSON
-	var params types.XValue
+	var params *types.XObject
 	if event.Extra() != nil {
 		asJSON, err := json.Marshal(event.Extra())
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to marshal extra from channel event")
 		}
-		params = types.JSONToXValue(asJSON)
+		params, err = types.ReadXObject(asJSON)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to read extra from channel event")
+		}
 	}
 
 	// build our flow trigger

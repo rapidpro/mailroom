@@ -1,3 +1,8 @@
+v2.0.16
+----------
+ * write/read parent summary on flow starts
+ * fix IVR starts not being able to reference parent
+
 v2.0.15
 ----------
  * Update to goflow v0.42.0

@@ -171,13 +171,21 @@ func StartFlowBatch(
 		return nil, errors.Wrapf(err, "error loading campaign flow: %d", batch.FlowID())
 	}
 
+	var params *types.XObject
+	if len(batch.Extra()) > 0 {
+		params, err = types.ReadXObject(batch.Extra())
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to read JSON from flow start extra")
+		}
+	}
+
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
-		if batch.Parent() != nil {
-			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.Parent())
+		if batch.ParentSummary() != nil {
+			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.ParentSummary())
 		}
 		if batch.Extra() != nil {
-			return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, types.JSONToXValue(batch.Extra()))
+			return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, params)
 		}
 		return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
 	}
