@@ -1,3 +1,7 @@
+v2.0.18
+----------
+ * Make FlowSession.uuid nullable for now
+
 v2.0.17
 ----------
  * Update to goflow v0.45.0
