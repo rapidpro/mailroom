@@ -63,20 +63,20 @@ var keptEvents = map[string]bool{
 // Session is the mailroom type for a FlowSession
 type Session struct {
 	s struct {
-		ID            SessionID         `db:"id"`
-		UUID          flows.SessionUUID `db:"uuid"`
-		SessionType   FlowType          `db:"session_type"`
-		Status        SessionStatus     `db:"status"`
-		Responded     bool              `db:"responded"`
-		Output        string            `db:"output"`
-		ContactID     ContactID         `db:"contact_id"`
-		OrgID         OrgID             `db:"org_id"`
-		CreatedOn     time.Time         `db:"created_on"`
-		EndedOn       *time.Time        `db:"ended_on"`
-		TimeoutOn     *time.Time        `db:"timeout_on"`
-		WaitStartedOn *time.Time        `db:"wait_started_on"`
-		CurrentFlowID FlowID            `db:"current_flow_id"`
-		ConnectionID  *ConnectionID     `db:"connection_id"`
+		ID            SessionID     `db:"id"`
+		UUID          null.String   `db:"uuid"` // TODO remove nullable once backfilled
+		SessionType   FlowType      `db:"session_type"`
+		Status        SessionStatus `db:"status"`
+		Responded     bool          `db:"responded"`
+		Output        string        `db:"output"`
+		ContactID     ContactID     `db:"contact_id"`
+		OrgID         OrgID         `db:"org_id"`
+		CreatedOn     time.Time     `db:"created_on"`
+		EndedOn       *time.Time    `db:"ended_on"`
+		TimeoutOn     *time.Time    `db:"timeout_on"`
+		WaitStartedOn *time.Time    `db:"wait_started_on"`
+		CurrentFlowID FlowID        `db:"current_flow_id"`
+		ConnectionID  *ConnectionID `db:"connection_id"`
 	}
 
 	incomingMsgID      MsgID
@@ -103,7 +103,7 @@ type Session struct {
 }
 
 func (s *Session) ID() SessionID                      { return s.s.ID }
-func (s *Session) UUID() flows.SessionUUID            { return s.s.UUID }
+func (s *Session) UUID() flows.SessionUUID            { return flows.SessionUUID(s.s.UUID) }
 func (s *Session) SessionType() FlowType              { return s.s.SessionType }
 func (s *Session) Status() SessionStatus              { return s.s.Status }
 func (s *Session) Responded() bool                    { return s.s.Responded }
@@ -290,7 +290,7 @@ func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session
 	// create our session object
 	session := &Session{}
 	s := &session.s
-	s.UUID = uuid
+	s.UUID = null.String(uuid)
 	s.Status = sessionStatus
 	s.SessionType = sessionType
 	s.Responded = false
