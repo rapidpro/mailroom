@@ -607,13 +607,15 @@
                     "bool": {
                         "must": [
                             {
-                                "term": {
-                                    "urns.path.keyword": 7979
+                                "match_phrase": {
+                                    "urns.path": {
+                                        "query": "7979"
+                                    }
                                 }
                             },
                             {
                                 "term": {
-                                    "urns.scheme": "name_tel"
+                                    "urns.scheme": "tel"
                                 }
                             }
                         ]

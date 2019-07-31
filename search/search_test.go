@@ -3,6 +3,7 @@ package search
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -27,10 +28,6 @@ func (r *MockRegistry) LookupSearchField(key string) *Field {
 		return &Field{key, Unavailable, Text, ""}
 	}
 
-	if field.Category == Implicit && r.IsAnon {
-		return &Field{"name_id", Implicit, Text, ""}
-	}
-
 	return field
 }
 
@@ -51,8 +48,6 @@ func TestElasticQuery(t *testing.T) {
 
 			"tel":      &Field{"tel", Scheme, Text, ""},
 			"whatsapp": &Field{"whatsapp", Scheme, Text, ""},
-
-			"*": &Field{"name_tel", Implicit, Text, ""},
 		},
 	}
 
@@ -75,10 +70,15 @@ func TestElasticQuery(t *testing.T) {
 	env := envs.NewEnvironmentBuilder().WithTimezone(ny).Build()
 
 	for _, tc := range tcs {
-		registry.IsAnon = tc.IsAnon
+		redactionPolicy := envs.RedactionPolicyNone
+		if tc.IsAnon {
+			redactionPolicy = envs.RedactionPolicyURNs
+		}
 
-		parsed, err := contactql.ParseQuery(tc.Search)
+		parsed, err := contactql.ParseQuery(tc.Search, redactionPolicy)
 		assert.NoError(t, err, "%s: error received parsing: ", tc.Label, tc.Search)
+
+		fmt.Printf("query: %s anon: %s parsed: %s\n", tc.Search, redactionPolicy, parsed.String())
 
 		query, err := ToElasticQuery(env, registry, parsed)
 

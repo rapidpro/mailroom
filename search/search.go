@@ -2,7 +2,6 @@ package search
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/nyaruka/goflow/contactql"
@@ -28,9 +27,6 @@ const Scheme = FieldCategory("scheme")
 
 // Unavailable means this field is not available for querying, such as schemes on anon orgs
 const Unavailable = FieldCategory("unavailable")
-
-// Implicit is used when no explicit query is asked for
-const Implicit = FieldCategory("implicit")
 
 // FieldType represents the type of the data for an elastic field
 type FieldType string
@@ -135,27 +131,7 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 
 	var query elastic.Query
 
-	if field.Category == Implicit {
-		number, _ := strconv.Atoi(c.Value())
-
-		if field.Key == NameTel {
-			if number != 0 {
-				return elastic.NewNestedQuery("urns", elastic.NewBoolQuery().Must(
-					elastic.NewTermQuery("urns.path.keyword", number),
-					elastic.NewTermQuery("urns.scheme", field.Key)),
-				), nil
-			}
-			return elastic.NewMatchQuery("name", c.Value()), nil
-
-		} else if field.Key == NameID {
-			if number != 0 {
-				return elastic.NewIdsQuery().Ids(c.Value()), nil
-			}
-			return elastic.NewMatchQuery("name", c.Value()), nil
-		} else {
-			return nil, fmt.Errorf("unknown implicit field key: %s", field.Key)
-		}
-	} else if field.Category == ContactField {
+	if field.Category == ContactField {
 		fieldQuery := elastic.NewTermQuery("fields.field", field.UUID)
 
 		// special cases for set/unset
