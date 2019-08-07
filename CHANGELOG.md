@@ -1,3 +1,16 @@
+v2.0.19
+----------
+ * Update to goflow v0.45.2
+
+v2.0.18
+----------
+ * Make FlowSession.uuid nullable for now
+
+v2.0.17
+----------
+ * Update to goflow v0.45.0
+ * Write UUID field on flows_flowsession
+
 v2.0.16
 ----------
  * write/read parent summary on flow starts

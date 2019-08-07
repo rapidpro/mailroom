@@ -4,92 +4,25 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/utils/dates"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
+	"github.com/nyaruka/goflow/utils/uuids"
 )
 
-// FieldCategory is our type for the category of field this is
-type FieldCategory string
-
-// ContactAttribute is a system attribute of the contact, such as id, name or language
-const ContactAttribute = FieldCategory("attribute")
-
-// ContactField is a user created field on a contact
-const ContactField = FieldCategory("field")
-
-// Scheme is a URN scheme
-const Scheme = FieldCategory("scheme")
-
-// Unavailable means this field is not available for querying, such as schemes on anon orgs
-const Unavailable = FieldCategory("unavailable")
-
-// FieldType represents the type of the data for an elastic field
-type FieldType string
-
-// Text is our FieldType for text fields
-const Text = FieldType("text")
-
-// Number is our FieldType for number fields
-const Number = FieldType("number")
-
-// DateTime is our FieldType for date time fields
-const DateTime = FieldType("datetime")
-
-// State is our FieldType for state fields
-const State = FieldType("state")
-
-// District is our FieldType for district fields
-const District = FieldType("district")
-
-// Ward is our field type for ward fields
-const Ward = FieldType("ward")
-
-// NameTel is our key for name_tel implicit queries
-const NameTel = "name_tel"
-
-// NameID is our key for name_id implicit queries
-const NameID = "name_id"
-
-// NameAttribute is our key for name queries
-const NameAttribute = "name"
-
-// CreatedOnAttribute is our key for created_on queries
-const CreatedOnAttribute = "created_on"
-
-// LanguageAttribute is our key for language queries
-const LanguageAttribute = "language"
-
-// IDAttribute is our key for id queries
-const IDAttribute = "id"
-
-var contactAttributes = map[string]bool{
-	NameAttribute:      true,
-	CreatedOnAttribute: true,
-	LanguageAttribute:  true,
-	IDAttribute:        true,
-}
-
-// IsContactAttribute returns whether the passed in field is a contact attribute
-func IsContactAttribute(field string) bool {
-	return contactAttributes[field]
-}
-
 // Field represents a field that elastic can search against
-type Field struct {
-	Key      string
-	Category FieldCategory
-	Type     FieldType
-	UUID     uuids.UUID
+type Field interface {
+	assets.Field
+	UUID() uuids.UUID
 }
 
 // FieldRegistry provides an interface for looking up queryable fields
 type FieldRegistry interface {
-	LookupSearchField(key string) *Field
+	LookupSearchField(key string) Field
 }
 
 // ToElasticQuery converts a contactql query to an Elastic query
@@ -124,21 +57,23 @@ func boolCombinationToElasticQuery(env envs.Environment, registry FieldRegistry,
 }
 
 func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *contactql.Condition) (elastic.Query, error) {
-	field := registry.LookupSearchField(c.Key())
-	if field == nil {
-		return nil, errors.Errorf("unable to find field: %s", c.Key())
-	}
-
 	var query elastic.Query
+	key := c.PropertyKey()
 
-	if field.Category == ContactField {
-		fieldQuery := elastic.NewTermQuery("fields.field", field.UUID)
+	if c.PropertyType() == contactql.PropertyTypeField {
+		field := registry.LookupSearchField(key)
+		if field == nil {
+			return nil, errors.Errorf("unable to find field: %s", key)
+		}
+
+		fieldQuery := elastic.NewTermQuery("fields.field", field.UUID())
+		fieldType := field.Type()
 
 		// special cases for set/unset
 		if (c.Comparator() == "=" || c.Comparator() == "!=") && c.Value() == "" {
 			query = elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(
 				fieldQuery,
-				elastic.NewExistsQuery("fields."+string(field.Type)),
+				elastic.NewExistsQuery("fields."+string(field.Type())),
 			))
 
 			// if we are looking for unset, inverse our query
@@ -148,7 +83,7 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 			return query, nil
 		}
 
-		if field.Type == Text {
+		if fieldType == assets.FieldTypeText {
 			value := strings.ToLower(c.Value())
 			if c.Comparator() == "=" {
 				query = elastic.NewTermQuery("fields.text", value)
@@ -165,7 +100,7 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
 
-		} else if field.Type == Number {
+		} else if fieldType == assets.FieldTypeNumber {
 			value, err := decimal.NewFromString(c.Value())
 			if err != nil {
 				return nil, errors.Errorf("can't convert '%s' to a number", c.Value())
@@ -187,7 +122,7 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
 
-		} else if field.Type == DateTime {
+		} else if fieldType == assets.FieldTypeDatetime {
 			value, err := envs.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to parse datetime: %s", c.Value())
@@ -210,18 +145,9 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
 
-		} else if field.Type == State || field.Type == District || field.Type == Ward {
+		} else if fieldType == assets.FieldTypeState || fieldType == assets.FieldTypeDistrict || fieldType == assets.FieldTypeWard {
 			value := strings.ToLower(c.Value())
-			var name = ""
-
-			if field.Type == Ward {
-				name = "fields.ward"
-			} else if field.Type == District {
-				name = "fields.district"
-			} else if field.Type == State {
-				name = "fields.state"
-			}
-			name += "_keyword"
+			var name = fmt.Sprintf("fields.%s_keyword", string(fieldType))
 
 			if c.Comparator() == "=" {
 				query = elastic.NewTermQuery(name, value)
@@ -240,16 +166,18 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
 		} else {
-			return nil, fmt.Errorf("unsupported contact field type: %s", field.Type)
+			return nil, fmt.Errorf("unsupported contact field type: %s", field.Type())
 		}
-	} else if field.Category == ContactAttribute {
+	} else if c.PropertyType() == contactql.PropertyTypeAttribute {
 		value := strings.ToLower(c.Value())
 
 		// special case for set/unset for name and language
-		if (c.Comparator() == "=" || c.Comparator() == "!=") && (field.Key == NameAttribute || field.Key == LanguageAttribute) && value == "" {
+		if (c.Comparator() == "=" || c.Comparator() == "!=") && value == "" &&
+			(key == contactql.AttributeName || key == contactql.AttributeLanguage) {
+
 			query = elastic.NewBoolQuery().Must(
-				elastic.NewExistsQuery("name"),
-				elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("name.keyword", "")),
+				elastic.NewExistsQuery(key),
+				elastic.NewBoolQuery().MustNot(elastic.NewTermQuery(fmt.Sprintf("%s.keyword", key), "")),
 			)
 
 			if c.Comparator() == "=" {
@@ -259,7 +187,7 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 			return query, nil
 		}
 
-		if field.Key == NameAttribute {
+		if key == contactql.AttributeName {
 			if c.Comparator() == "=" {
 				return elastic.NewTermQuery("name.keyword", c.Value()), nil
 			} else if c.Comparator() == "~" {
@@ -269,12 +197,12 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 			} else {
 				return nil, fmt.Errorf("unsupported name query comparator: %s", c.Comparator())
 			}
-		} else if field.Key == IDAttribute {
+		} else if key == contactql.AttributeID {
 			if c.Comparator() == "=" {
 				return elastic.NewIdsQuery().Ids(value), nil
 			}
 			return nil, fmt.Errorf("unsupported comparator for id: %s", c.Comparator())
-		} else if field.Key == LanguageAttribute {
+		} else if key == contactql.AttributeLanguage {
 			if c.Comparator() == "=" {
 				return elastic.NewTermQuery("language", value), nil
 			} else if c.Comparator() == "!=" {
@@ -282,7 +210,7 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 			} else {
 				return nil, fmt.Errorf("unsupported language comparator: %s", c.Comparator())
 			}
-		} else if field.Key == CreatedOnAttribute {
+		} else if key == contactql.AttributeCreatedOn {
 			value, err := envs.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to parse datetime: %s", c.Value())
@@ -303,15 +231,15 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 				return nil, fmt.Errorf("unsupported created_on comparator: %s", c.Comparator())
 			}
 		} else {
-			return nil, fmt.Errorf("unsupported contact attribute: %s", field.Key)
+			return nil, fmt.Errorf("unsupported contact attribute: %s", key)
 		}
-	} else if field.Category == Scheme {
+	} else if c.PropertyType() == contactql.PropertyTypeScheme {
 		value := strings.ToLower(c.Value())
 
 		// special case for set/unset
 		if (c.Comparator() == "=" || c.Comparator() == "!=") && value == "" {
 			query = elastic.NewNestedQuery("urns", elastic.NewBoolQuery().Must(
-				elastic.NewTermQuery("urns.scheme", field.Key),
+				elastic.NewTermQuery("urns.scheme", key),
 				elastic.NewExistsQuery("urns.path"),
 			))
 			if c.Comparator() == "=" {
@@ -323,19 +251,17 @@ func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *co
 		if c.Comparator() == "=" {
 			return elastic.NewNestedQuery("urns", elastic.NewBoolQuery().Must(
 				elastic.NewTermQuery("urns.path.keyword", value),
-				elastic.NewTermQuery("urns.scheme", field.Key)),
+				elastic.NewTermQuery("urns.scheme", key)),
 			), nil
 		} else if c.Comparator() == "~" {
 			return elastic.NewNestedQuery("urns", elastic.NewBoolQuery().Must(
 				elastic.NewMatchPhraseQuery("urns.path", value),
-				elastic.NewTermQuery("urns.scheme", field.Key)),
+				elastic.NewTermQuery("urns.scheme", key)),
 			), nil
 		} else {
 			return nil, fmt.Errorf("unsupported scheme comparator: %s", c.Comparator())
 		}
-	} else if field.Category == Unavailable {
-		return elastic.NewIdsQuery().Ids("-1"), nil
 	}
 
-	return nil, errors.Errorf("unsupported category type: %s", field.Category)
+	return nil, errors.Errorf("unsupported property type: %s", c.PropertyType())
 }

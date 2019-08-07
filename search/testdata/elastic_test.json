@@ -1079,14 +1079,14 @@
                         "must": [
                             {
                                 "exists": {
-                                    "field": "name"
+                                    "field": "language"
                                 }
                             },
                             {
                                 "bool": {
                                     "must_not": {
                                         "term": {
-                                            "name.keyword": ""
+                                            "language.keyword": ""
                                         }
                                     }
                                 }
@@ -1105,14 +1105,14 @@
                 "must": [
                     {
                         "exists": {
-                            "field": "name"
+                            "field": "language"
                         }
                     },
                     {
                         "bool": {
                             "must_not": {
                                 "term": {
-                                    "name.keyword": ""
+                                    "language.keyword": ""
                                 }
                             }
                         }
@@ -1345,21 +1345,15 @@
         "error": "unsupported scheme comparator: >"
     },
     {
-        "label": "tel on anon org (should this be error?)",
+        "label": "tel on anon org",
         "search": "tel=12345",
         "is_anon": true,
-        "query": {
-            "ids": {
-                "values": [
-                    "-1"
-                ]
-            }
-        }
+        "error": "cannot query on redacted URNs"
     },
     {
         "label": "unsupported field",
         "search": "unsupported=12345",
-        "error": "unable to find field: unsupported"
+        "error": "can't resolve 'unsupported' to attribute, scheme or field"
     },
     {
         "label": "bool and",

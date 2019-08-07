@@ -156,7 +156,9 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// parse our query
-	cql, err := contactql.ParseQuery(query)
+	cql, err := contactql.ParseQuery(query, org.Env().RedactionPolicy(), func(key string) assets.Field {
+		return org.FieldByKey(key)
+	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing contactql query: %s", query)
 	}
@@ -646,7 +648,8 @@ func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urn
 // campaigns as necessary based on those group changes.
 func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, contact *flows.Contact) error {
 	orgGroups, _ := org.Groups()
-	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups))
+	orgFields, _ := org.Fields()
+	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups), flows.NewFieldAssets(orgFields))
 	if len(errs) > 0 {
 		return errors.Wrapf(errs[0], "error calculating dynamic groups")
 	}

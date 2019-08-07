@@ -8,46 +8,42 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/stretchr/testify/assert"
 )
 
 type MockRegistry struct {
-	Fields map[string]*Field
+	Fields map[string]Field
 	IsAnon bool
 }
 
-func (r *MockRegistry) LookupSearchField(key string) *Field {
-	field := r.Fields[key]
-	if field == nil {
-		return field
-	}
+type MockField struct {
+	fieldKey  string
+	fieldType assets.FieldType
+	fieldUUID uuids.UUID
+}
 
-	if field.Category == Scheme && r.IsAnon {
-		return &Field{key, Unavailable, Text, ""}
-	}
+func (f *MockField) Key() string            { return f.fieldKey }
+func (f *MockField) Name() string           { return f.fieldKey }
+func (f *MockField) Type() assets.FieldType { return f.fieldType }
+func (f *MockField) UUID() uuids.UUID       { return f.fieldUUID }
 
-	return field
+func (r *MockRegistry) LookupSearchField(key string) Field {
+	return r.Fields[key]
 }
 
 func TestElasticQuery(t *testing.T) {
 	registry := &MockRegistry{
-		Fields: map[string]*Field{
-			"name":       &Field{"name", ContactAttribute, Text, ""},
-			"id":         &Field{"id", ContactAttribute, Text, ""},
-			"language":   &Field{"language", ContactAttribute, Text, ""},
-			"created_on": &Field{"created_on", ContactAttribute, DateTime, ""},
-
-			"age":      &Field{"age", ContactField, Number, "6b6a43fa-a26d-4017-bede-328bcdd5c93b"},
-			"color":    &Field{"color", ContactField, Text, "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"},
-			"dob":      &Field{"dob", ContactField, DateTime, "cbd3fc0e-9b74-4207-a8c7-248082bb4572"},
-			"state":    &Field{"state", ContactField, State, "67663ad1-3abc-42dd-a162-09df2dea66ec"},
-			"district": &Field{"district", ContactField, District, "54c72635-d747-4e45-883c-099d57dd998e"},
-			"ward":     &Field{"ward", ContactField, Ward, "fde8f740-c337-421b-8abb-83b954897c80"},
-
-			"tel":      &Field{"tel", Scheme, Text, ""},
-			"whatsapp": &Field{"whatsapp", Scheme, Text, ""},
+		Fields: map[string]Field{
+			"age":      &MockField{"age", assets.FieldTypeNumber, "6b6a43fa-a26d-4017-bede-328bcdd5c93b"},
+			"color":    &MockField{"color", assets.FieldTypeText, "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"},
+			"dob":      &MockField{"dob", assets.FieldTypeDatetime, "cbd3fc0e-9b74-4207-a8c7-248082bb4572"},
+			"state":    &MockField{"state", assets.FieldTypeState, "67663ad1-3abc-42dd-a162-09df2dea66ec"},
+			"district": &MockField{"district", assets.FieldTypeDistrict, "54c72635-d747-4e45-883c-099d57dd998e"},
+			"ward":     &MockField{"ward", assets.FieldTypeWard, "fde8f740-c337-421b-8abb-83b954897c80"},
 		},
 	}
 
@@ -75,7 +71,15 @@ func TestElasticQuery(t *testing.T) {
 			redactionPolicy = envs.RedactionPolicyURNs
 		}
 
-		parsed, err := contactql.ParseQuery(tc.Search, redactionPolicy)
+		resolver := func(key string) assets.Field {
+			return registry.LookupSearchField(key)
+		}
+
+		parsed, err := contactql.ParseQuery(tc.Search, redactionPolicy, resolver)
+		if err != nil && tc.Error != "" {
+			assert.Contains(t, err.Error(), tc.Error)
+			continue
+		}
 		assert.NoError(t, err, "%s: error received parsing: ", tc.Label, tc.Search)
 
 		fmt.Printf("query: %s anon: %s parsed: %s\n", tc.Search, redactionPolicy, parsed.String())

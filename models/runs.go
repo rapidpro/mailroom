@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
 
@@ -63,6 +64,7 @@ var keptEvents = map[string]bool{
 type Session struct {
 	s struct {
 		ID            SessionID     `db:"id"`
+		UUID          null.String   `db:"uuid"` // TODO remove nullable once backfilled
 		SessionType   FlowType      `db:"session_type"`
 		Status        SessionStatus `db:"status"`
 		Responded     bool          `db:"responded"`
@@ -101,6 +103,7 @@ type Session struct {
 }
 
 func (s *Session) ID() SessionID                      { return s.s.ID }
+func (s *Session) UUID() flows.SessionUUID            { return flows.SessionUUID(s.s.UUID) }
 func (s *Session) SessionType() FlowType              { return s.s.SessionType }
 func (s *Session) Status() SessionStatus              { return s.s.Status }
 func (s *Session) Responded() bool                    { return s.s.Responded }
@@ -279,9 +282,15 @@ func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session
 		return nil, errors.Errorf("unknown flow type: %s", fs.Type())
 	}
 
+	uuid := fs.UUID()
+	if uuid == "" {
+		uuid = flows.SessionUUID(uuids.New())
+	}
+
 	// create our session object
 	session := &Session{}
 	s := &session.s
+	s.UUID = null.String(uuid)
 	s.Status = sessionStatus
 	s.SessionType = sessionType
 	s.Responded = false
@@ -352,7 +361,8 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 
 const selectLastSessionSQL = `
 SELECT 
-	id, 
+	id,
+	uuid,
 	session_type,
 	status,
 	responded,
@@ -378,15 +388,15 @@ LIMIT 1
 
 const insertCompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession( session_type, status, responded, output, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
-               VALUES(:session_type,:status,:responded,:output,:contact_id,:org_id, NOW(),      NOW(),    NULL,           :connection_id)
+	flows_flowsession( uuid, session_type, status, responded, output, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
+               VALUES(:uuid,:session_type,:status,:responded,:output,:contact_id,:org_id, NOW(),      NOW(),    NULL,           :connection_id)
 RETURNING id
 `
 
 const insertIncompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession( session_type, status, responded, output, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
-               VALUES(:session_type,:status,:responded,:output,:contact_id,:org_id, NOW(),     :current_flow_id,:timeout_on,:wait_started_on,:connection_id)
+	flows_flowsession( uuid, session_type, status, responded, output, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
+               VALUES(:uuid,:session_type,:status,:responded,:output,:contact_id,:org_id, NOW(),     :current_flow_id,:timeout_on,:wait_started_on,:connection_id)
 RETURNING id
 `
 

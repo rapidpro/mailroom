@@ -15,7 +15,7 @@ import (
 type FieldID int
 
 // FieldUUID is our type for the UUID of a field
-type FieldUUID uuids.UUID
+type FieldUUID = uuids.UUID
 
 // Field is our mailroom type for contact field types
 type Field struct {
