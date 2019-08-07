@@ -11,38 +11,33 @@ import (
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
-	"github.com/nyaruka/goflow/utils/uuids"
 )
 
-// Field represents a field that elastic can search against
-type Field interface {
-	assets.Field
-	UUID() uuids.UUID
+// ToElasticQuery converts a contactql query string to an Elastic query
+func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (elastic.Query, error) {
+	node, err := contactql.ParseQuery(query, env.RedactionPolicy(), resolver)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	return nodeToElasticQuery(env, resolver, node.Root())
 }
 
-// FieldRegistry provides an interface for looking up queryable fields
-type FieldRegistry interface {
-	LookupSearchField(key string) Field
-}
-
-// ToElasticQuery converts a contactql query to an Elastic query
-func ToElasticQuery(env envs.Environment, registry FieldRegistry, node contactql.QueryNode) (elastic.Query, error) {
+func nodeToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, node contactql.QueryNode) (elastic.Query, error) {
 	switch n := node.(type) {
-	case *contactql.ContactQuery:
-		return ToElasticQuery(env, registry, n.Root())
 	case *contactql.BoolCombination:
-		return boolCombinationToElasticQuery(env, registry, n)
+		return boolCombinationToElasticQuery(env, resolver, n)
 	case *contactql.Condition:
-		return conditionToElasticQuery(env, registry, n)
+		return conditionToElasticQuery(env, resolver, n)
 	default:
 		return nil, errors.Errorf("unknown type converting to elastic query: %v", n)
 	}
 }
 
-func boolCombinationToElasticQuery(env envs.Environment, registry FieldRegistry, combination *contactql.BoolCombination) (elastic.Query, error) {
+func boolCombinationToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, combination *contactql.BoolCombination) (elastic.Query, error) {
 	queries := make([]elastic.Query, len(combination.Children()))
 	for i, child := range combination.Children() {
-		childQuery, err := ToElasticQuery(env, registry, child)
+		childQuery, err := nodeToElasticQuery(env, resolver, child)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error evaluating child query")
 		}
@@ -56,12 +51,12 @@ func boolCombinationToElasticQuery(env envs.Environment, registry FieldRegistry,
 	return elastic.NewBoolQuery().Should(queries...), nil
 }
 
-func conditionToElasticQuery(env envs.Environment, registry FieldRegistry, c *contactql.Condition) (elastic.Query, error) {
+func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, c *contactql.Condition) (elastic.Query, error) {
 	var query elastic.Query
 	key := c.PropertyKey()
 
 	if c.PropertyType() == contactql.PropertyTypeField {
-		field := registry.LookupSearchField(key)
+		field := resolver(key)
 		if field == nil {
 			return nil, errors.Errorf("unable to find field: %s", key)
 		}

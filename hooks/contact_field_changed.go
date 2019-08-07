@@ -6,6 +6,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
@@ -26,9 +27,9 @@ var commitFieldChangesHook = &CommitFieldChangesHook{}
 func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// our list of updates
 	fieldUpdates := make([]interface{}, 0, len(sessions))
-	fieldDeletes := make(map[models.FieldUUID][]interface{})
+	fieldDeletes := make(map[assets.FieldUUID][]interface{})
 	for session, es := range sessions {
-		updates := make(map[models.FieldUUID]*flows.Value, len(es))
+		updates := make(map[assets.FieldUUID]*flows.Value, len(es))
 		for _, e := range es {
 			event := e.(*events.ContactFieldChangedEvent)
 			field := org.FieldByKey(event.Field.Key)
@@ -107,7 +108,7 @@ func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 
 type FieldDelete struct {
 	ContactID models.ContactID `db:"contact_id"`
-	FieldUUID models.FieldUUID `db:"field_uuid"`
+	FieldUUID assets.FieldUUID `db:"field_uuid"`
 }
 
 type FieldUpdate struct {

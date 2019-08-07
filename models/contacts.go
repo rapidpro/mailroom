@@ -11,7 +11,6 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -155,16 +154,13 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 		return nil, errors.Errorf("no elastic client available, check your configuration")
 	}
 
-	// parse our query
-	cql, err := contactql.ParseQuery(query, org.Env().RedactionPolicy(), func(key string) assets.Field {
+	// our field resolver
+	resolver := func(key string) assets.Field {
 		return org.FieldByKey(key)
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing contactql query: %s", query)
 	}
 
 	// turn into elastic query
-	eq, err := search.ToElasticQuery(org.Env(), org, cql)
+	eq, err := search.ToElasticQuery(org.Env(), resolver, query)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}
@@ -330,17 +326,17 @@ func (u *ContactURN) AsURN(org *OrgAssets) (urns.URN, error) {
 
 // contactEnvelope is our JSON structure for a contact as read from the database
 type contactEnvelope struct {
-	ID         ContactID                         `json:"id"`
-	UUID       flows.ContactUUID                 `json:"uuid"`
-	Name       string                            `json:"name"`
-	Language   envs.Language                     `json:"language"`
-	IsStopped  bool                              `json:"is_stopped"`
-	IsBlocked  bool                              `json:"is_blocked"`
-	Fields     map[FieldUUID]*fieldValueEnvelope `json:"fields"`
-	GroupIDs   []GroupID                         `json:"group_ids"`
-	URNs       []ContactURN                      `json:"urns"`
-	ModifiedOn time.Time                         `json:"modified_on"`
-	CreatedOn  time.Time                         `json:"created_on"`
+	ID         ContactID                                `json:"id"`
+	UUID       flows.ContactUUID                        `json:"uuid"`
+	Name       string                                   `json:"name"`
+	Language   envs.Language                            `json:"language"`
+	IsStopped  bool                                     `json:"is_stopped"`
+	IsBlocked  bool                                     `json:"is_blocked"`
+	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
+	GroupIDs   []GroupID                                `json:"group_ids"`
+	URNs       []ContactURN                             `json:"urns"`
+	ModifiedOn time.Time                                `json:"modified_on"`
+	CreatedOn  time.Time                                `json:"created_on"`
 }
 
 const selectContactSQL = `

@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/mailroom/search"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 )
@@ -43,7 +42,7 @@ type OrgAssets struct {
 	campaignsByGroup      map[GroupID][]*Campaign
 
 	fields       []assets.Field
-	fieldsByUUID map[FieldUUID]*Field
+	fieldsByUUID map[assets.FieldUUID]*Field
 	fieldsByKey  map[string]*Field
 
 	groups       []assets.Group
@@ -88,7 +87,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		channelsByID:   make(map[ChannelID]*Channel),
 		channelsByUUID: make(map[assets.ChannelUUID]*Channel),
 
-		fieldsByUUID: make(map[FieldUUID]*Field),
+		fieldsByUUID: make(map[assets.FieldUUID]*Field),
 		fieldsByKey:  make(map[string]*Field),
 
 		groupsByID:   make(map[GroupID]*Group),
@@ -278,7 +277,7 @@ func (a *OrgAssets) Fields() ([]assets.Field, error) {
 	return a.fields, nil
 }
 
-func (a *OrgAssets) FieldByUUID(fieldUUID FieldUUID) *Field {
+func (a *OrgAssets) FieldByUUID(fieldUUID assets.FieldUUID) *Field {
 	return a.fieldsByUUID[fieldUUID]
 }
 
@@ -417,9 +416,4 @@ func (a *OrgAssets) ResthookBySlug(slug string) *Resthook {
 
 func (a *OrgAssets) Templates() ([]assets.Template, error) {
 	return a.templates, nil
-}
-
-// LookupSearchField satisfies the search.FieldRegistry interface
-func (a *OrgAssets) LookupSearchField(key string) search.Field {
-	return a.FieldByKey(key)
 }
