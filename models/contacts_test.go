@@ -6,10 +6,130 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/olivere/elastic"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+
+	"fmt"
 )
+
+func TestElasticContacts(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	es := search.NewMockElasticServer()
+	defer es.Close()
+
+	client, err := elastic.NewClient(
+		elastic.SetURL(es.URL()),
+		elastic.SetHealthcheck(false),
+		elastic.SetSniff(false),
+	)
+	assert.NoError(t, err)
+
+	org, err := GetOrgAssets(ctx, db, 1)
+	assert.NoError(t, err)
+
+	tcs := []struct {
+		Query    string
+		Request  string
+		Response string
+		Contacts []ContactID
+	}{
+		{
+			Query: "george",
+			Request: `{
+				"_source":false,
+				"query":{
+					"bool":{
+						"must":[
+							{"match":{"name":{"query":"george"}}},
+							{"term":{"org_id":1}},
+							{"term":{"is_active":true}},
+							{"term":{"is_blocked":false}},
+							{"term":{"is_stopped":false}}
+						]
+					}
+				},
+				"sort":["_doc"]
+			}`,
+			Response: fmt.Sprintf(`{
+				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
+				"took": 2,
+				"timed_out": false,
+				"_shards": {
+				  "total": 1,
+				  "successful": 1,
+				  "skipped": 0,
+				  "failed": 0
+				},
+				"hits": {
+				  "total": 1,
+				  "max_score": null,
+				  "hits": [
+					{
+					  "_index": "contacts",
+					  "_type": "_doc",
+					  "_id": "%d",
+					  "_score": null,
+					  "_routing": "1",
+					  "sort": [
+						15124352
+					  ]
+					}
+				  ]
+				}
+			}`, GeorgeID),
+			Contacts: []ContactID{GeorgeID},
+		}, {
+			Query: "nobody",
+			Request: `{
+				"_source":false,
+				"query":{
+					"bool":{
+						"must":[
+							{"match":{"name":{"query":"nobody"}}},
+							{"term":{"org_id":1}},
+							{"term":{"is_active":true}},
+							{"term":{"is_blocked":false}},
+							{"term":{"is_stopped":false}}
+						]
+					}
+				},
+				"sort":["_doc"]
+			}`,
+			Response: `{
+				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
+				"took": 2,
+				"timed_out": false,
+				"_shards": {
+				  "total": 1,
+				  "successful": 1,
+				  "skipped": 0,
+				  "failed": 0
+				},
+				"hits": {
+				  "total": 0,
+				  "max_score": null,
+				  "hits": []
+				}
+			}`,
+			Contacts: []ContactID{},
+		},
+	}
+
+	for i, tc := range tcs {
+		es.NextResponse = tc.Response
+
+		ids, err := ContactIDsForQuery(ctx, client, org, tc.Query)
+		assert.NoError(t, err, "%d: error encountered performing query", i)
+		assert.JSONEq(t, tc.Request, es.LastBody, "%d: request mismatch", i)
+		assert.Equal(t, tc.Contacts, ids, "%d: ids mismatch", i)
+	}
+}
 
 func TestContacts(t *testing.T) {
 	testsuite.Reset()

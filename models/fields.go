@@ -6,7 +6,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -14,14 +13,11 @@ import (
 // FieldID is our type for the database field ID
 type FieldID int
 
-// FieldUUID is our type for the UUID of a field
-type FieldUUID uuids.UUID
-
 // Field is our mailroom type for contact field types
 type Field struct {
 	f struct {
 		ID        FieldID          `json:"id"`
-		UUID      FieldUUID        `json:"uuid"`
+		UUID      assets.FieldUUID `json:"uuid"`
 		Key       string           `json:"key"`
 		Name      string           `json:"name"`
 		FieldType assets.FieldType `json:"field_type"`
@@ -32,7 +28,7 @@ type Field struct {
 func (f *Field) ID() FieldID { return f.f.ID }
 
 // UUID returns the UUID of this field
-func (f *Field) UUID() FieldUUID { return f.f.UUID }
+func (f *Field) UUID() assets.FieldUUID { return f.f.UUID }
 
 // Key returns the key for this field
 func (f *Field) Key() string { return f.f.Key }

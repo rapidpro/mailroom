@@ -118,8 +118,8 @@ func TestBatchStart(t *testing.T) {
 
 	tcs := []struct {
 		Flow          models.FlowID
-		Restart       bool
-		IncludeActive bool
+		Restart       models.RestartParticipants
+		IncludeActive models.IncludeActive
 		Extra         json.RawMessage
 		Msg           string
 		Count         int
@@ -143,11 +143,9 @@ func TestBatchStart(t *testing.T) {
 	last := time.Now()
 
 	for i, tc := range tcs {
-		start := models.NewFlowStart(
-			models.OrgID(1), models.MessagingFlow, tc.Flow,
-			nil, contactIDs, nil, false, tc.Restart, tc.IncludeActive,
-			nil, tc.Extra,
-		)
+		start := models.NewFlowStart(models.OrgID(1), models.MessagingFlow, tc.Flow, tc.Restart, tc.IncludeActive).
+			WithContactIDs(contactIDs).
+			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs)
 		batch.SetIsLast(true)
 

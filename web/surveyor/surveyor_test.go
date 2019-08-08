@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -96,7 +97,7 @@ func TestSurveyor(t *testing.T) {
 		FlowID         models.FlowID    `db:"flow_id"`
 		ContactID      flows.ContactID  `db:"contact_id"`
 		OrgID          models.OrgID     `db:"org_id"`
-		AgeFieldUUID   models.FieldUUID `db:"age_field_uuid"`
+		AgeFieldUUID   assets.FieldUUID `db:"age_field_uuid"`
 		TestersGroupID models.GroupID   `db:"testers_group_id"`
 	}
 

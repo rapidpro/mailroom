@@ -2,6 +2,7 @@ package starts
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/nyaruka/goflow/utils/uuids"
@@ -9,8 +10,9 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
-
+	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,6 +24,16 @@ func TestStarts(t *testing.T) {
 	rc := testsuite.RC()
 	defer rc.Close()
 
+	mes := search.NewMockElasticServer()
+	defer mes.Close()
+
+	es, err := elastic.NewClient(
+		elastic.SetURL(mes.URL()),
+		elastic.SetHealthcheck(false),
+		elastic.SetSniff(false),
+	)
+	assert.NoError(t, err)
+
 	// insert a flow run for one of our contacts
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
 	db.MustExec(
@@ -32,34 +44,64 @@ func TestStarts(t *testing.T) {
 		FlowID              models.FlowID
 		GroupIDs            []models.GroupID
 		ContactIDs          []models.ContactID
-		RestartParticipants bool
-		IncludeActive       bool
+		Query               string
+		QueryResponse       string
+		RestartParticipants models.RestartParticipants
+		IncludeActive       models.IncludeActive
 		Queue               string
 		ContactCount        int
 		BatchCount          int
 		TotalCount          int
 	}{
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, nil, false, false, queue.BatchQueue, 121, 2, 121},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.CathyID}, false, false, queue.BatchQueue, 121, 2, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.CathyID}, true, true, queue.HandlerQueue, 1, 1, 1},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.BobID}, false, false, queue.BatchQueue, 122, 2, 1},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, false, false, queue.HandlerQueue, 1, 1, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, false, true, queue.HandlerQueue, 1, 1, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, true, true, queue.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, nil, "", "", false, false, queue.BatchQueue, 121, 2, 121},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.CathyID}, "", "", false, false, queue.BatchQueue, 121, 2, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.CathyID}, "", "", true, true, queue.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.BobID}, "", "", false, false, queue.BatchQueue, 122, 2, 1},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, "", "", false, false, queue.HandlerQueue, 1, 1, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, "", "", false, true, queue.HandlerQueue, 1, 1, 0},
+		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, "", "", true, true, queue.HandlerQueue, 1, 1, 1},
+		{models.SingleMessageFlowID, nil, nil, "bob", fmt.Sprintf(`{
+			"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
+			"took": 2,
+			"timed_out": false,
+			"_shards": {
+			  "total": 1,
+			  "successful": 1,
+			  "skipped": 0,
+			  "failed": 0
+			},
+			"hits": {
+			  "total": 1,
+			  "max_score": null,
+			  "hits": [
+				{
+				  "_index": "contacts",
+				  "_type": "_doc",
+				  "_id": "%d",
+				  "_score": null,
+				  "_routing": "1",
+				  "sort": [
+					15124352
+				  ]
+				}
+			  ]
+			}
+		}`, models.BobID), true, true, queue.HandlerQueue, 1, 1, 1},
 	}
 
 	for i, tc := range tcs {
+		mes.NextResponse = tc.QueryResponse
+
 		// handle our start task
-		start := models.NewFlowStart(
-			models.Org1, models.MessagingFlow, tc.FlowID,
-			tc.GroupIDs, tc.ContactIDs, nil, false,
-			tc.RestartParticipants, tc.IncludeActive,
-			nil, nil,
-		)
+		start := models.NewFlowStart(models.Org1, models.MessagingFlow, tc.FlowID, tc.RestartParticipants, tc.IncludeActive).
+			WithGroupIDs(tc.GroupIDs).
+			WithContactIDs(tc.ContactIDs).
+			WithQuery(tc.Query)
+
 		err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 		assert.NoError(t, err)
 
-		err = CreateFlowBatches(ctx, db, rp, start)
+		err = CreateFlowBatches(ctx, db, rp, es, start)
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them

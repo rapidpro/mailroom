@@ -83,8 +83,8 @@ var DoctorsGroupUUID = assets.GroupUUID("c153e265-f7c9-4539-9dbc-9b358714b638")
 var TestersGroupID = GroupID(10001)
 var TestersGroupUUID = assets.GroupUUID("5e9d8fab-5e7e-4f51-b533-261af5dea70d")
 
-var AgeFieldUUID = FieldUUID("903f51da-2717-47c7-a0d3-f2f32877013d")
-var GenderFieldUUID = FieldUUID("3a5891e4-756e-4dc9-8e12-b7a766168824")
+var AgeFieldUUID = assets.FieldUUID("903f51da-2717-47c7-a0d3-f2f32877013d")
+var GenderFieldUUID = assets.FieldUUID("3a5891e4-756e-4dc9-8e12-b7a766168824")
 
 var CreatedOnFieldID = FieldID(2)
 
