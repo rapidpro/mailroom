@@ -1,3 +1,8 @@
+v2.0.20
+----------
+ * fix empty starts not being marked as complete
+ * allow flow starts to specify query for contacts to start
+
 v2.0.19
 ----------
  * Update to goflow v0.45.2
