@@ -1,3 +1,8 @@
+v2.0.21
+----------
+ * Change default port for Elastic to 9200 and use HTTP.
+ * Don't try to sniff cluster (doesn't with with cloud elastic)
+
 v2.0.20
 ----------
  * fix empty starts not being marked as complete
