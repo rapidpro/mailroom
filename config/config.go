@@ -53,7 +53,7 @@ func NewMailroomConfig() *Config {
 		DB:                "postgres://temba:temba@localhost/temba?sslmode=disable",
 		DBPoolSize:        36,
 		Redis:             "redis://localhost:6379/15",
-		Elastic:           "https://localhost:9243",
+		Elastic:           "http://localhost:9200",
 		BatchWorkers:      4,
 		HandlerWorkers:    32,
 		LogLevel:          "error",

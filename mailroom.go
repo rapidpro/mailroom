@@ -185,9 +185,14 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// initialize our elastic client
-	mr.ElasticClient, err = elastic.NewClient(elastic.SetURL(mr.Config.Elastic))
+	mr.ElasticClient, err = elastic.NewClient(
+		elastic.SetURL(mr.Config.Elastic),
+		elastic.SetSniff(false),
+	)
 	if err != nil {
-		log.WithError(err).Error("unable to sniff elastic cluster, check configuration")
+		log.WithError(err).Error("unable to connect to elastic, check configuration")
+	} else {
+		log.Info("elastic ok")
 	}
 
 	for _, initFunc := range initFunctions {
