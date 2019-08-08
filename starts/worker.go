@@ -131,6 +131,21 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 	rc := rp.Get()
 	defer rc.Close()
 
+	// mark our start as starting, last task will mark as complete
+	err = models.MarkStartStarted(ctx, db, start.ID(), len(contactIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error marking start as started")
+	}
+
+	// if there are no contacts to start, mark our start as complete, we are done
+	if len(contactIDs) == 0 {
+		err = models.MarkStartComplete(ctx, db, start.ID())
+		if err != nil {
+			return errors.Wrapf(err, "error marking start as complete")
+		}
+		return nil
+	}
+
 	// by default we start in the batch queue unless we have two or fewer contacts
 	q := queue.BatchQueue
 	if len(contactIDs) <= 2 {
@@ -166,12 +181,6 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 	// queue our last batch
 	if len(contacts) > 0 {
 		queueBatch(true)
-	}
-
-	// mark our start as started
-	err = models.MarkStartStarted(ctx, db, start.ID(), len(contactIDs))
-	if err != nil {
-		return errors.Wrapf(err, "error marking start as started")
 	}
 
 	return nil
