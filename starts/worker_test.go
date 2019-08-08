@@ -53,6 +53,7 @@ func TestStarts(t *testing.T) {
 		BatchCount          int
 		TotalCount          int
 	}{
+		{models.SingleMessageFlowID, nil, nil, "", "", false, false, queue.BatchQueue, 0, 0, 0},
 		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, nil, "", "", false, false, queue.BatchQueue, 121, 2, 121},
 		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.CathyID}, "", "", false, false, queue.BatchQueue, 121, 2, 0},
 		{models.SingleMessageFlowID, nil, []models.ContactID{models.CathyID}, "", "", true, true, queue.HandlerQueue, 1, 1, 1},
