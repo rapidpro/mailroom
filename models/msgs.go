@@ -721,7 +721,6 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		// if this is a legacy template, migrate it forward
 		if bcast.TemplateState() == TemplateStateLegacy {
 			template, _ = expressions.MigrateTemplate(t.Text, nil)
-			fmt.Println("Template: " + template)
 		} else if bcast.TemplateState() == TemplateStateUnevaluated {
 			template = t.Text
 		}
