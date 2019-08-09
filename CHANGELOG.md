@@ -1,3 +1,7 @@
+v2.0.22
+----------
+ * Populate context with urns and fields when evaluating broadcast templates
+
 v2.0.21
 ----------
  * Change default port for Elastic to 9200 and use HTTP.
