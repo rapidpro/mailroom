@@ -30,7 +30,7 @@ func TestBroadcastEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	eng := envs.Language("eng")
-	basicMsg := map[envs.Language]*events.BroadcastTranslation{
+	msg := map[envs.Language]*events.BroadcastTranslation{
 		eng: &events.BroadcastTranslation{
 			Text:         "hello world",
 			Attachments:  nil,
@@ -67,14 +67,14 @@ func TestBroadcastEvents(t *testing.T) {
 		MsgCount     int
 		MsgText      string
 	}{
-		{basicMsg, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basicMsg, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basicMsg, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world"},
-		{basicMsg, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basicMsg, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
-		{basicMsg, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
-		{basicMsg, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world"},
-		{basicMsg, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world"},
+		{msg, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{msg, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{msg, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world"},
+		{msg, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{msg, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
+		{msg, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
+		{msg, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world"},
+		{msg, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world"},
 	}
 
 	lastNow := time.Now()
