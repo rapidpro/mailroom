@@ -30,7 +30,7 @@ func TestBroadcastEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	eng := envs.Language("eng")
-	basic := map[envs.Language]*events.BroadcastTranslation{
+	basicMsg := map[envs.Language]*events.BroadcastTranslation{
 		eng: &events.BroadcastTranslation{
 			Text:         "hello world",
 			Attachments:  nil,
@@ -67,14 +67,14 @@ func TestBroadcastEvents(t *testing.T) {
 		MsgCount     int
 		MsgText      string
 	}{
-		{basic, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world"},
-		{basic, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world"},
-		{basic, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world"},
+		{basicMsg, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{basicMsg, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{basicMsg, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world"},
+		{basicMsg, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
+		{basicMsg, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
+		{basicMsg, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
+		{basicMsg, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world"},
+		{basicMsg, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world"},
 	}
 
 	lastNow := time.Now()
@@ -151,7 +151,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	legacy := map[envs.Language]*models.BroadcastTranslation{
 		eng: &models.BroadcastTranslation{
-			Text:         "hi @(PROPER(contact.name)) legacy",
+			Text:         "hi @(PROPER(contact.name)) legacy URN: @contact.tel_e164 Gender: @contact.gender",
 			Attachments:  nil,
 			QuickReplies: nil,
 		},
@@ -159,7 +159,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	template := map[envs.Language]*models.BroadcastTranslation{
 		eng: &models.BroadcastTranslation{
-			Text:         "hi @(title(contact.name)) goflow",
+			Text:         "hi @(title(contact.name)) goflow URN: @urns.tel Gender: @fields.gender",
 			Attachments:  nil,
 			QuickReplies: nil,
 		},
@@ -187,8 +187,8 @@ func TestBroadcastTask(t *testing.T) {
 		MsgText       string
 	}{
 		{models.NilBroadcastID, evaluated, models.TemplateStateEvaluated, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{legacyID, legacy, models.TemplateStateLegacy, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy legacy"},
-		{models.NilBroadcastID, template, models.TemplateStateUnevaluated, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy goflow"},
+		{legacyID, legacy, models.TemplateStateLegacy, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy legacy URN: +12065551212 Gender: F"},
+		{models.NilBroadcastID, template, models.TemplateStateUnevaluated, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy goflow URN: tel:+12065551212 Gender: F"},
 	}
 
 	lastNow := time.Now()

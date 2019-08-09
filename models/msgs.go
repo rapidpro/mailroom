@@ -721,6 +721,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		// if this is a legacy template, migrate it forward
 		if bcast.TemplateState() == TemplateStateLegacy {
 			template, _ = expressions.MigrateTemplate(t.Text, nil)
+			fmt.Println("Template: " + template)
 		} else if bcast.TemplateState() == TemplateStateUnevaluated {
 			template = t.Text
 		}
@@ -729,8 +730,12 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 
 		// if we have a template, evaluate it
 		if template != "" {
-			contactCtx := flows.Context(org.Env(), contact)
-			templateCtx := types.NewXObject(map[string]types.XValue{"contact": contactCtx})
+			// build up the minimum viable context for templates
+			templateCtx := types.NewXObject(map[string]types.XValue{
+				"contact": flows.Context(org.Env(), contact),
+				"fields":  flows.Context(org.Env(), contact.Fields()),
+				"urns":    flows.ContextFunc(org.Env(), contact.URNs().MapContext),
+			})
 			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template)
 		}
 
