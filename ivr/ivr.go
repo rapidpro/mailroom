@@ -127,7 +127,7 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 	logger := httputils.NewLoggingTransport(http.DefaultTransport)
 	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
 
-	// try to request our call start
+	// try to request our call hangup
 	err = c.HangupCall(client, conn.ExternalID())
 
 	// insert any logged requests
