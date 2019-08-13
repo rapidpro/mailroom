@@ -61,6 +61,9 @@ const (
 
 	// StartIVRFlowBatch is our task for starting an ivr batch
 	StartIVRFlowBatch = "start_ivr_flow_batch"
+
+	// InterruptSessions is our task type to interrupt a set of sessions
+	InterruptSessions = "interrupt_sessions"
 )
 
 // Size returns the number of tasks for the passed in queue
