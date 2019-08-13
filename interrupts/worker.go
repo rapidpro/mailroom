@@ -1,16 +1,14 @@
-package starts
+package interrupts
 
 import (
 	"context"
 	"encoding/json"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
-	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 )
 
@@ -20,20 +18,20 @@ func init() {
 
 // InterruptSessionsTask is our task for interrupting sessions
 type InterruptSessionsTask struct {
-	SessionIDs    []models.SessionID `json:"session_ids,omitempty"`
-	ContactIDs    []models.ContactID `json:"contact_ids,omitempty"`
-	IVRChannelIDs []models.ChannelID `json:"ivr_channel_ids,omitempty"`
+	SessionIDs []models.SessionID `json:"session_ids,omitempty"`
+	ContactIDs []models.ContactID `json:"contact_ids,omitempty"`
+	ChannelIDs []models.ChannelID `json:"channel_ids,omitempty"`
 }
 
 const activeSessionIDsForChannelsSQL = `
 SELECT 
-	id
+	fs.id
 FROM 
-	flows_flowsession fs,
-	channels_channelconnetion cc JOIN ON fs.connection_id = cc.id
+	flows_flowsession fs
+	JOIN channels_channelconnection cc ON fs.connection_id = cc.id
 WHERE
-	fs.ended_on IS NULL AND
-	cc.channel_id = ANY($1)
+	fs.status = 'W' AND
+	cc.channel_id IN (?);
 `
 
 const activeSessionIDsForContactsSQL = `
@@ -42,8 +40,8 @@ SELECT
 FROM 
 	flows_flowsession fs
 WHERE
-	fs.ended_on IS NULL AND
-	fs.contact_id = ANY($1)
+	fs.status = 'W' AND
+	fs.contact_id IN (?);
 `
 
 // handleInterruptSessions interrupts all the passed in sessions
@@ -61,20 +59,27 @@ func handleInterruptSessions(ctx context.Context, mr *mailroom.Mailroom, task *q
 		return errors.Wrapf(err, "error unmarshalling interrupt task: %s", string(task.Task))
 	}
 
-	return InterruptSessions(ctx, mr.DB, mr.RP, mr.ElasticClient, intTask)
+	return interruptSessions(ctx, mr.DB, intTask)
 }
 
 // InterruptSessions interrupts all the passed in sessions
-func InterruptSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *elastic.Client, task *InterruptSessionsTask) error {
+func interruptSessions(ctx context.Context, db *sqlx.DB, task *InterruptSessionsTask) error {
 	sessionIDs := make(map[models.SessionID]bool)
 	for _, sid := range task.SessionIDs {
 		sessionIDs[sid] = true
 	}
 
 	// if we have ivr channel ids, explode those to session ids
-	if len(task.IVRChannelIDs) > 0 {
-		channelSessionIDs := make([]models.SessionID, 0, len(task.IVRChannelIDs))
-		err := db.SelectContext(ctx, &channelSessionIDs, activeSessionIDsForChannelsSQL, task.IVRChannelIDs)
+	if len(task.ChannelIDs) > 0 {
+		channelSessionIDs := make([]models.SessionID, 0, len(task.ChannelIDs))
+
+		query, args, err := sqlx.In(activeSessionIDsForChannelsSQL, task.ChannelIDs)
+		if err != nil {
+			return errors.Wrapf(err, "error rebinding channel sessions query")
+		}
+		query = db.Rebind(query)
+
+		err = db.SelectContext(ctx, &channelSessionIDs, query, args...)
 		if err != nil {
 			return errors.Wrapf(err, "error selecting sessions for channels")
 		}
@@ -87,7 +92,14 @@ func InterruptSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 	// if we have contact ids, explode those to session ids
 	if len(task.ContactIDs) > 0 {
 		contactSessionIDs := make([]models.SessionID, 0, len(task.ContactIDs))
-		err := db.SelectContext(ctx, &contactSessionIDs, activeSessionIDsForContactsSQL, task.ContactIDs)
+
+		query, args, err := sqlx.In(activeSessionIDsForContactsSQL, task.ContactIDs)
+		if err != nil {
+			return errors.Wrapf(err, "error rebinding contact sessions query")
+		}
+		query = db.Rebind(query)
+
+		err = db.SelectContext(ctx, &contactSessionIDs, query, args...)
 		if err != nil {
 			return errors.Wrapf(err, "error selecting sessions for contacts")
 		}
