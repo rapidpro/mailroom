@@ -1,3 +1,9 @@
+v2.0.23
+----------
+ * Use ExitSession when stopping a session due to missing flow
+ * Add new interrupt sessions task, use more specific exit for missing flows
+ * Deal with handles for contacts that no longer have a URN
+
 v2.0.22
 ----------
  * Populate context with urns and fields when evaluating broadcast templates
