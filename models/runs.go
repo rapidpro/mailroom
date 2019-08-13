@@ -33,17 +33,18 @@ type FlowRunID int64
 const NilFlowRunID = FlowRunID(0)
 
 const (
-	SessionStatusActive    = "A"
-	SessionStatusCompleted = "C"
-	SessionStatusErrored   = "E"
-	SessionStatusWaiting   = "W"
-	SessionStatusExpired   = "X"
+	SessionStatusActive      = "A"
+	SessionStatusCompleted   = "C"
+	SessionStatusFailed      = "F"
+	SessionStatusWaiting     = "W"
+	SessionStatusExpired     = "X"
+	SessionStatusInterrupted = "I"
 )
 
 var sessionStatusMap = map[flows.SessionStatus]SessionStatus{
 	flows.SessionStatusActive:    SessionStatusActive,
 	flows.SessionStatusCompleted: SessionStatusCompleted,
-	flows.SessionStatusErrored:   SessionStatusErrored,
+	flows.SessionStatusErrored:   SessionStatusFailed,
 	flows.SessionStatusWaiting:   SessionStatusWaiting,
 }
 
@@ -53,7 +54,14 @@ var (
 	ExitInterrupted = ExitType("I")
 	ExitCompleted   = ExitType("C")
 	ExitExpired     = ExitType("E")
+	ExitFailed      = ExitType("F")
 )
+
+var exitStatusMap = map[ExitType]SessionStatus{
+	ExitInterrupted: SessionStatusInterrupted,
+	ExitCompleted:   SessionStatusCompleted,
+	ExitExpired:     SessionStatusExpired,
+}
 
 var keptEvents = map[string]bool{
 	events.TypeMsgCreated:  true,
@@ -512,7 +520,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// if this session is complete, so is any associated connection
 	if s.channelConnection != nil {
-		if s.Status() == SessionStatusCompleted || s.Status() == SessionStatusErrored {
+		if s.Status() == SessionStatusCompleted || s.Status() == SessionStatusFailed {
 			err := s.channelConnection.UpdateStatus(ctx, tx, ConnectionStatusCompleted, 0, time.Now())
 			if err != nil {
 				return errors.Wrapf(err, "error update channel connection")
@@ -880,7 +888,13 @@ func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitT
 
 	// then our sessions
 	start = time.Now()
-	res, err = tx.ExecContext(ctx, exitSessionsSQL, pq.Array(sessionIDs), now)
+
+	status, found := exitStatusMap[exitType]
+	if !found {
+		return errors.Wrapf(err, "unknown exit type: %s", exitType)
+	}
+
+	res, err = tx.ExecContext(ctx, exitSessionsSQL, pq.Array(sessionIDs), now, status)
 	if err != nil {
 		return errors.Wrapf(err, "error exiting sessions")
 	}
@@ -897,6 +911,7 @@ SET
 	is_active = FALSE,
 	exit_type = $2,
 	exited_on = $3,
+	timeout_on = NULL,
 	modified_on = NOW(),
 	child_context = NULL,
 	parent_context = NULL
@@ -908,8 +923,8 @@ const exitSessionsSQL = `
 UPDATE
 	flows_flowsession
 SET
-	status = 'C',
-	ended_on = $2
+	ended_on = $2,
+	status = $3
 WHERE
 	id = ANY ($1)
 `

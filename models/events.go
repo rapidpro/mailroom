@@ -92,7 +92,7 @@ func RegisterPreWriteHook(eventType string, handler EventHandler) {
 // ApplyEvent applies the passed in event, IE, creates the db objects required etc..
 func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
 	// if this session is errored, don't apply any hooks
-	if session.Status() == SessionStatusErrored {
+	if session.Status() == SessionStatusFailed {
 		return nil
 	}
 
@@ -108,7 +108,7 @@ func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets
 // that all types have a handler.
 func ApplyPreWriteEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
 	// if this session is errored, don't apply any hooks
-	if session.Status() == SessionStatusErrored {
+	if session.Status() == SessionStatusFailed {
 		return nil
 	}
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -31,7 +32,7 @@ FROM
 	JOIN channels_channelconnection cc ON fs.connection_id = cc.id
 WHERE
 	fs.status = 'W' AND
-	cc.channel_id IN (?);
+	cc.channel_id = ANY($1);
 `
 
 const activeSessionIDsForContactsSQL = `
@@ -41,7 +42,7 @@ FROM
 	flows_flowsession fs
 WHERE
 	fs.status = 'W' AND
-	fs.contact_id IN (?);
+	fs.contact_id = ANY($1);
 `
 
 // handleInterruptSessions interrupts all the passed in sessions
@@ -73,13 +74,7 @@ func interruptSessions(ctx context.Context, db *sqlx.DB, task *InterruptSessions
 	if len(task.ChannelIDs) > 0 {
 		channelSessionIDs := make([]models.SessionID, 0, len(task.ChannelIDs))
 
-		query, args, err := sqlx.In(activeSessionIDsForChannelsSQL, task.ChannelIDs)
-		if err != nil {
-			return errors.Wrapf(err, "error rebinding channel sessions query")
-		}
-		query = db.Rebind(query)
-
-		err = db.SelectContext(ctx, &channelSessionIDs, query, args...)
+		err := db.SelectContext(ctx, &channelSessionIDs, activeSessionIDsForChannelsSQL, pq.Array(task.ChannelIDs))
 		if err != nil {
 			return errors.Wrapf(err, "error selecting sessions for channels")
 		}
@@ -93,13 +88,7 @@ func interruptSessions(ctx context.Context, db *sqlx.DB, task *InterruptSessions
 	if len(task.ContactIDs) > 0 {
 		contactSessionIDs := make([]models.SessionID, 0, len(task.ContactIDs))
 
-		query, args, err := sqlx.In(activeSessionIDsForContactsSQL, task.ContactIDs)
-		if err != nil {
-			return errors.Wrapf(err, "error rebinding contact sessions query")
-		}
-		query = db.Rebind(query)
-
-		err = db.SelectContext(ctx, &contactSessionIDs, query, args...)
+		err := db.SelectContext(ctx, &contactSessionIDs, activeSessionIDsForContactsSQL, pq.Array(task.ContactIDs))
 		if err != nil {
 			return errors.Wrapf(err, "error selecting sessions for contacts")
 		}

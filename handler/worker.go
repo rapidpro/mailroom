@@ -565,7 +565,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 		// flow this session is in is gone, interrupt our session and reset it
 		if err == models.ErrNotFound {
-			err = models.InterruptContactRuns(ctx, db, models.MessagingFlow, []flows.ContactID{contact.ID()}, time.Now())
+			err = models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitInterrupted, time.Now())
 			session = nil
 		}
 
