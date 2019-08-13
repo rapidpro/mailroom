@@ -509,10 +509,12 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	// load the channel for this message
 	channel := org.ChannelByID(event.ChannelID)
 
-	// make sure this URN is our highest priority (this is usually a noop)
-	err = modelContact.UpdatePreferredURN(ctx, db, org, event.URNID, channel)
-	if err != nil {
-		return errors.Wrapf(err, "error changing primary URN")
+	// if we have URNs make sure the message URN is our highest priority (this is usually a noop)
+	if len(modelContact.URNs()) > 0 {
+		err = modelContact.UpdatePreferredURN(ctx, db, org, event.URNID, channel)
+		if err != nil {
+			return errors.Wrapf(err, "error changing primary URN")
+		}
 	}
 
 	// build our flow contact

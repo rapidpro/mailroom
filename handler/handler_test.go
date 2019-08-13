@@ -48,6 +48,9 @@ func TestMsgEvents(t *testing.T) {
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
 		VALUES(TRUE, now(), now(), 'ivr', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`, models.IVRFlowID)
 
+	// clear all of Alexandria's URNs
+	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.AlexandriaID)
+
 	models.FlushCache()
 
 	tcs := []struct {
@@ -78,6 +81,9 @@ func TestMsgEvents(t *testing.T) {
 		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
 
 		{models.BobID, models.BobURN, models.BobURNID, "ivr", "", models.TwitterChannelID, models.Org1},
+
+		// no URN on contact but handle event, session gets started but no message created
+		{models.AlexandriaID, models.AlexandriaURN, models.AlexandriaURNID, "start", "", models.TwilioChannelID, models.Org1},
 	}
 
 	makeMsgTask := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *queue.Task {
