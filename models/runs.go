@@ -326,11 +326,11 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 
 		// if this run is waiting, save it as the current flow
 		if r.Status() == flows.RunStatusWaiting {
-			flow, err := org.Flow(r.Flow().UUID())
+			flowID, err := flowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error loading current flow")
+				return nil, errors.Wrapf(err, "error loading current flow for UUID: %s", r.FlowReference().UUID)
 			}
-			s.CurrentFlowID = flow.(*Flow).ID()
+			s.CurrentFlowID = flowID
 		}
 	}
 
