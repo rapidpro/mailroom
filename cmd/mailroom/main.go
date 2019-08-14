@@ -21,7 +21,7 @@ import (
 	_ "github.com/nyaruka/mailroom/starts"
 	_ "github.com/nyaruka/mailroom/stats"
 	_ "github.com/nyaruka/mailroom/timeouts"
-	_ "github.com/nyaruka/mailroom/interruptions"
+	_ "github.com/nyaruka/mailroom/interrupts"
 
 	_ "github.com/nyaruka/mailroom/web/docs"
 	_ "github.com/nyaruka/mailroom/web/flow"
