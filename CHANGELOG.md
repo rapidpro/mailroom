@@ -1,3 +1,7 @@
+v2.0.24
+----------
+ * Enable interrupt_sessions task
+
 v2.0.23
 ----------
  * Use ExitSession when stopping a session due to missing flow
