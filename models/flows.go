@@ -124,6 +124,19 @@ func (f *Flow) FlowReference() *assets.FlowReference {
 	return assets.NewFlowReference(f.UUID(), f.Name())
 }
 
+func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
+	// first try to look up in our assets
+	flow, _ := org.Flow(flowUUID)
+	if flow != nil {
+		return flow.(*Flow).ID(), nil
+	}
+
+	// flow may be inactive, try to look up the ID only
+	var flowID FlowID
+	err := tx.GetContext(ctx, &flowID, `SELECT id FROM flows_flow WHERE org_id = $1 AND uuid = $2;`, org.OrgID(), flowUUID)
+	return flowID, err
+}
+
 func loadFlowByUUID(ctx context.Context, db *sqlx.DB, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
 	return loadFlow(ctx, db, selectFlowByUUIDSQL, orgID, flowUUID)
 }
