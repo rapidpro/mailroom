@@ -57,3 +57,32 @@ func TestFlows(t *testing.T) {
 		}
 	}
 }
+
+func TestGetFlowUUID(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	org, _ := GetOrgAssets(ctx, db, Org1)
+
+	tx, err := db.BeginTxx(ctx, nil)
+	assert.NoError(t, err)
+
+	id, err := flowIDForUUID(ctx, tx, org, FavoritesFlowUUID)
+	assert.NoError(t, err)
+	assert.Equal(t, FavoritesFlowID, id)
+
+	// make favorite inactive
+	tx.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, FavoritesFlowID)
+	tx.Commit()
+
+	tx, err = db.BeginTxx(ctx, nil)
+	assert.NoError(t, err)
+	defer tx.Rollback()
+
+	// clear our assets so it isn't cached
+	FlushCache()
+	org, _ = GetOrgAssets(ctx, db, Org1)
+
+	id, err = flowIDForUUID(ctx, tx, org, FavoritesFlowUUID)
+	assert.NoError(t, err)
+	assert.Equal(t, FavoritesFlowID, id)
+}
