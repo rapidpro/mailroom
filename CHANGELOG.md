@@ -1,3 +1,7 @@
+v2.0.26
+----------
+ * Start writing flows_flowrun.status alongside exit_type
+
 v2.0.25
 ----------
  * Handle FlowRun having nil Flow, use FlowReference instead
