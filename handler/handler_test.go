@@ -54,6 +54,7 @@ func TestMsgEvents(t *testing.T) {
 	models.FlushCache()
 
 	tcs := []struct {
+		Hook      func()
 		ContactID models.ContactID
 		URN       urns.URN
 		URNID     models.URNID
@@ -62,28 +63,37 @@ func TestMsgEvents(t *testing.T) {
 		ChannelID models.ChannelID
 		OrgID     models.OrgID
 	}{
-		{models.CathyID, models.CathyURN, models.CathyURNID, "noop", "", models.TwitterChannelID, models.Org1},
-		{models.CathyID, models.CathyURN, models.CathyURNID, "start other", "", models.TwitterChannelID, models.Org1},
-		{models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, models.Org1},
-		{models.CathyID, models.CathyURN, models.CathyURNID, "purple", "I don't know that color. Try again.", models.TwitterChannelID, models.Org1},
-		{models.CathyID, models.CathyURN, models.CathyURNID, "blue", "Good choice, I like Blue too! What is your favorite beer?", models.TwitterChannelID, models.Org1},
-		{models.CathyID, models.CathyURN, models.CathyURNID, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", models.TwitterChannelID, models.Org1},
-		{models.CathyID, models.CathyURN, models.CathyURNID, "Cathy", "Thanks Cathy, we are all done!", models.TwitterChannelID, models.Org1},
-		{models.CathyID, models.CathyURN, models.CathyURNID, "noop", "Thanks Cathy, we are all done!", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "noop", "", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "start other", "", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "purple", "I don't know that color. Try again.", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "blue", "Good choice, I like Blue too! What is your favorite beer?", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "Cathy", "Thanks Cathy, we are all done!", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "noop", "", models.TwitterChannelID, models.Org1},
 
-		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "other", "Hey, how are you?", models.Org2ChannelID, models.Org2},
-		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
-		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "green", "Good choice, I like Green too! What is your favorite beer?", models.Org2ChannelID, models.Org2},
-		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", models.Org2ChannelID, models.Org2},
-		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "george", "Thanks george, we are all done!", models.Org2ChannelID, models.Org2},
-		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "blargh", "Hey, how are you?", models.Org2ChannelID, models.Org2},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "other", "Hey, how are you?", models.Org2ChannelID, models.Org2},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "green", "Good choice, I like Green too! What is your favorite beer?", models.Org2ChannelID, models.Org2},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", models.Org2ChannelID, models.Org2},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "george", "Thanks george, we are all done!", models.Org2ChannelID, models.Org2},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "blargh", "Hey, how are you?", models.Org2ChannelID, models.Org2},
 
-		{models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
-
-		{models.BobID, models.BobURN, models.BobURNID, "ivr", "", models.TwitterChannelID, models.Org1},
+		{nil, models.BobID, models.BobURN, models.BobURNID, "ivr", "", models.TwitterChannelID, models.Org1},
 
 		// no URN on contact but handle event, session gets started but no message created
-		{models.AlexandriaID, models.AlexandriaURN, models.AlexandriaURNID, "start", "", models.TwilioChannelID, models.Org1},
+		{nil, models.AlexandriaID, models.AlexandriaURN, models.AlexandriaURNID, "start", "", models.TwilioChannelID, models.Org1},
+
+		// start Fred back in our favorite flow, then make it inactive, will be handled by catch-all
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
+		{func() {
+			db.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, models.Org2FavoritesFlowID)
+		}, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red", "Hey, how are you?", models.Org2ChannelID, models.Org2},
+
+		// start Fred back in our favorites flow to test retries
+		{func() {
+			db.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, models.Org2FavoritesFlowID)
+		}, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
 	}
 
 	makeMsgTask := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *queue.Task {
@@ -110,7 +120,16 @@ func TestMsgEvents(t *testing.T) {
 		return task
 	}
 
+	last := time.Now()
+
 	for i, tc := range tcs {
+		models.FlushCache()
+
+		// run our hook if we have one
+		if tc.Hook != nil {
+			tc.Hook()
+		}
+
 		task := makeMsgTask(tc.OrgID, tc.ChannelID, tc.ContactID, tc.URN, tc.URNID, tc.Message)
 
 		err := AddHandleTask(rc, tc.ContactID, task)
@@ -124,8 +143,10 @@ func TestMsgEvents(t *testing.T) {
 
 		// if we are meant to have a response
 		var text string
-		db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 ORDER BY id DESC LIMIT 1`, tc.ContactID)
+		db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.ContactID, last)
 		assert.Equal(t, text, tc.Response, "%d: response: '%s' does not contain '%s'", i, text, tc.Response)
+
+		last = time.Now()
 	}
 
 	// should have one remaining IVR task to handle for Bob
@@ -137,12 +158,12 @@ func TestMsgEvents(t *testing.T) {
 	// should have 7 queued priority messages
 	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", models.Org2ChannelUUID)))
 	assert.NoError(t, err)
-	assert.Equal(t, 7, count)
+	assert.Equal(t, 9, count)
 
-	// Fred's session should not have a timeout because courier will set it
+	// Fred's sessions should not have a timeout because courier will set them
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL AND wait_started_on IS NOT NULL`,
-		[]interface{}{models.Org2FredID}, 1,
+		[]interface{}{models.Org2FredID}, 2,
 	)
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
@@ -184,7 +205,7 @@ func TestMsgEvents(t *testing.T) {
 	// and should have interrupted previous session
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from flows_flowsession where contact_id = $1 and status ='I' and current_flow_id = $2`,
-		[]interface{}{models.Org2FredID, models.Org2FavoritesFlowID}, 1,
+		[]interface{}{models.Org2FredID, models.Org2FavoritesFlowID}, 2,
 	)
 
 	// trigger should also not start a new session

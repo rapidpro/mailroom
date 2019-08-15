@@ -44,7 +44,7 @@ const (
 var sessionStatusMap = map[flows.SessionStatus]SessionStatus{
 	flows.SessionStatusActive:    SessionStatusActive,
 	flows.SessionStatusCompleted: SessionStatusCompleted,
-	flows.SessionStatusErrored:   SessionStatusFailed,
+	flows.SessionStatusFailed:    SessionStatusFailed,
 	flows.SessionStatusWaiting:   SessionStatusWaiting,
 }
 
@@ -267,7 +267,7 @@ type Step struct {
 
 // NewSession a session objects from the passed in flow session. It does NOT
 // commit said session to the database.
-func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session, error) {
+func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session, error) {
 	output, err := json.Marshal(fs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error marshalling flow session")
@@ -316,7 +316,7 @@ func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session
 
 	// now build up our runs
 	for _, r := range fs.Runs() {
-		run, err := newRun(org, session, r)
+		run, err := newRun(ctx, tx, org, session, r)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating run: %s", r.UUID())
 		}
@@ -326,11 +326,11 @@ func NewSession(org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session
 
 		// if this run is waiting, save it as the current flow
 		if r.Status() == flows.RunStatusWaiting {
-			flow, err := org.Flow(r.Flow().UUID())
+			flowID, err := flowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error loading current flow")
+				return nil, errors.Wrapf(err, "error loading current flow for UUID: %s", r.FlowReference().UUID)
 			}
-			s.CurrentFlowID = flow.(*Flow).ID()
+			s.CurrentFlowID = flowID
 		}
 	}
 
@@ -465,7 +465,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// now build up our runs
 	for _, r := range fs.Runs() {
-		run, err := newRun(org, s, r)
+		run, err := newRun(ctx, tx, org, s, r)
 		if err != nil {
 			return errors.Wrapf(err, "error creating run: %s", r.UUID())
 		}
@@ -485,11 +485,11 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for _, r := range fs.Runs() {
 		// if this run is waiting, save it as the current flow
 		if r.Status() == flows.RunStatusWaiting {
-			flow, err := org.Flow(r.Flow().UUID())
+			flowID, err := flowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
 			if err != nil {
-				return errors.Wrapf(err, "error loading current flow")
+				return errors.Wrapf(err, "error loading flow: %s", r.FlowReference().UUID)
 			}
-			s.s.CurrentFlowID = flow.(*Flow).ID()
+			s.s.CurrentFlowID = flowID
 		}
 
 		// if we haven't already been marked as responded, walk our runs looking for an input
@@ -632,7 +632,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	incompleteSessionsI := make([]interface{}, 0, len(ss))
 	completedConnectionIDs := make([]ConnectionID, 0, 1)
 	for i, s := range ss {
-		session, err := NewSession(org, s, sprints[i])
+		session, err := NewSession(ctx, tx, org, s, sprints[i])
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating session objects")
 		}
@@ -732,7 +732,7 @@ RETURNING id
 
 // newRun writes the passed in flow run to our database, also applying any events in those runs as
 // appropriate. (IE, writing db messages etc..)
-func newRun(org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error) {
+func newRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error) {
 	// build our path elements
 	path := make([]Step, len(fr.Path()))
 	for i, p := range fr.Path() {
@@ -746,9 +746,9 @@ func newRun(org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error
 		return nil, err
 	}
 
-	flow, err := org.Flow(fr.Flow().UUID())
+	flowID, err := flowIDForUUID(ctx, tx, org, fr.FlowReference().UUID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to load flow with uuid: %s", fr.Flow().UUID())
+		return nil, errors.Wrapf(err, "unable to load flow with uuid: %s", fr.FlowReference().UUID)
 	}
 
 	// create our run
@@ -760,7 +760,7 @@ func newRun(org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error
 	r.ExpiresOn = fr.ExpiresOn()
 	r.ModifiedOn = fr.ModifiedOn()
 	r.ContactID = fr.Contact().ID()
-	r.FlowID = flow.(*Flow).ID()
+	r.FlowID = flowID
 	r.SessionID = session.ID()
 	r.StartID = NilStartID
 	r.OrgID = org.OrgID()
@@ -773,7 +773,7 @@ func newRun(org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error
 	// set our exit type if we exited
 	// TODO: audit exit types
 	if fr.Status() != flows.RunStatusActive && fr.Status() != flows.RunStatusWaiting {
-		if fr.Status() == flows.RunStatusErrored {
+		if fr.Status() == flows.RunStatusFailed {
 			r.ExitType = ExitInterrupted
 		} else {
 			r.ExitType = ExitCompleted
