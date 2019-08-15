@@ -1,3 +1,7 @@
+v2.0.25
+----------
+ * Handle FlowRun having nil Flow, use FlowReference instead
+
 v2.0.24
 ----------
  * Enable interrupt_sessions task
