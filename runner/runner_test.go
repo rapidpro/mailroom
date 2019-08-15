@@ -76,7 +76,7 @@ func TestCampaignStarts(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND session_id IS NOT NULL`,
 		[]interface{}{pq.Array(contacts), models.CampaignFlowID}, 2,
@@ -161,7 +161,7 @@ func TestBatchStart(t *testing.T) {
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 			AND session_id IS NOT NULL`,
 			[]interface{}{pq.Array(contactIDs), tc.Flow}, tc.TotalCount, "%d: unexpected number of runs", i,
