@@ -17,5 +17,5 @@ RUN chown -R golang /app
 
 USER golang
 
-EXPOSE 80
+EXPOSE 8000
 ENTRYPOINT ["./mailroom"]
