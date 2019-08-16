@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+  mailroom:
+    image: ${DOCKER_IMAGE_NAME:-ilhasoft/mailroom}:${DOCKER_IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile
+    ports:
+      - 8080:80
