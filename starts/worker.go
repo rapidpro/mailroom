@@ -80,17 +80,14 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// if we are meant to create a new contact, do so
 	if start.CreateContact() {
-		if org == nil {
-			org, err = models.GetOrgAssets(ctx, db, start.OrgID())
-			if err != nil {
-				return errors.Wrapf(err, "error loading org assets")
-			}
+		if assets == nil {
 			assets, err = models.GetSessionAssets(org)
 			if err != nil {
 				return errors.Wrapf(err, "error loading session assets")
 			}
 		}
 
+		logrus.WithField("assets", assets).WithField("fields", assets.Fields()).Error("creating contact")
 		newID, err := models.CreateContact(ctx, db, org, assets, urns.NilURN)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
