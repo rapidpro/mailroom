@@ -87,7 +87,6 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 			}
 		}
 
-		logrus.WithField("assets", assets).WithField("fields", assets.Fields()).Error("creating contact")
 		newID, err := models.CreateContact(ctx, db, org, assets, urns.NilURN)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
