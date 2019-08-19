@@ -1,3 +1,7 @@
+v2.0.28
+----------
+ * Remove debug error message
+
 v2.0.27
 ----------
  * Remove references to trigger_count in unit tests
