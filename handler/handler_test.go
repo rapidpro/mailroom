@@ -30,23 +30,23 @@ func TestMsgEvents(t *testing.T) {
 
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`, models.FavoritesFlowID)
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
+		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`, models.FavoritesFlowID)
 
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 2, 0) RETURNING id`, models.Org2FavoritesFlowID)
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
+		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 2) RETURNING id`, models.Org2FavoritesFlowID)
 
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), '', false, $1, 'C', 'O', 1, 1, 2, 0) RETURNING id`, models.Org2SingleMessageFlowID)
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
+		VALUES(TRUE, now(), now(), '', false, $1, 'C', 'O', 1, 1, 2) RETURNING id`, models.Org2SingleMessageFlowID)
 
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'ivr', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`, models.IVRFlowID)
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
+		VALUES(TRUE, now(), now(), 'ivr', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`, models.IVRFlowID)
 
 	// clear all of Alexandria's URNs
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.AlexandriaID)
@@ -233,15 +233,15 @@ func TestChannelEvents(t *testing.T) {
 	// trigger on our twitter channel for new conversations and favorites flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count, channel_id)
-		VALUES(TRUE, now(), now(), NULL, false, $1, 'N', NULL, 1, 1, 1, 0, $2) RETURNING id`,
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
+		VALUES(TRUE, now(), now(), NULL, false, $1, 'N', NULL, 1, 1, 1, $2) RETURNING id`,
 		models.FavoritesFlowID, models.TwitterChannelID)
 
 	// trigger on our nexmo channel for referral and number flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count, channel_id)
-		VALUES(TRUE, now(), now(), NULL, false, $1, 'R', NULL, 1, 1, 1, 0, $2) RETURNING id`,
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
+		VALUES(TRUE, now(), now(), NULL, false, $1, 'R', NULL, 1, 1, 1, $2) RETURNING id`,
 		models.PickNumberFlowID, models.NexmoChannelID)
 
 	// add a URN for cathy so we can test twitter URNs
@@ -357,8 +357,8 @@ func TestTimedEvents(t *testing.T) {
 	// start to start our favorites flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`,
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
+		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`,
 		models.FavoritesFlowID,
 	)
 
