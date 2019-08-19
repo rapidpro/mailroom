@@ -1,3 +1,8 @@
+v2.0.27
+----------
+ * Remove references to trigger_count in unit tests
+ * Fix create contact failing to start
+
 v2.0.26
 ----------
  * Start writing flows_flowrun.status alongside exit_type
