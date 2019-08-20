@@ -1015,19 +1015,31 @@ WHERE
 
 // ExpireRunsAndSessions expires all the passed in runs and sessions. Note this should only be called
 // for runs that have no parents or no way of continuing
-func ExpireRunsAndSessions(ctx context.Context, db Queryer, runIDs []FlowRunID, sessionIDs []SessionID) error {
+func ExpireRunsAndSessions(ctx context.Context, db *sqlx.DB, runIDs []FlowRunID, sessionIDs []SessionID) error {
 	if len(runIDs) == 0 {
 		return nil
 	}
 
-	err := Exec(ctx, "expiring runs", db, expireRunsSQL, pq.Array(runIDs))
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error starting transaction to expire sessions")
 	}
 
-	err = Exec(ctx, "expiring sessions", db, expireSessionsSQL, pq.Array(sessionIDs))
+	err = Exec(ctx, "expiring runs", tx, expireRunsSQL, pq.Array(runIDs))
 	if err != nil {
-		return err
+		tx.Rollback()
+		return errors.Wrapf(err, "error expiring runs")
+	}
+
+	err = Exec(ctx, "expiring sessions", tx, expireSessionsSQL, pq.Array(sessionIDs))
+	if err != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error expiring sessions")
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return errors.Wrapf(err, "error committing expiration of runs and sessions")
 	}
 	return nil
 }
