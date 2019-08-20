@@ -1,3 +1,7 @@
+v2.0.29
+----------
+ * Expire runs and sessions in a transaction to guarantee they are always in sync
+
 v2.0.28
 ----------
  * Remove debug error message
