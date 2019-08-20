@@ -58,6 +58,24 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 	}
 	defer rows.Close()
 
+	expireRunsAndSessions := func(runs []models.FlowRunID, sessions []models.SessionID) error {
+		tx, err := db.BeginTxx(ctx, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error starting transaction for expiration")
+		}
+
+		err = models.ExpireRunsAndSessions(ctx, tx, runs, sessions)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		err = tx.Commit()
+		if err != nil {
+			return errors.Wrapf(err, "error committing expiration transaction")
+		}
+		return nil
+	}
+
 	count := 0
 	for rows.Next() {
 		expiration := &RunExpiration{}
@@ -75,9 +93,9 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 			// batch is full? commit it
 			if len(expiredRuns) == expireBatchSize {
-				err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
+				err = expireRunsAndSessions(expiredRuns, expiredSessions)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "error expiring runs and sessions")
 				}
 				expiredRuns = expiredRuns[:0]
 				expiredSessions = expiredSessions[:0]
@@ -114,9 +132,9 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 	// commit any stragglers
 	if len(expiredRuns) > 0 {
-		err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
+		err = expireRunsAndSessions(expiredRuns, expiredSessions)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error expiring runs and sessions")
 		}
 	}
 
