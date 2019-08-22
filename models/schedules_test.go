@@ -94,6 +94,15 @@ func TestNextFire(t *testing.T) {
 			Next:         dp(2019, 8, 21, 12, 35, la),
 		},
 		{
+			Label:        "daily repeat for next day across DST",
+			Start:        time.Date(2019, 3, 9, 12, 30, 0, 0, la),
+			Location:     la,
+			Period:       RepeatPeriodDaily,
+			HourOfDay:    ip(12),
+			MinuteOfHour: ip(30),
+			Next:         dp(2019, 3, 10, 12, 30, la),
+		},
+		{
 			Label:        "weekly repeat missing days of week",
 			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
@@ -131,6 +140,16 @@ func TestNextFire(t *testing.T) {
 			MinuteOfHour: ip(35),
 			DaysOfWeek:   null.String("MTWRFSU"),
 			Next:         dp(2019, 8, 21, 12, 35, la),
+		},
+		{
+			Label:        "weekly repeat for next day across DST",
+			Start:        time.Date(2019, 3, 9, 12, 30, 0, 0, la),
+			Location:     la,
+			Period:       RepeatPeriodWeekly,
+			HourOfDay:    ip(12),
+			MinuteOfHour: ip(30),
+			DaysOfWeek:   null.String("MTWRFSU"),
+			Next:         dp(2019, 3, 10, 12, 30, la),
 		},
 		{
 			Label:        "weekly repeat to day in next week",
@@ -201,6 +220,16 @@ func TestNextFire(t *testing.T) {
 			DayOfMonth:   ip(31),
 			Next:         dp(2019, 9, 30, 12, 35, la),
 		},
+		{
+			Label:        "monthy repeat for next month across DST",
+			Start:        time.Date(2019, 2, 10, 12, 30, 0, 0, la),
+			Location:     la,
+			Period:       RepeatPeriodMonthly,
+			HourOfDay:    ip(12),
+			MinuteOfHour: ip(30),
+			DayOfMonth:   ip(10),
+			Next:         dp(2019, 3, 10, 12, 30, la),
+		},
 	}
 
 	for _, tc := range tcs {
@@ -213,7 +242,9 @@ func TestNextFire(t *testing.T) {
 		s.DayOfMonth = tc.DayOfMonth
 		s.DaysOfWeek = tc.DaysOfWeek
 
-		next, err := sched.GetNextFire(tc.Location, tc.Start)
+		start := tc.Start.In(time.UTC)
+
+		next, err := sched.GetNextFire(tc.Location, start)
 		if err != nil {
 			if tc.Error == "" {
 				assert.NoError(t, err, "%s: received unexpected error", tc.Label)
