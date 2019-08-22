@@ -41,9 +41,11 @@ func TestStarts(t *testing.T) {
 		                    VALUES($1, TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), models.GeorgeID, models.SingleMessageFlowID)
 
 	tcs := []struct {
+		Label               string
 		FlowID              models.FlowID
 		GroupIDs            []models.GroupID
 		ContactIDs          []models.ContactID
+		CreateContact       bool
 		Query               string
 		QueryResponse       string
 		RestartParticipants models.RestartParticipants
@@ -53,15 +55,89 @@ func TestStarts(t *testing.T) {
 		BatchCount          int
 		TotalCount          int
 	}{
-		{models.SingleMessageFlowID, nil, nil, "", "", false, false, queue.BatchQueue, 0, 0, 0},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, nil, "", "", false, false, queue.BatchQueue, 121, 2, 121},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.CathyID}, "", "", false, false, queue.BatchQueue, 121, 2, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.CathyID}, "", "", true, true, queue.HandlerQueue, 1, 1, 1},
-		{models.SingleMessageFlowID, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{models.BobID}, "", "", false, false, queue.BatchQueue, 122, 2, 1},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, "", "", false, false, queue.HandlerQueue, 1, 1, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, "", "", false, true, queue.HandlerQueue, 1, 1, 0},
-		{models.SingleMessageFlowID, nil, []models.ContactID{models.BobID}, "", "", true, true, queue.HandlerQueue, 1, 1, 1},
-		{models.SingleMessageFlowID, nil, nil, "bob", fmt.Sprintf(`{
+		{
+			Label:        "empty flow start",
+			FlowID:       models.SingleMessageFlowID,
+			Queue:        queue.BatchQueue,
+			ContactCount: 0,
+			BatchCount:   0,
+			TotalCount:   0,
+		},
+		{
+			Label:        "Single group",
+			FlowID:       models.SingleMessageFlowID,
+			GroupIDs:     []models.GroupID{models.DoctorsGroupID},
+			Queue:        queue.BatchQueue,
+			ContactCount: 121,
+			BatchCount:   2,
+			TotalCount:   121,
+		},
+		{
+			Label:        "Group and Contact (but all already active)",
+			FlowID:       models.SingleMessageFlowID,
+			GroupIDs:     []models.GroupID{models.DoctorsGroupID},
+			ContactIDs:   []models.ContactID{models.CathyID},
+			Queue:        queue.BatchQueue,
+			ContactCount: 121,
+			BatchCount:   2,
+			TotalCount:   0,
+		},
+		{
+			Label:               "Contact restart",
+			FlowID:              models.SingleMessageFlowID,
+			ContactIDs:          []models.ContactID{models.CathyID},
+			RestartParticipants: true,
+			IncludeActive:       true,
+			Queue:               queue.HandlerQueue,
+			ContactCount:        1,
+			BatchCount:          1,
+			TotalCount:          1,
+		},
+		{
+			Label:        "Previous group and one new contact",
+			FlowID:       models.SingleMessageFlowID,
+			GroupIDs:     []models.GroupID{models.DoctorsGroupID},
+			ContactIDs:   []models.ContactID{models.BobID},
+			Queue:        queue.BatchQueue,
+			ContactCount: 122,
+			BatchCount:   2,
+			TotalCount:   1,
+		},
+		{
+			Label:        "Single contact, no restart",
+			FlowID:       models.SingleMessageFlowID,
+			ContactIDs:   []models.ContactID{models.BobID},
+			Queue:        queue.HandlerQueue,
+			ContactCount: 1,
+			BatchCount:   1,
+			TotalCount:   0,
+		},
+		{
+			Label:         "Single contact, include active, but no restart",
+			FlowID:        models.SingleMessageFlowID,
+			ContactIDs:    []models.ContactID{models.BobID},
+			IncludeActive: true,
+			Queue:         queue.HandlerQueue,
+			ContactCount:  1,
+			BatchCount:    1,
+			TotalCount:    0,
+		},
+		{
+			Label:               "Single contact, include active and restart",
+			FlowID:              models.SingleMessageFlowID,
+			ContactIDs:          []models.ContactID{models.BobID},
+			RestartParticipants: true,
+			IncludeActive:       true,
+			Queue:               queue.HandlerQueue,
+			ContactCount:        1,
+			BatchCount:          1,
+			TotalCount:          1,
+		},
+		{
+			Label:  "Query start",
+			FlowID: models.SingleMessageFlowID,
+			Query:  "bob",
+			QueryResponse: fmt.Sprintf(`{
 			"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
 			"took": 2,
 			"timed_out": false,
@@ -87,7 +163,23 @@ func TestStarts(t *testing.T) {
 				}
 			  ]
 			}
-		}`, models.BobID), true, true, queue.HandlerQueue, 1, 1, 1},
+			}`, models.BobID),
+			RestartParticipants: true,
+			IncludeActive:       true,
+			Queue:               queue.HandlerQueue,
+			ContactCount:        1,
+			BatchCount:          1,
+			TotalCount:          1,
+		},
+		{
+			Label:         "New Contact",
+			FlowID:        models.SingleMessageFlowID,
+			CreateContact: true,
+			Queue:         queue.HandlerQueue,
+			ContactCount:  1,
+			BatchCount:    1,
+			TotalCount:    1,
+		},
 	}
 
 	for i, tc := range tcs {
@@ -97,7 +189,8 @@ func TestStarts(t *testing.T) {
 		start := models.NewFlowStart(models.Org1, models.MessagingFlow, tc.FlowID, tc.RestartParticipants, tc.IncludeActive).
 			WithGroupIDs(tc.GroupIDs).
 			WithContactIDs(tc.ContactIDs).
-			WithQuery(tc.Query)
+			WithQuery(tc.Query).
+			WithCreateContact(tc.CreateContact)
 
 		err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 		assert.NoError(t, err)

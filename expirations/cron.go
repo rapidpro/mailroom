@@ -77,7 +77,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 			if len(expiredRuns) == expireBatchSize {
 				err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "error expiring runs and sessions")
 				}
 				expiredRuns = expiredRuns[:0]
 				expiredSessions = expiredSessions[:0]
@@ -116,7 +116,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 	if len(expiredRuns) > 0 {
 		err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error expiring runs and sessions")
 		}
 	}
 

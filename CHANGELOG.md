@@ -1,3 +1,16 @@
+v2.0.29
+----------
+ * Expire runs and sessions in a transaction to guarantee they are always in sync
+
+v2.0.28
+----------
+ * Remove debug error message
+
+v2.0.27
+----------
+ * Remove references to trigger_count in unit tests
+ * Fix create contact failing to start
+
 v2.0.26
 ----------
  * Start writing flows_flowrun.status alongside exit_type
