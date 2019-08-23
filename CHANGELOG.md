@@ -1,3 +1,7 @@
+v2.0.30
+----------
+ * Update to goflow v0.47.3
+
 v2.0.29
 ----------
  * Expire runs and sessions in a transaction to guarantee they are always in sync
