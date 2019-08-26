@@ -31,6 +31,8 @@ import (
 
 	_ "github.com/nyaruka/mailroom/ivr/nexmo"
 	_ "github.com/nyaruka/mailroom/ivr/twiml"
+
+	_ "github.com/nyaruka/mailroom/providers/transferto"
 )
 
 var version = "Dev"
