@@ -13,14 +13,14 @@ func TestContactNameChanged(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSetContactNameAction(newActionUUID(), "Fred"),
-					actions.NewSetContactNameAction(newActionUUID(), "Tarzan"),
+					actions.NewSetContactName(newActionUUID(), "Fred"),
+					actions.NewSetContactName(newActionUUID(), "Tarzan"),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSetContactNameAction(newActionUUID(), "Geoff Newman"),
+					actions.NewSetContactName(newActionUUID(), "Geoff Newman"),
 				},
 				models.AlexandriaID: []flows.Action{
-					actions.NewSetContactNameAction(newActionUUID(), "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
+					actions.NewSetContactName(newActionUUID(), "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 				},
 			},
 			SQLAssertions: []SQLAssertion{

@@ -39,7 +39,7 @@ func TestSessionTriggered(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewStartSessionAction(newActionUUID(), flow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
+					actions.NewStartSession(newActionUUID(), flow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
 				},
 			},
 			SQLAssertions: []SQLAssertion{

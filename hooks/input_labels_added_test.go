@@ -24,14 +24,14 @@ func TestInputLabelsAdded(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{reporting}),
-					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{testing}),
-					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{reporting}),
+					actions.NewAddInputLabels(newActionUUID(), []*assets.LabelReference{reporting}),
+					actions.NewAddInputLabels(newActionUUID(), []*assets.LabelReference{testing}),
+					actions.NewAddInputLabels(newActionUUID(), []*assets.LabelReference{reporting}),
 				},
 				models.BobID: []flows.Action{},
 				models.GeorgeID: []flows.Action{
-					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{testing}),
-					actions.NewAddInputLabelsAction(newActionUUID(), []*assets.LabelReference{reporting}),
+					actions.NewAddInputLabels(newActionUUID(), []*assets.LabelReference{testing}),
+					actions.NewAddInputLabels(newActionUUID(), []*assets.LabelReference{reporting}),
 				},
 			},
 			Msgs: ContactMsgMap{

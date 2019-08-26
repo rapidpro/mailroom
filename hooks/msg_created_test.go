@@ -37,7 +37,7 @@ func TestMsgCreated(t *testing.T) {
 
 	msg1 := createIncomingMsg(db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start")
 
-	templateAction := actions.NewSendMsgAction(newActionUUID(), "Template time", nil, nil, false)
+	templateAction := actions.NewSendMsg(newActionUUID(), "Template time", nil, nil, false)
 	templateAction.Templating = &actions.Templating{
 		Template:  &assets.TemplateReference{assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), "revive_issue"},
 		Variables: []string{"@contact.name", "tooth"},
@@ -47,13 +47,13 @@ func TestMsgCreated(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendMsgAction(newActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
+					actions.NewSendMsg(newActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSendMsgAction(newActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
+					actions.NewSendMsg(newActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
 				},
 				models.BobID: []flows.Action{
-					actions.NewSendMsgAction(newActionUUID(), "No URNs", nil, nil, false),
+					actions.NewSendMsg(newActionUUID(), "No URNs", nil, nil, false),
 				},
 				models.AlexandriaID: []flows.Action{
 					templateAction,
@@ -119,7 +119,7 @@ func TestNoTopup(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendMsgAction(newActionUUID(), "No Topup", nil, nil, false),
+					actions.NewSendMsg(newActionUUID(), "No Topup", nil, nil, false),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
@@ -158,16 +158,16 @@ func TestNewURN(t *testing.T) {
 			Actions: ContactActionMap{
 				// brand new URN on Cathy
 				models.CathyID: []flows.Action{
-					actions.NewAddContactURNAction(newActionUUID(), "telegram", "12345"),
-					actions.NewSetContactChannelAction(newActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
-					actions.NewSendMsgAction(newActionUUID(), "Cathy Message", nil, nil, false),
+					actions.NewAddContactURN(newActionUUID(), "telegram", "12345"),
+					actions.NewSetContactChannel(newActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
+					actions.NewSendMsg(newActionUUID(), "Cathy Message", nil, nil, false),
 				},
 
 				// Bob is stealing a URN previously assigned to George
 				models.BobID: []flows.Action{
-					actions.NewAddContactURNAction(newActionUUID(), "telegram", "67890"),
-					actions.NewSetContactChannelAction(newActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
-					actions.NewSendMsgAction(newActionUUID(), "Bob Message", nil, nil, false),
+					actions.NewAddContactURN(newActionUUID(), "telegram", "67890"),
+					actions.NewSetContactChannel(newActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
+					actions.NewSendMsg(newActionUUID(), "Bob Message", nil, nil, false),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
