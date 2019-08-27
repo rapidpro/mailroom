@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/providers/transferto"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +15,7 @@ func TestClient(t *testing.T) {
 	ts1 := httptest.NewServer(http.HandlerFunc(testAPIHandler))
 	defer ts1.Close()
 
-	cl := transferto.NewClient("joe", "1234567", utils.NewHTTPClient("testing"))
+	cl := transferto.NewClient("joe", "1234567", http.DefaultClient)
 	cl.SetAPIURL(ts1.URL)
 
 	// test ping action

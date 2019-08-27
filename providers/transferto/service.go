@@ -1,6 +1,10 @@
 package transferto
 
 import (
+	"crypto/tls"
+	"net/http"
+	"time"
+
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/goflow"
@@ -17,12 +21,29 @@ const (
 )
 
 func init() {
-	goflow.SetAirtimeService(&transferTo{})
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:    10,
+			IdleConnTimeout: 30 * time.Second,
+			TLSClientConfig: &tls.Config{
+				Renegotiation: tls.RenegotiateOnceAsClient, // support single TLS renegotiation
+			},
+		},
+		Timeout: time.Duration(15 * time.Second),
+	}
+
+	goflow.SetAirtimeService(newService(httpClient))
 }
 
-type transferTo struct{}
+type service struct {
+	httpClient *http.Client
+}
 
-func (s *transferTo) Transfer(session flows.Session, sender urns.URN, recipient urns.URN, amounts map[string]decimal.Decimal) (*flows.AirtimeTransfer, error) {
+func newService(httpClient *http.Client) flows.AirtimeService {
+	return &service{httpClient: httpClient}
+}
+
+func (s *service) Transfer(session flows.Session, sender urns.URN, recipient urns.URN, amounts map[string]decimal.Decimal) (*flows.AirtimeTransfer, error) {
 	t := &flows.AirtimeTransfer{
 		Sender:    sender,
 		Recipient: recipient,
@@ -38,7 +59,7 @@ func (s *transferTo) Transfer(session flows.Session, sender urns.URN, recipient 
 		return t, errors.New("missing transferto configuration")
 	}
 
-	client := NewClient(login, token, session.Engine().HTTPClient())
+	client := NewClient(login, token, s.httpClient)
 
 	info, err := client.MSISDNInfo(recipient.Path(), currency, "1")
 	if err != nil {

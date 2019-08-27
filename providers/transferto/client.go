@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nyaruka/goflow/utils"
-
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 )
@@ -27,7 +25,7 @@ const (
 type Client struct {
 	login      string
 	token      string
-	httpClient *utils.HTTPClient
+	httpClient *http.Client
 	apiURL     string
 }
 
@@ -46,7 +44,7 @@ func (r *baseResponse) ErrorCode() int   { return r.ErrorCode_ }
 func (r *baseResponse) ErrorTxt() string { return r.ErrorTxt_ }
 
 // NewClient creates a new TransferTo client
-func NewClient(login string, token string, httpClient *utils.HTTPClient) *Client {
+func NewClient(login string, token string, httpClient *http.Client) *Client {
 	return &Client{login: login, token: token, httpClient: httpClient, apiURL: apiURL}
 }
 
@@ -173,7 +171,7 @@ func (c *Client) request(data url.Values, dest interface{}) error {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	response, _, err := c.httpClient.DoWithDump(req)
+	response, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
