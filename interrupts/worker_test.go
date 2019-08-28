@@ -3,9 +3,11 @@ package interrupts
 import (
 	"testing"
 
+	"github.com/nyaruka/goflow/utils/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,21 +34,44 @@ func TestInterrupts(t *testing.T) {
 									VALUES('W', false, NOW(), $1, $2, $3, $4) RETURNING id`,
 			orgID, contactID, connectionID, currentFlowID)
 		assert.NoError(t, err)
+
+		// give session one active run too
+		db.MustExec(`INSERT INTO flows_flowrun(uuid, is_active, status, created_on, modified_on, responded, contact_id, flow_id, session_id, org_id)
+			                            VALUES($1, TRUE, 'W', now(), now(), FALSE, $2, $3, $4, 1);`, uuids.New(), contactID, currentFlowID, sessionID)
+
 		return sessionID
 	}
 
 	tcs := []struct {
-		ContactIDs      []models.ContactID
-		ChannelIDs      []models.ChannelID
-		FlowIDs         []models.FlowID
-		ActiveRemaining int
+		ContactIDs    []models.ContactID
+		ChannelIDs    []models.ChannelID
+		FlowIDs       []models.FlowID
+		StatusesAfter [5]string
 	}{
-		{nil, nil, nil, 4},
-		{[]models.ContactID{models.CathyID}, nil, nil, 3},
-		{[]models.ContactID{models.CathyID, models.GeorgeID}, nil, nil, 2},
-		{nil, []models.ChannelID{models.TwilioChannelID}, nil, 3},
-		{nil, nil, []models.FlowID{models.PickNumberFlowID}, 3},
-		{[]models.ContactID{models.CathyID, models.GeorgeID}, []models.ChannelID{models.TwilioChannelID}, []models.FlowID{models.PickNumberFlowID}, 0},
+		{
+			nil, nil, nil,
+			[5]string{"W", "W", "W", "W", "I"},
+		},
+		{
+			[]models.ContactID{models.CathyID}, nil, nil,
+			[5]string{"I", "W", "W", "W", "I"},
+		},
+		{
+			[]models.ContactID{models.CathyID, models.GeorgeID}, nil, nil,
+			[5]string{"I", "I", "W", "W", "I"},
+		},
+		{
+			nil, []models.ChannelID{models.TwilioChannelID}, nil,
+			[5]string{"W", "W", "I", "W", "I"},
+		},
+		{
+			nil, nil, []models.FlowID{models.PickNumberFlowID},
+			[5]string{"W", "W", "W", "I", "I"},
+		},
+		{
+			[]models.ContactID{models.CathyID, models.GeorgeID}, []models.ChannelID{models.TwilioChannelID}, []models.FlowID{models.PickNumberFlowID},
+			[5]string{"I", "I", "I", "I", "I"},
+		},
 	}
 
 	for i, tc := range tcs {
@@ -56,20 +81,22 @@ func TestInterrupts(t *testing.T) {
 		// twilio connection
 		twilioConnectionID := insertConnection(models.Org1, models.TwilioChannelID, models.AlexandriaID, models.AlexandriaURNID)
 
-		// insert our dummy contact sessions
-		insertSession(models.Org1, models.CathyID, models.NilConnectionID, models.FavoritesFlowID)
-		insertSession(models.Org1, models.GeorgeID, models.NilConnectionID, models.FavoritesFlowID)
-		insertSession(models.Org1, models.AlexandriaID, twilioConnectionID, models.FavoritesFlowID)
-		insertSession(models.Org1, models.BobID, models.NilConnectionID, models.PickNumberFlowID)
+		sessionIDs := make([]models.SessionID, 5)
 
-		// our static session we always end
-		sessionID := insertSession(models.Org1, models.BobID, models.NilConnectionID, models.FavoritesFlowID)
+		// insert our dummy contact sessions
+		sessionIDs[0] = insertSession(models.Org1, models.CathyID, models.NilConnectionID, models.FavoritesFlowID)
+		sessionIDs[1] = insertSession(models.Org1, models.GeorgeID, models.NilConnectionID, models.FavoritesFlowID)
+		sessionIDs[2] = insertSession(models.Org1, models.AlexandriaID, twilioConnectionID, models.FavoritesFlowID)
+		sessionIDs[3] = insertSession(models.Org1, models.BobID, models.NilConnectionID, models.PickNumberFlowID)
+
+		// a session we always end explicitly
+		sessionIDs[4] = insertSession(models.Org1, models.BobID, models.NilConnectionID, models.FavoritesFlowID)
 
 		// create our task
 		task := &InterruptSessionsTask{
+			SessionIDs: []models.SessionID{sessionIDs[4]},
 			ContactIDs: tc.ContactIDs,
 			ChannelIDs: tc.ChannelIDs,
-			SessionIDs: []models.SessionID{sessionID},
 			FlowIDs:    tc.FlowIDs,
 		}
 
@@ -77,8 +104,20 @@ func TestInterrupts(t *testing.T) {
 		err := interruptSessions(ctx, db, task)
 		assert.NoError(t, err)
 
-		// check final count of active
-		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'W'`,
-			nil, tc.ActiveRemaining, "%d: unexpected active session count", i)
+		// check session statuses are as expected
+		for j, sID := range sessionIDs {
+			var status string
+			err := db.Get(&status, `SELECT status FROM flows_flowsession WHERE id = $1`, sID)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.StatusesAfter[j], status, "%d: status mismatch for session #%d", i, j)
+
+			// check for runs with a different status to the session
+			testsuite.AssertQueryCount(
+				t, db,
+				`SELECT count(*) FROM flows_flowrun WHERE session_id = $1 AND status != $2`,
+				[]interface{}{sID, tc.StatusesAfter[j]}, 0,
+				"%d: unexpected un-interrupted runs for session #%d", i, j,
+			)
+		}
 	}
 }
