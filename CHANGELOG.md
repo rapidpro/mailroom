@@ -1,3 +1,8 @@
+v2.0.31
+----------
+ * Allow interrupting sessions by flow
+ * Update to goflow v0.49.0
+
 v2.0.30
 ----------
  * Update to goflow v0.47.3

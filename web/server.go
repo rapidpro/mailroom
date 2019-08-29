@@ -9,14 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/sirupsen/logrus"
 
+	"github.com/pkg/errors"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
+	"github.com/sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
