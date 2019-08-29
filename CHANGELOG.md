@@ -1,3 +1,7 @@
+v2.0.32
+----------
+ * Add expression/migrate endpoint
+
 v2.0.31
 ----------
  * Allow interrupting sessions by flow
