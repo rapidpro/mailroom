@@ -24,6 +24,7 @@ import (
 	_ "github.com/nyaruka/mailroom/timeouts"
 
 	_ "github.com/nyaruka/mailroom/web/docs"
+	_ "github.com/nyaruka/mailroom/web/expression"
 	_ "github.com/nyaruka/mailroom/web/flow"
 	_ "github.com/nyaruka/mailroom/web/ivr"
 	_ "github.com/nyaruka/mailroom/web/simulation"
