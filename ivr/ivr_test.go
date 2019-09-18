@@ -13,7 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/starts"
+	"github.com/nyaruka/mailroom/tasks/starts"
 	"github.com/pkg/errors"
 
 	"github.com/nyaruka/mailroom/testsuite"

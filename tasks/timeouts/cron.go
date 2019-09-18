@@ -9,7 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
-	"github.com/nyaruka/mailroom/handler"
+	"github.com/nyaruka/mailroom/tasks/handler"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"

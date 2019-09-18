@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/mailroom/handler"
+	"github.com/nyaruka/mailroom/tasks/handler"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
