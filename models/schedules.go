@@ -64,7 +64,7 @@ type Schedule struct {
 func (s *Schedule) ID() ScheduleID { return s.s.ID }
 
 // GetNextFire returns the next fire for this schedule (if any)
-func (s *Schedule) GetNextFire(tz *time.Location, start time.Time) (*time.Time, error) {
+func (s *Schedule) GetNextFire(tz *time.Location, now time.Time, start time.Time) (*time.Time, error) {
 	// should have hour and minute on everything else
 	if s.s.HourOfDay == nil {
 		return nil, errors.Errorf("schedule %d has no repeat_hour_of_day set", s.s.ID)
@@ -84,10 +84,13 @@ func (s *Schedule) GetNextFire(tz *time.Location, start time.Time) (*time.Time, 
 	switch s.s.RepeatPeriod {
 
 	case RepeatPeriodNever:
+		if !next.After(now) {
+			return nil, nil
+		}
 		return &next, nil
 
 	case RepeatPeriodDaily:
-		if !next.After(start) {
+		for !next.After(now) {
 			next = next.AddDate(0, 0, 1)
 		}
 		return &next, nil
@@ -108,7 +111,7 @@ func (s *Schedule) GetNextFire(tz *time.Location, start time.Time) (*time.Time, 
 		}
 
 		// until we are in the future, increment a day until we reach a day of week we send on
-		for !next.After(start) || !sendDays[next.Weekday()] {
+		for !next.After(now) || !sendDays[next.Weekday()] {
 			next = next.AddDate(0, 0, 1)
 		}
 
@@ -129,7 +132,7 @@ func (s *Schedule) GetNextFire(tz *time.Location, start time.Time) (*time.Time, 
 		next = time.Date(next.Year(), next.Month(), day, hour, minute, 0, 0, tz)
 
 		// this is in the past, move forward a month
-		if !next.After(start) {
+		for !next.After(now) {
 			next = time.Date(next.Year(), next.Month()+1, 1, hour, minute, 0, 0, tz)
 			day = *s.s.DayOfMonth
 			maxDay = daysInMonth(next)
