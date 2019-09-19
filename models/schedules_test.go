@@ -4,9 +4,45 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/null"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestGetExpired(t *testing.T) {
+	ctx := testsuite.CTX()
+
+	db := testsuite.DB()
+	var s1 ScheduleID
+	err := db.Get(
+		&s1,
+		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
+			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '1 DAY', 1, 1, $1) RETURNING id`,
+		Org1,
+	)
+	assert.NoError(t, err)
+
+	// add a broadcast
+	var b1 BroadcastID
+	err = db.Get(
+		&b1,
+		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id, schedule_id)
+			VALUES('P', hstore(ARRAY['eng','Test message']), 'eng', TRUE, NOW(), NOW(), TRUE, 1, 1, $1, $2) RETURNING id`,
+		Org1, s1,
+	)
+	assert.NoError(t, err)
+
+	// add a few contacts to the broadcast
+	db.MustExec(`INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES($1, $2),($1, $3)`, b1, CathyID, GeorgeID)
+
+	// and a group
+	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, DoctorsGroupID)
+
+	// get expired schedules
+	schedules, err := GetUnfiredSchedules(ctx, db)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(schedules))
+}
 
 func TestNextFire(t *testing.T) {
 	la, err := time.LoadLocation("America/Los_Angeles")
@@ -23,26 +59,26 @@ func TestNextFire(t *testing.T) {
 
 	tcs := []struct {
 		Label        string
-		Start        time.Time
+		Now          time.Time
 		Location     *time.Location
 		Period       RepeatPeriod
 		HourOfDay    *int
 		MinuteOfHour *int
 		DayOfMonth   *int
 		DaysOfWeek   null.String
-		Next         *time.Time
+		Next         []*time.Time
 		Error        string
 	}{
 		{
 			Label:    "no hour of day set",
-			Start:    time.Date(2019, 8, 20, 10, 57, 0, 0, la),
+			Now:      time.Date(2019, 8, 20, 10, 57, 0, 0, la),
 			Location: la,
 			Period:   RepeatPeriodDaily,
 			Error:    "schedule 0 has no repeat_hour_of_day set",
 		},
 		{
 			Label:     "no minute of hour set",
-			Start:     time.Date(2019, 8, 20, 10, 57, 0, 0, la),
+			Now:       time.Date(2019, 8, 20, 10, 57, 0, 0, la),
 			Location:  la,
 			Period:    RepeatPeriodDaily,
 			HourOfDay: ip(12),
@@ -50,7 +86,7 @@ func TestNextFire(t *testing.T) {
 		},
 		{
 			Label:        "unknown repeat period",
-			Start:        time.Date(2019, 8, 20, 10, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 10, 57, 0, 0, la),
 			Location:     la,
 			Period:       "Z",
 			HourOfDay:    ip(12),
@@ -59,52 +95,67 @@ func TestNextFire(t *testing.T) {
 		},
 		{
 			Label:        "no repeat",
-			Start:        time.Date(2019, 8, 20, 10, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 10, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodNever,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
-			Next:         dp(2019, 8, 20, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 8, 20, 12, 35, la)},
 		},
 		{
 			Label:        "daily repeat on same day",
-			Start:        time.Date(2019, 8, 20, 10, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 10, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodDaily,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
-			Next:         dp(2019, 8, 20, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 8, 20, 12, 35, la)},
 		},
 		{
 			Label:        "daily repeat on same hour minute",
-			Start:        time.Date(2019, 8, 20, 12, 35, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 12, 35, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodDaily,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
-			Next:         dp(2019, 8, 21, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 8, 21, 12, 35, la)},
 		},
 		{
 			Label:        "daily repeat for next day",
-			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodDaily,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
-			Next:         dp(2019, 8, 21, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 8, 21, 12, 35, la)},
 		},
 		{
-			Label:        "daily repeat for next day across DST",
-			Start:        time.Date(2019, 3, 9, 12, 30, 0, 0, la),
+			Label:        "daily repeat for next day across DST start",
+			Now:          time.Date(2019, 3, 9, 12, 30, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodDaily,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(30),
-			Next:         dp(2019, 3, 10, 12, 30, la),
+			Next: []*time.Time{
+				dp(2019, 3, 10, 12, 30, la),
+				dp(2019, 3, 11, 12, 30, la),
+			},
+		},
+		{
+			Label:        "daily repeat for next day across DST end",
+			Now:          time.Date(2019, 11, 2, 12, 30, 0, 0, la),
+			Location:     la,
+			Period:       RepeatPeriodDaily,
+			HourOfDay:    ip(12),
+			MinuteOfHour: ip(30),
+			Next: []*time.Time{
+				dp(2019, 11, 3, 12, 30, la),
+				dp(2019, 11, 4, 12, 30, la),
+			},
 		},
 		{
 			Label:        "weekly repeat missing days of week",
-			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodWeekly,
 			HourOfDay:    ip(12),
@@ -113,7 +164,7 @@ func TestNextFire(t *testing.T) {
 		},
 		{
 			Label:        "weekly with invalid days of week",
-			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodWeekly,
 			HourOfDay:    ip(12),
@@ -123,47 +174,58 @@ func TestNextFire(t *testing.T) {
 		},
 		{
 			Label:        "weekly repeat to day later in week",
-			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodWeekly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
 			DaysOfWeek:   null.String("RU"),
-			Next:         dp(2019, 8, 22, 12, 35, la),
+			Next: []*time.Time{
+				dp(2019, 8, 22, 12, 35, la),
+				dp(2019, 8, 25, 12, 35, la),
+				dp(2019, 8, 29, 12, 35, la),
+			},
 		},
 		{
 			Label:        "weekly repeat to day later in week using fire date",
-			Start:        time.Date(2019, 8, 20, 12, 35, 0, 0, la),
+			Now:          time.Date(2019, 8, 26, 12, 35, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodWeekly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
 			DaysOfWeek:   null.String("MTWRFSU"),
-			Next:         dp(2019, 8, 21, 12, 35, la),
+			Next: []*time.Time{
+				dp(2019, 8, 27, 12, 35, la),
+				dp(2019, 8, 28, 12, 35, la),
+				dp(2019, 8, 29, 12, 35, la),
+				dp(2019, 8, 30, 12, 35, la),
+				dp(2019, 8, 31, 12, 35, la),
+				dp(2019, 9, 1, 12, 35, la),
+			},
 		},
 		{
 			Label:        "weekly repeat for next day across DST",
-			Start:        time.Date(2019, 3, 9, 12, 30, 0, 0, la),
+			Now:          time.Date(2019, 3, 9, 12, 30, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodWeekly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(30),
 			DaysOfWeek:   null.String("MTWRFSU"),
-			Next:         dp(2019, 3, 10, 12, 30, la),
+			Next:         []*time.Time{dp(2019, 3, 10, 12, 30, la)},
 		},
 		{
 			Label:        "weekly repeat to day in next week",
-			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodWeekly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
 			DaysOfWeek:   null.String("M"),
-			Next:         dp(2019, 8, 26, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 8, 26, 12, 35, la)},
 		},
 		{
 			Label:        "monthly repeat with no day of month set",
-			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodMonthly,
 			HourOfDay:    ip(12),
@@ -172,66 +234,72 @@ func TestNextFire(t *testing.T) {
 		},
 		{
 			Label:        "monthly repeat to day in same month",
-			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodMonthly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
 			DayOfMonth:   ip(31),
-			Next:         dp(2019, 8, 31, 12, 35, la),
+			Next: []*time.Time{
+				dp(2019, 8, 31, 12, 35, la),
+				dp(2019, 9, 30, 12, 35, la),
+				dp(2019, 10, 31, 12, 35, la),
+				dp(2019, 11, 30, 12, 35, la),
+			},
 		},
 		{
 			Label:        "monthly repeat to day in same month from fire date",
-			Start:        time.Date(2019, 8, 20, 12, 35, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 12, 35, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodMonthly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
 			DayOfMonth:   ip(20),
-			Next:         dp(2019, 9, 20, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 9, 20, 12, 35, la)},
 		},
 		{
 			Label:        "monthly repeat to day in next month",
-			Start:        time.Date(2019, 8, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodMonthly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
 			DayOfMonth:   ip(5),
-			Next:         dp(2019, 9, 5, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 9, 5, 12, 35, la)},
 		},
 		{
 			Label:        "monthly repeat to day that exceeds month",
-			Start:        time.Date(2019, 9, 20, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 9, 20, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodMonthly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
 			DayOfMonth:   ip(31),
-			Next:         dp(2019, 9, 30, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 9, 30, 12, 35, la)},
 		},
 		{
 			Label:        "monthly repeat to day in next month that exceeds month",
-			Start:        time.Date(2019, 8, 31, 13, 57, 0, 0, la),
+			Now:          time.Date(2019, 8, 31, 13, 57, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodMonthly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
 			DayOfMonth:   ip(31),
-			Next:         dp(2019, 9, 30, 12, 35, la),
+			Next:         []*time.Time{dp(2019, 9, 30, 12, 35, la)},
 		},
 		{
 			Label:        "monthy repeat for next month across DST",
-			Start:        time.Date(2019, 2, 10, 12, 30, 0, 0, la),
+			Now:          time.Date(2019, 2, 10, 12, 30, 0, 0, la),
 			Location:     la,
 			Period:       RepeatPeriodMonthly,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(30),
 			DayOfMonth:   ip(10),
-			Next:         dp(2019, 3, 10, 12, 30, la),
+			Next:         []*time.Time{dp(2019, 3, 10, 12, 30, la)},
 		},
 	}
 
+tests:
 	for _, tc := range tcs {
 		// create a fake schedule
 		sched := &Schedule{}
@@ -242,17 +310,23 @@ func TestNextFire(t *testing.T) {
 		s.DayOfMonth = tc.DayOfMonth
 		s.DaysOfWeek = tc.DaysOfWeek
 
-		start := tc.Start.In(time.UTC)
+		now := tc.Now
 
-		next, err := sched.GetNextFire(tc.Location, start)
-		if err != nil {
-			if tc.Error == "" {
-				assert.NoError(t, err, "%s: received unexpected error", tc.Label)
-				continue
+		for _, n := range tc.Next {
+			next, err := sched.GetNextFire(tc.Location, now)
+			if err != nil {
+				if tc.Error == "" {
+					assert.NoError(t, err, "%s: received unexpected error", tc.Label)
+					continue tests
+				}
+				assert.Equal(t, tc.Error, err.Error(), "%s: error did not match", tc.Label)
+				continue tests
 			}
-			assert.Equal(t, tc.Error, err.Error(), "%s: error did not match", tc.Label)
-			continue
+			assert.Equal(t, n, next, "%s: next fire did not match", tc.Label)
+
+			if n != nil {
+				now = *n
+			}
 		}
-		assert.Equal(t, tc.Next, next, "%s: next fire did not match", tc.Label)
 	}
 }

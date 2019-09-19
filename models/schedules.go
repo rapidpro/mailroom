@@ -45,26 +45,25 @@ var dayStrToDayInt = map[byte]time.Weekday{
 // Schedule represents a scheduled event
 type Schedule struct {
 	s struct {
-		ID ScheduleID `json:"id"                    db:"id"`
+		ID           ScheduleID   `json:"id"`
+		RepeatPeriod RepeatPeriod `json:"repeat_period"`
+		HourOfDay    *int         `json:"repeat_hour_of_day"`
+		MinuteOfHour *int         `json:"repeat_minute_of_hour"`
+		DayOfMonth   *int         `json:"repeat_day_of_month"`
+		DaysOfWeek   null.String  `json:"repeat_days_of_week"`
+		NextFire     *time.Time   `json:"next_fire"`
+		LastFire     *time.Time   `json:"last_fire"`
+		OrgID        OrgID        `json:"org_id"`
 
-		RepeatPeriod RepeatPeriod `json:"repeat_period"         db:"repeat_period"`
-
-		HourOfDay    *int        `json:"repeat_hour_of_day"    db:"repeat_hour_of_day"`
-		MinuteOfHour *int        `json:"repeat_minute_of_hour" db:"repeat_minute_of_hour"`
-		DayOfMonth   *int        `json:"repeat_day_of_month"   db:"repeat_day_of_month"`
-		DaysOfWeek   null.String `json:"repeat_days_of_week"   db:"repeat_days_of_week"`
-
-		NextFire *time.Time `json:"next_fire"             db:"next_fire"`
-		LastFire *time.Time `json:"last_fire"             db:"last_fire"`
-
-		OrgID OrgID `json:"org_id"                db:"org_id"`
+		// associated broadcast if any
+		Broadcast *Broadcast `json:"broadcast,omitempty"`
 	}
 }
 
 func (s *Schedule) ID() ScheduleID { return s.s.ID }
 
 // GetNextFire returns the next fire for this schedule (if any)
-func (s *Schedule) GetNextFire(tz *time.Location, now time.Time, start time.Time) (*time.Time, error) {
+func (s *Schedule) GetNextFire(tz *time.Location, now time.Time) (*time.Time, error) {
 	// should have hour and minute on everything else
 	if s.s.HourOfDay == nil {
 		return nil, errors.Errorf("schedule %d has no repeat_hour_of_day set", s.s.ID)
@@ -74,7 +73,7 @@ func (s *Schedule) GetNextFire(tz *time.Location, now time.Time, start time.Time
 	}
 
 	// change our time to be in our location
-	start = start.In(tz)
+	start := now.In(tz)
 	minute := *s.s.MinuteOfHour
 	hour := *s.s.HourOfDay
 
@@ -156,21 +155,50 @@ func daysInMonth(t time.Time) int {
 }
 
 const selectUnfiredSchedules = `
-	SELECT ROW_TO_JSON(r) FROM (SELECT 
-		id,
-		repeat_hour_of_day,
-		repeat_minute_of_hour,
-		repeat_day_of_month,
-		repeat_days,
-		repeat_period,
-		next_fire,
-		last_fire
-	FROM
-		schedules_schedule s
-	WHERE
-		s.is_active = TRUE AND	
-		s.next_fire < NOW()
-	) r;
+SELECT ROW_TO_JSON(s) FROM (SELECT
+	id,
+	repeat_hour_of_day,
+	repeat_minute_of_hour,
+	repeat_day_of_month,
+	repeat_days,
+	repeat_period,
+	next_fire,
+	last_fire,
+	org_id,
+	(SELECT ROW_TO_JSON(sb) FROM (
+		SELECT
+			b.id as id,
+			(SELECT JSON_OBJECT_AGG(ts.key, ts.value) FROM (SELECT key, JSON_BUILD_OBJECT('text', t.value) as value FROM each(b.text) t) ts) as translations,
+			'unevaluated' as template_state,
+			b.base_language as base_language,
+			s.org_id as org_id,
+			(SELECT ARRAY_AGG(bc.contact_id) FROM (
+				SELECT
+					bc.contact_id
+				FROM
+					msgs_broadcast_contacts bc
+				WHERE
+					bc.broadcast_id = b.id
+			) bc) as contact_ids,
+			(SELECT ARRAY_AGG(bg.contactgroup_id) FROM (
+				SELECT
+					bg.contactgroup_id
+				FROM
+					msgs_broadcast_groups bg
+				WHERE
+					bg.broadcast_id = b.id
+			) bg) as group_ids
+		FROM
+			msgs_broadcast b
+		WHERE
+			b.schedule_id = s.id
+	) sb) as broadcast
+FROM
+	schedules_schedule s
+WHERE
+	s.is_active = TRUE AND
+	s.next_fire < NOW()
+) s;
 `
 
 // GetUnfiredSchedules returns all unfired schedules
@@ -184,7 +212,7 @@ func GetUnfiredSchedules(ctx context.Context, db *sqlx.DB) ([]*Schedule, error) 
 	unfired := make([]*Schedule, 0, 10)
 	for rows.Next() {
 		s := &Schedule{}
-		err := readJSONRow(rows, s.s)
+		err := readJSONRow(rows, &s.s)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading schedule")
 		}

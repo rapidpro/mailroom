@@ -26,6 +26,7 @@ const (
 	NewConversationTriggerType = TriggerType("N")
 	ReferralTriggerType        = TriggerType("R")
 	CallTriggerType            = TriggerType("V")
+	ScheduleTriggerType        = TriggerType("S")
 
 	MatchFirst = "F"
 	MatchOnly  = "O"
@@ -44,6 +45,7 @@ type Trigger struct {
 		ChannelID   ChannelID   `json:"channel_id"`
 		ReferrerID  string      `json:"referrer_id"`
 		GroupIDs    []GroupID   `json:"group_ids"`
+		ContactIDs  []ContactID `json:"contact_ids,omitempty"`
 	}
 }
 
@@ -55,6 +57,7 @@ func (t *Trigger) MatchType() MatchType     { return t.t.MatchType }
 func (t *Trigger) ChannelID() ChannelID     { return t.t.ChannelID }
 func (t *Trigger) ReferrerID() string       { return t.t.ReferrerID }
 func (t *Trigger) GroupIDs() []GroupID      { return t.t.GroupIDs }
+func (t *Trigger) ContactIDs() []ContactID  { return t.t.ContactIDs }
 func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 	if t.t.MatchType == MatchFirst {
 		return triggers.KeywordMatchTypeFirstWord
@@ -73,6 +76,7 @@ func (t *Trigger) Match() *triggers.KeywordMatch {
 	return nil
 }
 
+// loadTriggers loads all non-schedule triggers for the passed in org
 func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, error) {
 	start := time.Now()
 
@@ -285,7 +289,8 @@ FROM
 WHERE 
 	t.org_id = $1 AND 
 	t.is_active = TRUE AND
-	t.is_archived = FALSE
+	t.is_archived = FALSE AND
+	t.trigger_type != 'S'
 GROUP BY 
 	t.id
 ) r;
