@@ -54,9 +54,6 @@ func (o *Org) DefaultCountry() envs.Country { return o.env.DefaultCountry() }
 // Now returns the current time in the current timezone for this org
 func (o *Org) Now() time.Time { return o.env.Now() }
 
-// Extension returns the extension with the passed in name for this org
-func (o *Org) Extension(name string) json.RawMessage { return o.env.Extension(name) }
-
 // MaxValueLength returns our max value length for contact fields and run results
 func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
 

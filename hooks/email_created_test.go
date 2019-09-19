@@ -18,7 +18,7 @@ func TestEmailCreated(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendEmailAction(newActionUUID(), []string{"cathy@foo.bar", "bob@foo.bar"}, "Test Email", "This is your test email"),
+					actions.NewSendEmail(newActionUUID(), []string{"cathy@foo.bar", "bob@foo.bar"}, "Test Email", "This is your test email"),
 				},
 			},
 			SQLAssertions: []SQLAssertion{},

@@ -22,6 +22,7 @@ type InterruptSessionsTask struct {
 	SessionIDs []models.SessionID `json:"session_ids,omitempty"`
 	ContactIDs []models.ContactID `json:"contact_ids,omitempty"`
 	ChannelIDs []models.ChannelID `json:"channel_ids,omitempty"`
+	FlowIDs    []models.FlowID    `json:"flow_ids,omitempty"`
 }
 
 const activeSessionIDsForChannelsSQL = `
@@ -43,6 +44,16 @@ FROM
 WHERE
 	fs.status = 'W' AND
 	fs.contact_id = ANY($1);
+`
+
+const activeSessionIDsForFlowsSQL = `
+SELECT 
+	id
+FROM 
+	flows_flowsession fs
+WHERE
+	fs.status = 'W' AND
+	fs.current_flow_id = ANY($1);
 `
 
 // handleInterruptSessions interrupts all the passed in sessions
@@ -94,6 +105,20 @@ func interruptSessions(ctx context.Context, db *sqlx.DB, task *InterruptSessions
 		}
 
 		for _, sid := range contactSessionIDs {
+			sessionIDs[sid] = true
+		}
+	}
+
+	// if we have flow ids, explode those to session ids
+	if len(task.FlowIDs) > 0 {
+		flowSessionIDs := make([]models.SessionID, 0, len(task.FlowIDs))
+
+		err := db.SelectContext(ctx, &flowSessionIDs, activeSessionIDsForFlowsSQL, pq.Array(task.FlowIDs))
+		if err != nil {
+			return errors.Wrapf(err, "error selecting sessions for flows")
+		}
+
+		for _, sid := range flowSessionIDs {
 			sessionIDs[sid] = true
 		}
 	}

@@ -1,3 +1,16 @@
+v2.0.32
+----------
+ * Add expression/migrate endpoint
+
+v2.0.31
+----------
+ * Allow interrupting sessions by flow
+ * Update to goflow v0.49.0
+
+v2.0.30
+----------
+ * Update to goflow v0.47.3
+
 v2.0.29
 ----------
  * Expire runs and sessions in a transaction to guarantee they are always in sync

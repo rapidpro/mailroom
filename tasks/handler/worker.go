@@ -269,7 +269,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 			return nil
 		}
 
-		resume = resumes.NewRunExpirationResume(org.Env(), contact)
+		resume = resumes.NewRunExpiration(org.Env(), contact)
 
 	case TimeoutEventType:
 		if session.TimeoutOn() == nil {
@@ -284,7 +284,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 			return nil
 		}
 
-		resume = resumes.NewWaitTimeoutResume(org.Env(), contact)
+		resume = resumes.NewWaitTimeout(org.Env(), contact)
 
 	default:
 		return errors.Errorf("unknown event type: %s", eventType)
@@ -418,11 +418,11 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
 		channelEvent := triggers.NewChannelEvent(triggers.ChannelEventType(eventType), channel.ChannelReference())
-		flowTrigger = triggers.NewChannelTrigger(org.Env(), flow.FlowReference(), contact, channelEvent, params)
+		flowTrigger = triggers.NewChannel(org.Env(), flow.FlowReference(), contact, channelEvent, params)
 
 	case models.MOCallEventType:
 		urn := contacts[0].URNForID(event.URNID())
-		flowTrigger = triggers.NewIncomingCallTrigger(org.Env(), flow.FlowReference(), contact, urn, channel.ChannelReference())
+		flowTrigger = triggers.NewIncomingCall(org.Env(), flow.FlowReference(), contact, urn, channel.ChannelReference())
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
@@ -618,7 +618,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 			}
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
+			trigger := triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
 			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
@@ -629,7 +629,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 	// if there is a session, resume it
 	if session != nil && flow != nil {
-		resume := resumes.NewMsgResume(org.Env(), contact, msgIn)
+		resume := resumes.NewMsg(org.Env(), contact, msgIn)
 		_, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, hook)
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
