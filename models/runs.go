@@ -941,9 +941,7 @@ SET
 	exited_on = $3,
 	status = $4,
 	timeout_on = NULL,
-	modified_on = NOW(),
-	child_context = NULL,
-	parent_context = NULL
+	modified_on = NOW()
 WHERE
 	id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND is_active = TRUE)
 `
@@ -986,9 +984,7 @@ SET
 	exited_on = $3,
 	exit_type = 'I',
 	status = 'I',
-	modified_on = NOW(),
-	child_context = NULL,
-	parent_context = NULL
+	modified_on = NOW()
 WHERE
 	id = ANY (
 		SELECT 
@@ -1063,9 +1059,7 @@ const expireRunsSQL = `
 		exited_on = NOW(),
 		exit_type = 'E',
 		status = 'E',
-		modified_on = NOW(),
-		child_context = NULL,
-		parent_context = NULL
+		modified_on = NOW()
 	WHERE
 		id = ANY($1)
 `
