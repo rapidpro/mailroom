@@ -60,11 +60,15 @@ type Schedule struct {
 
 		// associated broadcast if any
 		Broadcast *Broadcast `json:"broadcast,omitempty"`
+
+		// associated trigger in flowstart format
+		FlowStart *FlowStart `json:"start,omitempty"`
 	}
 }
 
 func (s *Schedule) ID() ScheduleID        { return s.s.ID }
 func (s *Schedule) Broadcast() *Broadcast { return s.s.Broadcast }
+func (s *Schedule) FlowStart() *FlowStart { return s.s.FlowStart }
 func (s *Schedule) Timezone() (*time.Location, error) {
 	return time.LoadLocation(s.s.Timezone)
 }
@@ -211,7 +215,37 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 			msgs_broadcast b
 		WHERE
 			b.schedule_id = s.id
-	) sb) as broadcast
+	) sb) as broadcast,
+	(SELECT ROW_TO_JSON(st) FROM (
+		SELECT
+			t.id as id,
+			s.org_id as org_id,
+			t.flow_id as flow_id,
+			f.flow_type as flow_type,
+			TRUE as restart_participants,
+			TRUE as include_active,
+			(SELECT ARRAY_AGG(tc.contact_id) FROM (
+				SELECT
+					tc.contact_id
+				FROM
+					triggers_trigger_contacts tc
+				WHERE
+					tc.trigger_id = t.id
+			) tc) as contact_ids,
+			(SELECT ARRAY_AGG(tg.contactgroup_id) FROM (
+				SELECT
+					tg.contactgroup_id
+				FROM
+					triggers_trigger_groups tg
+				WHERE
+					tg.trigger_id = t.id
+			) tg) as group_ids
+		FROM
+			triggers_trigger t JOIN
+			flows_flow f on t.flow_id = f.id
+		WHERE
+			t.schedule_id = s.id
+	) st) as start
 FROM
 	schedules_schedule s JOIN
 	orgs_org o ON s.org_id = o.id

@@ -503,6 +503,7 @@ func (b *Broadcast) ContactIDs() []ContactID                               { ret
 func (b *Broadcast) GroupIDs() []GroupID                                   { return b.b.GroupIDs }
 func (b *Broadcast) URNs() []urns.URN                                      { return b.b.URNs }
 func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
+func (b *Broadcast) BaseLanguage() envs.Language                           { return b.b.BaseLanguage }
 func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { return b.b.Translations }
 func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
 

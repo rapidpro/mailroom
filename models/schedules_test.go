@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/null"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +13,7 @@ import (
 func TestGetExpired(t *testing.T) {
 	ctx := testsuite.CTX()
 
+	// add a schedule and tie a broadcast to it
 	db := testsuite.DB()
 	var s1 ScheduleID
 	err := db.Get(
@@ -21,22 +23,11 @@ func TestGetExpired(t *testing.T) {
 		Org1,
 	)
 	assert.NoError(t, err)
-
-	var s2 ScheduleID
-	err = db.Get(
-		&s2,
-		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
-			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '2 DAY', 1, 1, $1) RETURNING id`,
-		Org1,
-	)
-	assert.NoError(t, err)
-
-	// add a broadcast
 	var b1 BroadcastID
 	err = db.Get(
 		&b1,
 		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id, schedule_id)
-			VALUES('P', hstore(ARRAY['eng','Test message']), 'eng', TRUE, NOW(), NOW(), TRUE, 1, 1, $1, $2) RETURNING id`,
+			VALUES('P', hstore(ARRAY['eng','Test message', 'fra', 'Un Message']), 'eng', TRUE, NOW(), NOW(), TRUE, 1, 1, $1, $2) RETURNING id`,
 		Org1, s1,
 	)
 	assert.NoError(t, err)
@@ -47,19 +38,70 @@ func TestGetExpired(t *testing.T) {
 	// and a group
 	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, DoctorsGroupID)
 
+	// add another and tie a trigger to it
+	var s2 ScheduleID
+	err = db.Get(
+		&s2,
+		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
+			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '2 DAY', 1, 1, $1) RETURNING id`,
+		Org1,
+	)
+	assert.NoError(t, err)
+	var t1 TriggerID
+	err = db.Get(
+		&t1,
+		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, is_archived, trigger_type, created_by_id, modified_by_id, org_id, flow_id, schedule_id)
+			VALUES(TRUE, NOW(), NOW(), FALSE, 'S', 1, 1, $1, $2, $3) RETURNING id`,
+		Org1, FavoritesFlowID, s2,
+	)
+	assert.NoError(t, err)
+
+	// add a few contacts to the trigger
+	db.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2),($1, $3)`, t1, CathyID, GeorgeID)
+
+	// and a group
+	db.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, DoctorsGroupID)
+
+	var s3 ScheduleID
+	err = db.Get(
+		&s3,
+		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
+			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '3 DAY', 1, 1, $1) RETURNING id`,
+		Org1,
+	)
+	assert.NoError(t, err)
+
 	// get expired schedules
 	schedules, err := GetUnfiredSchedules(ctx, db)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(schedules))
+	assert.Equal(t, 3, len(schedules))
 
-	assert.Equal(t, s2, schedules[0].ID())
+	assert.Equal(t, s3, schedules[0].ID())
 	assert.Nil(t, schedules[0].Broadcast())
 	assert.Equal(t, RepeatPeriodNever, schedules[0].s.RepeatPeriod)
 	assert.NotNil(t, schedules[0].s.NextFire)
 	assert.Nil(t, schedules[0].s.LastFire)
 
-	assert.Equal(t, s1, schedules[1].ID())
-	assert.NotNil(t, schedules[1].Broadcast())
+	assert.Equal(t, s2, schedules[1].ID())
+	assert.Nil(t, schedules[1].Broadcast())
+	start := schedules[1].FlowStart()
+	assert.NotNil(t, start)
+	assert.Equal(t, MessagingFlow, start.FlowType())
+	assert.Equal(t, FavoritesFlowID, start.FlowID())
+	assert.Equal(t, Org1, start.OrgID())
+	assert.Equal(t, []ContactID{CathyID, GeorgeID}, start.ContactIDs())
+	assert.Equal(t, []GroupID{DoctorsGroupID}, start.GroupIDs())
+
+	assert.Equal(t, s1, schedules[2].ID())
+	bcast := schedules[2].Broadcast()
+	assert.NotNil(t, bcast)
+	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage())
+	assert.Equal(t, TemplateStateUnevaluated, bcast.TemplateState())
+	assert.Equal(t, "Test message", bcast.Translations()["eng"].Text)
+	assert.Equal(t, "Un Message", bcast.Translations()["fra"].Text)
+	assert.Equal(t, Org1, bcast.OrgID())
+	assert.Equal(t, []ContactID{CathyID, GeorgeID}, bcast.ContactIDs())
+	assert.Equal(t, []GroupID{DoctorsGroupID}, bcast.GroupIDs())
 }
 
 func TestNextFire(t *testing.T) {

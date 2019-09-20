@@ -53,18 +53,20 @@ func fireSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName st
 	triggers := 0
 
 	for _, s := range unfired {
+		log := log.WithField("schedule_id", s.ID())
+
+		now := time.Now()
+
+		tz, err := s.Timezone()
+		if err != nil {
+			log.WithError(err).Error("error firing schedule, unknown timezone")
+			continue
+		}
+
 		// if it is a broadcast
 		if s.Broadcast() != nil {
-			log := log.WithField("schedule_id", s.ID())
-
 			// clone our broadcast, our schedule broadcast is just a template
 			bcast := models.CloneBroadcast(s.Broadcast())
-
-			tz, err := s.Timezone()
-			if err != nil {
-				log.WithError(err).Error("error firing schedule, unknown timezone")
-				continue
-			}
 
 			taskQ := queue.HandlerQueue
 			priority := queue.DefaultPriority
@@ -76,7 +78,6 @@ func fireSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName st
 			}
 
 			// add our task to send this broadcast
-			now := time.Now()
 			err = queue.AddTask(rc, taskQ, queue.SendBroadcast, int(bcast.OrgID()), bcast, priority)
 			if err != nil {
 				log.WithError(err).Error("error firing scheduled broadcast")
@@ -84,17 +85,47 @@ func fireSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName st
 			}
 			broadcasts += 1
 
-			// calculate the next fire and update it
-			nextFire, err := s.GetNextFire(tz, now)
+		} else if s.FlowStart() != nil {
+			start := s.FlowStart()
+
+			// insert our flow start
+			err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 			if err != nil {
-				log.WithError(err).Error("error calculating next fire for schedule")
+				log.WithError(err).Error("error inserting new flow start for schedule")
+				continue
 			}
 
-			// update our next fire for this schedule
-			err = s.UpdateFires(ctx, db, now, nextFire)
-			if err != nil {
-				log.WithError(err).Error("error updating next fire for schedule")
+			// and queue it
+			taskQ := queue.HandlerQueue
+			priority := queue.DefaultPriority
+
+			// if we are starting groups, queue to our batch queue instead, but with high priority
+			if len(start.GroupIDs()) > 0 {
+				taskQ = queue.BatchQueue
+				priority = queue.HighPriority
 			}
+
+			err = queue.AddTask(rc, taskQ, queue.StartFlow, int(start.OrgID()), start, priority)
+			if err != nil {
+				log.WithError(err).Error("error firing scheduled trigger")
+			}
+
+			triggers += 1
+		} else {
+			log.Error("schedule found with no associated broadcast or trigger")
+			continue
+		}
+
+		// calculate the next fire and update it
+		nextFire, err := s.GetNextFire(tz, now)
+		if err != nil {
+			log.WithError(err).Error("error calculating next fire for schedule")
+		}
+
+		// update our next fire for this schedule
+		err = s.UpdateFires(ctx, db, now, nextFire)
+		if err != nil {
+			log.WithError(err).Error("error updating next fire for schedule")
 		}
 	}
 	log.WithField("broadcasts", broadcasts).WithField("triggers", triggers).WithField("elapsed", time.Since(start)).Info("fired schedules")
