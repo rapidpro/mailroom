@@ -527,6 +527,20 @@ func NewBroadcast(
 	return bcast
 }
 
+// CloneBroadcast clones the passed in broadcast, the clone will have a nil ID
+func CloneBroadcast(b *Broadcast) *Broadcast {
+	return NewBroadcast(
+		b.OrgID(),
+		NilBroadcastID,
+		b.b.Translations,
+		b.b.TemplateState,
+		b.b.BaseLanguage,
+		b.b.URNs,
+		b.b.ContactIDs,
+		b.b.GroupIDs,
+	)
+}
+
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
 	// converst our translations to our type

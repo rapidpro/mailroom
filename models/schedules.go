@@ -19,10 +19,10 @@ const NilScheduleID = ScheduleID(0)
 
 type RepeatPeriod string
 
-const RepeatPeriodNever = "O"
-const RepeatPeriodDaily = "D"
-const RepeatPeriodWeekly = "W"
-const RepeatPeriodMonthly = "M"
+const RepeatPeriodNever = RepeatPeriod("O")
+const RepeatPeriodDaily = RepeatPeriod("D")
+const RepeatPeriodWeekly = RepeatPeriod("W")
+const RepeatPeriodMonthly = RepeatPeriod("M")
 
 const Monday = 'M'
 const Tuesday = 'T'
@@ -55,12 +55,30 @@ type Schedule struct {
 		LastFire     *time.Time   `json:"last_fire"`
 		OrgID        OrgID        `json:"org_id"`
 
+		// Timezone of our org
+		Timezone string `json:"timezone"`
+
 		// associated broadcast if any
 		Broadcast *Broadcast `json:"broadcast,omitempty"`
 	}
 }
 
-func (s *Schedule) ID() ScheduleID { return s.s.ID }
+func (s *Schedule) ID() ScheduleID        { return s.s.ID }
+func (s *Schedule) Broadcast() *Broadcast { return s.s.Broadcast }
+func (s *Schedule) Timezone() (*time.Location, error) {
+	return time.LoadLocation(s.s.Timezone)
+}
+
+// UpdateFires updates the next and last fire for a shedule on the db
+func (s *Schedule) UpdateFires(ctx context.Context, db *sqlx.DB, last time.Time, next *time.Time) error {
+	_, err := db.ExecContext(ctx, `UPDATE schedules_schedule SET last_fire = $2, next_fire = $3 WHERE id = $1`,
+		s.s.ID, last, next,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "error updating schedule fire dates for: %d", s.s.ID)
+	}
+	return nil
+}
 
 // GetNextFire returns the next fire for this schedule (if any)
 func (s *Schedule) GetNextFire(tz *time.Location, now time.Time) (*time.Time, error) {
@@ -156,15 +174,16 @@ func daysInMonth(t time.Time) int {
 
 const selectUnfiredSchedules = `
 SELECT ROW_TO_JSON(s) FROM (SELECT
-	id,
-	repeat_hour_of_day,
-	repeat_minute_of_hour,
-	repeat_day_of_month,
-	repeat_days,
-	repeat_period,
-	next_fire,
-	last_fire,
-	org_id,
+	s.id as id,
+	s.repeat_hour_of_day as repeat_hour_of_day,
+	s.repeat_minute_of_hour as repeat_minute_of_hour,
+	s.repeat_day_of_month as repeat_day_of_month,
+	s.repeat_days_of_week as repeat_days_of_week,
+	s.repeat_period as repeat_period,
+	s.next_fire as next_fire,
+	s.last_fire as last_fire,
+	s.org_id as org_id,
+	o.timezone as timezone,
 	(SELECT ROW_TO_JSON(sb) FROM (
 		SELECT
 			b.id as id,
@@ -194,10 +213,13 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 			b.schedule_id = s.id
 	) sb) as broadcast
 FROM
-	schedules_schedule s
+	schedules_schedule s JOIN
+	orgs_org o ON s.org_id = o.id
 WHERE
 	s.is_active = TRUE AND
 	s.next_fire < NOW()
+ORDER BY
+    s.next_fire ASC
 ) s;
 `
 

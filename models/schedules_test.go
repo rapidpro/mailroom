@@ -22,6 +22,15 @@ func TestGetExpired(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
+	var s2 ScheduleID
+	err = db.Get(
+		&s2,
+		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
+			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '2 DAY', 1, 1, $1) RETURNING id`,
+		Org1,
+	)
+	assert.NoError(t, err)
+
 	// add a broadcast
 	var b1 BroadcastID
 	err = db.Get(
@@ -41,7 +50,16 @@ func TestGetExpired(t *testing.T) {
 	// get expired schedules
 	schedules, err := GetUnfiredSchedules(ctx, db)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(schedules))
+	assert.Equal(t, 2, len(schedules))
+
+	assert.Equal(t, s2, schedules[0].ID())
+	assert.Nil(t, schedules[0].Broadcast())
+	assert.Equal(t, RepeatPeriodNever, schedules[0].s.RepeatPeriod)
+	assert.NotNil(t, schedules[0].s.NextFire)
+	assert.Nil(t, schedules[0].s.LastFire)
+
+	assert.Equal(t, s1, schedules[1].ID())
+	assert.NotNil(t, schedules[1].Broadcast())
 }
 
 func TestNextFire(t *testing.T) {
