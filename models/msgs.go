@@ -518,12 +518,12 @@ func NewBroadcast(
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
 	bcast.b.BroadcastID = id
+	bcast.b.Translations = translations
 	bcast.b.TemplateState = state
 	bcast.b.BaseLanguage = baseLanguage
-	bcast.b.GroupIDs = groupIDs
-	bcast.b.ContactIDs = contactIDs
 	bcast.b.URNs = urns
-	bcast.b.Translations = translations
+	bcast.b.ContactIDs = contactIDs
+	bcast.b.GroupIDs = groupIDs
 
 	return bcast
 }

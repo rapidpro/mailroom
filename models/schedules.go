@@ -86,6 +86,11 @@ func (s *Schedule) UpdateFires(ctx context.Context, db *sqlx.DB, last time.Time,
 
 // GetNextFire returns the next fire for this schedule (if any)
 func (s *Schedule) GetNextFire(tz *time.Location, now time.Time) (*time.Time, error) {
+	// Never repeats? no next fire
+	if s.s.RepeatPeriod == RepeatPeriodNever {
+		return nil, nil
+	}
+
 	// should have hour and minute on everything else
 	if s.s.HourOfDay == nil {
 		return nil, errors.Errorf("schedule %d has no repeat_hour_of_day set", s.s.ID)
@@ -103,12 +108,6 @@ func (s *Schedule) GetNextFire(tz *time.Location, now time.Time) (*time.Time, er
 	next := time.Date(start.Year(), start.Month(), start.Day(), hour, minute, 0, 0, tz)
 
 	switch s.s.RepeatPeriod {
-
-	case RepeatPeriodNever:
-		if !next.After(now) {
-			return nil, nil
-		}
-		return &next, nil
 
 	case RepeatPeriodDaily:
 		for !next.After(now) {
@@ -244,7 +243,9 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 			triggers_trigger t JOIN
 			flows_flow f on t.flow_id = f.id
 		WHERE
-			t.schedule_id = s.id
+			t.schedule_id = s.id AND
+			t.is_active = TRUE AND
+			t.is_archived = FALSE
 	) st) as start
 FROM
 	schedules_schedule s JOIN

@@ -19,23 +19,23 @@ const (
 )
 
 func init() {
-	mailroom.AddInitFunction(StartFireSchedules)
+	mailroom.AddInitFunction(StartCheckSchedules)
 }
 
-// StartFireSchedules starts our cron job of firing schedules every minute
-func StartFireSchedules(mr *mailroom.Mailroom) error {
+// StartCheckSchedules starts our cron job of firing schedules every minute
+func StartCheckSchedules(mr *mailroom.Mailroom) error {
 	cron.StartCron(mr.Quit, mr.RP, scheduleLock, time.Minute*5,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return fireSchedules(ctx, mr.DB, mr.RP, lockName, lockValue)
+			return checkSchedules(ctx, mr.DB, mr.RP, lockName, lockValue)
 		},
 	)
 	return nil
 }
 
-// fireSchedules looks up any expired schedules and fires them, setting the next fire as needed
-func fireSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+// checkSchedules looks up any expired schedules and fires them, setting the next fire as needed
+func checkSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "schedules_cron").WithField("lock", lockValue)
 	start := time.Now()
 
@@ -51,6 +51,7 @@ func fireSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName st
 	// for each unfired schedule
 	broadcasts := 0
 	triggers := 0
+	noops := 0
 
 	for _, s := range unfired {
 		log := log.WithField("schedule_id", s.ID())
@@ -68,22 +69,13 @@ func fireSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName st
 			// clone our broadcast, our schedule broadcast is just a template
 			bcast := models.CloneBroadcast(s.Broadcast())
 
-			taskQ := queue.HandlerQueue
-			priority := queue.DefaultPriority
-
-			// if we are starting groups, queue to our batch queue instead, but with high priority
-			if len(bcast.GroupIDs()) > 0 {
-				taskQ = queue.BatchQueue
-				priority = queue.HighPriority
-			}
-
 			// add our task to send this broadcast
-			err = queue.AddTask(rc, taskQ, queue.SendBroadcast, int(bcast.OrgID()), bcast, priority)
+			err = queue.AddTask(rc, queue.BatchQueue, queue.SendBroadcast, int(bcast.OrgID()), bcast, queue.HighPriority)
 			if err != nil {
 				log.WithError(err).Error("error firing scheduled broadcast")
 				continue
 			}
-			broadcasts += 1
+			broadcasts++
 
 		} else if s.FlowStart() != nil {
 			start := s.FlowStart()
@@ -95,25 +87,16 @@ func fireSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName st
 				continue
 			}
 
-			// and queue it
-			taskQ := queue.HandlerQueue
-			priority := queue.DefaultPriority
-
-			// if we are starting groups, queue to our batch queue instead, but with high priority
-			if len(start.GroupIDs()) > 0 {
-				taskQ = queue.BatchQueue
-				priority = queue.HighPriority
-			}
-
-			err = queue.AddTask(rc, taskQ, queue.StartFlow, int(start.OrgID()), start, priority)
+			// add our flow start task
+			err = queue.AddTask(rc, queue.BatchQueue, queue.StartFlow, int(start.OrgID()), start, queue.HighPriority)
 			if err != nil {
 				log.WithError(err).Error("error firing scheduled trigger")
 			}
 
-			triggers += 1
+			triggers++
 		} else {
-			log.Error("schedule found with no associated broadcast or trigger")
-			continue
+			log.Info("schedule found with no associated active broadcast or trigger, ignoring")
+			noops++
 		}
 
 		// calculate the next fire and update it
@@ -128,7 +111,13 @@ func fireSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName st
 			log.WithError(err).Error("error updating next fire for schedule")
 		}
 	}
-	log.WithField("broadcasts", broadcasts).WithField("triggers", triggers).WithField("elapsed", time.Since(start)).Info("fired schedules")
+
+	log.WithFields(logrus.Fields{
+		"broadcasts": broadcasts,
+		"triggers":   triggers,
+		"noops":      noops,
+		"elapsed":    time.Since(start),
+	}).Info("fired schedules")
 
 	return nil
 }
