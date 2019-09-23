@@ -160,7 +160,7 @@ func TestNextFire(t *testing.T) {
 			Period:       RepeatPeriodNever,
 			HourOfDay:    ip(12),
 			MinuteOfHour: ip(35),
-			Next:         []*time.Time{dp(2019, 8, 20, 12, 35, la)},
+			Next:         nil,
 		},
 		{
 			Label:        "daily repeat on same day",
