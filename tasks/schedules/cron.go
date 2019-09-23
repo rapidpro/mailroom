@@ -24,7 +24,7 @@ func init() {
 
 // StartCheckSchedules starts our cron job of firing schedules every minute
 func StartCheckSchedules(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, scheduleLock, time.Minute*5,
+	cron.StartCron(mr.Quit, mr.RP, scheduleLock, time.Minute*1,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
