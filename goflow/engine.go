@@ -8,7 +8,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/goflow/flows/engine/webhooks"
+	"github.com/nyaruka/goflow/providers/webhooks"
 	"github.com/nyaruka/mailroom/config"
 )
 
