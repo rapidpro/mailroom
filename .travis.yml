@@ -11,7 +11,7 @@ addons:
   apt:
     packages:
     - postgresql-10
-    - postgresql-10-postgis-2.3    
+    - postgresql-10-postgis-2.4
     - postgresql-client-10
 
 env:
@@ -53,4 +53,3 @@ deploy:
     on:
       tags: true
       condition: $RELEASE = true
-
