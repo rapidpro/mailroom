@@ -16,18 +16,24 @@ services:
   - redis-server
 
 before_install:
-  # setup redis
-  - sudo sed -e 's/^bind.*/bind 127.0.0.1/' /etc/redis/redis.conf > redis.conf
-  - sudo mv redis.conf /etc/redis
-  - sudo service redis-server start
-  - echo PING | nc localhost 6379
-  - sudo -E apt-get -yq --no-install-suggests --no-install-recommends $(travis_apt_get_options) install postgresql-$PGDB postgresql-client-$PGDB postgresql-$PGDB-postgis-2.4 postgresql-$PGDB-postgis-2.4-scripts
+  # install the chosen PG version
+  - sudo -E apt-get -yq --no-install-suggests --no-install-recommends install postgresql-$PGDB postgresql-client-$PGDB postgresql-$PGDB-postgis-2.4 postgresql-$PGDB-postgis-2.4-scripts
   - sudo -E sed -i -e '/local.*peer/s/postgres/all/' -e 's/peer\|md5/trust/g' /etc/postgresql/*/main/pg_hba.conf
   - sudo -E sed -i 's/port = 5433/port = 5432/' /etc/postgresql/*/main/postgresql.conf
-  - sudo -E service postgresql restart $PGDB
-  # misc
-  - sudo mount -o remount,size=50% /var/ramfs
-  - df -h
+
+  # give PG some time to finish setup
+  - sleep 10
+
+  # stop any running postgres versions
+  - sudo -E service postgresql stop 10
+  - sudo -E ps axuwww | grep -i postg
+
+  # possibly a Travis bug but data directory sometimes not initialized
+  - if [ ! -d /var/ramfs/postgresql/$PGDB/main ]; then sudo -u postgres /usr/lib/postgresql/$PGDB/bin/initdb -D /var/ramfs/postgresql/$PGDB/main; fi
+
+  # start the chosen PG version
+  - sudo -E systemctl -l restart postgresql@$PGDB-main
+  - sudo -E systemctl -l status postgresql@$PGDB-main
 
 before_script:
   - psql -U postgres -c "CREATE USER mailroom_test PASSWORD 'temba';"
