@@ -18,17 +18,6 @@ matrix:
             - postgresql-10-postgis-2.4
             - postgresql-client-10
 
-    - name: "Postgres 11"
-      env:
-        global:
-          - RELEASE=true
-      addons:
-        postgresql: "11"
-        apt:
-          packages:
-            - postgresql-11
-            - postgresql-11-postgis-2.4
-            - postgresql-client-11
 env:
   global:
     - GO111MODULE=on
