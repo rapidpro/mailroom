@@ -6,12 +6,26 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/providers/airtime/dtone"
+	"github.com/nyaruka/goflow/providers/webhooks"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/goflow"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+const (
+	configDTOneLogin    = "TRANSFERTO_ACCOUNT_LOGIN"
+	configDTOneToken    = "TRANSFERTO_AIRTIME_API_TOKEN"
+	configDTOnecurrency = "TRANSFERTO_ACCOUNT_CURRENCY"
+)
+
+func init() {
+	goflow.SetServiceResolver(&serviceResolver{})
+}
 
 type OrgID int
 
@@ -157,3 +171,23 @@ SELECT id, config, ROW_TO_JSON(o) FROM (SELECT
 	WHERE
 		o.id = $1
 ) o`
+
+type serviceResolver struct{}
+
+// Webhooks returns an a webhook provider for the given session
+func (s *serviceResolver) Webhooks(flows.Session) flows.WebhookProvider {
+	return webhooks.NewProvider("RapidProMailroom/"+config.Mailroom.Version, 10000)
+}
+
+// Airtime returns an airtime provider for the given session if the org has one configured
+func (s *serviceResolver) Airtime(session flows.Session) flows.AirtimeProvider {
+	org := session.Assets().Source().(*OrgAssets).Org()
+	login := org.ConfigValue(configDTOneLogin, "")
+	token := org.ConfigValue(configDTOneToken, "")
+	currency := org.ConfigValue(configDTOnecurrency, "")
+
+	if login != "" && token != "" {
+		return dtone.NewProvider(login, token, currency)
+	}
+	return nil
+}
