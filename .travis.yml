@@ -26,6 +26,9 @@ services:
   - redis-server
   - postgresql
 
+before_install:
+  - sudo mount -o remount,size=25% /var/ramfs
+
 before_script:
   - psql -U postgres -c "create extension postgis;"
   - psql -U postgres -c "create extension postgis_topology;"
