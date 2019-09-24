@@ -10,8 +10,8 @@ env:
   global:
     - GO111MODULE=on
   matrix:
-    - PGDB=9.6 RELEASE=true
-    - PGDB=10
+    - PGDB=10 RELEASE=true
+    - PGDB=11
 
 services:
   - redis-server
