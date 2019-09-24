@@ -4,7 +4,7 @@ dist: bionic
 language: go
 
 go:
-  - "1.13"
+  - "1.12"
 
 env:
   global:
@@ -34,7 +34,6 @@ before_install:
   # start the chosen PG version
   - sudo -E systemctl -l restart postgresql@$PGDB-main
   - sudo -E systemctl -l status postgresql@$PGDB-main
-  - df -h
 
 before_script:
   - psql -U postgres -c "CREATE USER mailroom_test PASSWORD 'temba';"
