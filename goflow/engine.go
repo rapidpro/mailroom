@@ -12,6 +12,9 @@ import (
 	"github.com/nyaruka/mailroom/config"
 )
 
+var eng flows.Engine
+var engInit sync.Once
+
 // Engine returns the global engine instance for use in mailroom
 func Engine() flows.Engine {
 	httpClient := &http.Client{
@@ -27,20 +30,11 @@ func Engine() flows.Engine {
 
 	engInit.Do(func() {
 		eng = engine.NewBuilder().
-			WithWebhookService(webhooks.NewService(httpClient, "RapidProMailroom/"+config.Mailroom.Version, 10000)).
-			WithAirtimeService(airtimeService).
+			WithHTTPClient(httpClient).
+			WithWebhookService(webhooks.NewService("RapidProMailroom/"+config.Mailroom.Version, 10000)).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()
 	})
 
 	return eng
-}
-
-var eng flows.Engine
-var engInit sync.Once
-
-var airtimeService flows.AirtimeService
-
-func SetAirtimeService(s flows.AirtimeService) {
-	airtimeService = s
 }
