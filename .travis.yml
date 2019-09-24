@@ -27,6 +27,9 @@ services:
   - postgresql
 
 before_script:
+  - psql -U postgres -c "create extension postgis;"
+  - psql -U postgres -c "create extension postgis_topology;"
+  - psql -U postgres -c "create extension hstore;"
   - psql -U postgres -c "CREATE USER mailroom_test PASSWORD 'temba';"
   - psql -U postgres -c "ALTER ROLE mailroom_test WITH SUPERUSER;"
   - psql -U postgres -c "CREATE DATABASE mailroom_test;"
