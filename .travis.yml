@@ -11,7 +11,6 @@ env:
     - GO111MODULE=on
   matrix:
     - PGDB=10 RELEASE=true
-    - PGDB=11
 
 services:
   - redis-server
@@ -22,12 +21,6 @@ before_install:
   - sudo mv redis.conf /etc/redis
   - sudo service redis-server start
   - echo PING | nc localhost 6379
-  # setup postgresql
-  - sudo -E service postgresql stop 9.2
-  - sudo -E service postgresql stop 9.3
-  - sudo -E service postgresql stop 9.4
-  - sudo -E service postgresql stop 9.5
-  - sudo -E service postgresql stop 9.6
   - sudo -E apt-get -yq --no-install-suggests --no-install-recommends $(travis_apt_get_options) install postgresql-$PGDB postgresql-client-$PGDB postgresql-$PGDB-postgis-2.4 postgresql-$PGDB-postgis-2.4-scripts
   - sudo -E sed -i -e '/local.*peer/s/postgres/all/' -e 's/peer\|md5/trust/g' /etc/postgresql/*/main/pg_hba.conf
   - sudo -E sed -i 's/port = 5433/port = 5432/' /etc/postgresql/*/main/postgresql.conf
