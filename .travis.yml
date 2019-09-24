@@ -6,7 +6,8 @@ go:
 
 matrix:
   include:
-    - env:
+    - name: "Postgres 10"
+      env:
         global:
           - RELEASE=true
       addons:
@@ -17,7 +18,8 @@ matrix:
             - postgresql-10-postgis-2.4
             - postgresql-client-10
 
-    - env:
+    - name: "Postgres 11"
+      env:
         global:
           - RELEASE=true
       addons:
