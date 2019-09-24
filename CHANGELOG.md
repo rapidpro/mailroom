@@ -1,3 +1,13 @@
+v2.0.33
+----------
+ * Stop writing to legacy engine fields on flows_flowrun
+ * Move tasks into their own package
+ * Add ElasticSearch URL to README
+
+v2.0.32
+----------
+ * Add expression/migrate endpoint
+
 v2.0.31
 ----------
  * Allow interrupting sessions by flow
