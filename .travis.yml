@@ -1,33 +1,43 @@
 sudo: required
 dist: bionic
-
 language: go
-
 go:
-  - "1.12"
+  - "1.13"
 
-addons:
-  postgresql: "10"
-  apt:
-    packages:
-    - postgresql-10
-    - postgresql-10-postgis-2.4
-    - postgresql-client-10
+matrix:
+  include:
+    - env:
+        global:
+          - RELEASE=true
+      addons:
+        postgresql: "10"
+        apt:
+          packages:
+            - postgresql-10
+            - postgresql-10-postgis-2.4
+            - postgresql-client-10
 
+    - env:
+        global:
+          - RELEASE=true
+      addons:
+        postgresql: "11"
+        apt:
+          packages:
+            - postgresql-11
+            - postgresql-11-postgis-2.4
+            - postgresql-client-11
 env:
   global:
     - GO111MODULE=on
     - PGPORT=5432
-    
-  matrix:
-    - PGDB=10 RELEASE=true
 
 services:
   - redis-server
   - postgresql
 
 before_install:
-  - sudo mount -o remount,size=25% /var/ramfs
+  - sudo mount -o remount,size=50% /var/ramfs
 
 before_script:
   - psql -U postgres -c "create extension postgis;"
