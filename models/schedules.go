@@ -209,7 +209,15 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 					msgs_broadcast_groups bg
 				WHERE
 					bg.broadcast_id = b.id
-			) bg) as group_ids
+			) bg) as group_ids,
+			SELECT ARRAY_AGG(bg.contactgroup_id) FROM (
+				SELECT
+					bg.contactgroup_id
+				FROM
+					msgs_broadcast_groups bg
+				WHERE
+					bg.broadcast_id = b.id
+			) bg) as urns
 		FROM
 			msgs_broadcast b
 		WHERE

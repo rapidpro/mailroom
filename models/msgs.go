@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/legacy/expressions"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/nyaruka/null"
@@ -488,14 +487,15 @@ type BroadcastTranslation struct {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
-		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"   db:"id"`
+		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"             db:"text"`
 		TemplateState TemplateState                           `json:"template_state"`
-		BaseLanguage  envs.Language                           `json:"base_language"`
+		BaseLanguage  envs.Language                           `json:"base_language"            db:"base_language"`
 		URNs          []urns.URN                              `json:"urns,omitempty"`
 		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
 		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
-		OrgID         OrgID                                   `json:"org_id"`
+		OrgID         OrgID                                   `json:"org_id"                   db:"org_id"`
+		ParentID      BroadcastID                             `json:"parent_id,omitempty"      db:"parent_id"`
 	}
 }
 
@@ -574,61 +574,90 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 }
 
 // InsertBroadcasts inserts all the passed in broadcasts
-func InsertBroadcasts(ctx context.Context, db Queryer, starts []*Broadcast) error {
-	is := make([]interface{}, len(starts))
-	for i, s := range starts {
-		// populate UUID if needbe
-		if s.s.UUID == "" {
-			s.s.UUID = uuids.New()
-		}
-
-		is[i] = &s.s
+func InsertBroadcasts(ctx context.Context, db Queryer, bcasts []*Broadcast) error {
+	ib := make([]interface{}, len(bcasts))
+	for i, b := range bcasts {
+		ib[i] = &b.b
 	}
 
-	// insert our starts
-	err := BulkSQL(ctx, "inserting flow start", db, insertStartSQL, is)
+	// insert our broadcast
+	err := BulkSQL(ctx, "inserting broadcasts", db, insertStartSQL, ib)
 	if err != nil {
-		return errors.Wrapf(err, "error inserting flow starts")
+		return errors.Wrapf(err, "error inserting broadcasts")
 	}
 
 	// build up all our contact associations
-	contacts := make([]interface{}, 0, len(starts))
-	for _, start := range starts {
-		for _, contactID := range start.ContactIDs() {
-			contacts = append(contacts, &startContact{
-				StartID:   start.ID(),
-				ContactID: contactID,
+	contacts := make([]interface{}, 0, len(bcasts))
+	for _, bcast := range bcasts {
+		for _, contactID := range bcast.ContactIDs() {
+			contacts = append(contacts, &broadcastContact{
+				BroadcastID: bcast.BroadcastID(),
+				ContactID:   contactID,
 			})
 		}
 	}
 
 	// insert our contacts
-	err = BulkSQL(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
+	err = BulkSQL(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
 	if err != nil {
-		return errors.Wrapf(err, "error inserting flow start contacts for flow")
+		return errors.Wrapf(err, "error inserting contacts for broadcast")
 	}
 
 	// build up all our group associations
-	groups := make([]interface{}, 0, len(starts))
-	for _, start := range starts {
-		for _, groupID := range start.GroupIDs() {
-			groups = append(groups, &startGroup{
-				StartID: start.ID(),
-				GroupID: groupID,
+	groups := make([]interface{}, 0, len(bcasts))
+	for _, bcast := range bcasts {
+		for _, groupID := range bcast.GroupIDs() {
+			groups = append(groups, &broadcastGroup{
+				BroadcastID: bcast.BroadcastID(),
+				GroupID:     groupID,
 			})
 		}
 	}
 
 	// insert our groups
-	err = BulkSQL(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
+	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
 	if err != nil {
-		return errors.Wrapf(err, "error inserting flow start groups for flow")
+		return errors.Wrapf(err, "error inserting groups for broadcast")
+	}
+
+	// finally our URNs
+	urns := make([]interface{}, 0, len(bcasts))
+	for _, bcast := range bcasts {
+		for _, urn := range bcast.URNs() {
+			id := URN
+
+			groups = append(groups, &broadcastGroup{
+				BroadcastID: bcast.BroadcastID(),
+				GroupID:     groupID,
+			})
+		}
+	}
+
+	// insert our groups
+	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting groups for broadcast")
 	}
 
 	return nil
 }
 
-const insertStartSQL = `
+type broadcastURN struct {
+	BroadcastID BroadcastID `db:"start_id"`
+	URNID       URNID       `db:"contacturn_id"`
+}
+
+type broadcastContact struct {
+	BroadcastID BroadcastID `db:"start_id"`
+	ContactID   ContactID   `db:"contact_id"`
+}
+
+type broadcastGroup struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	GroupID     GroupID     `db:"contactgroup_id"`
+}
+
+const insertBroadcastSQL = `
 INSERT INTO
 	flows_flowstart(created_on,  uuid,  restart_participants,  include_active, status,  flow_id,  extra,  parent_summary)
 			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, 'P'   , :flow_id, :extra, :parent_summary)
@@ -636,13 +665,13 @@ RETURNING
 	id
 `
 
-const insertStartContactsSQL = `
+const insertBroadcastContactsSQL = `
 INSERT INTO
 	flows_flowstart_contacts( flowstart_id,  contact_id)
 	                  VALUES(:start_id,     :contact_id)
 `
 
-const insertStartGroupsSQL = `
+const insertBroadcastGroupsSQL = `
 INSERT INTO
 	flows_flowstart_groups( flowstart_id,  contactgroup_id)
 	                VALUES(:start_id,     :contactgroup_id)
