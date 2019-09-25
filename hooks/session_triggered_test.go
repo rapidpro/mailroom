@@ -18,6 +18,7 @@ import (
 func TestSessionTriggered(t *testing.T) {
 	testsuite.Reset()
 	testsuite.ResetRP()
+	models.FlushCache()
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
@@ -88,6 +89,7 @@ func TestSessionTriggered(t *testing.T) {
 func TestQuerySessionTriggered(t *testing.T) {
 	testsuite.Reset()
 	testsuite.ResetRP()
+	models.FlushCache()
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
