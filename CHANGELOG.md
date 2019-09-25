@@ -1,3 +1,8 @@
+v2.0.34
+----------
+ * Update to latest goflow v0.50.2
+ * Add support for triggering sessions via query within a flow
+
 v2.0.33
 ----------
  * Stop writing to legacy engine fields on flows_flowrun
