@@ -82,7 +82,7 @@ func TestBroadcastEvents(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		event := events.NewBroadcastCreated(tc.Translations, tc.BaseLanguage, tc.URNs, tc.Contacts, tc.Groups)
+		event := events.NewBroadcastCreated(tc.Translations, tc.BaseLanguage, tc.Groups, tc.Contacts, tc.URNs)
 		bcast, err := models.NewBroadcastFromEvent(ctx, db, org, event)
 		assert.NoError(t, err)
 

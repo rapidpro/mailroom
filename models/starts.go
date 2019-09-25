@@ -250,8 +250,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(created_on,  uuid,  restart_participants,  include_active, status,  flow_id,  extra,  parent_summary)
-			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, 'P'   , :flow_id, :extra, :parent_summary)
+	flows_flowstart(created_on,  uuid,  restart_participants,  include_active,  query, status,  flow_id,  extra,  parent_summary)
+			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, :query, 'P'   , :flow_id, :extra, :parent_summary)
 RETURNING
 	id
 `
