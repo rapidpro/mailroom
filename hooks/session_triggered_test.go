@@ -24,7 +24,7 @@ func TestSessionTriggered(t *testing.T) {
 	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	flow, err := org.FlowByID(models.SingleMessageFlowID)
+	simpleFlow, err := org.FlowByID(models.SingleMessageFlowID)
 	assert.NoError(t, err)
 
 	contactRef := &flows.ContactReference{
@@ -39,7 +39,7 @@ func TestSessionTriggered(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewStartSession(newActionUUID(), flow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
+					actions.NewStartSession(newActionUUID(), simpleFlow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
@@ -75,7 +75,56 @@ func TestSessionTriggered(t *testing.T) {
 					assert.Equal(t, start.CreateContact(), true)
 					assert.Equal(t, []models.ContactID{models.GeorgeID}, start.ContactIDs())
 					assert.Equal(t, []models.GroupID{models.TestersGroupID}, start.GroupIDs())
-					assert.Equal(t, start.FlowID(), flow.ID())
+					assert.Equal(t, start.FlowID(), simpleFlow.ID())
+					return nil
+				},
+			},
+		},
+	}
+
+	RunActionTestCases(t, tcs)
+}
+
+func TestQuerySessionTriggered(t *testing.T) {
+	testsuite.Reset()
+	testsuite.ResetRP()
+	db := testsuite.DB()
+	ctx := testsuite.CTX()
+
+	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	assert.NoError(t, err)
+
+	favoriteFlow, err := org.FlowByID(models.FavoritesFlowID)
+	assert.NoError(t, err)
+
+	sessionAction := actions.NewStartSession(newActionUUID(), favoriteFlow.FlowReference(), nil, nil, nil, nil, true)
+	sessionAction.ContactQuery = "name ~ @contact.name"
+
+	tcs := []HookTestCase{
+		HookTestCase{
+			Actions: ContactActionMap{
+				models.CathyID: []flows.Action{sessionAction},
+			},
+			SQLAssertions: []SQLAssertion{
+				SQLAssertion{
+					SQL:   "select count(*) from flows_flowstart where flow_id = $1 AND status = 'P' AND query = 'name ~ Cathy' AND parent_summary IS NOT NULL;",
+					Args:  []interface{}{models.FavoritesFlowID},
+					Count: 1,
+				},
+			},
+			Assertions: []Assertion{
+				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
+					task, err := queue.PopNextTask(rc, queue.BatchQueue)
+					assert.NoError(t, err)
+					assert.NotNil(t, task)
+					start := models.FlowStart{}
+					err = json.Unmarshal(task.Task, &start)
+					assert.NoError(t, err)
+					assert.Equal(t, start.CreateContact(), true)
+					assert.Equal(t, 0, len(start.ContactIDs()))
+					assert.Equal(t, 0, len(start.GroupIDs()))
+					assert.Equal(t, "name ~ Cathy", start.Query())
+					assert.Equal(t, start.FlowID(), favoriteFlow.ID())
 					return nil
 				},
 			},
