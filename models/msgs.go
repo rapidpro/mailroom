@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/legacy/expressions"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/nyaruka/null"
@@ -571,6 +572,81 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 
 	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs), nil
 }
+
+// InsertBroadcasts inserts all the passed in broadcasts
+func InsertBroadcasts(ctx context.Context, db Queryer, starts []*Broadcast) error {
+	is := make([]interface{}, len(starts))
+	for i, s := range starts {
+		// populate UUID if needbe
+		if s.s.UUID == "" {
+			s.s.UUID = uuids.New()
+		}
+
+		is[i] = &s.s
+	}
+
+	// insert our starts
+	err := BulkSQL(ctx, "inserting flow start", db, insertStartSQL, is)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting flow starts")
+	}
+
+	// build up all our contact associations
+	contacts := make([]interface{}, 0, len(starts))
+	for _, start := range starts {
+		for _, contactID := range start.ContactIDs() {
+			contacts = append(contacts, &startContact{
+				StartID:   start.ID(),
+				ContactID: contactID,
+			})
+		}
+	}
+
+	// insert our contacts
+	err = BulkSQL(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting flow start contacts for flow")
+	}
+
+	// build up all our group associations
+	groups := make([]interface{}, 0, len(starts))
+	for _, start := range starts {
+		for _, groupID := range start.GroupIDs() {
+			groups = append(groups, &startGroup{
+				StartID: start.ID(),
+				GroupID: groupID,
+			})
+		}
+	}
+
+	// insert our groups
+	err = BulkSQL(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting flow start groups for flow")
+	}
+
+	return nil
+}
+
+const insertStartSQL = `
+INSERT INTO
+	flows_flowstart(created_on,  uuid,  restart_participants,  include_active, status,  flow_id,  extra,  parent_summary)
+			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, 'P'   , :flow_id, :extra, :parent_summary)
+RETURNING
+	id
+`
+
+const insertStartContactsSQL = `
+INSERT INTO
+	flows_flowstart_contacts( flowstart_id,  contact_id)
+	                  VALUES(:start_id,     :contact_id)
+`
+
+const insertStartGroupsSQL = `
+INSERT INTO
+	flows_flowstart_groups( flowstart_id,  contactgroup_id)
+	                VALUES(:start_id,     :contactgroup_id)
+`
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 	batch := &BroadcastBatch{}
