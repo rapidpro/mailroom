@@ -55,60 +55,89 @@ func checkSchedules(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName s
 
 	for _, s := range unfired {
 		log := log.WithField("schedule_id", s.ID())
-
 		now := time.Now()
 
+		// grab our timezone
 		tz, err := s.Timezone()
 		if err != nil {
 			log.WithError(err).Error("error firing schedule, unknown timezone")
 			continue
 		}
 
+		// calculate our next fire
+		nextFire, err := s.GetNextFire(tz, now)
+		if err != nil {
+			log.WithError(err).Error("error calculating next fire for schedule")
+			continue
+		}
+
+		// open a transaction for committing all the items for this fire
+		tx, err := db.BeginTxx(ctx, nil)
+		if err != nil {
+			log.WithError(err).Error("error starting transaction for schedule fire")
+			continue
+		}
+
+		var task interface{}
+		var taskName string
+
 		// if it is a broadcast
 		if s.Broadcast() != nil {
 			// clone our broadcast, our schedule broadcast is just a template
-			bcast := models.CloneBroadcast(s.Broadcast())
-
-			// add our task to send this broadcast
-			err = queue.AddTask(rc, queue.BatchQueue, queue.SendBroadcast, int(bcast.OrgID()), bcast, queue.HighPriority)
+			bcast, err := models.InsertChildBroadcast(ctx, tx, s.Broadcast())
 			if err != nil {
-				log.WithError(err).Error("error firing scheduled broadcast")
+				log.WithError(err).Error("error inserting new broadcast for schedule")
+				tx.Rollback()
 				continue
 			}
+
+			// add our task to send this broadcast
+			task = bcast
+			taskName = queue.SendBroadcast
 			broadcasts++
 
 		} else if s.FlowStart() != nil {
 			start := s.FlowStart()
 
 			// insert our flow start
-			err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+			err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})
 			if err != nil {
 				log.WithError(err).Error("error inserting new flow start for schedule")
+				tx.Rollback()
 				continue
 			}
 
 			// add our flow start task
-			err = queue.AddTask(rc, queue.BatchQueue, queue.StartFlow, int(start.OrgID()), start, queue.HighPriority)
-			if err != nil {
-				log.WithError(err).Error("error firing scheduled trigger")
-			}
-
+			task = start
+			taskName = queue.StartFlow
 			triggers++
 		} else {
 			log.Info("schedule found with no associated active broadcast or trigger, ignoring")
 			noops++
 		}
 
-		// calculate the next fire and update it
-		nextFire, err := s.GetNextFire(tz, now)
-		if err != nil {
-			log.WithError(err).Error("error calculating next fire for schedule")
-		}
-
 		// update our next fire for this schedule
-		err = s.UpdateFires(ctx, db, now, nextFire)
+		err = s.UpdateFires(ctx, tx, now, nextFire)
 		if err != nil {
 			log.WithError(err).Error("error updating next fire for schedule")
+			tx.Rollback()
+			continue
+		}
+
+		// commit our transaction
+		err = tx.Commit()
+		if err != nil {
+			log.WithError(err).Error("error comitting schedule transaction")
+			tx.Rollback()
+			continue
+		}
+
+		// add our task if we have one
+		if task != nil {
+			err = queue.AddTask(rc, queue.BatchQueue, taskName, int(s.OrgID()), task, queue.HighPriority)
+			if err != nil {
+				log.WithError(err).Error("error firing task with name: ", taskName)
+			}
 		}
 	}
 

@@ -67,6 +67,7 @@ type Schedule struct {
 }
 
 func (s *Schedule) ID() ScheduleID        { return s.s.ID }
+func (s *Schedule) OrgID() OrgID          { return s.s.OrgID }
 func (s *Schedule) Broadcast() *Broadcast { return s.s.Broadcast }
 func (s *Schedule) FlowStart() *FlowStart { return s.s.FlowStart }
 func (s *Schedule) Timezone() (*time.Location, error) {
@@ -74,8 +75,8 @@ func (s *Schedule) Timezone() (*time.Location, error) {
 }
 
 // UpdateFires updates the next and last fire for a shedule on the db
-func (s *Schedule) UpdateFires(ctx context.Context, db *sqlx.DB, last time.Time, next *time.Time) error {
-	_, err := db.ExecContext(ctx, `UPDATE schedules_schedule SET last_fire = $2, next_fire = $3 WHERE id = $1`,
+func (s *Schedule) UpdateFires(ctx context.Context, tx Queryer, last time.Time, next *time.Time) error {
+	_, err := tx.ExecContext(ctx, `UPDATE schedules_schedule SET last_fire = $2, next_fire = $3 WHERE id = $1`,
 		s.s.ID, last, next,
 	)
 	if err != nil {
@@ -98,6 +99,9 @@ func (s *Schedule) GetNextFire(tz *time.Location, now time.Time) (*time.Time, er
 	if s.s.MinuteOfHour == nil {
 		return nil, errors.Errorf("schedule %d has no repeat_minute_of_hour set", s.s.ID)
 	}
+
+	// increment now by a minute, we don't want to double schedule in case of small clock drifts between boxes or db
+	now = now.Add(time.Minute)
 
 	// change our time to be in our location
 	start := now.In(tz)
@@ -210,14 +214,15 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 				WHERE
 					bg.broadcast_id = b.id
 			) bg) as group_ids,
-			SELECT ARRAY_AGG(bg.contactgroup_id) FROM (
+			(SELECT ARRAY_AGG(bu.urn) FROM (
 				SELECT
-					bg.contactgroup_id
+				    cu.identity || '?id=' || cu.id as urn
 				FROM
-					msgs_broadcast_groups bg
+					msgs_broadcast_urns bus JOIN
+					contacts_contacturn cu ON cu.id = bus.contacturn_id
 				WHERE
-					bg.broadcast_id = b.id
-			) bg) as urns
+					bus.broadcast_id = b.id
+			) bu) as urns
 		FROM
 			msgs_broadcast b
 		WHERE

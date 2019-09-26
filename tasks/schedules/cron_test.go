@@ -84,6 +84,11 @@ func TestCheckSchedules(t *testing.T) {
 		`SELECT count(*) FROM flows_flowstart WHERE flow_id = $1 AND status = 'P';`,
 		[]interface{}{models.FavoritesFlowID}, 1)
 
+	// and one broadcast as well
+	testsuite.AssertQueryCount(t, db,
+		`SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 AND status = 'Q';`,
+		[]interface{}{models.Org1}, 1)
+
 	// we shouldn't have any pending schedules since there were all one time fires, but all should have last fire
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM schedules_schedule WHERE next_fire IS NULL and last_fire < NOW();`,

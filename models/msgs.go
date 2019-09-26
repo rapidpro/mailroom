@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/lib/pq/hstore"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -487,15 +489,16 @@ type BroadcastTranslation struct {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"   db:"id"`
-		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"             db:"text"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty" db:"id"`
+		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+		Text          hstore.Hstore                           `                              db:"text"`
 		TemplateState TemplateState                           `json:"template_state"`
-		BaseLanguage  envs.Language                           `json:"base_language"            db:"base_language"`
+		BaseLanguage  envs.Language                           `json:"base_language"          db:"base_language"`
 		URNs          []urns.URN                              `json:"urns,omitempty"`
 		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
 		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
-		OrgID         OrgID                                   `json:"org_id"                   db:"org_id"`
-		ParentID      BroadcastID                             `json:"parent_id,omitempty"      db:"parent_id"`
+		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
+		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
 	}
 }
 
@@ -529,19 +532,125 @@ func NewBroadcast(
 	return bcast
 }
 
-// CloneBroadcast clones the passed in broadcast, the clone will have a nil ID
-func CloneBroadcast(b *Broadcast) *Broadcast {
-	return NewBroadcast(
-		b.OrgID(),
+// InsertChildBroadcast clones the passed in broadcast as a parent, then inserts that broadcast into the DB
+func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*Broadcast, error) {
+	child := NewBroadcast(
+		parent.OrgID(),
 		NilBroadcastID,
-		b.b.Translations,
-		b.b.TemplateState,
-		b.b.BaseLanguage,
-		b.b.URNs,
-		b.b.ContactIDs,
-		b.b.GroupIDs,
+		parent.b.Translations,
+		parent.b.TemplateState,
+		parent.b.BaseLanguage,
+		parent.b.URNs,
+		parent.b.ContactIDs,
+		parent.b.GroupIDs,
 	)
+	// populate our parent id
+	child.b.ParentID = parent.BroadcastID()
+
+	// populate text from our translations
+	child.b.Text.Map = make(map[string]sql.NullString)
+	for lang, t := range child.b.Translations {
+		child.b.Text.Map[string(lang)] = sql.NullString{String: t.Text, Valid: true}
+	}
+
+	// insert our broadcast
+	err := BulkSQL(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.BroadcastID())
+	}
+
+	// build up all our contact associations
+	contacts := make([]interface{}, 0, len(child.b.ContactIDs))
+	for _, contactID := range child.b.ContactIDs {
+		contacts = append(contacts, &broadcastContact{
+			BroadcastID: child.BroadcastID(),
+			ContactID:   contactID,
+		})
+	}
+
+	// insert our contacts
+	err = BulkSQL(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting contacts for broadcast")
+	}
+
+	// build up all our group associations
+	groups := make([]interface{}, 0, len(child.b.GroupIDs))
+	for _, groupID := range child.b.GroupIDs {
+		groups = append(groups, &broadcastGroup{
+			BroadcastID: child.BroadcastID(),
+			GroupID:     groupID,
+		})
+	}
+
+	// insert our groups
+	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting groups for broadcast")
+	}
+
+	// finally our URNs
+	urns := make([]interface{}, 0, len(child.b.URNs))
+	for _, urn := range child.b.URNs {
+		urnID := GetURNID(urn)
+		if urnID == NilURNID {
+			return nil, errors.Errorf("attempt to insert new broadcast with URNs that do not have id: %s", urn)
+		}
+		urns = append(groups, &broadcastURN{
+			BroadcastID: child.BroadcastID(),
+			URNID:       urnID,
+		})
+	}
+
+	// insert our urns
+	err = BulkSQL(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting URNs for broadcast")
+	}
+
+	return child, nil
 }
+
+type broadcastURN struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	URNID       URNID       `db:"contacturn_id"`
+}
+
+type broadcastContact struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	ContactID   ContactID   `db:"contact_id"`
+}
+
+type broadcastGroup struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	GroupID     GroupID     `db:"contactgroup_id"`
+}
+
+const insertBroadcastSQL = `
+INSERT INTO
+	msgs_broadcast( org_id,  parent_id, is_active, created_on, modified_on, status,  text,  base_language, send_all)
+			VALUES(:org_id, :parent_id, TRUE,      NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
+RETURNING
+	id
+`
+
+const insertBroadcastContactsSQL = `
+INSERT INTO
+	msgs_broadcast_contacts( broadcast_id,  contact_id)
+	                 VALUES(:broadcast_id,     :contact_id)
+`
+
+const insertBroadcastGroupsSQL = `
+INSERT INTO
+	msgs_broadcast_groups( broadcast_id,  contactgroup_id)
+	               VALUES(:broadcast_id,     :contactgroup_id)
+`
+
+const insertBroadcastURNsSQL = `
+INSERT INTO
+	msgs_broadcast_urns( broadcast_id,  contacturn_id)
+	             VALUES(:broadcast_id, :contacturn_id)
+`
 
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
@@ -572,110 +681,6 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 
 	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs), nil
 }
-
-// InsertBroadcasts inserts all the passed in broadcasts
-func InsertBroadcasts(ctx context.Context, db Queryer, bcasts []*Broadcast) error {
-	ib := make([]interface{}, len(bcasts))
-	for i, b := range bcasts {
-		ib[i] = &b.b
-	}
-
-	// insert our broadcast
-	err := BulkSQL(ctx, "inserting broadcasts", db, insertStartSQL, ib)
-	if err != nil {
-		return errors.Wrapf(err, "error inserting broadcasts")
-	}
-
-	// build up all our contact associations
-	contacts := make([]interface{}, 0, len(bcasts))
-	for _, bcast := range bcasts {
-		for _, contactID := range bcast.ContactIDs() {
-			contacts = append(contacts, &broadcastContact{
-				BroadcastID: bcast.BroadcastID(),
-				ContactID:   contactID,
-			})
-		}
-	}
-
-	// insert our contacts
-	err = BulkSQL(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
-	if err != nil {
-		return errors.Wrapf(err, "error inserting contacts for broadcast")
-	}
-
-	// build up all our group associations
-	groups := make([]interface{}, 0, len(bcasts))
-	for _, bcast := range bcasts {
-		for _, groupID := range bcast.GroupIDs() {
-			groups = append(groups, &broadcastGroup{
-				BroadcastID: bcast.BroadcastID(),
-				GroupID:     groupID,
-			})
-		}
-	}
-
-	// insert our groups
-	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
-	if err != nil {
-		return errors.Wrapf(err, "error inserting groups for broadcast")
-	}
-
-	// finally our URNs
-	urns := make([]interface{}, 0, len(bcasts))
-	for _, bcast := range bcasts {
-		for _, urn := range bcast.URNs() {
-			id := URN
-
-			groups = append(groups, &broadcastGroup{
-				BroadcastID: bcast.BroadcastID(),
-				GroupID:     groupID,
-			})
-		}
-	}
-
-	// insert our groups
-	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
-	if err != nil {
-		return errors.Wrapf(err, "error inserting groups for broadcast")
-	}
-
-	return nil
-}
-
-type broadcastURN struct {
-	BroadcastID BroadcastID `db:"start_id"`
-	URNID       URNID       `db:"contacturn_id"`
-}
-
-type broadcastContact struct {
-	BroadcastID BroadcastID `db:"start_id"`
-	ContactID   ContactID   `db:"contact_id"`
-}
-
-type broadcastGroup struct {
-	BroadcastID BroadcastID `db:"broadcast_id"`
-	GroupID     GroupID     `db:"contactgroup_id"`
-}
-
-const insertBroadcastSQL = `
-INSERT INTO
-	flows_flowstart(created_on,  uuid,  restart_participants,  include_active, status,  flow_id,  extra,  parent_summary)
-			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, 'P'   , :flow_id, :extra, :parent_summary)
-RETURNING
-	id
-`
-
-const insertBroadcastContactsSQL = `
-INSERT INTO
-	flows_flowstart_contacts( flowstart_id,  contact_id)
-	                  VALUES(:start_id,     :contact_id)
-`
-
-const insertBroadcastGroupsSQL = `
-INSERT INTO
-	flows_flowstart_groups( flowstart_id,  contactgroup_id)
-	                VALUES(:start_id,     :contactgroup_id)
-`
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 	batch := &BroadcastBatch{}

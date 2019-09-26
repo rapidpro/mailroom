@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/null"
@@ -37,6 +38,9 @@ func TestGetExpired(t *testing.T) {
 
 	// and a group
 	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, DoctorsGroupID)
+
+	// and a URN
+	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, CathyURNID)
 
 	// add another and tie a trigger to it
 	var s2 ScheduleID
@@ -102,6 +106,7 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, Org1, bcast.OrgID())
 	assert.Equal(t, []ContactID{CathyID, GeorgeID}, bcast.ContactIDs())
 	assert.Equal(t, []GroupID{DoctorsGroupID}, bcast.GroupIDs())
+	assert.Equal(t, []urns.URN{urns.URN("tel:+250700000001?id=10000")}, bcast.URNs())
 }
 
 func TestNextFire(t *testing.T) {
