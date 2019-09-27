@@ -42,6 +42,9 @@ func TestCheckSchedules(t *testing.T) {
 	// and a group
 	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, models.DoctorsGroupID)
 
+	// and a URN
+	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, models.CathyURNID)
+
 	// add another and tie a trigger to it
 	var s2 models.ScheduleID
 	err = db.Get(
@@ -84,10 +87,20 @@ func TestCheckSchedules(t *testing.T) {
 		`SELECT count(*) FROM flows_flowstart WHERE flow_id = $1 AND status = 'P';`,
 		[]interface{}{models.FavoritesFlowID}, 1)
 
+	// with the right count of groups and contacts
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowstart_contacts WHERE flowstart_id = 1`, nil, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowstart_groups WHERE flowstart_id = 1`, nil, 1)
+
 	// and one broadcast as well
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 AND status = 'Q';`,
-		[]interface{}{models.Org1}, 1)
+		`SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 AND parent_id = $2 AND text = hstore(ARRAY['eng','Test message', 'fra', 'Un Message'])
+		AND status = 'Q' AND base_language = 'eng';`,
+		[]interface{}{models.Org1, b1}, 1)
+
+	// with the right count of groups, contacts, urns
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from msgs_broadcast_urns WHERE broadcast_id = 2`, nil, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from msgs_broadcast_contacts WHERE broadcast_id = 2`, nil, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from msgs_broadcast_groups WHERE broadcast_id = 2`, nil, 1)
 
 	// we shouldn't have any pending schedules since there were all one time fires, but all should have last fire
 	testsuite.AssertQueryCount(t, db,

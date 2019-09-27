@@ -193,7 +193,7 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 	o.timezone as timezone,
 	(SELECT ROW_TO_JSON(sb) FROM (
 		SELECT
-			b.id as id,
+			b.id as broadcast_id,
 			(SELECT JSON_OBJECT_AGG(ts.key, ts.value) FROM (SELECT key, JSON_BUILD_OBJECT('text', t.value) as value FROM each(b.text) t) ts) as translations,
 			'unevaluated' as template_state,
 			b.base_language as base_language,

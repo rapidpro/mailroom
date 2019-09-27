@@ -596,7 +596,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		if urnID == NilURNID {
 			return nil, errors.Errorf("attempt to insert new broadcast with URNs that do not have id: %s", urn)
 		}
-		urns = append(groups, &broadcastURN{
+		urns = append(urns, &broadcastURN{
 			BroadcastID: child.BroadcastID(),
 			URNID:       urnID,
 		})
