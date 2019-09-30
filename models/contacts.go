@@ -150,6 +150,8 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 
 // ContactIDsForQuery returns the ids of all the contacts that match the passed in query
 func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAssets, query string) ([]ContactID, error) {
+	start := time.Now()
+
 	if client == nil {
 		return nil, errors.Errorf("no elastic client available, check your configuration")
 	}
@@ -182,6 +184,13 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	for {
 		results, err := scroll.Do(ctx)
 		if err == io.EOF {
+			logrus.WithFields(logrus.Fields{
+				"org_id":      org.OrgID(),
+				"query":       query,
+				"elapsed":     time.Since(start),
+				"match_count": len(ids),
+			}).Debug("contact query complete")
+
 			return ids, nil
 		}
 		if err != nil {
