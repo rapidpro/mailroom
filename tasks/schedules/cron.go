@@ -28,6 +28,9 @@ func StartCheckSchedules(mr *mailroom.Mailroom) error {
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
+			// we sleep 1 second since we fire right on the minute and want to make sure to fire
+			// things that are schedules right at the minute as well (and DB time may be slightly drifted)
+			time.Sleep(time.Second * 1)
 			return checkSchedules(ctx, mr.DB, mr.RP, lockName, lockValue)
 		},
 	)

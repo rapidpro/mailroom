@@ -551,6 +551,9 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	child.b.Text.Map = make(map[string]sql.NullString)
 	for lang, t := range child.b.Translations {
 		child.b.Text.Map[string(lang)] = sql.NullString{String: t.Text, Valid: true}
+		if len(t.Attachments) > 0 || len(t.QuickReplies) > 0 {
+			return nil, errors.Errorf("cannot clone broadcast with quick replies or attachments")
+		}
 	}
 
 	// insert our broadcast
