@@ -1,3 +1,8 @@
+v2.0.35
+----------
+ * Log query execution and elapsed time
+ * Update to goflow v0.50.4
+
 v2.0.34
 ----------
  * Update to latest goflow v0.50.2
