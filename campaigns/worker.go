@@ -8,7 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/greatnonprofits-nfp/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"

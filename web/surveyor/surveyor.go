@@ -5,15 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/nyaruka/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/assets"
 
-	"github.com/nyaruka/goflow/flows/actions/modifiers"
+	"github.com/greatnonprofits-nfp/goflow/flows/actions/modifiers"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/engine"
+	"github.com/greatnonprofits-nfp/goflow/flows/events"
+	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"

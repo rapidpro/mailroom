@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/handler"
 	"github.com/nyaruka/mailroom/ivr"

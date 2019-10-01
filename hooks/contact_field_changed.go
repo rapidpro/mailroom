@@ -6,8 +6,8 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
