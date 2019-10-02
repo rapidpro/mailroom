@@ -9,9 +9,10 @@ func init() {
 // Config is our top level configuration object
 type Config struct {
 	SentryDSN  string `help:"the DSN used for logging errors to Sentry"`
-	DB         string `help:"URL describing how to connect to the RapidPro database"`
+	DB         string `help:"URL for your Postgres database"`
 	DBPoolSize int    `help:"the size of our db pool"`
-	Redis      string `help:"URL describing how to connect to Redis"`
+	Redis      string `help:"URL for your Redis instance"`
+	Elastic    string `help:"URL for your ElasticSearch service"`
 	Version    string `help:"the version of this mailroom install"`
 	LogLevel   string `help:"the logging level courier should use"`
 	SMTPServer string `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
@@ -52,6 +53,7 @@ func NewMailroomConfig() *Config {
 		DB:                "postgres://temba:temba@localhost/temba?sslmode=disable",
 		DBPoolSize:        36,
 		Redis:             "redis://localhost:6379/15",
+		Elastic:           "http://localhost:9200",
 		BatchWorkers:      4,
 		HandlerWorkers:    32,
 		LogLevel:          "error",

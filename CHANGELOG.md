@@ -1,3 +1,90 @@
+v2.0.35
+----------
+ * Log query execution and elapsed time
+ * Update to goflow v0.50.4
+
+v2.0.34
+----------
+ * Update to latest goflow v0.50.2
+ * Add support for triggering sessions via query within a flow
+
+v2.0.33
+----------
+ * Stop writing to legacy engine fields on flows_flowrun
+ * Move tasks into their own package
+ * Add ElasticSearch URL to README
+
+v2.0.32
+----------
+ * Add expression/migrate endpoint
+
+v2.0.31
+----------
+ * Allow interrupting sessions by flow
+ * Update to goflow v0.49.0
+
+v2.0.30
+----------
+ * Update to goflow v0.47.3
+
+v2.0.29
+----------
+ * Expire runs and sessions in a transaction to guarantee they are always in sync
+
+v2.0.28
+----------
+ * Remove debug error message
+
+v2.0.27
+----------
+ * Remove references to trigger_count in unit tests
+ * Fix create contact failing to start
+
+v2.0.26
+----------
+ * Start writing flows_flowrun.status alongside exit_type
+
+v2.0.25
+----------
+ * Handle FlowRun having nil Flow, use FlowReference instead
+
+v2.0.24
+----------
+ * Enable interrupt_sessions task
+
+v2.0.23
+----------
+ * Use ExitSession when stopping a session due to missing flow
+ * Add new interrupt sessions task, use more specific exit for missing flows
+ * Deal with handles for contacts that no longer have a URN
+
+v2.0.22
+----------
+ * Populate context with urns and fields when evaluating broadcast templates
+
+v2.0.21
+----------
+ * Change default port for Elastic to 9200 and use HTTP.
+ * Don't try to sniff cluster (doesn't with with cloud elastic)
+
+v2.0.20
+----------
+ * fix empty starts not being marked as complete
+ * allow flow starts to specify query for contacts to start
+
+v2.0.19
+----------
+ * Update to goflow v0.45.2
+
+v2.0.18
+----------
+ * Make FlowSession.uuid nullable for now
+
+v2.0.17
+----------
+ * Update to goflow v0.45.0
+ * Write UUID field on flows_flowsession
+
 v2.0.16
 ----------
  * write/read parent summary on flow starts

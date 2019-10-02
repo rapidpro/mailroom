@@ -37,10 +37,10 @@ func NewStartOptions() *StartOptions {
 // StartOptions define the various parameters that can be used when starting a flow
 type StartOptions struct {
 	// RestartParticipants should be true if the flow start should restart participants already in this flow
-	RestartParticipants bool
+	RestartParticipants models.RestartParticipants
 
 	// IncludeActive should be true if we want to interrupt people active in other flows (including this one)
-	IncludeActive bool
+	IncludeActive models.IncludeActive
 
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
@@ -65,7 +65,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
 			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_id", session.ID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow in resume")
-			return nil, models.InterruptContactRuns(ctx, db, models.MessagingFlow, []flows.ContactID{resume.Contact().ID()}, time.Now())
+			return nil, models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitInterrupted, time.Now())
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
 	}
@@ -182,12 +182,12 @@ func StartFlowBatch(
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
 		if batch.ParentSummary() != nil {
-			return triggers.NewFlowActionTrigger(org.Env(), flow.FlowReference(), contact, batch.ParentSummary())
+			return triggers.NewFlowAction(org.Env(), flow.FlowReference(), contact, batch.ParentSummary())
 		}
 		if batch.Extra() != nil {
-			return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, params)
+			return triggers.NewManual(org.Env(), flow.FlowReference(), contact, params)
 		}
-		return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
+		return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
 	}
 
 	// before committing our runs we want to set the start they are associated with
@@ -309,7 +309,7 @@ func FireCampaignEvents(
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 		delete(skippedContacts, models.ContactID(contact.ID()))
-		return triggers.NewCampaignTrigger(org.Env(), flowRef, contact, event)
+		return triggers.NewCampaign(org.Env(), flowRef, contact, event)
 	}
 
 	// this is our pre commit callback for our sessions, we'll mark the event fires associated
@@ -696,7 +696,8 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 	tx, _ := db.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.NewFlowStart(orgID, models.IVRFlow, flowID, nil, contactIDs, nil, false, true, true, nil, nil)
+	start := models.NewFlowStart(orgID, models.IVRFlow, flowID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs(contactIDs)
 
 	// insert it
 	err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})

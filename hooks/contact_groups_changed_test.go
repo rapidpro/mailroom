@@ -18,14 +18,14 @@ func TestContactGroupsChanged(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{testers}),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{testers}),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{testers}),
+					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{testers}),
 				},
 			},
 			SQLAssertions: []SQLAssertion{

@@ -42,7 +42,7 @@ type OrgAssets struct {
 	campaignsByGroup      map[GroupID][]*Campaign
 
 	fields       []assets.Field
-	fieldsByUUID map[FieldUUID]*Field
+	fieldsByUUID map[assets.FieldUUID]*Field
 	fieldsByKey  map[string]*Field
 
 	groups       []assets.Group
@@ -87,7 +87,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		channelsByID:   make(map[ChannelID]*Channel),
 		channelsByUUID: make(map[assets.ChannelUUID]*Channel),
 
-		fieldsByUUID: make(map[FieldUUID]*Field),
+		fieldsByUUID: make(map[assets.FieldUUID]*Field),
 		fieldsByKey:  make(map[string]*Field),
 
 		groupsByID:   make(map[GroupID]*Group),
@@ -277,7 +277,7 @@ func (a *OrgAssets) Fields() ([]assets.Field, error) {
 	return a.fields, nil
 }
 
-func (a *OrgAssets) FieldByUUID(fieldUUID FieldUUID) *Field {
+func (a *OrgAssets) FieldByUUID(fieldUUID assets.FieldUUID) *Field {
 	return a.fieldsByUUID[fieldUUID]
 }
 

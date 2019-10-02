@@ -127,7 +127,7 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 	logger := httputils.NewLoggingTransport(http.DefaultTransport)
 	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
 
-	// try to request our call start
+	// try to request our call hangup
 	err = c.HangupCall(client, conn.ExternalID())
 
 	// insert any logged requests
@@ -365,9 +365,9 @@ func StartIVRFlow(
 
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
-		trigger = triggers.NewFlowActionVoiceTrigger(org.Env(), flowRef, contact, connRef, start.ParentSummary())
+		trigger = triggers.NewFlowActionVoice(org.Env(), flowRef, contact, connRef, start.ParentSummary())
 	} else {
-		trigger = triggers.NewManualVoiceTrigger(org.Env(), flowRef, contact, connRef, params)
+		trigger = triggers.NewManualVoice(org.Env(), flowRef, contact, connRef, params)
 	}
 
 	// mark our connection as started
@@ -550,7 +550,7 @@ func ResumeIVRFlow(
 	}
 
 	// create our msg resume event
-	resume := resumes.NewMsgResume(org.Env(), contact, msgIn)
+	resume := resumes.NewMsg(org.Env(), contact, msgIn)
 
 	// hook to set our connection on our session before our event hooks run
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {

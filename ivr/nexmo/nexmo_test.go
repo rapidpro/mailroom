@@ -61,40 +61,40 @@ func TestResponseForSprint(t *testing.T) {
 		Expected string
 	}{
 		{
-			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "hello world", nil, nil, nil))},
+			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", nil, nil, nil))},
 			nil,
 			`[{"action":"talk","text":"hello world"}]`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:/recordings/foo.wav")}, nil, nil))},
+			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:/recordings/foo.wav")}, nil, nil))},
 			nil,
 			`[{"action":"stream","streamUrl":["/recordings/foo.wav"]}]`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:https://temba.io/recordings/foo.wav")}, nil, nil))},
+			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:https://temba.io/recordings/foo.wav")}, nil, nil))},
 			nil,
 			`[{"action":"stream","streamUrl":["https://temba.io/recordings/foo.wav"]}]`,
 		},
 		{
 			[]flows.Event{
-				events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "hello world", nil, nil, nil)),
-				events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "goodbye", nil, nil, nil)),
+				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", nil, nil, nil)),
+				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "goodbye", nil, nil, nil)),
 			},
 			nil,
 			`[{"action":"talk","text":"hello world"},{"action":"talk","text":"goodbye"}]`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "enter a number", nil, nil, nil))},
+			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "enter a number", nil, nil, nil))},
 			waits.NewActivatedMsgWait(nil, hints.NewFixedDigitsHint(1)),
 			`[{"action":"talk","text":"enter a number","bargeIn":true},{"action":"input","maxDigits":1,"submitOnHash":true,"timeOut":30,"eventUrl":["http://temba.io/resume?session=1\u0026wait_type=gather\u0026sig=OjsMUDhaBTUVLq1e6I4cM0SKYpk%3D"],"eventMethod":"POST"}]`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "enter a number, then press #", nil, nil, nil))},
+			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "enter a number, then press #", nil, nil, nil))},
 			waits.NewActivatedMsgWait(nil, hints.NewTerminatedDigitsHint("#")),
 			`[{"action":"talk","text":"enter a number, then press #","bargeIn":true},{"action":"input","maxDigits":20,"submitOnHash":true,"timeOut":30,"eventUrl":["http://temba.io/resume?session=1\u0026wait_type=gather\u0026sig=OjsMUDhaBTUVLq1e6I4cM0SKYpk%3D"],"eventMethod":"POST"}]`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreatedEvent(flows.NewMsgOut(urn, channelRef, "say something", nil, nil, nil))},
+			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "say something", nil, nil, nil))},
 			waits.NewActivatedMsgWait(nil, hints.NewAudioHint()),
 			`[{"action":"talk","text":"say something"},{"action":"record","endOnKey":"#","timeOut":600,"endOnSilence":5,"eventUrl":["http://temba.io/resume?session=1\u0026wait_type=recording_url\u0026recording_uuid=f3ede2d6-becc-4ea3-ae5e-88526a9f4a57\u0026sig=Am9z7fXyU3SPCZagkSpddZSi6xY%3D"],"eventMethod":"POST"},{"action":"input","submitOnHash":true,"timeOut":1,"eventUrl":["http://temba.io/resume?session=1\u0026wait_type=record\u0026recording_uuid=f3ede2d6-becc-4ea3-ae5e-88526a9f4a57\u0026sig=fX1RhjcJNN4xYaiojVYakaz5F%2Fk%3D"],"eventMethod":"POST"}]`,
 		},

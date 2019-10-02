@@ -39,11 +39,11 @@ func TestWebhookCalled(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewCallResthookAction(newActionUUID(), "foo", "foo"),
+					actions.NewCallResthook(newActionUUID(), "foo", "foo"),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewCallResthookAction(newActionUUID(), "foo", "foo"),
-					actions.NewCallWebhookAction(newActionUUID(), "GET", server.URL+"?unsub=1", nil, "", ""),
+					actions.NewCallResthook(newActionUUID(), "foo", "foo"),
+					actions.NewCallWebhook(newActionUUID(), "GET", server.URL+"?unsub=1", nil, "", ""),
 				},
 			},
 			SQLAssertions: []SQLAssertion{

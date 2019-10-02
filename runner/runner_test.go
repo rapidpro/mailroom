@@ -76,7 +76,7 @@ func TestCampaignStarts(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND session_id IS NOT NULL`,
 		[]interface{}{pq.Array(contacts), models.CampaignFlowID}, 2,
@@ -118,8 +118,8 @@ func TestBatchStart(t *testing.T) {
 
 	tcs := []struct {
 		Flow          models.FlowID
-		Restart       bool
-		IncludeActive bool
+		Restart       models.RestartParticipants
+		IncludeActive models.IncludeActive
 		Extra         json.RawMessage
 		Msg           string
 		Count         int
@@ -143,11 +143,9 @@ func TestBatchStart(t *testing.T) {
 	last := time.Now()
 
 	for i, tc := range tcs {
-		start := models.NewFlowStart(
-			models.OrgID(1), models.MessagingFlow, tc.Flow,
-			nil, contactIDs, nil, false, tc.Restart, tc.IncludeActive,
-			nil, tc.Extra,
-		)
+		start := models.NewFlowStart(models.OrgID(1), models.MessagingFlow, tc.Flow, tc.Restart, tc.IncludeActive).
+			WithContactIDs(contactIDs).
+			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs)
 		batch.SetIsLast(true)
 
@@ -163,7 +161,7 @@ func TestBatchStart(t *testing.T) {
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 			AND session_id IS NOT NULL`,
 			[]interface{}{pq.Array(contactIDs), tc.Flow}, tc.TotalCount, "%d: unexpected number of runs", i,
@@ -202,7 +200,7 @@ func TestContactRuns(t *testing.T) {
 	contact, err := contacts[0].FlowContact(org, sa)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
+	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
@@ -242,7 +240,7 @@ func TestContactRuns(t *testing.T) {
 		// answer our first question
 		msg := flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, tc.Message, nil)
 		msg.SetID(10)
-		resume := resumes.NewMsgResume(org.Env(), contact, msg)
+		resume := resumes.NewMsg(org.Env(), contact, msg)
 
 		session, err = ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
 		assert.NoError(t, err)

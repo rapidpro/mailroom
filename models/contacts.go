@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"io"
 	"net/url"
 	"strconv"
 	"time"
@@ -15,7 +16,9 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/null"
+	"github.com/olivere/elastic"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -145,6 +148,66 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
+// ContactIDsForQuery returns the ids of all the contacts that match the passed in query
+func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAssets, query string) ([]ContactID, error) {
+	start := time.Now()
+
+	if client == nil {
+		return nil, errors.Errorf("no elastic client available, check your configuration")
+	}
+
+	// our field resolver
+	resolver := func(key string) assets.Field {
+		return org.FieldByKey(key)
+	}
+
+	// turn into elastic query
+	eq, err := search.ToElasticQuery(org.Env(), resolver, query)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+	}
+
+	// filter by org, active, blocked and stopped
+	eq = elastic.NewBoolQuery().Must(
+		eq,
+		elastic.NewTermQuery("org_id", org.OrgID()),
+		elastic.NewTermQuery("is_active", true),
+		elastic.NewTermQuery("is_blocked", false),
+		elastic.NewTermQuery("is_stopped", false),
+	)
+
+	ids := make([]ContactID, 0, 100)
+
+	// iterate across our results, building up our contact ids
+	scroll := client.Scroll("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	scroll = scroll.KeepAlive("15m").Size(10000).Query(eq).FetchSource(false)
+	for {
+		results, err := scroll.Do(ctx)
+		if err == io.EOF {
+			logrus.WithFields(logrus.Fields{
+				"org_id":      org.OrgID(),
+				"query":       query,
+				"elapsed":     time.Since(start),
+				"match_count": len(ids),
+			}).Debug("contact query complete")
+
+			return ids, nil
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scrolling through results for search: %s", query)
+		}
+
+		for _, hit := range results.Hits.Hits {
+			id, err := strconv.Atoi(hit.Id)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
+			}
+
+			ids = append(ids, ContactID(id))
+		}
+	}
+}
+
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
 func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flows.Contact, error) {
 	// convert our groups to a list of asset groups
@@ -272,17 +335,17 @@ func (u *ContactURN) AsURN(org *OrgAssets) (urns.URN, error) {
 
 // contactEnvelope is our JSON structure for a contact as read from the database
 type contactEnvelope struct {
-	ID         ContactID                         `json:"id"`
-	UUID       flows.ContactUUID                 `json:"uuid"`
-	Name       string                            `json:"name"`
-	Language   envs.Language                     `json:"language"`
-	IsStopped  bool                              `json:"is_stopped"`
-	IsBlocked  bool                              `json:"is_blocked"`
-	Fields     map[FieldUUID]*fieldValueEnvelope `json:"fields"`
-	GroupIDs   []GroupID                         `json:"group_ids"`
-	URNs       []ContactURN                      `json:"urns"`
-	ModifiedOn time.Time                         `json:"modified_on"`
-	CreatedOn  time.Time                         `json:"created_on"`
+	ID         ContactID                                `json:"id"`
+	UUID       flows.ContactUUID                        `json:"uuid"`
+	Name       string                                   `json:"name"`
+	Language   envs.Language                            `json:"language"`
+	IsStopped  bool                                     `json:"is_stopped"`
+	IsBlocked  bool                                     `json:"is_blocked"`
+	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
+	GroupIDs   []GroupID                                `json:"group_ids"`
+	URNs       []ContactURN                             `json:"urns"`
+	ModifiedOn time.Time                                `json:"modified_on"`
+	CreatedOn  time.Time                                `json:"created_on"`
 }
 
 const selectContactSQL = `
@@ -590,7 +653,8 @@ func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urn
 // campaigns as necessary based on those group changes.
 func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, contact *flows.Contact) error {
 	orgGroups, _ := org.Groups()
-	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups))
+	orgFields, _ := org.Fields()
+	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups), flows.NewFieldAssets(orgFields))
 	if len(errs) > 0 {
 		return errors.Wrapf(errs[0], "error calculating dynamic groups")
 	}

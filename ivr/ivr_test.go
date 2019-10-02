@@ -13,7 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/starts"
+	"github.com/nyaruka/mailroom/tasks/starts"
 	"github.com/pkg/errors"
 
 	"github.com/nyaruka/mailroom/testsuite"
@@ -32,10 +32,11 @@ func TestIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID}, nil, false, true, true, nil, nil)
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{models.CathyID})
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, start)
+	err := starts.CreateFlowBatches(ctx, db, rp, nil, start)
 	assert.NoError(t, err)
 
 	// should have one task in our ivr queue

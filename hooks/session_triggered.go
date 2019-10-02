@@ -41,7 +41,7 @@ func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 			priority := queue.DefaultPriority
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
-			if len(start.GroupIDs()) > 0 {
+			if len(start.GroupIDs()) > 0 || start.Query() != "" {
 				taskQ = queue.BatchQueue
 				priority = queue.HighPriority
 			}
@@ -69,8 +69,8 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			event := e.(*events.SessionTriggeredEvent)
 
 			// we skip over any session starts that involve groups if we are in a batch start
-			if len(sessions) > 1 && len(event.Groups) > 0 {
-				logrus.WithField("session_id", s.ID).Error("ignoring session trigger on group in batch")
+			if len(sessions) > 1 && (len(event.Groups) > 0 || event.ContactQuery != "") {
+				logrus.WithField("session_id", s.ID).Error("ignoring session trigger on group or query in batch")
 				continue
 			}
 
@@ -97,12 +97,13 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			}
 
 			// create our start
-			start := models.NewFlowStart(
-				org.OrgID(), flow.FlowType(), flow.ID(),
-				groupIDs, contactIDs, event.URNs, event.CreateContact,
-				true, true,
-				event.RunSummary, nil,
-			)
+			start := models.NewFlowStart(org.OrgID(), flow.FlowType(), flow.ID(), models.DoRestartParticipants, models.DoIncludeActive).
+				WithGroupIDs(groupIDs).
+				WithContactIDs(contactIDs).
+				WithURNs(event.URNs).
+				WithQuery(event.ContactQuery).
+				WithCreateContact(event.CreateContact).
+				WithParentSummary(event.RunSummary)
 
 			starts = append(starts, start)
 

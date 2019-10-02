@@ -23,23 +23,23 @@ func TestContactFieldChanged(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSetContactFieldAction(newActionUUID(), gender, "Male"),
-					actions.NewSetContactFieldAction(newActionUUID(), gender, "Female"),
-					actions.NewSetContactFieldAction(newActionUUID(), age, ""),
+					actions.NewSetContactField(newActionUUID(), gender, "Male"),
+					actions.NewSetContactField(newActionUUID(), gender, "Female"),
+					actions.NewSetContactField(newActionUUID(), age, ""),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSetContactFieldAction(newActionUUID(), gender, "Male"),
-					actions.NewSetContactFieldAction(newActionUUID(), gender, ""),
-					actions.NewSetContactFieldAction(newActionUUID(), age, "40"),
+					actions.NewSetContactField(newActionUUID(), gender, "Male"),
+					actions.NewSetContactField(newActionUUID(), gender, ""),
+					actions.NewSetContactField(newActionUUID(), age, "40"),
 				},
 				models.BobID: []flows.Action{
-					actions.NewSetContactFieldAction(newActionUUID(), gender, ""),
-					actions.NewSetContactFieldAction(newActionUUID(), gender, "Male"),
-					actions.NewSetContactFieldAction(newActionUUID(), age, "Old"),
+					actions.NewSetContactField(newActionUUID(), gender, ""),
+					actions.NewSetContactField(newActionUUID(), gender, "Male"),
+					actions.NewSetContactField(newActionUUID(), age, "Old"),
 				},
 				models.AlexandriaID: []flows.Action{
-					actions.NewSetContactFieldAction(newActionUUID(), age, ""),
-					actions.NewSetContactFieldAction(newActionUUID(), gender, ""),
+					actions.NewSetContactField(newActionUUID(), age, ""),
+					actions.NewSetContactField(newActionUUID(), gender, ""),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
