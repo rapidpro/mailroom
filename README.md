@@ -49,6 +49,11 @@ Recommended settings for error and performance monitoring:
  * `MAILROOM_LIBRATO_TOKEN`: The token to use for logging of events to Librato
  * `MAILROOM_SENTRY_DSN`: The DSN to use when logging errors to Sentry
  * `MAILROOM_LOG_LEVEL`: the logging level mailroom should use (default "error", use "debug" for more)
+ 
+ For CCL Lookup and Gift Card features the following parameters should be set up as env variables:
+ * `MAILROOM_PARSE_SERVER_URL`: Parse Server URL used for looking up data
+ * `MAILROOM_PARSE_SERVER_APP_ID`: Parse Server Application ID
+ * `MAILROOM_PARSE_SERVER_MASTER_KEY`: Parse Server Application Master Key
 
 # Development
 
