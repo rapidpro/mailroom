@@ -1,3 +1,7 @@
+v2.0.37
+----------
+ * Schedules fired in Mailroom
+
 v2.0.36
 ----------
  * Fire schedules from Mailroom
