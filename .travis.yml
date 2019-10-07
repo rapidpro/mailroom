@@ -7,9 +7,6 @@ go:
 matrix:
   include:
     - name: "Postgres 10"
-      env:
-        global:
-          - RELEASE=true
       addons:
         postgresql: "10"
         apt:
@@ -22,6 +19,7 @@ env:
   global:
     - GO111MODULE=on
     - PGPORT=5432
+    - RELEASE=true
 
 services:
   - redis-server
