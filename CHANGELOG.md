@@ -1,3 +1,7 @@
+v2.0.36
+----------
+ * Fire schedules from Mailroom
+
 v2.0.35
 ----------
  * Log query execution and elapsed time
