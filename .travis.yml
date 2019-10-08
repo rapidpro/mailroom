@@ -6,6 +6,14 @@ go:
 
 matrix:
   include:
+    - name: "Postgres 11"
+      addons:
+        postgresql: "11"
+        apt:
+          packages:
+            - postgresql-11
+            - postgresql-11-postgis-2.5
+            - postgresql-client-11
     - name: "Postgres 10"
       addons:
         postgresql: "10"
