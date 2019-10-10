@@ -36,6 +36,9 @@ type OrgAssets struct {
 	channelsByID   map[ChannelID]*Channel
 	channelsByUUID map[assets.ChannelUUID]*Channel
 
+	classifiers       []assets.Classifier
+	classifiersByUUID map[assets.ClassifierUUID]*Classifier
+
 	campaigns             []*Campaign
 	campaignEventsByField map[FieldID][]*CampaignEvent
 	campaignEventsByID    map[CampaignEventID]*CampaignEvent
@@ -87,6 +90,8 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		channelsByID:   make(map[ChannelID]*Channel),
 		channelsByUUID: make(map[assets.ChannelUUID]*Channel),
 
+		classifiersByUUID: make(map[assets.ClassifierUUID]*Classifier),
+
 		fieldsByUUID: make(map[assets.FieldUUID]*Field),
 		fieldsByKey:  make(map[string]*Field),
 
@@ -119,6 +124,14 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		channel := c.(*Channel)
 		o.channelsByID[channel.ID()] = channel
 		o.channelsByUUID[channel.UUID()] = channel
+	}
+
+	o.classifiers, err = loadClassifiers(ctx, db, orgID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading classifier assets for org %d", orgID)
+	}
+	for _, c := range o.classifiers {
+		o.classifiersByUUID[c.UUID()] = c.(*Classifier)
 	}
 
 	o.fields, err = loadFields(ctx, db, orgID)
@@ -271,6 +284,14 @@ func (a *OrgAssets) ChannelByID(channelID ChannelID) *Channel {
 func (a *OrgAssets) AddTestChannel(channel assets.Channel) {
 	a.channels = append(a.channels, channel)
 	// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
+}
+
+func (a *OrgAssets) Classifiers() ([]assets.Classifier, error) {
+	return a.classifiers, nil
+}
+
+func (a *OrgAssets) ClassifierByUUID(classifierUUID assets.ClassifierUUID) *Classifier {
+	return a.classifiersByUUID[classifierUUID]
 }
 
 func (a *OrgAssets) Fields() ([]assets.Field, error) {

@@ -30,9 +30,9 @@ func TestInterrupts(t *testing.T) {
 	insertSession := func(orgID models.OrgID, contactID models.ContactID, connectionID models.ConnectionID, currentFlowID models.FlowID) models.SessionID {
 		var sessionID models.SessionID
 		err := db.Get(&sessionID,
-			`INSERT INTO flows_flowsession(status, responded, created_on, org_id, contact_id, connection_id, current_flow_id)
-									VALUES('W', false, NOW(), $1, $2, $3, $4) RETURNING id`,
-			orgID, contactID, connectionID, currentFlowID)
+			`INSERT INTO flows_flowsession(uuid, status, responded, created_on, org_id, contact_id, connection_id, current_flow_id)
+									VALUES($1, 'W', false, NOW(), $2, $3, $4, $5) RETURNING id`,
+			uuids.New(), orgID, contactID, connectionID, currentFlowID)
 		assert.NoError(t, err)
 
 		// give session one active run too

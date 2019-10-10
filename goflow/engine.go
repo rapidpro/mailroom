@@ -8,7 +8,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/goflow/providers/webhooks"
+	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/mailroom/config"
 )
 
@@ -31,7 +31,9 @@ func Engine() flows.Engine {
 	engInit.Do(func() {
 		eng = engine.NewBuilder().
 			WithHTTPClient(httpClient).
-			WithWebhookService(webhooks.NewService("RapidProMailroom/"+config.Mailroom.Version, 10000)).
+			WithWebhookServiceFactory(func(flows.Session) flows.WebhookService {
+				return webhooks.NewService("RapidProMailroom/"+config.Mailroom.Version, 10000)
+			}).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()
 	})
