@@ -53,12 +53,6 @@ func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 		"classifier_uuid": event.Classifier.UUID,
 	}).Debug("classifier called")
 
-	// if this is a connection error, use that as our response
-	response := event.Response
-	if event.Status == flows.CallStatusConnectionError {
-		response = "connection error"
-	}
-
 	classifier := org.ClassifierByUUID(event.Classifier.UUID)
 	if classifier == nil {
 		return errors.Errorf("unable to find classifier with UUID: %s", event.Classifier.UUID)
@@ -70,7 +64,7 @@ func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 		classifier.ID(),
 		event.URL,
 		event.Request,
-		response,
+		event.Response,
 		event.Status != flows.CallStatusSuccess,
 		time.Duration(event.ElapsedMS)*time.Millisecond,
 		event.CreatedOn(),

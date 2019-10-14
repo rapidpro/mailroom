@@ -38,9 +38,7 @@ func Engine() flows.Engine {
 	engInit.Do(func() {
 		eng = engine.NewBuilder().
 			WithHTTPClient(httpClient).
-			WithWebhookServiceFactory(func(flows.Session) (flows.WebhookService, error) {
-				return webhooks.NewService("RapidProMailroom/"+config.Mailroom.Version, 10000), nil
-			}).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory("RapidProMailroom/"+config.Mailroom.Version, 10000)).
 			WithClassificationServiceFactory(classificationFactory).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()

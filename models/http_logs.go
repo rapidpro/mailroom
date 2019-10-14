@@ -30,7 +30,7 @@ type HTTPLog struct {
 		ClassifierID ClassifierID `db:"classifier_id"`
 		URL          string       `db:"url"`
 		Request      string       `db:"request"`
-		Response     string       `db:"response"`
+		Response     null.String  `db:"response"`
 		IsError      bool         `db:"is_error"`
 		RequestTime  int          `db:"request_time"`
 		CreatedOn    time.Time    `db:"created_on"`
@@ -48,7 +48,7 @@ func NewClassifierCalledLog(
 	h.h.ClassifierID = cid
 	h.h.URL = url
 	h.h.Request = request
-	h.h.Response = response
+	h.h.Response = null.String(response)
 	h.h.IsError = isError
 	h.h.RequestTime = int(elapsed / time.Millisecond)
 	h.h.CreatedOn = createdOn
