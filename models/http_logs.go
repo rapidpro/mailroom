@@ -8,7 +8,7 @@ import (
 	"github.com/nyaruka/null"
 )
 
-// HTTPLogID is our type for classifier ids
+// HTTPLogID is our type for HTTPLog ids
 type HTTPLogID null.Int
 
 // HTTPLogType is the type for the type of log this is
@@ -61,7 +61,7 @@ INSERT INTO request_logs_httplog( log_type,  org_id,  classifier_id,  url,  requ
 RETURNING id
 `
 
-// InsertHTTPLogs inserts the passed in classifiers returning any errors encountered
+// InsertHTTPLogs inserts the passed in logs returning any errors encountered
 func InsertHTTPLogs(ctx context.Context, tx Queryer, logs []*HTTPLog) error {
 	if len(logs) == 0 {
 		return nil

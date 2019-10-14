@@ -19,10 +19,11 @@ import (
 // ClassifierID is our type for classifier ids
 type ClassifierID null.Int
 
-// NilClassifierID is our const for a nil classifier ID
-const NilClassifierID = ClassifierID(0)
-
 const (
+	// NilClassifierID is our const for a nil classifier ID
+	NilClassifierID = ClassifierID(0)
+
+	// Our classifier types
 	ClassifierTypeWit  = "wit"
 	ClassifierTypeLuis = "luis"
 
