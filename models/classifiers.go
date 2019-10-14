@@ -7,6 +7,10 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/services/classification/luis"
+	"github.com/nyaruka/goflow/services/classification/wit"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -18,14 +22,38 @@ type ClassifierID null.Int
 // NilClassifierID is our const for a nil classifier ID
 const NilClassifierID = ClassifierID(0)
 
+const (
+	ClassifierTypeWit  = "wit"
+	ClassifierTypeLuis = "luis"
+
+	// Wit.ai config options
+	WitConfigAppID       = "app_id"
+	WitConfigAccessToken = "access_token"
+
+	// LUIS config options
+	LuisConfigAppID       = "app_id"
+	LuisConfigVersion     = "version"
+	LuisConfigEndpointURL = "endpoint_url"
+	LuisConfigPrimaryKey  = "primary_key"
+)
+
+// Register a classification service factory with the engine
+func init() {
+	goflow.RegisterClassificationServiceFactory(
+		func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
+			return classifier.Asset().(*Classifier).AsService(classifier)
+		},
+	)
+}
+
 // Classifier is our type for a Classifier
 type Classifier struct {
 	c struct {
-		ID      ClassifierID           `json:"id"`
-		UUID    assets.ClassifierUUID  `json:"uuid"`
-		Type    string                 `json:"classifier_type"`
-		Name    string                 `json:"name"`
-		Config  map[string]interface{} `json:"config"`
+		ID      ClassifierID          `json:"id"`
+		UUID    assets.ClassifierUUID `json:"uuid"`
+		Type    string                `json:"classifier_type"`
+		Name    string                `json:"name"`
+		Config  map[string]string     `json:"config"`
 		Intents []struct {
 			Name       string `json:"name"`
 			ExternalID string `json:"external_id"`
@@ -49,6 +77,31 @@ func (c *Classifier) Intents() []string { return c.c.intentNames }
 
 // Type returns the type of this classifier
 func (c *Classifier) Type() string { return c.c.Type }
+
+// AsService builds the corresponding ClassificationService for the passed in Classifier
+func (c *Classifier) AsService(classifier *flows.Classifier) (flows.ClassificationService, error) {
+	switch c.Type() {
+	case ClassifierTypeWit:
+		accessToken := c.c.Config[WitConfigAccessToken]
+		if accessToken == "" {
+			return nil, errors.Errorf("missing %s for Wit classifier: %s", WitConfigAccessToken, c.UUID())
+		}
+		return wit.NewService(classifier, accessToken), nil
+
+	case ClassifierTypeLuis:
+		endpoint := c.c.Config[LuisConfigEndpointURL]
+		appID := c.c.Config[LuisConfigAppID]
+		key := c.c.Config[LuisConfigPrimaryKey]
+		if endpoint == "" || appID == "" || key == "" {
+			return nil, errors.Errorf("missing %s, %s or %s on LUIS classifier: %s",
+				LuisConfigEndpointURL, LuisConfigAppID, LuisConfigPrimaryKey, c.UUID())
+		}
+		return luis.NewService(classifier, endpoint, appID, key), nil
+
+	default:
+		return nil, errors.Errorf("unknown classifier type '%s' for classifier: %s", c.Type(), c.UUID())
+	}
+}
 
 // loadClassifiers loads all the classifiers for the passed in org
 func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Classifier, error) {

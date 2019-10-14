@@ -14,6 +14,13 @@ import (
 
 var eng flows.Engine
 var engInit sync.Once
+var classificationFactory engine.ClassificationServiceFactory
+
+// RegisterClassificationServiceFactory can be used by outside callers to register a classification factory
+// for use by the engine
+func RegisterClassificationServiceFactory(factory engine.ClassificationServiceFactory) {
+	classificationFactory = factory
+}
 
 // Engine returns the global engine instance for use in mailroom
 func Engine() flows.Engine {
@@ -31,9 +38,10 @@ func Engine() flows.Engine {
 	engInit.Do(func() {
 		eng = engine.NewBuilder().
 			WithHTTPClient(httpClient).
-			WithWebhookServiceFactory(func(flows.Session) flows.WebhookService {
-				return webhooks.NewService("RapidProMailroom/"+config.Mailroom.Version, 10000)
+			WithWebhookServiceFactory(func(flows.Session) (flows.WebhookService, error) {
+				return webhooks.NewService("RapidProMailroom/"+config.Mailroom.Version, 10000), nil
 			}).
+			WithClassificationServiceFactory(classificationFactory).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()
 	})

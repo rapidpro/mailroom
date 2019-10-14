@@ -17,24 +17,24 @@ func init() {
 	models.RegisterEventHook(events.TypeClassifierCalled, handleClassifierCalled)
 }
 
-// InsertClassifierLogsHook is our hook for inserting classifier logs
-type InsertClassifierLogsHook struct{}
+// InsertHTTPLogsHook is our hook for inserting classifier logs
+type InsertHTTPLogsHook struct{}
 
-var insertClassifierLogsHook = &InsertClassifierLogsHook{}
+var insertHTTPLogsHook = &InsertHTTPLogsHook{}
 
 // Apply inserts all the classifier logs that were created
-func (h *InsertClassifierLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
 	// gather all our logs
-	logs := make([]*models.ClassifierLog, 0, len(sessions))
+	logs := make([]*models.HTTPLog, 0, len(sessions))
 	for _, ls := range sessions {
 		for _, l := range ls {
-			logs = append(logs, l.(*models.ClassifierLog))
+			logs = append(logs, l.(*models.HTTPLog))
 		}
 	}
 
-	err := models.InsertClassifierLogs(ctx, tx, logs)
+	err := models.InsertHTTPLogs(ctx, tx, logs)
 	if err != nil {
-		return errors.Wrapf(err, "error inserting classifier logs")
+		return errors.Wrapf(err, "error inserting http logs")
 	}
 
 	return nil
@@ -65,18 +65,18 @@ func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 	}
 
 	// create a log for this call
-	log := models.NewClassifierLog(
+	log := models.NewClassifierCalledLog(
+		org.OrgID(),
 		classifier.ID(),
 		event.URL,
 		event.Request,
 		response,
 		event.Status != flows.CallStatusSuccess,
-		"Classifier Called",
 		time.Duration(event.ElapsedMS)*time.Millisecond,
 		event.CreatedOn(),
 	)
 
-	session.AddPreCommitEvent(insertClassifierLogsHook, log)
+	session.AddPreCommitEvent(insertHTTPLogsHook, log)
 
 	return nil
 }
