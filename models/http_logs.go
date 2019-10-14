@@ -44,8 +44,8 @@ func NewClassifierCalledLog(
 	isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
 	h := &HTTPLog{}
 	h.h.LogType = LogTypeClassifierCalled
-	h.h.ClassifierID = cid
 	h.h.OrgID = orgID
+	h.h.ClassifierID = cid
 	h.h.URL = url
 	h.h.Request = request
 	h.h.Response = response
@@ -56,8 +56,8 @@ func NewClassifierCalledLog(
 }
 
 const insertHTTPLogsSQL = `
-INSERT INTO classifiers_classifierlog( url,  request,  response,  is_error,  description,  request_time,  created_on,  classifier_id,  org_id)
-							   VALUES(:url, :request, :response, :is_error, :descripiton, :request_time, :created_on, :classifier_id, :org_id)
+INSERT INTO request_logs_httplog( log_type,  org_id,  classifier_id,  url,  request,  response,  is_error,  request_time,  created_on)
+					      VALUES(:log_type, :org_id, :classifier_id, :url, :request, :response, :is_error, :request_time, :created_on)
 RETURNING id
 `
 
