@@ -76,7 +76,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 	}).Debug("webhook called")
 
 	// if this was a resthook and the status was 410, that means we should remove it
-	if event.Status == flows.WebhookStatusSubscriberGone {
+	if event.Status == flows.CallStatusSubscriberGone {
 		unsub := &models.ResthookUnsubscribe{
 			OrgID: org.OrgID(),
 			Slug:  event.Resthook,
@@ -88,7 +88,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 
 	// if this is a connection error, use that as our response
 	response := event.Response
-	if event.Status == flows.WebhookStatusConnectionError {
+	if event.Status == flows.CallStatusConnectionError {
 		response = "connection error"
 	}
 

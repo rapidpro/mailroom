@@ -8,12 +8,19 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/goflow/providers/webhooks"
+	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/mailroom/config"
 )
 
 var eng flows.Engine
 var engInit sync.Once
+var classificationFactory engine.ClassificationServiceFactory
+
+// RegisterClassificationServiceFactory can be used by outside callers to register a classification factory
+// for use by the engine
+func RegisterClassificationServiceFactory(factory engine.ClassificationServiceFactory) {
+	classificationFactory = factory
+}
 
 // Engine returns the global engine instance for use in mailroom
 func Engine() flows.Engine {
@@ -31,7 +38,8 @@ func Engine() flows.Engine {
 	engInit.Do(func() {
 		eng = engine.NewBuilder().
 			WithHTTPClient(httpClient).
-			WithWebhookService(webhooks.NewService("RapidProMailroom/"+config.Mailroom.Version, 10000)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory("RapidProMailroom/"+config.Mailroom.Version, 10000)).
+			WithClassificationServiceFactory(classificationFactory).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()
 	})

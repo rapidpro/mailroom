@@ -94,6 +94,12 @@ var ReportingLabelUUID = assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"
 var TestingLabelID = LabelID(10001)
 var TestingLabelUUID = assets.LabelUUID("a6338cdc-7938-4437-8b05-2d5d785e3a08")
 
+var LuisID = ClassifierID(1)
+var LuisUUID = assets.ClassifierUUID("097e026c-ae79-4740-af67-656dbedf0263")
+
+var WitID = ClassifierID(2)
+var WitUUID = assets.ClassifierUUID("ff2a817c-040a-4eb2-8404-7d92e8b79dd0")
+
 // constants for org 2, just a few here
 
 var Org2 = OrgID(2)
