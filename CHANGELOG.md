@@ -1,3 +1,8 @@
+v2.0.38
+----------
+ * Latest GoFlow
+ * Add Classifier / NLU support for LUIS and Wit.ai
+
 v2.0.37
 ----------
  * Schedules fired in Mailroom
