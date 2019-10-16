@@ -2,13 +2,13 @@ package hooks
 
 import (
 	"context"
-	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -43,34 +43,37 @@ func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 // handleClassifierCalled is called for each classifier called event
 func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 	event := e.(*events.ClassifierCalledEvent)
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid":    session.ContactUUID(),
-		"session_id":      session.ID(),
-		"url":             event.URL,
-		"status":          event.Status,
-		"elapsed_ms":      event.ElapsedMS,
-		"classifier_name": event.Classifier.Name,
-		"classifier_uuid": event.Classifier.UUID,
-	}).Debug("classifier called")
 
 	classifier := org.ClassifierByUUID(event.Classifier.UUID)
 	if classifier == nil {
 		return errors.Errorf("unable to find classifier with UUID: %s", event.Classifier.UUID)
 	}
 
-	// create a log for this call
-	log := models.NewClassifierCalledLog(
-		org.OrgID(),
-		classifier.ID(),
-		event.URL,
-		event.Request,
-		event.Response,
-		event.Status != flows.CallStatusSuccess,
-		time.Duration(event.ElapsedMS)*time.Millisecond,
-		event.CreatedOn(),
-	)
+	// create a log for each HTTP call
+	for _, httpLog := range event.HTTPLogs {
+		logrus.WithFields(logrus.Fields{
+			"contact_uuid":    session.ContactUUID(),
+			"session_id":      session.ID(),
+			"url":             httpLog.URL,
+			"status":          httpLog.Status,
+			"elapsed_ms":      httpLog.ElapsedMS,
+			"classifier_name": event.Classifier.Name,
+			"classifier_uuid": event.Classifier.UUID,
+		}).Debug("classifier called")
 
-	session.AddPreCommitEvent(insertHTTPLogsHook, log)
+		log := models.NewClassifierCalledLog(
+			org.OrgID(),
+			classifier.ID(),
+			httpLog.URL,
+			httpLog.Request,
+			httpLog.Response,
+			httpLog.Status != flows.CallStatusSuccess,
+			httpLog.ElapsedMS,
+			httpLog.CreatedOn,
+		)
+
+		session.AddPreCommitEvent(insertHTTPLogsHook, log)
+	}
 
 	return nil
 }
