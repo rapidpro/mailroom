@@ -1,3 +1,9 @@
+v2.0.39
+----------
+ * Update to latest Librato library
+ * Audit closing HTTP bodies
+ * Add smtp-test command
+
 v2.0.38
 ----------
  * Latest GoFlow
