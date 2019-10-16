@@ -24,15 +24,18 @@ func RegisterClassificationServiceFactory(factory engine.ClassificationServiceFa
 
 // Engine returns the global engine instance for use in mailroom
 func Engine() flows.Engine {
+	// customize the default golang transport
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.MaxIdleConns = 32
+	t.MaxIdleConnsPerHost = 8
+	t.IdleConnTimeout = 30 * time.Second
+	t.TLSClientConfig = &tls.Config{
+		Renegotiation: tls.RenegotiateOnceAsClient, // support single TLS renegotiation
+	}
+
 	httpClient := &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConns:    10,
-			IdleConnTimeout: 30 * time.Second,
-			TLSClientConfig: &tls.Config{
-				Renegotiation: tls.RenegotiateOnceAsClient, // support single TLS renegotiation
-			},
-		},
-		Timeout: time.Duration(15 * time.Second),
+		Transport: t,
+		Timeout:   time.Duration(15 * time.Second),
 	}
 
 	engInit.Do(func() {
