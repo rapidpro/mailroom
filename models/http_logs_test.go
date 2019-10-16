@@ -13,7 +13,7 @@ func TestHTTPLogs(t *testing.T) {
 	db := testsuite.DB()
 
 	// insert a log
-	log := NewClassifierCalledLog(Org1, WitID, "http://foo.bar", "GET /", "STATUS 200", false, time.Second, time.Now())
+	log := NewClassifierCalledLog(Org1, WitID, "http://foo.bar", "GET /", "STATUS 200", false, 1000, time.Now())
 	err := InsertHTTPLogs(ctx, db, []*HTTPLog{log})
 	assert.Nil(t, err)
 
@@ -22,7 +22,7 @@ func TestHTTPLogs(t *testing.T) {
 		[]interface{}{Org1, WitID}, 1)
 
 	// insert a log with nil response
-	log = NewClassifierCalledLog(Org1, WitID, "http://foo.bar", "GET /", "", true, time.Second, time.Now())
+	log = NewClassifierCalledLog(Org1, WitID, "http://foo.bar", "GET /", "", true, 1000, time.Now())
 	err = InsertHTTPLogs(ctx, db, []*HTTPLog{log})
 	assert.Nil(t, err)
 
