@@ -6,17 +6,6 @@ go:
 
 matrix:
   include:
-    - name: "Postgres 11"
-      env:
-        - PGDB=11
-      addons:
-        postgresql: "11"
-        apt:
-          packages:
-            - postgresql-11
-            - postgresql-11-postgis-2.5
-            - postgresql-client-11
-            - postgresql-11-postgis-2.5-scripts
     - name: "Postgres 10"
       env:
         - PGDB=10
