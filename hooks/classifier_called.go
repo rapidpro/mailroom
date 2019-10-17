@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"context"
+	"time"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -68,7 +69,7 @@ func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 			httpLog.Request,
 			httpLog.Response,
 			httpLog.Status != flows.CallStatusSuccess,
-			httpLog.ElapsedMS,
+			time.Duration(httpLog.ElapsedMS)*time.Millisecond,
 			httpLog.CreatedOn,
 		)
 

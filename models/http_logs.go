@@ -39,7 +39,7 @@ type HTTPLog struct {
 }
 
 // NewClassifierCalledLog creates a new HTTPLog returning the result
-func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, request string, response string, isError bool, elapsedMS int, createdOn time.Time) *HTTPLog {
+func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
 	h := &HTTPLog{}
 	h.h.LogType = LogTypeClassifierCalled
 	h.h.OrgID = orgID
@@ -48,7 +48,7 @@ func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, request s
 	h.h.Request = request
 	h.h.Response = null.String(response)
 	h.h.IsError = isError
-	h.h.RequestTime = elapsedMS
+	h.h.RequestTime = int(elapsed / time.Millisecond)
 	h.h.CreatedOn = createdOn
 	return h
 }
