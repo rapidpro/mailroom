@@ -109,7 +109,7 @@ func (o *Org) AirtimeService() (flows.AirtimeService, error) {
 	currency := o.ConfigValue(configDTOnecurrency, "")
 
 	if login == "" || token == "" {
-		return nil, errors.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneLogin, configDTOneLogin, o.ID())
+		return nil, errors.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneLogin, configDTOneToken, o.ID())
 	}
 	return dtone.NewService(login, token, currency), nil
 }
