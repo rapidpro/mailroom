@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/services/classification/bothub"
 	"github.com/nyaruka/goflow/services/classification/luis"
 	"github.com/nyaruka/goflow/services/classification/wit"
 	"github.com/nyaruka/mailroom/goflow"
@@ -24,12 +25,15 @@ const (
 	NilClassifierID = ClassifierID(0)
 
 	// Our classifier types
-	ClassifierTypeWit  = "wit"
-	ClassifierTypeLuis = "luis"
+	ClassifierTypeWit    = "wit"
+	ClassifierTypeLuis   = "luis"
+	ClassifierTypeBothub = "bothub"
 
 	// Wit.ai config options
-	WitConfigAppID       = "app_id"
 	WitConfigAccessToken = "access_token"
+
+	// Bothub.it config options
+	BothubConfigAccessToken = "access_token"
 
 	// LUIS config options
 	LuisConfigAppID       = "app_id"
@@ -98,6 +102,13 @@ func (c *Classifier) AsService(classifier *flows.Classifier) (flows.Classificati
 				LuisConfigEndpointURL, LuisConfigAppID, LuisConfigPrimaryKey, c.UUID())
 		}
 		return luis.NewService(classifier, endpoint, appID, key), nil
+
+	case ClassifierTypeBothub:
+		accessToken := c.c.Config[BothubConfigAccessToken]
+		if accessToken == "" {
+			return nil, errors.Errorf("missing %s for Bothub classifier: %s", BothubConfigAccessToken, c.UUID())
+		}
+		return bothub.NewService(classifier, accessToken), nil
 
 	default:
 		return nil, errors.Errorf("unknown classifier type '%s' for classifier: %s", c.Type(), c.UUID())
