@@ -65,6 +65,8 @@ error_txt=Transaction successful
 var withCRLF = func(s string) string { return strings.Replace(s, "\n", "\r\n", -1) }
 
 func TestAirtimeTransferred(t *testing.T) {
+	testsuite.Reset()
+
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
@@ -75,8 +77,6 @@ func TestAirtimeTransferred(t *testing.T) {
 			httpx.NewMockResponse(200, "error_code=13\r\nerror_txt=Oops\r\n"),
 		},
 	}))
-
-	testsuite.Reset()
 
 	testsuite.DB().MustExec(
 		`UPDATE orgs_org SET config = '{"TRANSFERTO_ACCOUNT_LOGIN": "nyaruka", "TRANSFERTO_AIRTIME_API_TOKEN": "123456789"}'::jsonb
