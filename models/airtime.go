@@ -38,8 +38,8 @@ type AirtimeTransfer struct {
 		Sender        null.String           `db:"sender"`
 		Recipient     urns.URN              `db:"recipient"`
 		Currency      null.String           `db:"currency"`
-		DesiredAmount null.String           `db:"desired_amount"`
-		ActualAmount  null.String           `db:"actual_amount"`
+		DesiredAmount decimal.Decimal       `db:"desired_amount"`
+		ActualAmount  decimal.Decimal       `db:"actual_amount"`
 		CreatedOn     time.Time             `db:"created_on"`
 	}
 
@@ -55,8 +55,8 @@ func NewAirtimeTransfer(orgID OrgID, status AirtimeTransferStatus, contactID Con
 	t.t.Sender = null.String(string(sender))
 	t.t.Recipient = recipient
 	t.t.Currency = null.String(currency)
-	t.t.DesiredAmount = null.String(desiredAmount.String())
-	t.t.ActualAmount = null.String(actualAmount.String())
+	t.t.DesiredAmount = desiredAmount
+	t.t.ActualAmount = actualAmount
 	t.t.CreatedOn = createdOn
 	return t
 }
