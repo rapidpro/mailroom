@@ -15,11 +15,18 @@ import (
 var eng flows.Engine
 var engInit sync.Once
 var classificationFactory engine.ClassificationServiceFactory
+var airtimeFactory engine.AirtimeServiceFactory
 
 // RegisterClassificationServiceFactory can be used by outside callers to register a classification factory
 // for use by the engine
 func RegisterClassificationServiceFactory(factory engine.ClassificationServiceFactory) {
 	classificationFactory = factory
+}
+
+// RegisterAirtimeServiceFactory can be used by outside callers to register a airtime factory
+// for use by the engine
+func RegisterAirtimeServiceFactory(factory engine.AirtimeServiceFactory) {
+	airtimeFactory = factory
 }
 
 // Engine returns the global engine instance for use in mailroom
@@ -43,6 +50,7 @@ func Engine() flows.Engine {
 			WithHTTPClient(httpClient).
 			WithWebhookServiceFactory(webhooks.NewServiceFactory("RapidProMailroom/"+config.Mailroom.Version, 10000)).
 			WithClassificationServiceFactory(classificationFactory).
+			WithAirtimeServiceFactory(airtimeFactory).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()
 	})

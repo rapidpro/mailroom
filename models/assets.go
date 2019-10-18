@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/flows/engine"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // OrgAssets is our top level cache of all things contained in an org. It is used to build
@@ -365,6 +366,9 @@ func (a *OrgAssets) SetFlow(flowID FlowID, flow flows.Flow) (*Flow, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error marshalling flow definition")
 	}
+
+	logrus.WithField("flow_id", flowID).WithField("flow_uuid", flow.UUID()).Debug("set debug flow")
+	fmt.Println(string(definition))
 
 	f := &Flow{}
 	f.f.UUID = flow.UUID()

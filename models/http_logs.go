@@ -25,20 +25,35 @@ const (
 // HTTPLog is our type for a HTTPLog
 type HTTPLog struct {
 	h struct {
-		ID           HTTPLogID    `db:"id"`
-		LogType      HTTPLogType  `db:"log_type"`
-		ClassifierID ClassifierID `db:"classifier_id"`
-		URL          string       `db:"url"`
-		Request      string       `db:"request"`
-		Response     null.String  `db:"response"`
-		IsError      bool         `db:"is_error"`
-		RequestTime  int          `db:"request_time"`
-		CreatedOn    time.Time    `db:"created_on"`
-		OrgID        OrgID        `db:"org_id"`
+		ID                HTTPLogID         `db:"id"`
+		LogType           HTTPLogType       `db:"log_type"`
+		ClassifierID      ClassifierID      `db:"classifier_id"`
+		AirtimeTransferID AirtimeTransferID `db:"airtime_transfer_id"`
+		URL               string            `db:"url"`
+		Request           string            `db:"request"`
+		Response          null.String       `db:"response"`
+		IsError           bool              `db:"is_error"`
+		RequestTime       int               `db:"request_time"`
+		CreatedOn         time.Time         `db:"created_on"`
+		OrgID             OrgID             `db:"org_id"`
 	}
 }
 
-// NewClassifierCalledLog creates a new HTTPLog returning the result
+// NewHTTPLog creates a new HTTPLog
+func NewHTTPLog(orgID OrgID, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
+	h := &HTTPLog{}
+	h.h.LogType = LogTypeClassifierCalled
+	h.h.OrgID = orgID
+	h.h.URL = url
+	h.h.Request = request
+	h.h.Response = null.String(response)
+	h.h.IsError = isError
+	h.h.RequestTime = int(elapsed / time.Millisecond)
+	h.h.CreatedOn = createdOn
+	return h
+}
+
+// NewClassifierCalledLog creates a new HTTPLog for a classifier call
 func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
 	h := &HTTPLog{}
 	h.h.LogType = LogTypeClassifierCalled
@@ -53,9 +68,14 @@ func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, request s
 	return h
 }
 
+// SetAirtimeTransferID sets the transfer ID on a log
+func (h *HTTPLog) SetAirtimeTransferID(transferID AirtimeTransferID) {
+	h.h.AirtimeTransferID = transferID
+}
+
 const insertHTTPLogsSQL = `
-INSERT INTO request_logs_httplog( log_type,  org_id,  classifier_id,  url,  request,  response,  is_error,  request_time,  created_on)
-					      VALUES(:log_type, :org_id, :classifier_id, :url, :request, :response, :is_error, :request_time, :created_on)
+INSERT INTO request_logs_httplog( log_type,  org_id,  classifier_id,  airtime_transfer_id,  url,  request,  response,  is_error,  request_time,  created_on)
+					      VALUES(:log_type, :org_id, :classifier_id, :airtime_transfer_id, :url, :request, :response, :is_error, :request_time, :created_on)
 RETURNING id
 `
 
