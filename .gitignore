@@ -5,6 +5,7 @@
 *.so
 *.dylib
 mailroom
+test-smtp
 dist
 .vscode
 .envrc
