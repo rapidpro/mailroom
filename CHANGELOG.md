@@ -1,3 +1,8 @@
+v2.0.40
+----------
+ * Implement hook for airtime_transferred event
+ * Use DTOne for airtime service if configured
+
 v2.0.39
 ----------
  * Update to latest Librato library
