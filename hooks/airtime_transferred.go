@@ -26,20 +26,13 @@ var insertAirtimeTransfersHook = &InsertAirtimeTransfersHook{}
 
 // Apply inserts all the airtime transfers that were created
 func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
-	// gather all our transfers and logs
+	// gather all our transfers
 	transfers := make([]*models.AirtimeTransfer, 0, len(sessions))
-	logs := make([]*models.HTTPLog, 0, len(sessions))
-	logsByTransfer := make(map[*models.AirtimeTransfer][]*models.HTTPLog, len(sessions))
 
 	for _, ts := range sessions {
 		for _, t := range ts {
 			transfer := t.(*models.AirtimeTransfer)
 			transfers = append(transfers, transfer)
-
-			for _, l := range transfer.Logs {
-				logs = append(logs, l)
-				logsByTransfer[transfer] = append(logsByTransfer[transfer], l)
-			}
 		}
 	}
 
@@ -49,10 +42,13 @@ func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp 
 		return errors.Wrapf(err, "error inserting airtime transfers")
 	}
 
-	// set the newly inserted transfer IDs on the logs
-	for t, ls := range logsByTransfer {
-		for _, l := range ls {
+	// gather all our logs and set the newly inserted transfer IDs on them
+	logs := make([]*models.HTTPLog, 0, len(sessions))
+
+	for _, t := range transfers {
+		for _, l := range t.Logs {
 			l.SetAirtimeTransferID(t.ID())
+			logs = append(logs, l)
 		}
 	}
 
