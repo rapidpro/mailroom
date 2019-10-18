@@ -104,14 +104,14 @@ func TestAirtimeTransferred(t *testing.T) {
 		},
 		HookTestCase{
 			Actions: ContactActionMap{
-				models.CathyID: []flows.Action{
+				models.GeorgeID: []flows.Action{
 					actions.NewTransferAirtime(newActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.20`)}, "Transfer"),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'F'`,
-					Args:  []interface{}{models.Org1, models.CathyID},
+					Args:  []interface{}{models.Org1, models.GeorgeID},
 					Count: 1,
 				},
 				SQLAssertion{
