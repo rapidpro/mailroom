@@ -9,6 +9,7 @@ matrix:
     - name: "Postgres 10"
       env:
         - PGDB=10
+        - RELEASE=true
       addons:
         postgresql: "10"
         apt:
@@ -33,7 +34,6 @@ env:
   global:
     - GO111MODULE=on
     - PGPORT=5432
-    - RELEASE=true
 
 services:
   - redis-server
