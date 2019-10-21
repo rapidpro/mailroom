@@ -1,3 +1,7 @@
+v2.0.42
+----------
+ * Update to goflow v0.54.0
+
 v2.0.41
 ----------
  * only release on PG10
