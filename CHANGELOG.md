@@ -1,3 +1,7 @@
+v2.0.41
+----------
+ * only release on PG10
+
 v2.0.40
 ----------
  * Implement hook for airtime_transferred event
