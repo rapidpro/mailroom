@@ -1,3 +1,16 @@
+v2.0.42
+----------
+ * Update to goflow v0.54.0
+
+v2.0.41
+----------
+ * only release on PG10
+
+v2.0.40
+----------
+ * Implement hook for airtime_transferred event
+ * Use DTOne for airtime service if configured
+
 v2.0.39
 ----------
  * Update to latest Librato library

@@ -59,7 +59,7 @@ func TestElasticQuery(t *testing.T) {
 		if tc.IsAnon {
 			redactionPolicy = envs.RedactionPolicyURNs
 		}
-		env := envs.NewEnvironmentBuilder().WithTimezone(ny).WithRedactionPolicy(redactionPolicy).Build()
+		env := envs.NewBuilder().WithTimezone(ny).WithRedactionPolicy(redactionPolicy).Build()
 
 		query, err := ToElasticQuery(env, resolver, tc.Search)
 
