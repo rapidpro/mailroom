@@ -1,3 +1,8 @@
+v2.0.43
+----------
+ * Simulation should use a different engine instance with a fake airtime service
+ * Add bothub classifier service factory
+
 v2.0.42
 ----------
  * Update to goflow v0.54.0
