@@ -1,3 +1,7 @@
+v2.0.44
+----------
+ * fail calls that have missing channels when retrying them
+
 v2.0.43
 ----------
  * Simulation should use a different engine instance with a fake airtime service
