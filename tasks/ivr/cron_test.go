@@ -15,6 +15,8 @@ import (
 
 func TestRetries(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
+	models.FlushCache()
+
 	rc := rp.Get()
 	defer rc.Close()
 
