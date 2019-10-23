@@ -9,6 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/pkg/errors"
@@ -90,7 +91,7 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 		start := time.Now()
 
 		ctx, cancel := context.WithTimeout(bg, time.Minute)
-		session, err := RequestCallStart(ctx, config, db, org, batch, contact)
+		session, err := ivr.RequestCallStart(ctx, config, db, org, batch, contact)
 		cancel()
 		if err != nil {
 			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID())

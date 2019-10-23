@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/tasks/starts"
@@ -26,7 +27,7 @@ func TestIVR(t *testing.T) {
 	defer rc.Close()
 
 	// register our mock client
-	RegisterClientType(models.ChannelType("ZZ"), newMockClient)
+	ivr.RegisterClientType(models.ChannelType("ZZ"), newMockClient)
 
 	// update our twilio channel to be of type 'ZZ' and set max_concurrent_events to 1
 	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, models.TwilioChannelID)
@@ -52,14 +53,14 @@ func TestIVR(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`, []interface{}{models.CathyID, models.ConnectionStatusFailed}, 1)
 
 	client.callError = nil
-	client.callID = CallID("call1")
+	client.callID = ivr.CallID("call1")
 	err = HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, []interface{}{models.CathyID, models.ConnectionStatusWired, "call1"}, 1)
 
 	// trying again should put us in a throttled state (queued)
 	client.callError = nil
-	client.callID = CallID("call1")
+	client.callID = ivr.CallID("call1")
 	err = HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, []interface{}{models.CathyID, models.ConnectionStatusQueued}, 1)
@@ -67,16 +68,16 @@ func TestIVR(t *testing.T) {
 
 var client = &MockClient{}
 
-func newMockClient(channel *models.Channel) (Client, error) {
+func newMockClient(channel *models.Channel) (ivr.Client, error) {
 	return client, nil
 }
 
 type MockClient struct {
-	callID    CallID
+	callID    ivr.CallID
 	callError error
 }
 
-func (c *MockClient) RequestCall(client *http.Client, number urns.URN, handleURL string, statusURL string) (CallID, error) {
+func (c *MockClient) RequestCall(client *http.Client, number urns.URN, handleURL string, statusURL string) (ivr.CallID, error) {
 	return c.callID, c.callError
 }
 
@@ -97,7 +98,7 @@ func (c *MockClient) WriteEmptyResponse(w http.ResponseWriter, msg string) error
 }
 
 func (c *MockClient) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
-	return "", NilAttachment, nil
+	return "", ivr.NilAttachment, nil
 }
 
 func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {

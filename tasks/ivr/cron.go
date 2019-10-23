@@ -6,6 +6,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
 
 	"github.com/gomodule/redigo/redis"
@@ -83,7 +84,11 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 		// and the associated channel
 		channel := org.ChannelByID(conn.ChannelID())
 		if channel == nil {
-			log.WithField("channel_id", conn.ChannelID()).Error("unable to load channel")
+			// fail this call, channel is no longer active
+			err = models.UpdateChannelConnectionStatuses(ctx, db, []models.ConnectionID{conn.ID()}, models.ConnectionStatusFailed)
+			if err != nil {
+				log.WithError(err).WithField("channel_id", conn.ChannelID()).Error("error marking call as failed due to missing channel")
+			}
 			continue
 		}
 
@@ -94,7 +99,7 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 			continue
 		}
 
-		err = RequestCallStartForConnection(ctx, config, db, channel, urn, conn)
+		err = ivr.RequestCallStartForConnection(ctx, config, db, channel, urn, conn)
 		if err != nil {
 			log.WithError(err).Error(err)
 			continue
@@ -146,7 +151,7 @@ func expireCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *re
 		}
 
 		// hang up our call
-		err = HangupCall(ctx, config, db, conn)
+		err = ivr.HangupCall(ctx, config, db, conn)
 		if err != nil {
 			log.WithError(err).WithField("connection_id", conn.ID()).Error("error hanging up call")
 		}
