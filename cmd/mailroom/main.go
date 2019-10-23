@@ -18,11 +18,11 @@ import (
 	_ "github.com/nyaruka/mailroom/tasks/campaigns"
 	_ "github.com/nyaruka/mailroom/tasks/expirations"
 	_ "github.com/nyaruka/mailroom/tasks/interrupts"
+	_ "github.com/nyaruka/mailroom/tasks/ivr"
 	_ "github.com/nyaruka/mailroom/tasks/schedules"
 	_ "github.com/nyaruka/mailroom/tasks/starts"
 	_ "github.com/nyaruka/mailroom/tasks/stats"
 	_ "github.com/nyaruka/mailroom/tasks/timeouts"
-	_ "github.com/nyaruka/mailroom/tasks/ivr"
 
 	_ "github.com/nyaruka/mailroom/web/docs"
 	_ "github.com/nyaruka/mailroom/web/expression"
