@@ -1,3 +1,44 @@
+v2.0.44
+----------
+ * fail calls that have missing channels when retrying them
+
+v2.0.43
+----------
+ * Simulation should use a different engine instance with a fake airtime service
+ * Add bothub classifier service factory
+
+v2.0.42
+----------
+ * Update to goflow v0.54.0
+
+v2.0.41
+----------
+ * only release on PG10
+
+v2.0.40
+----------
+ * Implement hook for airtime_transferred event
+ * Use DTOne for airtime service if configured
+
+v2.0.39
+----------
+ * Update to latest Librato library
+ * Audit closing HTTP bodies
+ * Add smtp-test command
+
+v2.0.38
+----------
+ * Latest GoFlow
+ * Add Classifier / NLU support for LUIS and Wit.ai
+
+v2.0.37
+----------
+ * Schedules fired in Mailroom
+
+v2.0.36
+----------
+ * Fire schedules from Mailroom
+
 v2.0.35
 ----------
  * Log query execution and elapsed time

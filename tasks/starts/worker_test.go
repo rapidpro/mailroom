@@ -37,8 +37,8 @@ func TestStarts(t *testing.T) {
 	// insert a flow run for one of our contacts
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
 	db.MustExec(
-		`INSERT INTO flows_flowrun(uuid, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id)
-		                    VALUES($1, TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), models.GeorgeID, models.SingleMessageFlowID)
+		`INSERT INTO flows_flowrun(uuid, status, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id)
+		                    VALUES($1, 'W', TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), models.GeorgeID, models.SingleMessageFlowID)
 
 	tcs := []struct {
 		Label               string

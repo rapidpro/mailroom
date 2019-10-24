@@ -172,9 +172,11 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 
 	// reuse id from one of our real flows
 	flowID := models.FavoritesFlowID
-	flowUUID := assets.FlowUUID(uuids.New())
 
 	for i, tc := range tcs {
+		// new UUID for each test so our definition doesn't get cached
+		flowUUID := assets.FlowUUID(uuids.New())
+
 		// build our flow for this test case
 		flowDef := CreateTestFlow(t, flowUUID, tc)
 

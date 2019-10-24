@@ -624,7 +624,7 @@ func GetOrCreateURN(ctx context.Context, tx Queryer, org *OrgAssets, contactID C
 }
 
 // URNForID will return a URN for the passed in ID including all the special query parameters
-// set that goflow and mailroom depend on. Generally this URN is build when loading a contact
+// set that goflow and mailroom depend on. Generally this URN is built when loading a contact
 // but occasionally we need to load URNs one by one and this accomplishes that
 func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urns.URN, error) {
 	urn := &ContactURN{}
