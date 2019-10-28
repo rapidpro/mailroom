@@ -1,3 +1,7 @@
+v2.1.0
+----------
+ * Update to goflow v0.54.1
+
 v2.0.44
 ----------
  * fail calls that have missing channels when retrying them
