@@ -1,3 +1,7 @@
+v5.2.0
+----------
+ * RapidPro 5.2 release
+
 v2.1.0
 ----------
  * Update to goflow v0.54.1
