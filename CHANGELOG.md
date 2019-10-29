@@ -1,3 +1,7 @@
+v5.2.1
+----------
+ * Fix NPE when IVR channel not found
+
 v5.2.0
 ----------
  * RapidPro 5.2 release
