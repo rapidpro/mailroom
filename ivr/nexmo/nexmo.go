@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -303,8 +304,10 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
+		io.Copy(ioutil.Discard, resp.Body)
 		return ivr.NilCallID, errors.Errorf("received non 200 status for call start: %d", resp.StatusCode)
 	}
 
@@ -338,6 +341,8 @@ func (c *client) HangupCall(client *http.Client, callID string) error {
 	if err != nil {
 		return errors.Wrapf(err, "error trying to hangup call")
 	}
+	defer resp.Body.Close()
+	io.Copy(ioutil.Discard, resp.Body)
 
 	if resp.StatusCode != 204 {
 		return errors.Errorf("received non 204 status for call hangup: %d", resp.StatusCode)

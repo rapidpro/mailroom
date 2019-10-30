@@ -126,7 +126,7 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
 func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, sa flows.SessionAssets, trigger flows.Trigger) (interface{}, int, error) {
 	// start our flow session
-	session, sprint, err := goflow.Engine().NewSession(sa, trigger)
+	session, sprint, err := goflow.Simulator().NewSession(sa, trigger)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
@@ -192,7 +192,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, err
 	}
 
-	session, err := goflow.Engine().ReadSession(sa, request.Session, assets.IgnoreMissing)
+	session, err := goflow.Simulator().ReadSession(sa, request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

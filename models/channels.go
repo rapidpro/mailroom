@@ -16,11 +16,11 @@ import (
 
 type ChannelID null.Int
 
-var NilChannelID = ChannelID(0)
-
 type ChannelType string
 
 const (
+	NilChannelID = ChannelID(0)
+
 	ChannelTypeAndroid = ChannelType("A")
 
 	ChannelConfigCallbackDomain = "callback_domain"
