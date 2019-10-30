@@ -16,9 +16,9 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/tasks/handler"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/tasks/handler"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -274,7 +274,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 	// and our channel
 	channel := org.ChannelByID(conn.ChannelID())
 	if channel == nil {
-		return writeClientError(w, errors.Wrapf(err, "no active channel with id: %d", conn.ChannelID()))
+		return writeClientError(w, errors.Errorf("no active channel with id: %d", conn.ChannelID()))
 	}
 
 	// create a channel log for this request and connection

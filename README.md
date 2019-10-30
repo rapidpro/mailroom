@@ -1,6 +1,6 @@
 # mailroom [![Build Status](https://travis-ci.org/nyaruka/mailroom.svg?branch=master)](https://travis-ci.org/nyaruka/mailroom) [![codecov](https://codecov.io/gh/nyaruka/mailroom/branch/master/graph/badge.svg)](https://codecov.io/gh/nyaruka/mailroom)
 
-# About
+# About 
 
 Mailroom is the [RapidPro](https://github.com/rapidpro/rapidpro) component responsible for the execution of
 flows. It interacts directly with the RapidPro database and sends and receives messages with [Courier](https://github.com/nyaruka/courier) for handling via Redis.
