@@ -27,7 +27,7 @@ const (
 	// Our classifier types
 	ClassifierTypeWit    = "wit"
 	ClassifierTypeLuis   = "luis"
-	ClassifierTypeBothub = "bothub"
+	ClassifierTypeBothub = "bh"
 
 	// Wit.ai config options
 	WitConfigAccessToken = "access_token"
