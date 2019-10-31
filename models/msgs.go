@@ -863,7 +863,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 				"fields":  flows.Context(org.Env(), contact.Fields()),
 				"urns":    flows.ContextFunc(org.Env(), contact.URNs().MapContext),
 			})
-			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template)
+			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template, nil)
 		}
 
 		// don't do anything if we have no text or attachments
