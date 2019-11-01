@@ -1,0 +1,42 @@
+on: [push, pull_request]
+name: Test
+jobs:
+  test:
+    strategy:
+      matrix:
+        pg-version: ['10', '11']
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Install Redis
+      uses: zhulik/redis-action@v1.0.0
+      with:
+        redis version: '5'
+
+    - name: Install PostgreSQL
+      uses: nyaruka/postgis-action@master
+      with:
+        postgresql version: '${{ matrix.pg-version }}'
+
+    - name: Install Linux packages
+      run: sudo apt install -y --no-install-recommends postgresql-client
+
+    - name: Initialize database
+      run: |
+        psql -h localhost -U postgres -c "CREATE USER mailroom_test PASSWORD 'temba';"
+        psql -h localhost -U postgres -c "ALTER ROLE mailroom_test WITH SUPERUSER;"
+        psql -h localhost -U postgres -c "CREATE DATABASE mailroom_test;"
+
+    - name: Install Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13.x
+
+    - name: Get Go dependencies
+      run: go get -v -t -d ./...
+
+    - name: Run tests
+      run: go test -p=1 -coverprofile=coverage.text -covermode=atomic ./...
