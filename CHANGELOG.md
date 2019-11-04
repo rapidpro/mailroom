@@ -1,3 +1,7 @@
+v5.2.3
+----------
+ * collect queue size 15 seconds after the minute
+
 v5.2.2
 ----------
  * Update to goflow v0.55.0
