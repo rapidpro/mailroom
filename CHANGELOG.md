@@ -1,3 +1,7 @@
+v5.2.4
+----------
+ * Add new dump file with bothub instead of bh
+
 v5.2.3
 ----------
  * collect queue size 15 seconds after the minute
