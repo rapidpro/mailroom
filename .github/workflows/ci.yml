@@ -1,0 +1,74 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    name: Test
+    strategy:
+      matrix:
+        pg-version: ['10', '11']
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Install Redis
+      uses: zhulik/redis-action@v1.0.0
+      with:
+        redis version: '5'
+
+    - name: Install PostgreSQL
+      uses: nyaruka/postgis-action@master
+      with:
+        postgresql version: ${{ matrix.pg-version }}
+
+    - name: Install Linux packages
+      run: sudo apt install -y --no-install-recommends postgresql-client
+
+    - name: Initialize database
+      run: |
+        psql -h localhost -U postgres -c "CREATE USER mailroom_test PASSWORD 'temba';"
+        psql -h localhost -U postgres -c "ALTER ROLE mailroom_test WITH SUPERUSER;"
+        psql -h localhost -U postgres -c "CREATE DATABASE mailroom_test;"
+
+    - name: Install Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13.x
+
+    - name: Run tests
+      run: go test -p=1 -coverprofile=coverage.text -covermode=atomic ./...
+
+    # see https://github.com/codecov/codecov-action/issues/23
+    - name: Upload coverage
+      if: success()
+      run: bash <(curl -s https://codecov.io/bash) -t $TOKEN -B $REF
+      env:
+        TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        REF: ${{ github.ref }}
+  
+  release:
+    name: Release
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Fetch GoFlow docs
+      run: |
+        export GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2)
+        curl https://codeload.github.com/nyaruka/goflow/tar.gz/$GOFLOW_VERSION | tar --wildcards --strip=1 -zx "*/docs/*"
+
+    - name: Install Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13.x
+
+    - name: Publish release
+      uses: goreleaser/goreleaser-action@v1
+      with:
+        version: latest
+        args: release --rm-dist
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

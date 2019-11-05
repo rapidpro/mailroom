@@ -44,7 +44,7 @@ func ResetDB() {
 		dir = path.Dir(dir)
 	}
 
-	mustExec("pg_restore", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
+	mustExec("pg_restore", "-h", "localhost", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
 }
 
 // DB returns an open test database pool
