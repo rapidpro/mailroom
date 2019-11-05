@@ -23,6 +23,7 @@ func TestClassifiers(t *testing.T) {
 	}{
 		{LuisID, LuisUUID, "LUIS", []string{"book_flight", "book_car"}},
 		{WitID, WitUUID, "Wit.ai", []string{"register"}},
+		{BothubID, BothubUUID, "BotHub", []string{"intent"}},
 	}
 
 	assert.Equal(t, len(tcs), len(classifiers))

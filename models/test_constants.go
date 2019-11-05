@@ -100,6 +100,9 @@ var LuisUUID = assets.ClassifierUUID("097e026c-ae79-4740-af67-656dbedf0263")
 var WitID = ClassifierID(2)
 var WitUUID = assets.ClassifierUUID("ff2a817c-040a-4eb2-8404-7d92e8b79dd0")
 
+var BothubID = ClassifierID(3)
+var BothubUUID = assets.ClassifierUUID("859b436d-3005-4e43-9ad5-3de5f26ede4c")
+
 // constants for org 2, just a few here
 
 var Org2 = OrgID(2)
