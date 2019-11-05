@@ -1,5 +1,5 @@
+name: CI
 on: [push, pull_request]
-name: Test and Release
 jobs:
   test:
     name: Test
@@ -19,7 +19,7 @@ jobs:
     - name: Install PostgreSQL
       uses: nyaruka/postgis-action@master
       with:
-        postgresql version: '${{ matrix.pg-version }}'
+        postgresql version: ${{ matrix.pg-version }}
 
     - name: Install Linux packages
       run: sudo apt install -y --no-install-recommends postgresql-client
@@ -43,29 +43,29 @@ jobs:
       if: success()
       run: bash <(curl -s https://codecov.io/bash) -t $TOKEN -B $REF
       env:
-        TOKEN: "${{ secrets.CODECOV_TOKEN }}"
-        REF: "${{ github.ref }}"
+        TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        REF: ${{ github.ref }}
   
   release:
     name: Release
-    needs: test
+    needs: [test]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Fetch GoFlow docs
+      run: |
+        export GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2)
+        curl https://codeload.github.com/nyaruka/goflow/tar.gz/$GOFLOW_VERSION | tar --wildcards --strip=1 -zx "*/docs/*"
+
     - name: Install Go
       uses: actions/setup-go@v1
       with:
         go-version: 1.13.x
 
-    - name: Checkout code
-      uses: actions/checkout@v1
-
-    - name: Bundle goflow docs
-      run: |
-        export GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2)
-        curl https://codeload.github.com/nyaruka/goflow/tar.gz/$GOFLOW_VERSION | tar --wildcards --strip=1 -zx "*/docs/*"
-
-    - name: Make release
+    - name: Publish release
       uses: goreleaser/goreleaser-action@v1
       with:
         version: latest
