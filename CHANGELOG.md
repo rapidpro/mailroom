@@ -1,3 +1,7 @@
+v5.3.0
+----------
+ * Use github actions
+
 v5.2.4
 ----------
  * Add new dump file with bothub instead of bh
