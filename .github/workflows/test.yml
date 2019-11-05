@@ -1,12 +1,12 @@
 on: [push, pull_request]
-name: Test
+name: Test and Release
 jobs:
   test:
+    name: Test
     strategy:
       matrix:
         pg-version: ['10', '11']
-        platform: [ubuntu-latest]
-    runs-on: ${{ matrix.platform }}
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v1
@@ -35,9 +35,6 @@ jobs:
       with:
         go-version: 1.13.x
 
-    - name: Get Go dependencies
-      run: go get -v -t -d ./...
-
     - name: Run tests
       run: go test -p=1 -coverprofile=coverage.text -covermode=atomic ./...
 
@@ -48,16 +45,28 @@ jobs:
       env:
         TOKEN: "${{ secrets.CODECOV_TOKEN }}"
         REF: "${{ github.ref }}"
+  
+  release:
+    name: Release
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13.x
+
+    - name: Checkout code
+      uses: actions/checkout@v1
 
     - name: Bundle goflow docs
-      if: success()
       run: |
         export GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2)
         curl https://codeload.github.com/nyaruka/goflow/tar.gz/$GOFLOW_VERSION | tar --wildcards --strip=1 -zx "*/docs/*"
 
     - name: Make release
       uses: goreleaser/goreleaser-action@v1
-      if: success() && startsWith(github.ref, 'refs/tags/') && matrix.pg-version == '10'
       with:
         version: latest
         args: release --rm-dist
