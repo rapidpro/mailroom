@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows/definition"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
@@ -39,7 +39,7 @@ func TestFlows(t *testing.T) {
 			assert.Equal(t, tc.Name, flow.StringConfigValue("name", "missing"))
 			assert.Equal(t, "missing", flow.StringConfigValue("not_there", "missing"))
 
-			_, err := definition.ReadFlow(flow.Definition())
+			_, err := goflow.ReadFlow(flow.Definition())
 			assert.NoError(t, err)
 		} else {
 			assert.Nil(t, flow)

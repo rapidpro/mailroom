@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/mailroom/goflow"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -239,11 +240,7 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 
 // NewSessionAssets creates new sessions assets, returning the result
 func NewSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
-	assets, err := engine.NewSessionAssets(org)
-	if err != nil {
-		return nil, err
-	}
-	return assets, nil
+	return engine.NewSessionAssets(org, goflow.MigrationConfig())
 }
 
 // GetSessionAssets returns a goflow session assets object for the passed in org assets

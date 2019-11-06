@@ -740,7 +740,7 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 func validateFlow(sa flows.SessionAssets, uuid assets.FlowUUID) error {
 	flow, err := sa.Flows().Get(uuid)
 	if err != nil {
-		return errors.Wrapf(err, "invalid flow: %s, cannot start", flow.UUID())
+		return errors.Wrapf(err, "invalid flow: %s, cannot start", uuid)
 	}
 
 	// check for missing assets and log
