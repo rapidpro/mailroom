@@ -6,11 +6,9 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/definition"
-	"github.com/nyaruka/goflow/legacy"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
-	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
 
@@ -41,7 +39,7 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	flow, err := readFlow(request.Flow)
+	flow, err := goflow.ReadFlow(request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -74,7 +72,7 @@ func handleValidate(ctx context.Context, s *web.Server, r *http.Request) (interf
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	flow, err := readFlow(request.Flow)
+	flow, err := goflow.ReadFlow(request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -116,7 +114,7 @@ func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	flow, err := readFlow(request.Flow)
+	flow, err := goflow.ReadFlow(request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -158,7 +156,7 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 	}
 
 	// try to read the flow definition
-	flow, err := definition.ReadFlow(request.Flow)
+	flow, err := goflow.ReadFlow(request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -174,32 +172,6 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 	}
 
 	return clone, http.StatusOK, nil
-}
-
-// reads a flow from the given JSON, migrating it if it's in legacy format
-func readFlow(flowDef json.RawMessage) (flows.Flow, error) {
-	var flow flows.Flow
-	var err error
-
-	if legacy.IsLegacyDefinition(flowDef) {
-		// migrate definition if it is in legacy format
-		legacyFlow, err := legacy.ReadLegacyFlow(flowDef)
-		if err != nil {
-			return nil, err
-		}
-
-		flow, err = legacyFlow.Migrate("https://" + config.Mailroom.AttachmentDomain)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		flow, err = definition.ReadFlow(flowDef)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return flow, nil
 }
 
 func validate(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.Flow) (interface{}, int, error) {
