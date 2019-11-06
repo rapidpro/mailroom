@@ -25,8 +25,8 @@ func init() {
 }
 
 type flowDefinition struct {
-	UUID       assets.FlowUUID `json:"uuid"                validate:"required"`
-	Definition json.RawMessage `json:"definition"`
+	UUID       assets.FlowUUID `json:"uuid"       validate:"required"`
+	Definition json.RawMessage `json:"definition" validate:"required"`
 }
 
 type sessionRequest struct {
@@ -259,6 +259,5 @@ func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawM
 
 	flow := f.(*models.Flow)
 	flow.SetDefinition(flowDef)
-
-	return errors.Errorf("missing definition for flow: %s", uuid)
+	return nil
 }
