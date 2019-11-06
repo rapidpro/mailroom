@@ -1,3 +1,7 @@
+v5.3.1
+----------
+ * Update to latest goflow
+
 v5.3.0
 ----------
  * Use github actions
