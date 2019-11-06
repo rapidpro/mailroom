@@ -25,9 +25,8 @@ func init() {
 }
 
 type flowDefinition struct {
-	UUID             assets.FlowUUID `json:"uuid"                validate:"required"`
-	Definition       json.RawMessage `json:"definition"`
-	LegacyDefinition json.RawMessage `json:"legacy_definition"`
+	UUID       assets.FlowUUID `json:"uuid"                validate:"required"`
+	Definition json.RawMessage `json:"definition"`
 }
 
 type sessionRequest struct {
@@ -49,8 +48,7 @@ type sessionResponse struct {
 //     "org_id": 1,
 //     "flows": [{
 //        "uuid": uuidv4,
-//        "definition": "goflow definition",
-//        "legacy_definition": "legacy definition",
+//        "definition": {...},
 //     },.. ],
 //     "trigger": {...},
 //     "assets": {...}
@@ -97,7 +95,7 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 	// for each of our passed in definitions
 	for _, flow := range request.Flows {
 		// populate our flow in our org from our request
-		err = populateFlow(org, flow.UUID, flow.Definition, flow.LegacyDefinition)
+		err = populateFlow(org, flow.UUID, flow.Definition)
 		if err != nil {
 			return nil, http.StatusBadRequest, err
 		}
@@ -145,8 +143,7 @@ func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, sa flo
 //     "org_id": 1,
 //     "flows": [{
 //        "uuid": uuidv4,
-//        "definition": "goflow definition",
-//        "legacy_definition": "legacy definition",
+//        "definition": {...},
 //     },.. ],
 //     "session": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "runs": [...], ...},
 //     "resume": {...},
@@ -175,7 +172,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// for each of our passed in definitions
 	for _, flow := range request.Flows {
 		// populate our flow in our org from our request
-		err = populateFlow(org, flow.UUID, flow.Definition, flow.LegacyDefinition)
+		err = populateFlow(org, flow.UUID, flow.Definition)
 		if err != nil {
 			return nil, http.StatusBadRequest, err
 		}
@@ -254,22 +251,14 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 }
 
 // populateFlow takes care of setting the definition for the flow with the passed in UUID according to the passed in definitions
-func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawMessage, legacyFlowDef json.RawMessage) error {
+func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawMessage) error {
 	f, err := org.Flow(uuid)
 	if err != nil {
 		return errors.Wrapf(err, "unable to find flow with uuid: %s", uuid)
 	}
 
 	flow := f.(*models.Flow)
-	if flowDef != nil {
-		flow.SetDefinition(flowDef)
-		return nil
-	}
+	flow.SetDefinition(flowDef)
 
-	if legacyFlowDef != nil {
-		flow.SetDefinition(legacyFlowDef)
-		return nil
-	}
-
-	return errors.Errorf("missing definition or legacy_definition for flow: %s", uuid)
+	return errors.Errorf("missing definition for flow: %s", uuid)
 }
