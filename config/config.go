@@ -44,6 +44,9 @@ type Config struct {
 	AuthToken string `help:"the token clients will need to authenticate web requests"`
 	Address   string `help:"the address to bind our web server to"`
 	Port      int    `help:"the port to bind our web server to"`
+
+	FDLKey        string `help:"the FDL API key used to generate shorten links"`
+	FDLDefaultURL string `help:"the FDL default URL used to access the shorten link generated"`
 }
 
 // NewMailroomConfig returns a new default configuration object

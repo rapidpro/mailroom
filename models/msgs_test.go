@@ -54,7 +54,7 @@ func TestMsgs(t *testing.T) {
 		assert.NoError(t, err)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil)
-		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now)
+		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now, "", ctx, tx)
 
 		if err == nil {
 			assert.False(t, tc.HasErr)
