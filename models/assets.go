@@ -439,3 +439,7 @@ func (a *OrgAssets) ResthookBySlug(slug string) *Resthook {
 func (a *OrgAssets) Templates() ([]assets.Template, error) {
 	return a.templates, nil
 }
+
+func (a *OrgAssets) Globals() ([]assets.Global, error) {
+	return nil, nil // not supported yet
+}

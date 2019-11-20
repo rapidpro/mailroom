@@ -49,9 +49,13 @@ func RegisterAirtimeServiceFactory(factory engine.AirtimeServiceFactory) {
 // Engine returns the global engine instance for use with real sessions
 func Engine() flows.Engine {
 	engInit.Do(func() {
+		webhookHeaders := map[string]string{
+			"User-Agent":      "RapidProMailroom/" + config.Mailroom.Version,
+			"X-Mailroom-Mode": "normal",
+		}
+
 		eng = engine.NewBuilder().
-			WithHTTPClient(httpClient).
-			WithWebhookServiceFactory(webhooks.NewServiceFactory("RapidProMailroom/"+config.Mailroom.Version, 10000)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, webhookHeaders, 10000)).
 			WithClassificationServiceFactory(classificationFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
@@ -64,9 +68,13 @@ func Engine() flows.Engine {
 // Simulator returns the global engine instance for use with simulated sessions
 func Simulator() flows.Engine {
 	simulatorInit.Do(func() {
+		webhookHeaders := map[string]string{
+			"User-Agent":      "RapidProMailroom/" + config.Mailroom.Version,
+			"X-Mailroom-Mode": "simulation",
+		}
+
 		simulator = engine.NewBuilder().
-			WithHTTPClient(httpClient).
-			WithWebhookServiceFactory(webhooks.NewServiceFactory("RapidProMailroom/"+config.Mailroom.Version, 10000)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, webhookHeaders, 10000)).
 			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // but faked airtime transfers
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
