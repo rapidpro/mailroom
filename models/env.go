@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"time"
 
 	"github.com/nyaruka/goflow/envs"
@@ -18,9 +19,12 @@ import (
 
 // Register a airtime service factory with the engine
 func init() {
+	// give airtime transfers an extra long timeout
+	httpClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
+
 	goflow.RegisterAirtimeServiceFactory(
 		func(session flows.Session) (flows.AirtimeService, error) {
-			return orgFromSession(session).AirtimeService()
+			return orgFromSession(session).AirtimeService(httpClient)
 		},
 	)
 }
@@ -103,7 +107,7 @@ func (o *Org) ConfigValue(key string, def string) string {
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
-func (o *Org) AirtimeService() (flows.AirtimeService, error) {
+func (o *Org) AirtimeService(httpClient *http.Client) (flows.AirtimeService, error) {
 	login := o.ConfigValue(configDTOneLogin, "")
 	token := o.ConfigValue(configDTOneToken, "")
 	currency := o.ConfigValue(configDTOnecurrency, "")
@@ -111,7 +115,7 @@ func (o *Org) AirtimeService() (flows.AirtimeService, error) {
 	if login == "" || token == "" {
 		return nil, errors.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneLogin, configDTOneToken, o.ID())
 	}
-	return dtone.NewService(login, token, currency), nil
+	return dtone.NewService(httpClient, login, token, currency), nil
 }
 
 // gets the underlying org for the given engine session

@@ -425,10 +425,6 @@ func (a *OrgAssets) Triggers() []*Trigger {
 	return a.triggers
 }
 
-func (a *OrgAssets) Globals() ([]assets.Global, error) {
-	return a.globals, nil
-}
-
 func (a *OrgAssets) Locations() ([]assets.LocationHierarchy, error) {
 	return a.locations, nil
 }
@@ -448,4 +444,8 @@ func (a *OrgAssets) ResthookBySlug(slug string) *Resthook {
 
 func (a *OrgAssets) Templates() ([]assets.Template, error) {
 	return a.templates, nil
+}
+
+func (a *OrgAssets) Globals() ([]assets.Global, error) {
+	return a.globals, nil
 }
