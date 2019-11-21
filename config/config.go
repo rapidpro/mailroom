@@ -76,5 +76,8 @@ func NewMailroomConfig() *Config {
 
 		Address: "localhost",
 		Port:    8090,
+
+		FDLDefaultURL: "https://ccl.page.link",
+		FDLKey:        "12345",
 	}
 }
