@@ -5,7 +5,11 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/buger/jsonparser"
+	"io/ioutil"
+	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -25,6 +29,7 @@ import (
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
 )
 
 // MsgID is our internal type for msg ids, which can be null/0
@@ -303,23 +308,25 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 	}
 
 	// Splitting the text as array for analyzing and replace if it's the case
-	textSplitted := strings.Split(out.Text(), " ")
+	re := regexp.MustCompile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`)
+	textSplitted := re.FindAllString(out.Text(), -1)
+	text := out.Text()
 	for i := range textSplitted {
 		d := textSplitted[i]
 
 		// Checking if the text is a valid URL
-		u, err := url.ParseRequestURI(d)
-		if err != nil {
+		if !isValidUrl(d) {
 			continue
 		}
 
-		dest, errLink := GetLinksFromOrg(ctx, tx, orgID, u.String())
+		dest, errLink := GetLinksFromOrg(ctx, tx, orgID, d)
 
 		if errLink == nil && contactUUID != "" {
 			fdlURL := fmt.Sprintf("https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=%s", config.Mailroom.FDLKey)
 			handleURL := fmt.Sprintf("https://%s/link/handler/%s", config.Mailroom.Domain, dest["uuid"])
 			longURL := fmt.Sprintf("%s?contact=%s", handleURL, contactUUID)
 
+			// creating the payload
 			payload := &TLPayload{
 				LongDynamicLink: fmt.Sprintf("%s/?link=%s", config.Mailroom.FDLDefaultURL, longURL),
 				Suffix: TLSuffix{
@@ -327,12 +334,35 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 				},
 			}
 
+			b, _ := json.Marshal(payload)
+
+			// build our request
+			method := "POST"
+			req, errReq := http.NewRequest(method, fdlURL, strings.NewReader(string(b)))
+			if errReq != nil {
+				continue
+			}
+
+			req.Header.Add("Content-Type", "application/json")
+
+			resp, errHttp := http.DefaultClient.Do(req)
+			if errHttp != nil {
+				continue
+			}
+			content, errRead := ioutil.ReadAll(resp.Body)
+			if errRead != nil {
+				continue
+			}
+
+			// replacing the link for the FDL generated link
+			shortLink, _ := jsonparser.GetString(content, "shortLink")
+			text = strings.Replace(text, d, shortLink, -1)
 		}
 
 	}
 
 	m.UUID = out.UUID()
-	m.Text = out.Text()
+	m.Text = text
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
@@ -434,6 +464,7 @@ func GetLinksFromOrg(ctx context.Context, tx Queryer, org OrgID, d string) (map[
 	if !rows.Next() {
 		return dest, errors.Errorf("no link found")
 	}
+	defer rows.Close()
 
 	err = readJSONRow(rows, link)
 	if err != nil {
@@ -931,4 +962,14 @@ func (i BroadcastID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *BroadcastID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
+}
+
+// Check if it's a valid URL
+func isValidUrl(toTest string) bool {
+	_, err := url.ParseRequestURI(toTest)
+	if err != nil {
+		return false
+	} else {
+		return true
+	}
 }
