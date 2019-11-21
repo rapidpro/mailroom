@@ -1,3 +1,7 @@
+v2.0.9.4
+----------
+ * Update to goflow v0.41.14.23 (Lookup + Gift Card + Trackable Links)
+
 v2.0.9.3
 ----------
  * Update to goflow v0.41.14.19
