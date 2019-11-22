@@ -64,7 +64,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 FROM 
 	globals_global g
 WHERE 
-	org_id = $1 
+	org_id = $1 AND
+	is_active = TRUE
 ORDER BY 
 	key ASC
 ) r;
