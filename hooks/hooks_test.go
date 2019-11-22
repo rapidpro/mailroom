@@ -194,12 +194,12 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 			}
 			return nil
 		}
-		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
+		options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
 			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
+				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil), nil
 			}
-			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil)
+			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil), nil
 		}
 
 		_, err = runner.StartFlow(ctx, db, rp, org, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)

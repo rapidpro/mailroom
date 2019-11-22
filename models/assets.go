@@ -60,6 +60,7 @@ type OrgAssets struct {
 	resthooks []assets.Resthook
 	templates []assets.Template
 	triggers  []*Trigger
+	globals   []assets.Global
 
 	locations        []assets.LocationHierarchy
 	locationsBuiltAt time.Time
@@ -189,6 +190,11 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	o.templates, err = loadTemplates(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading templates for org %d", orgID)
+	}
+
+	o.globals, err = loadGlobals(ctx, db, orgID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading globals for org %d", orgID)
 	}
 
 	// cache locations for an hour
@@ -438,4 +444,8 @@ func (a *OrgAssets) ResthookBySlug(slug string) *Resthook {
 
 func (a *OrgAssets) Templates() ([]assets.Template, error) {
 	return a.templates, nil
+}
+
+func (a *OrgAssets) Globals() ([]assets.Global, error) {
+	return a.globals, nil
 }
