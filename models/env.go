@@ -3,19 +3,41 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"time"
 
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/services/airtime/dtone"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/goflow"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// Register a airtime service factory with the engine
+func init() {
+	// give airtime transfers an extra long timeout
+	httpClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
+
+	goflow.RegisterAirtimeServiceFactory(
+		func(session flows.Session) (flows.AirtimeService, error) {
+			return orgFromSession(session).AirtimeService(httpClient)
+		},
+	)
+}
+
 type OrgID int
 
-const NilOrgID = OrgID(0)
+const (
+	NilOrgID = OrgID(0)
+
+	configDTOneLogin    = "TRANSFERTO_ACCOUNT_LOGIN"
+	configDTOneToken    = "TRANSFERTO_AIRTIME_API_TOKEN"
+	configDTOnecurrency = "TRANSFERTO_ACCOUNT_CURRENCY"
+)
 
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
 type Org struct {
@@ -54,9 +76,6 @@ func (o *Org) DefaultCountry() envs.Country { return o.env.DefaultCountry() }
 // Now returns the current time in the current timezone for this org
 func (o *Org) Now() time.Time { return o.env.Now() }
 
-// Extension returns the extension with the passed in name for this org
-func (o *Org) Extension(name string) json.RawMessage { return o.env.Extension(name) }
-
 // MaxValueLength returns our max value length for contact fields and run results
 func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
 
@@ -85,6 +104,23 @@ func (o *Org) ConfigValue(key string, def string) string {
 	}
 
 	return strVal
+}
+
+// AirtimeService returns the airtime service for this org if one is configured
+func (o *Org) AirtimeService(httpClient *http.Client) (flows.AirtimeService, error) {
+	login := o.ConfigValue(configDTOneLogin, "")
+	token := o.ConfigValue(configDTOneToken, "")
+	currency := o.ConfigValue(configDTOnecurrency, "")
+
+	if login == "" || token == "" {
+		return nil, errors.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneLogin, configDTOneToken, o.ID())
+	}
+	return dtone.NewService(httpClient, login, token, currency), nil
+}
+
+// gets the underlying org for the given engine session
+func orgFromSession(session flows.Session) *Org {
+	return session.Assets().Source().(*OrgAssets).Org()
 }
 
 // loadOrg loads the org for the passed in id, returning any error encountered

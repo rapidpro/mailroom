@@ -15,7 +15,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/starts"
+	"github.com/nyaruka/mailroom/tasks/starts"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/sirupsen/logrus"
 
@@ -26,6 +26,7 @@ import (
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/ivr/nexmo"
 	"github.com/nyaruka/mailroom/ivr/twiml"
+	ivr_tasks "github.com/nyaruka/mailroom/tasks/ivr"
 )
 
 func TestTwilioIVR(t *testing.T) {
@@ -88,7 +89,7 @@ func TestTwilioIVR(t *testing.T) {
 	assert.NoError(t, err)
 
 	// request our call to start
-	err = ivr.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
+	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db,
@@ -390,7 +391,7 @@ func TestNexmoIVR(t *testing.T) {
 	assert.NoError(t, err)
 
 	// request our call to start
-	err = ivr.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
+	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db,

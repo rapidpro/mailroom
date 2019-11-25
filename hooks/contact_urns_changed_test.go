@@ -23,10 +23,10 @@ func TestAddContactURN(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewAddContactURNAction(newActionUUID(), "tel", "12065551212"),
-					actions.NewAddContactURNAction(newActionUUID(), "tel", "12065551212"),
-					actions.NewAddContactURNAction(newActionUUID(), "telegram", "11551"),
-					actions.NewAddContactURNAction(newActionUUID(), "tel", "250700000001"),
+					actions.NewAddContactURN(newActionUUID(), "tel", "12065551212"),
+					actions.NewAddContactURN(newActionUUID(), "tel", "12065551212"),
+					actions.NewAddContactURN(newActionUUID(), "telegram", "11551"),
+					actions.NewAddContactURN(newActionUUID(), "tel", "250700000001"),
 				},
 				models.GeorgeID: []flows.Action{},
 			},

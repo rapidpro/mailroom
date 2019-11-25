@@ -35,10 +35,10 @@ func TestCampaignStarts(t *testing.T) {
 	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, models.CathyID, models.BobID, models.AlexandriaID)
 
 	// create an active session for Alexandria to test skipping
-	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES('M', $1, $2, 'W', FALSE, NOW(), $3);`, models.Org1, models.AlexandriaID, models.FavoritesFlowID)
+	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), models.Org1, models.AlexandriaID, models.FavoritesFlowID)
 
 	// create an active voice call for Cathy to make sure it doesn't get interrupted or cause skipping
-	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES('V', $1, $2, 'W', FALSE, NOW(), $3);`, models.Org1, models.CathyID, models.IVRFlowID)
+	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'V', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), models.Org1, models.CathyID, models.IVRFlowID)
 
 	// set our event to skip
 	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)
@@ -200,7 +200,7 @@ func TestContactRuns(t *testing.T) {
 	contact, err := contacts[0].FlowContact(org, sa)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
+	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
@@ -240,7 +240,7 @@ func TestContactRuns(t *testing.T) {
 		// answer our first question
 		msg := flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, tc.Message, nil)
 		msg.SetID(10)
-		resume := resumes.NewMsgResume(org.Env(), contact, msg)
+		resume := resumes.NewMsg(org.Env(), contact, msg)
 
 		session, err = ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
 		assert.NoError(t, err)

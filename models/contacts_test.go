@@ -5,7 +5,6 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/olivere/elastic"
@@ -139,7 +138,7 @@ func TestContacts(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, 1)
 	assert.NoError(t, err)
 
-	session, err := engine.NewSessionAssets(org)
+	session, err := NewSessionAssets(org)
 	assert.NoError(t, err)
 
 	db.MustExec(

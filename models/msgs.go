@@ -2,27 +2,30 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/legacy/expressions"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/nyaruka/null"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+	"github.com/lib/pq/hstore"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -487,14 +490,16 @@ type BroadcastTranslation struct {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty" db:"id"`
 		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+		Text          hstore.Hstore                           `                              db:"text"`
 		TemplateState TemplateState                           `json:"template_state"`
-		BaseLanguage  envs.Language                           `json:"base_language"`
+		BaseLanguage  envs.Language                           `json:"base_language"          db:"base_language"`
 		URNs          []urns.URN                              `json:"urns,omitempty"`
 		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
 		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
-		OrgID         OrgID                                   `json:"org_id"`
+		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
+		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
 	}
 }
 
@@ -503,6 +508,7 @@ func (b *Broadcast) ContactIDs() []ContactID                               { ret
 func (b *Broadcast) GroupIDs() []GroupID                                   { return b.b.GroupIDs }
 func (b *Broadcast) URNs() []urns.URN                                      { return b.b.URNs }
 func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
+func (b *Broadcast) BaseLanguage() envs.Language                           { return b.b.BaseLanguage }
 func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { return b.b.Translations }
 func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
 
@@ -517,15 +523,138 @@ func NewBroadcast(
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
 	bcast.b.BroadcastID = id
+	bcast.b.Translations = translations
 	bcast.b.TemplateState = state
 	bcast.b.BaseLanguage = baseLanguage
-	bcast.b.GroupIDs = groupIDs
-	bcast.b.ContactIDs = contactIDs
 	bcast.b.URNs = urns
-	bcast.b.Translations = translations
+	bcast.b.ContactIDs = contactIDs
+	bcast.b.GroupIDs = groupIDs
 
 	return bcast
 }
+
+// InsertChildBroadcast clones the passed in broadcast as a parent, then inserts that broadcast into the DB
+func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*Broadcast, error) {
+	child := NewBroadcast(
+		parent.OrgID(),
+		NilBroadcastID,
+		parent.b.Translations,
+		parent.b.TemplateState,
+		parent.b.BaseLanguage,
+		parent.b.URNs,
+		parent.b.ContactIDs,
+		parent.b.GroupIDs,
+	)
+	// populate our parent id
+	child.b.ParentID = parent.BroadcastID()
+
+	// populate text from our translations
+	child.b.Text.Map = make(map[string]sql.NullString)
+	for lang, t := range child.b.Translations {
+		child.b.Text.Map[string(lang)] = sql.NullString{String: t.Text, Valid: true}
+		if len(t.Attachments) > 0 || len(t.QuickReplies) > 0 {
+			return nil, errors.Errorf("cannot clone broadcast with quick replies or attachments")
+		}
+	}
+
+	// insert our broadcast
+	err := BulkSQL(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.BroadcastID())
+	}
+
+	// build up all our contact associations
+	contacts := make([]interface{}, 0, len(child.b.ContactIDs))
+	for _, contactID := range child.b.ContactIDs {
+		contacts = append(contacts, &broadcastContact{
+			BroadcastID: child.BroadcastID(),
+			ContactID:   contactID,
+		})
+	}
+
+	// insert our contacts
+	err = BulkSQL(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting contacts for broadcast")
+	}
+
+	// build up all our group associations
+	groups := make([]interface{}, 0, len(child.b.GroupIDs))
+	for _, groupID := range child.b.GroupIDs {
+		groups = append(groups, &broadcastGroup{
+			BroadcastID: child.BroadcastID(),
+			GroupID:     groupID,
+		})
+	}
+
+	// insert our groups
+	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting groups for broadcast")
+	}
+
+	// finally our URNs
+	urns := make([]interface{}, 0, len(child.b.URNs))
+	for _, urn := range child.b.URNs {
+		urnID := GetURNID(urn)
+		if urnID == NilURNID {
+			return nil, errors.Errorf("attempt to insert new broadcast with URNs that do not have id: %s", urn)
+		}
+		urns = append(urns, &broadcastURN{
+			BroadcastID: child.BroadcastID(),
+			URNID:       urnID,
+		})
+	}
+
+	// insert our urns
+	err = BulkSQL(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting URNs for broadcast")
+	}
+
+	return child, nil
+}
+
+type broadcastURN struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	URNID       URNID       `db:"contacturn_id"`
+}
+
+type broadcastContact struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	ContactID   ContactID   `db:"contact_id"`
+}
+
+type broadcastGroup struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	GroupID     GroupID     `db:"contactgroup_id"`
+}
+
+const insertBroadcastSQL = `
+INSERT INTO
+	msgs_broadcast( org_id,  parent_id, is_active, created_on, modified_on, status,  text,  base_language, send_all)
+			VALUES(:org_id, :parent_id, TRUE,      NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
+RETURNING
+	id
+`
+
+const insertBroadcastContactsSQL = `
+INSERT INTO
+	msgs_broadcast_contacts( broadcast_id,  contact_id)
+	                 VALUES(:broadcast_id,     :contact_id)
+`
+
+const insertBroadcastGroupsSQL = `
+INSERT INTO
+	msgs_broadcast_groups( broadcast_id,  contactgroup_id)
+	               VALUES(:broadcast_id,     :contactgroup_id)
+`
+
+const insertBroadcastURNsSQL = `
+INSERT INTO
+	msgs_broadcast_urns( broadcast_id,  contacturn_id)
+	             VALUES(:broadcast_id, :contacturn_id)
+`
 
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
@@ -735,7 +864,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 				"fields":  flows.Context(org.Env(), contact.Fields()),
 				"urns":    flows.ContextFunc(org.Env(), contact.URNs().MapContext),
 			})
-			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template)
+			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template, nil)
 		}
 
 		// don't do anything if we have no text or attachments

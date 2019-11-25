@@ -196,8 +196,13 @@ type startGroup struct {
 // InsertFlowStarts inserts all the passed in starts
 func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) error {
 	is := make([]interface{}, len(starts))
-	for i := range starts {
-		is[i] = &starts[i].s
+	for i, s := range starts {
+		// populate UUID if needed
+		if s.s.UUID == "" {
+			s.s.UUID = uuids.New()
+		}
+
+		is[i] = &s.s
 	}
 
 	// insert our starts
@@ -245,8 +250,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(created_on,  uuid,  restart_participants,  include_active, status,  flow_id,  extra,  parent_summary)
-			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, 'P'   , :flow_id, :extra, :parent_summary)
+	flows_flowstart(created_on,  uuid,  restart_participants,  include_active,  query, status,  flow_id,  extra,  parent_summary)
+			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, :query, 'P'   , :flow_id, :extra, :parent_summary)
 RETURNING
 	id
 `

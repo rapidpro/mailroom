@@ -113,7 +113,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		flows.NodeUUID(""),
 	))
 
-	router := routers.NewSwitchRouter(nil, "", categories, "@contact.id", cases, defaultCategoryUUID)
+	router := routers.NewSwitch(nil, "", categories, "@contact.id", cases, defaultCategoryUUID)
 
 	// and our entry node
 	entry := definition.NewNode(
@@ -172,9 +172,11 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 
 	// reuse id from one of our real flows
 	flowID := models.FavoritesFlowID
-	flowUUID := assets.FlowUUID(uuids.New())
 
 	for i, tc := range tcs {
+		// new UUID for each test so our definition doesn't get cached
+		flowUUID := assets.FlowUUID(uuids.New())
+
 		// build our flow for this test case
 		flowDef := CreateTestFlow(t, flowUUID, tc)
 
@@ -192,12 +194,12 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 			}
 			return nil
 		}
-		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
+		options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
 			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
+				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil), nil
 			}
-			return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil)
+			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil), nil
 		}
 
 		_, err = runner.StartFlow(ctx, db, rp, org, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)

@@ -126,7 +126,7 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
 func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, sa flows.SessionAssets, trigger flows.Trigger) (interface{}, int, error) {
 	// start our flow session
-	session, sprint, err := goflow.Engine().NewSession(sa, trigger)
+	session, sprint, err := goflow.Simulator().NewSession(sa, trigger)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
@@ -192,7 +192,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, err
 	}
 
-	session, err := goflow.Engine().ReadSession(sa, request.Session, assets.IgnoreMissing)
+	session, err := goflow.Simulator().ReadSession(sa, request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -227,7 +227,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 				}
 
 				if triggeredFlow != nil {
-					trigger := triggers.NewMsgTrigger(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
+					trigger := triggers.NewMsg(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
 					return triggerFlow(ctx, s.DB, org, sa, trigger)
 				}
 			}
@@ -267,10 +267,7 @@ func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawM
 	}
 
 	if legacyFlowDef != nil {
-		err = flow.SetLegacyDefinition(legacyFlowDef)
-		if err != nil {
-			return errors.Wrapf(err, "unable to populate flow: %s invalid definition", uuid)
-		}
+		flow.SetDefinition(legacyFlowDef)
 		return nil
 	}
 
