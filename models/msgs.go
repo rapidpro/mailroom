@@ -329,7 +329,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 			metadata["templating"] = out.Templating()
 		}
 		if out.Topic() != flows.NilMsgTopic {
-			metadata["topic"] = out.Topic()
+			metadata["topic"] = string(out.Topic())
 		}
 		m.Metadata = null.NewMap(metadata)
 	}
