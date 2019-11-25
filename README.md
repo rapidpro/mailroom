@@ -54,6 +54,9 @@ Recommended settings for error and performance monitoring:
  * `MAILROOM_PARSE_SERVER_URL`: Parse Server URL used for looking up data
  * `MAILROOM_PARSE_SERVER_APP_ID`: Parse Server Application ID
  * `MAILROOM_PARSE_SERVER_MASTER_KEY`: Parse Server Application Master Key
+ 
+ For Trackable Links the follow parameter should be set up as env variable:
+ * `MAILROOM_SHORTEN_URL_PING`: This URL should be called as a fake webbhook call to have a success response with less than 10000 bytes
 
 # Development
 
