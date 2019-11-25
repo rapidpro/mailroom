@@ -1,3 +1,7 @@
+v5.3.7
+----------
+ * Add support for message topics
+
 v5.3.6
 ----------
  * Load global assets from database
