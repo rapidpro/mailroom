@@ -1,3 +1,7 @@
+v5.3.6
+----------
+ * Load global assets from database
+
 v5.3.5
 ----------
  * Update to goflow v0.59.0

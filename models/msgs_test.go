@@ -26,24 +26,62 @@ func TestMsgs(t *testing.T) {
 	chanUUID := channels[0].UUID()
 
 	tcs := []struct {
-		ChannelUUID  assets.ChannelUUID
-		Channel      *Channel
-		Text         string
-		ContactID    ContactID
-		URN          urns.URN
-		ContactURNID URNID
-		Attachments  []utils.Attachment
-		QuickReplies []string
-		Metadata     map[string]interface{}
-		MsgCount     int
-		HasErr       bool
+		ChannelUUID      assets.ChannelUUID
+		Channel          *Channel
+		Text             string
+		ContactID        ContactID
+		URN              urns.URN
+		ContactURNID     URNID
+		Attachments      []utils.Attachment
+		QuickReplies     []string
+		Topic            flows.MsgTopic
+		ExpectedMetadata map[string]interface{}
+		ExpectedMsgCount int
+		HasErr           bool
 	}{
-		{chanUUID, channel, "missing urn id", CathyID, urns.URN("tel:+250700000001"), URNID(0),
-			nil, nil, map[string]interface{}{}, 1, true},
-		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
-			nil, []string{"yes", "no"}, map[string]interface{}{"quick_replies": []string{"yes", "no"}}, 1, false},
-		{chanUUID, channel, "test outgoing", CathyID, urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)), CathyURNID,
-			[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")}, nil, map[string]interface{}{}, 2, false},
+		{
+			chanUUID, channel,
+			"missing urn id",
+			CathyID,
+			urns.URN("tel:+250700000001"),
+			URNID(0),
+			nil,
+			nil,
+			flows.NilMsgTopic,
+			map[string]interface{}{},
+			1,
+			true,
+		},
+		{
+			chanUUID,
+			channel,
+			"test outgoing",
+			CathyID,
+			urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)),
+			CathyURNID,
+			nil,
+			[]string{"yes", "no"},
+			flows.MsgTopicPurchase,
+			map[string]interface{}{
+				"quick_replies": []string{"yes", "no"},
+				"topic":         "purchase",
+			},
+			1,
+			false,
+		},
+		{
+			chanUUID,
+			channel,
+			"test outgoing",
+			CathyID,
+			urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)),
+			CathyURNID,
+			[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
+			nil,
+			flows.NilMsgTopic,
+			map[string]interface{}{},
+			2,
+			false},
 	}
 
 	now := time.Now()
@@ -53,7 +91,7 @@ func TestMsgs(t *testing.T) {
 		tx, err := db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil)
+		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic)
 		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now)
 
 		if err == nil {
@@ -71,8 +109,8 @@ func TestMsgs(t *testing.T) {
 			} else {
 				assert.Nil(t, msg.ContactURNID())
 			}
-			assert.Equal(t, tc.Metadata, msg.Metadata())
-			assert.Equal(t, tc.MsgCount, msg.MsgCount())
+			assert.Equal(t, tc.ExpectedMetadata, msg.Metadata())
+			assert.Equal(t, tc.ExpectedMsgCount, msg.MsgCount())
 			assert.Equal(t, now, msg.CreatedOn())
 			assert.True(t, msg.ID() > 0)
 			assert.True(t, msg.QueuedOn().After(now))
