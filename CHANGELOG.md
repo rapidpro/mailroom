@@ -1,3 +1,7 @@
+v5.3.8
+----------
+ * Update to goflow v0.60.1
+
 v5.3.7
 ----------
  * Add support for message topics
