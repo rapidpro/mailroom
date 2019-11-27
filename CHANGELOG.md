@@ -1,3 +1,7 @@
+v5.2.5
+----------
+ * Backport of fix for dynamic group re-evaluation
+
 v5.2.4
 ----------
  * Add new dump file with bothub instead of bh
