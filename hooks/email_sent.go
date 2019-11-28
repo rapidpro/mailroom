@@ -16,10 +16,9 @@ func init() {
 	models.RegisterEventHook(events.TypeEmailSent, handleEmailSent)
 }
 
-// handleEmailCreated event queues an email to be sent later on
+// goflow now sends email so this just logs the event
 func handleEmailSent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
 
-	// goflow now sends email so just log the event
 	event := e.(*events.EmailSentEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": session.ContactUUID(),
