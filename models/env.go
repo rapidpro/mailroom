@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/services/airtime/dtone"
+	"github.com/nyaruka/goflow/services/email/smtp"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/goflow"
 
@@ -22,6 +23,12 @@ func init() {
 	// give airtime transfers an extra long timeout
 	httpClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
 
+	goflow.RegisterEmailServiceFactory(
+		func(session flows.Session) (flows.EmailService, error) {
+			return orgFromSession(session).EmailService(httpClient)
+		},
+	)
+
 	goflow.RegisterAirtimeServiceFactory(
 		func(session flows.Session) (flows.AirtimeService, error) {
 			return orgFromSession(session).AirtimeService(httpClient)
@@ -34,6 +41,7 @@ type OrgID int
 const (
 	NilOrgID = OrgID(0)
 
+	configSMTPServer    = "smtp_server"
 	configDTOneLogin    = "TRANSFERTO_ACCOUNT_LOGIN"
 	configDTOneToken    = "TRANSFERTO_AIRTIME_API_TOKEN"
 	configDTOnecurrency = "TRANSFERTO_ACCOUNT_CURRENCY"
@@ -104,6 +112,16 @@ func (o *Org) ConfigValue(key string, def string) string {
 	}
 
 	return strVal
+}
+
+// EmailService returns the email service for this org
+func (o *Org) EmailService(httpClient *http.Client) (flows.EmailService, error) {
+	connectionURL := o.ConfigValue(configSMTPServer, config.Mailroom.SMTPServer)
+
+	if connectionURL == "" {
+		return nil, errors.New("missing SMTP configuration")
+	}
+	return smtp.NewServiceFromURL(connectionURL)
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
