@@ -15,7 +15,7 @@ require (
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.0.2
-	github.com/greatnonprofits-nfp/goflow v0.0.0-20191125230210-caba1d4ef8bd
+	github.com/greatnonprofits-nfp/goflow v0.0.0-20191128020951-1268befeb7d7
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect
 	github.com/lib/pq v1.0.0

@@ -307,15 +307,20 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		return nil, errors.Wrapf(err, "error setting msg urn")
 	}
 
-	// Splitting the text as array for analyzing and replace if it's the case
+	// splitting the text as array for analyzing and replace if it's the case
 	re := regexp.MustCompile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`)
 	textSplitted := re.FindAllString(out.Text(), -1)
 	text := out.Text()
 	for i := range textSplitted {
 		d := textSplitted[i]
 
-		// Checking if the text is a valid URL
+		// checking if the text is a valid URL
 		if !isValidUrl(d) {
+			continue
+		}
+
+		// if we don't have the FDL key and FDL default URL, should be skipped
+		if config.Mailroom.FDLKey == "" || config.Mailroom.FDLDefaultURL == "" {
 			continue
 		}
 
