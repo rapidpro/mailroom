@@ -1,3 +1,7 @@
+v5.3.9
+----------
+ * Update to goflow v0.61.0 and provide email service to engine
+
 v5.3.8
 ----------
  * Update to goflow v0.60.1
