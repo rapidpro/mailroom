@@ -18,6 +18,8 @@ import (
 var httpClient *http.Client
 var eng, simulator flows.Engine
 var engInit, simulatorInit sync.Once
+
+var emailFactory engine.EmailServiceFactory
 var classificationFactory engine.ClassificationServiceFactory
 var airtimeFactory engine.AirtimeServiceFactory
 
@@ -32,6 +34,12 @@ func init() {
 	}
 
 	httpClient = &http.Client{Transport: t, Timeout: time.Duration(15 * time.Second)}
+}
+
+// RegisterEmailServiceFactory can be used by outside callers to register a email factory
+// for use by the engine
+func RegisterEmailServiceFactory(factory engine.EmailServiceFactory) {
+	emailFactory = factory
 }
 
 // RegisterClassificationServiceFactory can be used by outside callers to register a classification factory
@@ -56,6 +64,7 @@ func Engine() flows.Engine {
 
 		eng = engine.NewBuilder().
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, webhookHeaders, 10000)).
+			WithEmailServiceFactory(emailFactory).
 			WithClassificationServiceFactory(classificationFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
@@ -76,12 +85,23 @@ func Simulator() flows.Engine {
 		simulator = engine.NewBuilder().
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, webhookHeaders, 10000)).
 			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
-			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // but faked airtime transfers
+			WithEmailServiceFactory(simulatorEmailServiceFactory).     // but faked emails
+			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // and faked airtime transfers
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()
 	})
 
 	return simulator
+}
+
+func simulatorEmailServiceFactory(session flows.Session) (flows.EmailService, error) {
+	return &simulatorEmailService{}, nil
+}
+
+type simulatorEmailService struct{}
+
+func (s *simulatorEmailService) Send(session flows.Session, addresses []string, subject, body string) error {
+	return nil
 }
 
 func simulatorAirtimeServiceFactory(session flows.Session) (flows.AirtimeService, error) {
