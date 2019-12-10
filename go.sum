@@ -43,8 +43,8 @@ github.com/gomodule/redigo v2.0.0+incompatible h1:K/R+8tc58AaqLkqG2Ol3Qk+DR/TlNu
 github.com/gomodule/redigo v2.0.0+incompatible/go.mod h1:B4C85qUVwatsJoIUNIfCRsp7qO0iAmpGFZ4EELWSbC4=
 github.com/gorilla/schema v1.0.2 h1:sAgNfOcNYvdDSrzGHVy9nzCQahG+qmsg+nE8dK85QRA=
 github.com/gorilla/schema v1.0.2/go.mod h1:kgLaKoK1FELgZqMAVxx/5cbj0kT+57qxUrAlIO2eleU=
-github.com/greatnonprofits-nfp/goflow v0.0.0-20191128020951-1268befeb7d7 h1:mLp5cgIUD/TeLxV0rM0uPigVpxrorRW3NhEK7E6tGuM=
-github.com/greatnonprofits-nfp/goflow v0.0.0-20191128020951-1268befeb7d7/go.mod h1:xc8QDhdkyajNSgbaGnaA8vqFOASWSujExyEmX8Ik9c8=
+github.com/greatnonprofits-nfp/goflow v0.0.0-20191210191956-438698d91c31 h1:5zSjlkzRwSLRjtHk3lPli4eR6bp/Kvh51dZXhL+6A5g=
+github.com/greatnonprofits-nfp/goflow v0.0.0-20191210191956-438698d91c31/go.mod h1:xc8QDhdkyajNSgbaGnaA8vqFOASWSujExyEmX8Ik9c8=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af h1:pmfjZENx5imkbgOkpRUYLnmbU7UEFbjtDA2hxJ1ichM=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=
 github.com/jmoiron/sqlx v1.2.0 h1:41Ip0zITnmWNR/vHV+S4m+VoUivnWY5E4OJfLZjCJMA=
