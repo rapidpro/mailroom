@@ -5,25 +5,31 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/buger/jsonparser"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/excellent"
+	"github.com/greatnonprofits-nfp/goflow/excellent/types"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/events"
+	"github.com/greatnonprofits-nfp/goflow/legacy/expressions"
+	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/excellent"
-	"github.com/nyaruka/goflow/excellent/types"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/legacy/expressions"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
 )
 
 // MsgID is our internal type for msg ids, which can be null/0
@@ -33,6 +39,20 @@ type MsgID null.Int
 const NilMsgID = MsgID(0)
 
 type MsgDirection string
+
+type TrackableLink struct {
+	UUID        string `json:"uuid"          db:"uuid"`
+	Destination string `json:"destination"    db:"destination"`
+}
+
+type TLPayload struct {
+	LongDynamicLink string   `json:"longDynamicLink"`
+	Suffix          TLSuffix `json:"suffix"`
+}
+
+type TLSuffix struct {
+	Option string `json:"option"`
+}
 
 const (
 	DirectionIn  = MsgDirection("I")
@@ -278,7 +298,7 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 }
 
 // NewOutgoingMsg creates an outgoing message for the passed in flow message. Note that this message is created in a queued state!
-func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, contactUUID flows.ContactUUID, ctx context.Context, tx Queryer) (*Msg, error) {
 	msg := &Msg{}
 
 	m := &msg.m
@@ -287,8 +307,67 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		return nil, errors.Wrapf(err, "error setting msg urn")
 	}
 
+	// splitting the text as array for analyzing and replace if it's the case
+	re := regexp.MustCompile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`)
+	textSplitted := re.FindAllString(out.Text(), -1)
+	text := out.Text()
+	for i := range textSplitted {
+		d := textSplitted[i]
+
+		// checking if the text is a valid URL
+		if !isValidUrl(d) {
+			continue
+		}
+
+		// if we don't have the FDL key and FDL default URL, should be skipped
+		if config.Mailroom.FDLKey == "" || config.Mailroom.FDLDefaultURL == "" {
+			continue
+		}
+
+		dest, errLink := GetLinksFromOrg(ctx, tx, orgID, d)
+
+		if errLink == nil && contactUUID != "" {
+			fdlURL := fmt.Sprintf("https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=%s", config.Mailroom.FDLKey)
+			handleURL := fmt.Sprintf("https://%s/link/handler/%s", config.Mailroom.Domain, dest["uuid"])
+			longURL := fmt.Sprintf("%s?contact=%s", handleURL, contactUUID)
+
+			// creating the payload
+			payload := &TLPayload{
+				LongDynamicLink: fmt.Sprintf("%s/?link=%s", config.Mailroom.FDLDefaultURL, longURL),
+				Suffix: TLSuffix{
+					Option: "SHORT",
+				},
+			}
+
+			b, _ := json.Marshal(payload)
+
+			// build our request
+			method := "POST"
+			req, errReq := http.NewRequest(method, fdlURL, strings.NewReader(string(b)))
+			if errReq != nil {
+				continue
+			}
+
+			req.Header.Add("Content-Type", "application/json")
+
+			resp, errHttp := http.DefaultClient.Do(req)
+			if errHttp != nil {
+				continue
+			}
+			content, errRead := ioutil.ReadAll(resp.Body)
+			if errRead != nil {
+				continue
+			}
+
+			// replacing the link for the FDL generated link
+			shortLink, _ := jsonparser.GetString(content, "shortLink")
+			text = strings.Replace(text, d, shortLink, -1)
+		}
+
+	}
+
 	m.UUID = out.UUID()
-	m.Text = out.Text()
+	m.Text = text
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
@@ -374,6 +453,34 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	}
 
 	return msg
+}
+
+// GetLinksFromOrg queries the trackable links from the org returning them
+func GetLinksFromOrg(ctx context.Context, tx Queryer, org OrgID, d string) (map[string]string, error) {
+	link := &TrackableLink{}
+	dest := make(map[string]string)
+
+	rows, err := tx.QueryxContext(ctx,
+		`SELECT row_to_json(r) FROM (SELECT uuid FROM links_link 
+				WHERE org_id = $1 AND destination = $2 AND is_active = TRUE AND is_archived = FALSE 
+				ORDER BY id DESC LIMIT 1) r`,
+		org, d,
+	)
+	if !rows.Next() {
+		return dest, errors.Errorf("no link found")
+	}
+	defer rows.Close()
+
+	err = readJSONRow(rows, link)
+	if err != nil {
+		return dest, errors.Wrapf(err, "error loading trackable link")
+	}
+
+	dest = map[string]string{
+		"uuid": link.UUID,
+	}
+
+	return dest, nil
 }
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
@@ -747,7 +854,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil)
-		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now())
+		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now(), c.uuid, ctx, db)
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -860,4 +967,14 @@ func (i BroadcastID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *BroadcastID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
+}
+
+// Check if it's a valid URL
+func isValidUrl(toTest string) bool {
+	_, err := url.ParseRequestURI(toTest)
+	if err != nil {
+		return false
+	} else {
+		return true
+	}
 }

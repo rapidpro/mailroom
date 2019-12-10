@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +54,7 @@ func TestMsgs(t *testing.T) {
 		assert.NoError(t, err)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil)
-		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now)
+		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now, "", ctx, tx)
 
 		if err == nil {
 			assert.False(t, tc.HasErr)

@@ -1,3 +1,23 @@
+v2.0.9.5
+----------
+ * Update to goflow v0.41.14.27 (Lookup + Gift Card + Trackable Links with Fake Links on the simulator)
+
+v2.0.9.4
+----------
+ * Update to goflow v0.41.14.23 (Lookup + Gift Card + Trackable Links)
+
+v2.0.9.3
+----------
+ * Update to goflow v0.41.14.19
+
+v2.0.9.2
+----------
+ * Update to goflow v0.41.14.18
+
+v2.0.9.1
+----------
+ * Update to goflow v0.41.14.16
+
 v2.0.9
 ----------
  * Update to goflow v0.41.14

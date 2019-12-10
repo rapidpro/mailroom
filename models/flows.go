@@ -8,9 +8,9 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/legacy"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/legacy"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
