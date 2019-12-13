@@ -148,6 +148,61 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
+// ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
+func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, offset int, pageSize int) ([]ContactID, int64, error) {
+	start := time.Now()
+
+	if client == nil {
+		return nil, 0, errors.Errorf("no elastic client available, check your configuration")
+	}
+
+	// our field resolver
+	resolver := func(key string) assets.Field {
+		return org.FieldByKey(key)
+	}
+
+	// turn into elastic query
+	eq, err := search.ToElasticQuery(org.Env(), resolver, query)
+	if err != nil {
+		return nil, 0, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+	}
+
+	eq = elastic.NewBoolQuery().Must(
+		eq,
+		elastic.NewTermQuery("org_id", org.OrgID()),
+		elastic.NewTermQuery("is_active", true), // technically this ought to be redundant with the group, but better to be safe
+		elastic.NewTermQuery("groups", group),
+	)
+
+	s := client.Search("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	s = s.Size(pageSize).From(offset).Query(eq).FetchSource(false)
+
+	results, err := s.Do(ctx)
+	if err != nil {
+		return nil, 0, errors.Wrapf(err, "error performing query")
+	}
+
+	ids := make([]ContactID, 0, pageSize)
+	for _, hit := range results.Hits.Hits {
+		id, err := strconv.Atoi(hit.Id)
+		if err != nil {
+			return nil, 0, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
+		}
+
+		ids = append(ids, ContactID(id))
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"org_id":      org.OrgID(),
+		"group_uuid":  group,
+		"query":       query,
+		"elapsed":     time.Since(start),
+		"match_count": len(ids),
+	}).Debug("paged contact query complete")
+
+	return ids, results.Hits.TotalHits, nil
+}
+
 // ContactIDsForQuery returns the ids of all the contacts that match the passed in query
 func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAssets, query string) ([]ContactID, error) {
 	start := time.Now()
