@@ -59,6 +59,7 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusServiceUnavailable, errors.Wrapf(err, "error performing query")
 	}
 
+	// build our response
 	response := &searchResponse{
 		Results: hits,
 		Total:   total,
