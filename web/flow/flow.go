@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
 
+	"github.com/Masterminds/semver"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -26,11 +27,13 @@ func init() {
 // Migrates a legacy flow to the new flow definition specification
 //
 //   {
-//     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...}
+//     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...},
+//     "to_version": "13.0.0"
 //   }
 //
 type migrateRequest struct {
-	Flow json.RawMessage `json:"flow" validate:"required"`
+	Flow      json.RawMessage `json:"flow" validate:"required"`
+	ToVersion *semver.Version `json:"to_version"`
 }
 
 func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
@@ -39,12 +42,22 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	flow, err := goflow.ReadFlow(request.Flow)
-	if err != nil {
-		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
+	// if we're migrating to latest engine version, do full read so that we get validation
+	if request.ToVersion == nil || request.ToVersion.Equal(goflow.SpecVersion()) {
+		flow, err := goflow.ReadFlow(request.Flow)
+		if err != nil {
+			return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
+		}
+		return flow, http.StatusOK, nil
 	}
 
-	return flow, http.StatusOK, nil
+	// if not then it's a JSON to JSON migration to the specified version
+	migrated, err := goflow.MigrateDefinition(request.Flow, request.ToVersion)
+	if err != nil {
+		return errors.Wrapf(err, "unable to migrate flow"), http.StatusUnprocessableEntity, nil
+	}
+
+	return migrated, http.StatusOK, nil
 }
 
 // Validates a flow. If validation fails, we return the error. If it succeeds, we return
@@ -155,23 +168,26 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// try to read the flow definition
-	flow, err := goflow.ReadFlow(request.Flow)
+	// try to clone the flow definition
+	cloneJSON, err := goflow.CloneDefinition(request.Flow, request.DependencyMapping)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
-	clone := flow.Clone(request.DependencyMapping)
-
 	// if we have an org ID, do asset validation on the new clone
 	if request.ValidateWithOrgID != models.NilOrgID {
+		clone, err := goflow.ReadFlow(cloneJSON)
+		if err != nil {
+			return errors.Wrapf(err, "unable to clone flow"), http.StatusUnprocessableEntity, nil
+		}
+
 		result, status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, clone)
 		if result != nil || err != nil {
 			return result, status, err
 		}
 	}
 
-	return clone, http.StatusOK, nil
+	return cloneJSON, http.StatusOK, nil
 }
 
 func validate(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.Flow) (interface{}, int, error) {

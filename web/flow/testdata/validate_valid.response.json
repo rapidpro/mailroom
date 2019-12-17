@@ -1,7 +1,7 @@
 {
     "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
     "revision": 106,
-    "spec_version": "13.0.0",
+    "spec_version": "13.1.0",
     "type": "messaging",
     "expire_after_minutes": 10080,
     "language": "eng",

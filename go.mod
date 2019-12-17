@@ -1,6 +1,7 @@
 module github.com/nyaruka/mailroom
 
 require (
+	github.com/Masterminds/semver v1.4.2
 	github.com/apex/log v1.0.0
 	github.com/aws/aws-sdk-go v1.16.17
 	github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44
@@ -22,7 +23,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.1.1
-	github.com/nyaruka/goflow v0.61.0
+	github.com/nyaruka/goflow v0.63.0
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0
