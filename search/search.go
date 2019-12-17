@@ -13,14 +13,19 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// ToElasticQuery converts a contactql query string to an Elastic query
-func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (elastic.Query, error) {
+// ToElasticQuery converts a contactql query string to an Elastic query returning the normalized view as well as the elastic query
+func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (string, elastic.Query, error) {
 	node, err := contactql.ParseQuery(query, env.RedactionPolicy(), resolver)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing query: %s", query)
+		return "", nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	return nodeToElasticQuery(env, resolver, node.Root())
+	eq, err := nodeToElasticQuery(env, resolver, node.Root())
+	if err != nil {
+		return "", nil, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	return node.String(), eq, nil
 }
 
 func nodeToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, node contactql.QueryNode) (elastic.Query, error) {

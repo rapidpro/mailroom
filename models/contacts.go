@@ -148,29 +148,45 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
-// ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
-func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, offset int, pageSize int) ([]ContactID, int64, error) {
-	start := time.Now()
-
-	if client == nil {
-		return nil, 0, errors.Errorf("no elastic client available, check your configuration")
-	}
-
+// ParseQuery parses the passed in query for the passed in org, returning the parsed query and the resulting elastic query
+func ParseQuery(org *OrgAssets, query string) (string, elastic.Query, error) {
 	// our field resolver
 	resolver := func(key string) assets.Field {
 		return org.FieldByKey(key)
 	}
 
 	// turn into elastic query
-	eq, err := search.ToElasticQuery(org.Env(), resolver, query)
+	parsed, eq, err := search.ToElasticQuery(org.Env(), resolver, query)
 	if err != nil {
-		return nil, 0, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+		return "", nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}
 
+	// additionally filter by org and active contacts
 	eq = elastic.NewBoolQuery().Must(
 		eq,
 		elastic.NewTermQuery("org_id", org.OrgID()),
-		elastic.NewTermQuery("is_active", true), // technically this ought to be redundant with the group, but better to be safe
+		elastic.NewTermQuery("is_active", true),
+	)
+
+	return parsed, eq, nil
+}
+
+// ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
+func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, offset int, pageSize int) (string, []ContactID, int64, error) {
+	start := time.Now()
+
+	if client == nil {
+		return "", nil, 0, errors.Errorf("no elastic client available, check your configuration")
+	}
+
+	parsed, eq, err := ParseQuery(org, query)
+	if err != nil {
+		return "", nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	// filter by our base group
+	eq = elastic.NewBoolQuery().Must(
+		eq,
 		elastic.NewTermQuery("groups", group),
 	)
 
@@ -179,14 +195,14 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 
 	results, err := s.Do(ctx)
 	if err != nil {
-		return nil, 0, errors.Wrapf(err, "error performing query")
+		return "", nil, 0, errors.Wrapf(err, "error performing query")
 	}
 
 	ids := make([]ContactID, 0, pageSize)
 	for _, hit := range results.Hits.Hits {
 		id, err := strconv.Atoi(hit.Id)
 		if err != nil {
-			return nil, 0, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
+			return "", nil, 0, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
 		}
 
 		ids = append(ids, ContactID(id))
@@ -194,13 +210,14 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 
 	logrus.WithFields(logrus.Fields{
 		"org_id":      org.OrgID(),
+		"parsed":      parsed,
 		"group_uuid":  group,
 		"query":       query,
 		"elapsed":     time.Since(start),
 		"match_count": len(ids),
 	}).Debug("paged contact query complete")
 
-	return ids, results.Hits.TotalHits, nil
+	return parsed, ids, results.Hits.TotalHits, nil
 }
 
 // ContactIDsForQuery returns the ids of all the contacts that match the passed in query
@@ -211,22 +228,15 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 		return nil, errors.Errorf("no elastic client available, check your configuration")
 	}
 
-	// our field resolver
-	resolver := func(key string) assets.Field {
-		return org.FieldByKey(key)
-	}
-
 	// turn into elastic query
-	eq, err := search.ToElasticQuery(org.Env(), resolver, query)
+	_, eq, err := ParseQuery(org, query)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}
 
-	// filter by org, active, blocked and stopped
+	// only include unblocked and unstopped contacts
 	eq = elastic.NewBoolQuery().Must(
 		eq,
-		elastic.NewTermQuery("org_id", org.OrgID()),
-		elastic.NewTermQuery("is_active", true),
 		elastic.NewTermQuery("is_blocked", false),
 		elastic.NewTermQuery("is_stopped", false),
 	)

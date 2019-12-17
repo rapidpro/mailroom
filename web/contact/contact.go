@@ -1,4 +1,4 @@
-package search
+package contact
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/search/search", web.RequireAuthToken(handleSearch))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
 }
 
 // Searches the contacts for an org
@@ -33,11 +33,11 @@ type searchRequest struct {
 
 // Response for a contact search
 type searchResponse struct {
-	Parsed  string             `json:"parsed"`
-	Error   string             `json:"error"`
-	Results []models.ContactID `json:"results"`
-	Total   int64              `json:"total"`
-	Offset  int                `json:"offset"`
+	Query      string             `json:"query"`
+	Error      string             `json:"error"`
+	ContactIDs []models.ContactID `json:"contact_ids"`
+	Total      int64              `json:"total"`
+	Offset     int                `json:"offset"`
 }
 
 // handles a a contact search request
@@ -48,22 +48,23 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// grab our org
-	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
+	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// Perform our search
-	hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, org, request.GroupUUID, request.Query, request.Offset, request.PageSize)
+	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, org, request.GroupUUID, request.Query, request.Offset, request.PageSize)
 	if err != nil {
 		return nil, http.StatusServiceUnavailable, errors.Wrapf(err, "error performing query")
 	}
 
 	// build our response
 	response := &searchResponse{
-		Results: hits,
-		Total:   total,
-		Offset:  request.Offset,
+		ContactIDs: hits,
+		Total:      total,
+		Offset:     request.Offset,
+		Query:      parsed,
 	}
 
 	return response, http.StatusOK, nil

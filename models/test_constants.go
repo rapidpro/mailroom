@@ -80,6 +80,9 @@ var RemindersEvent2ID = CampaignEventID(10001)
 var DoctorsGroupID = GroupID(10000)
 var DoctorsGroupUUID = assets.GroupUUID("c153e265-f7c9-4539-9dbc-9b358714b638")
 
+var AllContactsGroupID = GroupID(1)
+var AllContactsGroupUUID = assets.GroupUUID("bc268217-9ffa-49e0-883e-e4e09c252a5a")
+
 var TestersGroupID = GroupID(10001)
 var TestersGroupUUID = assets.GroupUUID("5e9d8fab-5e7e-4f51-b533-261af5dea70d")
 

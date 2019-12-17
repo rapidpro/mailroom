@@ -61,7 +61,7 @@ func TestElasticQuery(t *testing.T) {
 		}
 		env := envs.NewBuilder().WithTimezone(ny).WithRedactionPolicy(redactionPolicy).Build()
 
-		query, err := ToElasticQuery(env, resolver, tc.Search)
+		_, query, err := ToElasticQuery(env, resolver, tc.Search)
 
 		if tc.Error != "" {
 			assert.Error(t, err, "%s: error not received converting to elastic: %s", tc.Label, tc.Search)
