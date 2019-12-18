@@ -1,3 +1,0 @@
-{
-    "error": "unable to read flow: invalid node[uuid=6fde1a09-3997-47dd-aff0-92e8aff3a642]: destination 55fbef81-4151-4589-9f0a-8e5c44f6b5a3 of exit[uuid=d3f3f024-a90e-43a5-bd5a-7056f5bea699] isn't a known node"
-}

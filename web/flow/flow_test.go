@@ -49,12 +49,6 @@ func TestServer(t *testing.T) {
 		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_minimal_legacy.json", Status: 200, ResponseFile: "migrate_minimal_legacy.response.json"},
 		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_legacy_with_version.json", Status: 200, ResponseFile: "migrate_legacy_with_version.response.json"},
 
-		{URL: "/mr/flow/validate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid_legacy.json", Status: 200, ResponseFile: "validate_valid_legacy.response.json"},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid_legacy.json", Status: 422, ResponseFile: "validate_invalid_legacy.response.json"},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid.json", Status: 200, ResponseFile: "validate_valid.response.json"},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid.json", Status: 422, ResponseFile: "validate_invalid.response.json"},
-
 		{URL: "/mr/flow/inspect", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid_legacy.json", Status: 200, ResponseFile: "inspect_valid_legacy.response.json"},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_invalid_legacy.json", Status: 422, ResponseFile: "inspect_invalid_legacy.response.json"},
