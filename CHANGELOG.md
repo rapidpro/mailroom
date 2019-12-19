@@ -1,3 +1,7 @@
+v5.3.11
+----------
+ * Update to latest goflow to add support for flow migrations
+
 v5.3.10
 ----------
  * Update CreateBroadcastMessages to include globals in context
