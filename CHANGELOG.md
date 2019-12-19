@@ -1,3 +1,7 @@
+v5.3.12
+----------
+ * Still do validation even when migrating to less than the current engine version
+
 v5.3.11
 ----------
  * Update to latest goflow to add support for flow migrations
