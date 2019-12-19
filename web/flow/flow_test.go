@@ -46,8 +46,10 @@ func TestServer(t *testing.T) {
 		ResponsePattern string
 	}{
 		{URL: "/mr/flow/migrate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
+		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_minimal_v13.json", Status: 200, ResponseFile: "migrate_minimal_v13.response.json"},
 		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_minimal_legacy.json", Status: 200, ResponseFile: "migrate_minimal_legacy.response.json"},
 		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_legacy_with_version.json", Status: 200, ResponseFile: "migrate_legacy_with_version.response.json"},
+		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_invalid_v13.json", Status: 422, Response: `{"error": "unable to read migrated flow: unable to read node: field 'uuid' is required"}`},
 
 		{URL: "/mr/flow/inspect", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid_legacy.json", Status: 200, ResponseFile: "inspect_valid_legacy.response.json"},

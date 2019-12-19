@@ -41,19 +41,16 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// if we're migrating to latest engine version, do full read so that we get validation
-	if request.ToVersion == nil || request.ToVersion.Equal(goflow.SpecVersion()) {
-		flow, err := goflow.ReadFlow(request.Flow)
-		if err != nil {
-			return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
-		}
-		return flow, http.StatusOK, nil
-	}
-
-	// if not then it's a JSON to JSON migration to the specified version
+	// do a JSON to JSON migration of the definition
 	migrated, err := goflow.MigrateDefinition(request.Flow, request.ToVersion)
 	if err != nil {
 		return errors.Wrapf(err, "unable to migrate flow"), http.StatusUnprocessableEntity, nil
+	}
+
+	// try to read result to check that it's valid
+	_, err = goflow.ReadFlow(migrated)
+	if err != nil {
+		return errors.Wrapf(err, "unable to read migrated flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	return migrated, http.StatusOK, nil
