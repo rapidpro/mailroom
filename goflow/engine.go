@@ -101,10 +101,14 @@ func webhooksHTTP() (*http.Client, *httpx.RetryConfig) {
 
 		webhooksHTTPClient = &http.Client{
 			Transport: t,
-			Timeout:   time.Duration(config.Mailroom.WebhooksTimeout) * time.Second,
+			Timeout:   time.Duration(config.Mailroom.WebhooksTimeout) * time.Millisecond,
 		}
 
-		webhooksHTTPRetries = httpx.NewRetryDelays(3, 10)
+		webhooksHTTPRetries = httpx.NewExponentialRetries(
+			time.Duration(config.Mailroom.WebhooksInitialBackoff)*time.Millisecond,
+			config.Mailroom.WebhooksMaxRetries,
+			config.Mailroom.WebhooksBackoffJitter,
+		)
 	})
 	return webhooksHTTPClient, webhooksHTTPRetries
 }

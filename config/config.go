@@ -22,10 +22,13 @@ type Config struct {
 
 	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
 
-	WebhooksTimeout   int    `help:"the timeout in seconds for webhook calls from engine"`
-	SMTPServer        string `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
-	MaxStepsPerSprint int    `help:"the maximum number of steps allowed per engine sprint"`
-	MaxValueLength    int    `help:"the maximum size in characters for contact field values and run result values"`
+	WebhooksTimeout        int     `help:"the timeout in milliseconds for webhook calls from engine"`
+	WebhooksMaxRetries     int     `help:"the number of times to retry a failed webhook call"`
+	WebhooksInitialBackoff int     `help:"the initial backoff in milliseconds when retrying a failed webhook call"`
+	WebhooksBackoffJitter  float64 `help:"the amount of jitter to apply to backoff times"`
+	SMTPServer             string  `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
+	MaxStepsPerSprint      int     `help:"the maximum number of steps allowed per engine sprint"`
+	MaxValueLength         int     `help:"the maximum size in characters for contact field values and run result values"`
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
@@ -61,10 +64,13 @@ func NewMailroomConfig() *Config {
 		LogLevel:       "error",
 		Version:        "Dev",
 
-		WebhooksTimeout:   15,
-		SMTPServer:        "",
-		MaxStepsPerSprint: 100,
-		MaxValueLength:    640,
+		WebhooksTimeout:        15000,
+		WebhooksMaxRetries:     2,
+		WebhooksInitialBackoff: 5000,
+		WebhooksBackoffJitter:  0.5,
+		SMTPServer:             "",
+		MaxStepsPerSprint:      100,
+		MaxValueLength:         640,
 
 		S3Endpoint:         "https://s3.amazonaws.com",
 		S3Region:           "us-east-1",

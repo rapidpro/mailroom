@@ -23,7 +23,7 @@ import (
 func init() {
 	// give airtime transfers an extra long timeout
 	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
-	airtimeHTTPRetries := httpx.NewRetryDelays(5, 10)
+	airtimeHTTPRetries := httpx.NewFixedRetries(5, 10)
 
 	goflow.RegisterEmailServiceFactory(
 		func(session flows.Session) (flows.EmailService, error) {

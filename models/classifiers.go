@@ -47,7 +47,7 @@ const (
 // Register a classification service factory with the engine
 func init() {
 	httpClient := &http.Client{Timeout: time.Duration(15 * time.Second)}
-	httpRetries := httpx.NewRetryDelays(3, 10)
+	httpRetries := httpx.NewFixedRetries(3, 10)
 
 	goflow.RegisterClassificationServiceFactory(
 		func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
