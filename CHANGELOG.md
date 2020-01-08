@@ -1,3 +1,31 @@
+v5.3.13
+----------
+ * Update to latest goflow v0.63.1
+
+v5.3.12
+----------
+ * Still do validation even when migrating to less than the current engine version
+
+v5.3.11
+----------
+ * Update to latest goflow to add support for flow migrations
+
+v5.3.10
+----------
+ * Update CreateBroadcastMessages to include globals in context
+
+v5.3.9
+----------
+ * Update to goflow v0.61.0 and provide email service to engine
+
+v5.3.8
+----------
+ * Update to goflow v0.60.1
+
+v5.3.7
+----------
+ * Add support for message topics
+
 v5.3.6
 ----------
  * Load global assets from database
