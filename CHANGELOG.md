@@ -1,3 +1,9 @@
+v5.3.14
+----------
+ * Make webhooks timeout configurable
+ * Update to goflow v0.64.0
+ * Fix elastic query evaluation when contact field doesn't exist
+
 v5.3.13
 ----------
  * Update to latest goflow v0.63.1
