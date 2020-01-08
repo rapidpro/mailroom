@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/services/airtime/dtone"
 	"github.com/nyaruka/goflow/services/email/smtp"
+	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/goflow"
 
@@ -22,6 +23,7 @@ import (
 func init() {
 	// give airtime transfers an extra long timeout
 	httpClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
+	httpRetries := httpx.NewRetryDelays(5, 10)
 
 	goflow.RegisterEmailServiceFactory(
 		func(session flows.Session) (flows.EmailService, error) {
@@ -31,7 +33,7 @@ func init() {
 
 	goflow.RegisterAirtimeServiceFactory(
 		func(session flows.Session) (flows.AirtimeService, error) {
-			return orgFromSession(session).AirtimeService(httpClient)
+			return orgFromSession(session).AirtimeService(httpClient, httpRetries)
 		},
 	)
 }
@@ -125,7 +127,7 @@ func (o *Org) EmailService(httpClient *http.Client) (flows.EmailService, error) 
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
-func (o *Org) AirtimeService(httpClient *http.Client) (flows.AirtimeService, error) {
+func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryConfig) (flows.AirtimeService, error) {
 	login := o.ConfigValue(configDTOneLogin, "")
 	token := o.ConfigValue(configDTOneToken, "")
 	currency := o.ConfigValue(configDTOnecurrency, "")
@@ -133,7 +135,7 @@ func (o *Org) AirtimeService(httpClient *http.Client) (flows.AirtimeService, err
 	if login == "" || token == "" {
 		return nil, errors.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneLogin, configDTOneToken, o.ID())
 	}
-	return dtone.NewService(httpClient, login, token, currency), nil
+	return dtone.NewService(httpClient, httpRetries, login, token, currency), nil
 }
 
 // gets the underlying org for the given engine session

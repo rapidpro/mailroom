@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
+	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/config"
 
 	"github.com/shopspring/decimal"
@@ -62,8 +63,10 @@ func Engine() flows.Engine {
 			"X-Mailroom-Mode": "normal",
 		}
 
+		retries := httpx.NewRetryDelays(3, 10)
+
 		eng = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, webhookHeaders, 10000)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, retries, webhookHeaders, 10000)).
 			WithEmailServiceFactory(emailFactory).
 			WithClassificationServiceFactory(classificationFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
@@ -83,7 +86,7 @@ func Simulator() flows.Engine {
 		}
 
 		simulator = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, webhookHeaders, 10000)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, webhookHeaders, 10000)).
 			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
 			WithEmailServiceFactory(simulatorEmailServiceFactory).     // but faked emails
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // and faked airtime transfers
