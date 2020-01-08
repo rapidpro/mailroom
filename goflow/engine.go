@@ -16,26 +16,15 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-var httpClient *http.Client
 var eng, simulator flows.Engine
-var engInit, simulatorInit sync.Once
+var engInit, simulatorInit, webhooksHTTPInit sync.Once
+
+var webhooksHTTPClient *http.Client
+var webhooksHTTPRetries *httpx.RetryConfig
 
 var emailFactory engine.EmailServiceFactory
 var classificationFactory engine.ClassificationServiceFactory
 var airtimeFactory engine.AirtimeServiceFactory
-
-func init() {
-	// customize the default golang transport
-	t := http.DefaultTransport.(*http.Transport).Clone()
-	t.MaxIdleConns = 32
-	t.MaxIdleConnsPerHost = 8
-	t.IdleConnTimeout = 30 * time.Second
-	t.TLSClientConfig = &tls.Config{
-		Renegotiation: tls.RenegotiateOnceAsClient, // support single TLS renegotiation
-	}
-
-	httpClient = &http.Client{Transport: t, Timeout: time.Duration(15 * time.Second)}
-}
 
 // RegisterEmailServiceFactory can be used by outside callers to register a email factory
 // for use by the engine
@@ -63,10 +52,10 @@ func Engine() flows.Engine {
 			"X-Mailroom-Mode": "normal",
 		}
 
-		retries := httpx.NewRetryDelays(3, 10)
+		httpClient, httpRetries := webhooksHTTP()
 
 		eng = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, retries, webhookHeaders, 10000)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, webhookHeaders, 10000)).
 			WithEmailServiceFactory(emailFactory).
 			WithClassificationServiceFactory(classificationFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
@@ -85,6 +74,8 @@ func Simulator() flows.Engine {
 			"X-Mailroom-Mode": "simulation",
 		}
 
+		httpClient, _ := webhooksHTTP() // don't do retries in simulator
+
 		simulator = engine.NewBuilder().
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, webhookHeaders, 10000)).
 			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
@@ -95,6 +86,27 @@ func Simulator() flows.Engine {
 	})
 
 	return simulator
+}
+
+func webhooksHTTP() (*http.Client, *httpx.RetryConfig) {
+	webhooksHTTPInit.Do(func() {
+		// customize the default golang transport
+		t := http.DefaultTransport.(*http.Transport).Clone()
+		t.MaxIdleConns = 32
+		t.MaxIdleConnsPerHost = 8
+		t.IdleConnTimeout = 30 * time.Second
+		t.TLSClientConfig = &tls.Config{
+			Renegotiation: tls.RenegotiateOnceAsClient, // support single TLS renegotiation
+		}
+
+		webhooksHTTPClient = &http.Client{
+			Transport: t,
+			Timeout:   time.Duration(config.Mailroom.WebhooksTimeout) * time.Second,
+		}
+
+		webhooksHTTPRetries = httpx.NewRetryDelays(3, 10)
+	})
+	return webhooksHTTPClient, webhooksHTTPRetries
 }
 
 func simulatorEmailServiceFactory(session flows.Session) (flows.EmailService, error) {
