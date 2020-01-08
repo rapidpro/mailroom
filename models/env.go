@@ -22,18 +22,18 @@ import (
 // Register a airtime service factory with the engine
 func init() {
 	// give airtime transfers an extra long timeout
-	httpClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
-	httpRetries := httpx.NewRetryDelays(5, 10)
+	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
+	airtimeHTTPRetries := httpx.NewRetryDelays(5, 10)
 
 	goflow.RegisterEmailServiceFactory(
 		func(session flows.Session) (flows.EmailService, error) {
-			return orgFromSession(session).EmailService(httpClient)
+			return orgFromSession(session).EmailService(http.DefaultClient)
 		},
 	)
 
 	goflow.RegisterAirtimeServiceFactory(
 		func(session flows.Session) (flows.AirtimeService, error) {
-			return orgFromSession(session).AirtimeService(httpClient, httpRetries)
+			return orgFromSession(session).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
 		},
 	)
 }
