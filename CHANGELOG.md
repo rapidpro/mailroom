@@ -1,3 +1,7 @@
+v5.3.16
+----------
+ * Update to goflow v0.64.2
+
 v5.3.15
 ----------
  * Update to new goreleaser.yml format
