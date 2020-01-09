@@ -40,6 +40,12 @@ var (
 
 // dumpStats calculates a bunch of stats every minute and both logs them and posts them to librato
 func dumpStats(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+	// We wait 15 seconds since we fire at the top of the minute, the same as expirations.
+	// That way any metrics related to the size of our queue are a bit more accurate (all expirations can
+	// usually be handled in 15 seconds). Something more complicated would take into account the age of
+	// the items in our queues.
+	time.Sleep(time.Second * 15)
+
 	// get our DB status
 	stats := db.Stats()
 

@@ -109,7 +109,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
-					SQL:   "select count(*) from flows_flowstart where flow_id = $1 AND status = 'P' AND query = 'name ~ Cathy' AND parent_summary IS NOT NULL;",
+					SQL:   `select count(*) from flows_flowstart where flow_id = $1 AND status = 'P' AND query = 'name ~ "Cathy"' AND parent_summary IS NOT NULL;`,
 					Args:  []interface{}{models.FavoritesFlowID},
 					Count: 1,
 				},
@@ -125,7 +125,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 					assert.Equal(t, start.CreateContact(), true)
 					assert.Equal(t, 0, len(start.ContactIDs()))
 					assert.Equal(t, 0, len(start.GroupIDs()))
-					assert.Equal(t, "name ~ Cathy", start.Query())
+					assert.Equal(t, `name ~ "Cathy"`, start.Query())
 					assert.Equal(t, start.FlowID(), favoriteFlow.ID())
 					return nil
 				},
