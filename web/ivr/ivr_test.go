@@ -60,7 +60,7 @@ func TestTwilioIVR(t *testing.T) {
 	twiml.IgnoreSignatures = true
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -364,7 +364,7 @@ func TestNexmoIVR(t *testing.T) {
 	defer ts.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 	defer server.Stop()
 
