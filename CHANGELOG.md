@@ -1,3 +1,7 @@
+v5.3.15
+----------
+ * Update to new goreleaser.yml format
+
 v5.3.14
 ----------
  * Make webhooks timeout configurable
