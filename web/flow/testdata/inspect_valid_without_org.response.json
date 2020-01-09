@@ -14,5 +14,6 @@
         ]
     },
     "results": [],
-    "waiting_exits": []
+    "waiting_exits": [],
+    "parent_refs": []
 }
