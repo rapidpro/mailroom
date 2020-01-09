@@ -152,7 +152,11 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 func ParseQuery(org *OrgAssets, query string) (string, elastic.Query, error) {
 	// our field resolver
 	resolver := func(key string) assets.Field {
-		return org.FieldByKey(key)
+		f := org.FieldByKey(key)
+		if f == nil {
+			return nil
+		}
+		return f
 	}
 
 	// turn into elastic query

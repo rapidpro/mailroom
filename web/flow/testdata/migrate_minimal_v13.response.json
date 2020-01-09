@@ -1,6 +1,6 @@
 {
     "uuid": "42362831-f376-4df1-b6d9-a80b102821d9",
-    "name": "No ruleset flow",
+    "name": "Simple Flow",
     "revision": 1,
     "spec_version": "13.1.0",
     "type": "messaging",

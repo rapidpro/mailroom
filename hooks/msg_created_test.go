@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/goflow/utils/uuids"
 )
 
 func TestMsgCreated(t *testing.T) {
@@ -39,6 +40,7 @@ func TestMsgCreated(t *testing.T) {
 
 	templateAction := actions.NewSendMsg(newActionUUID(), "Template time", nil, nil, false)
 	templateAction.Templating = &actions.Templating{
+		UUID:      uuids.UUID("db297d56-ec8c-4231-bbe8-030369777ae1"),
 		Template:  &assets.TemplateReference{assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), "revive_issue"},
 		Variables: []string{"@contact.name", "tooth"},
 	}

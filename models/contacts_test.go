@@ -37,6 +37,7 @@ func TestElasticContacts(t *testing.T) {
 		Request  string
 		Response string
 		Contacts []ContactID
+		Error    bool
 	}{
 		{
 			Query: "george",
@@ -117,6 +118,9 @@ func TestElasticContacts(t *testing.T) {
 				}
 			}`,
 			Contacts: []ContactID{},
+		}, {
+			Query: "goats > 2", // no such contact field
+			Error: true,
 		},
 	}
 
@@ -124,9 +128,14 @@ func TestElasticContacts(t *testing.T) {
 		es.NextResponse = tc.Response
 
 		ids, err := ContactIDsForQuery(ctx, client, org, tc.Query)
-		assert.NoError(t, err, "%d: error encountered performing query", i)
-		assert.JSONEq(t, tc.Request, es.LastBody, "%d: request mismatch", i)
-		assert.Equal(t, tc.Contacts, ids, "%d: ids mismatch", i)
+
+		if tc.Error {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err, "%d: error encountered performing query", i)
+			assert.JSONEq(t, tc.Request, es.LastBody, "%d: request mismatch", i)
+			assert.Equal(t, tc.Contacts, ids, "%d: ids mismatch", i)
+		}
 	}
 }
 

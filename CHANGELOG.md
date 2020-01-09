@@ -1,3 +1,25 @@
+v5.3.15
+----------
+ * Update to new goreleaser.yml format
+
+v5.3.14
+----------
+ * Make webhooks timeout configurable
+ * Update to goflow v0.64.0
+ * Fix elastic query evaluation when contact field doesn't exist
+
+v5.3.13
+----------
+ * Update to latest goflow v0.63.1
+
+v5.3.12
+----------
+ * Still do validation even when migrating to less than the current engine version
+
+v5.3.11
+----------
+ * Update to latest goflow to add support for flow migrations
+
 v5.3.10
 ----------
  * Update CreateBroadcastMessages to include globals in context
