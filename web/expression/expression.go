@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/goflow/legacy/expressions"
+	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/web"
 
