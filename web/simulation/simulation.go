@@ -267,10 +267,7 @@ func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawM
 	}
 
 	if legacyFlowDef != nil {
-		err = flow.SetLegacyDefinition(legacyFlowDef)
-		if err != nil {
-			return errors.Wrapf(err, "unable to populate flow: %s invalid definition", uuid)
-		}
+		flow.SetDefinition(legacyFlowDef)
 		return nil
 	}
 

@@ -365,7 +365,10 @@ func StartIVRFlow(
 
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
-		trigger = triggers.NewFlowActionVoice(org.Env(), flowRef, contact, connRef, start.ParentSummary())
+		trigger, err = triggers.NewFlowActionVoice(org.Env(), flowRef, contact, connRef, start.ParentSummary())
+		if err != nil {
+			return errors.Wrap(err, "unable to create flow action trigger")
+		}
 	} else {
 		trigger = triggers.NewManualVoice(org.Env(), flowRef, contact, connRef, params)
 	}

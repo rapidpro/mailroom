@@ -11,7 +11,6 @@ require (
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-chi/chi v3.3.3+incompatible
-	github.com/go-mail/mail v0.0.0-20180301192024-63235f23494b
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible
@@ -24,7 +23,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.1.1
-	github.com/nyaruka/goflow v0.55.0
+	github.com/nyaruka/goflow v0.64.2
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0

@@ -5,7 +5,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
@@ -87,7 +86,7 @@ func TestTriggers(t *testing.T) {
 	contacts, err := LoadContacts(ctx, db, org, contactIDs)
 	assert.NoError(t, err)
 
-	sa, err := engine.NewSessionAssets(org)
+	sa, err := NewSessionAssets(org)
 	assert.NoError(t, err)
 
 	cathy, err := contacts[0].FlowContact(org, sa)

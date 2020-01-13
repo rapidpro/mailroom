@@ -158,7 +158,11 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 
 	// our field resolver
 	resolver := func(key string) assets.Field {
-		return org.FieldByKey(key)
+		f := org.FieldByKey(key)
+		if f == nil {
+			return nil
+		}
+		return f
 	}
 
 	// turn into elastic query
