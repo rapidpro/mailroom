@@ -53,7 +53,7 @@ type StartOptions struct {
 }
 
 // TriggerBuilder defines the interface for building a trigger for the passed in contact
-type TriggerBuilder func(contact *flows.Contact) flows.Trigger
+type TriggerBuilder func(contact *flows.Contact) (flows.Trigger, error)
 
 // ResumeFlow resumes the passed in session using the passed in session
 func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, sa flows.SessionAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
@@ -180,14 +180,18 @@ func StartFlowBatch(
 	}
 
 	// this will build our trigger for each contact started
-	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
+	triggerBuilder := func(contact *flows.Contact) (flows.Trigger, error) {
 		if batch.ParentSummary() != nil {
-			return triggers.NewFlowAction(org.Env(), flow.FlowReference(), contact, batch.ParentSummary())
+			trigger, err := triggers.NewFlowAction(org.Env(), flow.FlowReference(), contact, batch.ParentSummary())
+			if err != nil {
+				return nil, errors.Wrap(err, "unable to create flow action trigger")
+			}
+			return trigger, nil
 		}
 		if batch.Extra() != nil {
-			return triggers.NewManual(org.Env(), flow.FlowReference(), contact, params)
+			return triggers.NewManual(org.Env(), flow.FlowReference(), contact, params), nil
 		}
-		return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
+		return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil), nil
 	}
 
 	// before committing our runs we want to set the start they are associated with
@@ -307,9 +311,9 @@ func FireCampaignEvents(
 
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
-	options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
+	options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
 		delete(skippedContacts, models.ContactID(contact.ID()))
-		return triggers.NewCampaign(org.Env(), flowRef, contact, event)
+		return triggers.NewCampaign(org.Env(), flowRef, contact, event), nil
 	}
 
 	// this is our pre commit callback for our sessions, we'll mark the event fires associated
@@ -487,7 +491,11 @@ func StartFlow(
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating flow contact")
 			}
-			triggers = append(triggers, options.TriggerBuilder(contact))
+			trigger, err := options.TriggerBuilder(contact)
+			if err != nil {
+				return nil, err
+			}
+			triggers = append(triggers, trigger)
 		}
 
 		ss, err := StartFlowForContacts(ctx, db, rp, org, sa, flow, triggers, options.CommitHook, options.Interrupt)
@@ -740,7 +748,7 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 func validateFlow(sa flows.SessionAssets, uuid assets.FlowUUID) error {
 	flow, err := sa.Flows().Get(uuid)
 	if err != nil {
-		return errors.Wrapf(err, "invalid flow: %s, cannot start", flow.UUID())
+		return errors.Wrapf(err, "invalid flow: %s, cannot start", uuid)
 	}
 
 	// check for missing assets and log

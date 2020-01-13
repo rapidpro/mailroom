@@ -46,13 +46,10 @@ func TestServer(t *testing.T) {
 		ResponsePattern string
 	}{
 		{URL: "/mr/flow/migrate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
+		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_minimal_v13.json", Status: 200, ResponseFile: "migrate_minimal_v13.response.json"},
 		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_minimal_legacy.json", Status: 200, ResponseFile: "migrate_minimal_legacy.response.json"},
-
-		{URL: "/mr/flow/validate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid_legacy.json", Status: 200, ResponseFile: "validate_valid_legacy.response.json"},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid_legacy.json", Status: 422, ResponseFile: "validate_invalid_legacy.response.json"},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_valid.json", Status: 200, ResponseFile: "validate_valid.response.json"},
-		{URL: "/mr/flow/validate", Method: "POST", BodyFile: "validate_invalid.json", Status: 422, ResponseFile: "validate_invalid.response.json"},
+		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_legacy_with_version.json", Status: 200, ResponseFile: "migrate_legacy_with_version.response.json"},
+		{URL: "/mr/flow/migrate", Method: "POST", BodyFile: "migrate_invalid_v13.json", Status: 422, Response: `{"error": "unable to read migrated flow: unable to read node: field 'uuid' is required"}`},
 
 		{URL: "/mr/flow/inspect", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid_legacy.json", Status: 200, ResponseFile: "inspect_valid_legacy.response.json"},
@@ -65,7 +62,7 @@ func TestServer(t *testing.T) {
 
 		{URL: "/mr/flow/clone", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid.json", Status: 200, ResponsePattern: `"uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"`},
-		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_struct_invalid.json", Status: 422, Response: `{"error": "unable to read flow: unable to read node: field 'uuid' is required"}`},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_struct_invalid.json", Status: 422, Response: `{"error": "unable to clone flow: unable to read node: field 'uuid' is required"}`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_missing_dep_mapping.json", Status: 422, ResponsePattern: `group\[uuid=[-0-9a-f]{36},name=Testers\]`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid_bad_org.json", Status: 500, Response: `{"error": "error loading environment for org 167733: no org with id: 167733"}`},
 	}
