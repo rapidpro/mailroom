@@ -28,6 +28,40 @@ func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, 
 	return node.String(), eq, nil
 }
 
+// ToElasticFieldSort returns the FieldSort for the passed in field
+func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) (*elastic.FieldSort, error) {
+	// no field name? default to most recent first by id
+	if fieldName == "" {
+		return elastic.NewFieldSort("id").Desc(), nil
+	}
+
+	// figure out if we are ascending or descending (default is ascending, can be changed with leading -)
+	ascending := true
+	if strings.HasPrefix(fieldName, "-") {
+		ascending = false
+		fieldName = fieldName[1:]
+	}
+
+	fieldName = strings.ToLower(fieldName)
+
+	// we are sorting by an attribute
+	if fieldName == contactql.AttributeID || fieldName == contactql.AttributeCreatedOn ||
+		fieldName == contactql.AttributeLanguage || fieldName == contactql.AttributeName {
+		return elastic.NewFieldSort(fieldName).Order(ascending), nil
+	}
+
+	// we are sorting by a custom field
+	field := resolver(fieldName)
+	if field == nil {
+		return nil, errors.Errorf("unable to find field with name: %s", fieldName)
+	}
+
+	sort := elastic.NewFieldSort(fmt.Sprintf("fields.%s", field.Type()))
+	sort = sort.Nested(elastic.NewNestedSort("fields").Filter(elastic.NewTermQuery("fields.field", field.UUID())))
+	sort = sort.Order(ascending)
+	return sort, nil
+}
+
 func nodeToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, node contactql.QueryNode) (elastic.Query, error) {
 	switch n := node.(type) {
 	case *contactql.BoolCombination:

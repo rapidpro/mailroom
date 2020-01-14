@@ -19,8 +19,9 @@ func init() {
 //
 //   {
 //     "org_id": 1,
-//     "group_uuid": "",
-//     "search": "age > 10"
+//     "group_uuid": "985a83fe-2e9f-478d-a3ec-fa602d5e7ddd",
+//     "search": "age > 10",
+//     "sort": "-age"
 //   }
 //
 type searchRequest struct {
@@ -29,12 +30,19 @@ type searchRequest struct {
 	Query     string           `json:"query"      validate:"required"`
 	PageSize  int              `json:"page_size"`
 	Offset    int              `json:"offset"`
+	Sort      string           `json:"sort"`
 }
 
 // Response for a contact search
+//
+// {
+//   "query": "age > 10",
+//   "contact_ids": [5,10,15],
+//   "total": 3,
+//   "offset": 0
+// }
 type searchResponse struct {
 	Query      string             `json:"query"`
-	Error      string             `json:"error"`
 	ContactIDs []models.ContactID `json:"contact_ids"`
 	Total      int64              `json:"total"`
 	Offset     int                `json:"offset"`
@@ -54,17 +62,17 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// Perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, org, request.GroupUUID, request.Query, request.Offset, request.PageSize)
+	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, org, request.GroupUUID, request.Query, request.Sort, request.Offset, request.PageSize)
 	if err != nil {
 		return nil, http.StatusServiceUnavailable, errors.Wrapf(err, "error performing query")
 	}
 
 	// build our response
 	response := &searchResponse{
+		Query:      parsed,
 		ContactIDs: hits,
 		Total:      total,
 		Offset:     request.Offset,
-		Query:      parsed,
 	}
 
 	return response, http.StatusOK, nil

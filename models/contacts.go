@@ -11,6 +11,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -148,17 +149,19 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
-// ParseQuery parses the passed in query for the passed in org, returning the parsed query and the resulting elastic query
-func ParseQuery(org *OrgAssets, query string) (string, elastic.Query, error) {
-	// our field resolver
-	resolver := func(key string) assets.Field {
+// buildFieldResolver builds a field resolver function for the passed in Org
+func buildFieldResolver(org *OrgAssets) contactql.FieldResolverFunc {
+	return func(key string) assets.Field {
 		f := org.FieldByKey(key)
 		if f == nil {
 			return nil
 		}
 		return f
 	}
+}
 
+// ParseQuery parses the passed in query for the passed in org, returning the parsed query and the resulting elastic query
+func ParseQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, query string) (string, elastic.Query, error) {
 	// turn into elastic query
 	parsed, eq, err := search.ToElasticQuery(org.Env(), resolver, query)
 	if err != nil {
@@ -176,16 +179,22 @@ func ParseQuery(org *OrgAssets, query string) (string, elastic.Query, error) {
 }
 
 // ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
-func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, offset int, pageSize int) (string, []ContactID, int64, error) {
+func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, sort string, offset int, pageSize int) (string, []ContactID, int64, error) {
 	start := time.Now()
 
 	if client == nil {
 		return "", nil, 0, errors.Errorf("no elastic client available, check your configuration")
 	}
 
-	parsed, eq, err := ParseQuery(org, query)
+	resolver := buildFieldResolver(org)
+	parsed, eq, err := ParseQuery(org, resolver, query)
 	if err != nil {
 		return "", nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	fieldSort, err := search.ToElasticFieldSort(resolver, sort)
+	if err != nil {
+		return "", nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
 
 	// filter by our base group
@@ -195,7 +204,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 	)
 
 	s := client.Search("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
-	s = s.Size(pageSize).From(offset).Query(eq).FetchSource(false)
+	s = s.Size(pageSize).From(offset).Query(eq).SortBy(fieldSort).FetchSource(false)
 
 	results, err := s.Do(ctx)
 	if err != nil {
@@ -233,7 +242,8 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// turn into elastic query
-	_, eq, err := ParseQuery(org, query)
+	resolver := buildFieldResolver(org)
+	_, eq, err := ParseQuery(org, resolver, query)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}
