@@ -217,7 +217,6 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		if err != nil {
 			return "", nil, 0, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
 		}
-
 		ids = append(ids, ContactID(id))
 	}
 
@@ -227,7 +226,8 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		"group_uuid":  group,
 		"query":       query,
 		"elapsed":     time.Since(start),
-		"match_count": len(ids),
+		"page_count":  len(ids),
+		"total_count": results.Hits.TotalHits,
 	}).Debug("paged contact query complete")
 
 	return parsed, ids, results.Hits.TotalHits, nil
