@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/assets/static/types"
+	"github.com/nyaruka/goflow/excellent/tools"
 	xtypes "github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -40,15 +41,22 @@ type sessionRequest struct {
 }
 
 type simulationResponse struct {
-	Session flows.Session            `json:"session"`
-	Events  []flows.Event            `json:"events"`
-	Context map[string]xtypes.XValue `json:"context,omitempty"`
+	Session flows.Session   `json:"session"`
+	Events  []flows.Event   `json:"events"`
+	Context *xtypes.XObject `json:"context,omitempty"`
 }
 
 func newSimulationResponse(session flows.Session, sprint flows.Sprint) *simulationResponse {
-	var context map[string]xtypes.XValue
+	var context *xtypes.XObject
 	if session != nil {
 		context = session.CurrentContext()
+
+		// include object defaults which are not marshaled by default
+		if context != nil {
+			tools.ContextWalkObjects(context, func(o *xtypes.XObject) {
+				o.SetMarshalDefault(true)
+			})
+		}
 	}
 	return &simulationResponse{Session: session, Events: sprint.Events(), Context: context}
 }
