@@ -1,3 +1,7 @@
+v5.3.17
+----------
+ * Include evaluation context with simulation requests
+
 v5.3.16
 ----------
  * Update to goflow v0.64.2
