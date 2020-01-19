@@ -17,12 +17,12 @@ import (
 func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (string, elastic.Query, error) {
 	node, err := contactql.ParseQuery(query, env.RedactionPolicy(), resolver)
 	if err != nil {
-		return "", nil, NewError("error parsing query: %s", err.Error())
+		return "", nil, NewError(err.Error())
 	}
 
 	eq, err := nodeToElasticQuery(env, resolver, node.Root())
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "error parsing query: %s", query)
+		return "", nil, NewError(err.Error())
 	}
 
 	return node.String(), eq, nil
@@ -159,7 +159,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 		} else if fieldType == assets.FieldTypeDatetime {
 			value, err := envs.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
-				return nil, NewError("unable to parse datetime: %s", c.Value())
+				return nil, NewError("string '%s' couldn't be parsed as a date", c.Value())
 			}
 			start, end := dates.DayToUTCRange(value, value.Location())
 
@@ -247,7 +247,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 		} else if key == contactql.AttributeCreatedOn {
 			value, err := envs.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
-				return nil, NewError("unable to parse datetime: %s", c.Value())
+				return nil, NewError("string '%s' couldn't be parsed as a date", c.Value())
 			}
 			start, end := dates.DayToUTCRange(value, value.Location())
 
