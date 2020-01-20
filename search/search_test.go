@@ -55,7 +55,11 @@ func TestElasticSort(t *testing.T) {
 	}
 
 	resolver := func(key string) assets.Field {
-		return registry[key]
+		field, found := registry[key]
+		if !found {
+			return nil
+		}
+		return field
 	}
 
 	for _, tc := range tcs {
@@ -100,7 +104,11 @@ func TestElasticQuery(t *testing.T) {
 	ny, _ := time.LoadLocation("America/New_York")
 
 	resolver := func(key string) assets.Field {
-		return registry[key]
+		field, found := registry[key]
+		if !found {
+			return nil
+		}
+		return field
 	}
 
 	for _, tc := range tcs {
