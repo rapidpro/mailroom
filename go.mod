@@ -17,6 +17,7 @@ require (
 	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/gorilla/schema v1.0.2
 	github.com/jmoiron/sqlx v1.2.0
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
@@ -36,6 +37,7 @@ require (
 	golang.org/x/net v0.0.0-20181217023233-e147a9138326 // indirect
 	google.golang.org/appengine v1.4.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/go-playground/validator.v9 v9.21.0
 	gopkg.in/mail.v2 v2.3.1
 )
