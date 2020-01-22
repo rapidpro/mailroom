@@ -85,7 +85,7 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	response := &searchResponse{
 		Query:      parsed.String(),
 		ContactIDs: hits,
-		Fields:     search.DependentFields(parsed),
+		Fields:     search.FieldDependencies(parsed),
 		Total:      total,
 		Offset:     request.Offset,
 		Sort:       request.Sort,

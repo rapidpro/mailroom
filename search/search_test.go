@@ -60,7 +60,7 @@ func TestElasticSort(t *testing.T) {
 		{"descending created_on", "-created_on", `{"created_on":{"order":"desc"}}`, nil},
 		{"ascending name", "name", `{"name":{"order":"asc"}}`, nil},
 		{"descending language", "-language", `{"language":{"order":"desc"}}`, nil},
-		{"descending numeric", "-age", `{"fields.number":{"nested":{"filter":{"term":{"fields.field":"6b6a43fa-a26d-4017-bede-328bcdd5c93b"}},"path":"fields"},"order":"desc"}}`, nil},
+		{"descending numeric", "-AGE", `{"fields.number":{"nested":{"filter":{"term":{"fields.field":"6b6a43fa-a26d-4017-bede-328bcdd5c93b"}},"path":"fields"},"order":"desc"}}`, nil},
 		{"ascending text", "color", `{"fields.text":{"nested":{"filter":{"term":{"fields.field":"ecc7b13b-c698-4f46-8a90-24a8fab6fe34"}},"path":"fields"},"order":"asc"}}`, nil},
 		{"descending date", "-dob", `{"fields.datetime":{"nested":{"filter":{"term":{"fields.field":"cbd3fc0e-9b74-4207-a8c7-248082bb4572"}},"path":"fields"},"order":"desc"}}`, nil},
 		{"descending state", "-state", `{"fields.state":{"nested":{"filter":{"term":{"fields.field":"67663ad1-3abc-42dd-a162-09df2dea66ec"}},"path":"fields"},"order":"desc"}}`, nil},
@@ -93,7 +93,7 @@ func TestQueryTerms(t *testing.T) {
 	}{
 		{"joe", []string{"name"}},
 		{"id = 10", []string{"id"}},
-		{"name = joe or age > 10", []string{"age", "name"}},
+		{"name = joe or AGE > 10", []string{"age", "name"}},
 	}
 
 	env := envs.NewBuilder().Build()
@@ -102,7 +102,7 @@ func TestQueryTerms(t *testing.T) {
 		parsed, err := ParseQuery(env, resolver, tc.Query)
 		assert.NoError(t, err)
 
-		fields := DependentFields(parsed)
+		fields := FieldDependencies(parsed)
 		assert.Equal(t, fields, tc.Fields)
 	}
 

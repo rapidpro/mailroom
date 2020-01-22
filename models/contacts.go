@@ -190,7 +190,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 
 	parsed, err := search.ParseQuery(org.Env(), resolver, query)
 	if err != nil {
-		return nil, nil, 0, errors.Wrapf(err, "error parsind query: %s", query)
+		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
 	eq, err := BuildElasticQuery(org, resolver, parsed)

@@ -33,8 +33,8 @@ func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, 
 	return eq, nil
 }
 
-// DependentFields returns all the dependent fields for the passed in query. This includes attributes such as "id" and "name"
-func DependentFields(query *contactql.ContactQuery) []string {
+// FieldDependencies returns all the field this query is dependent on. This includes attributes such as "id" and "name"
+func FieldDependencies(query *contactql.ContactQuery) []string {
 	seen := make(map[string]bool)
 	var appendFields func(node contactql.QueryNode, seen map[string]bool)
 	appendFields = func(node contactql.QueryNode, seen map[string]bool) {
