@@ -160,12 +160,12 @@ func buildFieldResolver(org *OrgAssets) contactql.FieldResolverFunc {
 	}
 }
 
-// ParseQuery parses the passed in query for the passed in org, returning the parsed query and the resulting elastic query
-func ParseQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, query string) (string, elastic.Query, error) {
+// BuildElasticQuery turns the passed in contact ql query into an elastic query
+func BuildElasticQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, query *contactql.ContactQuery) (elastic.Query, error) {
 	// turn into elastic query
-	parsed, eq, err := search.ToElasticQuery(org.Env(), resolver, query)
+	eq, err := search.ToElasticQuery(org.Env(), resolver, query)
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}
 
 	// additionally filter by org and active contacts
@@ -175,26 +175,32 @@ func ParseQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, query stri
 		elastic.NewTermQuery("is_active", true),
 	)
 
-	return parsed, eq, nil
+	return eq, nil
 }
 
 // ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
-func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, sort string, offset int, pageSize int) (string, []ContactID, int64, error) {
+func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
 	start := time.Now()
 
 	if client == nil {
-		return "", nil, 0, errors.Errorf("no elastic client available, check your configuration")
+		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
 	}
 
 	resolver := buildFieldResolver(org)
-	parsed, eq, err := ParseQuery(org, resolver, query)
+
+	parsed, err := search.ParseQuery(org.Env(), resolver, query)
 	if err != nil {
-		return "", nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+		return nil, nil, 0, errors.Wrapf(err, "error parsind query: %s", query)
+	}
+
+	eq, err := BuildElasticQuery(org, resolver, parsed)
+	if err != nil {
+		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
 	fieldSort, err := search.ToElasticFieldSort(resolver, sort)
 	if err != nil {
-		return "", nil, 0, errors.Wrapf(err, "error parsing sort")
+		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
 
 	// filter by our base group
@@ -208,14 +214,14 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 
 	results, err := s.Do(ctx)
 	if err != nil {
-		return "", nil, 0, errors.Wrapf(err, "error performing query")
+		return nil, nil, 0, errors.Wrapf(err, "error performing query")
 	}
 
 	ids := make([]ContactID, 0, pageSize)
 	for _, hit := range results.Hits.Hits {
 		id, err := strconv.Atoi(hit.Id)
 		if err != nil {
-			return "", nil, 0, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
+			return nil, nil, 0, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
 		}
 		ids = append(ids, ContactID(id))
 	}
@@ -243,7 +249,12 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 
 	// turn into elastic query
 	resolver := buildFieldResolver(org)
-	_, eq, err := ParseQuery(org, resolver, query)
+	parsed, err := search.ParseQuery(org.Env(), resolver, query)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	eq, err := BuildElasticQuery(org, resolver, parsed)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}

@@ -2,6 +2,7 @@ package search
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/nyaruka/goflow/assets"
@@ -13,19 +14,54 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// ToElasticQuery converts a contactql query string to an Elastic query returning the normalized view as well as the elastic query
-func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (string, elastic.Query, error) {
-	node, err := contactql.ParseQuery(query, env.RedactionPolicy(), resolver)
+// ParseQuery parses the passed in query returning the result
+func ParseQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (*contactql.ContactQuery, error) {
+	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), resolver)
 	if err != nil {
-		return "", nil, NewError(err.Error())
+		return nil, NewError(err.Error())
+	}
+	return parsed, nil
+}
+
+// ToElasticQuery converts a contactql query to an Elastic query returning the normalized view as well as the elastic query
+func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query *contactql.ContactQuery) (elastic.Query, error) {
+	eq, err := nodeToElasticQuery(env, resolver, query.Root())
+	if err != nil {
+		return nil, NewError(err.Error())
 	}
 
-	eq, err := nodeToElasticQuery(env, resolver, node.Root())
-	if err != nil {
-		return "", nil, NewError(err.Error())
+	return eq, nil
+}
+
+// DependentFields returns all the dependent fields for the passed in query. This includes attributes such as "id" and "name"
+func DependentFields(query *contactql.ContactQuery) []string {
+	seen := make(map[string]bool)
+	var appendFields func(node contactql.QueryNode, seen map[string]bool)
+	appendFields = func(node contactql.QueryNode, seen map[string]bool) {
+		switch n := node.(type) {
+		case *contactql.BoolCombination:
+			for _, c := range n.Children() {
+				appendFields(c, seen)
+			}
+
+		case *contactql.Condition:
+			seen[n.PropertyKey()] = true
+
+		default:
+			panic(fmt.Sprintf("unknown type in contactql query: %v", n))
+		}
 	}
 
-	return node.String(), eq, nil
+	appendFields(query.Root(), seen)
+	fields := make([]string, 0, len(seen))
+	for k := range seen {
+		fields = append(fields, k)
+	}
+
+	// order to make deterministic
+	sort.Strings(fields)
+
+	return fields
 }
 
 // ToElasticFieldSort returns the FieldSort for the passed in field

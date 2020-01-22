@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +26,7 @@ func (f *MockField) Name() string           { return f.fieldKey }
 func (f *MockField) Type() assets.FieldType { return f.fieldType }
 func (f *MockField) UUID() assets.FieldUUID { return f.fieldUUID }
 
-func TestElasticSort(t *testing.T) {
+func buildResolver() contactql.FieldResolverFunc {
 	registry := map[string]assets.Field{
 		"age":      &MockField{"age", assets.FieldTypeNumber, "6b6a43fa-a26d-4017-bede-328bcdd5c93b"},
 		"color":    &MockField{"color", assets.FieldTypeText, "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"},
@@ -33,6 +35,20 @@ func TestElasticSort(t *testing.T) {
 		"district": &MockField{"district", assets.FieldTypeDistrict, "54c72635-d747-4e45-883c-099d57dd998e"},
 		"ward":     &MockField{"ward", assets.FieldTypeWard, "fde8f740-c337-421b-8abb-83b954897c80"},
 	}
+
+	resolver := func(key string) assets.Field {
+		field, found := registry[key]
+		if !found {
+			return nil
+		}
+		return field
+	}
+
+	return resolver
+}
+
+func TestElasticSort(t *testing.T) {
+	resolver := buildResolver()
 
 	tcs := []struct {
 		Label   string
@@ -54,14 +70,6 @@ func TestElasticSort(t *testing.T) {
 		{"unknown field", "foo", "", fmt.Errorf("unable to find field with name: foo")},
 	}
 
-	resolver := func(key string) assets.Field {
-		field, found := registry[key]
-		if !found {
-			return nil
-		}
-		return field
-	}
-
 	for _, tc := range tcs {
 		sort, err := ToElasticFieldSort(resolver, tc.Sort)
 
@@ -76,15 +84,32 @@ func TestElasticSort(t *testing.T) {
 	}
 }
 
-func TestElasticQuery(t *testing.T) {
-	registry := map[string]assets.Field{
-		"age":      &MockField{"age", assets.FieldTypeNumber, "6b6a43fa-a26d-4017-bede-328bcdd5c93b"},
-		"color":    &MockField{"color", assets.FieldTypeText, "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"},
-		"dob":      &MockField{"dob", assets.FieldTypeDatetime, "cbd3fc0e-9b74-4207-a8c7-248082bb4572"},
-		"state":    &MockField{"state", assets.FieldTypeState, "67663ad1-3abc-42dd-a162-09df2dea66ec"},
-		"district": &MockField{"district", assets.FieldTypeDistrict, "54c72635-d747-4e45-883c-099d57dd998e"},
-		"ward":     &MockField{"ward", assets.FieldTypeWard, "fde8f740-c337-421b-8abb-83b954897c80"},
+func TestQueryTerms(t *testing.T) {
+	resolver := buildResolver()
+
+	tcs := []struct {
+		Query  string
+		Fields []string
+	}{
+		{"joe", []string{"name"}},
+		{"id = 10", []string{"id"}},
+		{"name = joe or age > 10", []string{"age", "name"}},
 	}
+
+	env := envs.NewBuilder().Build()
+
+	for _, tc := range tcs {
+		parsed, err := ParseQuery(env, resolver, tc.Query)
+		assert.NoError(t, err)
+
+		fields := DependentFields(parsed)
+		assert.Equal(t, fields, tc.Fields)
+	}
+
+}
+
+func TestElasticQuery(t *testing.T) {
+	resolver := buildResolver()
 
 	type TestCase struct {
 		Label  string          `json:"label"`
@@ -93,7 +118,6 @@ func TestElasticQuery(t *testing.T) {
 		Error  string          `json:"error"`
 		IsAnon bool            `json:"is_anon"`
 	}
-
 	tcs := make([]TestCase, 0, 20)
 	tcJSON, err := ioutil.ReadFile("testdata/elastic_test.json")
 	assert.NoError(t, err)
@@ -103,14 +127,6 @@ func TestElasticQuery(t *testing.T) {
 
 	ny, _ := time.LoadLocation("America/New_York")
 
-	resolver := func(key string) assets.Field {
-		field, found := registry[key]
-		if !found {
-			return nil
-		}
-		return field
-	}
-
 	for _, tc := range tcs {
 		redactionPolicy := envs.RedactionPolicyNone
 		if tc.IsAnon {
@@ -118,7 +134,12 @@ func TestElasticQuery(t *testing.T) {
 		}
 		env := envs.NewBuilder().WithTimezone(ny).WithRedactionPolicy(redactionPolicy).Build()
 
-		_, query, err := ToElasticQuery(env, resolver, tc.Search)
+		qlQuery, err := ParseQuery(env, resolver, tc.Search)
+
+		var query elastic.Query
+		if err == nil {
+			query, err = ToElasticQuery(env, resolver, qlQuery)
+		}
 
 		if tc.Error != "" {
 			assert.Error(t, err, "%s: error not received converting to elastic: %s", tc.Label, tc.Search)

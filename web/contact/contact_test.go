@@ -46,6 +46,34 @@ func TestServer(t *testing.T) {
 
 	defer server.Stop()
 
+	singleESResponse := fmt.Sprintf(`{
+		"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
+		"took": 2,
+		"timed_out": false,
+		"_shards": {
+		  "total": 1,
+		  "successful": 1,
+		  "skipped": 0,
+		  "failed": 0
+		},
+		"hits": {
+		  "total": 1,
+		  "max_score": null,
+		  "hits": [
+			{
+			  "_index": "contacts",
+			  "_type": "_doc",
+			  "_id": "%d",
+			  "_score": null,
+			  "_routing": "1",
+			  "sort": [
+				15124352
+			  ]
+			}
+		  ]
+		}
+	}`, models.CathyID)
+
 	tcs := []struct {
 		URL        string
 		Method     string
@@ -53,42 +81,30 @@ func TestServer(t *testing.T) {
 		Status     int
 		Response   string
 		Hits       []models.ContactID
+		Query      string
+		Fields     []string
 		ESResponse string
 	}{
-		{"/mr/contact/search", "GET", "", 405, "illegal", nil, ""},
+		{"/mr/contact/search", "GET", "", 405, "illegal", nil, "", nil, ""},
 		{
 			"/mr/contact/search", "POST",
 			fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
 			200,
 			`name~Cathy`,
 			[]models.ContactID{models.CathyID},
-			fmt.Sprintf(`{
-				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-				"took": 2,
-				"timed_out": false,
-				"_shards": {
-				  "total": 1,
-				  "successful": 1,
-				  "skipped": 0,
-				  "failed": 0
-				},
-				"hits": {
-				  "total": 1,
-				  "max_score": null,
-				  "hits": [
-					{
-					  "_index": "contacts",
-					  "_type": "_doc",
-					  "_id": "%d",
-					  "_score": null,
-					  "_routing": "1",
-					  "sort": [
-						15124352
-					  ]
-					}
-				  ]
-				}
-			}`, models.CathyID),
+			`name~Cathy`,
+			[]string{"name"},
+			singleESResponse,
+		},
+		{
+			"/mr/contact/search", "POST",
+			fmt.Sprintf(`{"org_id": 1, "query": "age = 10 and gender = M", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			200,
+			`AND(age=10, gender=M)`,
+			[]models.ContactID{models.CathyID},
+			`AND(age=10, gender=M)`,
+			[]string{"age", "gender"},
+			singleESResponse,
 		},
 	}
 
@@ -118,6 +134,8 @@ func TestServer(t *testing.T) {
 			err = json.Unmarshal(content, r)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.Hits, r.ContactIDs)
+			assert.Equal(t, tc.Query, r.Query)
+			assert.Equal(t, tc.Fields, r.Fields)
 		}
 	}
 }
