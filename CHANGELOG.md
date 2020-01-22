@@ -1,3 +1,8 @@
+v5.3.21
+----------
+ * Return field dependencies with queries on contact search endpoint
+ * Latest goflow, larger webhook bodies, trim expressions
+
 v5.3.20
 ----------
  * Update to latest goflow v0.64.9
