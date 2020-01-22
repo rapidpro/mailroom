@@ -45,6 +45,7 @@ type searchRequest struct {
 type searchResponse struct {
 	Query      string             `json:"query"`
 	ContactIDs []models.ContactID `json:"contact_ids"`
+	Fields     []string           `json:"fields"`
 	Total      int64              `json:"total"`
 	Offset     int                `json:"offset"`
 	Sort       string             `json:"sort"`
@@ -82,8 +83,9 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// build our response
 	response := &searchResponse{
-		Query:      parsed,
+		Query:      parsed.String(),
 		ContactIDs: hits,
+		Fields:     search.FieldDependencies(parsed),
 		Total:      total,
 		Offset:     request.Offset,
 		Sort:       request.Sort,

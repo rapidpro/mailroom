@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -46,49 +45,77 @@ func TestServer(t *testing.T) {
 
 	defer server.Stop()
 
+	singleESResponse := fmt.Sprintf(`{
+		"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
+		"took": 2,
+		"timed_out": false,
+		"_shards": {
+		  "total": 1,
+		  "successful": 1,
+		  "skipped": 0,
+		  "failed": 0
+		},
+		"hits": {
+		  "total": 1,
+		  "max_score": null,
+		  "hits": [
+			{
+			  "_index": "contacts",
+			  "_type": "_doc",
+			  "_id": "%d",
+			  "_score": null,
+			  "_routing": "1",
+			  "sort": [
+				15124352
+			  ]
+			}
+		  ]
+		}
+	}`, models.CathyID)
+
 	tcs := []struct {
 		URL        string
 		Method     string
 		Body       string
 		Status     int
-		Response   string
+		Error      string
 		Hits       []models.ContactID
+		Query      string
+		Fields     []string
 		ESResponse string
 	}{
-		{"/mr/contact/search", "GET", "", 405, "illegal", nil, ""},
+		{"/mr/contact/search", "GET", "", 405, "illegal method: GET", nil, "", nil, ""},
+		{
+			"/mr/contact/search", "POST",
+			fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			400, "can't resolve 'birthday' to attribute, scheme or field",
+			nil, "", nil, "",
+		},
+		{
+			"/mr/contact/search", "POST",
+			fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			400, "can't convert 'tomorrow' to a number",
+			nil, "", nil, "",
+		},
 		{
 			"/mr/contact/search", "POST",
 			fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
 			200,
-			`name~Cathy`,
+			"",
 			[]models.ContactID{models.CathyID},
-			fmt.Sprintf(`{
-				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-				"took": 2,
-				"timed_out": false,
-				"_shards": {
-				  "total": 1,
-				  "successful": 1,
-				  "skipped": 0,
-				  "failed": 0
-				},
-				"hits": {
-				  "total": 1,
-				  "max_score": null,
-				  "hits": [
-					{
-					  "_index": "contacts",
-					  "_type": "_doc",
-					  "_id": "%d",
-					  "_score": null,
-					  "_routing": "1",
-					  "sort": [
-						15124352
-					  ]
-					}
-				  ]
-				}
-			}`, models.CathyID),
+			`name ~ "Cathy"`,
+			[]string{"name"},
+			singleESResponse,
+		},
+		{
+			"/mr/contact/search", "POST",
+			fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			200,
+			"",
+			[]models.ContactID{models.CathyID},
+			`age = 10 AND gender = "M"`,
+			[]string{"age", "gender"},
+			singleESResponse,
 		},
 	}
 
@@ -110,7 +137,6 @@ func TestServer(t *testing.T) {
 
 		content, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
-		assert.True(t, strings.Contains(string(content), tc.Response), "%d: did not find string: %s in body: %s", i, tc.Response, string(content))
 
 		// on 200 responses parse them
 		if resp.StatusCode == 200 {
@@ -118,6 +144,13 @@ func TestServer(t *testing.T) {
 			err = json.Unmarshal(content, r)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.Hits, r.ContactIDs)
+			assert.Equal(t, tc.Query, r.Query)
+			assert.Equal(t, tc.Fields, r.Fields)
+		} else {
+			r := &web.ErrorResponse{}
+			err = json.Unmarshal(content, r)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.Error, r.Error)
 		}
 	}
 }

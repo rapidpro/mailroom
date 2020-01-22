@@ -182,12 +182,12 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 
 		// handler errored (a hard error)
 		if err != nil {
-			value = errorAsResponse(err)
+			value = NewErrorResponse(err)
 		} else {
 			// handler returned an error to use as a the response
 			asError, isError := value.(error)
 			if isError {
-				value = errorAsResponse(asError)
+				value = NewErrorResponse(asError)
 			}
 		}
 
@@ -221,7 +221,7 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 
 		logrus.WithError(err).WithField("http_request", r).Error("error handling request")
 		w.WriteHeader(http.StatusInternalServerError)
-		serialized, _ := json.Marshal(errorAsResponse(err))
+		serialized, _ := json.Marshal(NewErrorResponse(err))
 		w.Write(serialized)
 		return
 	}
@@ -285,8 +285,12 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func errorAsResponse(err error) interface{} {
-	return map[string]string{
-		"error": err.Error(),
-	}
+// ErrorResponse is the type for our error responses, it just contains a single error field
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// NewErrorResponse creates a new error response from the passed in errro
+func NewErrorResponse(err error) *ErrorResponse {
+	return &ErrorResponse{err.Error()}
 }
