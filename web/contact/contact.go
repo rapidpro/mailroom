@@ -14,6 +14,7 @@ import (
 
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(handleParseQuery))
 }
 
 // Searches the contacts for an org
@@ -39,6 +40,7 @@ type searchRequest struct {
 // {
 //   "query": "age > 10",
 //   "contact_ids": [5,10,15],
+//   "fields": ["age"],
 //   "total": 3,
 //   "offset": 0
 // }
@@ -51,7 +53,7 @@ type searchResponse struct {
 	Sort       string             `json:"sort"`
 }
 
-// handles a a contact search request
+// handles a contact search request
 func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &searchRequest{
 		Offset:   0,
@@ -89,6 +91,63 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		Total:      total,
 		Offset:     request.Offset,
 		Sort:       request.Sort,
+	}
+
+	return response, http.StatusOK, nil
+}
+
+// Request to parse the passed in query
+//
+//   {
+//     "org_id": 1,
+//     "query": "age > 10",
+//   }
+//
+type parseRequest struct {
+	OrgID models.OrgID `json:"org_id"     validate:"required"`
+	Query string       `json:"query"      validate:"required"`
+}
+
+// Response for a parse query request
+//
+// {
+//   "query": "age > 10",
+//   "fields": ["age"]
+// }
+type parseResponse struct {
+	Query  string   `json:"query"`
+	Fields []string `json:"fields"`
+}
+
+// handles a query parsing request
+func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &parseRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	resolver := models.BuildFieldResolver(org)
+	parsed, err := search.ParseQuery(org.Env(), resolver, request.Query)
+
+	if err != nil {
+		switch cause := errors.Cause(err).(type) {
+		case *search.Error:
+			return cause, http.StatusBadRequest, nil
+		default:
+			return nil, http.StatusInternalServerError, err
+		}
+	}
+
+	// build our response
+	response := &parseResponse{
+		Query:  parsed.String(),
+		Fields: search.FieldDependencies(parsed),
 	}
 
 	return response, http.StatusOK, nil

@@ -149,8 +149,8 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
-// buildFieldResolver builds a field resolver function for the passed in Org
-func buildFieldResolver(org *OrgAssets) contactql.FieldResolverFunc {
+// BuildFieldResolver builds a field resolver function for the passed in Org
+func BuildFieldResolver(org *OrgAssets) contactql.FieldResolverFunc {
 	return func(key string) assets.Field {
 		f := org.FieldByKey(key)
 		if f == nil {
@@ -186,7 +186,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
 	}
 
-	resolver := buildFieldResolver(org)
+	resolver := BuildFieldResolver(org)
 
 	parsed, err := search.ParseQuery(org.Env(), resolver, query)
 	if err != nil {
@@ -248,7 +248,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// turn into elastic query
-	resolver := buildFieldResolver(org)
+	resolver := BuildFieldResolver(org)
 	parsed, err := search.ParseQuery(org.Env(), resolver, query)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
