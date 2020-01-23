@@ -67,7 +67,7 @@ func NewMailroomConfig() *Config {
 
 		WebhooksTimeout:        15000,
 		WebhooksMaxRetries:     2,
-		WebhooksMaxBodyBytes:   10000,
+		WebhooksMaxBodyBytes:   1024 * 1024, // 1MB
 		WebhooksInitialBackoff: 5000,
 		WebhooksBackoffJitter:  0.5,
 		SMTPServer:             "",
