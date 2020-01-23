@@ -1226,7 +1226,7 @@
     {
         "label": "invalid created_on operand",
         "search": "created_on<dog",
-        "error": "unable to parse datetime: dog: string 'dog' couldn't be parsed as a date"
+        "error": "string 'dog' couldn't be parsed as a date"
     },
     {
         "label": "valid tel is set",

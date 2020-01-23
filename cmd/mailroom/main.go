@@ -24,6 +24,7 @@ import (
 	_ "github.com/nyaruka/mailroom/tasks/stats"
 	_ "github.com/nyaruka/mailroom/tasks/timeouts"
 
+	_ "github.com/nyaruka/mailroom/web/contact"
 	_ "github.com/nyaruka/mailroom/web/docs"
 	_ "github.com/nyaruka/mailroom/web/expression"
 	_ "github.com/nyaruka/mailroom/web/flow"
