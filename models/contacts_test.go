@@ -48,9 +48,9 @@ func TestElasticContacts(t *testing.T) {
 						"must":[
 							{ "bool":{
 								"must":[
-									{"match":{"name":{"query":"george"}}},
 									{"term":{"org_id":1}},
-									{"term":{"is_active":true}}
+									{"term":{"is_active":true}},
+									{"match":{"name":{"query":"george"}}}
 								]
 							}},
 							{ "term":{
@@ -101,9 +101,9 @@ func TestElasticContacts(t *testing.T) {
 						"must":[
 							{"bool":
 								{"must":[
-									{"match":{"name":{"query":"nobody"}}},
 									{"term":{"org_id":1}},
-									{"term":{"is_active":true}}
+									{"term":{"is_active":true}},
+									{"match":{"name":{"query":"nobody"}}}
 								]}
 							},
 							{"term":{"is_blocked":false}},

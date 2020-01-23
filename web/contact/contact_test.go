@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestServer(t *testing.T) {
+func TestSearch(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
@@ -117,6 +117,16 @@ func TestServer(t *testing.T) {
 			[]string{"age", "gender"},
 			singleESResponse,
 		},
+		{
+			"/mr/contact/search", "POST",
+			fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			200,
+			"",
+			[]models.ContactID{models.CathyID},
+			``,
+			[]string{},
+			singleESResponse,
+		},
 	}
 
 	for i, tc := range tcs {
@@ -146,6 +156,75 @@ func TestServer(t *testing.T) {
 			assert.Equal(t, tc.Hits, r.ContactIDs)
 			assert.Equal(t, tc.Query, r.Query)
 			assert.Equal(t, tc.Fields, r.Fields)
+		} else {
+			r := &web.ErrorResponse{}
+			err = json.Unmarshal(content, r)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.Error, r.Error)
+		}
+	}
+}
+
+func TestParse(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	rp := testsuite.RP()
+	wg := &sync.WaitGroup{}
+
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server.Start()
+	time.Sleep(time.Second)
+
+	defer server.Stop()
+
+	tcs := []struct {
+		URL    string
+		Method string
+		Body   string
+		Status int
+		Error  string
+		Query  string
+		Fields []string
+	}{
+		{
+			"/mr/contact/parse_query", "GET",
+			"",
+			405, "illegal method: GET",
+			"", nil,
+		},
+		{
+			"/mr/contact/parse_query", "POST",
+			`{"org_id": 1, "query": "birthday = tomorrow"}`,
+			400, "can't resolve 'birthday' to attribute, scheme or field",
+			"", nil,
+		},
+		{
+			"/mr/contact/parse_query", "POST",
+			`{"org_id": 1, "query": "age > 10"}`,
+			200, "",
+			"age > 10", []string{"age"},
+		},
+	}
+
+	for i, tc := range tcs {
+		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.URL, bytes.NewReader([]byte(tc.Body)))
+		assert.NoError(t, err, "%d: error creating request", i)
+
+		resp, err := http.DefaultClient.Do(req)
+		assert.NoError(t, err, "%d: error making request", i)
+
+		assert.Equal(t, tc.Status, resp.StatusCode, "%d: unexpected status", i)
+
+		content, err := ioutil.ReadAll(resp.Body)
+		assert.NoError(t, err, "%d: error reading body", i)
+
+		// on 200 responses parse them
+		if resp.StatusCode == 200 {
+			r := &searchResponse{}
+			err = json.Unmarshal(content, r)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.Query, r.Query)
 		} else {
 			r := &web.ErrorResponse{}
 			err = json.Unmarshal(content, r)
