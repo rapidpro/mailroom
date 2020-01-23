@@ -1,3 +1,10 @@
+v5.3.22
+----------
+ * Make default for MaxBodyBytes 1MB
+ * Allow search endpoint to return results without a query
+ * Add endpoint to parse contactql query
+ * Add config option to max bytes of a webhook call response body
+
 v5.3.21
 ----------
  * Return field dependencies with queries on contact search endpoint
