@@ -162,18 +162,21 @@ func BuildFieldResolver(org *OrgAssets) contactql.FieldResolverFunc {
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
 func BuildElasticQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, query *contactql.ContactQuery) (elastic.Query, error) {
-	// turn into elastic query
-	eq, err := search.ToElasticQuery(org.Env(), resolver, query)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
-	}
-
-	// additionally filter by org and active contacts
-	eq = elastic.NewBoolQuery().Must(
-		eq,
+	// filter by org and active contacts
+	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
 		elastic.NewTermQuery("is_active", true),
 	)
+
+	// and by our query if present
+	if query != nil {
+		q, err := search.ToElasticQuery(org.Env(), resolver, query)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+		}
+
+		eq = eq.Must(q)
+	}
 
 	return eq, nil
 }
@@ -181,6 +184,8 @@ func BuildElasticQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, que
 // ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
 func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
 	start := time.Now()
+	var parsed *contactql.ContactQuery
+	var err error
 
 	if client == nil {
 		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
@@ -188,9 +193,11 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 
 	resolver := BuildFieldResolver(org)
 
-	parsed, err := search.ParseQuery(org.Env(), resolver, query)
-	if err != nil {
-		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+	if query != "" {
+		parsed, err = search.ParseQuery(org.Env(), resolver, query)
+		if err != nil {
+			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+		}
 	}
 
 	eq, err := BuildElasticQuery(org, resolver, parsed)

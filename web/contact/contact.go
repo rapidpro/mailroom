@@ -29,7 +29,7 @@ func init() {
 type searchRequest struct {
 	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
 	GroupUUID assets.GroupUUID `json:"group_uuid" validate:"required"`
-	Query     string           `json:"query"      validate:"required"`
+	Query     string           `json:"query"`
 	PageSize  int              `json:"page_size"`
 	Offset    int              `json:"offset"`
 	Sort      string           `json:"sort"`
@@ -83,9 +83,15 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		}
 	}
 
+	// create our normalized query
+	normalized := ""
+	if parsed != nil {
+		normalized = parsed.String()
+	}
+
 	// build our response
 	response := &searchResponse{
-		Query:      parsed.String(),
+		Query:      normalized,
 		ContactIDs: hits,
 		Fields:     search.FieldDependencies(parsed),
 		Total:      total,
@@ -144,9 +150,14 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		}
 	}
 
+	normalized := ""
+	if parsed != nil {
+		normalized = parsed.String()
+	}
+
 	// build our response
 	response := &parseResponse{
-		Query:  parsed.String(),
+		Query:  normalized,
 		Fields: search.FieldDependencies(parsed),
 	}
 

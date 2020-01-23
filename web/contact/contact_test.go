@@ -117,6 +117,16 @@ func TestSearch(t *testing.T) {
 			[]string{"age", "gender"},
 			singleESResponse,
 		},
+		{
+			"/mr/contact/search", "POST",
+			fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			200,
+			"",
+			[]models.ContactID{models.CathyID},
+			``,
+			[]string{},
+			singleESResponse,
+		},
 	}
 
 	for i, tc := range tcs {
