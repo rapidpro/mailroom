@@ -2,13 +2,24 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+)
+
+// GroupStatus is the current status of the passed in group
+type GroupStatus string
+
+const (
+	GroupStatusInitializing = GroupStatus("I")
+	GroupStatusEvaluating   = GroupStatus("V")
+	GroupStatusReady        = GroupStatus("R")
 )
 
 // GroupID is our type for group ids
@@ -164,4 +175,107 @@ func ContactIDsForGroupIDs(ctx context.Context, tx Queryer, groupIDs []GroupID) 
 	}
 
 	return contactIDs, nil
+}
+
+const updateGroupStatusSQL = `UPDATE contacts_contactgroup SET status = $2 WHERE id = $1`
+
+// UpdateGroupStatus updates the group status for the passed in group
+func UpdateGroupStatus(ctx context.Context, db Queryer, groupID GroupID, status GroupStatus) error {
+	_, err := db.ExecContext(ctx, updateGroupStatusSQL, groupID, status)
+	if err != nil {
+		return errors.Wrapf(err, "error updating group status for group: %d", groupID)
+	}
+	return nil
+}
+
+// PopulateDynamicGroup calculates which members should be part of a group and populates the contacts
+// for that group by performing the minimum number of inserts / deletes.
+func PopulateDynamicGroup(ctx context.Context, db Queryer, es *elastic.Client, org *OrgAssets, groupID GroupID, query string) (int, error) {
+	err := UpdateGroupStatus(ctx, db, groupID, GroupStatusEvaluating)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error marking dynamic group as evaluating")
+	}
+
+	start := time.Now()
+
+	// we have a bit of a race with the indexer process.. we want to make sure that any contacts that changed
+	// before this group was updated but after the last index are included, so if a contact was modified
+	// more recently than 10 seconds ago, we wait that long before starting in populating our group
+	rows, err := db.QueryxContext(ctx, "SELECT modified_on FROM contacts_contact WHERE org_id = $1 ORDER BY modified_on DESC LIMIT 1", org.OrgID())
+	if err != nil && err != sql.ErrNoRows {
+		return 0, errors.Wrapf(err, "error selecting most recently changed contact for org: %d", org.OrgID())
+	}
+	defer rows.Close()
+	if err != sql.ErrNoRows {
+		rows.Next()
+		var newest time.Time
+		err = rows.Scan(&newest)
+		if err != nil {
+			return 0, errors.Wrapf(err, "error scanning most recent contact modified_on for org: %d", org.OrgID())
+		}
+
+		// if it was more recent than 10 seconds ago, sleep until it has been 10 seconds
+		if newest.Add(time.Second * 10).After(start) {
+			sleep := newest.Add(time.Second * 10).Sub(start)
+			logrus.WithField("sleep", sleep).Info("sleeping before evaluating dynamic group")
+			time.Sleep(sleep)
+		}
+	}
+
+	// get current set of ids in our group
+	ids, err := ContactIDsForGroupIDs(ctx, db, []GroupID{groupID})
+	if err != nil {
+		return 0, errors.Wrapf(err, "unable to look up contact ids for group: %d", groupID)
+	}
+	present := make(map[ContactID]bool, len(ids))
+	for _, i := range ids {
+		present[i] = true
+	}
+
+	// calculate new set of ids
+	new, err := ContactIDsForQuery(ctx, es, org, query)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error performing query: %s for group: %d", query, groupID)
+	}
+
+	// find which need to be added or removed
+	adds := make([]interface{}, 0, 100)
+	for _, id := range new {
+		if !present[id] {
+			adds = append(adds, &GroupAdd{
+				GroupID:   groupID,
+				ContactID: id,
+			})
+		}
+		delete(present, id)
+	}
+
+	// ids that remain need to be removed
+	removes := make([]interface{}, 0, 100)
+	for id := range present {
+		removes = append(removes, &GroupRemove{
+			GroupID:   groupID,
+			ContactID: id,
+		})
+	}
+
+	// first remove those needing removal
+	err = BatchedBulkSQL(ctx, "remove dynamic group contacts", db, removeContactsFromGroupsSQL, removes, 500)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error removing contacts from dynamic group: %d", groupID)
+	}
+
+	// then add those needing adding
+	err = BatchedBulkSQL(ctx, "add dynamic group contacts", db, addContactsToGroupsSQL, adds, 500)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error adding contacts to dynamic group: %d", groupID)
+	}
+
+	// mark our group as no longer evaluating
+	err = UpdateGroupStatus(ctx, db, groupID, GroupStatusReady)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error marking dynamic group as ready")
+	}
+
+	return len(new), nil
 }

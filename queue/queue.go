@@ -64,6 +64,9 @@ const (
 
 	// InterruptSessions is our task type to interrupt a set of sessions
 	InterruptSessions = "interrupt_sessions"
+
+	// PopulateDynamicGroup is our task to populate the contacts for a dynamic group
+	PopulateDynamicGroup = "populate_dynamic_group"
 )
 
 // Size returns the number of tasks for the passed in queue
