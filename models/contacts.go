@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"io"
@@ -118,6 +119,27 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 	logrus.WithField("elapsed", time.Since(start)).WithField("count", len(contacts)).Debug("loaded contacts")
 
 	return contacts, nil
+}
+
+// GetNewestContactModifiedOn returns the newest modified_on for a contact in the passed in org
+func GetNewestContactModifiedOn(ctx context.Context, db *sqlx.DB, org *OrgAssets) (*time.Time, error) {
+	rows, err := db.QueryxContext(ctx, "SELECT modified_on FROM contacts_contact WHERE org_id = $1 ORDER BY modified_on DESC LIMIT 1", org.OrgID())
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrapf(err, "error selecting most recently changed contact for org: %d", org.OrgID())
+	}
+	defer rows.Close()
+	if err != sql.ErrNoRows {
+		rows.Next()
+		var newest time.Time
+		err = rows.Scan(&newest)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning most recent contact modified_on for org: %d", org.OrgID())
+		}
+
+		return &newest, nil
+	}
+
+	return nil, nil
 }
 
 // ContactIDsFromReferences queries the contacts for the passed in org, returning the contact ids for the references

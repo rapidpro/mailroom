@@ -2,12 +2,12 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -188,9 +188,156 @@ func UpdateGroupStatus(ctx context.Context, db Queryer, groupID GroupID, status 
 	return nil
 }
 
+// RemoveContactsFromGroupAndCampaigns removes the passed in contacts from the passed in group, taking care of also
+// removing them from any associated campaigns
+func RemoveContactsFromGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAssets, groupID GroupID, contactIDs []ContactID) error {
+	removeBatch := func(batch []ContactID) error {
+		tx, err := db.BeginTxx(ctx, nil)
+
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error starting transaction")
+		}
+
+		removals := make([]*GroupRemove, len(batch))
+		for i, cid := range batch {
+			removals[i] = &GroupRemove{
+				GroupID:   groupID,
+				ContactID: cid,
+			}
+		}
+		err = RemoveContactsFromGroups(ctx, tx, removals)
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error removing contacts from group: %d", groupID)
+		}
+
+		// remove from any campaign events
+		err = DeleteUnfiredEventsForGroupRemoval(ctx, tx, org, batch, groupID)
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error removing contacts from unfired campaign events for group: %d", groupID)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			return errors.Wrapf(err, "error commiting batch removal of contacts for group: %d", groupID)
+		}
+
+		return nil
+	}
+
+	// batch up our contacts for removal, 500 at a time
+	batch := make([]ContactID, 0, 100)
+	for _, id := range contactIDs {
+		batch = append(batch, id)
+
+		if len(batch) == 500 {
+			err := removeBatch(batch)
+			if err != nil {
+				return err
+			}
+			batch = batch[:0]
+		}
+	}
+	if len(batch) > 0 {
+		err := removeBatch(batch)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// AddContactsToGroupAndCampaigns takes care of adding the passed in contacts to the passed in group, updating any
+// associated campaigns as needed
+func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAssets, groupID GroupID, contactIDs []ContactID) error {
+	// we need session assets in order to recalculate campaign events
+	sa, err := GetSessionAssets(org)
+	if err != nil {
+		return errors.Wrapf(err, "error creating session assets during group addition: %d", groupID)
+	}
+
+	addBatch := func(batch []ContactID) error {
+		tx, err := db.BeginTxx(ctx, nil)
+
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error starting transaction")
+		}
+
+		adds := make([]*GroupAdd, len(batch))
+		for i, cid := range batch {
+			adds[i] = &GroupAdd{
+				GroupID:   groupID,
+				ContactID: cid,
+			}
+		}
+		err = AddContactsToGroups(ctx, tx, adds)
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error adding contacts to group: %d", groupID)
+		}
+
+		// now load our contacts and add update their campaign events
+		contacts, err := LoadContacts(ctx, tx, org, batch)
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error loading contacts when adding to group: %d", groupID)
+		}
+
+		// convert to flow contacts
+		fcs := make([]*flows.Contact, len(contacts))
+		for i, c := range contacts {
+			fcs[i], err = c.FlowContact(org, sa)
+			if err != nil {
+				tx.Rollback()
+				return errors.Wrapf(err, "error converting contact to flow contact: %s", c.UUID())
+			}
+		}
+
+		// schedule any upcoming events that were affected by this group
+		err = AddCampaignEventsForGroupAddition(ctx, tx, org, fcs, groupID)
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error calculating new campaign events during group addition: %d", groupID)
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			return errors.Wrapf(err, "error commiting batch addition of contacts for group: %d", groupID)
+		}
+
+		return nil
+	}
+
+	// add our contacts in batches of 500
+	batch := make([]ContactID, 0, 500)
+	for _, id := range contactIDs {
+		batch = append(batch, id)
+
+		if len(batch) == 500 {
+			err = addBatch(batch)
+			if err != nil {
+				return err
+			}
+			batch = batch[:0]
+		}
+	}
+	if len(batch) > 0 {
+		err = addBatch(batch)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // PopulateDynamicGroup calculates which members should be part of a group and populates the contacts
 // for that group by performing the minimum number of inserts / deletes.
-func PopulateDynamicGroup(ctx context.Context, db Queryer, es *elastic.Client, org *OrgAssets, groupID GroupID, query string) (int, error) {
+func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, org *OrgAssets, groupID GroupID, query string) (int, error) {
 	err := UpdateGroupStatus(ctx, db, groupID, GroupStatusEvaluating)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error marking dynamic group as evaluating")
@@ -201,28 +348,22 @@ func PopulateDynamicGroup(ctx context.Context, db Queryer, es *elastic.Client, o
 	// we have a bit of a race with the indexer process.. we want to make sure that any contacts that changed
 	// before this group was updated but after the last index are included, so if a contact was modified
 	// more recently than 10 seconds ago, we wait that long before starting in populating our group
-	rows, err := db.QueryxContext(ctx, "SELECT modified_on FROM contacts_contact WHERE org_id = $1 ORDER BY modified_on DESC LIMIT 1", org.OrgID())
-	if err != nil && err != sql.ErrNoRows {
-		return 0, errors.Wrapf(err, "error selecting most recently changed contact for org: %d", org.OrgID())
+	newest, err := GetNewestContactModifiedOn(ctx, db, org)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error getting most recent contact modified_on for org: %d", org.OrgID())
 	}
-	defer rows.Close()
-	if err != sql.ErrNoRows {
-		rows.Next()
-		var newest time.Time
-		err = rows.Scan(&newest)
-		if err != nil {
-			return 0, errors.Wrapf(err, "error scanning most recent contact modified_on for org: %d", org.OrgID())
-		}
+	if newest != nil {
+		n := *newest
 
 		// if it was more recent than 10 seconds ago, sleep until it has been 10 seconds
-		if newest.Add(time.Second * 10).After(start) {
-			sleep := newest.Add(time.Second * 10).Sub(start)
+		if n.Add(time.Second * 10).After(start) {
+			sleep := n.Add(time.Second * 10).Sub(start)
 			logrus.WithField("sleep", sleep).Info("sleeping before evaluating dynamic group")
 			time.Sleep(sleep)
 		}
 	}
 
-	// get current set of ids in our group
+	// get current set of contacts in our group
 	ids, err := ContactIDsForGroupIDs(ctx, db, []GroupID{groupID})
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to look up contact ids for group: %d", groupID)
@@ -239,36 +380,30 @@ func PopulateDynamicGroup(ctx context.Context, db Queryer, es *elastic.Client, o
 	}
 
 	// find which need to be added or removed
-	adds := make([]interface{}, 0, 100)
+	adds := make([]ContactID, 0, 100)
 	for _, id := range new {
 		if !present[id] {
-			adds = append(adds, &GroupAdd{
-				GroupID:   groupID,
-				ContactID: id,
-			})
+			adds = append(adds, id)
 		}
 		delete(present, id)
 	}
 
-	// ids that remain need to be removed
-	removes := make([]interface{}, 0, 100)
+	// build our list of removals
+	removals := make([]ContactID, 0, len(present))
 	for id := range present {
-		removes = append(removes, &GroupRemove{
-			GroupID:   groupID,
-			ContactID: id,
-		})
+		removals = append(removals, id)
 	}
 
-	// first remove those needing removal
-	err = BatchedBulkSQL(ctx, "remove dynamic group contacts", db, removeContactsFromGroupsSQL, removes, 500)
+	// first remove all the contacts
+	err = RemoveContactsFromGroupAndCampaigns(ctx, db, org, groupID, removals)
 	if err != nil {
-		return 0, errors.Wrapf(err, "error removing contacts from dynamic group: %d", groupID)
+		return 0, errors.Wrapf(err, "error removing contacts from group: %d", groupID)
 	}
 
-	// then add those needing adding
-	err = BatchedBulkSQL(ctx, "add dynamic group contacts", db, addContactsToGroupsSQL, adds, 500)
+	// then add them all
+	err = AddContactsToGroupAndCampaigns(ctx, db, org, groupID, adds)
 	if err != nil {
-		return 0, errors.Wrapf(err, "error adding contacts to dynamic group: %d", groupID)
+		return 0, errors.Wrapf(err, "error adding contacts to group: %d", groupID)
 	}
 
 	// mark our group as no longer evaluating
