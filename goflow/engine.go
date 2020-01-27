@@ -55,7 +55,7 @@ func Engine() flows.Engine {
 		httpClient, httpRetries := webhooksHTTP()
 
 		eng = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, webhookHeaders, 10000)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
 			WithEmailServiceFactory(emailFactory).
 			WithClassificationServiceFactory(classificationFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
@@ -77,7 +77,7 @@ func Simulator() flows.Engine {
 		httpClient, _ := webhooksHTTP() // don't do retries in simulator
 
 		simulator = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, webhookHeaders, 10000)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
 			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
 			WithEmailServiceFactory(simulatorEmailServiceFactory).     // but faked emails
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // and faked airtime transfers

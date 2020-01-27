@@ -24,6 +24,7 @@ type Config struct {
 
 	WebhooksTimeout        int     `help:"the timeout in milliseconds for webhook calls from engine"`
 	WebhooksMaxRetries     int     `help:"the number of times to retry a failed webhook call"`
+	WebhooksMaxBodyBytes   int     `help:"the maximum size of bytes to a webhook call response body"`
 	WebhooksInitialBackoff int     `help:"the initial backoff in milliseconds when retrying a failed webhook call"`
 	WebhooksBackoffJitter  float64 `help:"the amount of jitter to apply to backoff times"`
 	SMTPServer             string  `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
@@ -66,6 +67,7 @@ func NewMailroomConfig() *Config {
 
 		WebhooksTimeout:        15000,
 		WebhooksMaxRetries:     2,
+		WebhooksMaxBodyBytes:   1024 * 1024, // 1MB
 		WebhooksInitialBackoff: 5000,
 		WebhooksBackoffJitter:  0.5,
 		SMTPServer:             "",

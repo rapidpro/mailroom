@@ -256,7 +256,7 @@ func TestServer(t *testing.T) {
 	rp := testsuite.RP()
 	wg := &sync.WaitGroup{}
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 
 	// give our server time to start
@@ -329,6 +329,12 @@ func TestServer(t *testing.T) {
 			sessionJSON, _ := json.Marshal(parsed["session"])
 			session = string(sessionJSON)
 			fmt.Println(session)
+
+			context, hasContext := parsed["context"]
+			if hasContext {
+				assert.Contains(t, context, "contact")
+				assert.Contains(t, context, "globals")
+			}
 		}
 
 		assert.True(t, strings.Contains(string(content), tc.Response), "%d: did not find string: %s in body: %s", i, tc.Response, string(content))

@@ -11,14 +11,15 @@ import (
 
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/olivere/elastic"
 
-	"github.com/pkg/errors"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"github.com/sirupsen/logrus"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -60,13 +61,14 @@ func RegisterRoute(method string, pattern string, handler Handler) {
 }
 
 // NewServer creates a new web server, it will need to be started after being created
-func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API, wg *sync.WaitGroup) *Server {
+func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API, elasticClient *elastic.Client, wg *sync.WaitGroup) *Server {
 	s := &Server{
-		CTX:      ctx,
-		RP:       rp,
-		DB:       db,
-		S3Client: s3Client,
-		Config:   config,
+		CTX:           ctx,
+		RP:            rp,
+		DB:            db,
+		S3Client:      s3Client,
+		ElasticClient: elasticClient,
+		Config:        config,
 
 		wg: wg,
 	}
@@ -180,12 +182,12 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 
 		// handler errored (a hard error)
 		if err != nil {
-			value = errorAsResponse(err)
+			value = NewErrorResponse(err)
 		} else {
 			// handler returned an error to use as a the response
 			asError, isError := value.(error)
 			if isError {
-				value = errorAsResponse(asError)
+				value = NewErrorResponse(asError)
 			}
 		}
 
@@ -219,7 +221,7 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 
 		logrus.WithError(err).WithField("http_request", r).Error("error handling request")
 		w.WriteHeader(http.StatusInternalServerError)
-		serialized, _ := json.Marshal(errorAsResponse(err))
+		serialized, _ := json.Marshal(NewErrorResponse(err))
 		w.Write(serialized)
 		return
 	}
@@ -271,19 +273,24 @@ func handle405(ctx context.Context, s *Server, r *http.Request) (interface{}, in
 }
 
 type Server struct {
-	CTX      context.Context
-	RP       *redis.Pool
-	DB       *sqlx.DB
-	S3Client s3iface.S3API
-	Config   *config.Config
+	CTX           context.Context
+	RP            *redis.Pool
+	DB            *sqlx.DB
+	S3Client      s3iface.S3API
+	Config        *config.Config
+	ElasticClient *elastic.Client
 
 	wg *sync.WaitGroup
 
 	httpServer *http.Server
 }
 
-func errorAsResponse(err error) interface{} {
-	return map[string]string{
-		"error": err.Error(),
-	}
+// ErrorResponse is the type for our error responses, it just contains a single error field
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// NewErrorResponse creates a new error response from the passed in errro
+func NewErrorResponse(err error) *ErrorResponse {
+	return &ErrorResponse{err.Error()}
 }
