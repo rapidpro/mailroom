@@ -1,3 +1,7 @@
+v5.3.26
+----------
+ * Update to goflow v0.66.3
+
 v5.3.25
 ----------
  * Update to latest goflow
