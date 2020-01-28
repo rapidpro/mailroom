@@ -36,7 +36,6 @@ var BobID = ContactID(10001)
 var BobUUID = flows.ContactUUID("b699a406-7e44-49be-9f01-1a82893e8a10")
 var BobURN = urns.URN("tel:+250700000002")
 var BobURNID = URNID(10001)
-
 var GeorgeID = ContactID(10002)
 var GeorgeUUID = flows.ContactUUID("8d024bcd-f473-4719-a00a-bd0bb1190135")
 var GeorgeURN = urns.URN("tel:+250700000003")
@@ -88,6 +87,9 @@ var TestersGroupUUID = assets.GroupUUID("5e9d8fab-5e7e-4f51-b533-261af5dea70d")
 
 var AgeFieldUUID = assets.FieldUUID("903f51da-2717-47c7-a0d3-f2f32877013d")
 var GenderFieldUUID = assets.FieldUUID("3a5891e4-756e-4dc9-8e12-b7a766168824")
+
+var JoinedFieldID = FieldID(7)
+var JoinedFieldUUID = assets.FieldUUID("d83aae24-4bbf-49d0-ab85-6bfd201eac6d")
 
 var CreatedOnFieldID = FieldID(2)
 

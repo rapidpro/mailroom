@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/olivere/elastic"
@@ -42,6 +44,29 @@ func TestDynamicGroups(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
+	// insert an event on our campaign
+	var eventID CampaignEventID
+	testsuite.DB().Get(&eventID,
+		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
+											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
+									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I') RETURNING id`,
+		uuids.New(), DoctorRemindersCampaignID, FavoritesFlowID, JoinedFieldID)
+
+	fmt.Println(eventID)
+
+	// clear Cathy's value
+	testsuite.DB().MustExec(
+		`update contacts_contact set fields = fields - $2
+		WHERE id = $1`, CathyID, JoinedFieldUUID)
+
+	// and populate Bob's
+	testsuite.DB().MustExec(
+		fmt.Sprintf(`update contacts_contact set fields = fields ||
+		'{"%s": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
+		WHERE id = $1`, JoinedFieldUUID), BobID)
+
+	// clear our org cache so we reload org campaigns and events
+	FlushCache()
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
@@ -83,27 +108,31 @@ func TestDynamicGroups(t *testing.T) {
 		}
 	}`
 
-	georgeHit := fmt.Sprintf(contactHit, GeorgeID)
+	cathyHit := fmt.Sprintf(contactHit, CathyID)
 	bobHit := fmt.Sprintf(contactHit, BobID)
 
 	tcs := []struct {
-		Query      string
-		ESResponse string
-		ContactIDs []ContactID
+		Query           string
+		ESResponse      string
+		ContactIDs      []ContactID
+		EventContactIDs []ContactID
 	}{
 		{
-			"george",
-			georgeHit,
-			[]ContactID{GeorgeID},
+			"cathy",
+			cathyHit,
+			[]ContactID{CathyID},
+			[]ContactID{},
 		},
 		{
 			"bob",
 			bobHit,
 			[]ContactID{BobID},
+			[]ContactID{BobID},
 		},
 		{
 			"unchanged",
 			bobHit,
+			[]ContactID{BobID},
 			[]ContactID{BobID},
 		},
 	}
@@ -124,6 +153,14 @@ func TestDynamicGroups(t *testing.T) {
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) from contacts_contactgroup WHERE id = $1 AND status = 'R'`,
-			[]interface{}{DoctorsGroupID}, 1)
+			[]interface{}{DoctorsGroupID}, 1, "wrong number of contacts in group for query: %s", tc.Query)
+
+		testsuite.AssertQueryCount(t, db,
+			`SELECT count(*) from campaigns_eventfire WHERE event_id = $1`,
+			[]interface{}{eventID}, len(tc.EventContactIDs), "wrong number of contacts with events for query: %s", tc.Query)
+
+		testsuite.AssertQueryCount(t, db,
+			`SELECT count(*) from campaigns_eventfire WHERE event_id = $1 AND contact_id = ANY($2)`,
+			[]interface{}{eventID, pq.Array(tc.EventContactIDs)}, len(tc.EventContactIDs), "wrong contacts with events for query: %s", tc.Query)
 	}
 }
