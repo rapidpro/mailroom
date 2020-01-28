@@ -115,22 +115,22 @@
     {
         "label": "invalid text >",
         "search": "color > red",
-        "error": "unsupported text comparator: >"
+        "error": "comparisons with > can only be used with date and number fields"
     },
     {
         "label": "invalid text <",
         "search": "color < red",
-        "error": "unsupported text comparator: <"
+        "error": "comparisons with < can only be used with date and number fields"
     },
     {
         "label": "invalid text < \"\"",
         "search": "color < \"\"",
-        "error": "unsupported text comparator: <"
+        "error": "comparisons with < can only be used with date and number fields"
     },
     {
         "label": "invalid text > \"\"",
         "search": "color > \"\"",
-        "error": "unsupported text comparator: >"
+        "error": "comparisons with > can only be used with date and number fields"
     },
     {
         "label": "valid number is set",
@@ -735,7 +735,7 @@
     {
         "label": "invalid state <",
         "search": "state<washington",
-        "error": "unsupported location comparator: <"
+        "error": "comparisons with < can only be used with date and number fields"
     },
     {
         "label": "valid district is set",
@@ -848,7 +848,7 @@
     {
         "label": "invalid district <",
         "search": "district<chelan",
-        "error": "unsupported location comparator: <"
+        "error": "comparisons with < can only be used with date and number fields"
     },
     {
         "label": "valid ward is set",
@@ -961,7 +961,7 @@
     {
         "label": "invalid ward <",
         "search": "ward<stevens",
-        "error": "unsupported location comparator: <"
+        "error": "comparisons with < can only be used with date and number fields"
     },
     {
         "label": "valid name =",
@@ -1051,7 +1051,7 @@
     {
         "label": "invalid name >",
         "search": "name>chef",
-        "error": "unsupported name query comparator: >"
+        "error": "comparisons with > can only be used with date and number fields"
     },
     {
         "label": "valid id =",
@@ -1146,7 +1146,7 @@
     {
         "label": "invalid language >",
         "search": "language>dog",
-        "error": "unsupported language comparator: >"
+        "error": "comparisons with > can only be used with date and number fields"
     },
     {
         "label": "valid created_on >",
@@ -1342,7 +1342,7 @@
     {
         "label": "invalid tel >",
         "search": "tel>12345",
-        "error": "unsupported scheme comparator: >"
+        "error": "comparisons with > can only be used with date and number fields"
     },
     {
         "label": "tel on anon org",
