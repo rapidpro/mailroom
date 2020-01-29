@@ -2,6 +2,7 @@ package search
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/nyaruka/goflow/assets"
@@ -13,14 +14,92 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// ToElasticQuery converts a contactql query string to an Elastic query
-func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (elastic.Query, error) {
-	node, err := contactql.ParseQuery(query, env.RedactionPolicy(), resolver)
+// ParseQuery parses the passed in query returning the result
+func ParseQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (*contactql.ContactQuery, error) {
+	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), resolver)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing query: %s", query)
+		return nil, NewError(err.Error())
+	}
+	return parsed, nil
+}
+
+// ToElasticQuery converts a contactql query to an Elastic query returning the normalized view as well as the elastic query
+func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query *contactql.ContactQuery) (elastic.Query, error) {
+	eq, err := nodeToElasticQuery(env, resolver, query.Root())
+	if err != nil {
+		return nil, NewError(err.Error())
 	}
 
-	return nodeToElasticQuery(env, resolver, node.Root())
+	return eq, nil
+}
+
+// FieldDependencies returns all the field this query is dependent on. This includes attributes such as "id" and "name"
+func FieldDependencies(query *contactql.ContactQuery) []string {
+	if query == nil {
+		return []string{}
+	}
+
+	seen := make(map[string]bool)
+	var appendFields func(node contactql.QueryNode, seen map[string]bool)
+	appendFields = func(node contactql.QueryNode, seen map[string]bool) {
+		switch n := node.(type) {
+		case *contactql.BoolCombination:
+			for _, c := range n.Children() {
+				appendFields(c, seen)
+			}
+
+		case *contactql.Condition:
+			seen[n.PropertyKey()] = true
+
+		default:
+			panic(fmt.Sprintf("unknown type in contactql query: %v", n))
+		}
+	}
+
+	appendFields(query.Root(), seen)
+	fields := make([]string, 0, len(seen))
+	for k := range seen {
+		fields = append(fields, k)
+	}
+
+	// order to make deterministic
+	sort.Strings(fields)
+
+	return fields
+}
+
+// ToElasticFieldSort returns the FieldSort for the passed in field
+func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) (*elastic.FieldSort, error) {
+	// no field name? default to most recent first by id
+	if fieldName == "" {
+		return elastic.NewFieldSort("id").Desc(), nil
+	}
+
+	// figure out if we are ascending or descending (default is ascending, can be changed with leading -)
+	ascending := true
+	if strings.HasPrefix(fieldName, "-") {
+		ascending = false
+		fieldName = fieldName[1:]
+	}
+
+	fieldName = strings.ToLower(fieldName)
+
+	// we are sorting by an attribute
+	if fieldName == contactql.AttributeID || fieldName == contactql.AttributeCreatedOn ||
+		fieldName == contactql.AttributeLanguage || fieldName == contactql.AttributeName {
+		return elastic.NewFieldSort(fieldName).Order(ascending), nil
+	}
+
+	// we are sorting by a custom field
+	field := resolver(fieldName)
+	if field == nil {
+		return nil, NewError("unable to find field with name: %s", fieldName)
+	}
+
+	sort := elastic.NewFieldSort(fmt.Sprintf("fields.%s", field.Type()))
+	sort = sort.Nested(elastic.NewNestedSort("fields").Filter(elastic.NewTermQuery("fields.field", field.UUID())))
+	sort = sort.Order(ascending)
+	return sort, nil
 }
 
 func nodeToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, node contactql.QueryNode) (elastic.Query, error) {
@@ -58,7 +137,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 	if c.PropertyType() == contactql.PropertyTypeField {
 		field := resolver(key)
 		if field == nil {
-			return nil, errors.Errorf("unable to find field: %s", key)
+			return nil, NewError("unable to find field: %s", key)
 		}
 
 		fieldQuery := elastic.NewTermQuery("fields.field", field.UUID())
@@ -90,7 +169,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 				)
 				return elastic.NewBoolQuery().MustNot(elastic.NewNestedQuery("fields", query)), nil
 			} else {
-				return nil, fmt.Errorf("unsupported text comparator: %s", c.Comparator())
+				return nil, NewError("unsupported text comparator: %s", c.Comparator())
 			}
 
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
@@ -98,7 +177,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 		} else if fieldType == assets.FieldTypeNumber {
 			value, err := decimal.NewFromString(c.Value())
 			if err != nil {
-				return nil, errors.Errorf("can't convert '%s' to a number", c.Value())
+				return nil, NewError("can't convert '%s' to a number", c.Value())
 			}
 
 			if c.Comparator() == "=" {
@@ -112,7 +191,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			} else if c.Comparator() == "<=" {
 				query = elastic.NewRangeQuery("fields.number").Lte(value)
 			} else {
-				return nil, fmt.Errorf("unsupported number comparator: %s", c.Comparator())
+				return nil, NewError("unsupported number comparator: %s", c.Comparator())
 			}
 
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
@@ -120,7 +199,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 		} else if fieldType == assets.FieldTypeDatetime {
 			value, err := envs.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unable to parse datetime: %s", c.Value())
+				return nil, NewError("string '%s' couldn't be parsed as a date", c.Value())
 			}
 			start, end := dates.DayToUTCRange(value, value.Location())
 
@@ -135,7 +214,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			} else if c.Comparator() == "<=" {
 				query = elastic.NewRangeQuery("fields.datetime").Lt(end)
 			} else {
-				return nil, fmt.Errorf("unsupported datetime comparator: %s", c.Comparator())
+				return nil, NewError("unsupported datetime comparator: %s", c.Comparator())
 			}
 
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
@@ -156,12 +235,12 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 					),
 				), nil
 			} else {
-				return nil, fmt.Errorf("unsupported location comparator: %s", c.Comparator())
+				return nil, NewError("unsupported location comparator: %s", c.Comparator())
 			}
 
 			return elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(fieldQuery, query)), nil
 		} else {
-			return nil, fmt.Errorf("unsupported contact field type: %s", field.Type())
+			return nil, NewError("unsupported contact field type: %s", field.Type())
 		}
 	} else if c.PropertyType() == contactql.PropertyTypeAttribute {
 		value := strings.ToLower(c.Value())
@@ -190,25 +269,25 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			} else if c.Comparator() == "!=" {
 				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("name.keyword", c.Value())), nil
 			} else {
-				return nil, fmt.Errorf("unsupported name query comparator: %s", c.Comparator())
+				return nil, NewError("unsupported name query comparator: %s", c.Comparator())
 			}
 		} else if key == contactql.AttributeID {
 			if c.Comparator() == "=" {
 				return elastic.NewIdsQuery().Ids(value), nil
 			}
-			return nil, fmt.Errorf("unsupported comparator for id: %s", c.Comparator())
+			return nil, NewError("unsupported comparator for id: %s", c.Comparator())
 		} else if key == contactql.AttributeLanguage {
 			if c.Comparator() == "=" {
 				return elastic.NewTermQuery("language", value), nil
 			} else if c.Comparator() == "!=" {
 				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("language", value)), nil
 			} else {
-				return nil, fmt.Errorf("unsupported language comparator: %s", c.Comparator())
+				return nil, NewError("unsupported language comparator: %s", c.Comparator())
 			}
 		} else if key == contactql.AttributeCreatedOn {
 			value, err := envs.DateTimeFromString(env, c.Value(), false)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unable to parse datetime: %s", c.Value())
+				return nil, NewError("string '%s' couldn't be parsed as a date", c.Value())
 			}
 			start, end := dates.DayToUTCRange(value, value.Location())
 
@@ -223,10 +302,10 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			} else if c.Comparator() == "<=" {
 				return elastic.NewRangeQuery("created_on").Lt(end), nil
 			} else {
-				return nil, fmt.Errorf("unsupported created_on comparator: %s", c.Comparator())
+				return nil, NewError("unsupported created_on comparator: %s", c.Comparator())
 			}
 		} else {
-			return nil, fmt.Errorf("unsupported contact attribute: %s", key)
+			return nil, NewError("unsupported contact attribute: %s", key)
 		}
 	} else if c.PropertyType() == contactql.PropertyTypeScheme {
 		value := strings.ToLower(c.Value())
@@ -254,9 +333,22 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 				elastic.NewTermQuery("urns.scheme", key)),
 			), nil
 		} else {
-			return nil, fmt.Errorf("unsupported scheme comparator: %s", c.Comparator())
+			return nil, NewError("unsupported scheme comparator: %s", c.Comparator())
 		}
 	}
 
-	return nil, errors.Errorf("unsupported property type: %s", c.PropertyType())
+	return nil, NewError("unsupported property type: %s", c.PropertyType())
+}
+
+// Error is used when an error is in the parsing of a field or query format
+type Error struct {
+	error string
+}
+
+func (e *Error) Error() string {
+	return e.error
+}
+
+func NewError(err string, args ...interface{}) *Error {
+	return &Error{fmt.Sprintf(err, args...)}
 }

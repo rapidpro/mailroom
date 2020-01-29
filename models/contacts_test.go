@@ -37,6 +37,7 @@ func TestElasticContacts(t *testing.T) {
 		Request  string
 		Response string
 		Contacts []ContactID
+		Error    bool
 	}{
 		{
 			Query: "george",
@@ -45,11 +46,19 @@ func TestElasticContacts(t *testing.T) {
 				"query":{
 					"bool":{
 						"must":[
-							{"match":{"name":{"query":"george"}}},
-							{"term":{"org_id":1}},
-							{"term":{"is_active":true}},
-							{"term":{"is_blocked":false}},
-							{"term":{"is_stopped":false}}
+							{ "bool":{
+								"must":[
+									{"term":{"org_id":1}},
+									{"term":{"is_active":true}},
+									{"match":{"name":{"query":"george"}}}
+								]
+							}},
+							{ "term":{
+								"is_blocked":false
+							}},
+							{"term":
+								{"is_stopped":false
+							}}
 						]
 					}
 				},
@@ -90,9 +99,13 @@ func TestElasticContacts(t *testing.T) {
 				"query":{
 					"bool":{
 						"must":[
-							{"match":{"name":{"query":"nobody"}}},
-							{"term":{"org_id":1}},
-							{"term":{"is_active":true}},
+							{"bool":
+								{"must":[
+									{"term":{"org_id":1}},
+									{"term":{"is_active":true}},
+									{"match":{"name":{"query":"nobody"}}}
+								]}
+							},
 							{"term":{"is_blocked":false}},
 							{"term":{"is_stopped":false}}
 						]
@@ -117,6 +130,9 @@ func TestElasticContacts(t *testing.T) {
 				}
 			}`,
 			Contacts: []ContactID{},
+		}, {
+			Query: "goats > 2", // no such contact field
+			Error: true,
 		},
 	}
 
@@ -124,9 +140,14 @@ func TestElasticContacts(t *testing.T) {
 		es.NextResponse = tc.Response
 
 		ids, err := ContactIDsForQuery(ctx, client, org, tc.Query)
-		assert.NoError(t, err, "%d: error encountered performing query", i)
-		assert.JSONEq(t, tc.Request, es.LastBody, "%d: request mismatch", i)
-		assert.Equal(t, tc.Contacts, ids, "%d: ids mismatch", i)
+
+		if tc.Error {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err, "%d: error encountered performing query", i)
+			assert.JSONEq(t, tc.Request, es.LastBody, "%d: request mismatch, got: %s", i, es.LastBody)
+			assert.Equal(t, tc.Contacts, ids, "%d: ids mismatch", i)
+		}
 	}
 }
 

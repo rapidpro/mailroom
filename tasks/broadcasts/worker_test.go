@@ -159,7 +159,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	template := map[envs.Language]*models.BroadcastTranslation{
 		eng: &models.BroadcastTranslation{
-			Text:         "hi @(title(contact.name)) goflow URN: @urns.tel Gender: @fields.gender",
+			Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
 			Attachments:  nil,
 			QuickReplies: nil,
 		},
@@ -188,7 +188,7 @@ func TestBroadcastTask(t *testing.T) {
 	}{
 		{models.NilBroadcastID, evaluated, models.TemplateStateEvaluated, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
 		{legacyID, legacy, models.TemplateStateLegacy, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy legacy URN: +12065551212 Gender: F"},
-		{models.NilBroadcastID, template, models.TemplateStateUnevaluated, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy goflow URN: tel:+12065551212 Gender: F"},
+		{models.NilBroadcastID, template, models.TemplateStateUnevaluated, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy from Nyaruka goflow URN: tel:+12065551212 Gender: F"},
 	}
 
 	lastNow := time.Now()

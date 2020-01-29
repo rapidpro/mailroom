@@ -1,5 +1,6 @@
 package config
 
+// Mailroom is the global configuration
 var Mailroom *Config
 
 func init() {
@@ -15,15 +16,20 @@ type Config struct {
 	Elastic    string `help:"URL for your ElasticSearch service"`
 	Version    string `help:"the version of this mailroom install"`
 	LogLevel   string `help:"the logging level courier should use"`
-	SMTPServer string `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
 
 	BatchWorkers   int `help:"the number of go routines that will be used to handle batch events"`
 	HandlerWorkers int `help:"the number of go routines that will be used to handle messages"`
 
 	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
 
-	MaxValueLength    int `help:"the maximum size in characters for contact field values and run result values"`
-	MaxStepsPerSprint int `help:"the maximum number of steps allowed per engine sprint"`
+	WebhooksTimeout        int     `help:"the timeout in milliseconds for webhook calls from engine"`
+	WebhooksMaxRetries     int     `help:"the number of times to retry a failed webhook call"`
+	WebhooksMaxBodyBytes   int     `help:"the maximum size of bytes to a webhook call response body"`
+	WebhooksInitialBackoff int     `help:"the initial backoff in milliseconds when retrying a failed webhook call"`
+	WebhooksBackoffJitter  float64 `help:"the amount of jitter to apply to backoff times"`
+	SMTPServer             string  `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
+	MaxStepsPerSprint      int     `help:"the maximum number of steps allowed per engine sprint"`
+	MaxValueLength         int     `help:"the maximum size in characters for contact field values and run result values"`
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
@@ -50,17 +56,23 @@ type Config struct {
 // NewMailroomConfig returns a new default configuration object
 func NewMailroomConfig() *Config {
 	return &Config{
-		DB:                "postgres://temba:temba@localhost/temba?sslmode=disable",
-		DBPoolSize:        36,
-		Redis:             "redis://localhost:6379/15",
-		Elastic:           "http://localhost:9200",
-		BatchWorkers:      4,
-		HandlerWorkers:    32,
-		LogLevel:          "error",
-		Version:           "Dev",
-		SMTPServer:        "",
-		MaxValueLength:    640,
-		MaxStepsPerSprint: 100,
+		DB:             "postgres://temba:temba@localhost/temba?sslmode=disable",
+		DBPoolSize:     36,
+		Redis:          "redis://localhost:6379/15",
+		Elastic:        "http://localhost:9200",
+		BatchWorkers:   4,
+		HandlerWorkers: 32,
+		LogLevel:       "error",
+		Version:        "Dev",
+
+		WebhooksTimeout:        15000,
+		WebhooksMaxRetries:     2,
+		WebhooksMaxBodyBytes:   1024 * 1024, // 1MB
+		WebhooksInitialBackoff: 5000,
+		WebhooksBackoffJitter:  0.5,
+		SMTPServer:             "",
+		MaxStepsPerSprint:      100,
+		MaxValueLength:         640,
 
 		S3Endpoint:         "https://s3.amazonaws.com",
 		S3Region:           "us-east-1",
