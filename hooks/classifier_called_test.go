@@ -15,7 +15,7 @@ func TestClassifierCalled(t *testing.T) {
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.wit.ai/message?v=20170307&q=book+me+a+flight": []httpx.MockResponse{
-			httpx.NewMockResponse(200, `{"_text":"book me a flight","entities":{"intent":[{"confidence":0.84709152161066,"value":"book_flight"}]},"msg_id":"1M7fAcDWag76OmgDI"}`, nil),
+			httpx.NewMockResponse(200, nil, `{"_text":"book me a flight","entities":{"intent":[{"confidence":0.84709152161066,"value":"book_flight"}]},"msg_id":"1M7fAcDWag76OmgDI"}`, 1),
 		},
 	}))
 

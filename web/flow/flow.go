@@ -83,7 +83,7 @@ func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interfa
 
 	// if we have an org ID, do asset validation
 	if request.ValidateWithOrgID != models.NilOrgID {
-		result, status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, flow)
+		result, status, err := checkDependencies(s.CTX, s.DB, request.ValidateWithOrgID, flow)
 		if result != nil || err != nil {
 			return result, status, err
 		}
@@ -130,7 +130,7 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 			return errors.Wrapf(err, "unable to clone flow"), http.StatusUnprocessableEntity, nil
 		}
 
-		result, status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, clone)
+		result, status, err := checkDependencies(s.CTX, s.DB, request.ValidateWithOrgID, clone)
 		if result != nil || err != nil {
 			return result, status, err
 		}
@@ -139,7 +139,7 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 	return cloneJSON, http.StatusOK, nil
 }
 
-func validate(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.Flow) (interface{}, int, error) {
+func checkDependencies(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.Flow) (interface{}, int, error) {
 	org, err := models.NewOrgAssets(ctx, db, orgID, nil)
 	if err != nil {
 		return nil, 0, err
@@ -150,7 +150,7 @@ func validate(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.F
 		return nil, 0, err
 	}
 
-	if err := flow.Validate(sa, nil); err != nil {
+	if err := flow.CheckDependencies(sa, nil); err != nil {
 		return errors.Wrapf(err, "flow failed validation"), http.StatusUnprocessableEntity, nil
 	}
 

@@ -751,9 +751,9 @@ func validateFlow(sa flows.SessionAssets, uuid assets.FlowUUID) error {
 		return errors.Wrapf(err, "invalid flow: %s, cannot start", uuid)
 	}
 
-	// check for missing assets and log
+	// check for missing dependencies and log
 	missingDeps := make([]string, 0)
-	err = flow.ValidateRecursive(sa, func(r assets.Reference) {
+	err = flow.CheckDependenciesRecursive(sa, func(r assets.Reference) {
 		missingDeps = append(missingDeps, r.String())
 	})
 
