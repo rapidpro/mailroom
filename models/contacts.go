@@ -11,6 +11,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -148,6 +149,103 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
+// BuildFieldResolver builds a field resolver function for the passed in Org
+func BuildFieldResolver(org *OrgAssets) contactql.FieldResolverFunc {
+	return func(key string) assets.Field {
+		f := org.FieldByKey(key)
+		if f == nil {
+			return nil
+		}
+		return f
+	}
+}
+
+// BuildElasticQuery turns the passed in contact ql query into an elastic query
+func BuildElasticQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, query *contactql.ContactQuery) (elastic.Query, error) {
+	// filter by org and active contacts
+	eq := elastic.NewBoolQuery().Must(
+		elastic.NewTermQuery("org_id", org.OrgID()),
+		elastic.NewTermQuery("is_active", true),
+	)
+
+	// and by our query if present
+	if query != nil {
+		q, err := search.ToElasticQuery(org.Env(), resolver, query)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+		}
+
+		eq = eq.Must(q)
+	}
+
+	return eq, nil
+}
+
+// ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
+func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
+	start := time.Now()
+	var parsed *contactql.ContactQuery
+	var err error
+
+	if client == nil {
+		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
+	}
+
+	resolver := BuildFieldResolver(org)
+
+	if query != "" {
+		parsed, err = search.ParseQuery(org.Env(), resolver, query)
+		if err != nil {
+			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+		}
+	}
+
+	eq, err := BuildElasticQuery(org, resolver, parsed)
+	if err != nil {
+		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	fieldSort, err := search.ToElasticFieldSort(resolver, sort)
+	if err != nil {
+		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
+	}
+
+	// filter by our base group
+	eq = elastic.NewBoolQuery().Must(
+		eq,
+		elastic.NewTermQuery("groups", group),
+	)
+
+	s := client.Search("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	s = s.Size(pageSize).From(offset).Query(eq).SortBy(fieldSort).FetchSource(false)
+
+	results, err := s.Do(ctx)
+	if err != nil {
+		return nil, nil, 0, errors.Wrapf(err, "error performing query")
+	}
+
+	ids := make([]ContactID, 0, pageSize)
+	for _, hit := range results.Hits.Hits {
+		id, err := strconv.Atoi(hit.Id)
+		if err != nil {
+			return nil, nil, 0, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
+		}
+		ids = append(ids, ContactID(id))
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"org_id":      org.OrgID(),
+		"parsed":      parsed,
+		"group_uuid":  group,
+		"query":       query,
+		"elapsed":     time.Since(start),
+		"page_count":  len(ids),
+		"total_count": results.Hits.TotalHits,
+	}).Debug("paged contact query complete")
+
+	return parsed, ids, results.Hits.TotalHits, nil
+}
+
 // ContactIDsForQuery returns the ids of all the contacts that match the passed in query
 func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAssets, query string) ([]ContactID, error) {
 	start := time.Now()
@@ -156,26 +254,21 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 		return nil, errors.Errorf("no elastic client available, check your configuration")
 	}
 
-	// our field resolver
-	resolver := func(key string) assets.Field {
-		f := org.FieldByKey(key)
-		if f == nil {
-			return nil
-		}
-		return f
+	// turn into elastic query
+	resolver := BuildFieldResolver(org)
+	parsed, err := search.ParseQuery(org.Env(), resolver, query)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	// turn into elastic query
-	eq, err := search.ToElasticQuery(org.Env(), resolver, query)
+	eq, err := BuildElasticQuery(org, resolver, parsed)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}
 
-	// filter by org, active, blocked and stopped
+	// only include unblocked and unstopped contacts
 	eq = elastic.NewBoolQuery().Must(
 		eq,
-		elastic.NewTermQuery("org_id", org.OrgID()),
-		elastic.NewTermQuery("is_active", true),
 		elastic.NewTermQuery("is_blocked", false),
 		elastic.NewTermQuery("is_stopped", false),
 	)

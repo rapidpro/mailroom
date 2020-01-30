@@ -71,7 +71,7 @@ To run the tests you need to create the test database:
 
 ```
 $ createdb mailroom_test
-$ createuser -P -E temba (set no password)
+$ createuser -P -E -s mailroom_test (set no password)
 ```
 
 To run all of the tests:

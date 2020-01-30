@@ -19,13 +19,13 @@ func TestEngineWebhook(t *testing.T) {
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://temba.io": []httpx.MockResponse{httpx.NewMockResponse(200, "OK")},
+		"http://temba.io": []httpx.MockResponse{httpx.NewMockResponse(200, "OK", nil)},
 	}))
 
 	request, err := http.NewRequest("GET", "http://temba.io", nil)
 	require.NoError(t, err)
 
-	call, err := svc.Call(nil, request, "")
+	call, err := svc.Call(nil, request)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
 	assert.Equal(t, "GET / HTTP/1.1\r\nHost: temba.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: normal\r\nAccept-Encoding: gzip\r\n\r\n", string(call.Request))
@@ -56,13 +56,13 @@ func TestSimulatorWebhook(t *testing.T) {
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://temba.io": []httpx.MockResponse{httpx.NewMockResponse(200, "OK")},
+		"http://temba.io": []httpx.MockResponse{httpx.NewMockResponse(200, "OK", nil)},
 	}))
 
 	request, err := http.NewRequest("GET", "http://temba.io", nil)
 	require.NoError(t, err)
 
-	call, err := svc.Call(nil, request, "")
+	call, err := svc.Call(nil, request)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
 	assert.Equal(t, "GET / HTTP/1.1\r\nHost: temba.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: simulation\r\nAccept-Encoding: gzip\r\n\r\n", string(call.Request))

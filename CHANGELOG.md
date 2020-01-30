@@ -1,3 +1,62 @@
+v5.3.26
+----------
+ * Update to goflow v0.66.3
+
+v5.3.25
+----------
+ * Update to latest goflow
+
+v5.3.24
+----------
+ * Update to latest goflow v0.66.0
+
+v5.3.23
+----------
+ * Update to latest goflow v0.65.0
+
+v5.3.22
+----------
+ * Make default for MaxBodyBytes 1MB
+ * Allow search endpoint to return results without a query
+ * Add endpoint to parse contactql query
+ * Add config option to max bytes of a webhook call response body
+
+v5.3.21
+----------
+ * Return field dependencies with queries on contact search endpoint
+ * Latest goflow, larger webhook bodies, trim expressions
+
+v5.3.20
+----------
+ * Update to latest goflow v0.64.9
+ * Add contact search web endpoint
+
+v5.3.19
+----------
+ * Update to goflow v0.64.8
+
+v5.3.18
+----------
+ * Update to goflow v0.64.7
+
+v5.3.17
+----------
+ * Include evaluation context with simulation requests
+
+v5.3.16
+----------
+ * Update to goflow v0.64.2
+
+v5.3.15
+----------
+ * Update to new goreleaser.yml format
+
+v5.3.14
+----------
+ * Make webhooks timeout configurable
+ * Update to goflow v0.64.0
+ * Fix elastic query evaluation when contact field doesn't exist
+
 v5.3.13
 ----------
  * Update to latest goflow v0.63.1

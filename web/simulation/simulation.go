@@ -8,6 +8,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/assets/static/types"
+	"github.com/nyaruka/goflow/excellent/tools"
+	xtypes "github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
@@ -37,9 +39,25 @@ type sessionRequest struct {
 	} `json:"assets"`
 }
 
-type sessionResponse struct {
-	Session flows.Session `json:"session"`
-	Events  []flows.Event `json:"events"`
+type simulationResponse struct {
+	Session flows.Session   `json:"session"`
+	Events  []flows.Event   `json:"events"`
+	Context *xtypes.XObject `json:"context,omitempty"`
+}
+
+func newSimulationResponse(session flows.Session, sprint flows.Sprint) *simulationResponse {
+	var context *xtypes.XObject
+	if session != nil {
+		context = session.CurrentContext()
+
+		// include object defaults which are not marshaled by default
+		if context != nil {
+			tools.ContextWalkObjects(context, func(o *xtypes.XObject) {
+				o.SetMarshalDefault(true)
+			})
+		}
+	}
+	return &simulationResponse{Session: session, Events: sprint.Events(), Context: context}
 }
 
 // Starts a new engine session
@@ -134,7 +152,7 @@ func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, sa flo
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
 
-	return &sessionResponse{Session: session, Events: sprint.Events()}, http.StatusOK, nil
+	return newSimulationResponse(session, sprint), http.StatusOK, nil
 }
 
 // Resumes an existing engine session
@@ -233,7 +251,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// if our session is already complete, then this is a no-op, return the session unchanged
 	if session.Status() != flows.SessionStatusWaiting {
-		return &sessionResponse{Session: session, Events: nil}, http.StatusOK, nil
+		return &simulationResponse{Session: session, Events: nil}, http.StatusOK, nil
 	}
 
 	// resume our session
@@ -247,7 +265,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
 
-	return &sessionResponse{Session: session, Events: sprint.Events()}, http.StatusOK, nil
+	return newSimulationResponse(session, sprint), http.StatusOK, nil
 }
 
 // populateFlow takes care of setting the definition for the flow with the passed in UUID according to the passed in definitions

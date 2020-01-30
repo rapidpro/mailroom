@@ -211,7 +211,7 @@ func (mr *Mailroom) Start() error {
 	mr.handlerForeman.Start()
 
 	// start our web server
-	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.S3Client, mr.WaitGroup)
+	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.S3Client, mr.ElasticClient, mr.WaitGroup)
 	mr.webserver.Start()
 
 	logrus.Info("mailroom started")
