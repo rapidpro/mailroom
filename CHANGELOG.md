@@ -1,3 +1,7 @@
+v5.3.28
+----------
+ * Allow dynamic group population within mailroom
+
 v5.3.27
 ----------
  * Update to latest goflow v0.67.0
