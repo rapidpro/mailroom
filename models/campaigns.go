@@ -97,7 +97,6 @@ func (c *Campaign) GroupUUID() assets.GroupUUID { return c.c.GroupUUID }
 func (c *Campaign) Events() []*CampaignEvent { return c.c.Events }
 
 // CampaignEvent is our struct for an individual campaign event
-
 type CampaignEvent struct {
 	e struct {
 		ID            CampaignEventID   `json:"id"`
@@ -434,7 +433,7 @@ WHERE
 `
 
 // DeleteUnfiredEventFires removes event fires for the passed in event and contact
-func DeleteUnfiredEventFires(ctx context.Context, tx *sqlx.Tx, removes []*FireDelete) error {
+func DeleteUnfiredEventFires(ctx context.Context, tx Queryer, removes []*FireDelete) error {
 	if len(removes) == 0 {
 		return nil
 	}
@@ -504,4 +503,74 @@ type FireAdd struct {
 	ContactID ContactID       `db:"contact_id"`
 	EventID   CampaignEventID `db:"event_id"`
 	Scheduled time.Time       `db:"scheduled"`
+}
+
+// DeleteUnfiredEventsForGroupRemoval deletes any unfired events for all campaigns that are
+// based on the passed in group id for all the passed in contacts.
+func DeleteUnfiredEventsForGroupRemoval(ctx context.Context, tx Queryer, org *OrgAssets, contactIDs []ContactID, groupID GroupID) error {
+	fds := make([]*FireDelete, 0, 10)
+
+	for _, c := range org.CampaignByGroupID(groupID) {
+		for _, e := range c.Events() {
+			for _, cid := range contactIDs {
+				fds = append(fds, &FireDelete{
+					EventID:   e.ID(),
+					ContactID: cid,
+				})
+			}
+		}
+	}
+
+	// delete all the unfired events
+	return DeleteUnfiredEventFires(ctx, tx, fds)
+}
+
+// AddCampaignEventsForGroupAddition first removes the passed in contacts from any events that group change may effect, then recreates
+// the campaign events they qualify for.
+func AddCampaignEventsForGroupAddition(ctx context.Context, tx Queryer, org *OrgAssets, contacts []*flows.Contact, groupID GroupID) error {
+	cids := make([]ContactID, len(contacts))
+	for i, c := range contacts {
+		cids[i] = ContactID(c.ID())
+	}
+
+	// first remove all unfired events that may be affected by our group change
+	err := DeleteUnfiredEventsForGroupRemoval(ctx, tx, org, cids, groupID)
+	if err != nil {
+		return errors.Wrapf(err, "error removing unfired campaign events for contacts")
+	}
+
+	// now calculate which event fires need to be added
+	fas := make([]*FireAdd, 0, 10)
+
+	tz := org.Env().Timezone()
+
+	// for each of our contacts
+	for _, contact := range contacts {
+		// for each campaign that may have changed from this group change
+		for _, c := range org.CampaignByGroupID(groupID) {
+			// check each event
+			for _, e := range c.Events() {
+				// and if we qualify by field
+				if e.QualifiesByField(contact) {
+					// calculate our scheduled fire
+					scheduled, err := e.ScheduleForContact(tz, time.Now(), contact)
+					if err != nil {
+						return errors.Wrapf(err, "error calculating schedule for event: %d and contact: %d", e.ID(), c.ID())
+					}
+
+					// if we have one, add it to our list for our batch commit
+					if scheduled != nil {
+						fas = append(fas, &FireAdd{
+							ContactID: ContactID(contact.ID()),
+							EventID:   e.ID(),
+							Scheduled: *scheduled,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// add all our new event fires
+	return AddEventFires(ctx, tx, fas)
 }

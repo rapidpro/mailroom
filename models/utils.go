@@ -89,6 +89,7 @@ func Exec(ctx context.Context, label string, tx Queryer, sql string, args ...int
 	return nil
 }
 
+// BulkSQL runs the SQL passed in for the passed in interfaces, replacing any variables in the SQL as needed
 func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []interface{}) error {
 	// no values, nothing to do
 	if len(vs) == 0 {
@@ -129,16 +130,14 @@ func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []int
 		return errors.Wrapf(err, "error extracting values from sql: %s", sql)
 	}
 
-	bulkInsert := tx.Rebind(strings.Replace(sql, valuesSQL, values.String(), -1))
-
-	// insert them all at once
-	rows, err := tx.QueryxContext(ctx, bulkInsert, args...)
+	bulkQuery := tx.Rebind(strings.Replace(sql, valuesSQL, values.String(), -1))
+	rows, err := tx.QueryxContext(ctx, bulkQuery, args...)
 	if err != nil {
-		return errors.Wrapf(err, "error during bulk insert")
+		return errors.Wrapf(err, "error during bulk query")
 	}
 	defer rows.Close()
 
-	// read in all our inserted rows, scanning in any values if we have a returning clause
+	// if have a returning clause, read them back and try to map them
 	if strings.Contains(strings.ToUpper(sql), "RETURNING") {
 		for _, v := range vs {
 			if !rows.Next() {
