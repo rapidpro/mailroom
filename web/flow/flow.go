@@ -23,7 +23,7 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/clone", web.RequireAuthToken(handleClone))
 }
 
-// Migrates a legacy flow to the new flow definition specification
+// Migrates a flow to the latest flow specification
 //
 //   {
 //     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...},
