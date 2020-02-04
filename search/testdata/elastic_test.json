@@ -289,7 +289,7 @@
                             },
                             {
                                 "range": {
-                                    "fields_number": {
+                                    "fields.number": {
                                         "from": null,
                                         "include_lower": true,
                                         "include_upper": false,

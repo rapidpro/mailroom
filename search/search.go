@@ -187,7 +187,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			} else if c.Comparator() == ">=" {
 				query = elastic.NewRangeQuery("fields.number").Gte(value)
 			} else if c.Comparator() == "<" {
-				query = elastic.NewRangeQuery("fields_number").Lt(value)
+				query = elastic.NewRangeQuery("fields.number").Lt(value)
 			} else if c.Comparator() == "<=" {
 				query = elastic.NewRangeQuery("fields.number").Lte(value)
 			} else {
