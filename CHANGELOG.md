@@ -1,3 +1,8 @@
+v5.3.30
+----------
+ * Sort locations fields by keyword value
+ * Update to latest goflow
+
 v5.3.29
 ----------
  * Fix > query on numbers, never use cached orgs
