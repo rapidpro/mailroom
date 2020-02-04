@@ -1,3 +1,9 @@
+v5.3.29
+----------
+ * Fix > query on numbers, never use cached orgs
+ * Update gocommon for v1.2.0
+ * Remove superfulous legacy_definition fields on endpoints
+
 v5.3.28
 ----------
  * Allow dynamic group population within mailroom
