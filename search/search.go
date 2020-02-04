@@ -96,7 +96,17 @@ func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) 
 		return nil, NewError("unable to find field with name: %s", fieldName)
 	}
 
-	sort := elastic.NewFieldSort(fmt.Sprintf("fields.%s", field.Type()))
+	var key string
+	switch field.Type() {
+	case assets.FieldTypeState,
+		assets.FieldTypeDistrict,
+		assets.FieldTypeWard:
+		key = fmt.Sprintf("fields.%s_keyword", field.Type())
+	default:
+		key = fmt.Sprintf("fields.%s", field.Type())
+	}
+
+	sort := elastic.NewFieldSort(key)
 	sort = sort.Nested(elastic.NewNestedSort("fields").Filter(elastic.NewTermQuery("fields.field", field.UUID())))
 	sort = sort.Order(ascending)
 	return sort, nil
