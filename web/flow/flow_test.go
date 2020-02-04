@@ -53,7 +53,7 @@ func TestServer(t *testing.T) {
 
 		{URL: "/mr/flow/inspect", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid_legacy.json", Status: 200, ResponseFile: "inspect_valid_legacy.response.json"},
-		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_invalid_legacy.json", Status: 422, ResponseFile: "inspect_invalid_legacy.response.json"},
+		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_invalid_legacy.json", Status: 200, ResponseFile: "inspect_invalid_legacy.response.json"},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid.json", Status: 200, ResponseFile: "inspect_valid.response.json"},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_invalid.json", Status: 422, ResponseFile: "inspect_invalid.response.json"},
 		{URL: "/mr/flow/inspect", Method: "POST", BodyFile: "inspect_valid_without_org.json", Status: 200, ResponseFile: "inspect_valid_without_org.response.json"},
@@ -63,8 +63,7 @@ func TestServer(t *testing.T) {
 		{URL: "/mr/flow/clone", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid.json", Status: 200, ResponsePattern: `"uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"`},
 		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_struct_invalid.json", Status: 422, Response: `{"error": "unable to clone flow: unable to read node: field 'uuid' is required"}`},
-		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_missing_dep_mapping.json", Status: 422, ResponsePattern: `group\[uuid=[-0-9a-f]{36},name=Testers\]`},
-		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_valid_bad_org.json", Status: 500, Response: `{"error": "error loading environment for org 167733: no org with id: 167733"}`},
+		{URL: "/mr/flow/clone", Method: "POST", BodyFile: "clone_missing_dep_mapping.json", Status: 200, ResponseFile: `clone_missing_dep_mapping.response.json`},
 	}
 
 	for _, tc := range tcs {
