@@ -4,13 +4,19 @@
             "key": "birthdate",
             "name": "",
             "type": "field",
-            "missing": true
+            "missing": true,
+            "node_uuids": [
+                "6fde1a09-3997-47dd-aff0-92e8aff3a642"
+            ]
         },
         {
             "uuid": "1465eb20-066d-4933-a8b4-62fe7b19fd39",
             "name": "I Don't Exist",
             "type": "group",
-            "missing": true
+            "missing": true,
+            "node_uuids": [
+                "6fde1a09-3997-47dd-aff0-92e8aff3a642"
+            ]
         }
     ],
     "parent_refs": [],

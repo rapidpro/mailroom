@@ -3,12 +3,18 @@
         {
             "key": "birthdate",
             "name": "",
-            "type": "field"
+            "type": "field",
+            "node_uuids": [
+                "6fde1a09-3997-47dd-aff0-92e8aff3a642"
+            ]
         },
         {
             "name": "No such group",
             "uuid": "e484d7b8-aada-4b63-b498-4ba4fbcafbc7",
-            "type": "group"
+            "type": "group",
+            "node_uuids": [
+                "6fde1a09-3997-47dd-aff0-92e8aff3a642"
+            ]
         }
     ],
     "results": [],
