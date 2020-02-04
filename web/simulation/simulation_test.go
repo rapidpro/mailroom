@@ -203,7 +203,7 @@ const (
 		"flows": [
 			{
 				"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85",
-				"legacy_definition": {
+				"definition": {
 					"base_language": "eng",
 					"action_sets": [{
 						"y": 0,
