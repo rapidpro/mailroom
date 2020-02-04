@@ -60,7 +60,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 	start := time.Now()
 
 	// does the flow this session is part of still exist?
-	flow, err := org.FlowByID(session.CurrentFlowID())
+	_, err := org.FlowByID(session.CurrentFlowID())
 	if err != nil {
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
@@ -68,12 +68,6 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 			return nil, models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitInterrupted, time.Now())
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
-	}
-
-	// validate our flow
-	err = validateFlow(sa, flow.UUID())
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid flow: %s, cannot resume", flow.UUID())
 	}
 
 	// build our flow session
@@ -435,12 +429,6 @@ func StartFlow(
 		return nil, errors.Wrapf(err, "error starting flow, unable to load assets")
 	}
 
-	// validate our flow
-	err = validateFlow(sa, flow.UUID())
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid flow: %s, cannot start", flow.UUID())
-	}
-
 	// we now need to grab locks for our contacts so that they are never in two starts or handles at the
 	// same time we try to grab locks for up to five minutes, but do it in batches where we wait for one
 	// second per contact to prevent deadlocks
@@ -740,27 +728,6 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 	err = queue.AddTask(rc, queue.BatchQueue, queue.StartIVRFlowBatch, int(orgID), task, queue.HighPriority)
 	if err != nil {
 		return errors.Wrapf(err, "error queuing ivr flow start")
-	}
-
-	return nil
-}
-
-func validateFlow(sa flows.SessionAssets, uuid assets.FlowUUID) error {
-	flow, err := sa.Flows().Get(uuid)
-	if err != nil {
-		return errors.Wrapf(err, "invalid flow: %s, cannot start", uuid)
-	}
-
-	// check for missing dependencies and log
-	missingDeps := make([]string, 0)
-	err = flow.CheckDependenciesRecursive(sa, func(r assets.Reference) {
-		missingDeps = append(missingDeps, r.String())
-	})
-
-	// one day we might error if we encounter missing dependencies but for now it's too common so log them
-	// to help us find whatever problem is creating them
-	if len(missingDeps) > 0 {
-		logrus.WithField("flow_uuid", flow.UUID()).WithField("missing", missingDeps).Warn("flow being started with missing dependencies")
 	}
 
 	return nil
