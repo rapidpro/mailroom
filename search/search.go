@@ -16,7 +16,7 @@ import (
 
 // ParseQuery parses the passed in query returning the result
 func ParseQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (*contactql.ContactQuery, error) {
-	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), resolver)
+	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), resolver)
 	if err != nil {
 		return nil, NewError(err.Error())
 	}
