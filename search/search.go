@@ -84,9 +84,13 @@ func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) 
 
 	fieldName = strings.ToLower(fieldName)
 
-	// we are sorting by an attribute
-	if fieldName == contactql.AttributeID || fieldName == contactql.AttributeCreatedOn ||
-		fieldName == contactql.AttributeLanguage || fieldName == contactql.AttributeName {
+	// name needs to be sorted by keyword field
+	if fieldName == contactql.AttributeName {
+		return elastic.NewFieldSort("name.keyword").Order(ascending), nil
+	}
+
+	// other attributes are straight sorts
+	if fieldName == contactql.AttributeID || fieldName == contactql.AttributeCreatedOn || fieldName == contactql.AttributeLanguage {
 		return elastic.NewFieldSort(fieldName).Order(ascending), nil
 	}
 
@@ -314,6 +318,26 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			} else {
 				return nil, NewError("unsupported created_on comparator: %s", c.Comparator())
 			}
+		} else if key == contactql.AttributeURN {
+			value := strings.ToLower(c.Value())
+
+			// special case for set/unset
+			if (c.Comparator() == "=" || c.Comparator() == "!=") && value == "" {
+				query = elastic.NewNestedQuery("urns", elastic.NewExistsQuery("urns.path"))
+				if c.Comparator() == "=" {
+					query = elastic.NewBoolQuery().MustNot(query)
+				}
+				return query, nil
+			}
+
+			if c.Comparator() == "=" {
+				return elastic.NewNestedQuery("urns", elastic.NewTermQuery("urns.path.keyword", value)), nil
+			} else if c.Comparator() == "~" {
+				return elastic.NewNestedQuery("urns", elastic.NewMatchPhraseQuery("urns.path", value)), nil
+			} else {
+				return nil, NewError("unsupported urn comparator: %s", c.Comparator())
+			}
+
 		} else {
 			return nil, NewError("unsupported contact attribute: %s", key)
 		}

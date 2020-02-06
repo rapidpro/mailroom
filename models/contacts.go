@@ -243,7 +243,13 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 
 	results, err := s.Do(ctx)
 	if err != nil {
-		return nil, nil, 0, errors.Wrapf(err, "error performing query")
+		// Get *elastic.Error which contains additional information
+		ee, ok := err.(*elastic.Error)
+		if !ok {
+			return nil, nil, 0, errors.Wrapf(err, "error performing query")
+		}
+
+		return nil, nil, 0, errors.Wrapf(err, "error performing query: %s", ee.Details.Reason)
 	}
 
 	ids := make([]ContactID, 0, pageSize)

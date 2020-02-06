@@ -1468,5 +1468,67 @@
                 ]
             }
         }
+    },
+    {
+        "label": "urn is unset",
+        "search": "urn=\"\"",
+        "query": {
+            "bool":{
+                "must_not":{
+                    "nested":{
+                        "path":"urns",
+                        "query":{
+                            "exists":{
+                                "field":"urns.path"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "urn is set",
+        "search": "urn !=\"\"",
+        "query": {
+            "nested":{
+                "path":"urns",
+                "query":{
+                    "exists":{
+                        "field":"urns.path"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "urn is number",
+        "search": "urn=\"+12067799192\"",
+        "query": {
+            "nested":{
+                "path":"urns",
+                "query":{
+                    "term":{
+                        "urns.path.keyword":"+12067799192"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "urn contains 12345",
+        "search": "urn~12345",
+        "query": {
+            "nested": {
+                "path": "urns",
+                "query": {
+                    "match_phrase": {
+                        "urns.path": {
+                            "query": "12345"
+                        }
+                    }
+                }
+            }
+        }
     }
 ]

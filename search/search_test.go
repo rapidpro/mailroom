@@ -58,7 +58,7 @@ func TestElasticSort(t *testing.T) {
 	}{
 		{"empty", "", `{"id":{"order":"desc"}}`, nil},
 		{"descending created_on", "-created_on", `{"created_on":{"order":"desc"}}`, nil},
-		{"ascending name", "name", `{"name":{"order":"asc"}}`, nil},
+		{"ascending name", "name", `{"name.keyword":{"order":"asc"}}`, nil},
 		{"descending language", "-language", `{"language":{"order":"desc"}}`, nil},
 		{"descending numeric", "-AGE", `{"fields.number":{"nested":{"filter":{"term":{"fields.field":"6b6a43fa-a26d-4017-bede-328bcdd5c93b"}},"path":"fields"},"order":"desc"}}`, nil},
 		{"ascending text", "color", `{"fields.text":{"nested":{"filter":{"term":{"fields.field":"ecc7b13b-c698-4f46-8a90-24a8fab6fe34"}},"path":"fields"},"order":"asc"}}`, nil},
