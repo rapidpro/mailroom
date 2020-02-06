@@ -1,3 +1,7 @@
+v5.3.32
+----------
+ * Update to goflow v0.70.0
+
 v5.3.31
 ----------
  * Add urn =, !=, ~ support
