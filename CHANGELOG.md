@@ -1,3 +1,9 @@
+v5.3.31
+----------
+ * Add urn =, !=, ~ support
+ * Fix name sorting on queries
+ * Update to latest goflow v0.69.0
+
 v5.3.30
 ----------
  * Sort locations fields by keyword value
