@@ -58,7 +58,7 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	request := &searchRequest{
 		Offset:   0,
 		PageSize: 50,
-		Sort:     "-created_on",
+		Sort:     "-id",
 	}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
