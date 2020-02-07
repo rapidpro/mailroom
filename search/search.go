@@ -196,6 +196,15 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 
 			if c.Comparator() == "=" {
 				query = elastic.NewMatchQuery("fields.number", value)
+			} else if c.Comparator() == "!=" {
+				return elastic.NewBoolQuery().MustNot(
+					elastic.NewNestedQuery("fields",
+						elastic.NewBoolQuery().Must(
+							fieldQuery,
+							elastic.NewMatchQuery("fields.number", value),
+						),
+					),
+				), nil
 			} else if c.Comparator() == ">" {
 				query = elastic.NewRangeQuery("fields.number").Gt(value)
 			} else if c.Comparator() == ">=" {
@@ -219,6 +228,15 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 
 			if c.Comparator() == "=" {
 				query = elastic.NewRangeQuery("fields.datetime").Gte(start).Lt(end)
+			} else if c.Comparator() == "!=" {
+				return elastic.NewBoolQuery().MustNot(
+					elastic.NewNestedQuery("fields",
+						elastic.NewBoolQuery().Must(
+							fieldQuery,
+							elastic.NewRangeQuery("fields.datetime").Gte(start).Lt(end),
+						),
+					),
+				), nil
 			} else if c.Comparator() == ">" {
 				query = elastic.NewRangeQuery("fields.datetime").Gte(end)
 			} else if c.Comparator() == ">=" {
@@ -307,6 +325,8 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 
 			if c.Comparator() == "=" {
 				return elastic.NewRangeQuery("created_on").Gte(start).Lt(end), nil
+			} else if c.Comparator() == "!=" {
+				return elastic.NewBoolQuery().MustNot(elastic.NewRangeQuery("created_on").Gte(start).Lt(end)), nil
 			} else if c.Comparator() == ">" {
 				return elastic.NewRangeQuery("created_on").Gte(end), nil
 			} else if c.Comparator() == ">=" {
