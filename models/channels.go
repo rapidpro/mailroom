@@ -34,18 +34,19 @@ const (
 type Channel struct {
 	// inner struct for privacy and so we don't collide with method names
 	c struct {
-		ID            ChannelID                `json:"id"`
-		UUID          assets.ChannelUUID       `json:"uuid"`
-		Parent        *assets.ChannelReference `json:"parent"`
-		Name          string                   `json:"name"`
-		Address       string                   `json:"address"`
-		ChannelType   ChannelType              `json:"channel_type"`
-		TPS           int                      `json:"tps"`
-		Country       null.String              `json:"country"`
-		Schemes       []string                 `json:"schemes"`
-		Roles         []assets.ChannelRole     `json:"roles"`
-		MatchPrefixes []string                 `json:"match_prefixes"`
-		Config        map[string]interface{}   `json:"config"`
+		ID                 ChannelID                `json:"id"`
+		UUID               assets.ChannelUUID       `json:"uuid"`
+		Parent             *assets.ChannelReference `json:"parent"`
+		Name               string                   `json:"name"`
+		Address            string                   `json:"address"`
+		ChannelType        ChannelType              `json:"channel_type"`
+		TPS                int                      `json:"tps"`
+		Country            null.String              `json:"country"`
+		Schemes            []string                 `json:"schemes"`
+		Roles              []assets.ChannelRole     `json:"roles"`
+		MatchPrefixes      []string                 `json:"match_prefixes"`
+		AllowInternational bool                     `json:"allow_international"`
+		Config             map[string]interface{}   `json:"config"`
 	}
 }
 
@@ -78,6 +79,9 @@ func (c *Channel) Roles() []assets.ChannelRole { return c.c.Roles }
 
 // MatchPrefixes returns the prefixes we should also match when determining channel affinity
 func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
+
+// AllowInternational returns whether this channel allows sending internationally (only applies to TEL schemes)
+func (c *Channel) AllowInternational() bool { return c.c.AllowInternational }
 
 // Parent returns a reference to the parent channel of this channel (if any)
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
@@ -156,7 +160,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		END 
 		FROM unnest(regexp_split_to_array(c.role,'')) as r)
 	) as roles,
-	JSON_EXTRACT_PATH(c.config::json, 'matching_prefixes') as match_prefixes
+	JSON_EXTRACT_PATH(c.config::json, 'matching_prefixes') as match_prefixes,
+	TRUE as allow_international
 FROM 
 	channels_channel c
 WHERE 
