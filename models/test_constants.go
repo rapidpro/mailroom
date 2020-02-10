@@ -91,7 +91,7 @@ var GenderFieldUUID = assets.FieldUUID("3a5891e4-756e-4dc9-8e12-b7a766168824")
 var JoinedFieldID = FieldID(7)
 var JoinedFieldUUID = assets.FieldUUID("d83aae24-4bbf-49d0-ab85-6bfd201eac6d")
 
-var CreatedOnFieldID = FieldID(2)
+var CreatedOnFieldID = FieldID(3)
 
 var ReportingLabelID = LabelID(10000)
 var ReportingLabelUUID = assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698")
