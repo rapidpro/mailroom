@@ -214,6 +214,38 @@
         }
     },
     {
+        "label": "valid number !=",
+        "search": "age!=10",
+        "query": {
+            "bool":{
+                "must_not":{
+                    "nested":{
+                        "path":"fields",
+                        "query":{
+                            "bool":{
+                                "must":[
+                                    {
+                                        "term":{
+                                            "fields.field":"6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                        }
+                                    }
+                                    ,
+                                    {
+                                        "match":{
+                                            "fields.number":{
+                                                "query":"10"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
         "label": "valid number <=",
         "search": "age<=10",
         "query": {
@@ -334,11 +366,6 @@
         }
     },
     {
-        "label": "invalid number !=",
-        "search": "age!=10",
-        "error": "unsupported number comparator: !="
-    },
-    {
         "label": "invalid number operand",
         "search": "age=fred",
         "error": "can't convert 'fred' to a number"
@@ -347,11 +374,6 @@
         "label": "invalid datetime operand",
         "search": "dob=10",
         "error": "string '10' couldn't be parsed as a date"
-    },
-    {
-        "label": "invalid datetime operator",
-        "search": "dob!=2018-06-23",
-        "error": "unsupported datetime comparator: !="
     },
     {
         "label": "invalid number >",
@@ -437,6 +459,40 @@
                                 }
                             }
                         ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid date !=",
+        "search": "dob!=2018-06-23",
+        "query": {
+            "bool":{
+                "must_not":{
+                    "nested":{
+                        "path":"fields",
+                        "query":{
+                            "bool":{
+                                "must":[
+                                    {
+                                        "term":{
+                                            "fields.field":"cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                        }
+                                    },
+                                    {
+                                        "range":{
+                                            "fields.datetime":{
+                                                "from":"2018-06-23T00:00:00-04:00",
+                                                "include_lower":true,
+                                                "include_upper":false,
+                                                "to":"2018-06-24T00:00:00-04:00"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
                     }
                 }
             }
@@ -1219,9 +1275,22 @@
         }
     },
     {
-        "label": "invalid created_on !=",
+        "label": "valid created_on !=",
         "search": "created_on!=2018-06-23",
-        "error": "unsupported created_on comparator: !="
+        "query": {
+            "bool":{
+                "must_not":{
+                    "range":{
+                        "created_on":{
+                            "from":"2018-06-23T00:00:00-04:00",
+                            "include_lower":true,
+                            "include_upper":false,
+                            "to":"2018-06-24T00:00:00-04:00"
+                        }
+                    }
+                }
+            }
+        }
     },
     {
         "label": "invalid created_on operand",

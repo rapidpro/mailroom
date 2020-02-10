@@ -1,3 +1,7 @@
+v5.3.33
+----------
+ * add != operator for numbers, dates, created_on
+
 v5.3.32
 ----------
  * Update to goflow v0.70.0
