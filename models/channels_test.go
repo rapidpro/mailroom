@@ -12,8 +12,8 @@ func TestChannels(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	// add some prefixes to channel 2
-	db.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"]}' WHERE id = $1`, NexmoChannelID)
+	// add some tel specific config to channel 2
+	db.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"], "allow_international": true}' WHERE id = $1`, NexmoChannelID)
 
 	// make twitter channel have a parent of twilio channel
 	db.MustExec(`UPDATE channels_channel SET parent_id = $1 WHERE id = $2`, TwilioChannelID, TwitterChannelID)
@@ -22,21 +22,49 @@ func TestChannels(t *testing.T) {
 	assert.NoError(t, err)
 
 	tcs := []struct {
-		ID       ChannelID
-		UUID     assets.ChannelUUID
-		Name     string
-		Address  string
-		Schemes  []string
-		Roles    []assets.ChannelRole
-		Prefixes []string
-		Parent   *assets.ChannelReference
+		ID                 ChannelID
+		UUID               assets.ChannelUUID
+		Name               string
+		Address            string
+		Schemes            []string
+		Roles              []assets.ChannelRole
+		Prefixes           []string
+		AllowInternational bool
+		Parent             *assets.ChannelReference
 	}{
-		{TwilioChannelID, TwilioChannelUUID, "Twilio", "+13605551212",
-			[]string{"tel"}, []assets.ChannelRole{"send", "receive", "call", "answer"}, nil, nil},
-		{NexmoChannelID, NexmoChannelUUID, "Nexmo", "5789",
-			[]string{"tel"}, []assets.ChannelRole{"send", "receive"}, []string{"250", "251"}, nil},
-		{TwitterChannelID, TwitterChannelUUID, "Twitter", "ureport", []string{"twitter"}, []assets.ChannelRole{"send", "receive"}, nil,
-			assets.NewChannelReference(TwilioChannelUUID, "Twilio")},
+		{
+			TwilioChannelID,
+			TwilioChannelUUID,
+			"Twilio",
+			"+13605551212",
+			[]string{"tel"},
+			[]assets.ChannelRole{"send", "receive", "call", "answer"},
+			nil,
+			false,
+			nil,
+		},
+		{
+			NexmoChannelID,
+			NexmoChannelUUID,
+			"Nexmo",
+			"5789",
+			[]string{"tel"},
+			[]assets.ChannelRole{"send", "receive"},
+			[]string{"250", "251"},
+			true,
+			nil,
+		},
+		{
+			TwitterChannelID,
+			TwitterChannelUUID,
+			"Twitter",
+			"ureport",
+			[]string{"twitter"},
+			[]assets.ChannelRole{"send", "receive"},
+			nil,
+			false,
+			assets.NewChannelReference(TwilioChannelUUID, "Twilio"),
+		},
 	}
 
 	assert.Equal(t, len(tcs), len(channels))
@@ -49,7 +77,7 @@ func TestChannels(t *testing.T) {
 		assert.Equal(t, tc.Roles, channel.Roles())
 		assert.Equal(t, tc.Schemes, channel.Schemes())
 		assert.Equal(t, tc.Prefixes, channel.MatchPrefixes())
+		assert.Equal(t, tc.AllowInternational, channel.AllowInternational())
 		assert.Equal(t, tc.Parent, channel.Parent())
 	}
-
 }
