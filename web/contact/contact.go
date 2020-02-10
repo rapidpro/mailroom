@@ -107,22 +107,26 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 //   {
 //     "org_id": 1,
 //     "query": "age > 10",
+//     "group_uuid": "123123-123-123-"
 //   }
 //
 type parseRequest struct {
-	OrgID models.OrgID `json:"org_id"     validate:"required"`
-	Query string       `json:"query"      validate:"required"`
+	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
+	Query     string           `json:"query"      validate:"required"`
+	GroupUUID assets.GroupUUID `json:"group_uuid"`
 }
 
 // Response for a parse query request
 //
 // {
 //   "query": "age > 10",
-//   "fields": ["age"]
+//   "fields": ["age"],
+//   "elastic_query": { .. }
 // }
 type parseResponse struct {
-	Query  string   `json:"query"`
-	Fields []string `json:"fields"`
+	Query       string      `json:"query"`
+	Fields      []string    `json:"fields"`
+	ParsedQuery interface{} `json:"elastic_query"`
 }
 
 // handles a query parsing request
@@ -155,10 +159,20 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		normalized = parsed.String()
 	}
 
+	eq, err := models.BuildElasticQuery(org, resolver, request.GroupUUID, parsed)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	eqj, err := eq.Source()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
 	// build our response
 	response := &parseResponse{
-		Query:  normalized,
-		Fields: search.FieldDependencies(parsed),
+		Query:       normalized,
+		Fields:      search.FieldDependencies(parsed),
+		ParsedQuery: eqj,
 	}
 
 	return response, http.StatusOK, nil
