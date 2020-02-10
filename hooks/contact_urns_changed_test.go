@@ -26,7 +26,7 @@ func TestAddContactURN(t *testing.T) {
 					actions.NewAddContactURN(newActionUUID(), "tel", "12065551212"),
 					actions.NewAddContactURN(newActionUUID(), "tel", "12065551212"),
 					actions.NewAddContactURN(newActionUUID(), "telegram", "11551"),
-					actions.NewAddContactURN(newActionUUID(), "tel", "250700000001"),
+					actions.NewAddContactURN(newActionUUID(), "tel", "+16055741111"),
 				},
 				models.GeorgeID: []flows.Action{},
 			},
@@ -42,7 +42,7 @@ func TestAddContactURN(t *testing.T) {
 					Count: 1,
 				},
 				SQLAssertion{
-					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+250700000001' and priority = 1000",
+					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+16055741111' and priority = 1000",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
