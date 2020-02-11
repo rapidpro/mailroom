@@ -124,9 +124,9 @@ type parseRequest struct {
 //   "elastic_query": { .. }
 // }
 type parseResponse struct {
-	Query       string      `json:"query"`
-	Fields      []string    `json:"fields"`
-	ParsedQuery interface{} `json:"elastic_query"`
+	Query        string      `json:"query"`
+	Fields       []string    `json:"fields"`
+	ElasticQuery interface{} `json:"elastic_query"`
 }
 
 // handles a query parsing request
@@ -170,9 +170,9 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 
 	// build our response
 	response := &parseResponse{
-		Query:       normalized,
-		Fields:      search.FieldDependencies(parsed),
-		ParsedQuery: eqj,
+		Query:        normalized,
+		Fields:       search.FieldDependencies(parsed),
+		ElasticQuery: eqj,
 	}
 
 	return response, http.StatusOK, nil
