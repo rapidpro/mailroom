@@ -1,3 +1,7 @@
+v5.3.35
+----------
+ * Update to goflow v0.71.2
+
 v5.3.34
 ----------
  * Read allow_international from channel config
