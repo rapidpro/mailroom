@@ -161,7 +161,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		FROM unnest(regexp_split_to_array(c.role,'')) as r)
 	) as roles,
 	JSON_EXTRACT_PATH(c.config::json, 'matching_prefixes') as match_prefixes,
-	TRUE as allow_international
+	JSON_EXTRACT_PATH(c.config::json, 'allow_international') as allow_international
 FROM 
 	channels_channel c
 WHERE 
