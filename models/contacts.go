@@ -183,12 +183,17 @@ func BuildFieldResolver(org *OrgAssets) contactql.FieldResolverFunc {
 }
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, query *contactql.ContactQuery) (elastic.Query, error) {
+func BuildElasticQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, group assets.GroupUUID, query *contactql.ContactQuery) (elastic.Query, error) {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
 		elastic.NewTermQuery("is_active", true),
 	)
+
+	// our group if present
+	if group != "" {
+		eq = eq.Must(elastic.NewTermQuery("groups", group))
+	}
 
 	// and by our query if present
 	if query != nil {
@@ -222,7 +227,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		}
 	}
 
-	eq, err := BuildElasticQuery(org, resolver, parsed)
+	eq, err := BuildElasticQuery(org, resolver, group, parsed)
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 	}
@@ -231,12 +236,6 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
-
-	// filter by our base group
-	eq = elastic.NewBoolQuery().Must(
-		eq,
-		elastic.NewTermQuery("groups", group),
-	)
 
 	s := client.Search("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
 	s = s.Size(pageSize).From(offset).Query(eq).SortBy(fieldSort).FetchSource(false)
@@ -289,7 +288,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq, err := BuildElasticQuery(org, resolver, parsed)
+	eq, err := BuildElasticQuery(org, resolver, "", parsed)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}

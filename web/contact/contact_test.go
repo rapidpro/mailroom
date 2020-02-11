@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/search"
@@ -179,31 +180,127 @@ func TestParse(t *testing.T) {
 	defer server.Stop()
 
 	tcs := []struct {
-		URL    string
-		Method string
-		Body   string
-		Status int
-		Error  string
-		Query  string
-		Fields []string
+		URL      string
+		Method   string
+		Body     string
+		Status   int
+		Response json.RawMessage
 	}{
 		{
 			"/mr/contact/parse_query", "GET",
 			"",
-			405, "illegal method: GET",
-			"", nil,
+			405,
+			json.RawMessage(`{"error": "illegal method: GET"}`),
 		},
 		{
 			"/mr/contact/parse_query", "POST",
 			`{"org_id": 1, "query": "birthday = tomorrow"}`,
-			400, "can't resolve 'birthday' to attribute, scheme or field",
-			"", nil,
+			400,
+			json.RawMessage(`{"error":"can't resolve 'birthday' to attribute, scheme or field"}`),
 		},
 		{
 			"/mr/contact/parse_query", "POST",
 			`{"org_id": 1, "query": "age > 10"}`,
-			200, "",
-			"age > 10", []string{"age"},
+			200,
+			json.RawMessage(`{
+				"elastic_query": {
+					"bool": {
+						"must": [{
+							"term": {
+								"org_id": 1
+							}
+						}, {
+							"term": {
+								"is_active": true
+							}
+						}, {
+							"nested": {
+								"path": "fields",
+								"query": {
+									"bool": {
+										"must": [{
+												"term": {
+													"fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
+												}
+											},
+											{
+												"range": {
+													"fields.number": {
+														"from": 10,
+														"include_lower": false,
+														"include_upper": true,
+														"to": null
+													}
+												}
+											}
+										]
+									}
+								}
+							}
+						}]
+					}
+				},
+				"fields": [
+					"age"
+				],
+				"query": "age > 10"
+			}`),
+		},
+		{
+			"/mr/contact/parse_query", "POST",
+			`{"org_id": 1, "query": "age > 10", "group_uuid": "903f51da-2717-47c7-a0d3-f2f32877013d"}`,
+			200,
+			json.RawMessage(`{
+				"elastic_query": {
+					"bool": {
+						"must": [{
+								"term": {
+									"org_id": 1
+								}
+							},
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"groups": "903f51da-2717-47c7-a0d3-f2f32877013d"
+								}
+							},
+							{
+								"nested": {
+									"path": "fields",
+									"query": {
+										"bool": {
+											"must": [{
+													"term": {
+														"fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
+													}
+												},
+												{
+													"range": {
+														"fields.number": {
+															"from": 10,
+															"include_lower": false,
+															"include_upper": true,
+															"to": null
+														}
+													}
+												}
+											]
+										}
+									}
+								}
+							}
+						]
+					}
+				},
+				"fields": [
+					"age"
+				],
+				"query": "age > 10"
+			}`),
 		},
 	}
 
@@ -216,20 +313,9 @@ func TestParse(t *testing.T) {
 
 		assert.Equal(t, tc.Status, resp.StatusCode, "%d: unexpected status", i)
 
-		content, err := ioutil.ReadAll(resp.Body)
+		response, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
 
-		// on 200 responses parse them
-		if resp.StatusCode == 200 {
-			r := &searchResponse{}
-			err = json.Unmarshal(content, r)
-			assert.NoError(t, err)
-			assert.Equal(t, tc.Query, r.Query)
-		} else {
-			r := &web.ErrorResponse{}
-			err = json.Unmarshal(content, r)
-			assert.NoError(t, err)
-			assert.Equal(t, tc.Error, r.Error)
-		}
+		test.AssertEqualJSON(t, tc.Response, json.RawMessage(response), "%d: unexpected response", i)
 	}
 }
