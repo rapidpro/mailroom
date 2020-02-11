@@ -1,3 +1,9 @@
+v5.3.34
+----------
+ * Read allow_international from channel config
+ * Add elastic query to parse query responses
+ * Update to goflow v0.71.1
+
 v5.3.33
 ----------
  * add != operator for numbers, dates, created_on
