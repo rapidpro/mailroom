@@ -2,9 +2,11 @@ package contact
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/search"
@@ -15,6 +17,7 @@ import (
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(handleParseQuery))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/regroup", web.RequireAuthToken(handleRegroup))
 }
 
 // Searches the contacts for an org
@@ -176,4 +179,74 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	}
 
 	return response, http.StatusOK, nil
+}
+
+// Request to reevaluate the groups for a contact
+//
+//   {
+//     "org_id": 1,
+//     "contact": ....
+//   }
+//
+type regroupRequest struct {
+	OrgID   models.OrgID    `json:"org_id"     validate:"required"`
+	Contact json.RawMessage `json:"contact"    validate:"required"`
+}
+
+// Response for a regroup request
+//
+// {
+//	 "contact_uuid": "...",
+//   "groups": [
+//	    ...
+//   ],
+//   "errors": ["no such field gender", ..]
+// }
+type regroupResponse struct {
+	ContactUUID flows.ContactUUID        `json:"contact_uuid"`
+	Groups      []*assets.GroupReference `json:"groups"`
+	Errors      []error                  `json:"errors,omitempty"`
+}
+
+// handles a regroup contact request
+func handleRegroup(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &regroupRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	sa, err := models.NewSessionAssets(org)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load session assets")
+	}
+
+	// try to read our contact
+	contact, err := flows.ReadContact(sa, request.Contact, nil)
+	if err != nil {
+		return errors.Wrapf(err, "error reading contact"), http.StatusBadRequest, nil
+	}
+
+	orgGroups, _ := org.Groups()
+	orgFields, _ := org.Fields()
+
+	// errors during reevaluation don't concern us, if dynamic groups are broken then their membership won't be included
+	_, _, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups), flows.NewFieldAssets(orgFields))
+
+	// build our final list of group references
+	groups := make([]*assets.GroupReference, 0, len(contact.Groups().All()))
+	for _, group := range contact.Groups().All() {
+		groups = append(groups, group.Reference())
+	}
+
+	return regroupResponse{
+		ContactUUID: contact.UUID(),
+		Groups:      groups,
+		Errors:      errs,
+	}, http.StatusOK, nil
 }

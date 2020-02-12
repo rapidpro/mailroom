@@ -319,3 +319,94 @@ func TestParse(t *testing.T) {
 		test.AssertEqualJSON(t, tc.Response, json.RawMessage(response), "%d: unexpected response", i)
 	}
 }
+
+func TestRegroup(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	rp := testsuite.RP()
+	wg := &sync.WaitGroup{}
+
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server.Start()
+	time.Sleep(time.Second)
+
+	defer server.Stop()
+
+	// make our doctors group dynamic
+	db.MustExec("UPDATE contacts_contactgroup SET query = $1 WHERE id = $2", "age > 10", models.DoctorsGroupID)
+
+	tcs := []struct {
+		URL      string
+		Method   string
+		Body     string
+		Status   int
+		Response string
+	}{
+		{
+			"/mr/contact/regroup", "GET",
+			"",
+			405,
+			`{"error": "illegal method: GET"}`,
+		},
+		{
+			"/mr/contact/regroup", "POST",
+			"",
+			400,
+			`{"error": "request failed validation: unexpected end of JSON input"}`,
+		},
+		{
+			"/mr/contact/regroup", "POST",
+			`{
+				"org_id": 1,
+				"contact": {
+					"id": 1,
+					"uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5",
+					"name": "Jane",
+					"language": "eng",
+					"timezone": "America/Los_Angeles",
+					"created_on": "2020-01-02T15:04:05Z",
+					"urns": [],
+					"groups": [],
+					"fields": {}
+				}
+			}`,
+			200,
+			`{"contact_uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5", "groups": []}`,
+		},
+		{
+			"/mr/contact/regroup", "POST",
+			`{
+				"org_id": 1,
+				"contact": {
+					"id": 1,
+					"uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5",
+					"name": "Jane",
+					"language": "eng",
+					"timezone": "America/Los_Angeles",
+					"created_on": "2020-01-02T15:04:05Z",
+					"urns": [],
+					"groups": [],
+					"fields": { "age": { "number": 12, "text": "12" } }
+				}
+			}`,
+			200,
+			fmt.Sprintf(`{"contact_uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5", "groups": [{"name": "Doctors", "uuid": "%s"}]}`, models.DoctorsGroupUUID),
+		},
+	}
+
+	for i, tc := range tcs {
+		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.URL, bytes.NewReader([]byte(tc.Body)))
+		assert.NoError(t, err, "%d: error creating request", i)
+
+		resp, err := http.DefaultClient.Do(req)
+		assert.NoError(t, err, "%d: error making request", i)
+
+		assert.Equal(t, tc.Status, resp.StatusCode, "%d: unexpected status", i)
+
+		response, err := ioutil.ReadAll(resp.Body)
+		assert.NoError(t, err, "%d: error reading body", i)
+
+		test.AssertEqualJSON(t, json.RawMessage(tc.Response), json.RawMessage(response), "%d: unexpected response", i)
+	}
+}
