@@ -2,10 +2,18 @@ package contact
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
+	"github.com/apex/log"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/goflow/flows/definition"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/web"
@@ -15,6 +23,7 @@ import (
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(handleParseQuery))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/apply_actions", web.RequireAuthToken(handleApplyActions))
 }
 
 // Searches the contacts for an org
@@ -174,6 +183,126 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		Fields:       search.FieldDependencies(parsed),
 		ElasticQuery: eqj,
 	}
+
+	return response, http.StatusOK, nil
+}
+
+// Request update a contact. Clients should only pass in the fields they want updated.
+//
+//   {
+//     "org_id": 1,
+//     "contact_uuid": "559d4cf7-8ed3-43db-9bbb-2be85345f87e",
+//     "name": "Joe",
+//     "fields": {
+//        "age": "124"
+//     },
+//     "add_groups": [],
+//     "remove_groups": []
+//   }
+//
+type applyActionsRequest struct {
+	OrgID       models.OrgID      `json:"org_id"       validate:"required"`
+	ContactUUID flows.ContactUUID `json:"contact_uuid" validate:"required"`
+	Actions     []json.RawMessage `json:"actions"      validate:"required"`
+}
+
+// Response for a contact update. Will return the full contact state and any errors
+//
+// {
+//   "contact": {
+//     "id": 123,
+//     "contact_uuid": "559d4cf7-8ed3-43db-9bbb-2be85345f87e",
+//     "name": "Joe",
+//     "language": "eng",
+//     "created_on": ".."
+//     "urns": [ .. ],
+//     "fields": {
+//     }
+//     "groups": [ .. ],
+//   }
+// }
+type applyActionsResponse struct {
+	Contact json.RawMessage `json:"contact"`
+}
+
+// the types of actions our apply_actions endpoind supports
+var supportedTypes map[string]bool = map[string]bool{
+	actions.TypeAddContactGroups: true,
+	actions.TypeAddContactURN:    true,
+	// actions.TypeRemoveContactURN  <-- missing
+	actions.TypeRemoveContactGroups: true,
+	actions.TypeSetContactChannel:   true,
+	actions.TypeSetContactLanguage:  true,
+	actions.TypeSetContactName:      true,
+	actions.TypeSetContactTimezone:  true,
+	actions.TypeSetContactField:     true,
+}
+
+// handles a request to apply the passed in actions
+func handleApplyActions(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &applyActionsRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	sa, err := models.NewSessionAssets(org)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load session assets")
+	}
+
+	// build up our actions
+	as := make([]flows.Action, len(request.Actions))
+	for i, a := range request.Actions {
+		action, err := actions.ReadAction(a)
+		if err != nil {
+			return errors.Wrapf(err, "error in action: %s", string(a)), http.StatusBadRequest, nil
+		}
+		if !supportedTypes[action.Type()] {
+			return errors.Errorf("unsupported action type: %s", action.Type), http.StatusBadRequest, nil
+		}
+
+		as[i] = action
+	}
+
+	// create a minimal flow with these actions
+	entry := definition.NewNode(
+		flows.NodeUUID(uuids.New()),
+		as,
+		nil,
+		nil,
+	)
+
+	// we have our nodes, lets create our flow
+	flowUUID := assets.FlowUUID(uuids.New())
+	flow, err := definition.NewFlow(
+		flowUUID,
+		"Contact Update Flow",
+		envs.Language("eng"),
+		flows.FlowTypeMessaging,
+		1,
+		300,
+		definition.NewLocalization(),
+		[]flows.Node{entry},
+		nil,
+	)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error building flow")
+	}
+
+	session, sprint, err := goflow.Engine().NewSession(sa, trigger)
+	if err != nil {
+		log.WithError(err).Errorf("error starting flow")
+		continue
+	}
+
+	// build our response
+	response := &applyActionsResponse{}
 
 	return response, http.StatusOK, nil
 }
