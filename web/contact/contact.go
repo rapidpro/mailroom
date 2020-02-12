@@ -196,16 +196,16 @@ type regroupRequest struct {
 // Response for a regroup request
 //
 // {
-//	 "contact_uuid": "...",
+//   "contact_uuid": "...",
 //   "groups": [
 //	    ...
 //   ],
-//   "errors": ["no such field gender", ..]
+//  "errors": ["no such field gender", ..]
 // }
 type regroupResponse struct {
 	ContactUUID flows.ContactUUID        `json:"contact_uuid"`
 	Groups      []*assets.GroupReference `json:"groups"`
-	Errors      []error                  `json:"errors,omitempty"`
+	Errors      []string                 `json:"errors,omitempty"`
 }
 
 // handles a regroup contact request
@@ -235,18 +235,21 @@ func handleRegroup(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	orgGroups, _ := org.Groups()
 	orgFields, _ := org.Fields()
 
-	// errors during reevaluation don't concern us, if dynamic groups are broken then their membership won't be included
+	// any errors we get during reevaluation will be passed back, but they don't affect us moving forward
 	_, _, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups), flows.NewFieldAssets(orgFields))
 
-	// build our final list of group references
-	groups := make([]*assets.GroupReference, 0, len(contact.Groups().All()))
+	response := &regroupResponse{ContactUUID: contact.UUID()}
+
+	// set our new groups
+	response.Groups = make([]*assets.GroupReference, 0, len(contact.Groups().All()))
 	for _, group := range contact.Groups().All() {
-		groups = append(groups, group.Reference())
+		response.Groups = append(response.Groups, group.Reference())
 	}
 
-	return regroupResponse{
-		ContactUUID: contact.UUID(),
-		Groups:      groups,
-		Errors:      errs,
-	}, http.StatusOK, nil
+	// and populate any errors
+	for _, err = range errs {
+		response.Errors = append(response.Errors, err.Error())
+	}
+
+	return response, http.StatusOK, nil
 }

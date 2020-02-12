@@ -335,7 +335,7 @@ func TestRegroup(t *testing.T) {
 
 	// make some of our groups dynamic
 	db.MustExec("UPDATE contacts_contactgroup SET query = $1 WHERE id = $2", "age > 10", models.DoctorsGroupID)
-	db.MustExec("UPDATE contacts_contactgroup SET query = $1 WHERE id = $2", "name = \"\"", models.TestersGroupID)
+	db.MustExec("UPDATE contacts_contactgroup SET query = $1 WHERE id = $2", "age > TEN\"\"", models.TestersGroupID)
 
 	tcs := []struct {
 		URL      string
@@ -373,7 +373,13 @@ func TestRegroup(t *testing.T) {
 				}
 			}`,
 			200,
-			`{"contact_uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5", "groups": []}`,
+			`{
+				"contact_uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5", 
+				"errors": [
+					"extraneous input '\"\"' expecting <EOF>"
+				],
+				"groups": []
+			}`,
 		},
 		{
 			"/mr/contact/regroup", "POST",
@@ -395,28 +401,19 @@ func TestRegroup(t *testing.T) {
 				}
 			}`, models.TestersGroupUUID),
 			200,
-			fmt.Sprintf(`{"contact_uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5", "groups": [{"name": "Doctors", "uuid": "%s"}]}`, models.DoctorsGroupUUID),
-		}, {
-			"/mr/contact/regroup", "POST",
 			fmt.Sprintf(`{
-				"org_id": 1,
-				"contact": {
-					"id": 1,
-					"uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5",
-					"name": "",
-					"language": "eng",
-					"timezone": "America/Los_Angeles",
-					"created_on": "2020-01-02T15:04:05Z",
-					"urns": [],
-					"groups": [{
-						"name": "Testers",
-						"uuid": "%s"
-					}],
-					"fields": { "age": { "number": 1, "text": "1" } }
-				}
-			}`, models.TestersGroupUUID),
-			200,
-			fmt.Sprintf(`{"contact_uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5", "groups": [{"name": "Testers", "uuid": "%s"}]}`, models.TestersGroupUUID),
+				"contact_uuid": "3c97698b-74f0-487a-9b16-dccb57094dc5", 
+				"errors": [
+					"extraneous input '\"\"' expecting <EOF>"
+				],
+				"groups": [{
+					"name": "Testers",
+					"uuid": "%s"
+				},{
+					"name": "Doctors", 
+					"uuid": "%s"
+				}]
+			}`, models.TestersGroupUUID, models.DoctorsGroupUUID),
 		},
 	}
 
