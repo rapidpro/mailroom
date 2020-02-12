@@ -16,7 +16,7 @@ type Global struct {
 	g struct {
 		Key   string `json:"key"   validate:"required"`
 		Name  string `json:"name"  validate:"required"`
-		Value string `json:"value" validate:"required"`
+		Value string `json:"value"`
 	}
 }
 
