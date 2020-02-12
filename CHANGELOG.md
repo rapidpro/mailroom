@@ -1,3 +1,7 @@
+v5.3.36
+----------
+ * allow globals with empty values
+
 v5.3.35
 ----------
  * Update to goflow v0.71.2
