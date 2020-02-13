@@ -284,7 +284,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return errors.Errorf("unknown event type: %s", eventType)
 	}
 
-	_, err = runner.ResumeFlow(ctx, db, rp, org, org.SessionAssets(), session, resume, nil)
+	_, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming flow for timeout")
 	}
@@ -428,7 +428,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, org.SessionAssets(), flow, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{flowTrigger}, hook, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -601,7 +601,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 			// otherwise build the trigger and start the flow directly
 			trigger := triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
-			_, err = runner.StartFlowForContacts(ctx, db, rp, org, org.SessionAssets(), flow, []flows.Trigger{trigger}, hook, true)
+			_, err = runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -612,7 +612,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	// if there is a session, resume it
 	if session != nil && flow != nil {
 		resume := resumes.NewMsg(org.Env(), contact, msgIn)
-		_, err = runner.ResumeFlow(ctx, db, rp, org, org.SessionAssets(), session, resume, hook)
+		_, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, hook)
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
 		}

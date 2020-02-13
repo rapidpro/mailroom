@@ -61,7 +61,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// look up any contacts by URN
 	if len(start.URNs()) > 0 {
-		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, org, org.SessionAssets(), start.URNs())
+		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, org, start.URNs())
 		if err != nil {
 			return errors.Wrapf(err, "error getting contact ids from urns")
 		}
@@ -72,7 +72,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// if we are meant to create a new contact, do so
 	if start.CreateContact() {
-		newID, err := models.CreateContact(ctx, db, org, org.SessionAssets(), urns.NilURN)
+		newID, err := models.CreateContact(ctx, db, org, urns.NilURN)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
 		}

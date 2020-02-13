@@ -275,7 +275,7 @@ func TestContactsFromURN(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		ids, err := ContactIDsFromURNs(ctx, db, org, org.SessionAssets(), []urns.URN{tc.URN})
+		ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN})
 		assert.NoError(t, err, "%d: error getting contact ids", i)
 
 		if len(ids) != 1 {
@@ -310,7 +310,7 @@ func TestCreateContact(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		id, err := CreateContact(ctx, db, org, org.SessionAssets(), tc.URN)
+		id, err := CreateContact(ctx, db, org, tc.URN)
 		assert.NoError(t, err, "%d: error creating contact", i)
 		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
 	}

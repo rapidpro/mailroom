@@ -106,7 +106,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// create / fetch our contact based on the highest priority URN
-	contactID, err := models.CreateContact(ctx, s.DB, org, org.SessionAssets(), urn)
+	contactID, err := models.CreateContact(ctx, s.DB, org, urn)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 	}

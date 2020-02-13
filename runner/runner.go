@@ -56,8 +56,9 @@ type StartOptions struct {
 type TriggerBuilder func(contact *flows.Contact) (flows.Trigger, error)
 
 // ResumeFlow resumes the passed in session using the passed in session
-func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, sa flows.SessionAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
+func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
 	start := time.Now()
+	sa := org.SessionAssets()
 
 	// does the flow this session is part of still exist?
 	_, err := org.FlowByID(session.CurrentFlowID())
@@ -480,7 +481,7 @@ func StartFlow(
 			triggers = append(triggers, trigger)
 		}
 
-		ss, err := StartFlowForContacts(ctx, db, rp, org, org.SessionAssets(), flow, triggers, options.CommitHook, options.Interrupt)
+		ss, err := StartFlowForContacts(ctx, db, rp, org, flow, triggers, options.CommitHook, options.Interrupt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error starting flow for contacts")
 		}
@@ -506,8 +507,9 @@ func StartFlow(
 
 // StartFlowForContacts runs the passed in flow for the passed in contact
 func StartFlowForContacts(
-	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, assets flows.SessionAssets,
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets,
 	flow *models.Flow, triggers []flows.Trigger, hook models.SessionCommitHook, interrupt bool) ([]*models.Session, error) {
+	assets := org.SessionAssets()
 
 	// no triggers? nothing to do
 	if len(triggers) == 0 {

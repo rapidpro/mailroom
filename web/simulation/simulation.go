@@ -130,13 +130,13 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
 
-	return triggerFlow(ctx, s.DB, org, org.SessionAssets(), trigger)
+	return triggerFlow(ctx, s.DB, org, trigger)
 }
 
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
-func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, sa flows.SessionAssets, trigger flows.Trigger) (interface{}, int, error) {
+func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, trigger flows.Trigger) (interface{}, int, error) {
 	// start our flow session
-	session, sprint, err := goflow.Simulator().NewSession(sa, trigger)
+	session, sprint, err := goflow.Simulator().NewSession(org.SessionAssets(), trigger)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
@@ -231,7 +231,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 				if triggeredFlow != nil {
 					trigger := triggers.NewMsg(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
-					return triggerFlow(ctx, s.DB, org, org.SessionAssets(), trigger)
+					return triggerFlow(ctx, s.DB, org, trigger)
 				}
 			}
 		}

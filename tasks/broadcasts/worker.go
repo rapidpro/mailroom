@@ -62,7 +62,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	}
 
 	// get the contact ids for our URNs
-	urnMap, err := models.ContactIDsFromURNs(ctx, db, org, org.SessionAssets(), bcast.URNs())
+	urnMap, err := models.ContactIDsFromURNs(ctx, db, org, bcast.URNs())
 	if err != nil {
 		return errors.Wrapf(err, "error getting contact ids for urns")
 	}
@@ -166,7 +166,7 @@ func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast 
 	}
 
 	// create this batch of messages
-	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, org, org.SessionAssets(), bcast)
+	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, org, bcast)
 	if err != nil {
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}

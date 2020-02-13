@@ -198,7 +198,7 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, org.SessionAssets(), flow, []flows.Trigger{trigger}, nil, true)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
@@ -239,7 +239,7 @@ func TestContactRuns(t *testing.T) {
 		msg.SetID(10)
 		resume := resumes.NewMsg(org.Env(), contact, msg)
 
-		session, err = ResumeFlow(ctx, db, rp, org, org.SessionAssets(), session, resume, nil)
+		session, err = ResumeFlow(ctx, db, rp, org, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 

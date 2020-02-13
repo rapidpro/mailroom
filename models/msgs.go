@@ -730,7 +730,7 @@ func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
 func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, org *OrgAssets, sa flows.SessionAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, org *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
 	broadcastURNs := bcast.URNs()
 
@@ -762,7 +762,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
 	}
 
-	channels := sa.Channels()
+	channels := org.SessionAssets().Channels()
 
 	// for each contact, build our message
 	msgs := make([]*Msg, 0, len(contacts))
@@ -865,7 +865,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 			templateCtx := types.NewXObject(map[string]types.XValue{
 				"contact": flows.Context(org.Env(), contact),
 				"fields":  flows.Context(org.Env(), contact.Fields()),
-				"globals": flows.Context(org.Env(), sa.Globals()),
+				"globals": flows.Context(org.Env(), org.SessionAssets().Globals()),
 				"urns":    flows.ContextFunc(org.Env(), contact.URNs().MapContext),
 			})
 			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template, nil)

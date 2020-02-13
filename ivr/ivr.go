@@ -382,7 +382,7 @@ func StartIVRFlow(
 	}
 
 	// start our flow
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, org.SessionAssets(), flow, []flows.Trigger{trigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, hook, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow")
 	}
@@ -560,7 +560,7 @@ func ResumeIVRFlow(
 		}
 	}
 
-	session, err = runner.ResumeFlow(ctx, db, rp, org, org.SessionAssets(), session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}
