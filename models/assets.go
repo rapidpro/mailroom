@@ -69,7 +69,6 @@ type OrgAssets struct {
 }
 
 var orgCache = cache.New(time.Hour, time.Minute*5)
-var assetCache = cache.New(5*time.Second, time.Minute*5)
 var ErrNotFound = errors.New("not found")
 
 const cacheTimeout = time.Second * 5
@@ -78,7 +77,6 @@ const locationCacheTimeout = time.Hour
 // FlushCache clears our entire org cache
 func FlushCache() {
 	orgCache.Flush()
-	assetCache.Flush()
 }
 
 // NewOrgAssets creates and returns a new org assets objects, potentially using the previous
@@ -250,11 +248,6 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 
 	// return our assets
 	return o, nil
-}
-
-// GetSessionAssets returns a goflow session assets object for the passed in org assets
-func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
-	return org.sessionAssets, nil
 }
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }

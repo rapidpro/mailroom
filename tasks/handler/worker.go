@@ -225,7 +225,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	modelContact := contacts[0]
 
 	// build our flow contact
-	contact, err := modelContact.FlowContact(org, org.SessionAssets())
+	contact, err := modelContact.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}
@@ -350,7 +350,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// build our flow contact
-	contact, err := modelContact.FlowContact(org, org.SessionAssets())
+	contact, err := modelContact.FlowContact(org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating flow contact")
 	}
@@ -500,7 +500,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// build our flow contact
-	contact, err := modelContact.FlowContact(org, org.SessionAssets())
+	contact, err := modelContact.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}

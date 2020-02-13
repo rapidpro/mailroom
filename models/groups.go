@@ -285,7 +285,7 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 		// convert to flow contacts
 		fcs := make([]*flows.Contact, len(contacts))
 		for i, c := range contacts {
-			fcs[i], err = c.FlowContact(org, org.SessionAssets())
+			fcs[i], err = c.FlowContact(org)
 			if err != nil {
 				tx.Rollback()
 				return errors.Wrapf(err, "error converting contact to flow contact: %s", c.UUID())

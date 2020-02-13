@@ -773,7 +773,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 			return nil, nil
 		}
 
-		contact, err := c.FlowContact(org, sa)
+		contact, err := c.FlowContact(org)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating flow contact")
 		}

@@ -469,7 +469,7 @@ func StartFlow(
 		// ok, we've filtered our contacts, build our triggers
 		triggers := make([]flows.Trigger, 0, len(locked))
 		for _, c := range contacts {
-			contact, err := c.FlowContact(org, org.SessionAssets())
+			contact, err := c.FlowContact(org)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating flow contact")
 			}

@@ -194,7 +194,7 @@ func TestContactRuns(t *testing.T) {
 	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{models.CathyID})
 	assert.NoError(t, err)
 
-	contact, err := contacts[0].FlowContact(org, org.SessionAssets())
+	contact, err := contacts[0].FlowContact(org)
 	assert.NoError(t, err)
 
 	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)

@@ -340,7 +340,7 @@ func StartIVRFlow(
 	}
 
 	// our flow contact
-	contact, err := c.FlowContact(org, org.SessionAssets())
+	contact, err := c.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error loading flow contact")
 	}
@@ -407,7 +407,7 @@ func ResumeIVRFlow(
 	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
-	contact, err := c.FlowContact(org, org.SessionAssets())
+	contact, err := c.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}

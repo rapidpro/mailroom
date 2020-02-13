@@ -333,7 +333,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 }
 
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
-func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flows.Contact, error) {
+func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 	// convert our groups to a list of asset groups
 	groups := make([]assets.Group, len(c.groups))
 	for i, g := range c.groups {
@@ -342,7 +342,7 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 
 	// create our flow contact
 	contact, err := flows.NewContact(
-		session,
+		org.SessionAssets(),
 		c.uuid,
 		flows.ContactID(c.id),
 		c.name,
@@ -663,7 +663,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 		return NilContactID, errors.Wrapf(err, "error loading new contact")
 	}
 
-	flowContact, err := contacts[0].FlowContact(org, assets)
+	flowContact, err := contacts[0].FlowContact(org)
 	if err != nil {
 		tx.Rollback()
 		return NilContactID, errors.Wrapf(err, "error creating flow contact")

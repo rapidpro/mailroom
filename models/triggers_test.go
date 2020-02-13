@@ -86,10 +86,10 @@ func TestTriggers(t *testing.T) {
 	contacts, err := LoadContacts(ctx, db, org, contactIDs)
 	assert.NoError(t, err)
 
-	cathy, err := contacts[0].FlowContact(org, org.SessionAssets())
+	cathy, err := contacts[0].FlowContact(org)
 	assert.NoError(t, err)
 
-	greg, err := contacts[1].FlowContact(org, org.SessionAssets())
+	greg, err := contacts[1].FlowContact(org)
 	assert.NoError(t, err)
 
 	tcs := []struct {

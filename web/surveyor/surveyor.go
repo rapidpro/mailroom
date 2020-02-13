@@ -121,7 +121,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// load our flow contact
-	flowContact, err := contacts[0].FlowContact(org, org.SessionAssets())
+	flowContact, err := contacts[0].FlowContact(org)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading flow contact")
 	}
