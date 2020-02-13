@@ -81,18 +81,13 @@ func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	}
 
 	var sa flows.SessionAssets
-
 	// if we have an org ID, create session assets to look for missing dependencies
 	if request.ValidateWithOrgID != models.NilOrgID {
 		org, err := models.NewOrgAssets(ctx, s.DB, request.ValidateWithOrgID, nil)
 		if err != nil {
 			return nil, 0, err
 		}
-
-		sa, err = models.NewSessionAssets(org)
-		if err != nil {
-			return nil, 0, err
-		}
+		sa = org.SessionAssets()
 	}
 
 	return flow.Inspect(sa), http.StatusOK, nil

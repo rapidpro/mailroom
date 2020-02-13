@@ -159,8 +159,7 @@ func TestContacts(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, 1)
 	assert.NoError(t, err)
 
-	session, err := NewSessionAssets(org)
-	assert.NoError(t, err)
+	session := org.SessionAssets()
 
 	db.MustExec(
 		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
@@ -177,7 +176,7 @@ func TestContacts(t *testing.T) {
 	// convert to goflow contacts
 	contacts := make([]*flows.Contact, len(modelContacts))
 	for i := range modelContacts {
-		contacts[i], err = modelContacts[i].FlowContact(org, session)
+		contacts[i], err = modelContacts[i].FlowContact(org, org.SessionAssets())
 		assert.NoError(t, err)
 	}
 
@@ -277,11 +276,8 @@ func TestContactsFromURN(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	assets, err := GetSessionAssets(org)
-	assert.NoError(t, err)
-
 	for i, tc := range tcs {
-		ids, err := ContactIDsFromURNs(ctx, db, org, assets, []urns.URN{tc.URN})
+		ids, err := ContactIDsFromURNs(ctx, db, org, org.SessionAssets(), []urns.URN{tc.URN})
 		assert.NoError(t, err, "%d: error getting contact ids", i)
 
 		if len(ids) != 1 {
@@ -315,11 +311,8 @@ func TestCreateContact(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	assets, err := GetSessionAssets(org)
-	assert.NoError(t, err)
-
 	for i, tc := range tcs {
-		id, err := CreateContact(ctx, db, org, assets, tc.URN)
+		id, err := CreateContact(ctx, db, org, org.SessionAssets(), tc.URN)
 		assert.NoError(t, err, "%d: error creating contact", i)
 		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
 	}

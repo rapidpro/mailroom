@@ -423,12 +423,6 @@ func StartFlow(
 		return nil, nil
 	}
 
-	// build our session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error starting flow, unable to load assets")
-	}
-
 	// we now need to grab locks for our contacts so that they are never in two starts or handles at the
 	// same time we try to grab locks for up to five minutes, but do it in batches where we wait for one
 	// second per contact to prevent deadlocks
@@ -475,7 +469,7 @@ func StartFlow(
 		// ok, we've filtered our contacts, build our triggers
 		triggers := make([]flows.Trigger, 0, len(locked))
 		for _, c := range contacts {
-			contact, err := c.FlowContact(org, sa)
+			contact, err := c.FlowContact(org, org.SessionAssets())
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating flow contact")
 			}
@@ -486,7 +480,7 @@ func StartFlow(
 			triggers = append(triggers, trigger)
 		}
 
-		ss, err := StartFlowForContacts(ctx, db, rp, org, sa, flow, triggers, options.CommitHook, options.Interrupt)
+		ss, err := StartFlowForContacts(ctx, db, rp, org, org.SessionAssets(), flow, triggers, options.CommitHook, options.Interrupt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error starting flow for contacts")
 		}

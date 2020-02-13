@@ -29,6 +29,8 @@ type OrgAssets struct {
 
 	env *Org
 
+	sessionAssets flows.SessionAssets
+
 	flowByUUID map[assets.FlowUUID]assets.Flow
 
 	flowByID      map[FlowID]assets.Flow
@@ -209,6 +211,12 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		}
 	}
 
+	// intialize our session assets
+	o.sessionAssets, err = engine.NewSessionAssets(o, goflow.MigrationConfig())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error build session assets for org: %d", orgID)
+	}
+
 	return o, nil
 }
 
@@ -244,26 +252,9 @@ func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, er
 	return o, nil
 }
 
-// NewSessionAssets creates new sessions assets, returning the result
-func NewSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
-	return engine.NewSessionAssets(org, goflow.MigrationConfig())
-}
-
 // GetSessionAssets returns a goflow session assets object for the passed in org assets
 func GetSessionAssets(org *OrgAssets) (flows.SessionAssets, error) {
-	key := fmt.Sprintf("%d", org.OrgID())
-	cached, found := assetCache.Get(key)
-	if found {
-		return cached.(flows.SessionAssets), nil
-	}
-
-	assets, err := NewSessionAssets(org)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error creating session assets from org")
-	}
-
-	assetCache.Set(key, assets, cache.DefaultExpiration)
-	return assets, nil
+	return org.sessionAssets, nil
 }
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
@@ -271,6 +262,8 @@ func (a *OrgAssets) OrgID() OrgID { return a.orgID }
 func (a *OrgAssets) Env() envs.Environment { return a.env }
 
 func (a *OrgAssets) Org() *Org { return a.env }
+
+func (a *OrgAssets) SessionAssets() flows.SessionAssets { return a.sessionAssets }
 
 func (a *OrgAssets) Channels() ([]assets.Channel, error) {
 	return a.channels, nil
@@ -287,6 +280,8 @@ func (a *OrgAssets) ChannelByID(channelID ChannelID) *Channel {
 // AddTestChannel adds a test channel to our org, this is only used in session assets during simulation
 func (a *OrgAssets) AddTestChannel(channel assets.Channel) {
 	a.channels = append(a.channels, channel)
+	a.sessionAssets, _ = engine.NewSessionAssets(a, goflow.MigrationConfig())
+
 	// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
 }
 

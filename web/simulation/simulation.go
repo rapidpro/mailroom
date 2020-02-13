@@ -124,19 +124,13 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 		org.AddTestChannel(channel)
 	}
 
-	// build our session
-	sa, err := models.NewSessionAssets(org)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable get session assets")
-	}
-
 	// read our trigger
-	trigger, err := triggers.ReadTrigger(sa, request.Trigger, assets.IgnoreMissing)
+	trigger, err := triggers.ReadTrigger(org.SessionAssets(), request.Trigger, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
 
-	return triggerFlow(ctx, s.DB, org, sa, trigger)
+	return triggerFlow(ctx, s.DB, org, org.SessionAssets(), trigger)
 }
 
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
@@ -201,19 +195,13 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		org.AddTestChannel(channel)
 	}
 
-	// build our session
-	sa, err := models.NewSessionAssets(org)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-
-	session, err := goflow.Simulator().ReadSession(sa, request.Session, assets.IgnoreMissing)
+	session, err := goflow.Simulator().ReadSession(org.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// read our resume
-	resume, err := resumes.ReadResume(sa, request.Resume, assets.IgnoreMissing)
+	resume, err := resumes.ReadResume(org.SessionAssets(), request.Resume, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -243,7 +231,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 				if triggeredFlow != nil {
 					trigger := triggers.NewMsg(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
-					return triggerFlow(ctx, s.DB, org, sa, trigger)
+					return triggerFlow(ctx, s.DB, org, org.SessionAssets(), trigger)
 				}
 			}
 		}

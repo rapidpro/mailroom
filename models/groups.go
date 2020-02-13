@@ -254,11 +254,6 @@ func RemoveContactsFromGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *
 // associated campaigns as needed
 func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAssets, groupID GroupID, contactIDs []ContactID) error {
 	// we need session assets in order to recalculate campaign events
-	sa, err := GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "error creating session assets during group addition: %d", groupID)
-	}
-
 	addBatch := func(batch []ContactID) error {
 		tx, err := db.BeginTxx(ctx, nil)
 
@@ -290,7 +285,7 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 		// convert to flow contacts
 		fcs := make([]*flows.Contact, len(contacts))
 		for i, c := range contacts {
-			fcs[i], err = c.FlowContact(org, sa)
+			fcs[i], err = c.FlowContact(org, org.SessionAssets())
 			if err != nil {
 				tx.Rollback()
 				return errors.Wrapf(err, "error converting contact to flow contact: %s", c.UUID())
@@ -318,7 +313,7 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 		batch = append(batch, id)
 
 		if len(batch) == 500 {
-			err = addBatch(batch)
+			err := addBatch(batch)
 			if err != nil {
 				return err
 			}
@@ -326,7 +321,7 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 		}
 	}
 	if len(batch) > 0 {
-		err = addBatch(batch)
+		err := addBatch(batch)
 		if err != nil {
 			return err
 		}

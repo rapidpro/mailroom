@@ -61,13 +61,8 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "error getting session assets")
-	}
-
 	// get the contact ids for our URNs
-	urnMap, err := models.ContactIDsFromURNs(ctx, db, org, sa, bcast.URNs())
+	urnMap, err := models.ContactIDsFromURNs(ctx, db, org, org.SessionAssets(), bcast.URNs())
 	if err != nil {
 		return errors.Wrapf(err, "error getting contact ids for urns")
 	}
@@ -170,13 +165,8 @@ func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast 
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "error getting session assets")
-	}
-
 	// create this batch of messages
-	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, org, sa, bcast)
+	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, org, org.SessionAssets(), bcast)
 	if err != nil {
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
