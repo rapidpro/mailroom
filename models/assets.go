@@ -338,7 +338,7 @@ func GetOrgAssetsWithRefresh(ctx context.Context, db *sqlx.DB, orgID OrgID, refr
 		return nil, err
 	}
 
-	orgCache.Set(key, o, time.Minute)
+	orgCache.SetDefault(key, o)
 
 	// return our assets
 	return o, nil
