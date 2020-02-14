@@ -315,26 +315,25 @@ func GetOrgAssetsWithRefresh(ctx context.Context, db *sqlx.DB, orgID OrgID, refr
 		cached = c.(*OrgAssets)
 	}
 
-	cacheRefresh := refresh
 	if found {
 		// we found assets to use, but they are stale, refresh everything but locations
 		if time.Since(cached.builtAt) > cacheTimeout {
-			cacheRefresh = ^RefreshLocations
+			refresh = ^RefreshLocations
 		}
 
 		// our locations are stale, refresh those
 		if time.Since(cached.locationsBuiltAt) > locationCacheTimeout {
-			cacheRefresh = refresh | RefreshLocations
+			refresh = refresh | RefreshLocations
 		}
 	}
 
 	// if found and nothing to refresh, return it
-	if found && cacheRefresh == RefreshNone {
+	if found && refresh == RefreshNone {
 		return cached, nil
 	}
 
 	// otherwise build our new assets
-	o, err := NewOrgAssets(ctx, db, orgID, cached, cacheRefresh)
+	o, err := NewOrgAssets(ctx, db, orgID, cached, refresh)
 	if err != nil {
 		return nil, err
 	}
