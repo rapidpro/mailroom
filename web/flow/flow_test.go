@@ -1,13 +1,13 @@
-package flow
+package flow_test
 
 import (
 	"testing"
 
-	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/web"
 )
 
 func TestServer(t *testing.T) {
-	tcs := []testsuite.ServerTestCase{
+	tcs := []web.ServerTestCase{
 		{URL: "/mr/flow/migrate", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
 		{URL: "/mr/flow/migrate", Method: "POST", Files: "migrate_minimal_v13", Status: 200},
 		{URL: "/mr/flow/migrate", Method: "POST", Files: "migrate_minimal_legacy", Status: 200},
@@ -29,5 +29,5 @@ func TestServer(t *testing.T) {
 		{URL: "/mr/flow/clone", Method: "POST", Files: "clone_missing_dep_mapping", Status: 200},
 	}
 
-	testsuite.RunServerTestCases(t, tcs)
+	web.RunServerTestCases(t, tcs)
 }

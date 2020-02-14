@@ -1,4 +1,4 @@
-package testsuite
+package web
 
 import (
 	"fmt"
@@ -13,8 +13,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/web"
-
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,13 +27,13 @@ type ServerTestCase struct {
 }
 
 func RunServerTestCases(t *testing.T, tcs []ServerTestCase) {
-	Reset()
-	ctx := CTX()
-	db := DB()
-	rp := RP()
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	rp := testsuite.RP()
 	wg := &sync.WaitGroup{}
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 
 	// give our server time to start
