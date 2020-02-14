@@ -159,9 +159,6 @@ func TestContacts(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, 1)
 	assert.NoError(t, err)
 
-	session, err := NewSessionAssets(org)
-	assert.NoError(t, err)
-
 	db.MustExec(
 		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
 		                          VALUES(1, $1, 'whatsapp', '250788373373', 'whatsapp:250788373373', 100)`, BobID)
@@ -177,7 +174,7 @@ func TestContacts(t *testing.T) {
 	// convert to goflow contacts
 	contacts := make([]*flows.Contact, len(modelContacts))
 	for i := range modelContacts {
-		contacts[i], err = modelContacts[i].FlowContact(org, session)
+		contacts[i], err = modelContacts[i].FlowContact(org)
 		assert.NoError(t, err)
 	}
 
@@ -210,7 +207,7 @@ func TestContacts(t *testing.T) {
 	err = modelContacts[1].UpdatePreferredURN(ctx, db, org, BobURNID, channel)
 	assert.NoError(t, err)
 
-	bob, err := modelContacts[1].FlowContact(org, session)
+	bob, err := modelContacts[1].FlowContact(org)
 	assert.NoError(t, err)
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())
@@ -228,7 +225,7 @@ func TestContacts(t *testing.T) {
 	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, URNID(20122), channel)
 	assert.NoError(t, err)
 
-	bob, err = modelContacts[0].FlowContact(org, session)
+	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
 	assert.Equal(t, "tel:+250788373393?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
@@ -238,7 +235,7 @@ func TestContacts(t *testing.T) {
 	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, URNID(20122), channel)
 	assert.NoError(t, err)
 
-	bob, err = modelContacts[0].FlowContact(org, session)
+	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
 	assert.Equal(t, "tel:+250788373393?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
@@ -248,7 +245,7 @@ func TestContacts(t *testing.T) {
 	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, URNID(20122), nil)
 	assert.NoError(t, err)
 
-	bob, err = modelContacts[0].FlowContact(org, session)
+	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
 	assert.Equal(t, "tel:+250788373393?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
@@ -277,11 +274,8 @@ func TestContactsFromURN(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	assets, err := GetSessionAssets(org)
-	assert.NoError(t, err)
-
 	for i, tc := range tcs {
-		ids, err := ContactIDsFromURNs(ctx, db, org, assets, []urns.URN{tc.URN})
+		ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN})
 		assert.NoError(t, err, "%d: error getting contact ids", i)
 
 		if len(ids) != 1 {
@@ -315,11 +309,8 @@ func TestCreateContact(t *testing.T) {
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	assets, err := GetSessionAssets(org)
-	assert.NoError(t, err)
-
 	for i, tc := range tcs {
-		id, err := CreateContact(ctx, db, org, assets, tc.URN)
+		id, err := CreateContact(ctx, db, org, tc.URN)
 		assert.NoError(t, err, "%d: error creating contact", i)
 		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
 	}

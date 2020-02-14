@@ -1,3 +1,12 @@
+v5.3.37
+----------
+ * Better asset caching
+ * Convert flow and expression endpoint testing to be snapshot based
+
+v5.3.36
+----------
+ * allow globals with empty values
+
 v5.3.35
 ----------
  * Update to goflow v0.71.2

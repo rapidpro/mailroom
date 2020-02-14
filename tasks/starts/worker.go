@@ -10,7 +10,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -55,8 +54,6 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 		contactIDs[id] = true
 	}
 
-	var assets flows.SessionAssets
-
 	org, err := models.GetOrgAssets(ctx, db, start.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org assets")
@@ -64,12 +61,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// look up any contacts by URN
 	if len(start.URNs()) > 0 {
-		assets, err = models.GetSessionAssets(org)
-		if err != nil {
-			return errors.Wrapf(err, "error loading session assets")
-		}
-
-		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, org, assets, start.URNs())
+		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, org, start.URNs())
 		if err != nil {
 			return errors.Wrapf(err, "error getting contact ids from urns")
 		}
@@ -80,14 +72,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// if we are meant to create a new contact, do so
 	if start.CreateContact() {
-		if assets == nil {
-			assets, err = models.GetSessionAssets(org)
-			if err != nil {
-				return errors.Wrapf(err, "error loading session assets")
-			}
-		}
-
-		newID, err := models.CreateContact(ctx, db, org, assets, urns.NilURN)
+		newID, err := models.CreateContact(ctx, db, org, urns.NilURN)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
 		}

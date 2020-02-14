@@ -68,11 +68,6 @@ func (f *Flow) FlowType() FlowType { return f.f.FlowType }
 // Version returns the version this flow was authored in
 func (f *Flow) Version() string { return f.f.Version }
 
-// SetDefinition sets our definition from the passed in definition
-func (f *Flow) SetDefinition(definition json.RawMessage) {
-	f.f.Definition = definition
-}
-
 // IntConfigValue returns the value for the key passed in as an int. If the value
 // is not an integer or is not present then the defaultValue is returned
 func (f *Flow) IntConfigValue(key string, defaultValue int64) int64 {

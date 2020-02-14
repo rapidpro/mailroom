@@ -1,27 +1,27 @@
 {
-    "dependencies": [
-        {
-            "key": "birthdate",
-            "name": "",
-            "type": "field",
-            "nodes": {
-                "6fde1a09-3997-47dd-aff0-92e8aff3a642": [
-                    "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e"
-                ]
-            }
-        },
-        {
-            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
-            "name": "Testers",
-            "type": "group",
-            "nodes": {
-                "6fde1a09-3997-47dd-aff0-92e8aff3a642": [
-                    "23337aa9-0d3d-4e70-876e-9a2633d1e5e4"
-                ]
-            }
-        }
-    ],
-    "results": [],
-    "waiting_exits": [],
-    "parent_refs": []
+  "dependencies": [
+    {
+      "key": "birthdate",
+      "name": "",
+      "type": "field",
+      "nodes": {
+        "6fde1a09-3997-47dd-aff0-92e8aff3a642": [
+          "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e"
+        ]
+      }
+    },
+    {
+      "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+      "name": "Testers",
+      "type": "group",
+      "nodes": {
+        "6fde1a09-3997-47dd-aff0-92e8aff3a642": [
+          "23337aa9-0d3d-4e70-876e-9a2633d1e5e4"
+        ]
+      }
+    }
+  ],
+  "results": [],
+  "waiting_exits": [],
+  "parent_refs": []
 }
