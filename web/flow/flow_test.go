@@ -19,8 +19,6 @@ func TestServer(t *testing.T) {
 		{URL: "/mr/flow/inspect", Method: "POST", Files: "inspect_invalid_legacy", Status: 200},
 		{URL: "/mr/flow/inspect", Method: "POST", Files: "inspect_valid", Status: 200},
 		{URL: "/mr/flow/inspect", Method: "POST", Files: "inspect_invalid", Status: 422},
-		{URL: "/mr/flow/inspect", Method: "POST", Files: "inspect_valid_without_org", Status: 200},
-		{URL: "/mr/flow/inspect", Method: "POST", Files: "inspect_invalid_without_org", Status: 200},
 		{URL: "/mr/flow/inspect", Method: "POST", Files: "inspect_legacy_single_msg", Status: 200},
 
 		{URL: "/mr/flow/clone", Method: "GET", Status: 405, Response: `{"error": "illegal method: GET"}`},
