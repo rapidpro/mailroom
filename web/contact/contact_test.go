@@ -3,6 +3,7 @@ package contact
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,7 +13,10 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/test"
+	"github.com/nyaruka/goflow/utils/dates"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
+	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -317,5 +321,84 @@ func TestParse(t *testing.T) {
 		assert.NoError(t, err, "%d: error reading body", i)
 
 		test.AssertEqualJSON(t, tc.Response, json.RawMessage(response), "%d: unexpected response", i)
+	}
+}
+
+var update = flag.Bool("update", false, "update testdata files")
+
+func TestApplyActions(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	rp := testsuite.RP()
+	wg := &sync.WaitGroup{}
+
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server.Start()
+	time.Sleep(time.Second)
+
+	defer server.Stop()
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(0))
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
+	defer dates.SetNowSource(dates.DefaultNowSource)
+
+	// for simpler tests we clear out cathy's fields and groups to start
+	db.MustExec(`UPDATE contacts_contact SET fields = NULL WHERE id = $1`, models.CathyID)
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, models.CathyID)
+	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.CathyID)
+
+	type TestCase struct {
+		Label        string          `json:"label"`
+		Method       string          `json:"method"`
+		Path         string          `json:"path"`
+		Body         json.RawMessage `json:"body"`
+		Status       int             `json:"status"`
+		Response     json.RawMessage `json:"response"`
+		DBAssertions []struct {
+			Query string `json:"query"`
+			Count int    `json:"count"`
+		} `json:"db_assertions"`
+	}
+	tcs := make([]*TestCase, 0, 20)
+	tcJSON, err := ioutil.ReadFile("testdata/apply_actions.json")
+	assert.NoError(t, err)
+
+	err = json.Unmarshal(tcJSON, &tcs)
+	assert.NoError(t, err)
+
+	for _, tc := range tcs {
+		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.Path, bytes.NewReader([]byte(tc.Body)))
+		assert.NoError(t, err, "%s: error creating request", tc.Label)
+
+		resp, err := http.DefaultClient.Do(req)
+		assert.NoError(t, err, "%s: error making request", tc.Label)
+
+		assert.Equal(t, tc.Status, resp.StatusCode, "%s: unexpected status", tc.Label)
+
+		response, err := ioutil.ReadAll(resp.Body)
+		assert.NoError(t, err, "%s: error reading body", tc.Label)
+
+		if !*update {
+			test.AssertEqualJSON(t, json.RawMessage(tc.Response), json.RawMessage(response), "%s: unexpected response\nExpected: %s\nGot: %s", tc.Label, tc.Response, string(response))
+		}
+
+		for _, dba := range tc.DBAssertions {
+			testsuite.AssertQueryCount(t, db, dba.Query, nil, dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
+		}
+
+		tc.Response = json.RawMessage(response)
+	}
+
+	// update if we are meant to
+	if *update {
+		truth, err := json.MarshalIndent(tcs, "", "    ")
+		assert.NoError(t, err)
+
+		if err := ioutil.WriteFile("testdata/apply_actions.json", truth, 0644); err != nil {
+			t.Fatalf("failed to update truth file: %s", err)
+		}
 	}
 }

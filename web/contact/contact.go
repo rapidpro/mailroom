@@ -3,14 +3,15 @@ package contact
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 
-	"github.com/apex/log"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/goflow/flows/definition"
+	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/goflow"
@@ -201,9 +202,9 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 //   }
 //
 type applyActionsRequest struct {
-	OrgID       models.OrgID      `json:"org_id"       validate:"required"`
-	ContactUUID flows.ContactUUID `json:"contact_uuid" validate:"required"`
-	Actions     []json.RawMessage `json:"actions"      validate:"required"`
+	OrgID     models.OrgID      `json:"org_id"       validate:"required"`
+	ContactID models.ContactID  `json:"contact_id"   validate:"required"`
+	Actions   []json.RawMessage `json:"actions"      validate:"required"`
 }
 
 // Response for a contact update. Will return the full contact state and any errors
@@ -222,7 +223,8 @@ type applyActionsRequest struct {
 //   }
 // }
 type applyActionsResponse struct {
-	Contact json.RawMessage `json:"contact"`
+	Contact *flows.Contact `json:"contact"`
+	Events  []flows.Event  `json:"events"`
 }
 
 // the types of actions our apply_actions endpoind supports
@@ -246,14 +248,24 @@ func handleApplyActions(ctx context.Context, s *web.Server, r *http.Request) (in
 	}
 
 	// grab our org
-	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
+	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	sa, err := models.NewSessionAssets(org)
+	// clone it as we will modify flows
+	org, err = org.Clone(s.CTX, s.DB)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load session assets")
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
+	}
+
+	// load our contact
+	contact, err := models.LoadContact(ctx, s.DB, org, request.ContactID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load contact")
+	}
+	if contact == nil {
+		return errors.Errorf("unable to find contact widh id: %d", request.ContactID), http.StatusBadRequest, nil
 	}
 
 	// build up our actions
@@ -264,23 +276,23 @@ func handleApplyActions(ctx context.Context, s *web.Server, r *http.Request) (in
 			return errors.Wrapf(err, "error in action: %s", string(a)), http.StatusBadRequest, nil
 		}
 		if !supportedTypes[action.Type()] {
-			return errors.Errorf("unsupported action type: %s", action.Type), http.StatusBadRequest, nil
+			return errors.Errorf("unsupported action type: %s", action.Type()), http.StatusBadRequest, nil
 		}
 
 		as[i] = action
 	}
 
-	// create a minimal flow with these actions
+	// create a minimal node with these actions
 	entry := definition.NewNode(
 		flows.NodeUUID(uuids.New()),
 		as,
 		nil,
-		nil,
+		[]flows.Exit{definition.NewExit(flows.ExitUUID(uuids.New()), "")},
 	)
 
 	// we have our nodes, lets create our flow
 	flowUUID := assets.FlowUUID(uuids.New())
-	flow, err := definition.NewFlow(
+	flowDef, err := definition.NewFlow(
 		flowUUID,
 		"Contact Update Flow",
 		envs.Language("eng"),
@@ -292,17 +304,79 @@ func handleApplyActions(ctx context.Context, s *web.Server, r *http.Request) (in
 		nil,
 	)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error building flow")
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error building contact flow")
 	}
 
-	session, sprint, err := goflow.Engine().NewSession(sa, trigger)
+	flowJSON, err := json.Marshal(flowDef)
 	if err != nil {
-		log.WithError(err).Errorf("error starting flow")
-		continue
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error marshalling contact flow")
 	}
 
-	// build our response
-	response := &applyActionsResponse{}
+	flow := org.SetFlow(math.MaxInt32, flowUUID, flowDef.Name(), flowJSON)
+
+	flowContact, err := contact.FlowContact(org)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error converting to flow contact")
+	}
+
+	// build our trigger
+	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), flowContact, nil)
+	flowSession, flowSprint, err := goflow.Engine().NewSession(org.SessionAssets(), trigger)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error running contact flow")
+	}
+
+	tx, err := s.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction")
+	}
+
+	session, err := models.NewSession(ctx, tx, org, flowSession, flowSprint)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating session object")
+	}
+
+	// apply our events
+	for _, e := range flowSprint.Events() {
+		err := models.ApplyEvent(ctx, tx, s.RP, org, session, e)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying event: %v", e)
+		}
+	}
+
+	// gather all our pre commit events, group them by hook and apply them
+	err = models.ApplyPreEventHooks(ctx, tx, s.RP, org, []*models.Session{session})
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
+	}
+
+	// commit our transaction
+	err = tx.Commit()
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
+	}
+
+	tx, err = s.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for post commit")
+	}
+
+	// then apply our post commit hooks
+	err = models.ApplyPostEventHooks(ctx, tx, s.RP, org, []*models.Session{session})
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
+	}
+
+	// all done! build our response, including our updated contact and events
+	response := &applyActionsResponse{
+		Contact: flowSession.Contact(),
+		Events:  flowSprint.Events(),
+	}
 
 	return response, http.StatusOK, nil
 }
