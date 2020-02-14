@@ -107,12 +107,6 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
 	}
 
-	// build our session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load assets"))
-	}
-
 	// lookup the URN of the caller
 	urn, err := client.URNForRequest(r)
 	if err != nil {
@@ -120,7 +114,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	}
 
 	// get the contact id for this URN
-	ids, err := models.ContactIDsFromURNs(ctx, s.DB, org, sa, []urns.URN{urn})
+	ids, err := models.ContactIDsFromURNs(ctx, s.DB, org, []urns.URN{urn})
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load contact by urn"))
 	}

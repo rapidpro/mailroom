@@ -333,7 +333,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 }
 
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
-func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flows.Contact, error) {
+func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 	// convert our groups to a list of asset groups
 	groups := make([]assets.Group, len(c.groups))
 	for i, g := range c.groups {
@@ -342,7 +342,7 @@ func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flo
 
 	// create our flow contact
 	contact, err := flows.NewContact(
-		session,
+		org.SessionAssets(),
 		c.uuid,
 		flows.ContactID(c.id),
 		c.name,
@@ -529,7 +529,7 @@ WHERE
 
 // ContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
 // the passed in URNs with the ids of the contacts.
-func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, us []urns.URN) (map[urns.URN]ContactID, error) {
+func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []urns.URN) (map[urns.URN]ContactID, error) {
 	// build a map of our urns to contact id
 	urnMap := make(map[urns.URN]ContactID, len(us))
 
@@ -581,7 +581,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 		// create the contacts that are missing
 		for _, u := range us {
 			if urnMap[u] == NilContactID {
-				id, err := CreateContact(ctx, db, org, assets, u)
+				id, err := CreateContact(ctx, db, org, u)
 				if err != nil {
 					return nil, errors.Wrapf(err, "error while creating contact")
 				}
@@ -600,7 +600,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 }
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
-func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, urn urns.URN) (ContactID, error) {
+func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, urn urns.URN) (ContactID, error) {
 	// we have a URN, first try to look up the URN
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -629,7 +629,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 		if pqErr, ok := err.(*pq.Error); ok {
 			// if this was a duplicate URN, we should be able to select this contact instead
 			if pqErr.Code.Name() == "unique_violation" {
-				ids, err := ContactIDsFromURNs(ctx, db, org, assets, []urns.URN{urn})
+				ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{urn})
 				if err != nil || len(ids) == 0 {
 					return NilContactID, errors.Wrapf(err, "unable to load contact for urn: %s", urn)
 				}
@@ -663,7 +663,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 		return NilContactID, errors.Wrapf(err, "error loading new contact")
 	}
 
-	flowContact, err := contacts[0].FlowContact(org, assets)
+	flowContact, err := contacts[0].FlowContact(org)
 	if err != nil {
 		tx.Rollback()
 		return NilContactID, errors.Wrapf(err, "error creating flow contact")
