@@ -105,9 +105,14 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 	}
 
 	// grab our org
-	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
+	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
+	}
+	// clone it since we will be modifying it
+	org, err = org.Clone(s.CTX, s.DB)
+	if err != nil {
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to clone org")
 	}
 
 	// for each of our passed in definitions
@@ -176,7 +181,13 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// grab our org
-	org, err := models.NewOrgAssets(s.CTX, s.DB, request.OrgID, nil)
+	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	// clone it as we will modify it
+	org, err = org.Clone(s.CTX, s.DB)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -262,8 +273,8 @@ func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawM
 	if err != nil {
 		return errors.Wrapf(err, "unable to find flow with uuid: %s", uuid)
 	}
-
 	flow := f.(*models.Flow)
-	flow.SetDefinition(flowDef)
+
+	org.SetFlow(flow.ID(), flow.UUID(), flow.Name(), flowDef)
 	return nil
 }
