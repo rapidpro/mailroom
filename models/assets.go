@@ -390,6 +390,13 @@ func (a *OrgAssets) Clone(ctx context.Context, db *sqlx.DB) (*OrgAssets, error) 
 	// only channels and flows can be modified so only refresh those
 	org, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows|RefreshChannels)
 	org.cloned = true
+
+	// rebuild our session assets with our new items
+	org.sessionAssets, err = engine.NewSessionAssets(org, goflow.MigrationConfig())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error build session assets for org: %d", org.OrgID())
+	}
+
 	return org, err
 }
 
