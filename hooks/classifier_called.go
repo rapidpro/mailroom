@@ -24,10 +24,10 @@ type InsertHTTPLogsHook struct{}
 var insertHTTPLogsHook = &InsertHTTPLogsHook{}
 
 // Apply inserts all the classifier logs that were created
-func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
 	// gather all our logs
-	logs := make([]*models.HTTPLog, 0, len(sessions))
-	for _, ls := range sessions {
+	logs := make([]*models.HTTPLog, 0, len(scene))
+	for _, ls := range scene {
 		for _, l := range ls {
 			logs = append(logs, l.(*models.HTTPLog))
 		}
@@ -42,7 +42,7 @@ func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 }
 
 // handleClassifierCalled is called for each classifier called event
-func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ClassifierCalledEvent)
 
 	classifier := org.ClassifierByUUID(event.Classifier.UUID)
@@ -53,8 +53,8 @@ func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 	// create a log for each HTTP call
 	for _, httpLog := range event.HTTPLogs {
 		logrus.WithFields(logrus.Fields{
-			"contact_uuid":    session.ContactUUID(),
-			"session_id":      session.ID(),
+			"contact_uuid":    scene.ContactUUID(),
+			"session_id":      scene.ID(),
 			"url":             httpLog.URL,
 			"status":          httpLog.Status,
 			"elapsed_ms":      httpLog.ElapsedMS,
@@ -73,7 +73,7 @@ func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 			httpLog.CreatedOn,
 		)
 
-		session.AddPreCommitEvent(insertHTTPLogsHook, log)
+		scene.AddPreCommitEvent(insertHTTPLogsHook, log)
 	}
 
 	return nil

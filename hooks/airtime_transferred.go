@@ -25,11 +25,11 @@ type InsertAirtimeTransfersHook struct{}
 var insertAirtimeTransfersHook = &InsertAirtimeTransfersHook{}
 
 // Apply inserts all the airtime transfers that were created
-func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our transfers
-	transfers := make([]*models.AirtimeTransfer, 0, len(sessions))
+	transfers := make([]*models.AirtimeTransfer, 0, len(scenes))
 
-	for _, ts := range sessions {
+	for _, ts := range scenes {
 		for _, t := range ts {
 			transfer := t.(*models.AirtimeTransfer)
 			transfers = append(transfers, transfer)
@@ -43,7 +43,7 @@ func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp 
 	}
 
 	// gather all our logs and set the newly inserted transfer IDs on them
-	logs := make([]*models.HTTPLog, 0, len(sessions))
+	logs := make([]*models.HTTPLog, 0, len(scenes))
 
 	for _, t := range transfers {
 		for _, l := range t.Logs {
@@ -62,8 +62,13 @@ func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp 
 }
 
 // handleAirtimeTransferred is called for each airtime transferred event
-func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.AirtimeTransferredEvent)
+
+	// must be in a session
+	if scene.Session() == nil {
+		return errors.Errorf("cannot handle airtime transferred event without session")
+	}
 
 	status := models.AirtimeTransferStatusSuccess
 	if event.ActualAmount == decimal.Zero {
@@ -73,7 +78,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	transfer := models.NewAirtimeTransfer(
 		org.OrgID(),
 		status,
-		session.ContactID(),
+		scene.ContactID(),
 		event.Sender,
 		event.Recipient,
 		event.Currency,
@@ -83,8 +88,8 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	)
 
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid":   session.ContactUUID(),
-		"session_id":     session.ID(),
+		"contact_uuid":   scene.ContactUUID(),
+		"session_id":     scene.ID(),
 		"sender":         string(event.Sender),
 		"recipient":      string(event.Recipient),
 		"currency":       event.Currency,
@@ -105,7 +110,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 		))
 	}
 
-	session.AddPreCommitEvent(insertAirtimeTransfersHook, transfer)
+	scene.AddPreCommitEvent(insertAirtimeTransfersHook, transfer)
 
 	return nil
 }

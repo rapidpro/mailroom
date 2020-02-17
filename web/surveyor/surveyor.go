@@ -171,7 +171,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// write our post commit hooks
-	err = models.ApplyPostEventHooks(ctx, tx, s.RP, org, sessions)
+	err = models.ApplyPostEventHooks(ctx, tx, s.RP, org, []*models.Scene{sessions[0].Scene()})
 	if err != nil {
 		tx.Rollback()
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying post commit hooks")

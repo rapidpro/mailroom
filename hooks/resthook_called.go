@@ -22,9 +22,9 @@ type InsertWebhookEventHook struct{}
 var insertWebhookEventHook = &InsertWebhookEventHook{}
 
 // Apply inserts all the webook events that were created
-func (h *InsertWebhookEventHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
-	events := make([]*models.WebhookEvent, 0, len(sessions))
-	for _, rs := range sessions {
+func (h *InsertWebhookEventHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+	events := make([]*models.WebhookEvent, 0, len(scene))
+	for _, rs := range scene {
 		for _, r := range rs {
 			events = append(events, r.(*models.WebhookEvent))
 		}
@@ -38,12 +38,12 @@ func (h *InsertWebhookEventHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 	return nil
 }
 
-// handleResthookCalled is called for each resthook call in a session
-func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+// handleResthookCalled is called for each resthook call in a scene
+func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ResthookCalledEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.ID(),
 		"resthook":     event.Resthook,
 	}).Debug("resthook called")
 
@@ -61,7 +61,7 @@ func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 		string(event.Payload),
 		event.CreatedOn(),
 	)
-	session.AddPreCommitEvent(insertWebhookEventHook, re)
+	scene.AddPreCommitEvent(insertWebhookEventHook, re)
 
 	return nil
 }

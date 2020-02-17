@@ -3,18 +3,12 @@ package contact
 import (
 	"context"
 	"encoding/json"
-	"math"
 	"net/http"
 
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/actions"
-	"github.com/nyaruka/goflow/flows/definition"
-	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/flows/actions/modifiers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
-	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/web"
@@ -24,7 +18,7 @@ import (
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(handleParseQuery))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/apply_actions", web.RequireAuthToken(handleApplyActions))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
 }
 
 // Searches the contacts for an org
@@ -188,61 +182,51 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	return response, http.StatusOK, nil
 }
 
-// Request update a contact. Clients should only pass in the fields they want updated.
+// Request that a set of contacts is modified.
 //
 //   {
 //     "org_id": 1,
-//     "contact_uuid": "559d4cf7-8ed3-43db-9bbb-2be85345f87e",
-//     "name": "Joe",
-//     "fields": {
-//        "age": "124"
-//     },
-//     "add_groups": [],
-//     "remove_groups": []
+//     "contact_ids": [15,235],
+//     "modifiers": [{
+//        "type": "groups",
+//        "modification": "add",
+//        "groups": [{
+//            "uuid": "a8e8efdb-78ee-46e7-9eb0-6a578da3b02d",
+//            "name": "Doctors"
+//        }]
+//     }]
 //   }
 //
-type applyActionsRequest struct {
-	OrgID     models.OrgID      `json:"org_id"       validate:"required"`
-	ContactID models.ContactID  `json:"contact_id"   validate:"required"`
-	Actions   []json.RawMessage `json:"actions"      validate:"required"`
+type modifyRequest struct {
+	OrgID      models.OrgID       `json:"org_id"       validate:"required"`
+	ContactIDs []models.ContactID `json:"contact_ids"  validate:"required"`
+	Modifiers  []json.RawMessage  `json:"modifiers"    validate:"required"`
 }
 
 // Response for a contact update. Will return the full contact state and any errors
 //
 // {
-//   "contact": {
-//     "id": 123,
-//     "contact_uuid": "559d4cf7-8ed3-43db-9bbb-2be85345f87e",
-//     "name": "Joe",
-//     "language": "eng",
-//     "created_on": ".."
-//     "urns": [ .. ],
-//     "fields": {
-//     }
-//     "groups": [ .. ],
-//   }
+//   "1000": {
+//	   "contact": {
+//       "id": 123,
+//       "contact_uuid": "559d4cf7-8ed3-43db-9bbb-2be85345f87e",
+//       "name": "Joe",
+//       "language": "eng",
+//       ...
+//     }],
+//     "events": [{
+//          ....
+//     }]
+//   }, ...
 // }
-type applyActionsResponse struct {
+type modifyResult struct {
 	Contact *flows.Contact `json:"contact"`
 	Events  []flows.Event  `json:"events"`
 }
 
-// the types of actions our apply_actions endpoind supports
-var supportedTypes map[string]bool = map[string]bool{
-	actions.TypeAddContactGroups: true,
-	actions.TypeAddContactURN:    true,
-	// actions.TypeRemoveContactURN  <-- missing
-	actions.TypeRemoveContactGroups: true,
-	actions.TypeSetContactChannel:   true,
-	actions.TypeSetContactLanguage:  true,
-	actions.TypeSetContactName:      true,
-	actions.TypeSetContactTimezone:  true,
-	actions.TypeSetContactField:     true,
-}
-
 // handles a request to apply the passed in actions
-func handleApplyActions(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	request := &applyActionsRequest{}
+func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &modifyRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
@@ -259,93 +243,64 @@ func handleApplyActions(ctx context.Context, s *web.Server, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
 	}
 
-	// load our contact
-	contact, err := models.LoadContact(ctx, s.DB, org, request.ContactID)
+	// build up our modifiers
+	mods := make([]flows.Modifier, len(request.Modifiers))
+	for i, m := range request.Modifiers {
+		mod, err := modifiers.ReadModifier(org.SessionAssets(), m, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error in modifier: %s", string(m)), http.StatusBadRequest, nil
+		}
+		mods[i] = mod
+	}
+
+	// load our contacts
+	contacts, err := models.LoadContacts(ctx, s.DB, org, request.ContactIDs)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load contact")
 	}
-	if contact == nil {
-		return errors.Errorf("unable to find contact widh id: %d", request.ContactID), http.StatusBadRequest, nil
-	}
 
-	// build up our actions
-	as := make([]flows.Action, len(request.Actions))
-	for i, a := range request.Actions {
-		action, err := actions.ReadAction(a)
+	results := make(map[models.ContactID]modifyResult)
+
+	// create scenes for our contacts
+	scenes := make([]*models.Scene, 0, len(contacts))
+	for _, contact := range contacts {
+		flowContact, err := contact.FlowContact(org)
 		if err != nil {
-			return errors.Wrapf(err, "error in action: %s", string(a)), http.StatusBadRequest, nil
-		}
-		if !supportedTypes[action.Type()] {
-			return errors.Errorf("unsupported action type: %s", action.Type()), http.StatusBadRequest, nil
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
 
-		as[i] = action
+		result := modifyResult{
+			Contact: flowContact,
+			Events:  make([]flows.Event, 0, len(mods)),
+		}
+
+		scene := models.NewSceneForContact(flowContact)
+
+		// apply our modifiers
+		for _, mod := range mods {
+			mod.Apply(org.Env(), org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+		}
+
+		results[contact.ID()] = result
+		scenes = append(scenes, scene)
 	}
 
-	// create a minimal node with these actions
-	entry := definition.NewNode(
-		flows.NodeUUID(uuids.New()),
-		as,
-		nil,
-		[]flows.Exit{definition.NewExit(flows.ExitUUID(uuids.New()), "")},
-	)
-
-	// we have our nodes, lets create our flow
-	flowUUID := assets.FlowUUID(uuids.New())
-	flowDef, err := definition.NewFlow(
-		flowUUID,
-		"Contact Update Flow",
-		envs.Language("eng"),
-		flows.FlowTypeMessaging,
-		1,
-		300,
-		definition.NewLocalization(),
-		[]flows.Node{entry},
-		nil,
-	)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error building contact flow")
-	}
-
-	flowJSON, err := json.Marshal(flowDef)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error marshalling contact flow")
-	}
-
-	flow := org.SetFlow(math.MaxInt32, flowUUID, flowDef.Name(), flowJSON)
-
-	flowContact, err := contact.FlowContact(org)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error converting to flow contact")
-	}
-
-	// build our trigger
-	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), flowContact, nil)
-	flowSession, flowSprint, err := goflow.Engine().NewSession(org.SessionAssets(), trigger)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error running contact flow")
-	}
-
+	// ok, commit all our events
 	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction")
 	}
 
-	session, err := models.NewSession(ctx, tx, org, flowSession, flowSprint)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating session object")
-	}
-
 	// apply our events
-	for _, e := range flowSprint.Events() {
-		err := models.ApplyEvent(ctx, tx, s.RP, org, session, e)
+	for _, scene := range scenes {
+		err := models.ApplyEvents(ctx, tx, s.RP, org, scene, results[scene.ContactID()].Events)
 		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying event: %v", e)
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying events")
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = models.ApplyPreEventHooks(ctx, tx, s.RP, org, []*models.Session{session})
+	err = models.ApplyPreEventHooks(ctx, tx, s.RP, org, scenes)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
 	}
@@ -362,7 +317,7 @@ func handleApplyActions(ctx context.Context, s *web.Server, r *http.Request) (in
 	}
 
 	// then apply our post commit hooks
-	err = models.ApplyPostEventHooks(ctx, tx, s.RP, org, []*models.Session{session})
+	err = models.ApplyPostEventHooks(ctx, tx, s.RP, org, scenes)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
 	}
@@ -372,11 +327,5 @@ func handleApplyActions(ctx context.Context, s *web.Server, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
 	}
 
-	// all done! build our response, including our updated contact and events
-	response := &applyActionsResponse{
-		Contact: flowSession.Contact(),
-		Events:  flowSprint.Events(),
-	}
-
-	return response, http.StatusOK, nil
+	return results, http.StatusOK, nil
 }

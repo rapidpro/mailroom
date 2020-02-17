@@ -191,8 +191,8 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		assert.NoError(t, err)
 
 		options := runner.NewStartOptions()
-		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
-			for _, s := range sessions {
+		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session []*models.Session) error {
+			for _, s := range session {
 				msg := tc.Msgs[s.ContactID()]
 				if msg != nil {
 					s.SetIncomingMsg(msg.ID(), "")

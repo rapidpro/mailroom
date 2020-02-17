@@ -22,10 +22,10 @@ type CommitURNChangesHook struct{}
 var commitURNChangesHook = &CommitURNChangesHook{}
 
 // Apply adds all our URNS in a batch
-func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
-	// gather all our urn changes, we only care about the last change for each session
-	changes := make([]*models.ContactURNsChanged, 0, len(sessions))
-	for _, sessionChanges := range sessions {
+func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+	// gather all our urn changes, we only care about the last change for each scene
+	changes := make([]*models.ContactURNsChanged, 0, len(scene))
+	for _, sessionChanges := range scene {
 		changes = append(changes, sessionChanges[len(sessionChanges)-1].(*models.ContactURNsChanged))
 	}
 
@@ -38,24 +38,24 @@ func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis
 }
 
 // handleContactURNsChanged is called for each contact urn changed event that is encountered
-func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactURNsChangedEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.ID(),
 		"urns":         event.URNs,
 	}).Debug("contact urns changed")
 
 	// create our URN changed event
 	change := &models.ContactURNsChanged{
-		ContactID: session.ContactID(),
+		ContactID: scene.ContactID(),
 		OrgID:     org.OrgID(),
 		URNs:      event.URNs,
 	}
 
 	// add our callback
-	session.AddPreCommitEvent(commitURNChangesHook, change)
-	session.AddPreCommitEvent(contactModifiedHook, session.Contact().ID())
+	scene.AddPreCommitEvent(commitURNChangesHook, change)
+	scene.AddPreCommitEvent(contactModifiedHook, scene.Contact().ID())
 
 	return nil
 }
