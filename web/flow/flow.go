@@ -61,18 +61,24 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 //
 //   {
 //     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]},
-//     "validate_with_org_id": 1
+//     "org_id": 1
 //   }
 //
 type inspectRequest struct {
 	Flow              json.RawMessage `json:"flow" validate:"required"`
-	ValidateWithOrgID models.OrgID    `json:"validate_with_org_id"`
+	OrgID             models.OrgID    `json:"org_id"`
+	ValidateWithOrgID models.OrgID    `json:"validate_with_org_id"` // backwards compatibility
 }
 
 func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &inspectRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// TODO switch RapidPro to use org_id and remove this
+	if request.ValidateWithOrgID != models.NilOrgID {
+		request.OrgID = request.ValidateWithOrgID
 	}
 
 	flow, err := goflow.ReadFlow(request.Flow)
@@ -82,8 +88,8 @@ func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interfa
 
 	var sa flows.SessionAssets
 	// if we have an org ID, create session assets to look for missing dependencies
-	if request.ValidateWithOrgID != models.NilOrgID {
-		org, err := models.GetOrgAssetsWithRefresh(ctx, s.DB, request.ValidateWithOrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
+	if request.OrgID != models.NilOrgID {
+		org, err := models.GetOrgAssetsWithRefresh(ctx, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
 		if err != nil {
 			return nil, 0, err
 		}
