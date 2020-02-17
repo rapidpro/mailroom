@@ -121,7 +121,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 		DBAssertions []struct {
 			Query string `json:"query"`
 			Count int    `json:"count"`
-		} `json:"db_assertions"`
+		} `json:"db_assertions,omitempty"`
 	}
 	tcs := make([]*TestCase, 0, 20)
 	tcJSON, err := ioutil.ReadFile(truthFile)
