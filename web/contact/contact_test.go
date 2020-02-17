@@ -345,6 +345,9 @@ func TestApplyActions(t *testing.T) {
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
 	defer dates.SetNowSource(dates.DefaultNowSource)
 
+	// to be deterministic, update the creation date on cathy
+	db.MustExec(`UPDATE contacts_contact SET created_on = $1 WHERE id = $2`, dates.Now(), models.CathyID)
+
 	// for simpler tests we clear out cathy's fields and groups to start
 	db.MustExec(`UPDATE contacts_contact SET fields = NULL WHERE id = $1`, models.CathyID)
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, models.CathyID)
