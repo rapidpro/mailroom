@@ -33,7 +33,7 @@ func Reset() (context.Context, *sqlx.DB, *redis.Pool) {
 // then copying the mailroom_test.dump file to your mailroom root directory
 //   % cp mailroom_test.dump ../mailroom
 func ResetDB() {
-	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable")
+	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
 	defer db.Close()
 	db.MustExec("drop owned by mailroom_test cascade")
 	dir, _ := os.Getwd()
@@ -49,7 +49,7 @@ func ResetDB() {
 
 // DB returns an open test database pool
 func DB() *sqlx.DB {
-	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable")
+	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
 	return db
 }
 

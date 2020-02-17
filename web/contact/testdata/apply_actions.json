@@ -15,7 +15,7 @@
                 "id": 10000,
                 "name": "Cathy",
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00"
+                "created_on": "2018-07-06T12:30:00.123457Z"
             },
             "events": []
         },
@@ -48,7 +48,7 @@
                 "id": 10000,
                 "name": "Kathy",
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00"
+                "created_on": "2018-07-06T12:30:00.123457Z"
             },
             "events": [
                 {
@@ -87,7 +87,7 @@
                 "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                 "id": 10000,
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00"
+                "created_on": "2018-07-06T12:30:00.123457Z"
             },
             "events": [
                 {
@@ -130,7 +130,7 @@
                 "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                 "id": 10000,
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00",
+                "created_on": "2018-07-06T12:30:00.123457Z",
                 "fields": {
                     "age": {
                         "text": "24",
@@ -186,7 +186,7 @@
                 "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                 "id": 10000,
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00"
+                "created_on": "2018-07-06T12:30:00.123457Z"
             },
             "events": [
                 {
@@ -234,7 +234,7 @@
                 "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                 "id": 10000,
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00",
+                "created_on": "2018-07-06T12:30:00.123457Z",
                 "groups": [
                     {
                         "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
@@ -289,7 +289,7 @@
                 "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                 "id": 10000,
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00"
+                "created_on": "2018-07-06T12:30:00.123457Z"
             },
             "events": [
                 {
@@ -334,7 +334,7 @@
                 "id": 10000,
                 "language": "fra",
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00"
+                "created_on": "2018-07-06T12:30:00.123457Z"
             },
             "events": [
                 {
@@ -375,7 +375,7 @@
                 "id": 10000,
                 "language": "fra",
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T05:30:00.123457-07:00",
+                "created_on": "2018-07-06T12:30:00.123457Z",
                 "urns": [
                     "tel:0788555111"
                 ]
