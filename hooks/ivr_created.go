@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeIVRCreated, handleIVRCreated)
+	models.RegisterEventHandler(events.TypeIVRCreated, handleIVRCreated)
 }
 
 // CommitIVRHook is our hook for comitting scene messages / say commands
@@ -57,15 +57,9 @@ func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 // handleIVRCreated creates the db msg for the passed in event
 func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.IVRCreatedEvent)
-
-	// must be in a session
-	if scene.Session() == nil {
-		return errors.Errorf("cannot apply ivr created event, not in a session")
-	}
-
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"text":         event.Msg.Text(),
 	}).Debug("ivr say")
 
@@ -86,7 +80,7 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 	}
 
 	// register to have this message committed
-	scene.AddPreCommitEvent(commitIVRHook, msg)
+	scene.AppendToEventPreCommitHook(commitIVRHook, msg)
 
 	return nil
 }

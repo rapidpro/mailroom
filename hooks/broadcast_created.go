@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeBroadcastCreated, handleBroadcastCreated)
+	models.RegisterEventHandler(events.TypeBroadcastCreated, handleBroadcastCreated)
 }
 
 // StartBroadcastsHook is our hook for starting the broadcasts created in these scene
@@ -34,7 +34,7 @@ func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 
 			// we skip over any scene starts that involve groups if we are in a batch start
 			if len(scene) > 1 && len(event.Groups) > 0 {
-				logrus.WithField("session_id", s.ID).Error("ignoring broadcast on group in batch")
+				logrus.WithField("session_id", s.SessionID).Error("ignoring broadcast on group in batch")
 				continue
 			}
 
@@ -64,20 +64,15 @@ func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 
 // handleBroadcastCreated is called for each broadcast created event across our scene
 func handleBroadcastCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
-	// must be in a session
-	if scene.Session() == nil {
-		return errors.Errorf("cannot handle broadcast created event without session")
-	}
-
 	event := e.(*events.BroadcastCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"translations": event.Translations[event.BaseLanguage],
 	}).Debug("broadcast created")
 
 	// schedule this for being started after our scene are committed
-	scene.AddPostCommitEvent(startBroadcastsHook, event)
+	scene.AppendToEventPostCommitHook(startBroadcastsHook, event)
 
 	return nil
 }

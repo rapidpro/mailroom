@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeWebhookCalled, handleWebhookCalled)
+	models.RegisterEventHandler(events.TypeWebhookCalled, handleWebhookCalled)
 }
 
 // UnsubscribeResthookHook is our hook for when a webhook is called
@@ -68,7 +68,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 	event := e.(*events.WebhookCalledEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"url":          event.URL,
 		"status":       event.Status,
 		"elapsed_ms":   event.ElapsedMS,
@@ -83,7 +83,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 			URL:   event.URL,
 		}
 
-		scene.AddPreCommitEvent(unsubscribeResthookHook, unsub)
+		scene.AppendToEventPreCommitHook(unsubscribeResthookHook, unsub)
 	}
 
 	// if this is a connection error, use that as our response
@@ -99,7 +99,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 		event.StatusCode, response,
 		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),
 	)
-	scene.AddPreCommitEvent(insertWebhookResultHook, result)
+	scene.AppendToEventPreCommitHook(insertWebhookResultHook, result)
 
 	return nil
 }

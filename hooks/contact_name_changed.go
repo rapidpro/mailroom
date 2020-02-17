@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactNameChanged, handleContactNameChanged)
+	models.RegisterEventHandler(events.TypeContactNameChanged, handleContactNameChanged)
 }
 
 // CommitNameChangesHook is our hook for name changes
@@ -40,11 +40,11 @@ func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	event := e.(*events.ContactNameChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"name":         event.Name,
 	}).Debug("changing contact name")
 
-	scene.AddPreCommitEvent(commitNameChangesHook, event)
+	scene.AppendToEventPreCommitHook(commitNameChangesHook, event)
 	return nil
 }
 

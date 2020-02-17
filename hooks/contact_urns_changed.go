@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactURNsChanged, handleContactURNsChanged)
+	models.RegisterEventHandler(events.TypeContactURNsChanged, handleContactURNsChanged)
 }
 
 // CommitURNChangesHook is our hook for when a URN is added to a contact
@@ -42,7 +42,7 @@ func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	event := e.(*events.ContactURNsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"urns":         event.URNs,
 	}).Debug("contact urns changed")
 
@@ -54,8 +54,8 @@ func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	}
 
 	// add our callback
-	scene.AddPreCommitEvent(commitURNChangesHook, change)
-	scene.AddPreCommitEvent(contactModifiedHook, scene.Contact().ID())
+	scene.AppendToEventPreCommitHook(commitURNChangesHook, change)
+	scene.AppendToEventPreCommitHook(contactModifiedHook, scene.Contact().ID())
 
 	return nil
 }

@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeAirtimeTransferred, handleAirtimeTransferred)
+	models.RegisterEventHandler(events.TypeAirtimeTransferred, handleAirtimeTransferred)
 }
 
 // InsertAirtimeTransfersHook is our hook for inserting airtime transfers
@@ -65,11 +65,6 @@ func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp 
 func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.AirtimeTransferredEvent)
 
-	// must be in a session
-	if scene.Session() == nil {
-		return errors.Errorf("cannot handle airtime transferred event without session")
-	}
-
 	status := models.AirtimeTransferStatusSuccess
 	if event.ActualAmount == decimal.Zero {
 		status = models.AirtimeTransferStatusFailed
@@ -89,7 +84,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":   scene.ContactUUID(),
-		"session_id":     scene.ID(),
+		"session_id":     scene.SessionID(),
 		"sender":         string(event.Sender),
 		"recipient":      string(event.Recipient),
 		"currency":       event.Currency,
@@ -110,7 +105,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 		))
 	}
 
-	scene.AddPreCommitEvent(insertAirtimeTransfersHook, transfer)
+	scene.AppendToEventPreCommitHook(insertAirtimeTransfersHook, transfer)
 
 	return nil
 }

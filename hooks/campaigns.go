@@ -47,7 +47,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 					logrus.WithFields(logrus.Fields{
 						"field_key":  event.Field.Key,
 						"field_name": event.Field.Name,
-						"session_id": s.ID(),
+						"session_id": s.SessionID(),
 					}).Debug("unable to find field with key, ignoring for campaign updates")
 					continue
 				}

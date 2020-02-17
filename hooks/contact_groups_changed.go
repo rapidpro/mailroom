@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactGroupsChanged, handleContactGroupsChanged)
+	models.RegisterEventHandler(events.TypeContactGroupsChanged, handleContactGroupsChanged)
 }
 
 // CommitGroupChangesHook is our hook for all group changes
@@ -88,7 +88,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	event := e.(*events.ContactGroupsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":   scene.ContactUUID(),
-		"session_id":     scene.ID(),
+		"session_id":     scene.SessionID(),
 		"groups_removed": len(event.GroupsRemoved),
 		"groups_added":   len(event.GroupsAdded),
 	}).Debug("changing contact groups")
@@ -111,9 +111,9 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		}
 
 		// add our add event
-		scene.AddPreCommitEvent(commitGroupChangesHook, hookEvent)
-		scene.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
-		scene.AddPreCommitEvent(contactModifiedHook, scene.Contact().ID())
+		scene.AppendToEventPreCommitHook(commitGroupChangesHook, hookEvent)
+		scene.AppendToEventPreCommitHook(updateCampaignEventsHook, hookEvent)
+		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.Contact().ID())
 	}
 
 	// add each of our groups
@@ -134,9 +134,9 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			GroupID:   group.ID(),
 		}
 
-		scene.AddPreCommitEvent(commitGroupChangesHook, hookEvent)
-		scene.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
-		scene.AddPreCommitEvent(contactModifiedHook, scene.Contact().ID())
+		scene.AppendToEventPreCommitHook(commitGroupChangesHook, hookEvent)
+		scene.AppendToEventPreCommitHook(updateCampaignEventsHook, hookEvent)
+		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.Contact().ID())
 	}
 
 	return nil

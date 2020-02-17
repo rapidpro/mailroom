@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeSessionTriggered, handleSessionTriggered)
+	models.RegisterEventHandler(events.TypeSessionTriggered, handleSessionTriggered)
 }
 
 // StartStartHook is our hook to fire our scene starts
@@ -70,7 +70,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 			// we skip over any scene starts that involve groups if we are in a batch start
 			if len(scene) > 1 && (len(event.Groups) > 0 || event.ContactQuery != "") {
-				logrus.WithField("session_id", s.ID).Error("ignoring scene trigger on group or query in batch")
+				logrus.WithField("session_id", s.SessionID).Error("ignoring scene trigger on group or query in batch")
 				continue
 			}
 
@@ -108,7 +108,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			starts = append(starts, start)
 
 			// this will add our task for our start after we commit
-			s.AddPostCommitEvent(startStartHook, start)
+			s.AppendToEventPostCommitHook(startStartHook, start)
 		}
 	}
 
@@ -125,19 +125,14 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 func handleSessionTriggered(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.SessionTriggeredEvent)
 
-	// must be in a session
-	if scene.Session() == nil {
-		return errors.Errorf("cannot handle session triggered event without session")
-	}
-
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"flow":         event.Flow.Name,
 		"flow_uuid":    event.Flow.UUID,
 	}).Debug("scene triggered")
 
-	scene.AddPreCommitEvent(insertStartHook, event)
+	scene.AppendToEventPreCommitHook(insertStartHook, event)
 
 	return nil
 }

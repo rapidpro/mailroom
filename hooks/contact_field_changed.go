@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactFieldChanged, handleContactFieldChanged)
+	models.RegisterEventHandler(events.TypeContactFieldChanged, handleContactFieldChanged)
 }
 
 // CommitFieldChangesHook is our hook for contact field changes
@@ -37,7 +37,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 				logrus.WithFields(logrus.Fields{
 					"field_key":  event.Field.Key,
 					"field_name": event.Field.Name,
-					"session_id": scene.ID(),
+					"session_id": scene.SessionID(),
 				}).Debug("unable to find field with key, ignoring")
 				continue
 			}
@@ -94,14 +94,14 @@ func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 	event := e.(*events.ContactFieldChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"field_key":    event.Field.Key,
 		"value":        event.Value,
 	}).Debug("contact field changed")
 
 	// add our callback
-	scene.AddPreCommitEvent(commitFieldChangesHook, event)
-	scene.AddPreCommitEvent(updateCampaignEventsHook, event)
+	scene.AppendToEventPreCommitHook(commitFieldChangesHook, event)
+	scene.AppendToEventPreCommitHook(updateCampaignEventsHook, event)
 
 	return nil
 }

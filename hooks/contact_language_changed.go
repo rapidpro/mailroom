@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactLanguageChanged, handleContactLanguageChanged)
+	models.RegisterEventHandler(events.TypeContactLanguageChanged, handleContactLanguageChanged)
 }
 
 // CommitLanguageChangesHook is our hook for language changes
@@ -39,11 +39,11 @@ func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 	event := e.(*events.ContactLanguageChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"language":     event.Language,
 	}).Debug("changing contact language")
 
-	scene.AddPreCommitEvent(commitLanguageChangesHook, event)
+	scene.AppendToEventPreCommitHook(commitLanguageChangesHook, event)
 	return nil
 }
 

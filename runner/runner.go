@@ -119,7 +119,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.Or
 		return nil, errors.Wrapf(err, "error starting transaction for post commit hooks")
 	}
 
-	err = models.ApplyPostEventHooks(txCTX, tx, rp, org, []*models.Scene{session.Scene()})
+	err = models.ApplyEventPostCommitHooks(txCTX, tx, rp, org, []*models.Scene{session.Scene()})
 	if err == nil {
 		err = tx.Commit()
 	}
@@ -641,7 +641,7 @@ func StartFlowForContacts(
 		scenes = append(scenes, s.Scene())
 	}
 
-	err = models.ApplyPostEventHooks(txCTX, tx, rp, org, scenes)
+	err = models.ApplyEventPostCommitHooks(txCTX, tx, rp, org, scenes)
 	if err == nil {
 		err = tx.Commit()
 	}
@@ -663,7 +663,7 @@ func StartFlowForContacts(
 				continue
 			}
 
-			err = models.ApplyPostEventHooks(ctx, tx, rp, org, []*models.Scene{session.Scene()})
+			err = models.ApplyEventPostCommitHooks(ctx, tx, rp, org, []*models.Scene{session.Scene()})
 			if err != nil {
 				tx.Rollback()
 				log.WithError(err).Errorf("error applying post commit hook")

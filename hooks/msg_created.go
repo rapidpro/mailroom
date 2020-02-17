@@ -20,8 +20,8 @@ import (
 )
 
 func init() {
-	models.RegisterPreWriteHook(events.TypeMsgCreated, handlePreMsgCreated)
-	models.RegisterEventHook(events.TypeMsgCreated, handleMsgCreated)
+	models.RegisterEventPreWriteHandler(events.TypeMsgCreated, handlePreMsgCreated)
+	models.RegisterEventHandler(events.TypeMsgCreated, handleMsgCreated)
 }
 
 // SendMessagesHook is our hook for sending scene messages
@@ -63,10 +63,10 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 		if len(courierMsgs) > 0 {
 			// if our scene has a timeout, set it on our last message
 			if s.Session().Timeout() != nil && s.Session().WaitStartedOn() != nil {
-				courierMsgs[len(courierMsgs)-1].SetTimeout(s.ID(), *s.Session().WaitStartedOn(), *s.Session().Timeout())
+				courierMsgs[len(courierMsgs)-1].SetTimeout(s.SessionID(), *s.Session().WaitStartedOn(), *s.Session().Timeout())
 			}
 
-			log := log.WithField("messages", courierMsgs).WithField("scene", s.ID)
+			log := log.WithField("messages", courierMsgs).WithField("scene", s.SessionID)
 
 			err := courier.QueueMessages(rc, courierMsgs)
 
@@ -184,7 +184,7 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"text":         event.Msg.Text(),
 		"urn":          event.Msg.URN(),
 	}).Debug("msg created event")
@@ -226,24 +226,19 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 	msg.SetResponseTo(scene.Session().IncomingMsgID(), scene.Session().IncomingMsgExternalID())
 
 	// register to have this message committed
-	scene.AddPreCommitEvent(commitMessagesHook, msg)
+	scene.AppendToEventPreCommitHook(commitMessagesHook, msg)
 
 	// don't send messages for surveyor flows
 	if scene.Session().SessionType() != models.SurveyorFlow {
-		scene.AddPostCommitEvent(sendMessagesHook, msg)
+		scene.AppendToEventPostCommitHook(sendMessagesHook, msg)
 	}
 
 	return nil
 }
 
-// handlePreMsgCreated clears our timeout on our scene so that courier can send it when the message is sent, that will be set by courier when sent
+// handlePreMsgCreated clears our timeout on our session so that courier can send it when the message is sent, that will be set by courier when sent
 func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
-
-	// must be in a session
-	if scene.Session() == nil {
-		return errors.Errorf("cannot handle msg created event without session")
-	}
 
 	// we only clear timeouts on messaging flows
 	if scene.Session().SessionType() != models.MessagingFlow {

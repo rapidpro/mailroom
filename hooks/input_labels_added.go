@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeInputLabelsAdded, handleInputLabelsAdded)
+	models.RegisterEventHandler(events.TypeInputLabelsAdded, handleInputLabelsAdded)
 }
 
 // CommitAddedLabelsHook is our hook for input labels being added
@@ -48,7 +48,7 @@ func handleInputLabelsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 	event := e.(*events.InputLabelsAddedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"labels":       event.Labels,
 	}).Debug("input labels added")
 
@@ -64,10 +64,10 @@ func handleInputLabelsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 		}
 
 		if scene.Session().IncomingMsgID() == models.NilMsgID {
-			return errors.Errorf("cannot add label, no incoming message for scene: %d", scene.ID())
+			return errors.Errorf("cannot add label, no incoming message for scene: %d", scene.SessionID())
 		}
 
-		scene.AddPreCommitEvent(commitAddedLabelsHook, &models.MsgLabelAdd{
+		scene.AppendToEventPreCommitHook(commitAddedLabelsHook, &models.MsgLabelAdd{
 			MsgID:   scene.Session().IncomingMsgID(),
 			LabelID: label.ID(),
 		})

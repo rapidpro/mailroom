@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeClassifierCalled, handleClassifierCalled)
+	models.RegisterEventHandler(events.TypeClassifierCalled, handleClassifierCalled)
 }
 
 // InsertHTTPLogsHook is our hook for inserting classifier logs
@@ -54,7 +54,7 @@ func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 	for _, httpLog := range event.HTTPLogs {
 		logrus.WithFields(logrus.Fields{
 			"contact_uuid":    scene.ContactUUID(),
-			"session_id":      scene.ID(),
+			"session_id":      scene.SessionID(),
 			"url":             httpLog.URL,
 			"status":          httpLog.Status,
 			"elapsed_ms":      httpLog.ElapsedMS,
@@ -73,7 +73,7 @@ func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, or
 			httpLog.CreatedOn,
 		)
 
-		scene.AddPreCommitEvent(insertHTTPLogsHook, log)
+		scene.AppendToEventPreCommitHook(insertHTTPLogsHook, log)
 	}
 
 	return nil

@@ -581,14 +581,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// apply all our events
 	if s.Status() != SessionStatusFailed {
-		err = ApplyEvents(ctx, tx, rp, org, s.scene, sprint.Events())
+		err = HandleEvents(ctx, tx, rp, org, s.scene, sprint.Events())
 		if err != nil {
 			return errors.Wrapf(err, "error applying events: %d", s.ID())
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = ApplyPreEventHooks(ctx, tx, rp, org, []*Scene{s.scene})
+	err = ApplyEventPreCommitHooks(ctx, tx, rp, org, []*Scene{s.scene})
 	if err != nil {
 		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
@@ -723,7 +723,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 			continue
 		}
 
-		err = ApplyEvents(ctx, tx, rp, org, sessions[i].Scene(), sprints[i].Events())
+		err = HandleEvents(ctx, tx, rp, org, sessions[i].Scene(), sprints[i].Events())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error applying events for session: %d", sessions[i].ID())
 		}
@@ -733,7 +733,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// gather all our pre commit events, group them by hook
-	err = ApplyPreEventHooks(ctx, tx, rp, org, scenes)
+	err = ApplyEventPreCommitHooks(ctx, tx, rp, org, scenes)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}

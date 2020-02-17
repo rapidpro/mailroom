@@ -293,14 +293,14 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// apply our events
 	for _, scene := range scenes {
-		err := models.ApplyEvents(ctx, tx, s.RP, org, scene, results[scene.ContactID()].Events)
+		err := models.HandleEvents(ctx, tx, s.RP, org, scene, results[scene.ContactID()].Events)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying events")
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = models.ApplyPreEventHooks(ctx, tx, s.RP, org, scenes)
+	err = models.ApplyEventPreCommitHooks(ctx, tx, s.RP, org, scenes)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
 	}
@@ -317,7 +317,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// then apply our post commit hooks
-	err = models.ApplyPostEventHooks(ctx, tx, s.RP, org, scenes)
+	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, org, scenes)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
 	}

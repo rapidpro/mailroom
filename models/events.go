@@ -18,6 +18,7 @@ type Scene struct {
 	postCommits map[EventCommitHook][]interface{}
 }
 
+// NewSceneForSession creates a new scene for the passed in session
 func NewSceneForSession(session *Session) *Scene {
 	s := &Scene{
 		contact: session.Contact(),
@@ -29,6 +30,7 @@ func NewSceneForSession(session *Session) *Scene {
 	return s
 }
 
+// NewSceneForContact creates a new scene for the passed in contact, session will be nil
 func NewSceneForContact(contact *flows.Contact) *Scene {
 	s := &Scene{
 		contact: contact,
@@ -39,7 +41,8 @@ func NewSceneForContact(contact *flows.Contact) *Scene {
 	return s
 }
 
-func (s *Scene) ID() SessionID {
+// SessionID returns the session id for this scene if any
+func (s *Scene) SessionID() SessionID {
 	if s.session == nil {
 		return SessionID(0)
 	}
@@ -50,80 +53,35 @@ func (s *Scene) Contact() *flows.Contact        { return s.contact }
 func (s *Scene) ContactID() ContactID           { return ContactID(s.contact.ID()) }
 func (s *Scene) ContactUUID() flows.ContactUUID { return s.contact.UUID() }
 
-func (s *Scene) Session() *Session { return s.session }
+// Session returns the session for this scene if any
+func (s *Scene) Session() *Session {
+	if s.session == nil {
+		panic("attempt to retrieve session on scene without one")
+	}
+	return s.session
+}
 
-// AddPreCommitEvent adds a new event to be handled by a pre commit hook
-func (s *Scene) AddPreCommitEvent(hook EventCommitHook, event interface{}) {
+// AppendToEventPreCommitHook adds a new event to be handled by a pre commit hook
+func (s *Scene) AppendToEventPreCommitHook(hook EventCommitHook, event interface{}) {
 	s.preCommits[hook] = append(s.preCommits[hook], event)
 }
 
-// AddPostCommitEvent adds a new event to be handled by a post commit hook
-func (s *Scene) AddPostCommitEvent(hook EventCommitHook, event interface{}) {
+// AppendToEventPostCommitHook adds a new event to be handled by a post commit hook
+func (s *Scene) AppendToEventPostCommitHook(hook EventCommitHook, event interface{}) {
 	s.postCommits[hook] = append(s.postCommits[hook], event)
-}
-
-// EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
-type EventCommitHook interface {
-	Apply(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, map[*Scene][]interface{}) error
-}
-
-// ApplyPreEventHooks runs through all the pre event hooks for the passed in sessions and applies their events
-func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scenes []*Scene) error {
-	// gather all our hook events together across our sessions
-	preHooks := make(map[EventCommitHook]map[*Scene][]interface{})
-	for _, s := range scenes {
-		for hook, args := range s.preCommits {
-			sessionMap, found := preHooks[hook]
-			if !found {
-				sessionMap = make(map[*Scene][]interface{}, len(scenes))
-				preHooks[hook] = sessionMap
-			}
-			sessionMap[s] = args
-		}
-	}
-
-	// now fire each of our hooks
-	for hook, args := range preHooks {
-		err := hook.Apply(ctx, tx, rp, org, args)
-		if err != nil {
-			return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
-		}
-	}
-
-	return nil
-}
-
-// ApplyPostEventHooks runs through all the post event hooks for the passed in sessions and applies their events
-func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scenes []*Scene) error {
-	// gather all our hook events together across our sessions
-	postHooks := make(map[EventCommitHook]map[*Scene][]interface{})
-	for _, s := range scenes {
-		for hook, args := range s.postCommits {
-			sprintMap, found := postHooks[hook]
-			if !found {
-				sprintMap = make(map[*Scene][]interface{}, len(scenes))
-				postHooks[hook] = sprintMap
-			}
-			sprintMap[s] = args
-		}
-	}
-
-	// now fire each of our hooks
-	for hook, args := range postHooks {
-		err := hook.Apply(ctx, tx, rp, org, args)
-		if err != nil {
-			return errors.Wrapf(err, "error applying post commit hook: %v", hook)
-		}
-	}
-
-	return nil
 }
 
 // EventHandler defines a call for handling events that occur in a flow
 type EventHandler func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, *Scene, flows.Event) error
 
-// RegisterEventHook registers the passed in handler as being interested in the passed in type
-func RegisterEventHook(eventType string, handler EventHandler) {
+// our registry of event type to internal handlers
+var eventHandlers = make(map[string]EventHandler)
+
+// our registry of event type to pre insert handlers
+var preHandlers = make(map[string]EventHandler)
+
+// RegisterEventHandler registers the passed in handler as being interested in the passed in type
+func RegisterEventHandler(eventType string, handler EventHandler) {
 	// it's a bug if we try to register more than one handler for a type
 	_, found := eventHandlers[eventType]
 	if found {
@@ -132,8 +90,8 @@ func RegisterEventHook(eventType string, handler EventHandler) {
 	eventHandlers[eventType] = handler
 }
 
-// RegisterPreWriteHook registers the passed in handler as being interested in the passed in type before session and run insertion
-func RegisterPreWriteHook(eventType string, handler EventHandler) {
+// RegisterEventPreWriteHandler registers the passed in handler as being interested in the passed in type before session and run insertion
+func RegisterEventPreWriteHandler(eventType string, handler EventHandler) {
 	// it's a bug if we try to register more than one handler for a type
 	_, found := preHandlers[eventType]
 	if found {
@@ -142,8 +100,8 @@ func RegisterPreWriteHook(eventType string, handler EventHandler) {
 	preHandlers[eventType] = handler
 }
 
-// ApplyEvents applies the passed in event, IE, creates the db objects required etc..
-func ApplyEvents(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scene *Scene, events []flows.Event) error {
+// HandleEvents handles the passed in event, IE, creates the db objects required etc..
+func HandleEvents(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scene *Scene, events []flows.Event) error {
 	for _, e := range events {
 
 		handler, found := eventHandlers[e.Type()]
@@ -170,8 +128,59 @@ func ApplyPreWriteEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *O
 	return handler(ctx, tx, rp, org, scene, e)
 }
 
-// our map of event type to internal handlers
-var eventHandlers = make(map[string]EventHandler)
+// EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
+type EventCommitHook interface {
+	Apply(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, map[*Scene][]interface{}) error
+}
 
-// our map of event type to pre insert handlers
-var preHandlers = make(map[string]EventHandler)
+// ApplyEventPreCommitHooks runs through all the pre event hooks for the passed in sessions and applies their events
+func ApplyEventPreCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scenes []*Scene) error {
+	// gather all our hook events together across our sessions
+	preHooks := make(map[EventCommitHook]map[*Scene][]interface{})
+	for _, s := range scenes {
+		for hook, args := range s.preCommits {
+			sessionMap, found := preHooks[hook]
+			if !found {
+				sessionMap = make(map[*Scene][]interface{}, len(scenes))
+				preHooks[hook] = sessionMap
+			}
+			sessionMap[s] = args
+		}
+	}
+
+	// now fire each of our hooks
+	for hook, args := range preHooks {
+		err := hook.Apply(ctx, tx, rp, org, args)
+		if err != nil {
+			return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
+		}
+	}
+
+	return nil
+}
+
+// ApplyEventPostCommitHooks runs through all the post event hooks for the passed in sessions and applies their events
+func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scenes []*Scene) error {
+	// gather all our hook events together across our sessions
+	postHooks := make(map[EventCommitHook]map[*Scene][]interface{})
+	for _, s := range scenes {
+		for hook, args := range s.postCommits {
+			sprintMap, found := postHooks[hook]
+			if !found {
+				sprintMap = make(map[*Scene][]interface{}, len(scenes))
+				postHooks[hook] = sprintMap
+			}
+			sprintMap[s] = args
+		}
+	}
+
+	// now fire each of our hooks
+	for hook, args := range postHooks {
+		err := hook.Apply(ctx, tx, rp, org, args)
+		if err != nil {
+			return errors.Wrapf(err, "error applying post commit hook: %v", hook)
+		}
+	}
+
+	return nil
+}

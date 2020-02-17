@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeResthookCalled, handleResthookCalled)
+	models.RegisterEventHandler(events.TypeResthookCalled, handleResthookCalled)
 }
 
 // InsertWebhookEventHook is our hook for when a resthook needs to be inserted
@@ -43,7 +43,7 @@ func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 	event := e.(*events.ResthookCalledEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.ID(),
+		"session_id":   scene.SessionID(),
 		"resthook":     event.Resthook,
 	}).Debug("resthook called")
 
@@ -61,7 +61,7 @@ func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 		string(event.Payload),
 		event.CreatedOn(),
 	)
-	scene.AddPreCommitEvent(insertWebhookEventHook, re)
+	scene.AppendToEventPreCommitHook(insertWebhookEventHook, re)
 
 	return nil
 }
