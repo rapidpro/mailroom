@@ -1,6 +1,10 @@
 package web
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/test"
+	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -80,6 +85,81 @@ func RunServerTestCases(t *testing.T, tcs []ServerTestCase) {
 			}
 		} else {
 			test.AssertEqualJSON(t, []byte(tc.Response), content, "response mismatch in %s", testID)
+		}
+	}
+}
+
+// in cases where you want to update the truth files for web tests, just run the tests with -update
+var update = flag.Bool("update", false, "update testdata files")
+
+// RunWebTests runs the tests in the passed in filename, optionally updating them if the update flag is set
+func RunWebTests(t *testing.T, truthFile string) {
+	rp := testsuite.RP()
+	db := testsuite.DB()
+	wg := &sync.WaitGroup{}
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(0))
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
+	defer dates.SetNowSource(dates.DefaultNowSource)
+
+	server := NewServer(context.Background(), config.Mailroom, db, rp, nil, nil, wg)
+	server.Start()
+	defer server.Stop()
+
+	// give our server time to start
+	time.Sleep(time.Second)
+
+	type TestCase struct {
+		Label        string          `json:"label"`
+		Method       string          `json:"method"`
+		Path         string          `json:"path"`
+		Body         json.RawMessage `json:"body"`
+		Status       int             `json:"status"`
+		Response     json.RawMessage `json:"response"`
+		DBAssertions []struct {
+			Query string `json:"query"`
+			Count int    `json:"count"`
+		} `json:"db_assertions"`
+	}
+	tcs := make([]*TestCase, 0, 20)
+	tcJSON, err := ioutil.ReadFile(truthFile)
+	assert.NoError(t, err)
+
+	err = json.Unmarshal(tcJSON, &tcs)
+	assert.NoError(t, err)
+
+	for _, tc := range tcs {
+		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.Path, bytes.NewReader([]byte(tc.Body)))
+		assert.NoError(t, err, "%s: error creating request", tc.Label)
+
+		resp, err := http.DefaultClient.Do(req)
+		assert.NoError(t, err, "%s: error making request", tc.Label)
+
+		assert.Equal(t, tc.Status, resp.StatusCode, "%s: unexpected status", tc.Label)
+
+		response, err := ioutil.ReadAll(resp.Body)
+		assert.NoError(t, err, "%s: error reading body", tc.Label)
+
+		if !*update {
+			test.AssertEqualJSON(t, json.RawMessage(tc.Response), json.RawMessage(response), "%s: unexpected response\nExpected:\n%s\nGot:\n%s", tc.Label, tc.Response, string(response))
+		}
+
+		for _, dba := range tc.DBAssertions {
+			testsuite.AssertQueryCount(t, db, dba.Query, nil, dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
+		}
+
+		tc.Response = json.RawMessage(response)
+	}
+
+	// update if we are meant to
+	if *update {
+		truth, err := json.MarshalIndent(tcs, "", "    ")
+		assert.NoError(t, err)
+
+		if err := ioutil.WriteFile(truthFile, truth, 0644); err != nil {
+			t.Fatalf("failed to update truth file: %s", err)
 		}
 	}
 }
