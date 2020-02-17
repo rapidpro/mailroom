@@ -21,10 +21,10 @@ type CommitLanguageChangesHook struct{}
 var commitLanguageChangesHook = &CommitLanguageChangesHook{}
 
 // Apply applies our contact language change before our commit
-func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and language name
-	updates := make([]interface{}, 0, len(scene))
-	for s, e := range scene {
+	updates := make([]interface{}, 0, len(scenes))
+	for s, e := range scenes {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactLanguageChangedEvent)
 		updates = append(updates, &languageUpdate{s.ContactID(), event.Language})

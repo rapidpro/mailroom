@@ -28,12 +28,12 @@ type InsertStartHook struct{}
 var insertStartHook = &InsertStartHook{}
 
 // Apply queues up our flow starts
-func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
 	// for each of our scene
-	for _, es := range scene {
+	for _, es := range scenes {
 		for _, e := range es {
 			start := e.(*models.FlowStart)
 
@@ -57,19 +57,19 @@ func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 }
 
 // Apply inserts our starts
-func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
-	starts := make([]*models.FlowStart, 0, len(scene))
+	starts := make([]*models.FlowStart, 0, len(scenes))
 
 	// for each of our scene
-	for s, es := range scene {
+	for s, es := range scenes {
 		for _, e := range es {
 			event := e.(*events.SessionTriggeredEvent)
 
 			// we skip over any scene starts that involve groups if we are in a batch start
-			if len(scene) > 1 && (len(event.Groups) > 0 || event.ContactQuery != "") {
+			if len(scenes) > 1 && (len(event.Groups) > 0 || event.ContactQuery != "") {
 				logrus.WithField("session_id", s.SessionID).Error("ignoring scene trigger on group or query in batch")
 				continue
 			}

@@ -23,14 +23,14 @@ type CommitGroupChangesHook struct{}
 var commitGroupChangesHook = &CommitGroupChangesHook{}
 
 // Apply squashes and adds or removes all our contact groups
-func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of all adds and removes
-	adds := make([]*models.GroupAdd, 0, len(scene))
-	removes := make([]*models.GroupRemove, 0, len(scene))
-	changed := make(map[models.ContactID]bool, len(scene))
+	adds := make([]*models.GroupAdd, 0, len(scenes))
+	removes := make([]*models.GroupRemove, 0, len(scenes))
+	changed := make(map[models.ContactID]bool, len(scenes))
 
 	// we remove from our groups at once, build up our list
-	for _, events := range scene {
+	for _, events := range scenes {
 		// we use these sets to track what our final add or remove should be
 		seenAdds := make(map[models.GroupID]*models.GroupAdd)
 		seenRemoves := make(map[models.GroupID]*models.GroupRemove)

@@ -24,10 +24,10 @@ type InsertHTTPLogsHook struct{}
 var insertHTTPLogsHook = &InsertHTTPLogsHook{}
 
 // Apply inserts all the classifier logs that were created
-func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our logs
-	logs := make([]*models.HTTPLog, 0, len(scene))
-	for _, ls := range scene {
+	logs := make([]*models.HTTPLog, 0, len(scenes))
+	for _, ls := range scenes {
 		for _, l := range ls {
 			logs = append(logs, l.(*models.HTTPLog))
 		}

@@ -46,10 +46,10 @@ type InsertWebhookResultHook struct{}
 var insertWebhookResultHook = &InsertWebhookResultHook{}
 
 // Apply inserts all the webook results that were created
-func (h *InsertWebhookResultHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *InsertWebhookResultHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our results
-	results := make([]*models.WebhookResult, 0, len(scene))
-	for _, rs := range scene {
+	results := make([]*models.WebhookResult, 0, len(scenes))
+	for _, rs := range scenes {
 		for _, r := range rs {
 			results = append(results, r.(*models.WebhookResult))
 		}

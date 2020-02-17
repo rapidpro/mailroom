@@ -22,9 +22,9 @@ type CommitIVRHook struct{}
 var commitIVRHook = &CommitIVRHook{}
 
 // Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
-func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
-	msgs := make([]*models.Msg, 0, len(scene))
-	for _, s := range scene {
+func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+	msgs := make([]*models.Msg, 0, len(scenes))
+	for _, s := range scenes {
 		for _, m := range s {
 			msgs = append(msgs, m.(*models.Msg))
 		}

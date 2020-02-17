@@ -22,10 +22,10 @@ type CommitURNChangesHook struct{}
 var commitURNChangesHook = &CommitURNChangesHook{}
 
 // Apply adds all our URNS in a batch
-func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our urn changes, we only care about the last change for each scene
-	changes := make([]*models.ContactURNsChanged, 0, len(scene))
-	for _, sessionChanges := range scene {
+	changes := make([]*models.ContactURNsChanged, 0, len(scenes))
+	for _, sessionChanges := range scenes {
 		changes = append(changes, sessionChanges[len(sessionChanges)-1].(*models.ContactURNsChanged))
 	}
 

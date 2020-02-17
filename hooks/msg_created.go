@@ -30,7 +30,7 @@ type SendMessagesHook struct{}
 var sendMessagesHook = &SendMessagesHook{}
 
 // Apply sends all non-android messages to courier
-func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -41,7 +41,7 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 	androidChannels := make(map[*models.Channel]bool)
 
 	// for each scene gather all our messages
-	for s, args := range scene {
+	for s, args := range scenes {
 		// walk through our messages, separate by whether they have a topup
 		courierMsgs := make([]*models.Msg, 0, len(args))
 
@@ -141,9 +141,9 @@ type CommitMessagesHook struct{}
 var commitMessagesHook = &CommitMessagesHook{}
 
 // Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
-func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
-	msgs := make([]*models.Msg, 0, len(scene))
-	for _, s := range scene {
+func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+	msgs := make([]*models.Msg, 0, len(scenes))
+	for _, s := range scenes {
 		for _, m := range s {
 			msgs = append(msgs, m.(*models.Msg))
 		}

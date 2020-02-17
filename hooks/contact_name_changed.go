@@ -22,10 +22,10 @@ type CommitNameChangesHook struct{}
 var commitNameChangesHook = &CommitNameChangesHook{}
 
 // Apply commits our contact name changes as a bulk update for the passed in map of scene
-func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and contact name
-	updates := make([]interface{}, 0, len(scene))
-	for s, e := range scene {
+	updates := make([]interface{}, 0, len(scenes))
+	for s, e := range scenes {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactNameChangedEvent)
 		updates = append(updates, &nameUpdate{s.ContactID(), fmt.Sprintf("%.128s", event.Name)})

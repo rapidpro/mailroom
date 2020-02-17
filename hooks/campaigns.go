@@ -18,14 +18,14 @@ type UpdateCampaignEventsHook struct{}
 var updateCampaignEventsHook = &UpdateCampaignEventsHook{}
 
 // Apply will update all the campaigns for the passed in scene, minimizing the number of queries to do so
-func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// these are all the events we need to delete unfired fires for
 	deletes := make([]*models.FireDelete, 0, 5)
 
 	// these are all the new events we need to insert
 	inserts := make([]*models.FireAdd, 0, 5)
 
-	for s, es := range scene {
+	for s, es := range scenes {
 		groupAdds := make(map[models.GroupID]bool)
 		groupRemoves := make(map[models.GroupID]bool)
 		fieldChanges := make(map[models.FieldID]bool)

@@ -24,11 +24,11 @@ type CommitFieldChangesHook struct{}
 var commitFieldChangesHook = &CommitFieldChangesHook{}
 
 // Apply squashes and writes all the field updates for the contacts
-func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// our list of updates
-	fieldUpdates := make([]interface{}, 0, len(scene))
+	fieldUpdates := make([]interface{}, 0, len(scenes))
 	fieldDeletes := make(map[assets.FieldUUID][]interface{})
-	for scene, es := range scene {
+	for scene, es := range scenes {
 		updates := make(map[assets.FieldUUID]*flows.Value, len(es))
 		for _, e := range es {
 			event := e.(*events.ContactFieldChangedEvent)
