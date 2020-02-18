@@ -13,16 +13,15 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeEmailSent, handleEmailSent)
+	models.RegisterEventHandler(events.TypeEmailSent, handleEmailSent)
 }
 
 // goflow now sends email so this just logs the event
-func handleEmailSent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
-
+func handleEmailSent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.EmailSentEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.SessionID(),
 		"body":         event.Body,
 		"to":           event.To,
 	}).Debug("email sent")

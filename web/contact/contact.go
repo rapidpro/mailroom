@@ -2,9 +2,12 @@ package contact
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/actions/modifiers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/search"
@@ -15,6 +18,7 @@ import (
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(handleParseQuery))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
 }
 
 // Searches the contacts for an org
@@ -176,4 +180,152 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	}
 
 	return response, http.StatusOK, nil
+}
+
+// Request that a set of contacts is modified.
+//
+//   {
+//     "org_id": 1,
+//     "contact_ids": [15,235],
+//     "modifiers": [{
+//        "type": "groups",
+//        "modification": "add",
+//        "groups": [{
+//            "uuid": "a8e8efdb-78ee-46e7-9eb0-6a578da3b02d",
+//            "name": "Doctors"
+//        }]
+//     }]
+//   }
+//
+type modifyRequest struct {
+	OrgID      models.OrgID       `json:"org_id"       validate:"required"`
+	ContactIDs []models.ContactID `json:"contact_ids"  validate:"required"`
+	Modifiers  []json.RawMessage  `json:"modifiers"    validate:"required"`
+}
+
+// Response for a contact update. Will return the full contact state and any errors
+//
+// {
+//   "1000": {
+//	   "contact": {
+//       "id": 123,
+//       "contact_uuid": "559d4cf7-8ed3-43db-9bbb-2be85345f87e",
+//       "name": "Joe",
+//       "language": "eng",
+//       ...
+//     }],
+//     "events": [{
+//          ....
+//     }]
+//   }, ...
+// }
+type modifyResult struct {
+	Contact *flows.Contact `json:"contact"`
+	Events  []flows.Event  `json:"events"`
+}
+
+// handles a request to apply the passed in actions
+func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &modifyRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	// clone it as we will modify flows
+	org, err = org.Clone(s.CTX, s.DB)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
+	}
+
+	// build up our modifiers
+	mods := make([]flows.Modifier, len(request.Modifiers))
+	for i, m := range request.Modifiers {
+		mod, err := modifiers.ReadModifier(org.SessionAssets(), m, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error in modifier: %s", string(m)), http.StatusBadRequest, nil
+		}
+		mods[i] = mod
+	}
+
+	// load our contacts
+	contacts, err := models.LoadContacts(ctx, s.DB, org, request.ContactIDs)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load contact")
+	}
+
+	results := make(map[models.ContactID]modifyResult)
+
+	// create scenes for our contacts
+	scenes := make([]*models.Scene, 0, len(contacts))
+	for _, contact := range contacts {
+		flowContact, err := contact.FlowContact(org)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
+		}
+
+		result := modifyResult{
+			Contact: flowContact,
+			Events:  make([]flows.Event, 0, len(mods)),
+		}
+
+		scene := models.NewSceneForContact(flowContact)
+
+		// apply our modifiers
+		for _, mod := range mods {
+			mod.Apply(org.Env(), org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+		}
+
+		results[contact.ID()] = result
+		scenes = append(scenes, scene)
+	}
+
+	// ok, commit all our events
+	tx, err := s.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction")
+	}
+
+	// apply our events
+	for _, scene := range scenes {
+		err := models.HandleEvents(ctx, tx, s.RP, org, scene, results[scene.ContactID()].Events)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying events")
+		}
+	}
+
+	// gather all our pre commit events, group them by hook and apply them
+	err = models.ApplyEventPreCommitHooks(ctx, tx, s.RP, org, scenes)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
+	}
+
+	// commit our transaction
+	err = tx.Commit()
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
+	}
+
+	tx, err = s.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for post commit")
+	}
+
+	// then apply our post commit hooks
+	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, org, scenes)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
+	}
+
+	return results, http.StatusOK, nil
 }

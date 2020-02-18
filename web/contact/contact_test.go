@@ -11,8 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/test"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
+	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -168,154 +169,30 @@ func TestSearch(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	testsuite.Reset()
-	ctx := testsuite.CTX()
+	web.RunWebTests(t, "testdata/parse_query.json")
+}
+
+func TestModifyContacts(t *testing.T) {
+	testsuite.Reset()
 	db := testsuite.DB()
-	rp := testsuite.RP()
-	wg := &sync.WaitGroup{}
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
-	server.Start()
-	time.Sleep(time.Second)
+	// to be deterministic, update the creation date on cathy
+	db.MustExec(`UPDATE contacts_contact SET created_on = $1 WHERE id = $2`, time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC), models.CathyID)
 
-	defer server.Stop()
+	// make our campaign group dynamic
+	db.MustExec(`UPDATE contacts_contactgroup SET query = 'age > 18' WHERE id = $1`, models.DoctorsGroupID)
 
-	tcs := []struct {
-		URL      string
-		Method   string
-		Body     string
-		Status   int
-		Response json.RawMessage
-	}{
-		{
-			"/mr/contact/parse_query", "GET",
-			"",
-			405,
-			json.RawMessage(`{"error": "illegal method: GET"}`),
-		},
-		{
-			"/mr/contact/parse_query", "POST",
-			`{"org_id": 1, "query": "birthday = tomorrow"}`,
-			400,
-			json.RawMessage(`{"error":"can't resolve 'birthday' to attribute, scheme or field"}`),
-		},
-		{
-			"/mr/contact/parse_query", "POST",
-			`{"org_id": 1, "query": "age > 10"}`,
-			200,
-			json.RawMessage(`{
-				"elastic_query": {
-					"bool": {
-						"must": [{
-							"term": {
-								"org_id": 1
-							}
-						}, {
-							"term": {
-								"is_active": true
-							}
-						}, {
-							"nested": {
-								"path": "fields",
-								"query": {
-									"bool": {
-										"must": [{
-												"term": {
-													"fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
-												}
-											},
-											{
-												"range": {
-													"fields.number": {
-														"from": 10,
-														"include_lower": false,
-														"include_upper": true,
-														"to": null
-													}
-												}
-											}
-										]
-									}
-								}
-							}
-						}]
-					}
-				},
-				"fields": [
-					"age"
-				],
-				"query": "age > 10"
-			}`),
-		},
-		{
-			"/mr/contact/parse_query", "POST",
-			`{"org_id": 1, "query": "age > 10", "group_uuid": "903f51da-2717-47c7-a0d3-f2f32877013d"}`,
-			200,
-			json.RawMessage(`{
-				"elastic_query": {
-					"bool": {
-						"must": [{
-								"term": {
-									"org_id": 1
-								}
-							},
-							{
-								"term": {
-									"is_active": true
-								}
-							},
-							{
-								"term": {
-									"groups": "903f51da-2717-47c7-a0d3-f2f32877013d"
-								}
-							},
-							{
-								"nested": {
-									"path": "fields",
-									"query": {
-										"bool": {
-											"must": [{
-													"term": {
-														"fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
-													}
-												},
-												{
-													"range": {
-														"fields.number": {
-															"from": 10,
-															"include_lower": false,
-															"include_upper": true,
-															"to": null
-														}
-													}
-												}
-											]
-										}
-									}
-								}
-							}
-						]
-					}
-				},
-				"fields": [
-					"age"
-				],
-				"query": "age > 10"
-			}`),
-		},
-	}
+	// insert an event on our campaign that is based on created on
+	db.MustExec(
+		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
+											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
+									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
+		uuids.New(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID)
 
-	for i, tc := range tcs {
-		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.URL, bytes.NewReader([]byte(tc.Body)))
-		assert.NoError(t, err, "%d: error creating request", i)
+	// for simpler tests we clear out cathy's fields and groups to start
+	db.MustExec(`UPDATE contacts_contact SET fields = NULL WHERE id = $1`, models.CathyID)
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, models.CathyID)
+	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.CathyID)
 
-		resp, err := http.DefaultClient.Do(req)
-		assert.NoError(t, err, "%d: error making request", i)
-
-		assert.Equal(t, tc.Status, resp.StatusCode, "%d: unexpected status", i)
-
-		response, err := ioutil.ReadAll(resp.Body)
-		assert.NoError(t, err, "%d: error reading body", i)
-
-		test.AssertEqualJSON(t, tc.Response, json.RawMessage(response), "%d: unexpected response", i)
-	}
+	web.RunWebTests(t, "testdata/modify_contacts.json")
 }

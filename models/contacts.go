@@ -42,11 +42,23 @@ const (
 	NilContactID = ContactID(0)
 )
 
+// LoadContact loads a contact from the passed in id
+func LoadContact(ctx context.Context, db Queryer, org *OrgAssets, id ContactID) (*Contact, error) {
+	contacts, err := LoadContacts(ctx, db, org, []ContactID{id})
+	if err != nil {
+		return nil, err
+	}
+	if len(contacts) == 0 {
+		return nil, nil
+	}
+	return contacts[0], nil
+}
+
 // LoadContacts loads a set of contacts for the passed in ids
 func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []ContactID) ([]*Contact, error) {
 	start := time.Now()
 
-	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids))
+	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids), org.OrgID())
 	if err != nil {
 		return nil, errors.Wrap(err, "error selecting contacts")
 	}
@@ -523,7 +535,8 @@ LEFT JOIN (
 ) u ON c.id = u.contact_id
 WHERE 
 	c.id = ANY($1) AND
-	is_active = TRUE
+	is_active = TRUE AND
+	c.org_id = $2
 ) r;
 `
 
