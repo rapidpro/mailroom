@@ -1,3 +1,9 @@
+v5.3.39
+----------
+ * Update to goflow v0.72.2
+ * Add modify contact endpoint
+ * Refactor hooks to allow session-less use
+
 v5.3.38
 ----------
  * Update to goflow v0.72.0
