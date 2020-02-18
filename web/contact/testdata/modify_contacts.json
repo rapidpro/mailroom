@@ -144,6 +144,12 @@
                     "id": 10000,
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ],
                     "fields": {
                         "age": {
                             "text": "24",
@@ -163,6 +169,16 @@
                             "text": "24",
                             "number": 24
                         }
+                    },
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-07-06T12:30:03.123456789Z",
+                        "groups_added": [
+                            {
+                                "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                                "name": "Doctors"
+                            }
+                        ]
                     }
                 ]
             }
@@ -170,6 +186,14 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND fields = '{\"903f51da-2717-47c7-a0d3-f2f32877013d\": {\"text\": \"24\", \"number\": 24}}'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM campaigns_eventfire WHERE contact_id = 10000",
                 "count": 1
             }
         ]
@@ -206,12 +230,22 @@
                 "events": [
                     {
                         "type": "contact_field_changed",
-                        "created_on": "2018-07-06T12:30:03.123456789Z",
+                        "created_on": "2018-07-06T12:30:04.123456789Z",
                         "field": {
                             "key": "age",
                             "name": "Age"
                         },
                         "value": null
+                    },
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-07-06T12:30:05.123456789Z",
+                        "groups_removed": [
+                            {
+                                "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                                "name": "Doctors"
+                            }
+                        ]
                     }
                 ]
             }
@@ -220,6 +254,14 @@
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND fields = '{}'",
                 "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM campaigns_eventfire WHERE contact_id = 10000",
+                "count": 0
             }
         ]
     },
@@ -238,8 +280,8 @@
                     "modification": "add",
                     "groups": [
                         {
-                            "name": "Doctors",
-                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
                         }
                     ]
                 }
@@ -255,19 +297,19 @@
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "groups": [
                         {
-                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
-                            "name": "Doctors"
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                            "name": "Testers"
                         }
                     ]
                 },
                 "events": [
                     {
                         "type": "contact_groups_changed",
-                        "created_on": "2018-07-06T12:30:04.123456789Z",
+                        "created_on": "2018-07-06T12:30:06.123456789Z",
                         "groups_added": [
                             {
-                                "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
-                                "name": "Doctors"
+                                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                "name": "Testers"
                             }
                         ]
                     }
@@ -276,7 +318,7 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
                 "count": 1
             }
         ]
@@ -296,8 +338,8 @@
                     "modification": "add",
                     "groups": [
                         {
-                            "name": "Doctors",
-                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
                         }
                     ]
                 }
@@ -313,8 +355,8 @@
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "groups": [
                         {
-                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
-                            "name": "Doctors"
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                            "name": "Testers"
                         }
                     ]
                 },
@@ -323,7 +365,7 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
                 "count": 1
             }
         ]
@@ -343,8 +385,8 @@
                     "modification": "remove",
                     "groups": [
                         {
-                            "name": "Doctors",
-                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
                         }
                     ]
                 }
@@ -362,11 +404,11 @@
                 "events": [
                     {
                         "type": "contact_groups_changed",
-                        "created_on": "2018-07-06T12:30:05.123456789Z",
+                        "created_on": "2018-07-06T12:30:07.123456789Z",
                         "groups_removed": [
                             {
-                                "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
-                                "name": "Doctors"
+                                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                "name": "Testers"
                             }
                         ]
                     }
@@ -375,7 +417,7 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
                 "count": 0
             }
         ]
@@ -395,8 +437,8 @@
                     "modification": "remove",
                     "groups": [
                         {
-                            "name": "Doctors",
-                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
                         }
                     ]
                 }
@@ -450,7 +492,7 @@
                 "events": [
                     {
                         "type": "contact_language_changed",
-                        "created_on": "2018-07-06T12:30:06.123456789Z",
+                        "created_on": "2018-07-06T12:30:08.123456789Z",
                         "language": "fra"
                     }
                 ]
@@ -496,7 +538,7 @@
                 "events": [
                     {
                         "type": "contact_urns_changed",
-                        "created_on": "2018-07-06T12:30:07.123456789Z",
+                        "created_on": "2018-07-06T12:30:09.123456789Z",
                         "urns": [
                             "tel:+255788555111"
                         ]

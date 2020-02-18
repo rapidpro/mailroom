@@ -111,6 +111,8 @@ func mustExec(command string, args ...string) {
 func AssertQueryCount(t *testing.T, db *sqlx.DB, sql string, args []interface{}, count int, errMsg ...interface{}) {
 	var c int
 	err := db.Get(&c, sql, args...)
-	assert.NoError(t, err)
+	if err != nil {
+		assert.Fail(t, "error performing query: %s - %s", sql, err)
+	}
 	assert.Equal(t, count, c, errMsg...)
 }
