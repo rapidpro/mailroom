@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,6 +18,7 @@ import (
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,7 +75,7 @@ func RunServerTestCases(t *testing.T, tcs []ServerTestCase) {
 		if tc.Files != "" {
 			responsePath := "testdata/" + tc.Files + ".response.json"
 
-			if !test.WriteOutput {
+			if !test.UpdateSnapshots {
 				expectedRespBody, err := ioutil.ReadFile(responsePath)
 				require.NoError(t, err, "unable to read %s", responsePath)
 
@@ -88,9 +88,6 @@ func RunServerTestCases(t *testing.T, tcs []ServerTestCase) {
 		}
 	}
 }
-
-// in cases where you want to update the truth files for web tests, just run the tests with -update
-var update = flag.Bool("update", false, "update testdata files")
 
 // RunWebTests runs the tests in the passed in filename, optionally updating them if the update flag is set
 func RunWebTests(t *testing.T, truthFile string) {
@@ -142,7 +139,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 		response, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%s: error reading body", tc.Label)
 
-		if !*update {
+		if !test.UpdateSnapshots {
 			test.AssertEqualJSON(t, json.RawMessage(tc.Response), json.RawMessage(response), "%s: unexpected response\nExpected:\n%s\nGot:\n%s", tc.Label, tc.Response, string(response))
 		}
 
@@ -154,12 +151,12 @@ func RunWebTests(t *testing.T, truthFile string) {
 	}
 
 	// update if we are meant to
-	if *update {
+	if test.UpdateSnapshots {
 		truth, err := json.MarshalIndent(tcs, "", "    ")
 		assert.NoError(t, err)
 
 		if err := ioutil.WriteFile(truthFile, truth, 0644); err != nil {
-			t.Fatalf("failed to update truth file: %s", err)
+			require.NoError(t, err, "failed to update truth file")
 		}
 	}
 }
