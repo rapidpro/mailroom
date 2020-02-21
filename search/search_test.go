@@ -5,50 +5,55 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
+
 	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/assert"
 )
 
-type MockField struct {
-	fieldKey  string
-	fieldType assets.FieldType
-	fieldUUID assets.FieldUUID
-}
-
-func (f *MockField) Key() string            { return f.fieldKey }
-func (f *MockField) Name() string           { return f.fieldKey }
-func (f *MockField) Type() assets.FieldType { return f.fieldType }
-func (f *MockField) UUID() assets.FieldUUID { return f.fieldUUID }
-
-func buildResolver() contactql.FieldResolverFunc {
-	registry := map[string]assets.Field{
-		"age":      &MockField{"age", assets.FieldTypeNumber, "6b6a43fa-a26d-4017-bede-328bcdd5c93b"},
-		"color":    &MockField{"color", assets.FieldTypeText, "ecc7b13b-c698-4f46-8a90-24a8fab6fe34"},
-		"dob":      &MockField{"dob", assets.FieldTypeDatetime, "cbd3fc0e-9b74-4207-a8c7-248082bb4572"},
-		"state":    &MockField{"state", assets.FieldTypeState, "67663ad1-3abc-42dd-a162-09df2dea66ec"},
-		"district": &MockField{"district", assets.FieldTypeDistrict, "54c72635-d747-4e45-883c-099d57dd998e"},
-		"ward":     &MockField{"ward", assets.FieldTypeWard, "fde8f740-c337-421b-8abb-83b954897c80"},
+func buildResolvers() (contactql.FieldResolverFunc, GroupResolverFunc) {
+	fieldRegistry := map[string]assets.Field{
+		"age":      types.NewField("6b6a43fa-a26d-4017-bede-328bcdd5c93b", "age", "Age", assets.FieldTypeNumber),
+		"color":    types.NewField("ecc7b13b-c698-4f46-8a90-24a8fab6fe34", "color", "Color", assets.FieldTypeText),
+		"dob":      types.NewField("cbd3fc0e-9b74-4207-a8c7-248082bb4572", "dob", "DOB", assets.FieldTypeDatetime),
+		"state":    types.NewField("67663ad1-3abc-42dd-a162-09df2dea66ec", "state", "State", assets.FieldTypeState),
+		"district": types.NewField("54c72635-d747-4e45-883c-099d57dd998e", "district", "District", assets.FieldTypeDistrict),
+		"ward":     types.NewField("fde8f740-c337-421b-8abb-83b954897c80", "ward", "Ward", assets.FieldTypeWard),
 	}
 
-	resolver := func(key string) assets.Field {
-		field, found := registry[key]
+	groupRegistry := map[string]assets.Group{
+		"u-reporters": types.NewGroup("8de30b78-d9ef-4db2-b2e8-4f7b6aef64cf", "U-Reporters", ""),
+		"testers":     types.NewGroup("cf51cf8d-94da-447a-b27e-a42a900c37a6", "Testers", ""),
+	}
+
+	fields := func(key string) assets.Field {
+		field, found := fieldRegistry[key]
 		if !found {
 			return nil
 		}
 		return field
 	}
 
-	return resolver
+	groups := func(name string) assets.Group {
+		group, found := groupRegistry[strings.ToLower(name)]
+		if !found {
+			return nil
+		}
+		return group
+	}
+
+	return fields, groups
 }
 
 func TestElasticSort(t *testing.T) {
-	resolver := buildResolver()
+	resolveField, _ := buildResolvers()
 
 	tcs := []struct {
 		Label   string
@@ -71,7 +76,7 @@ func TestElasticSort(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		sort, err := ToElasticFieldSort(resolver, tc.Sort)
+		sort, err := ToElasticFieldSort(resolveField, tc.Sort)
 
 		if err != nil {
 			assert.Equal(t, tc.Error.Error(), err.Error())
@@ -85,7 +90,7 @@ func TestElasticSort(t *testing.T) {
 }
 
 func TestQueryTerms(t *testing.T) {
-	resolver := buildResolver()
+	resolveField, _ := buildResolvers()
 
 	tcs := []struct {
 		Query  string
@@ -99,7 +104,7 @@ func TestQueryTerms(t *testing.T) {
 	env := envs.NewBuilder().Build()
 
 	for _, tc := range tcs {
-		parsed, err := ParseQuery(env, resolver, tc.Query)
+		parsed, err := ParseQuery(env, resolveField, tc.Query)
 		assert.NoError(t, err)
 
 		fields := FieldDependencies(parsed)
@@ -109,7 +114,7 @@ func TestQueryTerms(t *testing.T) {
 }
 
 func TestElasticQuery(t *testing.T) {
-	resolver := buildResolver()
+	resolveField, resolveGroup := buildResolvers()
 
 	type TestCase struct {
 		Label  string          `json:"label"`
@@ -134,11 +139,11 @@ func TestElasticQuery(t *testing.T) {
 		}
 		env := envs.NewBuilder().WithTimezone(ny).WithRedactionPolicy(redactionPolicy).Build()
 
-		qlQuery, err := ParseQuery(env, resolver, tc.Search)
+		qlQuery, err := ParseQuery(env, resolveField, tc.Search)
 
 		var query elastic.Query
 		if err == nil {
-			query, err = ToElasticQuery(env, resolver, qlQuery)
+			query, err = ToElasticQuery(env, resolveField, resolveGroup, qlQuery)
 		}
 
 		if tc.Error != "" {

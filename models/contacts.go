@@ -183,19 +183,29 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
-// BuildFieldResolver builds a field resolver function for the passed in Org
-func BuildFieldResolver(org *OrgAssets) contactql.FieldResolverFunc {
-	return func(key string) assets.Field {
+// BuildSearchResolvers builds field and group resolver functions for the passed in org
+func BuildSearchResolvers(org *OrgAssets) (contactql.FieldResolverFunc, search.GroupResolverFunc) {
+	fields := func(key string) assets.Field {
 		f := org.FieldByKey(key)
 		if f == nil {
 			return nil
 		}
 		return f
 	}
+
+	groups := func(name string) assets.Group {
+		g := org.SessionAssets().Groups().FindByName(name)
+		if g == nil {
+			return nil
+		}
+		return g
+	}
+
+	return fields, groups
 }
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, group assets.GroupUUID, query *contactql.ContactQuery) (elastic.Query, error) {
+func BuildElasticQuery(org *OrgAssets, resolveField contactql.FieldResolverFunc, resolveGroup search.GroupResolverFunc, group assets.GroupUUID, query *contactql.ContactQuery) (elastic.Query, error) {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
@@ -209,7 +219,7 @@ func BuildElasticQuery(org *OrgAssets, resolver contactql.FieldResolverFunc, gro
 
 	// and by our query if present
 	if query != nil {
-		q, err := search.ToElasticQuery(org.Env(), resolver, query)
+		q, err := search.ToElasticQuery(org.Env(), resolveField, resolveGroup, query)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 		}
@@ -230,21 +240,21 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
 	}
 
-	resolver := BuildFieldResolver(org)
+	resolveField, resolveGroup := BuildSearchResolvers(org)
 
 	if query != "" {
-		parsed, err = search.ParseQuery(org.Env(), resolver, query)
+		parsed, err = search.ParseQuery(org.Env(), resolveField, query)
 		if err != nil {
 			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 		}
 	}
 
-	eq, err := BuildElasticQuery(org, resolver, group, parsed)
+	eq, err := BuildElasticQuery(org, resolveField, resolveGroup, group, parsed)
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	fieldSort, err := search.ToElasticFieldSort(resolver, sort)
+	fieldSort, err := search.ToElasticFieldSort(resolveField, sort)
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
@@ -294,13 +304,13 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// turn into elastic query
-	resolver := BuildFieldResolver(org)
-	parsed, err := search.ParseQuery(org.Env(), resolver, query)
+	resolveField, resolveGroup := BuildSearchResolvers(org)
+	parsed, err := search.ParseQuery(org.Env(), resolveField, query)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq, err := BuildElasticQuery(org, resolver, "", parsed)
+	eq, err := BuildElasticQuery(org, resolveField, resolveGroup, "", parsed)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}
@@ -346,10 +356,10 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
 func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
-	// convert our groups to a list of asset groups
-	groups := make([]assets.Group, len(c.groups))
+	// convert our groups to a list of references
+	groups := make([]*assets.GroupReference, len(c.groups))
 	for i, g := range c.groups {
-		groups[i] = g
+		groups[i] = assets.NewGroupReference(g.UUID(), g.Name())
 	}
 
 	// create our flow contact
@@ -364,6 +374,7 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		c.urns,
 		groups,
 		c.fields,
+		assets.IgnoreMissing,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating flow contact")
