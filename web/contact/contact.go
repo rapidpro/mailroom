@@ -148,8 +148,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	resolveField, resolveGroup := models.BuildSearchResolvers(org)
-	parsed, err := search.ParseQuery(org.Env(), resolveField, request.Query)
+	parsed, err := search.ParseQuery(org.Env(), org, request.Query)
 
 	if err != nil {
 		switch cause := errors.Cause(err).(type) {
@@ -165,7 +164,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		normalized = parsed.String()
 	}
 
-	eq, err := models.BuildElasticQuery(org, resolveField, resolveGroup, request.GroupUUID, parsed)
+	eq, err := models.BuildElasticQuery(org, request.GroupUUID, parsed)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}

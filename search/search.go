@@ -14,12 +14,15 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// GroupResolverFunc resolves a group name to a UUID because ES indexes groups by the latter
-type GroupResolverFunc func(name string) assets.Group
+// Resolver provides functions for resolving fields and groups referenced in queries
+type Resolver interface {
+	ResolveField(key string) assets.Field
+	ResolveGroup(name string) assets.Group
+}
 
 // ParseQuery parses the passed in query returning the result
-func ParseQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (*contactql.ContactQuery, error) {
-	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), resolver)
+func ParseQuery(env envs.Environment, resolver Resolver, query string) (*contactql.ContactQuery, error) {
+	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), resolver.ResolveField)
 	if err != nil {
 		return nil, NewError(err.Error())
 	}
@@ -27,8 +30,8 @@ func ParseQuery(env envs.Environment, resolver contactql.FieldResolverFunc, quer
 }
 
 // ToElasticQuery converts a contactql query to an Elastic query returning the normalized view as well as the elastic query
-func ToElasticQuery(env envs.Environment, resolveField contactql.FieldResolverFunc, resolveGroup GroupResolverFunc, query *contactql.ContactQuery) (elastic.Query, error) {
-	eq, err := nodeToElasticQuery(env, resolveField, resolveGroup, query.Root())
+func ToElasticQuery(env envs.Environment, resolver Resolver, query *contactql.ContactQuery) (elastic.Query, error) {
+	eq, err := nodeToElasticQuery(env, resolver, query.Root())
 	if err != nil {
 		return nil, NewError(err.Error())
 	}
@@ -72,7 +75,7 @@ func FieldDependencies(query *contactql.ContactQuery) []string {
 }
 
 // ToElasticFieldSort returns the FieldSort for the passed in field
-func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) (*elastic.FieldSort, error) {
+func ToElasticFieldSort(resolver Resolver, fieldName string) (*elastic.FieldSort, error) {
 	// no field name? default to most recent first by id
 	if fieldName == "" {
 		return elastic.NewFieldSort("id").Desc(), nil
@@ -98,7 +101,7 @@ func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) 
 	}
 
 	// we are sorting by a custom field
-	field := resolver(fieldName)
+	field := resolver.ResolveField(fieldName)
 	if field == nil {
 		return nil, NewError("unable to find field with name: %s", fieldName)
 	}
@@ -119,21 +122,21 @@ func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) 
 	return sort, nil
 }
 
-func nodeToElasticQuery(env envs.Environment, resolveField contactql.FieldResolverFunc, resolveGroup GroupResolverFunc, node contactql.QueryNode) (elastic.Query, error) {
+func nodeToElasticQuery(env envs.Environment, resolver Resolver, node contactql.QueryNode) (elastic.Query, error) {
 	switch n := node.(type) {
 	case *contactql.BoolCombination:
-		return boolCombinationToElasticQuery(env, resolveField, resolveGroup, n)
+		return boolCombinationToElasticQuery(env, resolver, n)
 	case *contactql.Condition:
-		return conditionToElasticQuery(env, resolveField, resolveGroup, n)
+		return conditionToElasticQuery(env, resolver, n)
 	default:
 		return nil, errors.Errorf("unknown type converting to elastic query: %v", n)
 	}
 }
 
-func boolCombinationToElasticQuery(env envs.Environment, resolveField contactql.FieldResolverFunc, resolveGroup GroupResolverFunc, combination *contactql.BoolCombination) (elastic.Query, error) {
+func boolCombinationToElasticQuery(env envs.Environment, resolver Resolver, combination *contactql.BoolCombination) (elastic.Query, error) {
 	queries := make([]elastic.Query, len(combination.Children()))
 	for i, child := range combination.Children() {
-		childQuery, err := nodeToElasticQuery(env, resolveField, resolveGroup, child)
+		childQuery, err := nodeToElasticQuery(env, resolver, child)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error evaluating child query")
 		}
@@ -147,12 +150,12 @@ func boolCombinationToElasticQuery(env envs.Environment, resolveField contactql.
 	return elastic.NewBoolQuery().Should(queries...), nil
 }
 
-func conditionToElasticQuery(env envs.Environment, resolveField contactql.FieldResolverFunc, resolveGroup GroupResolverFunc, c *contactql.Condition) (elastic.Query, error) {
+func conditionToElasticQuery(env envs.Environment, resolver Resolver, c *contactql.Condition) (elastic.Query, error) {
 	var query elastic.Query
 	key := c.PropertyKey()
 
 	if c.PropertyType() == contactql.PropertyTypeField {
-		field := resolveField(key)
+		field := resolver.ResolveField(key)
 		if field == nil {
 			return nil, NewError("unable to find field: %s", key)
 		}
@@ -362,7 +365,7 @@ func conditionToElasticQuery(env envs.Environment, resolveField contactql.FieldR
 			}
 
 		} else if key == contactql.AttributeGroup {
-			group := resolveGroup(c.Value())
+			group := resolver.ResolveGroup(c.Value())
 			var groupUUID string
 			if group != nil {
 				groupUUID = string(group.UUID())

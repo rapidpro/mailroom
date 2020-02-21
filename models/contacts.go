@@ -183,29 +183,8 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
-// BuildSearchResolvers builds field and group resolver functions for the passed in org
-func BuildSearchResolvers(org *OrgAssets) (contactql.FieldResolverFunc, search.GroupResolverFunc) {
-	fields := func(key string) assets.Field {
-		f := org.FieldByKey(key)
-		if f == nil {
-			return nil
-		}
-		return f
-	}
-
-	groups := func(name string) assets.Group {
-		g := org.SessionAssets().Groups().FindByName(name)
-		if g == nil {
-			return nil
-		}
-		return g
-	}
-
-	return fields, groups
-}
-
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, resolveField contactql.FieldResolverFunc, resolveGroup search.GroupResolverFunc, group assets.GroupUUID, query *contactql.ContactQuery) (elastic.Query, error) {
+func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.ContactQuery) (elastic.Query, error) {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
@@ -219,7 +198,7 @@ func BuildElasticQuery(org *OrgAssets, resolveField contactql.FieldResolverFunc,
 
 	// and by our query if present
 	if query != nil {
-		q, err := search.ToElasticQuery(org.Env(), resolveField, resolveGroup, query)
+		q, err := search.ToElasticQuery(org.Env(), org, query)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 		}
@@ -240,21 +219,19 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
 	}
 
-	resolveField, resolveGroup := BuildSearchResolvers(org)
-
 	if query != "" {
-		parsed, err = search.ParseQuery(org.Env(), resolveField, query)
+		parsed, err = search.ParseQuery(org.Env(), org, query)
 		if err != nil {
 			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 		}
 	}
 
-	eq, err := BuildElasticQuery(org, resolveField, resolveGroup, group, parsed)
+	eq, err := BuildElasticQuery(org, group, parsed)
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	fieldSort, err := search.ToElasticFieldSort(resolveField, sort)
+	fieldSort, err := search.ToElasticFieldSort(org, sort)
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
@@ -304,13 +281,12 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// turn into elastic query
-	resolveField, resolveGroup := BuildSearchResolvers(org)
-	parsed, err := search.ParseQuery(org.Env(), resolveField, query)
+	parsed, err := search.ParseQuery(org.Env(), org, query)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq, err := BuildElasticQuery(org, resolveField, resolveGroup, "", parsed)
+	eq, err := BuildElasticQuery(org, "", parsed)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 	}
