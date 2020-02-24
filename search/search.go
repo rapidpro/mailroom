@@ -15,7 +15,7 @@ import (
 )
 
 // ParseQuery parses the passed in query returning the result
-func ParseQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query string) (*contactql.ContactQuery, error) {
+func ParseQuery(env envs.Environment, resolver contactql.Resolver, query string) (*contactql.ContactQuery, error) {
 	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), resolver)
 	if err != nil {
 		return nil, NewError(err.Error())
@@ -24,7 +24,7 @@ func ParseQuery(env envs.Environment, resolver contactql.FieldResolverFunc, quer
 }
 
 // ToElasticQuery converts a contactql query to an Elastic query returning the normalized view as well as the elastic query
-func ToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, query *contactql.ContactQuery) (elastic.Query, error) {
+func ToElasticQuery(env envs.Environment, resolver contactql.Resolver, query *contactql.ContactQuery) (elastic.Query, error) {
 	eq, err := nodeToElasticQuery(env, resolver, query.Root())
 	if err != nil {
 		return nil, NewError(err.Error())
@@ -69,7 +69,7 @@ func FieldDependencies(query *contactql.ContactQuery) []string {
 }
 
 // ToElasticFieldSort returns the FieldSort for the passed in field
-func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) (*elastic.FieldSort, error) {
+func ToElasticFieldSort(resolver contactql.Resolver, fieldName string) (*elastic.FieldSort, error) {
 	// no field name? default to most recent first by id
 	if fieldName == "" {
 		return elastic.NewFieldSort("id").Desc(), nil
@@ -95,7 +95,7 @@ func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) 
 	}
 
 	// we are sorting by a custom field
-	field := resolver(fieldName)
+	field := resolver.ResolveField(fieldName)
 	if field == nil {
 		return nil, NewError("unable to find field with name: %s", fieldName)
 	}
@@ -116,7 +116,7 @@ func ToElasticFieldSort(resolver contactql.FieldResolverFunc, fieldName string) 
 	return sort, nil
 }
 
-func nodeToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, node contactql.QueryNode) (elastic.Query, error) {
+func nodeToElasticQuery(env envs.Environment, resolver contactql.Resolver, node contactql.QueryNode) (elastic.Query, error) {
 	switch n := node.(type) {
 	case *contactql.BoolCombination:
 		return boolCombinationToElasticQuery(env, resolver, n)
@@ -127,7 +127,7 @@ func nodeToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFu
 	}
 }
 
-func boolCombinationToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, combination *contactql.BoolCombination) (elastic.Query, error) {
+func boolCombinationToElasticQuery(env envs.Environment, resolver contactql.Resolver, combination *contactql.BoolCombination) (elastic.Query, error) {
 	queries := make([]elastic.Query, len(combination.Children()))
 	for i, child := range combination.Children() {
 		childQuery, err := nodeToElasticQuery(env, resolver, child)
@@ -144,12 +144,12 @@ func boolCombinationToElasticQuery(env envs.Environment, resolver contactql.Fiel
 	return elastic.NewBoolQuery().Should(queries...), nil
 }
 
-func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResolverFunc, c *contactql.Condition) (elastic.Query, error) {
+func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, c *contactql.Condition) (elastic.Query, error) {
 	var query elastic.Query
 	key := c.PropertyKey()
 
 	if c.PropertyType() == contactql.PropertyTypeField {
-		field := resolver(key)
+		field := resolver.ResolveField(key)
 		if field == nil {
 			return nil, NewError("unable to find field: %s", key)
 		}
@@ -158,14 +158,14 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 		fieldType := field.Type()
 
 		// special cases for set/unset
-		if (c.Comparator() == "=" || c.Comparator() == "!=") && c.Value() == "" {
+		if (c.Comparator() == contactql.ComparatorEqual || c.Comparator() == contactql.ComparatorNotEqual) && c.Value() == "" {
 			query = elastic.NewNestedQuery("fields", elastic.NewBoolQuery().Must(
 				fieldQuery,
 				elastic.NewExistsQuery("fields."+string(field.Type())),
 			))
 
 			// if we are looking for unset, inverse our query
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewBoolQuery().MustNot(query)
 			}
 			return query, nil
@@ -173,9 +173,9 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 
 		if fieldType == assets.FieldTypeText {
 			value := strings.ToLower(c.Value())
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewTermQuery("fields.text", value)
-			} else if c.Comparator() == "!=" {
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
 				query = elastic.NewBoolQuery().Must(
 					fieldQuery,
 					elastic.NewTermQuery("fields.text", value),
@@ -194,9 +194,9 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 				return nil, NewError("can't convert '%s' to a number", c.Value())
 			}
 
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewMatchQuery("fields.number", value)
-			} else if c.Comparator() == "!=" {
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
 				return elastic.NewBoolQuery().MustNot(
 					elastic.NewNestedQuery("fields",
 						elastic.NewBoolQuery().Must(
@@ -205,13 +205,13 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 						),
 					),
 				), nil
-			} else if c.Comparator() == ">" {
+			} else if c.Comparator() == contactql.ComparatorGreaterThan {
 				query = elastic.NewRangeQuery("fields.number").Gt(value)
-			} else if c.Comparator() == ">=" {
+			} else if c.Comparator() == contactql.ComparatorGreaterThanOrEqual {
 				query = elastic.NewRangeQuery("fields.number").Gte(value)
-			} else if c.Comparator() == "<" {
+			} else if c.Comparator() == contactql.ComparatorLessThan {
 				query = elastic.NewRangeQuery("fields.number").Lt(value)
-			} else if c.Comparator() == "<=" {
+			} else if c.Comparator() == contactql.ComparatorLessThanOrEqual {
 				query = elastic.NewRangeQuery("fields.number").Lte(value)
 			} else {
 				return nil, NewError("unsupported number comparator: %s", c.Comparator())
@@ -226,9 +226,9 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			}
 			start, end := dates.DayToUTCRange(value, value.Location())
 
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewRangeQuery("fields.datetime").Gte(start).Lt(end)
-			} else if c.Comparator() == "!=" {
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
 				return elastic.NewBoolQuery().MustNot(
 					elastic.NewNestedQuery("fields",
 						elastic.NewBoolQuery().Must(
@@ -237,13 +237,13 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 						),
 					),
 				), nil
-			} else if c.Comparator() == ">" {
+			} else if c.Comparator() == contactql.ComparatorGreaterThan {
 				query = elastic.NewRangeQuery("fields.datetime").Gte(end)
-			} else if c.Comparator() == ">=" {
+			} else if c.Comparator() == contactql.ComparatorGreaterThanOrEqual {
 				query = elastic.NewRangeQuery("fields.datetime").Gte(start)
-			} else if c.Comparator() == "<" {
+			} else if c.Comparator() == contactql.ComparatorLessThan {
 				query = elastic.NewRangeQuery("fields.datetime").Lt(start)
-			} else if c.Comparator() == "<=" {
+			} else if c.Comparator() == contactql.ComparatorLessThanOrEqual {
 				query = elastic.NewRangeQuery("fields.datetime").Lt(end)
 			} else {
 				return nil, NewError("unsupported datetime comparator: %s", c.Comparator())
@@ -255,9 +255,9 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			value := strings.ToLower(c.Value())
 			var name = fmt.Sprintf("fields.%s_keyword", string(fieldType))
 
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewTermQuery(name, value)
-			} else if c.Comparator() == "!=" {
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
 				return elastic.NewBoolQuery().MustNot(
 					elastic.NewNestedQuery("fields",
 						elastic.NewBoolQuery().Must(
@@ -278,7 +278,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 		value := strings.ToLower(c.Value())
 
 		// special case for set/unset for name and language
-		if (c.Comparator() == "=" || c.Comparator() == "!=") && value == "" &&
+		if (c.Comparator() == contactql.ComparatorEqual || c.Comparator() == contactql.ComparatorNotEqual) && value == "" &&
 			(key == contactql.AttributeName || key == contactql.AttributeLanguage) {
 
 			query = elastic.NewBoolQuery().Must(
@@ -286,7 +286,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 				elastic.NewBoolQuery().MustNot(elastic.NewTermQuery(fmt.Sprintf("%s.keyword", key), "")),
 			)
 
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewBoolQuery().MustNot(query)
 			}
 
@@ -294,24 +294,24 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 		}
 
 		if key == contactql.AttributeName {
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewTermQuery("name.keyword", c.Value()), nil
-			} else if c.Comparator() == "~" {
+			} else if c.Comparator() == contactql.ComparatorContains {
 				return elastic.NewMatchQuery("name", value), nil
-			} else if c.Comparator() == "!=" {
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
 				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("name.keyword", c.Value())), nil
 			} else {
 				return nil, NewError("unsupported name query comparator: %s", c.Comparator())
 			}
 		} else if key == contactql.AttributeID {
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewIdsQuery().Ids(value), nil
 			}
 			return nil, NewError("unsupported comparator for id: %s", c.Comparator())
 		} else if key == contactql.AttributeLanguage {
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewTermQuery("language", value), nil
-			} else if c.Comparator() == "!=" {
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
 				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("language", value)), nil
 			} else {
 				return nil, NewError("unsupported language comparator: %s", c.Comparator())
@@ -323,17 +323,17 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			}
 			start, end := dates.DayToUTCRange(value, value.Location())
 
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewRangeQuery("created_on").Gte(start).Lt(end), nil
-			} else if c.Comparator() == "!=" {
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
 				return elastic.NewBoolQuery().MustNot(elastic.NewRangeQuery("created_on").Gte(start).Lt(end)), nil
-			} else if c.Comparator() == ">" {
+			} else if c.Comparator() == contactql.ComparatorGreaterThan {
 				return elastic.NewRangeQuery("created_on").Gte(end), nil
-			} else if c.Comparator() == ">=" {
+			} else if c.Comparator() == contactql.ComparatorGreaterThanOrEqual {
 				return elastic.NewRangeQuery("created_on").Gte(start), nil
-			} else if c.Comparator() == "<" {
+			} else if c.Comparator() == contactql.ComparatorLessThan {
 				return elastic.NewRangeQuery("created_on").Lt(start), nil
-			} else if c.Comparator() == "<=" {
+			} else if c.Comparator() == contactql.ComparatorLessThanOrEqual {
 				return elastic.NewRangeQuery("created_on").Lt(end), nil
 			} else {
 				return nil, NewError("unsupported created_on comparator: %s", c.Comparator())
@@ -342,20 +342,38 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 			value := strings.ToLower(c.Value())
 
 			// special case for set/unset
-			if (c.Comparator() == "=" || c.Comparator() == "!=") && value == "" {
+			if (c.Comparator() == contactql.ComparatorEqual || c.Comparator() == contactql.ComparatorNotEqual) && value == "" {
 				query = elastic.NewNestedQuery("urns", elastic.NewExistsQuery("urns.path"))
-				if c.Comparator() == "=" {
+				if c.Comparator() == contactql.ComparatorEqual {
 					query = elastic.NewBoolQuery().MustNot(query)
 				}
 				return query, nil
 			}
 
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewNestedQuery("urns", elastic.NewTermQuery("urns.path.keyword", value)), nil
-			} else if c.Comparator() == "~" {
+			} else if c.Comparator() == contactql.ComparatorContains {
 				return elastic.NewNestedQuery("urns", elastic.NewMatchPhraseQuery("urns.path", value)), nil
 			} else {
 				return nil, NewError("unsupported urn comparator: %s", c.Comparator())
+			}
+
+		} else if key == contactql.AttributeGroup {
+			if c.Value() == "" {
+				return nil, NewError("empty values not supported for group conditions")
+			}
+
+			group := resolver.ResolveGroup(c.Value())
+			if group == nil {
+				return nil, NewError("no such group with name '%s", c.Value())
+			}
+
+			if c.Comparator() == contactql.ComparatorEqual {
+				return elastic.NewTermQuery("groups", group.UUID()), nil
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
+				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("groups", group.UUID())), nil
+			} else {
+				return nil, NewError("unsupported group comparator: %s", c.Comparator())
 			}
 
 		} else {
@@ -365,23 +383,23 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.FieldResol
 		value := strings.ToLower(c.Value())
 
 		// special case for set/unset
-		if (c.Comparator() == "=" || c.Comparator() == "!=") && value == "" {
+		if (c.Comparator() == contactql.ComparatorEqual || c.Comparator() == contactql.ComparatorNotEqual) && value == "" {
 			query = elastic.NewNestedQuery("urns", elastic.NewBoolQuery().Must(
 				elastic.NewTermQuery("urns.scheme", key),
 				elastic.NewExistsQuery("urns.path"),
 			))
-			if c.Comparator() == "=" {
+			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewBoolQuery().MustNot(query)
 			}
 			return query, nil
 		}
 
-		if c.Comparator() == "=" {
+		if c.Comparator() == contactql.ComparatorEqual {
 			return elastic.NewNestedQuery("urns", elastic.NewBoolQuery().Must(
 				elastic.NewTermQuery("urns.path.keyword", value),
 				elastic.NewTermQuery("urns.scheme", key)),
 			), nil
-		} else if c.Comparator() == "~" {
+		} else if c.Comparator() == contactql.ComparatorContains {
 			return elastic.NewNestedQuery("urns", elastic.NewBoolQuery().Must(
 				elastic.NewMatchPhraseQuery("urns.path", value),
 				elastic.NewTermQuery("urns.scheme", key)),

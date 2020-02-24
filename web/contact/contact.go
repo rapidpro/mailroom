@@ -125,12 +125,14 @@ type parseRequest struct {
 // {
 //   "query": "age > 10",
 //   "fields": ["age"],
-//   "elastic_query": { .. }
+//   "elastic_query": { .. },
+//   "allow_as_group": true
 // }
 type parseResponse struct {
 	Query        string      `json:"query"`
 	Fields       []string    `json:"fields"`
 	ElasticQuery interface{} `json:"elastic_query"`
+	AllowAsGroup bool        `json:"allow_as_group"`
 }
 
 // handles a query parsing request
@@ -146,8 +148,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	resolver := models.BuildFieldResolver(org)
-	parsed, err := search.ParseQuery(org.Env(), resolver, request.Query)
+	parsed, err := search.ParseQuery(org.Env(), org.SessionAssets(), request.Query)
 
 	if err != nil {
 		switch cause := errors.Cause(err).(type) {
@@ -163,7 +164,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		normalized = parsed.String()
 	}
 
-	eq, err := models.BuildElasticQuery(org, resolver, request.GroupUUID, parsed)
+	eq, err := models.BuildElasticQuery(org, request.GroupUUID, parsed)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -172,11 +173,15 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return nil, http.StatusInternalServerError, err
 	}
 
+	fields := search.FieldDependencies(parsed)
+	allowAsGroup := !(utils.StringSliceContains(fields, "id", false) || utils.StringSliceContains(fields, "group", false))
+
 	// build our response
 	response := &parseResponse{
 		Query:        normalized,
-		Fields:       search.FieldDependencies(parsed),
+		Fields:       fields,
 		ElasticQuery: eqj,
+		AllowAsGroup: allowAsGroup,
 	}
 
 	return response, http.StatusOK, nil

@@ -217,23 +217,22 @@
         "label": "valid number !=",
         "search": "age!=10",
         "query": {
-            "bool":{
-                "must_not":{
-                    "nested":{
-                        "path":"fields",
-                        "query":{
-                            "bool":{
-                                "must":[
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
                                     {
-                                        "term":{
-                                            "fields.field":"6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                        "term": {
+                                            "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
                                         }
-                                    }
-                                    ,
+                                    },
                                     {
-                                        "match":{
-                                            "fields.number":{
-                                                "query":"10"
+                                        "match": {
+                                            "fields.number": {
+                                                "query": "10"
                                             }
                                         }
                                     }
@@ -468,25 +467,25 @@
         "label": "valid date !=",
         "search": "dob!=2018-06-23",
         "query": {
-            "bool":{
-                "must_not":{
-                    "nested":{
-                        "path":"fields",
-                        "query":{
-                            "bool":{
-                                "must":[
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
                                     {
-                                        "term":{
-                                            "fields.field":"cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                        "term": {
+                                            "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
                                         }
                                     },
                                     {
-                                        "range":{
-                                            "fields.datetime":{
-                                                "from":"2018-06-23T00:00:00-04:00",
-                                                "include_lower":true,
-                                                "include_upper":false,
-                                                "to":"2018-06-24T00:00:00-04:00"
+                                        "range": {
+                                            "fields.datetime": {
+                                                "from": "2018-06-23T00:00:00-04:00",
+                                                "include_lower": true,
+                                                "include_upper": false,
+                                                "to": "2018-06-24T00:00:00-04:00"
                                             }
                                         }
                                     }
@@ -1179,25 +1178,35 @@
     },
     {
         "label": "valid language =",
-        "search": "language=dog",
+        "search": "language=spa",
         "query": {
             "term": {
-                "language": "dog"
+                "language": "spa"
             }
         }
     },
     {
         "label": "valid language !=",
-        "search": "language!=dog",
+        "search": "language!=fra",
         "query": {
             "bool": {
                 "must_not": {
                     "term": {
-                        "language": "dog"
+                        "language": "fra"
                     }
                 }
             }
         }
+    },
+    {
+        "label": "invalid language =",
+        "search": "language=dog",
+        "error": "'dog' is not a valid language code"
+    },
+    {
+        "label": "invalid language !=",
+        "search": "language!=dog",
+        "error": "'dog' is not a valid language code"
     },
     {
         "label": "invalid language >",
@@ -1278,14 +1287,14 @@
         "label": "valid created_on !=",
         "search": "created_on!=2018-06-23",
         "query": {
-            "bool":{
-                "must_not":{
-                    "range":{
-                        "created_on":{
-                            "from":"2018-06-23T00:00:00-04:00",
-                            "include_lower":true,
-                            "include_upper":false,
-                            "to":"2018-06-24T00:00:00-04:00"
+            "bool": {
+                "must_not": {
+                    "range": {
+                        "created_on": {
+                            "from": "2018-06-23T00:00:00-04:00",
+                            "include_lower": true,
+                            "include_upper": false,
+                            "to": "2018-06-24T00:00:00-04:00"
                         }
                     }
                 }
@@ -1542,13 +1551,13 @@
         "label": "urn is unset",
         "search": "urn=\"\"",
         "query": {
-            "bool":{
-                "must_not":{
-                    "nested":{
-                        "path":"urns",
-                        "query":{
-                            "exists":{
-                                "field":"urns.path"
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "urns",
+                        "query": {
+                            "exists": {
+                                "field": "urns.path"
                             }
                         }
                     }
@@ -1560,11 +1569,11 @@
         "label": "urn is set",
         "search": "urn !=\"\"",
         "query": {
-            "nested":{
-                "path":"urns",
-                "query":{
-                    "exists":{
-                        "field":"urns.path"
+            "nested": {
+                "path": "urns",
+                "query": {
+                    "exists": {
+                        "field": "urns.path"
                     }
                 }
             }
@@ -1574,11 +1583,11 @@
         "label": "urn is number",
         "search": "urn=\"+12067799192\"",
         "query": {
-            "nested":{
-                "path":"urns",
-                "query":{
-                    "term":{
-                        "urns.path.keyword":"+12067799192"
+            "nested": {
+                "path": "urns",
+                "query": {
+                    "term": {
+                        "urns.path.keyword": "+12067799192"
                     }
                 }
             }
@@ -1599,5 +1608,37 @@
                 }
             }
         }
+    },
+    {
+        "label": "group = valid group name",
+        "search": "group = \"U-Reporters\"",
+        "query": {
+            "term": {
+                "groups": "8de30b78-d9ef-4db2-b2e8-4f7b6aef64cf"
+            }
+        }
+    },
+    {
+        "label": "group = invalid group name",
+        "search": "group = \"Spammers\"",
+        "error": "'Spammers' is not a valid group name"
+    },
+    {
+        "label": "group not equals a valid name",
+        "search": "group != \"U-Reporters\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "term": {
+                        "groups": "8de30b78-d9ef-4db2-b2e8-4f7b6aef64cf"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "group != invalid group name",
+        "search": "group != \"Spammers\"",
+        "error": "'Spammers' is not a valid group name"
     }
 ]
