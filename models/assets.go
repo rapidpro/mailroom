@@ -13,7 +13,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/search"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 )
@@ -554,23 +553,3 @@ func (a *OrgAssets) Templates() ([]assets.Template, error) {
 func (a *OrgAssets) Globals() ([]assets.Global, error) {
 	return a.globals, nil
 }
-
-// ResolveField resolves a field from a key in a search query
-func (a *OrgAssets) ResolveField(key string) assets.Field {
-	f := a.FieldByKey(key)
-	if f == nil {
-		return nil
-	}
-	return f
-}
-
-// ResolveGroup resolves a group from a name in a search query
-func (a *OrgAssets) ResolveGroup(name string) assets.Group {
-	g := a.SessionAssets().Groups().FindByName(name)
-	if g == nil {
-		return nil
-	}
-	return g
-}
-
-var _ search.Resolver = (*OrgAssets)(nil)

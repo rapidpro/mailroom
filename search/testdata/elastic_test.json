@@ -1178,25 +1178,35 @@
     },
     {
         "label": "valid language =",
-        "search": "language=dog",
+        "search": "language=spa",
         "query": {
             "term": {
-                "language": "dog"
+                "language": "spa"
             }
         }
     },
     {
         "label": "valid language !=",
-        "search": "language!=dog",
+        "search": "language!=fra",
         "query": {
             "bool": {
                 "must_not": {
                     "term": {
-                        "language": "dog"
+                        "language": "fra"
                     }
                 }
             }
         }
+    },
+    {
+        "label": "invalid language =",
+        "search": "language=dog",
+        "error": "'dog' is not a valid language code"
+    },
+    {
+        "label": "invalid language !=",
+        "search": "language!=dog",
+        "error": "'dog' is not a valid language code"
     },
     {
         "label": "invalid language >",
@@ -1600,7 +1610,7 @@
         }
     },
     {
-        "label": "group equals a valid name",
+        "label": "group = valid group name",
         "search": "group = \"U-Reporters\"",
         "query": {
             "term": {
@@ -1609,13 +1619,9 @@
         }
     },
     {
-        "label": "group equals a non-valid name",
+        "label": "group = invalid group name",
         "search": "group = \"Spammers\"",
-        "query": {
-            "term": {
-                "groups": "db45fbea-b311-48fa-88d8-12387ce64f9b"
-            }
-        }
+        "error": "'Spammers' is not a valid group name"
     },
     {
         "label": "group not equals a valid name",
@@ -1631,16 +1637,8 @@
         }
     },
     {
-        "label": "group not equals a non-valid name",
+        "label": "group != invalid group name",
         "search": "group != \"Spammers\"",
-        "query": {
-            "bool": {
-                "must_not": {
-                    "term": {
-                        "groups": "db45fbea-b311-48fa-88d8-12387ce64f9b"
-                    }
-                }
-            }
-        }
+        "error": "'Spammers' is not a valid group name"
     }
 ]

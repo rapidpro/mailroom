@@ -14,15 +14,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// Resolver provides functions for resolving fields and groups referenced in queries
-type Resolver interface {
-	ResolveField(key string) assets.Field
-	ResolveGroup(name string) assets.Group
-}
-
 // ParseQuery parses the passed in query returning the result
-func ParseQuery(env envs.Environment, resolver Resolver, query string) (*contactql.ContactQuery, error) {
-	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), resolver.ResolveField)
+func ParseQuery(env envs.Environment, resolver contactql.Resolver, query string) (*contactql.ContactQuery, error) {
+	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), resolver)
 	if err != nil {
 		return nil, NewError(err.Error())
 	}
@@ -30,7 +24,7 @@ func ParseQuery(env envs.Environment, resolver Resolver, query string) (*contact
 }
 
 // ToElasticQuery converts a contactql query to an Elastic query returning the normalized view as well as the elastic query
-func ToElasticQuery(env envs.Environment, resolver Resolver, query *contactql.ContactQuery) (elastic.Query, error) {
+func ToElasticQuery(env envs.Environment, resolver contactql.Resolver, query *contactql.ContactQuery) (elastic.Query, error) {
 	eq, err := nodeToElasticQuery(env, resolver, query.Root())
 	if err != nil {
 		return nil, NewError(err.Error())
@@ -75,7 +69,7 @@ func FieldDependencies(query *contactql.ContactQuery) []string {
 }
 
 // ToElasticFieldSort returns the FieldSort for the passed in field
-func ToElasticFieldSort(resolver Resolver, fieldName string) (*elastic.FieldSort, error) {
+func ToElasticFieldSort(resolver contactql.Resolver, fieldName string) (*elastic.FieldSort, error) {
 	// no field name? default to most recent first by id
 	if fieldName == "" {
 		return elastic.NewFieldSort("id").Desc(), nil
@@ -122,7 +116,7 @@ func ToElasticFieldSort(resolver Resolver, fieldName string) (*elastic.FieldSort
 	return sort, nil
 }
 
-func nodeToElasticQuery(env envs.Environment, resolver Resolver, node contactql.QueryNode) (elastic.Query, error) {
+func nodeToElasticQuery(env envs.Environment, resolver contactql.Resolver, node contactql.QueryNode) (elastic.Query, error) {
 	switch n := node.(type) {
 	case *contactql.BoolCombination:
 		return boolCombinationToElasticQuery(env, resolver, n)
@@ -133,7 +127,7 @@ func nodeToElasticQuery(env envs.Environment, resolver Resolver, node contactql.
 	}
 }
 
-func boolCombinationToElasticQuery(env envs.Environment, resolver Resolver, combination *contactql.BoolCombination) (elastic.Query, error) {
+func boolCombinationToElasticQuery(env envs.Environment, resolver contactql.Resolver, combination *contactql.BoolCombination) (elastic.Query, error) {
 	queries := make([]elastic.Query, len(combination.Children()))
 	for i, child := range combination.Children() {
 		childQuery, err := nodeToElasticQuery(env, resolver, child)
@@ -150,7 +144,7 @@ func boolCombinationToElasticQuery(env envs.Environment, resolver Resolver, comb
 	return elastic.NewBoolQuery().Should(queries...), nil
 }
 
-func conditionToElasticQuery(env envs.Environment, resolver Resolver, c *contactql.Condition) (elastic.Query, error) {
+func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, c *contactql.Condition) (elastic.Query, error) {
 	var query elastic.Query
 	key := c.PropertyKey()
 
@@ -365,20 +359,19 @@ func conditionToElasticQuery(env envs.Environment, resolver Resolver, c *contact
 			}
 
 		} else if key == contactql.AttributeGroup {
-			group := resolver.ResolveGroup(c.Value())
-			var groupUUID string
-			if group != nil {
-				groupUUID = string(group.UUID())
-			} else {
-				groupUUID = "db45fbea-b311-48fa-88d8-12387ce64f9b"
+			if c.Value() == "" {
+				return nil, NewError("empty values not supported for group conditions")
 			}
 
-			// TODO set / unset
+			group := resolver.ResolveGroup(c.Value())
+			if group == nil {
+				return nil, NewError("no such group with name '%s", c.Value())
+			}
 
 			if c.Comparator() == contactql.ComparatorEqual {
-				return elastic.NewTermQuery("groups", groupUUID), nil
+				return elastic.NewTermQuery("groups", group.UUID()), nil
 			} else if c.Comparator() == contactql.ComparatorNotEqual {
-				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("groups", groupUUID)), nil
+				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("groups", group.UUID())), nil
 			} else {
 				return nil, NewError("unsupported group comparator: %s", c.Comparator())
 			}

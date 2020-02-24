@@ -198,7 +198,7 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.
 
 	// and by our query if present
 	if query != nil {
-		q, err := search.ToElasticQuery(org.Env(), org, query)
+		q, err := search.ToElasticQuery(org.Env(), org.SessionAssets(), query)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 		}
@@ -220,7 +220,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 	}
 
 	if query != "" {
-		parsed, err = search.ParseQuery(org.Env(), org, query)
+		parsed, err = search.ParseQuery(org.Env(), org.SessionAssets(), query)
 		if err != nil {
 			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 		}
@@ -231,7 +231,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	fieldSort, err := search.ToElasticFieldSort(org, sort)
+	fieldSort, err := search.ToElasticFieldSort(org.SessionAssets(), sort)
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
@@ -281,7 +281,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// turn into elastic query
-	parsed, err := search.ParseQuery(org.Env(), org, query)
+	parsed, err := search.ParseQuery(org.Env(), org.SessionAssets(), query)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
@@ -776,9 +776,7 @@ func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urn
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
 // campaigns as necessary based on those group changes.
 func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, contact *flows.Contact) error {
-	orgGroups, _ := org.Groups()
-	orgFields, _ := org.Fields()
-	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups), flows.NewFieldAssets(orgFields))
+	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env())
 	if len(errs) > 0 {
 		return errors.Wrapf(errs[0], "error calculating dynamic groups")
 	}

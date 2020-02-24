@@ -148,7 +148,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	parsed, err := search.ParseQuery(org.Env(), org, request.Query)
+	parsed, err := search.ParseQuery(org.Env(), org.SessionAssets(), request.Query)
 
 	if err != nil {
 		switch cause := errors.Cause(err).(type) {
