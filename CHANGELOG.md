@@ -1,3 +1,8 @@
+v5.3.41
+----------
+ * Update to goflow v0.76.0
+ * Add support for searching by group
+
 v5.3.40
 ----------
  * Update to goflow v0.74.0
