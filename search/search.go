@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
@@ -114,6 +115,11 @@ func ToElasticFieldSort(resolver contactql.Resolver, fieldName string) (*elastic
 	sort = sort.Nested(elastic.NewNestedSort("fields").Filter(elastic.NewTermQuery("fields.field", field.UUID())))
 	sort = sort.Order(ascending)
 	return sort, nil
+}
+
+// AllowAsGroup returns whether a query can be used as a dynamic group
+func AllowAsGroup(fields []string) bool {
+	return !(utils.StringSliceContains(fields, "id", false) || utils.StringSliceContains(fields, "group", false))
 }
 
 func nodeToElasticQuery(env envs.Environment, resolver contactql.Resolver, node contactql.QueryNode) (elastic.Query, error) {

@@ -102,7 +102,7 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		Query:        normalized,
 		ContactIDs:   hits,
 		Fields:       fields,
-		AllowAsGroup: allowQueryAsGroup(fields),
+		AllowAsGroup: search.AllowAsGroup(fields),
 		Total:        total,
 		Offset:       request.Offset,
 		Sort:         request.Sort,
@@ -185,7 +185,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		Query:        normalized,
 		Fields:       fields,
 		ElasticQuery: eqj,
-		AllowAsGroup: allowQueryAsGroup(fields),
+		AllowAsGroup: search.AllowAsGroup(fields),
 	}
 
 	return response, http.StatusOK, nil
@@ -337,8 +337,4 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	return results, http.StatusOK, nil
-}
-
-func allowQueryAsGroup(fields []string) bool {
-	return !(utils.StringSliceContains(fields, "id", false) || utils.StringSliceContains(fields, "group", false))
 }
