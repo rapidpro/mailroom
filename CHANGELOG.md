@@ -1,3 +1,7 @@
+v5.3.42
+----------
+ * Contact search endpoint should also return whether query can be used as group
+
 v5.3.41
 ----------
  * Update to goflow v0.76.0
