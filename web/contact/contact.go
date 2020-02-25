@@ -45,16 +45,18 @@ type searchRequest struct {
 //   "query": "age > 10",
 //   "contact_ids": [5,10,15],
 //   "fields": ["age"],
+//   "allow_as_group": true,
 //   "total": 3,
 //   "offset": 0
 // }
 type searchResponse struct {
-	Query      string             `json:"query"`
-	ContactIDs []models.ContactID `json:"contact_ids"`
-	Fields     []string           `json:"fields"`
-	Total      int64              `json:"total"`
-	Offset     int                `json:"offset"`
-	Sort       string             `json:"sort"`
+	Query        string             `json:"query"`
+	ContactIDs   []models.ContactID `json:"contact_ids"`
+	Fields       []string           `json:"fields"`
+	AllowAsGroup bool               `json:"allow_as_group"`
+	Total        int64              `json:"total"`
+	Offset       int                `json:"offset"`
+	Sort         string             `json:"sort"`
 }
 
 // handles a contact search request
@@ -93,14 +95,17 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		normalized = parsed.String()
 	}
 
+	fields := search.FieldDependencies(parsed)
+
 	// build our response
 	response := &searchResponse{
-		Query:      normalized,
-		ContactIDs: hits,
-		Fields:     search.FieldDependencies(parsed),
-		Total:      total,
-		Offset:     request.Offset,
-		Sort:       request.Sort,
+		Query:        normalized,
+		ContactIDs:   hits,
+		Fields:       fields,
+		AllowAsGroup: allowQueryAsGroup(fields),
+		Total:        total,
+		Offset:       request.Offset,
+		Sort:         request.Sort,
 	}
 
 	return response, http.StatusOK, nil
@@ -174,14 +179,13 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	}
 
 	fields := search.FieldDependencies(parsed)
-	allowAsGroup := !(utils.StringSliceContains(fields, "id", false) || utils.StringSliceContains(fields, "group", false))
 
 	// build our response
 	response := &parseResponse{
 		Query:        normalized,
 		Fields:       fields,
 		ElasticQuery: eqj,
-		AllowAsGroup: allowAsGroup,
+		AllowAsGroup: allowQueryAsGroup(fields),
 	}
 
 	return response, http.StatusOK, nil
@@ -333,4 +337,8 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	return results, http.StatusOK, nil
+}
+
+func allowQueryAsGroup(fields []string) bool {
+	return !(utils.StringSliceContains(fields, "id", false) || utils.StringSliceContains(fields, "group", false))
 }
