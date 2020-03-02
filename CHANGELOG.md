@@ -1,3 +1,7 @@
+v5.4.0
+----------
+ * Touch readme for 5.4 release
+
 v5.3.44
 ----------
  * Update to goflow v0.76.2
