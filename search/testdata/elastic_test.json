@@ -214,6 +214,37 @@
         }
     },
     {
+        "label": "valid number !=",
+        "search": "age!=10",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "fields.field": "6b6a43fa-a26d-4017-bede-328bcdd5c93b"
+                                        }
+                                    },
+                                    {
+                                        "match": {
+                                            "fields.number": {
+                                                "query": "10"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
         "label": "valid number <=",
         "search": "age<=10",
         "query": {
@@ -289,7 +320,7 @@
                             },
                             {
                                 "range": {
-                                    "fields_number": {
+                                    "fields.number": {
                                         "from": null,
                                         "include_lower": true,
                                         "include_upper": false,
@@ -334,11 +365,6 @@
         }
     },
     {
-        "label": "invalid number !=",
-        "search": "age!=10",
-        "error": "unsupported number comparator: !="
-    },
-    {
         "label": "invalid number operand",
         "search": "age=fred",
         "error": "can't convert 'fred' to a number"
@@ -347,11 +373,6 @@
         "label": "invalid datetime operand",
         "search": "dob=10",
         "error": "string '10' couldn't be parsed as a date"
-    },
-    {
-        "label": "invalid datetime operator",
-        "search": "dob!=2018-06-23",
-        "error": "unsupported datetime comparator: !="
     },
     {
         "label": "invalid number >",
@@ -437,6 +458,40 @@
                                 }
                             }
                         ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid date !=",
+        "search": "dob!=2018-06-23",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "fields",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "fields.field": "cbd3fc0e-9b74-4207-a8c7-248082bb4572"
+                                        }
+                                    },
+                                    {
+                                        "range": {
+                                            "fields.datetime": {
+                                                "from": "2018-06-23T00:00:00-04:00",
+                                                "include_lower": true,
+                                                "include_upper": false,
+                                                "to": "2018-06-24T00:00:00-04:00"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
                     }
                 }
             }
@@ -1123,25 +1178,35 @@
     },
     {
         "label": "valid language =",
-        "search": "language=dog",
+        "search": "language=spa",
         "query": {
             "term": {
-                "language": "dog"
+                "language": "spa"
             }
         }
     },
     {
         "label": "valid language !=",
-        "search": "language!=dog",
+        "search": "language!=fra",
         "query": {
             "bool": {
                 "must_not": {
                     "term": {
-                        "language": "dog"
+                        "language": "fra"
                     }
                 }
             }
         }
+    },
+    {
+        "label": "invalid language =",
+        "search": "language=dog",
+        "error": "'dog' is not a valid language code"
+    },
+    {
+        "label": "invalid language !=",
+        "search": "language!=dog",
+        "error": "'dog' is not a valid language code"
     },
     {
         "label": "invalid language >",
@@ -1219,9 +1284,22 @@
         }
     },
     {
-        "label": "invalid created_on !=",
+        "label": "valid created_on !=",
         "search": "created_on!=2018-06-23",
-        "error": "unsupported created_on comparator: !="
+        "query": {
+            "bool": {
+                "must_not": {
+                    "range": {
+                        "created_on": {
+                            "from": "2018-06-23T00:00:00-04:00",
+                            "include_lower": true,
+                            "include_upper": false,
+                            "to": "2018-06-24T00:00:00-04:00"
+                        }
+                    }
+                }
+            }
+        }
     },
     {
         "label": "invalid created_on operand",
@@ -1468,5 +1546,99 @@
                 ]
             }
         }
+    },
+    {
+        "label": "urn is unset",
+        "search": "urn=\"\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "urns",
+                        "query": {
+                            "exists": {
+                                "field": "urns.path"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "urn is set",
+        "search": "urn !=\"\"",
+        "query": {
+            "nested": {
+                "path": "urns",
+                "query": {
+                    "exists": {
+                        "field": "urns.path"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "urn is number",
+        "search": "urn=\"+12067799192\"",
+        "query": {
+            "nested": {
+                "path": "urns",
+                "query": {
+                    "term": {
+                        "urns.path.keyword": "+12067799192"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "urn contains 12345",
+        "search": "urn~12345",
+        "query": {
+            "nested": {
+                "path": "urns",
+                "query": {
+                    "match_phrase": {
+                        "urns.path": {
+                            "query": "12345"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "group = valid group name",
+        "search": "group = \"U-Reporters\"",
+        "query": {
+            "term": {
+                "groups": "8de30b78-d9ef-4db2-b2e8-4f7b6aef64cf"
+            }
+        }
+    },
+    {
+        "label": "group = invalid group name",
+        "search": "group = \"Spammers\"",
+        "error": "'Spammers' is not a valid group name"
+    },
+    {
+        "label": "group not equals a valid name",
+        "search": "group != \"U-Reporters\"",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "term": {
+                        "groups": "8de30b78-d9ef-4db2-b2e8-4f7b6aef64cf"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "group != invalid group name",
+        "search": "group != \"Spammers\"",
+        "error": "'Spammers' is not a valid group name"
     }
 ]

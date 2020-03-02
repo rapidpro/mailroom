@@ -40,10 +40,10 @@ func TestTwilioIVR(t *testing.T) {
 		logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("form", r.Form).Info("test server called")
 		if strings.HasSuffix(r.URL.String(), "Calls.json") {
 			to := r.Form.Get("To")
-			if to == "+250700000001" {
+			if to == "+16055741111" {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{"sid": "Call1"}`))
-			} else if to == "+250700000003" {
+			} else if to == "+16055743333" {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{"sid": "Call2"}`))
 			} else {
@@ -68,7 +68,7 @@ func TestTwilioIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy and george
-	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+250700000001?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
+	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+16055741111?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
 
 	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
 		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
@@ -350,10 +350,10 @@ func TestNexmoIVR(t *testing.T) {
 			logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).Info("test server called")
 			form := &CallForm{}
 			json.Unmarshal(body, form)
-			if form.To[0].Number == 250700000001 {
+			if form.To[0].Number == 16055741111 {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{ "uuid": "Call1","status": "started","direction": "outbound","conversation_uuid": "Conversation1"}`))
-			} else if form.To[0].Number == 250700000003 {
+			} else if form.To[0].Number == 16055743333 {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{ "uuid": "Call2","status": "started","direction": "outbound","conversation_uuid": "Conversation2"}`))
 			} else {

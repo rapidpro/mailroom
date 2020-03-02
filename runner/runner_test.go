@@ -187,9 +187,6 @@ func TestContactRuns(t *testing.T) {
 	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	sa, err := models.GetSessionAssets(org)
-	assert.NoError(t, err)
-
 	flow, err := org.FlowByID(models.FavoritesFlowID)
 	assert.NoError(t, err)
 
@@ -197,11 +194,11 @@ func TestContactRuns(t *testing.T) {
 	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{models.CathyID})
 	assert.NoError(t, err)
 
-	contact, err := contacts[0].FlowContact(org, sa)
+	contact, err := contacts[0].FlowContact(org)
 	assert.NoError(t, err)
 
 	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, nil, true)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
@@ -242,7 +239,7 @@ func TestContactRuns(t *testing.T) {
 		msg.SetID(10)
 		resume := resumes.NewMsg(org.Env(), contact, msg)
 
-		session, err = ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
+		session, err = ResumeFlow(ctx, db, rp, org, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 

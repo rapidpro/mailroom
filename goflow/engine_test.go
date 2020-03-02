@@ -19,7 +19,7 @@ func TestEngineWebhook(t *testing.T) {
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://temba.io": []httpx.MockResponse{httpx.NewMockResponse(200, "OK", nil)},
+		"http://temba.io": []httpx.MockResponse{httpx.NewMockResponse(200, nil, "OK", 1)},
 	}))
 
 	request, err := http.NewRequest("GET", "http://temba.io", nil)
@@ -28,8 +28,8 @@ func TestEngineWebhook(t *testing.T) {
 	call, err := svc.Call(nil, request)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
-	assert.Equal(t, "GET / HTTP/1.1\r\nHost: temba.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: normal\r\nAccept-Encoding: gzip\r\n\r\n", string(call.Request))
-	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nOK", string(call.Response))
+	assert.Equal(t, "GET / HTTP/1.1\r\nHost: temba.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: normal\r\nAccept-Encoding: gzip\r\n\r\n", string(call.RequestTrace))
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nOK", string(call.ResponseTrace))
 }
 
 func TestSimulatorAirtime(t *testing.T) {
@@ -56,7 +56,7 @@ func TestSimulatorWebhook(t *testing.T) {
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://temba.io": []httpx.MockResponse{httpx.NewMockResponse(200, "OK", nil)},
+		"http://temba.io": []httpx.MockResponse{httpx.NewMockResponse(200, nil, "OK", 1)},
 	}))
 
 	request, err := http.NewRequest("GET", "http://temba.io", nil)
@@ -65,6 +65,6 @@ func TestSimulatorWebhook(t *testing.T) {
 	call, err := svc.Call(nil, request)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
-	assert.Equal(t, "GET / HTTP/1.1\r\nHost: temba.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: simulation\r\nAccept-Encoding: gzip\r\n\r\n", string(call.Request))
-	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nOK", string(call.Response))
+	assert.Equal(t, "GET / HTTP/1.1\r\nHost: temba.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: simulation\r\nAccept-Encoding: gzip\r\n\r\n", string(call.RequestTrace))
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nOK", string(call.ResponseTrace))
 }

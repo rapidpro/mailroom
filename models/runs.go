@@ -94,20 +94,20 @@ var keptEvents = map[string]bool{
 // Session is the mailroom type for a FlowSession
 type Session struct {
 	s struct {
-		ID            SessionID     `db:"id"`
-		UUID          null.String   `db:"uuid"` // TODO remove nullable once backfilled
-		SessionType   FlowType      `db:"session_type"`
-		Status        SessionStatus `db:"status"`
-		Responded     bool          `db:"responded"`
-		Output        string        `db:"output"`
-		ContactID     ContactID     `db:"contact_id"`
-		OrgID         OrgID         `db:"org_id"`
-		CreatedOn     time.Time     `db:"created_on"`
-		EndedOn       *time.Time    `db:"ended_on"`
-		TimeoutOn     *time.Time    `db:"timeout_on"`
-		WaitStartedOn *time.Time    `db:"wait_started_on"`
-		CurrentFlowID FlowID        `db:"current_flow_id"`
-		ConnectionID  *ConnectionID `db:"connection_id"`
+		ID            SessionID         `db:"id"`
+		UUID          flows.SessionUUID `db:"uuid"`
+		SessionType   FlowType          `db:"session_type"`
+		Status        SessionStatus     `db:"status"`
+		Responded     bool              `db:"responded"`
+		Output        string            `db:"output"`
+		ContactID     ContactID         `db:"contact_id"`
+		OrgID         OrgID             `db:"org_id"`
+		CreatedOn     time.Time         `db:"created_on"`
+		EndedOn       *time.Time        `db:"ended_on"`
+		TimeoutOn     *time.Time        `db:"timeout_on"`
+		WaitStartedOn *time.Time        `db:"wait_started_on"`
+		CurrentFlowID FlowID            `db:"current_flow_id"`
+		ConnectionID  *ConnectionID     `db:"connection_id"`
 	}
 
 	incomingMsgID      MsgID
@@ -122,12 +122,13 @@ type Session struct {
 	contact *flows.Contact
 	runs    []*FlowRun
 
-	seenRuns    map[flows.RunUUID]time.Time
-	preCommits  map[EventCommitHook][]interface{}
-	postCommits map[EventCommitHook][]interface{}
+	seenRuns map[flows.RunUUID]time.Time
 
 	// we keep around a reference to the sprint associated with this session
 	sprint flows.Sprint
+
+	// the scene for our event hooks
+	scene *Scene
 
 	// we also keep around a reference to the wait (if any)
 	wait flows.ActivatedWait
@@ -150,6 +151,7 @@ func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID
 func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
 func (s *Session) IncomingMsgExternalID() null.String { return s.incomingExternalID }
+func (s *Session) Scene() *Scene                      { return s.scene }
 
 // ContactUUID returns the UUID of our contact
 func (s *Session) ContactUUID() flows.ContactUUID {
@@ -184,16 +186,6 @@ func (s *Session) Timeout() *time.Duration {
 // OutputMD5 returns the md5 of the passed in session
 func (s *Session) OutputMD5() string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s.s.Output)))
-}
-
-// AddPreCommitEvent adds a new event to be handled by a pre commit hook
-func (s *Session) AddPreCommitEvent(hook EventCommitHook, event interface{}) {
-	s.preCommits[hook] = append(s.preCommits[hook], event)
-}
-
-// AddPostCommitEvent adds a new event to be handled by a post commit hook
-func (s *Session) AddPostCommitEvent(hook EventCommitHook, event interface{}) {
-	s.postCommits[hook] = append(s.postCommits[hook], event)
 }
 
 // SetIncomingMsg set the incoming message that this session should be associated with in this sprint
@@ -322,7 +314,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	// create our session object
 	session := &Session{}
 	s := &session.s
-	s.UUID = null.String(uuid)
+	s.UUID = uuid
 	s.Status = sessionStatus
 	s.SessionType = sessionType
 	s.Responded = false
@@ -332,8 +324,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	s.CreatedOn = fs.Runs()[0].CreatedOn()
 
 	session.contact = fs.Contact()
-	session.preCommits = make(map[EventCommitHook][]interface{})
-	session.postCommits = make(map[EventCommitHook][]interface{})
+	session.scene = NewSceneForSession(session)
 
 	session.sprint = sprint
 	session.wait = fs.Wait()
@@ -379,10 +370,9 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 
 	// scan in our session
 	session := &Session{
-		contact:     contact,
-		preCommits:  make(map[EventCommitHook][]interface{}),
-		postCommits: make(map[EventCommitHook][]interface{}),
+		contact: contact,
 	}
+	session.scene = NewSceneForSession(session)
 	err = rows.StructScan(&session.s)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error scanning session")
@@ -530,7 +520,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// apply all our pre write events
 	for _, e := range sprint.Events() {
-		err := ApplyPreWriteEvent(ctx, tx, rp, org, s, e)
+		err := ApplyPreWriteEvent(ctx, tx, rp, org, s.scene, e)
 		if err != nil {
 			return errors.Wrapf(err, "error applying event: %v", e)
 		}
@@ -590,15 +580,15 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// apply all our events
-	for _, e := range sprint.Events() {
-		err := ApplyEvent(ctx, tx, rp, org, s, e)
+	if s.Status() != SessionStatusFailed {
+		err = HandleEvents(ctx, tx, rp, org, s.scene, sprint.Events())
 		if err != nil {
-			return errors.Wrapf(err, "error applying event: %v", e)
+			return errors.Wrapf(err, "error applying events: %d", s.ID())
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = ApplyPreEventHooks(ctx, tx, rp, org, []*Session{s})
+	err = ApplyEventPreCommitHooks(ctx, tx, rp, org, []*Scene{s.scene})
 	if err != nil {
 		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
@@ -676,7 +666,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	// apply all our pre write events
 	for i := range ss {
 		for _, e := range sprints[i].Events() {
-			err := ApplyPreWriteEvent(ctx, tx, rp, org, sessions[i], e)
+			err := ApplyPreWriteEvent(ctx, tx, rp, org, sessions[i].scene, e)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error applying event: %v", e)
 			}
@@ -727,17 +717,23 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// apply our all events for the session
-	for i := range ss {
-		for _, e := range sprints[i].Events() {
-			err := ApplyEvent(ctx, tx, rp, org, sessions[i], e)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error applying event: %v", e)
-			}
+	scenes := make([]*Scene, 0, len(ss))
+	for i := range sessions {
+		if ss[i].Status() == SessionStatusFailed {
+			continue
 		}
+
+		err = HandleEvents(ctx, tx, rp, org, sessions[i].Scene(), sprints[i].Events())
+		if err != nil {
+			return nil, errors.Wrapf(err, "error applying events for session: %d", sessions[i].ID())
+		}
+
+		scene := sessions[i].Scene()
+		scenes = append(scenes, scene)
 	}
 
 	// gather all our pre commit events, group them by hook
-	err = ApplyPreEventHooks(ctx, tx, rp, org, sessions)
+	err = ApplyEventPreCommitHooks(ctx, tx, rp, org, scenes)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}

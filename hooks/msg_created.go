@@ -20,17 +20,17 @@ import (
 )
 
 func init() {
-	models.RegisterPreWriteHook(events.TypeMsgCreated, handlePreMsgCreated)
-	models.RegisterEventHook(events.TypeMsgCreated, handleMsgCreated)
+	models.RegisterEventPreWriteHandler(events.TypeMsgCreated, handlePreMsgCreated)
+	models.RegisterEventHandler(events.TypeMsgCreated, handleMsgCreated)
 }
 
-// SendMessagesHook is our hook for sending session messages
+// SendMessagesHook is our hook for sending scene messages
 type SendMessagesHook struct{}
 
 var sendMessagesHook = &SendMessagesHook{}
 
 // Apply sends all non-android messages to courier
-func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -40,8 +40,8 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 	// android channels that need to be notified to sync
 	androidChannels := make(map[*models.Channel]bool)
 
-	// for each session gather all our messages
-	for s, args := range sessions {
+	// for each scene gather all our messages
+	for s, args := range scenes {
 		// walk through our messages, separate by whether they have a topup
 		courierMsgs := make([]*models.Msg, 0, len(args))
 
@@ -61,12 +61,12 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 
 		// if there are courier messages to send, do so
 		if len(courierMsgs) > 0 {
-			// if our session has a timeout, set it on our last message
-			if s.Timeout() != nil && s.WaitStartedOn() != nil {
-				courierMsgs[len(courierMsgs)-1].SetTimeout(s.ID(), *s.WaitStartedOn(), *s.Timeout())
+			// if our scene has a timeout, set it on our last message
+			if s.Session().Timeout() != nil && s.Session().WaitStartedOn() != nil {
+				courierMsgs[len(courierMsgs)-1].SetTimeout(s.SessionID(), *s.Session().WaitStartedOn(), *s.Session().Timeout())
 			}
 
-			log := log.WithField("messages", courierMsgs).WithField("session", s.ID)
+			log := log.WithField("messages", courierMsgs).WithField("scene", s.SessionID)
 
 			err := courier.QueueMessages(rc, courierMsgs)
 
@@ -135,15 +135,15 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 	return nil
 }
 
-// CommitMessagesHook is our hook for comitting session messages
+// CommitMessagesHook is our hook for comitting scene messages
 type CommitMessagesHook struct{}
 
 var commitMessagesHook = &CommitMessagesHook{}
 
-// Apply takes care of inserting all the messages in the passed in sessions assigning topups to them as needed.
-func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
-	msgs := make([]*models.Msg, 0, len(sessions))
-	for _, s := range sessions {
+// Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
+func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+	msgs := make([]*models.Msg, 0, len(scenes))
+	for _, s := range scenes {
 		for _, m := range s {
 			msgs = append(msgs, m.(*models.Msg))
 		}
@@ -174,27 +174,32 @@ func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 }
 
 // handleMsgCreated creates the db msg for the passed in event
-func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
 
+	// must be in a session
+	if scene.Session() == nil {
+		return errors.Errorf("cannot handle msg created event without session")
+	}
+
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.SessionID(),
 		"text":         event.Msg.Text(),
 		"urn":          event.Msg.URN(),
 	}).Debug("msg created event")
 
 	// ignore events that don't have a channel or URN set
 	// TODO: maybe we should create these messages in a failed state?
-	if session.SessionType() == models.MessagingFlow && (event.Msg.URN() == urns.NilURN || event.Msg.Channel() == nil) {
+	if scene.Session().SessionType() == models.MessagingFlow && (event.Msg.URN() == urns.NilURN || event.Msg.Channel() == nil) {
 		return nil
 	}
 
 	// messages in messaging flows must have urn id set on them, if not, go look it up
-	if session.SessionType() == models.MessagingFlow {
+	if scene.Session().SessionType() == models.MessagingFlow {
 		urn := event.Msg.URN()
 		if models.GetURNInt(urn, "id") == 0 {
-			urn, err := models.GetOrCreateURN(ctx, tx, org, session.ContactID(), event.Msg.URN())
+			urn, err := models.GetOrCreateURN(ctx, tx, org, scene.ContactID(), event.Msg.URN())
 			if err != nil {
 				return errors.Wrapf(err, "unable to get or create URN: %s", event.Msg.URN())
 			}
@@ -212,31 +217,31 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 		}
 	}
 
-	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, session.ContactID(), event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, scene.ContactID(), event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
 
 	// set our reply to as well (will be noop in cases when there is no incoming message)
-	msg.SetResponseTo(session.IncomingMsgID(), session.IncomingMsgExternalID())
+	msg.SetResponseTo(scene.Session().IncomingMsgID(), scene.Session().IncomingMsgExternalID())
 
 	// register to have this message committed
-	session.AddPreCommitEvent(commitMessagesHook, msg)
+	scene.AppendToEventPreCommitHook(commitMessagesHook, msg)
 
 	// don't send messages for surveyor flows
-	if session.SessionType() != models.SurveyorFlow {
-		session.AddPostCommitEvent(sendMessagesHook, msg)
+	if scene.Session().SessionType() != models.SurveyorFlow {
+		scene.AppendToEventPostCommitHook(sendMessagesHook, msg)
 	}
 
 	return nil
 }
 
 // handlePreMsgCreated clears our timeout on our session so that courier can send it when the message is sent, that will be set by courier when sent
-func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
 
 	// we only clear timeouts on messaging flows
-	if session.SessionType() != models.MessagingFlow {
+	if scene.Session().SessionType() != models.MessagingFlow {
 		return nil
 	}
 
@@ -261,7 +266,7 @@ func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 	}
 
 	// everybody else gets their timeout cleared, will be set by courier
-	session.ClearTimeoutOn()
+	scene.Session().ClearTimeoutOn()
 
 	return nil
 }

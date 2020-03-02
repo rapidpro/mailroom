@@ -1,3 +1,90 @@
+v5.4.0
+----------
+ * Touch readme for 5.4 release
+
+v5.3.44
+----------
+ * Update to goflow v0.76.2
+
+v5.3.43
+----------
+ * Update to goflow v0.76.1
+
+v5.3.42
+----------
+ * Contact search endpoint should also return whether query can be used as group
+
+v5.3.41
+----------
+ * Update to goflow v0.76.0
+ * Add support for searching by group
+
+v5.3.40
+----------
+ * Update to goflow v0.74.0
+
+v5.3.39
+----------
+ * Update to goflow v0.72.2
+ * Add modify contact endpoint
+ * Refactor hooks to allow session-less use
+
+v5.3.38
+----------
+ * Update to goflow v0.72.0
+
+v5.3.37
+----------
+ * Better asset caching
+ * Convert flow and expression endpoint testing to be snapshot based
+
+v5.3.36
+----------
+ * allow globals with empty values
+
+v5.3.35
+----------
+ * Update to goflow v0.71.2
+
+v5.3.34
+----------
+ * Read allow_international from channel config
+ * Add elastic query to parse query responses
+ * Update to goflow v0.71.1
+
+v5.3.33
+----------
+ * add != operator for numbers, dates, created_on
+
+v5.3.32
+----------
+ * Update to goflow v0.70.0
+
+v5.3.31
+----------
+ * Add urn =, !=, ~ support
+ * Fix name sorting on queries
+ * Update to latest goflow v0.69.0
+
+v5.3.30
+----------
+ * Sort locations fields by keyword value
+ * Update to latest goflow
+
+v5.3.29
+----------
+ * Fix > query on numbers, never use cached orgs
+ * Update gocommon for v1.2.0
+ * Remove superfulous legacy_definition fields on endpoints
+
+v5.3.28
+----------
+ * Allow dynamic group population within mailroom
+
+v5.3.27
+----------
+ * Update to latest goflow v0.67.0
+
 v5.3.26
 ----------
  * Update to goflow v0.66.3
