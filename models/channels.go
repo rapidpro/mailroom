@@ -9,6 +9,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -69,7 +70,7 @@ func (c *Channel) TPS() int { return c.c.TPS }
 func (c *Channel) Address() string { return c.c.Address }
 
 // Country returns the contry code for this channel
-func (c *Channel) Country() string { return string(c.c.Country) }
+func (c *Channel) Country() envs.Country { return envs.Country(string(c.c.Country)) }
 
 // Schemes returns the schemes this channel supports
 func (c *Channel) Schemes() []string { return c.c.Schemes }
