@@ -1,3 +1,7 @@
+v5.4.3
+----------
+ * Update to goflow v0.77.1
+
 v5.4.2
 ----------
  * Add noop handler for failure events
