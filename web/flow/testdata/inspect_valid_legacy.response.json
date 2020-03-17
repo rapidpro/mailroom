@@ -1,13 +1,13 @@
 {
-    "dependencies": {
-        "groups": [
-            {
-                "name": "Testers",
-                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
-            }
-        ]
-    },
-    "results": [],
-    "waiting_exits": [],
-    "parent_refs": []
+  "dependencies": [
+    {
+      "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+      "name": "Testers",
+      "type": "group"
+    }
+  ],
+  "issues": [],
+  "results": [],
+  "waiting_exits": [],
+  "parent_refs": []
 }

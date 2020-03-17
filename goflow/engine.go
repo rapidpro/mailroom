@@ -21,6 +21,7 @@ var engInit, simulatorInit, webhooksHTTPInit sync.Once
 
 var webhooksHTTPClient *http.Client
 var webhooksHTTPRetries *httpx.RetryConfig
+var webhookHTTPAccess *httpx.AccessConfig
 
 var emailFactory engine.EmailServiceFactory
 var classificationFactory engine.ClassificationServiceFactory
@@ -52,10 +53,10 @@ func Engine() flows.Engine {
 			"X-Mailroom-Mode": "normal",
 		}
 
-		httpClient, httpRetries := webhooksHTTP()
+		httpClient, httpRetries, httpAccess := WebhooksHTTP()
 
 		eng = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
 			WithEmailServiceFactory(emailFactory).
 			WithClassificationServiceFactory(classificationFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
@@ -74,10 +75,10 @@ func Simulator() flows.Engine {
 			"X-Mailroom-Mode": "simulation",
 		}
 
-		httpClient, _ := webhooksHTTP() // don't do retries in simulator
+		httpClient, _, httpAccess := WebhooksHTTP() // don't do retries in simulator
 
 		simulator = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
 			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
 			WithEmailServiceFactory(simulatorEmailServiceFactory).     // but faked emails
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // and faked airtime transfers
@@ -88,7 +89,7 @@ func Simulator() flows.Engine {
 	return simulator
 }
 
-func webhooksHTTP() (*http.Client, *httpx.RetryConfig) {
+func WebhooksHTTP() (*http.Client, *httpx.RetryConfig, *httpx.AccessConfig) {
 	webhooksHTTPInit.Do(func() {
 		// customize the default golang transport
 		t := http.DefaultTransport.(*http.Transport).Clone()
@@ -109,8 +110,11 @@ func webhooksHTTP() (*http.Client, *httpx.RetryConfig) {
 			config.Mailroom.WebhooksMaxRetries,
 			config.Mailroom.WebhooksBackoffJitter,
 		)
+
+		disallowedIPs, _ := config.Mailroom.ParseDisallowedIPs()
+		webhookHTTPAccess = httpx.NewAccessConfig(10*time.Second, disallowedIPs)
 	})
-	return webhooksHTTPClient, webhooksHTTPRetries
+	return webhooksHTTPClient, webhooksHTTPRetries, webhookHTTPAccess
 }
 
 func simulatorEmailServiceFactory(session flows.Session) (flows.EmailService, error) {

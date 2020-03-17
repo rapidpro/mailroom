@@ -14,10 +14,10 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeSessionTriggered, handleSessionTriggered)
+	models.RegisterEventHandler(events.TypeSessionTriggered, handleSessionTriggered)
 }
 
-// StartStartHook is our hook to fire our session starts
+// StartStartHook is our hook to fire our scene starts
 type StartStartHook struct{}
 
 var startStartHook = &StartStartHook{}
@@ -28,12 +28,12 @@ type InsertStartHook struct{}
 var insertStartHook = &InsertStartHook{}
 
 // Apply queues up our flow starts
-func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
-	// for each of our sessions
-	for _, es := range sessions {
+	// for each of our scene
+	for _, es := range scenes {
 		for _, e := range es {
 			start := e.(*models.FlowStart)
 
@@ -57,20 +57,20 @@ func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 }
 
 // Apply inserts our starts
-func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
-	starts := make([]*models.FlowStart, 0, len(sessions))
+	starts := make([]*models.FlowStart, 0, len(scenes))
 
-	// for each of our sessions
-	for s, es := range sessions {
+	// for each of our scene
+	for s, es := range scenes {
 		for _, e := range es {
 			event := e.(*events.SessionTriggeredEvent)
 
-			// we skip over any session starts that involve groups if we are in a batch start
-			if len(sessions) > 1 && (len(event.Groups) > 0 || event.ContactQuery != "") {
-				logrus.WithField("session_id", s.ID).Error("ignoring session trigger on group or query in batch")
+			// we skip over any scene starts that involve groups if we are in a batch start
+			if len(scenes) > 1 && (len(event.Groups) > 0 || event.ContactQuery != "") {
+				logrus.WithField("session_id", s.SessionID).Error("ignoring scene trigger on group or query in batch")
 				continue
 			}
 
@@ -108,30 +108,31 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			starts = append(starts, start)
 
 			// this will add our task for our start after we commit
-			s.AddPostCommitEvent(startStartHook, start)
+			s.AppendToEventPostCommitHook(startStartHook, start)
 		}
 	}
 
 	// insert all our starts
 	err := models.InsertFlowStarts(ctx, tx, starts)
 	if err != nil {
-		return errors.Wrapf(err, "error inserting flow starts for session triggers")
+		return errors.Wrapf(err, "error inserting flow starts for scene triggers")
 	}
 
 	return nil
 }
 
-// handleSessionTriggered queues this event for being started after our sessions are committed
-func handleSessionTriggered(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+// handleSessionTriggered queues this event for being started after our scene are committed
+func handleSessionTriggered(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.SessionTriggeredEvent)
+
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.SessionID(),
 		"flow":         event.Flow.Name,
 		"flow_uuid":    event.Flow.UUID,
-	}).Debug("session triggered")
+	}).Debug("scene triggered")
 
-	session.AddPreCommitEvent(insertStartHook, event)
+	scene.AppendToEventPreCommitHook(insertStartHook, event)
 
 	return nil
 }

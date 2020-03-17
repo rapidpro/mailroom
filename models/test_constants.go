@@ -29,22 +29,21 @@ var TwitterChannelUUID = assets.ChannelUUID("0f661e8b-ea9d-4bd3-9953-d368340acf9
 
 var CathyID = ContactID(10000)
 var CathyUUID = flows.ContactUUID("6393abc0-283d-4c9b-a1b3-641a035c34bf")
-var CathyURN = urns.URN("tel:+250700000001")
+var CathyURN = urns.URN("tel:+16055741111")
 var CathyURNID = URNID(10000)
 
 var BobID = ContactID(10001)
 var BobUUID = flows.ContactUUID("b699a406-7e44-49be-9f01-1a82893e8a10")
-var BobURN = urns.URN("tel:+250700000002")
+var BobURN = urns.URN("tel:+16055742222")
 var BobURNID = URNID(10001)
-
 var GeorgeID = ContactID(10002)
 var GeorgeUUID = flows.ContactUUID("8d024bcd-f473-4719-a00a-bd0bb1190135")
-var GeorgeURN = urns.URN("tel:+250700000003")
+var GeorgeURN = urns.URN("tel:+16055743333")
 var GeorgeURNID = URNID(10002)
 
 var AlexandriaID = ContactID(10003)
 var AlexandriaUUID = flows.ContactUUID("9709c157-4606-4d41-9df3-9e9c9b4ae2d4")
-var AlexandriaURN = urns.URN("tel:+250700000004")
+var AlexandriaURN = urns.URN("tel:+16055744444")
 var AlexandriaURNID = URNID(10003)
 
 var FavoritesFlowID = FlowID(10000)
@@ -89,7 +88,10 @@ var TestersGroupUUID = assets.GroupUUID("5e9d8fab-5e7e-4f51-b533-261af5dea70d")
 var AgeFieldUUID = assets.FieldUUID("903f51da-2717-47c7-a0d3-f2f32877013d")
 var GenderFieldUUID = assets.FieldUUID("3a5891e4-756e-4dc9-8e12-b7a766168824")
 
-var CreatedOnFieldID = FieldID(2)
+var JoinedFieldID = FieldID(7)
+var JoinedFieldUUID = assets.FieldUUID("d83aae24-4bbf-49d0-ab85-6bfd201eac6d")
+
+var CreatedOnFieldID = FieldID(3)
 
 var ReportingLabelID = LabelID(10000)
 var ReportingLabelUUID = assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698")

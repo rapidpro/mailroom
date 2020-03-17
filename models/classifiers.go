@@ -90,6 +90,8 @@ func (c *Classifier) Type() string { return c.c.Type }
 
 // AsService builds the corresponding ClassificationService for the passed in Classifier
 func (c *Classifier) AsService(httpClient *http.Client, httpRetries *httpx.RetryConfig, classifier *flows.Classifier) (flows.ClassificationService, error) {
+	_, _, httpAccess := goflow.WebhooksHTTP()
+
 	switch c.Type() {
 	case ClassifierTypeWit:
 		accessToken := c.c.Config[WitConfigAccessToken]
@@ -106,7 +108,7 @@ func (c *Classifier) AsService(httpClient *http.Client, httpRetries *httpx.Retry
 			return nil, errors.Errorf("missing %s, %s or %s on LUIS classifier: %s",
 				LuisConfigEndpointURL, LuisConfigAppID, LuisConfigPrimaryKey, c.UUID())
 		}
-		return luis.NewService(httpClient, httpRetries, classifier, endpoint, appID, key), nil
+		return luis.NewService(httpClient, httpRetries, httpAccess, classifier, endpoint, appID, key), nil
 
 	case ClassifierTypeBothub:
 		accessToken := c.c.Config[BothubConfigAccessToken]
