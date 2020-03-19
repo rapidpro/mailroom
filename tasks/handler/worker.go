@@ -224,14 +224,8 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 
 	modelContact := contacts[0]
 
-	// build session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "unable to load session assets")
-	}
-
 	// build our flow contact
-	contact, err := modelContact.FlowContact(org, sa)
+	contact, err := modelContact.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}
@@ -290,7 +284,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return errors.Errorf("unknown event type: %s", eventType)
 	}
 
-	_, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
+	_, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming flow for timeout")
 	}
@@ -349,12 +343,6 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
 	}
 
-	// build session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to load session assets")
-	}
-
 	// make sure this URN is our highest priority (this is usually a noop)
 	err = modelContact.UpdatePreferredURN(ctx, db, org, event.URNID(), channel)
 	if err != nil {
@@ -362,7 +350,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// build our flow contact
-	contact, err := modelContact.FlowContact(org, sa)
+	contact, err := modelContact.FlowContact(org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating flow contact")
 	}
@@ -440,7 +428,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{flowTrigger}, hook, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -498,12 +486,6 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		return nil
 	}
 
-	// build session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "unable to load session assets")
-	}
-
 	modelContact := contacts[0]
 
 	// load the channel for this message
@@ -518,7 +500,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// build our flow contact
-	contact, err := modelContact.FlowContact(org, sa)
+	contact, err := modelContact.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}
@@ -619,7 +601,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 			// otherwise build the trigger and start the flow directly
 			trigger := triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
-			_, err = runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, hook, true)
+			_, err = runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -630,7 +612,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	// if there is a session, resume it
 	if session != nil && flow != nil {
 		resume := resumes.NewMsg(org.Env(), contact, msgIn)
-		_, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, hook)
+		_, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, hook)
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
 		}

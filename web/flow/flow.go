@@ -13,7 +13,6 @@ import (
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/Masterminds/semver"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -23,7 +22,7 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/clone", web.RequireAuthToken(handleClone))
 }
 
-// Migrates a legacy flow to the new flow definition specification
+// Migrates a flow to the latest flow specification
 //
 //   {
 //     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...},
@@ -62,12 +61,13 @@ func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interfa
 //
 //   {
 //     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]},
-//     "validate_with_org_id": 1
+//     "org_id": 1
 //   }
 //
 type inspectRequest struct {
 	Flow              json.RawMessage `json:"flow" validate:"required"`
-	ValidateWithOrgID models.OrgID    `json:"validate_with_org_id"`
+	OrgID             models.OrgID    `json:"org_id"`
+	ValidateWithOrgID models.OrgID    `json:"validate_with_org_id"` // backwards compatibility
 }
 
 func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
@@ -76,20 +76,27 @@ func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
+	// TODO switch RapidPro to use org_id and remove this
+	if request.ValidateWithOrgID != models.NilOrgID {
+		request.OrgID = request.ValidateWithOrgID
+	}
+
 	flow, err := goflow.ReadFlow(request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
-	// if we have an org ID, do asset validation
-	if request.ValidateWithOrgID != models.NilOrgID {
-		result, status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, flow)
-		if result != nil || err != nil {
-			return result, status, err
+	var sa flows.SessionAssets
+	// if we have an org ID, create session assets to look for missing dependencies
+	if request.OrgID != models.NilOrgID {
+		org, err := models.GetOrgAssetsWithRefresh(ctx, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
+		if err != nil {
+			return nil, 0, err
 		}
+		sa = org.SessionAssets()
 	}
 
-	return flow.Inspect(), http.StatusOK, nil
+	return flow.Inspect(sa), http.StatusOK, nil
 }
 
 // Clones a flow, replacing all UUIDs with either the given mapping or new random UUIDs.
@@ -101,14 +108,12 @@ func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interfa
 //       "4ee4189e-0c06-4b00-b54f-5621329de947": "db31d23f-65b8-4518-b0f6-45638bfbbbf2",
 //       "723e62d8-a544-448f-8590-1dfd0fccfcd4": "f1fd861c-9e75-4376-a829-dcf76db6e721"
 //     },
-//     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]},
-//     "validate_with_org_id": 1
+//     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]}
 //   }
 //
 type cloneRequest struct {
 	DependencyMapping map[uuids.UUID]uuids.UUID `json:"dependency_mapping"`
 	Flow              json.RawMessage           `json:"flow" validate:"required"`
-	ValidateWithOrgID models.OrgID              `json:"validate_with_org_id"`
 }
 
 func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
@@ -123,36 +128,11 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
 
-	// if we have an org ID, do asset validation on the new clone
-	if request.ValidateWithOrgID != models.NilOrgID {
-		clone, err := goflow.ReadFlow(cloneJSON)
-		if err != nil {
-			return errors.Wrapf(err, "unable to clone flow"), http.StatusUnprocessableEntity, nil
-		}
-
-		result, status, err := validate(s.CTX, s.DB, request.ValidateWithOrgID, clone)
-		if result != nil || err != nil {
-			return result, status, err
-		}
+	// read flow to check that cloning produced something valid
+	_, err = goflow.ReadFlow(cloneJSON)
+	if err != nil {
+		return errors.Wrapf(err, "unable to clone flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	return cloneJSON, http.StatusOK, nil
-}
-
-func validate(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flow flows.Flow) (interface{}, int, error) {
-	org, err := models.NewOrgAssets(ctx, db, orgID, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	sa, err := models.NewSessionAssets(org)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if err := flow.Validate(sa, nil); err != nil {
-		return errors.Wrapf(err, "flow failed validation"), http.StatusUnprocessableEntity, nil
-	}
-
-	return nil, 0, nil
 }

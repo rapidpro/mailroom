@@ -1,8 +1,6 @@
 package hooks
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/nyaruka/mailroom/models"
@@ -10,30 +8,34 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/goflow/utils/httpx"
 )
 
-type HookHandler struct{}
-
-func (h *HookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Query()["unsub"] != nil {
-		w.WriteHeader(410)
-	} else {
-		w.WriteHeader(200)
-	}
-}
-
 func TestWebhookCalled(t *testing.T) {
+	testsuite.Reset()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"http://rapidpro.io/": []httpx.MockResponse{
+			httpx.NewMockResponse(200, nil, "OK", 1),
+			httpx.NewMockResponse(200, nil, "OK", 1),
+		},
+		"http://rapidpro.io/?unsub=1": []httpx.MockResponse{
+			httpx.NewMockResponse(410, nil, "Gone", 1),
+			httpx.NewMockResponse(410, nil, "Gone", 1),
+			httpx.NewMockResponse(410, nil, "Gone", 1),
+		},
+	}))
+
 	// add a few resthooks
 	testsuite.DB().MustExec(`INSERT INTO api_resthook(is_active, slug, org_id, created_on, modified_on, created_by_id, modified_by_id) VALUES(TRUE, 'foo', 1, NOW(), NOW(), 1, 1);`)
 	testsuite.DB().MustExec(`INSERT INTO api_resthook(is_active, slug, org_id, created_on, modified_on, created_by_id, modified_by_id) VALUES(TRUE, 'bar', 1, NOW(), NOW(), 1, 1);`)
 
-	handler := &HookHandler{}
-	server := httptest.NewServer(handler)
-
 	// and a few targets
-	testsuite.DB().MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), $1, 1, 1, 1);`, server.URL)
-	testsuite.DB().MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), $1, 1, 1, 2);`, server.URL+"?unsub=1")
-	testsuite.DB().MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), $1, 1, 1, 1);`, server.URL+"?unsub=1")
+	testsuite.DB().MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/', 1, 1, 1);`)
+	testsuite.DB().MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/?unsub=1', 1, 1, 2);`)
+	testsuite.DB().MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/?unsub=1', 1, 1, 1);`)
 
 	tcs := []HookTestCase{
 		HookTestCase{
@@ -43,7 +45,7 @@ func TestWebhookCalled(t *testing.T) {
 				},
 				models.GeorgeID: []flows.Action{
 					actions.NewCallResthook(newActionUUID(), "foo", "foo"),
-					actions.NewCallWebhook(newActionUUID(), "GET", server.URL+"?unsub=1", nil, "", ""),
+					actions.NewCallWebhook(newActionUUID(), "GET", "http://rapidpro.io/?unsub=1", nil, "", ""),
 				},
 			},
 			SQLAssertions: []SQLAssertion{

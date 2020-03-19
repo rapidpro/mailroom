@@ -339,14 +339,8 @@ func StartIVRFlow(
 		return errors.Wrapf(err, "unable to load flow: %d", startID)
 	}
 
-	// build our session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "error starting flow, unable to load assets")
-	}
-
 	// our flow contact
-	contact, err := c.FlowContact(org, sa)
+	contact, err := c.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error loading flow contact")
 	}
@@ -388,7 +382,7 @@ func StartIVRFlow(
 	}
 
 	// start our flow
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, hook, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow")
 	}
@@ -413,13 +407,7 @@ func ResumeIVRFlow(
 	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
-	// build our session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "unable to load assets")
-	}
-
-	contact, err := c.FlowContact(org, sa)
+	contact, err := c.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}
@@ -572,7 +560,7 @@ func ResumeIVRFlow(
 		}
 	}
 
-	session, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}

@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
+	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -20,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestServer(t *testing.T) {
+func TestSearch(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
@@ -117,6 +119,16 @@ func TestServer(t *testing.T) {
 			[]string{"age", "gender"},
 			singleESResponse,
 		},
+		{
+			"/mr/contact/search", "POST",
+			fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			200,
+			"",
+			[]models.ContactID{models.CathyID},
+			``,
+			[]string{},
+			singleESResponse,
+		},
 	}
 
 	for i, tc := range tcs {
@@ -153,4 +165,34 @@ func TestServer(t *testing.T) {
 			assert.Equal(t, tc.Error, r.Error)
 		}
 	}
+}
+
+func TestParse(t *testing.T) {
+	testsuite.Reset()
+	web.RunWebTests(t, "testdata/parse_query.json")
+}
+
+func TestModifyContacts(t *testing.T) {
+	testsuite.Reset()
+	db := testsuite.DB()
+
+	// to be deterministic, update the creation date on cathy
+	db.MustExec(`UPDATE contacts_contact SET created_on = $1 WHERE id = $2`, time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC), models.CathyID)
+
+	// make our campaign group dynamic
+	db.MustExec(`UPDATE contacts_contactgroup SET query = 'age > 18' WHERE id = $1`, models.DoctorsGroupID)
+
+	// insert an event on our campaign that is based on created on
+	db.MustExec(
+		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
+											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
+									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
+		uuids.New(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID)
+
+	// for simpler tests we clear out cathy's fields and groups to start
+	db.MustExec(`UPDATE contacts_contact SET fields = NULL WHERE id = $1`, models.CathyID)
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, models.CathyID)
+	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.CathyID)
+
+	web.RunWebTests(t, "testdata/modify_contacts.json")
 }

@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -52,12 +53,12 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// CreateTestFlow creates a flow that starts with a spit by contact id
+// createTestFlow creates a flow that starts with a split by contact id
 // and then routes the contact to a node where all the actions in the
 // test case are present.
 //
 // It returns the completed flow.
-func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.Flow {
+func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.Flow {
 	categoryUUIDs := make([]flows.CategoryUUID, len(tc.Actions))
 	exitUUIDs := make([]flows.ExitUUID, len(tc.Actions))
 	i := 0
@@ -170,6 +171,9 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
 	assert.NoError(t, err)
 
+	org, err = org.Clone(ctx, db)
+	assert.NoError(t, err)
+
 	// reuse id from one of our real flows
 	flowID := models.FavoritesFlowID
 
@@ -178,15 +182,17 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		flowUUID := assets.FlowUUID(uuids.New())
 
 		// build our flow for this test case
-		flowDef := CreateTestFlow(t, flowUUID, tc)
+		testFlow := createTestFlow(t, flowUUID, tc)
+		flowDef, err := json.Marshal(testFlow)
+		assert.NoError(t, err)
 
 		// add it to our org
-		flow, err := org.SetFlow(flowID, flowDef)
+		flow := org.SetFlow(flowID, flowUUID, testFlow.Name(), flowDef)
 		assert.NoError(t, err)
 
 		options := runner.NewStartOptions()
-		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
-			for _, s := range sessions {
+		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session []*models.Session) error {
+			for _, s := range session {
 				msg := tc.Msgs[s.ContactID()]
 				if msg != nil {
 					s.SetIncomingMsg(msg.ID(), "")

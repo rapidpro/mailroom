@@ -106,7 +106,7 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, Org1, bcast.OrgID())
 	assert.Equal(t, []ContactID{CathyID, GeorgeID}, bcast.ContactIDs())
 	assert.Equal(t, []GroupID{DoctorsGroupID}, bcast.GroupIDs())
-	assert.Equal(t, []urns.URN{urns.URN("tel:+250700000001?id=10000")}, bcast.URNs())
+	assert.Equal(t, []urns.URN{urns.URN("tel:+16055741111?id=10000")}, bcast.URNs())
 }
 
 func TestNextFire(t *testing.T) {

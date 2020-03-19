@@ -7,7 +7,7 @@ flows. It interacts directly with the RapidPro database and sends and receives m
 
 # Deploying
 
-As Mailroom is a go application, it compiles to a binary and that binary along with the config file is all
+As Mailroom is a Go application, it compiles to a binary and that binary along with the config file is all
 you need to run it on your server. You can find bundles for each platform in the
 [releases directory](https://github.com/nyaruka/mailroom/releases). We recommend running Mailroom
 behind a reverse proxy such as nginx or Elastic Load Balancer that provides HTTPs encryption.
@@ -77,5 +77,5 @@ $ createuser -P -E -s mailroom_test (set no password)
 To run all of the tests:
 
 ```
-go test github.com/nyaruka/mailroom/... -p=1
+go test ./... -p=1
 ```
