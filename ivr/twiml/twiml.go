@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"github.com/nyaruka/goflow/envs"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -65,6 +66,25 @@ const (
 	</Response>
 	`
 )
+var sayLanguage = map[envs.Language]string{
+	"dan": "da-DK",
+	"deu": "de-DE",
+	"eng": "en-US",
+	"cat": "ca-ES",
+	"spa": "es-ES",
+	"fin": "fi-FI",
+	"fra": "fr-FR",
+	"ita": "it-IT",
+	"jpn": "ja-JP",
+	"kor": "ko-KR",
+	"nor": "nb-NO",
+	"nld": "nl-NL",
+	"pol": "pl-PL",
+	"por": "pt-BR",
+	"rus": "ru-RU",
+	"swe": "sv-SE",
+	"zho": "zh-CN",
+}
 
 var indentMarshal = true
 
@@ -293,7 +313,7 @@ func (c *client) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a TWIML response for the events in the passed in session
-func (c *client) WriteSessionResponse(session *models.Session, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (c *client) WriteSessionResponse(session *models.Session, resumeURL string, defaultLanguage envs.Language, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -304,9 +324,13 @@ func (c *client) WriteSessionResponse(session *models.Session, resumeURL string,
 	if sprint == nil {
 		return errors.Errorf("cannot write IVR response for session with no sprint")
 	}
+	sayLanguageAttr := ""
 
+	if attr, ok := sayLanguage[defaultLanguage]; ok {
+		sayLanguageAttr = attr
+	}
 	// get our response
-	response, err := responseForSprint(resumeURL, session.Wait(), sprint.Events())
+	response, err := responseForSprint(resumeURL, sayLanguageAttr, session.Wait(), sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -387,8 +411,9 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 // TWIML building utilities
 
 type Say struct {
-	XMLName string `xml:"Say"`
-	Text    string `xml:",chardata"`
+	XMLName  string `xml:"Say"`
+	Text     string `xml:",chardata"`
+	Language string `xml:"language,attr,omitempty"`
 }
 
 type Play struct {
@@ -427,7 +452,7 @@ type Response struct {
 	Commands []interface{} `xml:",innerxml"`
 }
 
-func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+func responseForSprint(resumeURL string, sayLanguage string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 
@@ -435,7 +460,7 @@ func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event
 		switch event := e.(type) {
 		case *events.IVRCreatedEvent:
 			if len(event.Msg.Attachments()) == 0 {
-				commands = append(commands, Say{Text: event.Msg.Text()})
+				commands = append(commands, Say{Text: event.Msg.Text(), Language: sayLanguage})
 			} else {
 				for _, a := range event.Msg.Attachments() {
 					a = models.NormalizeAttachment(a)

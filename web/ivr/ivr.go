@@ -164,7 +164,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 		resumeURL := buildResumeURL(channel, conn, urn)
 
 		// have our client output our session status
-		err = client.WriteSessionResponse(session, resumeURL, r, w)
+		err = client.WriteSessionResponse(session, resumeURL, org.Org().DefaultLanguage(), r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for start")
 		}
