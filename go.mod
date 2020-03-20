@@ -13,6 +13,7 @@ require (
 	github.com/go-chi/chi v3.3.3+incompatible
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
+	github.com/golang/protobuf v1.3.2
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/gorilla/schema v1.0.2
@@ -31,6 +32,8 @@ require (
 	github.com/olivere/elastic v6.2.21+incompatible
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.8.1
+	github.com/prometheus/client_model v0.2.0
+	github.com/prometheus/common v0.9.1
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
