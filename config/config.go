@@ -1,5 +1,14 @@
 package config
 
+import (
+	"encoding/csv"
+	"io"
+	"net"
+	"strings"
+
+	"github.com/pkg/errors"
+)
+
 // Mailroom is the global configuration
 var Mailroom *Config
 
@@ -28,6 +37,7 @@ type Config struct {
 	WebhooksInitialBackoff int     `help:"the initial backoff in milliseconds when retrying a failed webhook call"`
 	WebhooksBackoffJitter  float64 `help:"the amount of jitter to apply to backoff times"`
 	SMTPServer             string  `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
+	DisallowedIPs          string  `help:"comma separated list of IP addresses which engine can't make HTTP calls to"`
 	MaxStepsPerSprint      int     `help:"the maximum number of steps allowed per engine sprint"`
 	MaxValueLength         int     `help:"the maximum size in characters for contact field values and run result values"`
 
@@ -71,6 +81,7 @@ func NewMailroomConfig() *Config {
 		WebhooksInitialBackoff: 5000,
 		WebhooksBackoffJitter:  0.5,
 		SMTPServer:             "",
+		DisallowedIPs:          `127.0.0.1,::1`,
 		MaxStepsPerSprint:      100,
 		MaxValueLength:         640,
 
@@ -88,4 +99,21 @@ func NewMailroomConfig() *Config {
 		Address: "localhost",
 		Port:    8090,
 	}
+}
+
+func (c *Config) ParseDisallowedIPs() ([]net.IP, error) {
+	addrs, err := csv.NewReader(strings.NewReader(c.DisallowedIPs)).Read()
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	ips := make([]net.IP, 0, len(addrs))
+	for _, addr := range addrs {
+		ip := net.ParseIP(addr)
+		if ip == nil {
+			return nil, errors.Errorf("couldn't parse '%s' as an IP address", addr)
+		}
+		ips = append(ips, ip)
+	}
+
+	return ips, nil
 }

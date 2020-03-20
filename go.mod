@@ -24,7 +24,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.2.0
-	github.com/nyaruka/goflow v0.76.2
+	github.com/nyaruka/goflow v0.77.4
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0
@@ -34,7 +34,6 @@ require (
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20181217023233-e147a9138326 // indirect
 	google.golang.org/appengine v1.4.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/go-playground/validator.v9 v9.21.0

@@ -1,3 +1,20 @@
+v5.4.4
+----------
+ * Update to latest goflow v0.77.4
+
+v5.4.3
+----------
+ * Update to goflow v0.77.1
+
+v5.4.2
+----------
+ * Add noop handler for failure events
+ * Update to latest goflow v0.77.0
+
+v5.4.1
+----------
+ * Fix @legacy_extra NPE on router operands
+
 v5.4.0
 ----------
  * Touch readme for 5.4 release

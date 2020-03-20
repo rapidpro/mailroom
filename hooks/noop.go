@@ -11,14 +11,15 @@ import (
 )
 
 func init() {
-	models.RegisterEventHandler(events.TypeEnvironmentRefreshed, NoopHandler)
 	models.RegisterEventHandler(events.TypeContactRefreshed, NoopHandler)
+	models.RegisterEventHandler(events.TypeEnvironmentRefreshed, NoopHandler)
 	models.RegisterEventHandler(events.TypeError, NoopHandler)
-	models.RegisterEventHandler(events.TypeRunResultChanged, NoopHandler)
-	models.RegisterEventHandler(events.TypeWaitTimedOut, NoopHandler)
-	models.RegisterEventHandler(events.TypeRunExpired, NoopHandler)
+	models.RegisterEventHandler(events.TypeFailure, NoopHandler)
 	models.RegisterEventHandler(events.TypeFlowEntered, NoopHandler)
 	models.RegisterEventHandler(events.TypeMsgWait, NoopHandler)
+	models.RegisterEventHandler(events.TypeRunExpired, NoopHandler)
+	models.RegisterEventHandler(events.TypeRunResultChanged, NoopHandler)
+	models.RegisterEventHandler(events.TypeWaitTimedOut, NoopHandler)
 }
 
 // NoopHandler is our hook for events we ignore in a run
