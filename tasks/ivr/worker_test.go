@@ -3,6 +3,7 @@ package ivr
 import (
 	"context"
 	"encoding/json"
+	"github.com/nyaruka/goflow/envs"
 	"net/http"
 	"testing"
 
@@ -87,7 +88,7 @@ func (c *MockClient) HangupCall(client *http.Client, externalID string) error {
 	return nil
 }
 
-func (c *MockClient) WriteSessionResponse(session *models.Session, resumeURL string, req *http.Request, w http.ResponseWriter) error {
+func (c *MockClient) WriteSessionResponse(session *models.Session, resumeURL string, defaultLanguage envs.Language, req *http.Request, w http.ResponseWriter) error {
 	return nil
 }
 
