@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
@@ -23,6 +24,10 @@ func TestMetrics(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
+
+	// wait for the server to start
+	time.Sleep(time.Second)
+
 	defer server.Stop()
 
 	tcs := []struct {
