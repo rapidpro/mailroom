@@ -1,3 +1,7 @@
+v5.5.1
+----------
+ * Update to latest goflow v0.78.0
+
 v5.5.0
 ----------
  * Add prometheus endpoint for org level metrics
