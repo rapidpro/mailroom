@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/golang/protobuf/proto"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
@@ -16,7 +17,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodGet, "/mr/org/{token:[0-9a-f]+}/metrics", handleMetrics)
+	web.RegisterRoute(http.MethodGet, "/mr/org/{uuid:[0-9a-f\\-]+}/metrics", handleMetrics)
 }
 
 const groupCountsSQL = `
@@ -273,7 +274,8 @@ ON
 WHERE
   a.is_active = TRUE AND
   o.is_active = TRUE AND
-  a.key = $1;
+  o.uuid = $1::uuid AND
+  a.key = $2;
 `
 
 type org struct {
@@ -281,9 +283,9 @@ type org struct {
 	Name string       `db:"name"`
 }
 
-func lookupOrgByToken(ctx context.Context, s *web.Server, token string) (*org, error) {
+func lookupOrgByToken(ctx context.Context, s *web.Server, orgUUID uuids.UUID, token string) (*org, error) {
 	org := &org{}
-	err := s.DB.GetContext(ctx, org, lookupOrgByTokenSQL, token)
+	err := s.DB.GetContext(ctx, org, lookupOrgByTokenSQL, orgUUID, token)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -294,15 +296,23 @@ func lookupOrgByToken(ctx context.Context, s *web.Server, token string) (*org, e
 }
 
 func handleMetrics(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
-	token := chi.URLParam(r, "token")
-	org, err := lookupOrgByToken(ctx, s, token)
+	// we should have basic auth headers, username should be metrics
+	username, token, ok := r.BasicAuth()
+	if !ok || username != "metrics" {
+		rawW.WriteHeader(http.StatusUnauthorized)
+		rawW.Write([]byte(`{"error": "invalid authentication"}`))
+		return nil
+	}
+
+	orgUUID := uuids.UUID(chi.URLParam(r, "uuid"))
+	org, err := lookupOrgByToken(ctx, s, orgUUID, token)
 	if err != nil {
 		return errors.Wrapf(err, "error looking up org for token")
 	}
 
 	if org == nil {
 		rawW.WriteHeader(http.StatusUnauthorized)
-		rawW.Write([]byte(`{"error": "invalid token"}`))
+		rawW.Write([]byte(`{"error": "invalid authentication"}`))
 		return nil
 	}
 

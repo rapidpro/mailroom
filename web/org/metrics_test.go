@@ -27,19 +27,42 @@ func TestMetrics(t *testing.T) {
 
 	// wait for the server to start
 	time.Sleep(time.Second)
-
 	defer server.Stop()
 
 	tcs := []struct {
 		URL      string
+		Username string
+		Password string
 		Contains []string
 	}{
 		{
-			URL:      "http://localhost:8090/mr/org/011/metrics",
-			Contains: []string{`{"error": "invalid token"}`},
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			Username: "",
+			Password: "",
+			Contains: []string{`{"error": "invalid authentication"}`},
 		},
 		{
-			URL: fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", token),
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			Username: "metrics",
+			Password: "invalid",
+			Contains: []string{`{"error": "invalid authentication"}`},
+		},
+		{
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			Username: "invalid",
+			Password: token,
+			Contains: []string{`{"error": "invalid authentication"}`},
+		},
+		{
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org2UUID),
+			Username: "metrics",
+			Password: token,
+			Contains: []string{`{"error": "invalid authentication"}`},
+		},
+		{
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			Username: "metrics",
+			Password: token,
 			Contains: []string{
 				`rapidpro_group_contact_count{group_name="All Contacts",group_uuid="966e2bdb-078c-42bb-afd7-c5c1dbe31aa6",group_type="system",org="UNICEF"} 124`,
 				`rapidpro_group_contact_count{group_name="Doctors",group_uuid="c153e265-f7c9-4539-9dbc-9b358714b638",group_type="user",org="UNICEF"} 121`,
@@ -49,7 +72,9 @@ func TestMetrics(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		resp, err := http.Get(tc.URL)
+		req, _ := http.NewRequest(http.MethodGet, tc.URL, nil)
+		req.SetBasicAuth(tc.Username, tc.Password)
+		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err, "%d received error")
 
 		body, _ := ioutil.ReadAll(resp.Body)
