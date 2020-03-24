@@ -1,3 +1,7 @@
+v5.5.2
+----------
+ * Change to using basic auth for org specific prom metrics endpoint
+
 v5.5.1
 ----------
  * Update to latest goflow v0.78.0
