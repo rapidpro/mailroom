@@ -58,8 +58,9 @@ Recommended settings for error and performance monitoring:
  
  For Trackable Links the follow parameter should be set up as env variable:
  * `MAILROOM_SHORTEN_URL_PING`: This URL should be called as a fake webbhook call to have a success response with less than 10000 bytes
- * `MAILROOM_FDL_KEY`: The Firebase Dynamic Link API Key
- * `MAILROOM_FDL_DEFAULT_URL`: The Firebase Dynamic Link default url
+ * `MAILROOM_YOURLS_LOGIN`: The YoURLs API username
+ * `MAILROOM_YOURLS_PASSWORD`: The YoURLs API password
+ * `MAILROOM_YOURLS_HOST`: The YoURLs API host
 
 # Development
 

@@ -62,8 +62,9 @@ type Config struct {
 	Address   string `help:"the address to bind our web server to"`
 	Port      int    `help:"the port to bind our web server to"`
 
-	FDLKey        string `help:"the FDL API key used to generate shorten links"`
-	FDLDefaultURL string `help:"the FDL default URL used to access the shorten link generated"`
+	YourlsLogin    string `help:"the YoURLs API login used to generate shorten links"`
+	YourlsPassword string `help:"the YoURLs API password used to access the shorten link generated"`
+	YourlsHost     string `help:"the YoURLs API host"`
 }
 
 // NewMailroomConfig returns a new default configuration object
@@ -102,8 +103,9 @@ func NewMailroomConfig() *Config {
 		Address: "localhost",
 		Port:    8090,
 
-		FDLDefaultURL: "https://ccl.page.link",
-		FDLKey:        "12345",
+		YourlsLogin:    "",
+		YourlsPassword: "",
+		YourlsHost:     "",
 	}
 }
 
