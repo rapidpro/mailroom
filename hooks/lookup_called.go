@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeLookupCalled, handleWebhookCalled)
+	models.RegisterEventHandler(events.TypeLookupCalled, handleWebhookCalled)
 }

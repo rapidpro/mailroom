@@ -3,8 +3,8 @@ package hooks
 import (
 	"context"
 
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
 
 	"github.com/gomodule/redigo/redis"

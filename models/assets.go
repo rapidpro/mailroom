@@ -267,7 +267,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	}
 
 	// intialize our session assets
-	o.sessionAssets, err = engine.NewSessionAssets(o, goflow.MigrationConfig())
+	o.sessionAssets, err = engine.NewSessionAssets(o.Env(), o, goflow.MigrationConfig())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", orgID)
 	}
@@ -391,7 +391,7 @@ func (a *OrgAssets) Clone(ctx context.Context, db *sqlx.DB) (*OrgAssets, error) 
 	org.cloned = true
 
 	// rebuild our session assets with our new items
-	org.sessionAssets, err = engine.NewSessionAssets(org, goflow.MigrationConfig())
+	org.sessionAssets, err = engine.NewSessionAssets(a.Env(), org, goflow.MigrationConfig())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", org.OrgID())
 	}
@@ -406,7 +406,7 @@ func (a *OrgAssets) AddTestChannel(channel assets.Channel) {
 	}
 
 	a.channels = append(a.channels, channel)
-	a.sessionAssets, _ = engine.NewSessionAssets(a, goflow.MigrationConfig())
+	a.sessionAssets, _ = engine.NewSessionAssets(a.Env(), a, goflow.MigrationConfig())
 
 	// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
 }

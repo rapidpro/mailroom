@@ -6,11 +6,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"github.com/buger/jsonparser"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"regexp"
 	"strings"
 	"time"
 

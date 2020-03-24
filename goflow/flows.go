@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/definition"
-	"github.com/nyaruka/goflow/flows/definition/migrations"
-	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/definition"
+	"github.com/greatnonprofits-nfp/goflow/flows/definition/migrations"
+	"github.com/greatnonprofits-nfp/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 
 	"github.com/Masterminds/semver"

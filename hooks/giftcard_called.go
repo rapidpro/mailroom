@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeGiftcardCalled, handleWebhookCalled)
+	models.RegisterEventHandler(events.TypeGiftcardCalled, handleWebhookCalled)
 }

@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeShortenURLCalled, handleWebhookCalled)
+	models.RegisterEventHandler(events.TypeShortenURLCalled, handleWebhookCalled)
 }

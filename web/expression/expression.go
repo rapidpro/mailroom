@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/flows/definition/legacy/expressions"
+	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
