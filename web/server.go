@@ -9,17 +9,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/sirupsen/logrus"
+	"github.com/olivere/elastic"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -61,13 +61,14 @@ func RegisterRoute(method string, pattern string, handler Handler) {
 }
 
 // NewServer creates a new web server, it will need to be started after being created
-func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API, wg *sync.WaitGroup) *Server {
+func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API, elasticClient *elastic.Client, wg *sync.WaitGroup) *Server {
 	s := &Server{
-		CTX:      ctx,
-		RP:       rp,
-		DB:       db,
-		S3Client: s3Client,
-		Config:   config,
+		CTX:           ctx,
+		RP:            rp,
+		DB:            db,
+		S3Client:      s3Client,
+		ElasticClient: elasticClient,
+		Config:        config,
 
 		wg: wg,
 	}
@@ -113,7 +114,7 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 	return func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
 		token := r.Header.Get("authorization")
 		if !strings.HasPrefix(token, "Token ") {
-			return nil, http.StatusUnauthorized, errors.New("missing authorization header")
+			return errors.New("missing authorization header"), http.StatusUnauthorized, nil
 		}
 
 		// pull out the actual token
@@ -136,20 +137,20 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 			o.is_active = TRUE AND
 			u.is_active = TRUE
 		`, token)
-
 		if err != nil {
-			return nil, http.StatusUnauthorized, errors.Wrapf(err, "error looking up authorization header")
+			return errors.Wrapf(err, "error looking up authorization header"), http.StatusUnauthorized, nil
 		}
+		defer rows.Close()
 
 		if !rows.Next() {
-			return nil, http.StatusUnauthorized, errors.Errorf("invalid authorization header")
+			return errors.Errorf("invalid authorization header"), http.StatusUnauthorized, nil
 		}
 
 		var userID int64
 		var orgID models.OrgID
 		err = rows.Scan(&userID, &orgID)
 		if err != nil {
-			return nil, http.StatusServiceUnavailable, errors.Wrapf(err, "error scanning auth row")
+			return nil, 0, errors.Wrapf(err, "error scanning auth row")
 		}
 
 		// we are authenticated set our user id ang org id on our context and call our sub handler
@@ -164,7 +165,7 @@ func RequireAuthToken(handler JSONHandler) JSONHandler {
 	return func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
 		auth := r.Header.Get("authorization")
 		if s.Config.AuthToken != "" && fmt.Sprintf("Token %s", s.Config.AuthToken) != auth {
-			return nil, http.StatusUnauthorized, fmt.Errorf("invalid or missing authorization header, denying")
+			return fmt.Errorf("invalid or missing authorization header, denying"), http.StatusUnauthorized, nil
 		}
 
 		// we are authenticated, call our chain
@@ -178,9 +179,15 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 		w.Header().Set("Content-type", "application/json")
 
 		value, status, err := handler(r.Context(), s, r)
+
+		// handler errored (a hard error)
 		if err != nil {
-			value = map[string]string{
-				"error": err.Error(),
+			value = NewErrorResponse(err)
+		} else {
+			// handler returned an error to use as a the response
+			asError, isError := value.(error)
+			if isError {
+				value = NewErrorResponse(asError)
 			}
 		}
 
@@ -194,7 +201,7 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 
 		if err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error handling request")
-			w.WriteHeader(status)
+			w.WriteHeader(http.StatusInternalServerError)
 			w.Write(serialized)
 			return
 		}
@@ -214,10 +221,7 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 
 		logrus.WithError(err).WithField("http_request", r).Error("error handling request")
 		w.WriteHeader(http.StatusInternalServerError)
-		value := map[string]string{
-			"error": err.Error(),
-		}
-		serialized, _ := json.Marshal(value)
+		serialized, _ := json.Marshal(NewErrorResponse(err))
 		w.Write(serialized)
 		return
 	}
@@ -261,21 +265,32 @@ func handleIndex(ctx context.Context, s *Server, r *http.Request) (interface{}, 
 }
 
 func handle404(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
-	return nil, http.StatusNotFound, errors.Errorf("not found: %s", r.URL.String())
+	return errors.Errorf("not found: %s", r.URL.String()), http.StatusNotFound, nil
 }
 
 func handle405(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
-	return nil, http.StatusMethodNotAllowed, errors.Errorf("illegal method: %s", r.Method)
+	return errors.Errorf("illegal method: %s", r.Method), http.StatusMethodNotAllowed, nil
 }
 
 type Server struct {
-	CTX      context.Context
-	RP       *redis.Pool
-	DB       *sqlx.DB
-	S3Client s3iface.S3API
-	Config   *config.Config
+	CTX           context.Context
+	RP            *redis.Pool
+	DB            *sqlx.DB
+	S3Client      s3iface.S3API
+	Config        *config.Config
+	ElasticClient *elastic.Client
 
 	wg *sync.WaitGroup
 
 	httpServer *http.Server
+}
+
+// ErrorResponse is the type for our error responses, it just contains a single error field
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// NewErrorResponse creates a new error response from the passed in errro
+func NewErrorResponse(err error) *ErrorResponse {
+	return &ErrorResponse{err.Error()}
 }

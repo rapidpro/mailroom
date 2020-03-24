@@ -33,7 +33,7 @@ func Reset() (context.Context, *sqlx.DB, *redis.Pool) {
 // then copying the mailroom_test.dump file to your mailroom root directory
 //   % cp mailroom_test.dump ../mailroom
 func ResetDB() {
-	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable")
+	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
 	defer db.Close()
 	db.MustExec("drop owned by mailroom_test cascade")
 	dir, _ := os.Getwd()
@@ -44,12 +44,12 @@ func ResetDB() {
 		dir = path.Dir(dir)
 	}
 
-	mustExec("pg_restore", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
+	mustExec("pg_restore", "-h", "localhost", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
 }
 
 // DB returns an open test database pool
 func DB() *sqlx.DB {
-	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable")
+	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
 	return db
 }
 
@@ -111,6 +111,8 @@ func mustExec(command string, args ...string) {
 func AssertQueryCount(t *testing.T, db *sqlx.DB, sql string, args []interface{}, count int, errMsg ...interface{}) {
 	var c int
 	err := db.Get(&c, sql, args...)
-	assert.NoError(t, err)
+	if err != nil {
+		assert.Fail(t, "error performing query: %s - %s", sql, err)
+	}
 	assert.Equal(t, count, c, errMsg...)
 }

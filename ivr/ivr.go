@@ -12,20 +12,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/excellent/types"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/flows/resumes"
 	"github.com/greatnonprofits-nfp/goflow/flows/triggers"
 	"github.com/greatnonprofits-nfp/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/httputils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/s3utils"
+
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -124,7 +127,7 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 	logger := httputils.NewLoggingTransport(http.DefaultTransport)
 	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
 
-	// try to request our call start
+	// try to request our call hangup
 	err = c.HangupCall(client, conn.ExternalID())
 
 	// insert any logged requests
@@ -326,32 +329,43 @@ func StartIVRFlow(
 	}
 
 	// get the flow for our start
-	flowID, err := models.FlowIDForStart(ctx, db, org.OrgID(), startID)
+	start, err := models.GetFlowStartAttributes(ctx, db, org.OrgID(), startID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
 
-	flow, err := org.FlowByID(flowID)
+	flow, err := org.FlowByID(start.FlowID())
 	if err != nil {
 		return errors.Wrapf(err, "unable to load flow: %d", startID)
 	}
 
-	// build our session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "error starting flow, unable to load assets")
-	}
-
 	// our flow contact
-	contact, err := c.FlowContact(org, sa)
+	contact, err := c.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error loading flow contact")
+	}
+
+	var params *types.XObject
+	if len(start.Extra()) > 0 {
+		params, err = types.ReadXObject(start.Extra())
+		if err != nil {
+			return errors.Wrap(err, "unable to read JSON from flow start extra")
+		}
 	}
 
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	connRef := flows.NewConnection(channel.ChannelReference(), urn)
-	trigger := triggers.NewManualVoiceTrigger(org.Env(), flowRef, contact, connRef, nil)
+
+	var trigger flows.Trigger
+	if len(start.ParentSummary()) > 0 {
+		trigger, err = triggers.NewFlowActionVoice(org.Env(), flowRef, contact, connRef, start.ParentSummary())
+		if err != nil {
+			return errors.Wrap(err, "unable to create flow action trigger")
+		}
+	} else {
+		trigger = triggers.NewManualVoice(org.Env(), flowRef, contact, connRef, params)
+	}
 
 	// mark our connection as started
 	err = conn.MarkStarted(ctx, db, time.Now())
@@ -368,7 +382,7 @@ func StartIVRFlow(
 	}
 
 	// start our flow
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, hook, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow")
 	}
@@ -393,13 +407,7 @@ func ResumeIVRFlow(
 	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
-	// build our session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return errors.Wrapf(err, "unable to load assets")
-	}
-
-	contact, err := c.FlowContact(org, sa)
+	contact, err := c.FlowContact(org)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}
@@ -446,7 +454,7 @@ func ResumeIVRFlow(
 	}
 
 	// our msg UUID
-	msgUUID := flows.MsgUUID(utils.NewUUID())
+	msgUUID := flows.MsgUUID(uuids.New())
 
 	// we have an attachment, download it locally
 	if attachment != NilAttachment {
@@ -533,7 +541,7 @@ func ResumeIVRFlow(
 	}
 
 	// create our msg resume event
-	resume := resumes.NewMsgResume(org.Env(), contact, msgIn)
+	resume := resumes.NewMsg(org.Env(), contact, msgIn)
 
 	// hook to set our connection on our session before our event hooks run
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
@@ -552,7 +560,7 @@ func ResumeIVRFlow(
 		}
 	}
 
-	session, err = runner.ResumeFlow(ctx, db, rp, org, sa, session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}
@@ -590,14 +598,14 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 		}
 
 		// on errors we need to look up the flow to know how long to wait before retrying
-		flowID, err := models.FlowIDForStart(ctx, db, org.OrgID(), conn.StartID())
+		start, err := models.GetFlowStartAttributes(ctx, db, org.OrgID(), conn.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())
 		}
 
-		flow, err := org.FlowByID(flowID)
+		flow, err := org.FlowByID(start.FlowID())
 		if err != nil {
-			return errors.Wrapf(err, "unable to load flow: %d", flowID)
+			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}
 
 		retryWait := time.Minute * time.Duration(flow.IntConfigValue(models.FlowConfigIVRRetryMinutes, models.ConnectionRetryWait))

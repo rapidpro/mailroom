@@ -203,7 +203,7 @@ const (
 		"flows": [
 			{
 				"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85",
-				"legacy_definition": {
+				"definition": {
 					"base_language": "eng",
 					"action_sets": [{
 						"y": 0,
@@ -256,7 +256,7 @@ func TestServer(t *testing.T) {
 	rp := testsuite.RP()
 	wg := &sync.WaitGroup{}
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 
 	// give our server time to start
@@ -268,16 +268,16 @@ func TestServer(t *testing.T) {
 	// add a trigger for our campaign flow with 'trigger'
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), 'trigger', false, $1, 'K', 'O', 1, 1, 1, 0) RETURNING id`,
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
+		VALUES(TRUE, now(), now(), 'trigger', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`,
 		models.CampaignFlowID,
 	)
 
 	// also add a catch all
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count)
-		VALUES(TRUE, now(), now(), NULL, false, $1, 'C', NULL, 1, 1, 1, 0) RETURNING id`,
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
+		VALUES(TRUE, now(), now(), NULL, false, $1, 'C', NULL, 1, 1, 1) RETURNING id`,
 		models.CampaignFlowID,
 	)
 
@@ -329,6 +329,12 @@ func TestServer(t *testing.T) {
 			sessionJSON, _ := json.Marshal(parsed["session"])
 			session = string(sessionJSON)
 			fmt.Println(session)
+
+			context, hasContext := parsed["context"]
+			if hasContext {
+				assert.Contains(t, context, "contact")
+				assert.Contains(t, context, "globals")
+			}
 		}
 
 		assert.True(t, strings.Contains(string(content), tc.Response), "%d: did not find string: %s in body: %s", i, tc.Response, string(content))

@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -13,23 +14,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/envs"
 	"github.com/greatnonprofits-nfp/goflow/excellent"
 	"github.com/greatnonprofits-nfp/goflow/excellent/types"
 	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/definition/legacy/expressions"
 	"github.com/greatnonprofits-nfp/goflow/flows/events"
-	"github.com/greatnonprofits-nfp/goflow/legacy/expressions"
 	"github.com/greatnonprofits-nfp/goflow/utils"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/nyaruka/null"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+	"github.com/lib/pq/hstore"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
 )
 
 // MsgID is our internal type for msg ids, which can be null/0
@@ -39,20 +42,6 @@ type MsgID null.Int
 const NilMsgID = MsgID(0)
 
 type MsgDirection string
-
-type TrackableLink struct {
-	UUID        string `json:"uuid"          db:"uuid"`
-	Destination string `json:"destination"    db:"destination"`
-}
-
-type TLPayload struct {
-	LongDynamicLink string   `json:"longDynamicLink"`
-	Suffix          TLSuffix `json:"suffix"`
-}
-
-type TLSuffix struct {
-	Option string `json:"option"`
-}
 
 const (
 	DirectionIn  = MsgDirection("I")
@@ -200,7 +189,7 @@ func (m *Msg) SetURN(urn urns.URN) error {
 
 	urnID := URNID(urnInt)
 	m.m.ContactURNID = &urnID
-	m.m.URNAuth = getURNAuth(urn)
+	m.m.URNAuth = GetURNAuth(urn)
 
 	return nil
 }
@@ -298,101 +287,35 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 }
 
 // NewOutgoingMsg creates an outgoing message for the passed in flow message. Note that this message is created in a queued state!
-func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, contactUUID flows.ContactUUID, ctx context.Context, tx Queryer) (*Msg, error) {
+func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	msg := &Msg{}
 
 	m := &msg.m
-	err := msg.SetURN(out.URN())
-	if err != nil {
-		return nil, errors.Wrapf(err, "error setting msg urn")
-	}
-
-	// splitting the text as array for analyzing and replace if it's the case
-	re := regexp.MustCompile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?!&//=]*)`)
-	textSplitted := re.FindAllString(out.Text(), -1)
-	text := out.Text()
-	for i := range textSplitted {
-		d := textSplitted[i]
-
-		// checking if the text is a valid URL
-		if !isValidUrl(d) {
-			continue
-		}
-
-		// if we don't have the FDL key and FDL default URL, should be skipped
-		if config.Mailroom.FDLKey == "" || config.Mailroom.FDLDefaultURL == "" {
-			continue
-		}
-
-		dest, errLink := GetLinksFromOrg(ctx, tx, orgID, d)
-
-		if errLink == nil && contactUUID != "" {
-			fdlURL := fmt.Sprintf("https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=%s", config.Mailroom.FDLKey)
-			handleURL := fmt.Sprintf("https://%s/link/handler/%s", config.Mailroom.Domain, dest["uuid"])
-			longURL := fmt.Sprintf("%s?contact=%s", handleURL, contactUUID)
-
-			// creating the payload
-			payload := &TLPayload{
-				LongDynamicLink: fmt.Sprintf("%s/?link=%s", config.Mailroom.FDLDefaultURL, longURL),
-				Suffix: TLSuffix{
-					Option: "SHORT",
-				},
-			}
-
-			b, _ := json.Marshal(payload)
-
-			// build our request
-			method := "POST"
-			req, errReq := http.NewRequest(method, fdlURL, strings.NewReader(string(b)))
-			if errReq != nil {
-				continue
-			}
-
-			req.Header.Add("Content-Type", "application/json")
-
-			resp, errHttp := http.DefaultClient.Do(req)
-			if errHttp != nil {
-				continue
-			}
-			content, errRead := ioutil.ReadAll(resp.Body)
-			if errRead != nil {
-				continue
-			}
-
-			// replacing the link for the FDL generated link
-			shortLink, _ := jsonparser.GetString(content, "shortLink")
-			text = strings.Replace(text, d, shortLink, -1)
-		}
-
-	}
 
 	m.UUID = out.UUID()
-	m.Text = text
+	m.Text = out.Text()
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
 	m.Visibility = VisibilityVisible
 	m.MsgType = TypeFlow
 	m.ContactID = contactID
-	m.URN = out.URN()
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
+	err := msg.SetURN(out.URN())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error setting msg urn")
+	}
+
 	if channel != nil {
 		m.ChannelUUID = channel.UUID()
 		msg.SetChannelID(channel.ID())
+		msg.channel = channel
 	}
+
 	m.MsgCount = 1
-
-	// get the id of our URN
-	urnInt := GetURNInt(out.URN(), "id")
-	if urnInt != 0 {
-		urnID := URNID(urnInt)
-		m.ContactURNID = &urnID
-	}
-
-	msg.channel = channel
 
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
@@ -402,13 +325,16 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 	}
 
 	// populate metadata if we have any
-	if len(out.QuickReplies()) > 0 || out.Templating() != nil {
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic {
 		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
 		}
 		if out.Templating() != nil {
 			metadata["templating"] = out.Templating()
+		}
+		if out.Topic() != flows.NilMsgTopic {
+			metadata["topic"] = string(out.Topic())
 		}
 		m.Metadata = null.NewMap(metadata)
 	}
@@ -453,34 +379,6 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	}
 
 	return msg
-}
-
-// GetLinksFromOrg queries the trackable links from the org returning them
-func GetLinksFromOrg(ctx context.Context, tx Queryer, org OrgID, d string) (map[string]string, error) {
-	link := &TrackableLink{}
-	dest := make(map[string]string)
-
-	rows, err := tx.QueryxContext(ctx,
-		`SELECT row_to_json(r) FROM (SELECT uuid FROM links_link 
-				WHERE org_id = $1 AND destination = $2 AND is_active = TRUE AND is_archived = FALSE 
-				ORDER BY id DESC LIMIT 1) r`,
-		org, d,
-	)
-	if !rows.Next() {
-		return dest, errors.Errorf("no link found")
-	}
-	defer rows.Close()
-
-	err = readJSONRow(rows, link)
-	if err != nil {
-		return dest, errors.Wrapf(err, "error loading trackable link")
-	}
-
-	dest = map[string]string{
-		"uuid": link.UUID,
-	}
-
-	return dest, nil
 }
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
@@ -600,50 +498,176 @@ type BroadcastTranslation struct {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                              `json:"broadcast_id,omitempty"`
-		Translations  map[utils.Language]*BroadcastTranslation `json:"translations"`
-		TemplateState TemplateState                            `json:"template_state"`
-		BaseLanguage  utils.Language                           `json:"base_language"`
-		URNs          []urns.URN                               `json:"urns,omitempty"`
-		ContactIDs    []ContactID                              `json:"contact_ids,omitempty"`
-		GroupIDs      []GroupID                                `json:"group_ids,omitempty"`
-		OrgID         OrgID                                    `json:"org_id"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty" db:"id"`
+		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+		Text          hstore.Hstore                           `                              db:"text"`
+		TemplateState TemplateState                           `json:"template_state"`
+		BaseLanguage  envs.Language                           `json:"base_language"          db:"base_language"`
+		URNs          []urns.URN                              `json:"urns,omitempty"`
+		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
+		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
+		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
+		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
 	}
 }
 
-func (b *Broadcast) BroadcastID() BroadcastID                               { return b.b.BroadcastID }
-func (b *Broadcast) ContactIDs() []ContactID                                { return b.b.ContactIDs }
-func (b *Broadcast) GroupIDs() []GroupID                                    { return b.b.GroupIDs }
-func (b *Broadcast) URNs() []urns.URN                                       { return b.b.URNs }
-func (b *Broadcast) OrgID() OrgID                                           { return b.b.OrgID }
-func (b *Broadcast) Translations() map[utils.Language]*BroadcastTranslation { return b.b.Translations }
-func (b *Broadcast) TemplateState() TemplateState                           { return b.b.TemplateState }
+func (b *Broadcast) BroadcastID() BroadcastID                              { return b.b.BroadcastID }
+func (b *Broadcast) ContactIDs() []ContactID                               { return b.b.ContactIDs }
+func (b *Broadcast) GroupIDs() []GroupID                                   { return b.b.GroupIDs }
+func (b *Broadcast) URNs() []urns.URN                                      { return b.b.URNs }
+func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
+func (b *Broadcast) BaseLanguage() envs.Language                           { return b.b.BaseLanguage }
+func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { return b.b.Translations }
+func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(
-	orgID OrgID, id BroadcastID, translations map[utils.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage utils.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID) *Broadcast {
+	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID) *Broadcast {
 
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
 	bcast.b.BroadcastID = id
+	bcast.b.Translations = translations
 	bcast.b.TemplateState = state
 	bcast.b.BaseLanguage = baseLanguage
-	bcast.b.GroupIDs = groupIDs
-	bcast.b.ContactIDs = contactIDs
 	bcast.b.URNs = urns
-	bcast.b.Translations = translations
+	bcast.b.ContactIDs = contactIDs
+	bcast.b.GroupIDs = groupIDs
 
 	return bcast
 }
 
+// InsertChildBroadcast clones the passed in broadcast as a parent, then inserts that broadcast into the DB
+func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*Broadcast, error) {
+	child := NewBroadcast(
+		parent.OrgID(),
+		NilBroadcastID,
+		parent.b.Translations,
+		parent.b.TemplateState,
+		parent.b.BaseLanguage,
+		parent.b.URNs,
+		parent.b.ContactIDs,
+		parent.b.GroupIDs,
+	)
+	// populate our parent id
+	child.b.ParentID = parent.BroadcastID()
+
+	// populate text from our translations
+	child.b.Text.Map = make(map[string]sql.NullString)
+	for lang, t := range child.b.Translations {
+		child.b.Text.Map[string(lang)] = sql.NullString{String: t.Text, Valid: true}
+		if len(t.Attachments) > 0 || len(t.QuickReplies) > 0 {
+			return nil, errors.Errorf("cannot clone broadcast with quick replies or attachments")
+		}
+	}
+
+	// insert our broadcast
+	err := BulkSQL(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.BroadcastID())
+	}
+
+	// build up all our contact associations
+	contacts := make([]interface{}, 0, len(child.b.ContactIDs))
+	for _, contactID := range child.b.ContactIDs {
+		contacts = append(contacts, &broadcastContact{
+			BroadcastID: child.BroadcastID(),
+			ContactID:   contactID,
+		})
+	}
+
+	// insert our contacts
+	err = BulkSQL(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting contacts for broadcast")
+	}
+
+	// build up all our group associations
+	groups := make([]interface{}, 0, len(child.b.GroupIDs))
+	for _, groupID := range child.b.GroupIDs {
+		groups = append(groups, &broadcastGroup{
+			BroadcastID: child.BroadcastID(),
+			GroupID:     groupID,
+		})
+	}
+
+	// insert our groups
+	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting groups for broadcast")
+	}
+
+	// finally our URNs
+	urns := make([]interface{}, 0, len(child.b.URNs))
+	for _, urn := range child.b.URNs {
+		urnID := GetURNID(urn)
+		if urnID == NilURNID {
+			return nil, errors.Errorf("attempt to insert new broadcast with URNs that do not have id: %s", urn)
+		}
+		urns = append(urns, &broadcastURN{
+			BroadcastID: child.BroadcastID(),
+			URNID:       urnID,
+		})
+	}
+
+	// insert our urns
+	err = BulkSQL(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting URNs for broadcast")
+	}
+
+	return child, nil
+}
+
+type broadcastURN struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	URNID       URNID       `db:"contacturn_id"`
+}
+
+type broadcastContact struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	ContactID   ContactID   `db:"contact_id"`
+}
+
+type broadcastGroup struct {
+	BroadcastID BroadcastID `db:"broadcast_id"`
+	GroupID     GroupID     `db:"contactgroup_id"`
+}
+
+const insertBroadcastSQL = `
+INSERT INTO
+	msgs_broadcast( org_id,  parent_id, is_active, created_on, modified_on, status,  text,  base_language, send_all)
+			VALUES(:org_id, :parent_id, TRUE,      NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
+RETURNING
+	id
+`
+
+const insertBroadcastContactsSQL = `
+INSERT INTO
+	msgs_broadcast_contacts( broadcast_id,  contact_id)
+	                 VALUES(:broadcast_id,     :contact_id)
+`
+
+const insertBroadcastGroupsSQL = `
+INSERT INTO
+	msgs_broadcast_groups( broadcast_id,  contactgroup_id)
+	               VALUES(:broadcast_id,     :contactgroup_id)
+`
+
+const insertBroadcastURNsSQL = `
+INSERT INTO
+	msgs_broadcast_urns( broadcast_id,  contacturn_id)
+	             VALUES(:broadcast_id, :contacturn_id)
+`
+
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
 	// converst our translations to our type
-	translations := make(map[utils.Language]*BroadcastTranslation)
+	translations := make(map[envs.Language]*BroadcastTranslation)
 	for l, t := range event.Translations {
 		translations[l] = &BroadcastTranslation{
 			Text:         t.Text,
@@ -684,14 +708,14 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {
 	b struct {
-		BroadcastID   BroadcastID                              `json:"broadcast_id,omitempty"`
-		Translations  map[utils.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage  utils.Language                           `json:"base_language"`
-		TemplateState TemplateState                            `json:"template_state"`
-		URNs          map[ContactID]urns.URN                   `json:"urns,omitempty"`
-		ContactIDs    []ContactID                              `json:"contact_ids,omitempty"`
-		IsLast        bool                                     `json:"is_last"`
-		OrgID         OrgID                                    `json:"org_id"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
+		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+		BaseLanguage  envs.Language                           `json:"base_language"`
+		TemplateState TemplateState                           `json:"template_state"`
+		URNs          map[ContactID]urns.URN                  `json:"urns,omitempty"`
+		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
+		IsLast        bool                                    `json:"is_last"`
+		OrgID         OrgID                                   `json:"org_id"`
 	}
 }
 
@@ -700,18 +724,18 @@ func (b *BroadcastBatch) ContactIDs() []ContactID             { return b.b.Conta
 func (b *BroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.URNs }
 func (b *BroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
 func (b *BroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
-func (b *BroadcastBatch) Translations() map[utils.Language]*BroadcastTranslation {
+func (b *BroadcastBatch) Translations() map[envs.Language]*BroadcastTranslation {
 	return b.b.Translations
 }
 func (b *BroadcastBatch) TemplateState() TemplateState { return b.b.TemplateState }
-func (b *BroadcastBatch) BaseLanguage() utils.Language { return b.b.BaseLanguage }
+func (b *BroadcastBatch) BaseLanguage() envs.Language  { return b.b.BaseLanguage }
 func (b *BroadcastBatch) IsLast() bool                 { return b.b.IsLast }
 func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
 
 func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, org *OrgAssets, sa flows.SessionAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, org *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
 	broadcastURNs := bcast.URNs()
 
@@ -743,7 +767,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
 	}
 
-	channels := sa.Channels()
+	channels := org.SessionAssets().Channels()
 
 	// for each contact, build our message
 	msgs := make([]*Msg, 0, len(contacts))
@@ -754,7 +778,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 			return nil, nil
 		}
 
-		contact, err := c.FlowContact(org, sa)
+		contact, err := c.FlowContact(org)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating flow contact")
 		}
@@ -797,7 +821,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		//   2) org default language
 		//   3) broadcast base language
 		lang := contact.Language()
-		if lang != utils.NilLanguage {
+		if lang != envs.NilLanguage {
 			found := false
 			for _, l := range org.Env().AllowedLanguages() {
 				if l == lang {
@@ -806,7 +830,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 				}
 			}
 			if !found {
-				lang = utils.NilLanguage
+				lang = envs.NilLanguage
 			}
 		}
 
@@ -842,9 +866,14 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 
 		// if we have a template, evaluate it
 		if template != "" {
-			contactCtx := flows.Context(org.Env(), contact)
-			templateCtx := types.NewXObject(map[string]types.XValue{"contact": contactCtx})
-			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template)
+			// build up the minimum viable context for templates
+			templateCtx := types.NewXObject(map[string]types.XValue{
+				"contact": flows.Context(org.Env(), contact),
+				"fields":  flows.Context(org.Env(), contact.Fields()),
+				"globals": flows.Context(org.Env(), org.SessionAssets().Globals()),
+				"urns":    flows.ContextFunc(org.Env(), contact.URNs().MapContext),
+			})
+			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template, nil)
 		}
 
 		// don't do anything if we have no text or attachments
@@ -853,8 +882,8 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil)
-		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now(), c.uuid, ctx, db)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
+		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now())
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -967,14 +996,4 @@ func (i BroadcastID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *BroadcastID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
-}
-
-// Check if it's a valid URL
-func isValidUrl(toTest string) bool {
-	_, err := url.ParseRequestURI(toTest)
-	if err != nil {
-		return false
-	} else {
-		return true
-	}
 }

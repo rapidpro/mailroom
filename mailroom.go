@@ -9,20 +9,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/s3utils"
 	"github.com/nyaruka/mailroom/web"
-	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/librato"
+	"github.com/olivere/elastic"
+	"github.com/sirupsen/logrus"
 )
 
 // InitFunction is a function that will be called when mailroom starts
@@ -47,10 +48,11 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	Config   *config.Config
-	DB       *sqlx.DB
-	RP       *redis.Pool
-	S3Client s3iface.S3API
+	Config        *config.Config
+	DB            *sqlx.DB
+	RP            *redis.Pool
+	ElasticClient *elastic.Client
+	S3Client      s3iface.S3API
 
 	Quit      chan bool
 	CTX       context.Context
@@ -182,6 +184,17 @@ func (mr *Mailroom) Start() error {
 		log.Info("s3 bucket ok")
 	}
 
+	// initialize our elastic client
+	mr.ElasticClient, err = elastic.NewClient(
+		elastic.SetURL(mr.Config.Elastic),
+		elastic.SetSniff(false),
+	)
+	if err != nil {
+		log.WithError(err).Error("unable to connect to elastic, check configuration")
+	} else {
+		log.Info("elastic ok")
+	}
+
 	for _, initFunc := range initFunctions {
 		initFunc(mr)
 	}
@@ -198,7 +211,7 @@ func (mr *Mailroom) Start() error {
 	mr.handlerForeman.Start()
 
 	// start our web server
-	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.S3Client, mr.WaitGroup)
+	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.S3Client, mr.ElasticClient, mr.WaitGroup)
 	mr.webserver.Start()
 
 	logrus.Info("mailroom started")
@@ -219,6 +232,7 @@ func (mr *Mailroom) Stop() error {
 	mr.webserver.Stop()
 
 	mr.WaitGroup.Wait()
+	mr.ElasticClient.Stop()
 	logrus.Info("mailroom stopped")
 	return nil
 }

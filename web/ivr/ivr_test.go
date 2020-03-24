@@ -15,7 +15,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/starts"
+	"github.com/nyaruka/mailroom/tasks/starts"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/sirupsen/logrus"
 
@@ -26,6 +26,7 @@ import (
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/ivr/nexmo"
 	"github.com/nyaruka/mailroom/ivr/twiml"
+	ivr_tasks "github.com/nyaruka/mailroom/tasks/ivr"
 )
 
 func TestTwilioIVR(t *testing.T) {
@@ -39,10 +40,10 @@ func TestTwilioIVR(t *testing.T) {
 		logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("form", r.Form).Info("test server called")
 		if strings.HasSuffix(r.URL.String(), "Calls.json") {
 			to := r.Form.Get("To")
-			if to == "+250700000001" {
+			if to == "+16055741111" {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{"sid": "Call1"}`))
-			} else if to == "+250700000003" {
+			} else if to == "+16055743333" {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{"sid": "Call2"}`))
 			} else {
@@ -59,7 +60,7 @@ func TestTwilioIVR(t *testing.T) {
 	twiml.IgnoreSignatures = true
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -67,11 +68,17 @@ func TestTwilioIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy and george
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, nil)
-	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+16055741111?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
+
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
+		WithParentSummary(parentSummary)
+
+	err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+	assert.NoError(t, err)
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, start)
+	err = starts.CreateFlowBatches(ctx, db, rp, nil, start)
 	assert.NoError(t, err)
 
 	// start our task
@@ -82,7 +89,7 @@ func TestTwilioIVR(t *testing.T) {
 	assert.NoError(t, err)
 
 	// request our call to start
-	err = ivr.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
+	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db,
@@ -110,7 +117,7 @@ func TestTwilioIVR(t *testing.T) {
 			ConnectionID: models.ConnectionID(1),
 			Form:         nil,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two.",
+			Contains:     "Hello there. Please enter one or two.  This flow was triggered by Cathy",
 		},
 		{
 			Action:       "resume",
@@ -343,10 +350,10 @@ func TestNexmoIVR(t *testing.T) {
 			logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).Info("test server called")
 			form := &CallForm{}
 			json.Unmarshal(body, form)
-			if form.To[0].Number == 250700000001 {
+			if form.To[0].Number == 16055741111 {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{ "uuid": "Call1","status": "started","direction": "outbound","conversation_uuid": "Conversation1"}`))
-			} else if form.To[0].Number == 250700000003 {
+			} else if form.To[0].Number == 16055743333 {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{ "uuid": "Call2","status": "started","direction": "outbound","conversation_uuid": "Conversation2"}`))
 			} else {
@@ -357,7 +364,7 @@ func TestNexmoIVR(t *testing.T) {
 	defer ts.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -366,11 +373,14 @@ func TestNexmoIVR(t *testing.T) {
 	nexmo.IgnoreSignatures = true
 
 	// create a flow start for cathy and george
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, nil, []models.ContactID{models.CathyID, models.GeorgeID}, nil, false, true, true, nil, nil)
+	extra := json.RawMessage(`{"ref_id":"123"}`)
+	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
+		WithExtra(extra)
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, start)
+	err := starts.CreateFlowBatches(ctx, db, rp, nil, start)
 	assert.NoError(t, err)
 
 	// start our task
@@ -381,7 +391,7 @@ func TestNexmoIVR(t *testing.T) {
 	assert.NoError(t, err)
 
 	// request our call to start
-	err = ivr.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
+	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db,
@@ -410,7 +420,7 @@ func TestNexmoIVR(t *testing.T) {
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two.",
+			Contains:     "Hello there. Please enter one or two. Your reference id is 123",
 		},
 		{
 			Action:       "resume",

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
@@ -26,7 +27,7 @@ func TestSurveyor(t *testing.T) {
 	defer rc.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -96,7 +97,7 @@ func TestSurveyor(t *testing.T) {
 		FlowID         models.FlowID    `db:"flow_id"`
 		ContactID      flows.ContactID  `db:"contact_id"`
 		OrgID          models.OrgID     `db:"org_id"`
-		AgeFieldUUID   models.FieldUUID `db:"age_field_uuid"`
+		AgeFieldUUID   assets.FieldUUID `db:"age_field_uuid"`
 		TestersGroupID models.GroupID   `db:"testers_group_id"`
 	}
 
@@ -108,6 +109,7 @@ func TestSurveyor(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
+		testID := fmt.Sprintf("%s[token=%s]", tc.File, tc.Token)
 		path := filepath.Join("testdata", tc.File)
 		submission, err := ioutil.ReadFile(path)
 		assert.NoError(t, err)
@@ -122,10 +124,10 @@ func TestSurveyor(t *testing.T) {
 		}
 
 		resp, err := http.DefaultClient.Do(req)
-		assert.Equal(t, tc.StatusCode, resp.StatusCode)
+		assert.Equal(t, tc.StatusCode, resp.StatusCode, "unexpected status code for %s", testID)
 
 		body, _ := ioutil.ReadAll(resp.Body)
-		assert.Containsf(t, string(body), tc.Contains, "%d does not contain expected body", i)
+		assert.Containsf(t, string(body), tc.Contains, "%s does not contain expected body", testID)
 
 		id, _ := jsonparser.GetInt(body, "contact", "id")
 		args.ContactID = flows.ContactID(id)

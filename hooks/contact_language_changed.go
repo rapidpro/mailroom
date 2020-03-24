@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactLanguageChanged, handleContactLanguageChanged)
+	models.RegisterEventHandler(events.TypeContactLanguageChanged, handleContactLanguageChanged)
 }
 
 // CommitLanguageChangesHook is our hook for language changes
@@ -21,10 +21,10 @@ type CommitLanguageChangesHook struct{}
 var commitLanguageChangesHook = &CommitLanguageChangesHook{}
 
 // Apply applies our contact language change before our commit
-func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and language name
-	updates := make([]interface{}, 0, len(sessions))
-	for s, e := range sessions {
+	updates := make([]interface{}, 0, len(scenes))
+	for s, e := range scenes {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactLanguageChangedEvent)
 		updates = append(updates, &languageUpdate{s.ContactID(), event.Language})
@@ -35,15 +35,15 @@ func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *
 }
 
 // handleContactLanguageChanged is called when we process a contact language change
-func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactLanguageChangedEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.SessionID(),
 		"language":     event.Language,
 	}).Debug("changing contact language")
 
-	session.AddPreCommitEvent(commitLanguageChangesHook, event)
+	scene.AppendToEventPreCommitHook(commitLanguageChangesHook, event)
 	return nil
 }
 

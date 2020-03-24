@@ -9,7 +9,7 @@ import (
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/flows/resumes"
 	"github.com/greatnonprofits-nfp/goflow/flows/triggers"
-	"github.com/greatnonprofits-nfp/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/utils/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -35,10 +35,10 @@ func TestCampaignStarts(t *testing.T) {
 	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, models.CathyID, models.BobID, models.AlexandriaID)
 
 	// create an active session for Alexandria to test skipping
-	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES('M', $1, $2, 'W', FALSE, NOW(), $3);`, models.Org1, models.AlexandriaID, models.FavoritesFlowID)
+	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), models.Org1, models.AlexandriaID, models.FavoritesFlowID)
 
 	// create an active voice call for Cathy to make sure it doesn't get interrupted or cause skipping
-	db.MustExec(`INSERT INTO flows_flowsession(session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES('V', $1, $2, 'W', FALSE, NOW(), $3);`, models.Org1, models.CathyID, models.IVRFlowID)
+	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'V', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), models.Org1, models.CathyID, models.IVRFlowID)
 
 	// set our event to skip
 	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)
@@ -76,7 +76,7 @@ func TestCampaignStarts(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND session_id IS NOT NULL`,
 		[]interface{}{pq.Array(contacts), models.CampaignFlowID}, 2,
@@ -111,15 +111,15 @@ func TestBatchStart(t *testing.T) {
 	// create a start object
 	db.MustExec(
 		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, contact_count, status, flow_id, created_by_id, modified_by_id)
-		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', $2, 1, 1)`, utils.NewUUID(), models.SingleMessageFlowID)
+		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', $2, 1, 1)`, uuids.New(), models.SingleMessageFlowID)
 
 	// and our batch object
 	contactIDs := []models.ContactID{models.CathyID, models.BobID}
 
 	tcs := []struct {
 		Flow          models.FlowID
-		Restart       bool
-		IncludeActive bool
+		Restart       models.RestartParticipants
+		IncludeActive models.IncludeActive
 		Extra         json.RawMessage
 		Msg           string
 		Count         int
@@ -143,11 +143,9 @@ func TestBatchStart(t *testing.T) {
 	last := time.Now()
 
 	for i, tc := range tcs {
-		start := models.NewFlowStart(
-			models.OrgID(1), models.MessagingFlow, tc.Flow,
-			nil, contactIDs, nil, false, tc.Restart, tc.IncludeActive,
-			nil, tc.Extra,
-		)
+		start := models.NewFlowStart(models.OrgID(1), models.MessagingFlow, tc.Flow, tc.Restart, tc.IncludeActive).
+			WithContactIDs(contactIDs).
+			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs)
 		batch.SetIsLast(true)
 
@@ -163,7 +161,7 @@ func TestBatchStart(t *testing.T) {
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C'
+			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 			AND session_id IS NOT NULL`,
 			[]interface{}{pq.Array(contactIDs), tc.Flow}, tc.TotalCount, "%d: unexpected number of runs", i,
@@ -189,9 +187,6 @@ func TestContactRuns(t *testing.T) {
 	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	sa, err := models.GetSessionAssets(org)
-	assert.NoError(t, err)
-
 	flow, err := org.FlowByID(models.FavoritesFlowID)
 	assert.NoError(t, err)
 
@@ -199,11 +194,11 @@ func TestContactRuns(t *testing.T) {
 	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{models.CathyID})
 	assert.NoError(t, err)
 
-	contact, err := contacts[0].FlowContact(org, sa)
+	contact, err := contacts[0].FlowContact(org)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, sa, flow, []flows.Trigger{trigger}, nil, true)
+	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
+	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
@@ -240,11 +235,11 @@ func TestContactRuns(t *testing.T) {
 	session := sessions[0]
 	for i, tc := range tcs {
 		// answer our first question
-		msg := flows.NewMsgIn(flows.MsgUUID(utils.NewUUID()), models.CathyURN, nil, tc.Message, nil)
+		msg := flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, tc.Message, nil)
 		msg.SetID(10)
-		resume := resumes.NewMsgResume(org.Env(), contact, msg)
+		resume := resumes.NewMsg(org.Env(), contact, msg)
 
-		session, err = ResumeFlow(ctx, db, rp, org, sa, session, resume, nil)
+		session, err = ResumeFlow(ctx, db, rp, org, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 

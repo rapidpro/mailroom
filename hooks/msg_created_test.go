@@ -13,6 +13,7 @@ import (
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/flows/actions"
+	"github.com/greatnonprofits-nfp/goflow/utils/uuids"
 )
 
 func TestMsgCreated(t *testing.T) {
@@ -37,8 +38,9 @@ func TestMsgCreated(t *testing.T) {
 
 	msg1 := createIncomingMsg(db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start")
 
-	templateAction := actions.NewSendMsgAction(newActionUUID(), "Template time", nil, nil, false)
+	templateAction := actions.NewSendMsg(newActionUUID(), "Template time", nil, nil, false)
 	templateAction.Templating = &actions.Templating{
+		UUID:      uuids.UUID("db297d56-ec8c-4231-bbe8-030369777ae1"),
 		Template:  &assets.TemplateReference{assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), "revive_issue"},
 		Variables: []string{"@contact.name", "tooth"},
 	}
@@ -47,13 +49,13 @@ func TestMsgCreated(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendMsgAction(newActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
+					actions.NewSendMsg(newActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSendMsgAction(newActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
+					actions.NewSendMsg(newActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
 				},
 				models.BobID: []flows.Action{
-					actions.NewSendMsgAction(newActionUUID(), "No URNs", nil, nil, false),
+					actions.NewSendMsg(newActionUUID(), "No URNs", nil, nil, false),
 				},
 				models.AlexandriaID: []flows.Action{
 					templateAction,
@@ -119,13 +121,90 @@ func TestNoTopup(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendMsgAction(newActionUUID(), "No Topup", nil, nil, false),
+					actions.NewSendMsg(newActionUUID(), "No Topup", nil, nil, false),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='No Topup' AND contact_id = $1 AND status = 'P'",
 					Args:  []interface{}{models.CathyID},
+					Count: 1,
+				},
+			},
+		},
+	}
+
+	RunActionTestCases(t, tcs)
+}
+
+func TestNewURN(t *testing.T) {
+	testsuite.Reset()
+	db := testsuite.DB()
+
+	// switch our twitter channel to telegram
+	telegramUUID := models.TwitterChannelUUID
+	telegramID := models.TwitterChannelID
+	db.MustExec(
+		`UPDATE channels_channel SET channel_type = 'TG', name = 'Telegram', schemes = ARRAY['telegram'] WHERE uuid = $1`,
+		telegramUUID,
+	)
+
+	// give George a URN that Bob will steal
+	db.MustExec(
+		`INSERT INTO contacts_contacturn(identity, path, scheme, priority, contact_id, org_id) 
+		                          VALUES('telegram:67890', '67890', 'telegram', 10, $1, 1)`,
+		models.GeorgeID)
+
+	tcs := []HookTestCase{
+		HookTestCase{
+			Actions: ContactActionMap{
+				// brand new URN on Cathy
+				models.CathyID: []flows.Action{
+					actions.NewAddContactURN(newActionUUID(), "telegram", "12345"),
+					actions.NewSetContactChannel(newActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
+					actions.NewSendMsg(newActionUUID(), "Cathy Message", nil, nil, false),
+				},
+
+				// Bob is stealing a URN previously assigned to George
+				models.BobID: []flows.Action{
+					actions.NewAddContactURN(newActionUUID(), "telegram", "67890"),
+					actions.NewSetContactChannel(newActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
+					actions.NewSendMsg(newActionUUID(), "Bob Message", nil, nil, false),
+				},
+			},
+			SQLAssertions: []SQLAssertion{
+				SQLAssertion{
+					SQL: `
+					SELECT 
+					  COUNT(*) 
+					FROM 
+					  msgs_msg m 
+					  JOIN contacts_contacturn u ON m.contact_urn_id = u.id
+					WHERE 
+					  m.text='Cathy Message' AND 
+					  m.contact_id = $1 AND 
+					  m.status = 'Q' AND
+					  u.identity = $2 AND
+					  m.channel_id = $3 AND
+					  u.channel_id IS NULL`,
+					Args:  []interface{}{models.CathyID, "telegram:12345", telegramID},
+					Count: 1,
+				},
+				SQLAssertion{
+					SQL: `
+					SELECT 
+					  COUNT(*) 
+					FROM 
+					  msgs_msg m 
+					  JOIN contacts_contacturn u ON m.contact_urn_id = u.id
+					WHERE 
+					  m.text='Bob Message' AND 
+					  m.contact_id = $1 AND 
+					  m.status = 'Q' AND
+					  u.identity = $2 AND
+					  m.channel_id = $3 AND
+					  u.channel_id IS NULL`,
+					Args:  []interface{}{models.BobID, "telegram:67890", telegramID},
 					Count: 1,
 				},
 			},

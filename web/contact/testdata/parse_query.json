@@ -1,0 +1,187 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/contact/parse_query",
+        "body": "",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "invalid body",
+        "method": "POST",
+        "path": "/mr/contact/parse_query",
+        "body": {
+            "org_id": 1,
+            "query": "birthday = tomorrow"
+        },
+        "status": 400,
+        "response": {
+            "error": "can't resolve 'birthday' to attribute, scheme or field"
+        }
+    },
+    {
+        "label": "valid query without group",
+        "method": "POST",
+        "path": "/mr/contact/parse_query",
+        "body": {
+            "org_id": 1,
+            "query": "AGE>10"
+        },
+        "status": 200,
+        "response": {
+            "query": "age > 10",
+            "fields": [
+                "age"
+            ],
+            "elastic_query": {
+                "bool": {
+                    "must": [
+                        {
+                            "term": {
+                                "org_id": 1
+                            }
+                        },
+                        {
+                            "term": {
+                                "is_active": true
+                            }
+                        },
+                        {
+                            "nested": {
+                                "path": "fields",
+                                "query": {
+                                    "bool": {
+                                        "must": [
+                                            {
+                                                "term": {
+                                                    "fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
+                                                }
+                                            },
+                                            {
+                                                "range": {
+                                                    "fields.number": {
+                                                        "from": 10,
+                                                        "include_lower": false,
+                                                        "include_upper": true,
+                                                        "to": null
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            "allow_as_group": true
+        }
+    },
+    {
+        "label": "valid query with group",
+        "method": "POST",
+        "path": "/mr/contact/parse_query",
+        "body": {
+            "org_id": 1,
+            "query": "age > 10",
+            "group_uuid": "903f51da-2717-47c7-a0d3-f2f32877013d"
+        },
+        "status": 200,
+        "response": {
+            "query": "age > 10",
+            "fields": [
+                "age"
+            ],
+            "elastic_query": {
+                "bool": {
+                    "must": [
+                        {
+                            "term": {
+                                "org_id": 1
+                            }
+                        },
+                        {
+                            "term": {
+                                "is_active": true
+                            }
+                        },
+                        {
+                            "term": {
+                                "groups": "903f51da-2717-47c7-a0d3-f2f32877013d"
+                            }
+                        },
+                        {
+                            "nested": {
+                                "path": "fields",
+                                "query": {
+                                    "bool": {
+                                        "must": [
+                                            {
+                                                "term": {
+                                                    "fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
+                                                }
+                                            },
+                                            {
+                                                "range": {
+                                                    "fields.number": {
+                                                        "from": 10,
+                                                        "include_lower": false,
+                                                        "include_upper": true,
+                                                        "to": null
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            "allow_as_group": true
+        }
+    },
+    {
+        "label": "valid query with group in query",
+        "method": "POST",
+        "path": "/mr/contact/parse_query",
+        "body": {
+            "org_id": 1,
+            "query": "group = \"Testers\""
+        },
+        "status": 200,
+        "response": {
+            "query": "group = \"Testers\"",
+            "fields": [
+                "group"
+            ],
+            "elastic_query": {
+                "bool": {
+                    "must": [
+                        {
+                            "term": {
+                                "org_id": 1
+                            }
+                        },
+                        {
+                            "term": {
+                                "is_active": true
+                            }
+                        },
+                        {
+                            "term": {
+                                "groups": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                            }
+                        }
+                    ]
+                }
+            },
+            "allow_as_group": false
+        }
+    }
+]

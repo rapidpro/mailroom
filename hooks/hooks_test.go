@@ -2,23 +2,26 @@ package hooks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/envs"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/flows/definition"
 	"github.com/greatnonprofits-nfp/goflow/flows/routers"
 	"github.com/greatnonprofits-nfp/goflow/flows/triggers"
-	"github.com/greatnonprofits-nfp/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/testsuite"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +45,7 @@ type SQLAssertion struct {
 }
 
 func newActionUUID() flows.ActionUUID {
-	return flows.ActionUUID(utils.NewUUID())
+	return flows.ActionUUID(uuids.New())
 }
 
 func TestMain(m *testing.M) {
@@ -50,22 +53,22 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// CreateTestFlow creates a flow that starts with a spit by contact id
+// createTestFlow creates a flow that starts with a split by contact id
 // and then routes the contact to a node where all the actions in the
 // test case are present.
 //
 // It returns the completed flow.
-func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.Flow {
+func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.Flow {
 	categoryUUIDs := make([]flows.CategoryUUID, len(tc.Actions))
 	exitUUIDs := make([]flows.ExitUUID, len(tc.Actions))
 	i := 0
 	for range tc.Actions {
-		categoryUUIDs[i] = flows.CategoryUUID(utils.NewUUID())
-		exitUUIDs[i] = flows.ExitUUID(utils.NewUUID())
+		categoryUUIDs[i] = flows.CategoryUUID(uuids.New())
+		exitUUIDs[i] = flows.ExitUUID(uuids.New())
 		i++
 	}
-	defaultCategoryUUID := flows.CategoryUUID(utils.NewUUID())
-	defaultExitUUID := flows.ExitUUID(utils.NewUUID())
+	defaultCategoryUUID := flows.CategoryUUID(uuids.New())
+	defaultExitUUID := flows.ExitUUID(uuids.New())
 
 	cases := make([]*routers.Case, len(tc.Actions))
 	categories := make([]*routers.Category, len(tc.Actions))
@@ -74,17 +77,17 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	i = 0
 	for cid, actions := range tc.Actions {
 		cases[i] = routers.NewCase(
-			utils.NewUUID(),
+			uuids.New(),
 			"has_any_word",
 			[]string{fmt.Sprintf("%d", cid)},
 			categoryUUIDs[i],
 		)
 
 		exitNodes[i] = definition.NewNode(
-			flows.NodeUUID(utils.NewUUID()),
+			flows.NodeUUID(uuids.New()),
 			actions,
 			nil,
-			[]flows.Exit{definition.NewExit(flows.ExitUUID(utils.NewUUID()), "")},
+			[]flows.Exit{definition.NewExit(flows.ExitUUID(uuids.New()), "")},
 		)
 
 		categories[i] = routers.NewCategory(
@@ -111,11 +114,11 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		flows.NodeUUID(""),
 	))
 
-	router := routers.NewSwitchRouter(nil, "", categories, "@contact.id", cases, defaultCategoryUUID)
+	router := routers.NewSwitch(nil, "", categories, "@contact.id", cases, defaultCategoryUUID)
 
 	// and our entry node
 	entry := definition.NewNode(
-		flows.NodeUUID(utils.NewUUID()),
+		flows.NodeUUID(uuids.New()),
 		nil,
 		router,
 		exits,
@@ -128,7 +131,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	flow, err := definition.NewFlow(
 		uuid,
 		"Test Flow",
-		utils.Language("eng"),
+		envs.Language("eng"),
 		flows.FlowTypeMessaging,
 		1,
 		300,
@@ -142,7 +145,7 @@ func CreateTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 }
 
 func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *flows.MsgIn {
-	msgUUID := flows.MsgUUID(utils.NewUUID())
+	msgUUID := flows.MsgUUID(uuids.New())
 	var msgID flows.MsgID
 
 	err := db.Get(&msgID,
@@ -168,21 +171,28 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
 	assert.NoError(t, err)
 
+	org, err = org.Clone(ctx, db)
+	assert.NoError(t, err)
+
 	// reuse id from one of our real flows
 	flowID := models.FavoritesFlowID
-	flowUUID := assets.FlowUUID(utils.NewUUID())
 
 	for i, tc := range tcs {
+		// new UUID for each test so our definition doesn't get cached
+		flowUUID := assets.FlowUUID(uuids.New())
+
 		// build our flow for this test case
-		flowDef := CreateTestFlow(t, flowUUID, tc)
+		testFlow := createTestFlow(t, flowUUID, tc)
+		flowDef, err := json.Marshal(testFlow)
+		assert.NoError(t, err)
 
 		// add it to our org
-		flow, err := org.SetFlow(flowID, flowDef)
+		flow := org.SetFlow(flowID, flowUUID, testFlow.Name(), flowDef)
 		assert.NoError(t, err)
 
 		options := runner.NewStartOptions()
-		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
-			for _, s := range sessions {
+		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session []*models.Session) error {
+			for _, s := range session {
 				msg := tc.Msgs[s.ContactID()]
 				if msg != nil {
 					s.SetIncomingMsg(msg.ID(), "")
@@ -190,12 +200,12 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 			}
 			return nil
 		}
-		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
+		options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
 			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewManualTrigger(org.Env(), flow.FlowReference(), contact, nil)
+				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil), nil
 			}
-			return triggers.NewMsgTrigger(org.Env(), flow.FlowReference(), contact, msg, nil)
+			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil), nil
 		}
 
 		_, err = runner.StartFlow(ctx, db, rp, org, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)

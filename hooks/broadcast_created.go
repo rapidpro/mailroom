@@ -14,27 +14,27 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeBroadcastCreated, handleBroadcastCreated)
+	models.RegisterEventHandler(events.TypeBroadcastCreated, handleBroadcastCreated)
 }
 
-// StartBroadcastsHook is our hook for starting the broadcasts created in these sessions
+// StartBroadcastsHook is our hook for starting the broadcasts created in these scene
 type StartBroadcastsHook struct{}
 
 var startBroadcastsHook = &StartBroadcastsHook{}
 
 // Apply queues up our broadcasts for sending
-func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
-	// for each of our sessions
-	for s, es := range sessions {
+	// for each of our scene
+	for s, es := range scenes {
 		for _, e := range es {
 			event := e.(*events.BroadcastCreatedEvent)
 
-			// we skip over any session starts that involve groups if we are in a batch start
-			if len(sessions) > 1 && len(event.Groups) > 0 {
-				logrus.WithField("session_id", s.ID).Error("ignoring broadcast on group in batch")
+			// we skip over any scene starts that involve groups if we are in a batch start
+			if len(scenes) > 1 && len(event.Groups) > 0 {
+				logrus.WithField("session_id", s.SessionID).Error("ignoring broadcast on group in batch")
 				continue
 			}
 
@@ -62,17 +62,17 @@ func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 	return nil
 }
 
-// handleBroadcastCreated is called for each broadcast created event across our sessions
-func handleBroadcastCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+// handleBroadcastCreated is called for each broadcast created event across our scene
+func handleBroadcastCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.BroadcastCreatedEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.SessionID(),
 		"translations": event.Translations[event.BaseLanguage],
 	}).Debug("broadcast created")
 
-	// schedule this for being started after our sessions are committed
-	session.AddPostCommitEvent(startBroadcastsHook, event)
+	// schedule this for being started after our scene are committed
+	scene.AppendToEventPostCommitHook(startBroadcastsHook, event)
 
 	return nil
 }

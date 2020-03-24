@@ -6,12 +6,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/Masterminds/semver"
 	"github.com/jmoiron/sqlx"
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/flows"
-	"github.com/greatnonprofits-nfp/goflow/legacy"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -71,11 +68,6 @@ func (f *Flow) FlowType() FlowType { return f.f.FlowType }
 // Version returns the version this flow was authored in
 func (f *Flow) Version() string { return f.f.Version }
 
-// SetDefinition sets our definition from the passed in new definition format
-func (f *Flow) SetDefinition(definition json.RawMessage) {
-	f.f.Definition = definition
-}
-
 // IntConfigValue returns the value for the key passed in as an int. If the value
 // is not an integer or is not present then the defaultValue is returned
 func (f *Flow) IntConfigValue(key string, defaultValue int64) int64 {
@@ -93,35 +85,25 @@ func (f *Flow) StringConfigValue(key string, defaultValue string) string {
 	return f.f.Config.GetString(key, defaultValue)
 }
 
-// SetLegacyDefinition sets our definition from the passed in legacy definition
-func (f *Flow) SetLegacyDefinition(legacyDefinition json.RawMessage) error {
-	// load it in from our json
-	legacyFlow, err := legacy.ReadLegacyFlow(legacyDefinition)
-	if err != nil {
-		return errors.Wrapf(err, "error reading flow into legacy format: %s", legacyDefinition)
-	}
-
-	// migrate forwards returning our final flow definition
-	newFlow, err := legacyFlow.Migrate("https://" + config.Mailroom.AttachmentDomain)
-	if err != nil {
-		return errors.Wrapf(err, "error migrating flow: %s", legacyDefinition)
-	}
-
-	// write this flow back out in our new format
-	f.f.Definition, err = json.Marshal(newFlow)
-	if err != nil {
-		return errors.Wrapf(err, "error mashalling migrated flow definition: %s", legacyDefinition)
-	}
-
-	return nil
-}
-
 // IgnoreTriggers returns whether this flow ignores triggers
 func (f *Flow) IgnoreTriggers() bool { return f.f.IgnoreTriggers }
 
 // FlowReference return a flow reference for this flow
 func (f *Flow) FlowReference() *assets.FlowReference {
 	return assets.NewFlowReference(f.UUID(), f.Name())
+}
+
+func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
+	// first try to look up in our assets
+	flow, _ := org.Flow(flowUUID)
+	if flow != nil {
+		return flow.(*Flow).ID(), nil
+	}
+
+	// flow may be inactive, try to look up the ID only
+	var flowID FlowID
+	err := tx.GetContext(ctx, &flowID, `SELECT id FROM flows_flow WHERE org_id = $1 AND uuid = $2;`, org.OrgID(), flowUUID)
+	return flowID, err
 }
 
 func loadFlowByUUID(ctx context.Context, db *sqlx.DB, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
@@ -151,19 +133,6 @@ func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg int
 	err = readJSONRow(rows, &flow.f)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading flow definition by: %s", arg)
-	}
-
-	version, err := semver.NewVersion(flow.Version())
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to parse flow version: %s", flow.Version())
-	}
-
-	// if this is a legacy definition, then we migrate forwards
-	if version.Major() < GoFlowMajorVersion {
-		err = flow.SetLegacyDefinition(flow.f.Definition)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error setting flow definition from legacy")
-		}
 	}
 
 	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("flow", arg).Debug("loaded flow")
@@ -237,7 +206,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 				'uuid', f.uuid, 
 				'id', f.id,
 				'name', f.name,
-				'revision', revision,
+				'revision', revision, 
 				'expires', f.expires_after_minutes
 			)
 	) as definition

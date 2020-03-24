@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactGroupsChanged, handleContactGroupsChanged)
+	models.RegisterEventHandler(events.TypeContactGroupsChanged, handleContactGroupsChanged)
 }
 
 // CommitGroupChangesHook is our hook for all group changes
@@ -23,14 +23,14 @@ type CommitGroupChangesHook struct{}
 var commitGroupChangesHook = &CommitGroupChangesHook{}
 
 // Apply squashes and adds or removes all our contact groups
-func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of all adds and removes
-	adds := make([]*models.GroupAdd, 0, len(sessions))
-	removes := make([]*models.GroupRemove, 0, len(sessions))
-	changed := make(map[models.ContactID]bool, len(sessions))
+	adds := make([]*models.GroupAdd, 0, len(scenes))
+	removes := make([]*models.GroupRemove, 0, len(scenes))
+	changed := make(map[models.ContactID]bool, len(scenes))
 
 	// we remove from our groups at once, build up our list
-	for _, events := range sessions {
+	for _, events := range scenes {
 		// we use these sets to track what our final add or remove should be
 		seenAdds := make(map[models.GroupID]*models.GroupAdd)
 		seenRemoves := make(map[models.GroupID]*models.GroupRemove)
@@ -84,11 +84,11 @@ func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 }
 
 // handleContactGroupsChanged is called when a group is added or removed from our contact
-func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactGroupsChangedEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid":   session.ContactUUID(),
-		"session_id":     session.ID(),
+		"contact_uuid":   scene.ContactUUID(),
+		"session_id":     scene.SessionID(),
 		"groups_removed": len(event.GroupsRemoved),
 		"groups_added":   len(event.GroupsAdded),
 	}).Debug("changing contact groups")
@@ -99,21 +99,21 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		group := org.GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
-				"contact_uuid": session.ContactUUID(),
+				"contact_uuid": scene.ContactUUID(),
 				"group_uuid":   g.UUID,
 			}).Warn("unable to find group to remove, skipping")
 			continue
 		}
 
 		hookEvent := &models.GroupRemove{
-			ContactID: session.ContactID(),
+			ContactID: scene.ContactID(),
 			GroupID:   group.ID(),
 		}
 
 		// add our add event
-		session.AddPreCommitEvent(commitGroupChangesHook, hookEvent)
-		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
-		session.AddPreCommitEvent(contactModifiedHook, session.Contact().ID())
+		scene.AppendToEventPreCommitHook(commitGroupChangesHook, hookEvent)
+		scene.AppendToEventPreCommitHook(updateCampaignEventsHook, hookEvent)
+		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.Contact().ID())
 	}
 
 	// add each of our groups
@@ -122,7 +122,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		group := org.GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
-				"contact_uuid": session.ContactUUID(),
+				"contact_uuid": scene.ContactUUID(),
 				"group_uuid":   g.UUID,
 			}).Warn("unable to find group to add, skipping")
 			continue
@@ -130,13 +130,13 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 		// add our add event
 		hookEvent := &models.GroupAdd{
-			ContactID: session.ContactID(),
+			ContactID: scene.ContactID(),
 			GroupID:   group.ID(),
 		}
 
-		session.AddPreCommitEvent(commitGroupChangesHook, hookEvent)
-		session.AddPreCommitEvent(updateCampaignEventsHook, hookEvent)
-		session.AddPreCommitEvent(contactModifiedHook, session.Contact().ID())
+		scene.AppendToEventPreCommitHook(commitGroupChangesHook, hookEvent)
+		scene.AppendToEventPreCommitHook(updateCampaignEventsHook, hookEvent)
+		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.Contact().ID())
 	}
 
 	return nil

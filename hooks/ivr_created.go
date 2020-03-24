@@ -13,18 +13,18 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeIVRCreated, handleIVRCreated)
+	models.RegisterEventHandler(events.TypeIVRCreated, handleIVRCreated)
 }
 
-// CommitIVRHook is our hook for comitting session messages / say commands
+// CommitIVRHook is our hook for comitting scene messages / say commands
 type CommitIVRHook struct{}
 
 var commitIVRHook = &CommitIVRHook{}
 
-// Apply takes care of inserting all the messages in the passed in sessions assigning topups to them as needed.
-func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
-	msgs := make([]*models.Msg, 0, len(sessions))
-	for _, s := range sessions {
+// Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
+func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+	msgs := make([]*models.Msg, 0, len(scenes))
+	for _, s := range scenes {
 		for _, m := range s {
 			msgs = append(msgs, m.(*models.Msg))
 		}
@@ -55,19 +55,18 @@ func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 }
 
 // handleIVRCreated creates the db msg for the passed in event
-func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.IVRCreatedEvent)
-
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.SessionID(),
 		"text":         event.Msg.Text(),
 	}).Debug("ivr say")
 
 	// get our channel connection
-	conn := session.ChannelConnection()
+	conn := scene.Session().ChannelConnection()
 	if conn == nil {
-		return errors.Errorf("ivr sessions must have a channel connection set")
+		return errors.Errorf("ivr session must have a channel connection set")
 	}
 
 	// if our call is no longer in progress, return
@@ -81,7 +80,7 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 	}
 
 	// register to have this message committed
-	session.AddPreCommitEvent(commitIVRHook, msg)
+	scene.AppendToEventPreCommitHook(commitIVRHook, msg)
 
 	return nil
 }

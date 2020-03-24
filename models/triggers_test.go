@@ -5,7 +5,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/greatnonprofits-nfp/goflow/flows"
-	"github.com/greatnonprofits-nfp/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,8 +13,8 @@ func insertTrigger(t *testing.T, db *sqlx.DB, active bool, flowID FlowID, trigge
 	var triggerID TriggerID
 	err := db.Get(&triggerID,
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, referrer_id, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, trigger_count, channel_id)
-		VALUES($1, now(), now(), $2, $6, false, $3, $4, $5, 1, 1, 1, 0, $7) RETURNING id`, active, keyword, flowID, triggerType, matchType, referrerID, channelID)
+									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
+		VALUES($1, now(), now(), $2, $6, false, $3, $4, $5, 1, 1, 1, $7) RETURNING id`, active, keyword, flowID, triggerType, matchType, referrerID, channelID)
 
 	assert.NoError(t, err)
 
@@ -87,13 +86,10 @@ func TestTriggers(t *testing.T) {
 	contacts, err := LoadContacts(ctx, db, org, contactIDs)
 	assert.NoError(t, err)
 
-	sa, err := engine.NewSessionAssets(org)
+	cathy, err := contacts[0].FlowContact(org)
 	assert.NoError(t, err)
 
-	cathy, err := contacts[0].FlowContact(org, sa)
-	assert.NoError(t, err)
-
-	greg, err := contacts[1].FlowContact(org, sa)
+	greg, err := contacts[1].FlowContact(org)
 	assert.NoError(t, err)
 
 	tcs := []struct {

@@ -13,11 +13,11 @@ func TestContactLanguageChanged(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSetContactLanguageAction(newActionUUID(), "fra"),
-					actions.NewSetContactLanguageAction(newActionUUID(), "eng"),
+					actions.NewSetContactLanguage(newActionUUID(), "fra"),
+					actions.NewSetContactLanguage(newActionUUID(), "eng"),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSetContactLanguageAction(newActionUUID(), "spa"),
+					actions.NewSetContactLanguage(newActionUUID(), "spa"),
 				},
 			},
 			SQLAssertions: []SQLAssertion{

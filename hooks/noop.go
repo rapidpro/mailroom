@@ -11,17 +11,18 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeEnvironmentRefreshed, NoopHandler)
-	models.RegisterEventHook(events.TypeContactRefreshed, NoopHandler)
-	models.RegisterEventHook(events.TypeError, NoopHandler)
-	models.RegisterEventHook(events.TypeRunResultChanged, NoopHandler)
-	models.RegisterEventHook(events.TypeWaitTimedOut, NoopHandler)
-	models.RegisterEventHook(events.TypeRunExpired, NoopHandler)
-	models.RegisterEventHook(events.TypeFlowEntered, NoopHandler)
-	models.RegisterEventHook(events.TypeMsgWait, NoopHandler)
+	models.RegisterEventHandler(events.TypeContactRefreshed, NoopHandler)
+	models.RegisterEventHandler(events.TypeEnvironmentRefreshed, NoopHandler)
+	models.RegisterEventHandler(events.TypeError, NoopHandler)
+	models.RegisterEventHandler(events.TypeFailure, NoopHandler)
+	models.RegisterEventHandler(events.TypeFlowEntered, NoopHandler)
+	models.RegisterEventHandler(events.TypeMsgWait, NoopHandler)
+	models.RegisterEventHandler(events.TypeRunExpired, NoopHandler)
+	models.RegisterEventHandler(events.TypeRunResultChanged, NoopHandler)
+	models.RegisterEventHandler(events.TypeWaitTimedOut, NoopHandler)
 }
 
 // NoopHandler is our hook for events we ignore in a run
-func NoopHandler(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, event flows.Event) error {
+func NoopHandler(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, event flows.Event) error {
 	return nil
 }

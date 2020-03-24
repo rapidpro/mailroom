@@ -9,20 +9,139 @@ import (
 	"github.com/pkg/errors"
 )
 
-// EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
-type EventCommitHook interface {
-	Apply(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, map[*Session][]interface{}) error
+// Scene represents the context that events are occurring in
+type Scene struct {
+	contact *flows.Contact
+	session *Session
+
+	preCommits  map[EventCommitHook][]interface{}
+	postCommits map[EventCommitHook][]interface{}
 }
 
-// ApplyPreEventHooks runs through all the pre event hooks for the passed in sessions and applies their events
-func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, sessions []*Session) error {
+// NewSceneForSession creates a new scene for the passed in session
+func NewSceneForSession(session *Session) *Scene {
+	s := &Scene{
+		contact: session.Contact(),
+		session: session,
+
+		preCommits:  make(map[EventCommitHook][]interface{}),
+		postCommits: make(map[EventCommitHook][]interface{}),
+	}
+	return s
+}
+
+// NewSceneForContact creates a new scene for the passed in contact, session will be nil
+func NewSceneForContact(contact *flows.Contact) *Scene {
+	s := &Scene{
+		contact: contact,
+
+		preCommits:  make(map[EventCommitHook][]interface{}),
+		postCommits: make(map[EventCommitHook][]interface{}),
+	}
+	return s
+}
+
+// SessionID returns the session id for this scene if any
+func (s *Scene) SessionID() SessionID {
+	if s.session == nil {
+		return SessionID(0)
+	}
+	return s.session.ID()
+}
+
+func (s *Scene) Contact() *flows.Contact        { return s.contact }
+func (s *Scene) ContactID() ContactID           { return ContactID(s.contact.ID()) }
+func (s *Scene) ContactUUID() flows.ContactUUID { return s.contact.UUID() }
+
+// Session returns the session for this scene if any
+func (s *Scene) Session() *Session {
+	if s.session == nil {
+		panic("attempt to retrieve session on scene without one")
+	}
+	return s.session
+}
+
+// AppendToEventPreCommitHook adds a new event to be handled by a pre commit hook
+func (s *Scene) AppendToEventPreCommitHook(hook EventCommitHook, event interface{}) {
+	s.preCommits[hook] = append(s.preCommits[hook], event)
+}
+
+// AppendToEventPostCommitHook adds a new event to be handled by a post commit hook
+func (s *Scene) AppendToEventPostCommitHook(hook EventCommitHook, event interface{}) {
+	s.postCommits[hook] = append(s.postCommits[hook], event)
+}
+
+// EventHandler defines a call for handling events that occur in a flow
+type EventHandler func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, *Scene, flows.Event) error
+
+// our registry of event type to internal handlers
+var eventHandlers = make(map[string]EventHandler)
+
+// our registry of event type to pre insert handlers
+var preHandlers = make(map[string]EventHandler)
+
+// RegisterEventHandler registers the passed in handler as being interested in the passed in type
+func RegisterEventHandler(eventType string, handler EventHandler) {
+	// it's a bug if we try to register more than one handler for a type
+	_, found := eventHandlers[eventType]
+	if found {
+		panic(errors.Errorf("duplicate handler being registered for type: %s", eventType))
+	}
+	eventHandlers[eventType] = handler
+}
+
+// RegisterEventPreWriteHandler registers the passed in handler as being interested in the passed in type before session and run insertion
+func RegisterEventPreWriteHandler(eventType string, handler EventHandler) {
+	// it's a bug if we try to register more than one handler for a type
+	_, found := preHandlers[eventType]
+	if found {
+		panic(errors.Errorf("duplicate handler being registered for type: %s", eventType))
+	}
+	preHandlers[eventType] = handler
+}
+
+// HandleEvents handles the passed in event, IE, creates the db objects required etc..
+func HandleEvents(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scene *Scene, events []flows.Event) error {
+	for _, e := range events {
+
+		handler, found := eventHandlers[e.Type()]
+		if !found {
+			return errors.Errorf("unable to find handler for event type: %s", e.Type())
+		}
+
+		err := handler(ctx, tx, rp, org, scene, e)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ApplyPreWriteEvent applies the passed in event before insertion or update, unlike normal event handlers it is not a requirement
+// that all types have a handler.
+func ApplyPreWriteEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scene *Scene, e flows.Event) error {
+	handler, found := preHandlers[e.Type()]
+	if !found {
+		return nil
+	}
+
+	return handler(ctx, tx, rp, org, scene, e)
+}
+
+// EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
+type EventCommitHook interface {
+	Apply(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, map[*Scene][]interface{}) error
+}
+
+// ApplyEventPreCommitHooks runs through all the pre event hooks for the passed in sessions and applies their events
+func ApplyEventPreCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scenes []*Scene) error {
 	// gather all our hook events together across our sessions
-	preHooks := make(map[EventCommitHook]map[*Session][]interface{})
-	for _, s := range sessions {
+	preHooks := make(map[EventCommitHook]map[*Scene][]interface{})
+	for _, s := range scenes {
 		for hook, args := range s.preCommits {
 			sessionMap, found := preHooks[hook]
 			if !found {
-				sessionMap = make(map[*Session][]interface{}, len(sessions))
+				sessionMap = make(map[*Scene][]interface{}, len(scenes))
 				preHooks[hook] = sessionMap
 			}
 			sessionMap[s] = args
@@ -33,25 +152,25 @@ func ApplyPreEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *O
 	for hook, args := range preHooks {
 		err := hook.Apply(ctx, tx, rp, org, args)
 		if err != nil {
-			return errors.Wrapf(err, "error applying pre commit hook: %v", hook)
+			return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 		}
 	}
 
 	return nil
 }
 
-// ApplyPostEventHooks runs through all the post event hooks for the passed in sessions and applies their events
-func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, sessions []*Session) error {
+// ApplyEventPostCommitHooks runs through all the post event hooks for the passed in sessions and applies their events
+func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scenes []*Scene) error {
 	// gather all our hook events together across our sessions
-	postHooks := make(map[EventCommitHook]map[*Session][]interface{})
-	for _, s := range sessions {
+	postHooks := make(map[EventCommitHook]map[*Scene][]interface{})
+	for _, s := range scenes {
 		for hook, args := range s.postCommits {
-			sessionMap, found := postHooks[hook]
+			sprintMap, found := postHooks[hook]
 			if !found {
-				sessionMap = make(map[*Session][]interface{}, len(sessions))
-				postHooks[hook] = sessionMap
+				sprintMap = make(map[*Scene][]interface{}, len(scenes))
+				postHooks[hook] = sprintMap
 			}
-			sessionMap[s] = args
+			sprintMap[s] = args
 		}
 	}
 
@@ -65,63 +184,3 @@ func ApplyPostEventHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 
 	return nil
 }
-
-// EventHandler defines a call for handling events that occur in a flow
-type EventHandler func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, *Session, flows.Event) error
-
-// RegisterEventHook registers the passed in handler as being interested in the passed in type
-func RegisterEventHook(eventType string, handler EventHandler) {
-	// it's a bug if we try to register more than one handler for a type
-	_, found := eventHandlers[eventType]
-	if found {
-		panic(errors.Errorf("duplicate handler being registered for type: %s", eventType))
-	}
-	eventHandlers[eventType] = handler
-}
-
-// RegisterPreWriteHook registers the passed in handler as being interested in the passed in type before session and run insertion
-func RegisterPreWriteHook(eventType string, handler EventHandler) {
-	// it's a bug if we try to register more than one handler for a type
-	_, found := preHandlers[eventType]
-	if found {
-		panic(errors.Errorf("duplicate handler being registered for type: %s", eventType))
-	}
-	preHandlers[eventType] = handler
-}
-
-// ApplyEvent applies the passed in event, IE, creates the db objects required etc..
-func ApplyEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
-	// if this session is errored, don't apply any hooks
-	if session.Status() == SessionStatusErrored {
-		return nil
-	}
-
-	handler, found := eventHandlers[e.Type()]
-	if !found {
-		return errors.Errorf("unable to find handler for event type: %s", e.Type())
-	}
-
-	return handler(ctx, tx, rp, org, session, e)
-}
-
-// ApplyPreWriteEvent applies the passed in event before insertion or update, unlike normal event handlers it is not a requirement
-// that all types have a handler.
-func ApplyPreWriteEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, session *Session, e flows.Event) error {
-	// if this session is errored, don't apply any hooks
-	if session.Status() == SessionStatusErrored {
-		return nil
-	}
-
-	handler, found := preHandlers[e.Type()]
-	if !found {
-		return nil
-	}
-
-	return handler(ctx, tx, rp, org, session, e)
-}
-
-// our map of event type to internal handlers
-var eventHandlers = make(map[string]EventHandler)
-
-// our map of event type to pre insert handlers
-var preHandlers = make(map[string]EventHandler)

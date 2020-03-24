@@ -58,7 +58,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// grab our org
 	orgID := ctx.Value(web.OrgIDKey).(models.OrgID)
-	org, err := models.NewOrgAssets(s.CTX, s.DB, orgID, nil)
+	org, err := models.GetOrgAssets(s.CTX, s.DB, orgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -69,13 +69,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Errorf("missing request user")
 	}
 
-	// read our session
-	sa, err := models.NewSessionAssets(org)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error building session assets")
-	}
-
-	fs, err := goflow.Engine().ReadSession(sa, request.Session, assets.IgnoreMissing)
+	fs, err := goflow.Engine().ReadSession(org.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading session")
 	}
@@ -93,7 +87,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// and our modifiers
 	contactModifiers := make([]flows.Modifier, 0, len(request.Modifiers))
 	for _, m := range request.Modifiers {
-		modifier, err := modifiers.ReadModifier(sa, m, assets.IgnoreMissing)
+		modifier, err := modifiers.ReadModifier(org.SessionAssets(), m, assets.IgnoreMissing)
 
 		// if this modifier turned into a no-op, ignore
 		if err == modifiers.ErrNoModifier {
@@ -112,7 +106,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// create / fetch our contact based on the highest priority URN
-	contactID, err := models.CreateContact(ctx, s.DB, org, sa, urn)
+	contactID, err := models.CreateContact(ctx, s.DB, org, urn)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 	}
@@ -127,7 +121,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// load our flow contact
-	flowContact, err := contacts[0].FlowContact(org, sa)
+	flowContact, err := contacts[0].FlowContact(org)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading flow contact")
 	}
@@ -139,7 +133,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// run through each contact modifier, applying it to our contact
 	for _, m := range contactModifiers {
-		m.Apply(org.Env(), sa, flowContact, appender)
+		m.Apply(org.Env(), org.SessionAssets(), flowContact, appender)
 	}
 
 	// set this updated contact on our session
@@ -177,7 +171,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// write our post commit hooks
-	err = models.ApplyPostEventHooks(ctx, tx, s.RP, org, sessions)
+	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, org, []*models.Scene{sessions[0].Scene()})
 	if err != nil {
 		tx.Rollback()
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying post commit hooks")

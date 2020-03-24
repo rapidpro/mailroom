@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -18,18 +19,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/buger/jsonparser"
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/flows/events"
 	"github.com/greatnonprofits-nfp/goflow/flows/routers/waits"
 	"github.com/greatnonprofits-nfp/goflow/flows/routers/waits/hints"
 	"github.com/greatnonprofits-nfp/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
+
+	"github.com/buger/jsonparser"
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -301,8 +304,10 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
+		io.Copy(ioutil.Discard, resp.Body)
 		return ivr.NilCallID, errors.Errorf("received non 200 status for call start: %d", resp.StatusCode)
 	}
 
@@ -336,6 +341,8 @@ func (c *client) HangupCall(client *http.Client, callID string) error {
 	if err != nil {
 		return errors.Wrapf(err, "error trying to hangup call")
 	}
+	defer resp.Body.Close()
+	io.Copy(ioutil.Discard, resp.Body)
 
 	if resp.StatusCode != 204 {
 		return errors.Errorf("received non 204 status for call hangup: %d", resp.StatusCode)
@@ -472,8 +479,8 @@ func (c *client) ValidateRequestSignature(r *http.Request) error {
 // WriteSessionResponse writes a TWIML response for the events in the passed in session
 func (c *client) WriteSessionResponse(session *models.Session, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
-	if session.Status() == models.SessionStatusErrored {
-		return errors.Errorf("cannot write IVR response for errored session")
+	if session.Status() == models.SessionStatusFailed {
+		return errors.Errorf("cannot write IVR response for failed session")
 	}
 
 	// otherwise look for any say events
@@ -684,7 +691,7 @@ func (c *client) responseForSprint(resumeURL string, w flows.ActivatedWait, es [
 			// with a 1 second timeout in the script that will get called / repeated until the UUID is
 			// populated at which time we will actually continue.
 
-			recordingUUID := string(utils.NewUUID())
+			recordingUUID := string(uuids.New())
 			eventURL := resumeURL + "&wait_type=recording_url&recording_uuid=" + recordingUUID
 			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
 			record := &Record{

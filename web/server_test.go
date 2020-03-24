@@ -12,6 +12,7 @@ import (
 
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +23,7 @@ func TestServer(t *testing.T) {
 	rp := testsuite.RP()
 	wg := &sync.WaitGroup{}
 
-	server := NewServer(ctx, config.Mailroom, db, rp, nil, wg)
+	server := NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
 	server.Start()
 
 	// give our server time to start

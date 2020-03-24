@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/greatnonprofits-nfp/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/utils/uuids"
 
 	"github.com/gomodule/redigo/redis"
 )
@@ -46,8 +46,8 @@ func QueueTask(rc redis.Conn, queueName string, taskName string, args interface{
 	}
 
 	body := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(defaultBody, string(argJSON))))
-	taskUUID := string(utils.NewUUID())
-	deliveryTag := string(utils.NewUUID())
+	taskUUID := string(uuids.New())
+	deliveryTag := string(uuids.New())
 
 	task := Task{
 		Body: body,
@@ -70,7 +70,7 @@ func QueueTask(rc redis.Conn, queueName string, taskName string, args interface{
 		Properties: TaskProperties{
 			BodyEncoding:  "base64",
 			CorrelationID: taskUUID,
-			ReplyTo:       string(utils.NewUUID()),
+			ReplyTo:       string(uuids.New()),
 			DeliveryMode:  2,
 			DeliveryTag:   deliveryTag,
 			DeliveryInfo: TaskDeliveryInfo{

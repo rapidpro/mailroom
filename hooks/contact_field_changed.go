@@ -6,6 +6,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
@@ -14,7 +15,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactFieldChanged, handleContactFieldChanged)
+	models.RegisterEventHandler(events.TypeContactFieldChanged, handleContactFieldChanged)
 }
 
 // CommitFieldChangesHook is our hook for contact field changes
@@ -23,12 +24,12 @@ type CommitFieldChangesHook struct{}
 var commitFieldChangesHook = &CommitFieldChangesHook{}
 
 // Apply squashes and writes all the field updates for the contacts
-func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// our list of updates
-	fieldUpdates := make([]interface{}, 0, len(sessions))
-	fieldDeletes := make(map[models.FieldUUID][]interface{})
-	for session, es := range sessions {
-		updates := make(map[models.FieldUUID]*flows.Value, len(es))
+	fieldUpdates := make([]interface{}, 0, len(scenes))
+	fieldDeletes := make(map[assets.FieldUUID][]interface{})
+	for scene, es := range scenes {
+		updates := make(map[assets.FieldUUID]*flows.Value, len(es))
 		for _, e := range es {
 			event := e.(*events.ContactFieldChangedEvent)
 			field := org.FieldByKey(event.Field.Key)
@@ -36,7 +37,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 				logrus.WithFields(logrus.Fields{
 					"field_key":  event.Field.Key,
 					"field_name": event.Field.Name,
-					"session_id": session.ID(),
+					"session_id": scene.SessionID(),
 				}).Debug("unable to find field with key, ignoring")
 				continue
 			}
@@ -49,7 +50,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 			if v == nil || v.Text.Native() == "" {
 				delete(updates, k)
 				fieldDeletes[k] = append(fieldDeletes[k], &FieldDelete{
-					ContactID: session.ContactID(),
+					ContactID: scene.ContactID(),
 					FieldUUID: k,
 				})
 			}
@@ -63,7 +64,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 
 		// and queue them up for our update
 		fieldUpdates = append(fieldUpdates, &FieldUpdate{
-			ContactID: session.ContactID(),
+			ContactID: scene.ContactID(),
 			Updates:   string(fieldJSON),
 		})
 	}
@@ -89,25 +90,25 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 }
 
 // handleContactFieldChanged is called when a contact field changes
-func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactFieldChangedEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.SessionID(),
 		"field_key":    event.Field.Key,
 		"value":        event.Value,
 	}).Debug("contact field changed")
 
 	// add our callback
-	session.AddPreCommitEvent(commitFieldChangesHook, event)
-	session.AddPreCommitEvent(updateCampaignEventsHook, event)
+	scene.AppendToEventPreCommitHook(commitFieldChangesHook, event)
+	scene.AppendToEventPreCommitHook(updateCampaignEventsHook, event)
 
 	return nil
 }
 
 type FieldDelete struct {
 	ContactID models.ContactID `db:"contact_id"`
-	FieldUUID models.FieldUUID `db:"field_uuid"`
+	FieldUUID assets.FieldUUID `db:"field_uuid"`
 }
 
 type FieldUpdate struct {

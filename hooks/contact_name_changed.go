@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHook(events.TypeContactNameChanged, handleContactNameChanged)
+	models.RegisterEventHandler(events.TypeContactNameChanged, handleContactNameChanged)
 }
 
 // CommitNameChangesHook is our hook for name changes
@@ -21,11 +21,11 @@ type CommitNameChangesHook struct{}
 
 var commitNameChangesHook = &CommitNameChangesHook{}
 
-// Apply commits our contact name changes as a bulk update for the passed in map of sessions
-func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions map[*models.Session][]interface{}) error {
+// Apply commits our contact name changes as a bulk update for the passed in map of scene
+func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and contact name
-	updates := make([]interface{}, 0, len(sessions))
-	for s, e := range sessions {
+	updates := make([]interface{}, 0, len(scenes))
+	for s, e := range scenes {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactNameChangedEvent)
 		updates = append(updates, &nameUpdate{s.ContactID(), fmt.Sprintf("%.128s", event.Name)})
@@ -36,15 +36,15 @@ func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 }
 
 // handleContactNameChanged changes the name of the contact
-func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session *models.Session, e flows.Event) error {
+func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactNameChangedEvent)
 	logrus.WithFields(logrus.Fields{
-		"contact_uuid": session.ContactUUID(),
-		"session_id":   session.ID(),
+		"contact_uuid": scene.ContactUUID(),
+		"session_id":   scene.SessionID(),
 		"name":         event.Name,
 	}).Debug("changing contact name")
 
-	session.AddPreCommitEvent(commitNameChangesHook, event)
+	scene.AppendToEventPreCommitHook(commitNameChangesHook, event)
 	return nil
 }
 
