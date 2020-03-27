@@ -1,3 +1,7 @@
+v5.5.3
+----------
+ * Add decode_html Excellent function
+
 v5.5.2
 ----------
  * Change to using basic auth for org specific prom metrics endpoint
