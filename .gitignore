@@ -27,3 +27,4 @@ fabconfig.pyc
 # GoLand config folder
 .idea/
 mailroom.toml
+.DS_Store
