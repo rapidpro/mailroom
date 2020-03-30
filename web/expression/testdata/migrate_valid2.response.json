@@ -1,3 +1,0 @@
-{
-  "migrated": "@(upper(format_urn(urns.tel)))"
-}
