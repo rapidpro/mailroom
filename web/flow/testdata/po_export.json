@@ -1,0 +1,55 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/flow/po_export",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "export POT from single flow",
+        "method": "POST",
+        "path": "/mr/flow/po_export",
+        "body": {
+            "org_id": 1,
+            "flow_ids": [
+                10000
+            ]
+        },
+        "status": 200,
+        "response_file": "testdata/po/favorites.po"
+    },
+    {
+        "label": "export Spanish PO from multiple flows",
+        "method": "POST",
+        "path": "/mr/flow/po_export",
+        "body": {
+            "org_id": 1,
+            "flow_ids": [
+                10000,
+                10001
+            ],
+            "language": "spa"
+        },
+        "status": 200,
+        "response_file": "testdata/po/multiple_flows.es.po"
+    },
+    {
+        "label": "export Spanish PO from flow exluding test arguments",
+        "method": "POST",
+        "path": "/mr/flow/po_export",
+        "body": {
+            "org_id": 1,
+            "flow_ids": [
+                10000,
+                10001
+            ],
+            "language": "spa",
+            "exclude_arguments": true
+        },
+        "status": 200,
+        "response_file": "testdata/po/multiple_flows_noargs.es.po"
+    }
+]

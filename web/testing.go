@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -74,17 +75,25 @@ func RunWebTests(t *testing.T, truthFile string) {
 		tc.actualResponse, err = ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%s: error reading body", tc.Label)
 
-		var expectedResponse []byte
-
-		if tc.ResponseFile != "" {
-			expectedResponse, err = ioutil.ReadFile(tc.ResponseFile)
-			require.NoError(t, err)
-		} else {
-			expectedResponse = tc.Response
-		}
-
 		if !test.UpdateSnapshots {
-			test.AssertEqualJSON(t, expectedResponse, tc.actualResponse, "%s: unexpected response", tc.Label)
+			var expectedResponse []byte
+			expectedIsJSON := false
+
+			if tc.ResponseFile != "" {
+				expectedResponse, err = ioutil.ReadFile(tc.ResponseFile)
+				require.NoError(t, err)
+
+				expectedIsJSON = strings.HasSuffix(tc.ResponseFile, ".json")
+			} else {
+				expectedResponse = tc.Response
+				expectedIsJSON = true
+			}
+
+			if expectedIsJSON {
+				test.AssertEqualJSON(t, expectedResponse, tc.actualResponse, "%s: unexpected JSON response", tc.Label)
+			} else {
+				assert.Equal(t, string(expectedResponse), string(tc.actualResponse), "%s: unexpected response", tc.Label)
+			}
 		}
 
 		for _, dba := range tc.DBAssertions {
