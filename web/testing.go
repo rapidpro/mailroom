@@ -15,6 +15,7 @@ import (
 
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils/dates"
+	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -24,11 +25,12 @@ import (
 )
 
 type ServerTestCase struct {
-	URL      string
-	Method   string
-	Files    string
-	Status   int
-	Response string
+	URL          string
+	Method       string
+	RequestFile  string
+	Status       int
+	ResponseFile string
+	Response     string
 }
 
 func RunServerTestCases(t *testing.T, tcs []ServerTestCase) {
@@ -114,18 +116,21 @@ func RunWebTests(t *testing.T, truthFile string) {
 		Path         string          `json:"path"`
 		Body         json.RawMessage `json:"body"`
 		Status       int             `json:"status"`
-		Response     json.RawMessage `json:"response"`
+		Response     json.RawMessage `json:"response,omitempty"`
+		ResponseFile string          `json:"response_file,omitempty"`
 		DBAssertions []struct {
 			Query string `json:"query"`
 			Count int    `json:"count"`
 		} `json:"db_assertions,omitempty"`
+
+		actualResponse []byte
 	}
 	tcs := make([]*TestCase, 0, 20)
 	tcJSON, err := ioutil.ReadFile(truthFile)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = json.Unmarshal(tcJSON, &tcs)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for _, tc := range tcs {
 		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.Path, bytes.NewReader([]byte(tc.Body)))
@@ -136,27 +141,38 @@ func RunWebTests(t *testing.T, truthFile string) {
 
 		assert.Equal(t, tc.Status, resp.StatusCode, "%s: unexpected status", tc.Label)
 
-		response, err := ioutil.ReadAll(resp.Body)
+		tc.actualResponse, err = ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%s: error reading body", tc.Label)
 
+		var expectedResponse []byte
+
+		if tc.ResponseFile != "" {
+			expectedResponse, err = ioutil.ReadFile(tc.ResponseFile)
+			require.NoError(t, err)
+		}
+
 		if !test.UpdateSnapshots {
-			test.AssertEqualJSON(t, json.RawMessage(tc.Response), json.RawMessage(response), "%s: unexpected response\nExpected:\n%s\nGot:\n%s", tc.Label, tc.Response, string(response))
+			test.AssertEqualJSON(t, expectedResponse, tc.actualResponse, "%s: unexpected response", tc.Label)
 		}
 
 		for _, dba := range tc.DBAssertions {
 			testsuite.AssertQueryCount(t, db, dba.Query, nil, dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
 		}
-
-		tc.Response = json.RawMessage(response)
 	}
 
 	// update if we are meant to
 	if test.UpdateSnapshots {
-		truth, err := json.MarshalIndent(tcs, "", "    ")
-		assert.NoError(t, err)
+		truth, err := jsonx.MarshalPretty(tcs)
+		require.NoError(t, err)
 
-		if err := ioutil.WriteFile(truthFile, truth, 0644); err != nil {
-			require.NoError(t, err, "failed to update truth file")
+		err = ioutil.WriteFile(truthFile, truth, 0644)
+		require.NoError(t, err, "failed to update truth file")
+
+		for _, tc := range tcs {
+			if tc.ResponseFile != "" {
+				err = ioutil.WriteFile(tc.ResponseFile, tc.actualResponse, 0644)
+				require.NoError(t, err, "failed to update response file")
+			}
 		}
 	}
 }
