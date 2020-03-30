@@ -1,0 +1,241 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/flow/clone",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "clone valid flow",
+        "method": "POST",
+        "path": "/mr/flow/clone",
+        "body": {
+            "dependency_mapping": {
+                "8f107d42-7416-4cf2-9a51-9490361ad517": "1cf84575-ee14-4253-88b6-e3675c04a066",
+                "ebe441b4-c581-4b03-b544-5695cfe29bc1": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+            },
+            "flow": {
+                "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+                "name": "Valid Flow",
+                "spec_version": "13.0.0",
+                "language": "eng",
+                "type": "messaging",
+                "revision": 106,
+                "expire_after_minutes": 10080,
+                "localization": {},
+                "nodes": [
+                    {
+                        "uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                        "actions": [
+                            {
+                                "type": "add_contact_groups",
+                                "uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+                                "groups": [
+                                    {
+                                        "uuid": "ebe441b4-c581-4b03-b544-5695cfe29bc1",
+                                        "name": "Testers"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "send_msg",
+                                "uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+                                "text": "Your birthdate is soon"
+                            }
+                        ],
+                        "exits": [
+                            {
+                                "uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+                            }
+                        ]
+                    }
+                ],
+                "_ui": {
+                    "nodes": {
+                        "6fde1a09-3997-47dd-aff0-92e8aff3a642": {
+                            "position": {
+                                "left": 100,
+                                "top": 0
+                            },
+                            "type": "execute_actions"
+                        }
+                    },
+                    "stickies": {}
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "_ui": {
+                "nodes": {
+                    "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5": {
+                        "position": {
+                            "left": 100,
+                            "top": 0
+                        },
+                        "type": "execute_actions"
+                    }
+                },
+                "stickies": {}
+            },
+            "expire_after_minutes": 10080,
+            "language": "eng",
+            "localization": {},
+            "name": "Valid Flow",
+            "nodes": [
+                {
+                    "actions": [
+                        {
+                            "groups": [
+                                {
+                                    "name": "Testers",
+                                    "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                                }
+                            ],
+                            "type": "add_contact_groups",
+                            "uuid": "692926ea-09d6-4942-bd38-d266ec8d3716"
+                        },
+                        {
+                            "text": "Your birthdate is soon",
+                            "type": "send_msg",
+                            "uuid": "8720f157-ca1c-432f-9c0b-2014ddc77094"
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "uuid": "c34b6c7d-fa06-4563-92a3-d648ab64bccb"
+                        }
+                    ],
+                    "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
+                }
+            ],
+            "revision": 106,
+            "spec_version": "13.0.0",
+            "type": "messaging",
+            "uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"
+        }
+    },
+    {
+        "label": "clone structurally invalid flow",
+        "method": "POST",
+        "path": "/mr/flow/clone",
+        "body": {
+            "dependency_mapping": {
+                "8f107d42-7416-4cf2-9a51-9490361ad517": "1cf84575-ee14-4253-88b6-e3675c04a066",
+                "ebe441b4-c581-4b03-b544-5695cfe29bc1": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+            },
+            "flow": {
+                "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+                "name": "Valid Flow",
+                "spec_version": "13.0.0",
+                "language": "eng",
+                "type": "messaging",
+                "revision": 106,
+                "expire_after_minutes": 10080,
+                "localization": {},
+                "nodes": [
+                    {
+                        "actions": [],
+                        "exits": [
+                            {
+                                "uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "status": 422,
+        "response": {
+            "error": "unable to clone flow: unable to read node: field 'uuid' is required"
+        }
+    },
+    {
+        "label": "clone flow with missing dependency mapping",
+        "method": "POST",
+        "path": "/mr/flow/clone",
+        "body": {
+            "dependency_mapping": {
+                "8f107d42-7416-4cf2-9a51-9490361ad517": "1cf84575-ee14-4253-88b6-e3675c04a066"
+            },
+            "flow": {
+                "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+                "name": "Valid Flow",
+                "spec_version": "13.0.0",
+                "language": "eng",
+                "type": "messaging",
+                "revision": 106,
+                "expire_after_minutes": 10080,
+                "localization": {},
+                "nodes": [
+                    {
+                        "uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                        "actions": [
+                            {
+                                "type": "add_contact_groups",
+                                "uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+                                "groups": [
+                                    {
+                                        "uuid": "ebe441b4-c581-4b03-b544-5695cfe29bc1",
+                                        "name": "Testers"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "send_msg",
+                                "uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+                                "text": "Your birthdate is soon"
+                            }
+                        ],
+                        "exits": [
+                            {
+                                "uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "status": 200,
+        "response": {
+            "expire_after_minutes": 10080,
+            "language": "eng",
+            "localization": {},
+            "name": "Valid Flow",
+            "nodes": [
+                {
+                    "actions": [
+                        {
+                            "groups": [
+                                {
+                                    "name": "Testers",
+                                    "uuid": "8720f157-ca1c-432f-9c0b-2014ddc77094"
+                                }
+                            ],
+                            "type": "add_contact_groups",
+                            "uuid": "692926ea-09d6-4942-bd38-d266ec8d3716"
+                        },
+                        {
+                            "text": "Your birthdate is soon",
+                            "type": "send_msg",
+                            "uuid": "c34b6c7d-fa06-4563-92a3-d648ab64bccb"
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "uuid": "5802813d-6c58-4292-8228-9728778b6c98"
+                        }
+                    ],
+                    "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
+                }
+            ],
+            "revision": 106,
+            "spec_version": "13.0.0",
+            "type": "messaging",
+            "uuid": "1cf84575-ee14-4253-88b6-e3675c04a066"
+        }
+    }
+]
