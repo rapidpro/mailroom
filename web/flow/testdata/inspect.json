@@ -13,7 +13,7 @@
         "method": "POST",
         "path": "/mr/flow/inspect",
         "body": {
-            "validate_with_org_id": 1,
+            "org_id": 1,
             "flow": {
                 "entry": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
                 "action_sets": [
@@ -80,7 +80,7 @@
         "method": "POST",
         "path": "/mr/flow/inspect",
         "body": {
-            "validate_with_org_id": 1,
+            "org_id": 1,
             "flow": {
                 "entry": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
                 "action_sets": [
@@ -219,7 +219,7 @@
                     }
                 ]
             },
-            "validate_with_org_id": 1
+            "org_id": 1
         },
         "status": 200,
         "response": {
@@ -250,7 +250,7 @@
         "method": "POST",
         "path": "/mr/flow/inspect",
         "body": {
-            "validate_with_org_id": 1,
+            "org_id": 1,
             "flow": {
                 "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
                 "name": "Invalid Flow",
