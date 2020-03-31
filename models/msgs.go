@@ -356,7 +356,7 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 	}
 
 	m.UUID = out.UUID()
-	m.Text = out.Text()
+	m.Text = text
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
