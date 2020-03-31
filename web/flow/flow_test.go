@@ -10,5 +10,4 @@ func TestServer(t *testing.T) {
 	web.RunWebTests(t, "testdata/clone.json")
 	web.RunWebTests(t, "testdata/inspect.json")
 	web.RunWebTests(t, "testdata/migrate.json")
-	web.RunWebTests(t, "testdata/po_export.json")
 }

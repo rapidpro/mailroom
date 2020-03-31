@@ -1,0 +1,11 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/po/import",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    }
+]

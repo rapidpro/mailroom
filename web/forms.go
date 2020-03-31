@@ -12,6 +12,10 @@ var (
 	validate = validator.New()
 )
 
+const (
+	maxMemory = 1024 * 1024
+)
+
 func init() {
 	decoder.IgnoreUnknownKeys(true)
 	decoder.SetAliasTag("form")
@@ -36,10 +40,22 @@ func DecodeAndValidateForm(form interface{}, r *http.Request) error {
 	}
 
 	// check our input is valid
-	err = validate.Struct(form)
+	return validate.Struct(form)
+}
+
+// DecodeAndValidateMultipartForm takes the passed in form and attempts to parse and validate it from the
+// multipart form data
+func DecodeAndValidateMultipartForm(form interface{}, r *http.Request) error {
+	err := r.ParseMultipartForm(maxMemory)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	err = decoder.Decode(form, r.Form)
+	if err != nil {
+		return err
+	}
+
+	// check our input is valid
+	return validate.Struct(form)
 }
