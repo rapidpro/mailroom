@@ -105,7 +105,7 @@ func handleImport(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return err, http.StatusBadRequest, nil
 	}
 
-	return flows, http.StatusOK, nil
+	return map[string]interface{}{"flows": flows}, http.StatusOK, nil
 }
 
 func loadFlows(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flowIDs []models.FlowID) ([]flows.Flow, error) {
