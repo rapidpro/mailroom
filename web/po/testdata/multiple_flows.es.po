@@ -36,7 +36,7 @@ msgstr ""
 msgid "Cyan"
 msgstr ""
 
-#: Favorites/e63e7fc9-fd28-48a3-8cd4-027e30191122/text:0
+#: Favorites/4809186b-3f6b-445a-bb81-2f6eda021bc6/text:0
 msgid "Good choice, I like @results.color.category_localized too! What is your favorite beer?"
 msgstr ""
 
@@ -45,15 +45,15 @@ msgstr ""
 msgid "Green"
 msgstr ""
 
-#: Favorites/ae793f01-8c12-43c2-8580-eb85fb4efae3/text:0
+#: Favorites/1d9c9727-5f85-467f-b44e-88a5f65ca91c/text:0
 msgid "I don't know that color. Try again."
 msgstr ""
 
-#: Favorites/bcd43905-a85c-4435-8719-a1455faee7ad/text:0
+#: Favorites/1ed8c4f2-9e57-487d-970a-3098cda01b56/text:0
 msgid "I don't know that one, try again please."
 msgstr ""
 
-#: Favorites/bf7ebe5f-aa45-4ade-ac86-dab020b9c8bf/text:0
+#: Favorites/88bd88e9-e093-4c49-a040-2659250a5278/text:0
 msgid "Mmmmm... delicious @results.beer.category_localized. If only they made @(lower(results.color)) @results.beer.category_localized! Lastly, what is your name?"
 msgstr ""
 
@@ -76,7 +76,7 @@ msgstr ""
 msgid "Other"
 msgstr ""
 
-#: Pick+a+Number/08ac439c-68ac-4ca1-8c42-9caac9924d3e/text:0
+#: Pick+a+Number/5c55d5e3-3f38-4764-b034-d1bb92cac276/text:0
 msgid "Pick a number between 1-10."
 msgstr ""
 
@@ -95,11 +95,11 @@ msgstr ""
 msgid "Skol"
 msgstr ""
 
-#: Favorites/3a273e90-92d0-410d-a628-2c5e8b96dbb6/text:0
+#: Favorites/c2b74c92-a2d3-441a-8aa4-d280e927530c/text:0
 msgid "Sorry you can't participate right now, I'll try again later."
 msgstr ""
 
-#: Favorites/096ffc80-c2f2-45ed-9ad5-ce10f0ec06c3/text:0
+#: Favorites/f7343147-8ef9-48ea-ba7f-6e0303a8722e/text:0
 msgid "Thanks @results.name, we are all done!"
 msgstr ""
 
@@ -108,11 +108,11 @@ msgstr ""
 msgid "Turbo King"
 msgstr ""
 
-#: Favorites/de694d5e-a291-49c3-992b-e685b362c11d/text:0
+#: Favorites/985238df-5dae-4949-8413-5249361b3b18/text:0
 msgid "What is your favorite color?"
 msgstr ""
 
-#: Pick+a+Number/fc381ea6-460c-45b7-8ca0-cfbfbde1e883/text:0
+#: Pick+a+Number/cebcc151-d8ae-4813-9bd0-11edf134885f/text:0
 msgid "You picked @results.number!"
 msgstr ""
 
