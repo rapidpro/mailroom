@@ -73,7 +73,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 			err = json.Unmarshal(tc.Body, &values)
 			require.NoError(t, err)
 
-			req, err = makeMultipartRequest(tc.Method, "http://localhost:8090"+tc.Path, values, tc.Files)
+			req, err = MakeMultipartRequest(tc.Method, "http://localhost:8090"+tc.Path, values, tc.Files)
 		} else {
 			req, err = http.NewRequest(tc.Method, "http://localhost:8090"+tc.Path, bytes.NewReader([]byte(tc.Body)))
 		}
@@ -132,7 +132,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 	}
 }
 
-func makeMultipartRequest(method, url string, fields map[string][]string, files map[string]string) (*http.Request, error) {
+func MakeMultipartRequest(method, url string, fields map[string][]string, files map[string]string) (*http.Request, error) {
 	b := &bytes.Buffer{}
 	w := multipart.NewWriter(b)
 
