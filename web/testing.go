@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"sync"
@@ -39,13 +41,14 @@ func RunWebTests(t *testing.T, truthFile string) {
 	time.Sleep(time.Second)
 
 	type TestCase struct {
-		Label        string          `json:"label"`
-		Method       string          `json:"method"`
-		Path         string          `json:"path"`
-		Body         json.RawMessage `json:"body,omitempty"`
-		Status       int             `json:"status"`
-		Response     json.RawMessage `json:"response,omitempty"`
-		ResponseFile string          `json:"response_file,omitempty"`
+		Label        string            `json:"label"`
+		Method       string            `json:"method"`
+		Path         string            `json:"path"`
+		Body         json.RawMessage   `json:"body,omitempty"`
+		Files        map[string]string `json:"files,omitempty"`
+		Status       int               `json:"status"`
+		Response     json.RawMessage   `json:"response,omitempty"`
+		ResponseFile string            `json:"response_file,omitempty"`
 		DBAssertions []struct {
 			Query string `json:"query"`
 			Count int    `json:"count"`
@@ -64,7 +67,16 @@ func RunWebTests(t *testing.T, truthFile string) {
 		uuids.SetGenerator(uuids.NewSeededGenerator(123456))
 		dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
 
-		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.Path, bytes.NewReader([]byte(tc.Body)))
+		var req *http.Request
+		if len(tc.Files) > 0 {
+			values := make(map[string][]string)
+			err = json.Unmarshal(tc.Body, &values)
+			require.NoError(t, err)
+
+			req, err = makeMultipartRequest(tc.Method, "http://localhost:8090"+tc.Path, values, tc.Files)
+		} else {
+			req, err = http.NewRequest(tc.Method, "http://localhost:8090"+tc.Path, bytes.NewReader([]byte(tc.Body)))
+		}
 		assert.NoError(t, err, "%s: error creating request", tc.Label)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -118,4 +130,32 @@ func RunWebTests(t *testing.T, truthFile string) {
 		err = ioutil.WriteFile(truthFile, truth, 0644)
 		require.NoError(t, err, "failed to update truth file")
 	}
+}
+
+func makeMultipartRequest(method, url string, fields map[string][]string, files map[string]string) (*http.Request, error) {
+	b := &bytes.Buffer{}
+	w := multipart.NewWriter(b)
+
+	for key, values := range fields {
+		for _, value := range values {
+			fw, err := w.CreateFormField(key)
+			if err != nil {
+				return nil, err
+			}
+			io.WriteString(fw, value)
+		}
+	}
+	for key, value := range files {
+		fw, err := w.CreateFormFile(key, key)
+		if err != nil {
+			return nil, err
+		}
+		io.WriteString(fw, value)
+	}
+
+	w.Close()
+
+	req, _ := http.NewRequest(method, url, bytes.NewReader(b.Bytes()))
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	return req, nil
 }

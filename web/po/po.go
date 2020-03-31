@@ -76,7 +76,7 @@ func handleExport(ctx context.Context, s *web.Server, r *http.Request, rawW http
 type importForm struct {
 	OrgID    models.OrgID    `form:"org_id"  validate:"required"`
 	FlowIDs  []models.FlowID `form:"flow_ids" validate:"required"`
-	Language envs.Language   `form:"language"`
+	Language envs.Language   `form:"language" validate:"required"`
 }
 
 func handleImport(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
