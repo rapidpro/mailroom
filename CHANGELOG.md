@@ -1,3 +1,8 @@
+v5.5.5
+----------
+ * Update mailroom test db
+ * Only Prometheus group can access metrics
+
 v5.5.4
 ----------
  * Drop no longer used validate_with_org_id param on inspect endpoint
