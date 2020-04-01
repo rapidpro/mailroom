@@ -268,13 +268,18 @@ SELECT
 FROM 
   orgs_org o
 JOIN 
-  api_apitoken a 
+  api_apitoken a
 ON 
   a.org_id = o.id
+JOIN
+  auth_group g
+ON
+  a.role_id = g.id
 WHERE
   a.is_active = TRUE AND
   o.is_active = TRUE AND
   o.uuid = $1::uuid AND
+  g.name = 'Prometheus' AND
   a.key = $2;
 `
 

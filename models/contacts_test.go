@@ -184,8 +184,8 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=50")
 		assert.Equal(t, 1, contacts[0].Groups().Count())
 
-		assert.Equal(t, "Sokoto", contacts[0].Fields()["state"].QueryValue())
-		assert.Equal(t, "Kilgori", contacts[0].Fields()["ward"].QueryValue())
+		assert.Equal(t, "Yobe", contacts[0].Fields()["state"].QueryValue())
+		assert.Equal(t, "Dokshi", contacts[0].Fields()["ward"].QueryValue())
 		assert.Equal(t, "F", contacts[0].Fields()["gender"].QueryValue())
 		assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
 

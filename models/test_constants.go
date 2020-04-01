@@ -19,7 +19,7 @@ import (
 // we could start deriving these instead from the UUIDs.
 
 var Org1 = OrgID(1)
-var Org1UUID = uuids.UUID("7109adde-f322-4afa-bef5-328eb8a7f7eb")
+var Org1UUID = uuids.UUID("bf0514a5-9407-44c9-b0f9-3f36f9c18414")
 
 var TwilioChannelID = ChannelID(10000)
 var TwilioChannelUUID = assets.ChannelUUID("74729f45-7f29-4868-9dc4-90e491e3c7d8")
