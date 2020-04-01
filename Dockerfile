@@ -23,7 +23,7 @@ ENV MAILROOM_YOURLS_PASSWORD=$MAILROOM_YOURLS_PASSWORD
 ARG MAILROOM_YOURLS_HOST
 ENV MAILROOM_YOURLS_HOST=$MAILROOM_YOURLS_HOST
 
-RUN go build ./cmd/... && chmod +x mailroom
+RUN go build ./cmd/mailroom && chmod +x mailroom
 
 EXPOSE 80
 ENTRYPOINT ["./mailroom"]
