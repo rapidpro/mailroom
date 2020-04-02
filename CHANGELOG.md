@@ -1,3 +1,7 @@
+v5.5.6
+----------
+ * Update to latest goflow v0.79.1
+
 v5.5.5
 ----------
  * Update mailroom test db
