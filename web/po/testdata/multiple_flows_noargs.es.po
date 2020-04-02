@@ -7,6 +7,7 @@ msgstr ""
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
+"Language-3: spa\n"
 "Source-Flows: 9de3663f-c5c5-4c92-9f45-ecbc09abcc85; 5890fe3a-f204-4661-b74d-025be4ee019c\n"
 
 #: Pick+a+Number/d2f852ec-7b4e-457f-ae7f-f8b243c49ff5/name:0
