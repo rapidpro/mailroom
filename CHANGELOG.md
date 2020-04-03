@@ -1,3 +1,33 @@
+v5.5.6
+----------
+ * Update to latest goflow v0.79.1
+
+v5.5.5
+----------
+ * Update mailroom test db
+ * Only Prometheus group can access metrics
+
+v5.5.4
+----------
+ * Drop no longer used validate_with_org_id param on inspect endpoint
+ * Add endpoints to export and import PO files from flows
+
+v5.5.3
+----------
+ * Add decode_html Excellent function
+
+v5.5.2
+----------
+ * Change to using basic auth for org specific prom metrics endpoint
+
+v5.5.1
+----------
+ * Update to latest goflow v0.78.0
+
+v5.5.0
+----------
+ * Add prometheus endpoint for org level metrics
+
 v5.4.4
 ----------
  * Update to latest goflow v0.77.4

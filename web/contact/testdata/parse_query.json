@@ -32,7 +32,7 @@
         },
         "status": 200,
         "response": {
-            "query": "age > 10",
+            "query": "age \u003e 10",
             "fields": [
                 "age"
             ],
@@ -92,7 +92,7 @@
         },
         "status": 200,
         "response": {
-            "query": "age > 10",
+            "query": "age \u003e 10",
             "fields": [
                 "age"
             ],

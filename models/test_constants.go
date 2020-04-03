@@ -4,6 +4,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils/uuids"
 )
 
 // Constants used in tests, these are tied to the DB created by the
@@ -18,6 +19,8 @@ import (
 // we could start deriving these instead from the UUIDs.
 
 var Org1 = OrgID(1)
+var Org1UUID = uuids.UUID("bf0514a5-9407-44c9-b0f9-3f36f9c18414")
+
 var TwilioChannelID = ChannelID(10000)
 var TwilioChannelUUID = assets.ChannelUUID("74729f45-7f29-4868-9dc4-90e491e3c7d8")
 
@@ -109,8 +112,9 @@ var BothubID = ClassifierID(3)
 var BothubUUID = assets.ClassifierUUID("859b436d-3005-4e43-9ad5-3de5f26ede4c")
 
 // constants for org 2, just a few here
-
 var Org2 = OrgID(2)
+var Org2UUID = uuids.UUID("3ae7cdeb-fd96-46e5-abc4-a4622f349921")
+
 var Org2ChannelID = ChannelID(20000)
 var Org2ChannelUUID = assets.ChannelUUID("a89bc872-3763-4b95-91d9-31d4e56c6651")
 

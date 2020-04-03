@@ -71,7 +71,7 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	defaultExitUUID := flows.ExitUUID(uuids.New())
 
 	cases := make([]*routers.Case, len(tc.Actions))
-	categories := make([]*routers.Category, len(tc.Actions))
+	categories := make([]flows.Category, len(tc.Actions))
 	exits := make([]flows.Exit, len(tc.Actions))
 	exitNodes := make([]flows.Node, len(tc.Actions))
 	i = 0
