@@ -53,6 +53,7 @@ github.com/gorilla/schema v1.0.2 h1:sAgNfOcNYvdDSrzGHVy9nzCQahG+qmsg+nE8dK85QRA=
 github.com/gorilla/schema v1.0.2/go.mod h1:kgLaKoK1FELgZqMAVxx/5cbj0kT+57qxUrAlIO2eleU=
 github.com/greatnonprofits-nfp/goflow v0.50.3-0.20200323211653-3004dd89ae2f h1:h8hlDC/JaJvNw2AjIrFryiIwdjBpjtRcpv8wEzD3dwA=
 github.com/greatnonprofits-nfp/goflow v0.50.3-0.20200323211653-3004dd89ae2f/go.mod h1:Ct6gIuJ4R//4IpJ7kcZli34tjP2zydMqcdEZj38OsZg=
+github.com/greatnonprofits-nfp/goflow v0.50.3-0.20200407151550-6ae79738ac61/go.mod h1:Ct6gIuJ4R//4IpJ7kcZli34tjP2zydMqcdEZj38OsZg=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af h1:pmfjZENx5imkbgOkpRUYLnmbU7UEFbjtDA2hxJ1ichM=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=
 github.com/jmoiron/sqlx v1.2.0 h1:41Ip0zITnmWNR/vHV+S4m+VoUivnWY5E4OJfLZjCJMA=
