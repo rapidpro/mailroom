@@ -71,10 +71,10 @@ func TestAirtimeTransferred(t *testing.T) {
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://airtime-api.dtone.com/cgi-bin/shop/topup": []httpx.MockResponse{
-			httpx.NewMockResponse(200, nil, withCRLF(msisdnResponse), 1),
-			httpx.NewMockResponse(200, nil, withCRLF(reserveResponse), 1),
-			httpx.NewMockResponse(200, nil, withCRLF(topupResponse), 1),
-			httpx.NewMockResponse(200, nil, "error_code=13\r\nerror_txt=Oops\r\n", 1),
+			httpx.NewMockResponse(200, nil, withCRLF(msisdnResponse)),
+			httpx.NewMockResponse(200, nil, withCRLF(reserveResponse)),
+			httpx.NewMockResponse(200, nil, withCRLF(topupResponse)),
+			httpx.NewMockResponse(200, nil, "error_code=13\r\nerror_txt=Oops\r\n"),
 		},
 	}))
 
