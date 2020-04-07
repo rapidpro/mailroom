@@ -29,7 +29,8 @@ func TestEngineWebhook(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
 	assert.Equal(t, "GET / HTTP/1.1\r\nHost: rapidpro.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: normal\r\nAccept-Encoding: gzip\r\n\r\n", string(call.RequestTrace))
-	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nOK", string(call.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\n", string(call.ResponseTrace))
+	assert.Equal(t, "OK", string(call.ResponseBody))
 }
 
 func TestSimulatorAirtime(t *testing.T) {
