@@ -325,3 +325,25 @@ func TestCreateContact(t *testing.T) {
 	// verify she's stopped
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE AND is_active = TRUE and is_blocked = FALSE`, []interface{}{CathyID}, 1)
 }
+
+func TestUpdateContactModifiedBy(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	err := UpdateContactModifiedBy(ctx, db, []ContactID{}, UserID(0))
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(0)}, 0)
+
+	err = UpdateContactModifiedBy(ctx, db, []ContactID{CathyID}, UserID(0))
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(0)}, 0)
+
+	err = UpdateContactModifiedBy(ctx, db, []ContactID{CathyID}, UserID(1))
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(1)}, 1)
+
+}

@@ -208,6 +208,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 //
 type modifyRequest struct {
 	OrgID      models.OrgID       `json:"org_id"       validate:"required"`
+	UserID     models.UserID      `json:"user_id"`
 	ContactIDs []models.ContactID `json:"contact_ids"  validate:"required"`
 	Modifiers  []json.RawMessage  `json:"modifiers"    validate:"required"`
 }
@@ -300,12 +301,23 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction")
 	}
 
+	modifiedContactIDs := make([]models.ContactID, 0, len(contacts))
+
 	// apply our events
 	for _, scene := range scenes {
 		err := models.HandleEvents(ctx, tx, s.RP, org, scene, results[scene.ContactID()].Events)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying events")
 		}
+		if len(results[scene.ContactID()].Events) > 0 {
+			modifiedContactIDs = append(modifiedContactIDs, scene.ContactID())
+		}
+	}
+
+	// apply modified_by
+	err = models.UpdateContactModifiedBy(ctx, tx, modifiedContactIDs, request.UserID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying modified_by")
 	}
 
 	// gather all our pre commit events, group them by hook and apply them

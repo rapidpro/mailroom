@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -38,10 +39,18 @@ func init() {
 	)
 }
 
+// OrgID is our type for orgs ids
 type OrgID int
 
+// UserID is our type for user ids used by modified_by, which can be null
+type UserID null.Int
+
 const (
+	// NilOrgID is the id 0 considered as nil org id
 	NilOrgID = OrgID(0)
+
+	// NilUserID si the id 0 considered as nil user id
+	NilUserID = UserID(0)
 
 	configSMTPServer    = "smtp_server"
 	configDTOneLogin    = "TRANSFERTO_ACCOUNT_LOGIN"
