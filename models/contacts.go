@@ -1262,3 +1262,12 @@ func (i *ContactID) Scan(value interface{}) error {
 func ContactLock(orgID OrgID, contactID ContactID) string {
 	return fmt.Sprintf("c:%d:%d", orgID, contactID)
 }
+
+// UpdateContactModifiedBy updates modified by the passed user id on the passed in contacts
+func UpdateContactModifiedBy(ctx context.Context, tx Queryer, contactIDs []ContactID, userID UserID) error {
+	if userID == NilUserID || len(contactIDs) == 0 {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW(), modified_by_id = $2 WHERE id = ANY($1)`, pq.Array(contactIDs), userID)
+	return err
+}
