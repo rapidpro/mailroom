@@ -1,3 +1,8 @@
+v5.5.8
+----------
+ * Update flow start modified_on when making changes
+ * Add method to set modified_by on contacts
+
 v5.5.7
 ----------
  * Update to latest goflow v0.81.0
