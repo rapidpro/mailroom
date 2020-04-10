@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/nyaruka/ezconf"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/logrus_sentry"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
@@ -75,6 +76,11 @@ func main() {
 			logrus.Fatalf("invalid sentry DSN: '%s': %s", config.SentryDSN, err)
 		}
 		logrus.StandardLogger().Hooks.Add(hook)
+	}
+
+	if config.UUIDSeed != 0 {
+		uuids.SetGenerator(uuids.NewSeededGenerator(int64(config.UUIDSeed)))
+		logrus.WithField("uuid-seed", config.UUIDSeed).Warn("using seeded UUID generation which is only appropriate for testing environments")
 	}
 
 	mr := mailroom.NewMailroom(config)
