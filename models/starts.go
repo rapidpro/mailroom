@@ -32,7 +32,7 @@ const DontIncludeActive = IncludeActive(false)
 
 // MarkStartComplete sets the status for the passed in flow start
 func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C' WHERE id = $1", startID)
+	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as complete")
 	}
@@ -41,7 +41,7 @@ func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error 
 
 // MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
 func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contactCount int) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'S', contact_count = $2 WHERE id = $1", startID, contactCount)
+	_, err := db.Exec("UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as started")
 	}
@@ -250,8 +250,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(created_on,  uuid,  restart_participants,  include_active,  query, status,  flow_id,  extra,  parent_summary)
-			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, :query, 'P'   , :flow_id, :extra, :parent_summary)
+	flows_flowstart(uuid,  created_on,  modified_on,  restart_participants,  include_active,  query, status,  flow_id,  extra,  parent_summary)
+			 VALUES(:uuid, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P'   , :flow_id, :extra, :parent_summary)
 RETURNING
 	id
 `
