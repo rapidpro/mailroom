@@ -10,88 +10,88 @@ msgstr ""
 "Language-3: \n"
 "Source-Flows: 9de3663f-c5c5-4c92-9f45-ecbc09abcc85\n"
 
-#: Favorites/b6c40a98-ecfa-4266-9853-0310d032b497/name:0
+#: Favorites/e87aeeab-8ede-4173-bc76-8f5583ea7207/name:0
 msgid "All Responses"
 msgstr ""
 
-#: Favorites/8720f157-ca1c-432f-9c0b-2014ddc77094/name:0
-#: Favorites/a4d15ed4-5b24-407f-b86e-4b881f09a186/arguments:0
+#: Favorites/34a421ac-34cb-49d8-a2a5-534f52c60851/arguments:0
+#: Favorites/c102acfc-8cc5-41fa-89ed-41cbfa362ba6/name:0
 msgid "Blue"
 msgstr ""
 
-#: Favorites/1b5491ec-2b83-445d-bebe-b4a1f677cf4c/arguments:0
-#: Favorites/c34b6c7d-fa06-4563-92a3-d648ab64bccb/name:0
+#: Favorites/3b400f91-db69-42b9-9fe2-24ad556b067a/arguments:0
+#: Favorites/8d2e259c-bc3c-464f-8c15-985bc736e212/name:0
 msgid "Cyan"
 msgstr ""
 
-#: Favorites/5cc1848a-357c-4de9-9720-45770ec18d11/text:0
+#: Favorites/3e2dcf45-ffc0-4197-b5ab-25ed974ea612/text:0
 msgid "Good choice, I like @results.color.category_localized too! What is your favorite beer?"
 msgstr ""
 
-#: Favorites/312d3af0-a565-4c96-ba00-bd7f0d08e671/arguments:0
-#: Favorites/692926ea-09d6-4942-bd38-d266ec8d3716/name:0
+#: Favorites/58284598-805a-4740-8966-dcb09e3b670a/name:0
+#: Favorites/b0c29972-6fd4-485e-83c2-057a3f7a04da/arguments:0
 msgid "Green"
 msgstr ""
 
-#: Favorites/3c82f999-661e-45ac-b30a-c416a7fcd983/text:0
+#: Favorites/943f85bb-50bc-40c3-8d6f-57dbe34c87f7/text:0
 msgid "I don't know that color. Try again."
 msgstr ""
 
-#: Favorites/575d728e-e5db-4510-85bf-06a58ffd6b4d/text:0
+#: Favorites/4cadf512-1299-468f-85e4-26af9edec193/text:0
 msgid "I don't know that one, try again please."
 msgstr ""
 
-#: Favorites/20853994-1b62-440b-a28e-03454bad0ad3/text:0
+#: Favorites/52d7a9ab-52b7-4e82-ba7f-672fb8d6ec91/text:0
 msgid "Mmmmm... delicious @results.beer.category_localized. If only they made @(lower(results.color)) @results.beer.category_localized! Lastly, what is your name?"
 msgstr ""
 
-#: Favorites/27b67219-e599-4697-b62c-3c781ca3b5da/arguments:0
-#: Favorites/4f15f627-b1e2-4851-8dbf-00ecf5d03034/name:0
+#: Favorites/87b850ff-ddc5-4add-8a4f-c395c3a9ac38/name:0
+#: Favorites/a813de57-c92a-4128-804d-56e80b332142/arguments:0
 msgid "Mutzig"
 msgstr ""
 
-#: Favorites/b88ce93d-4360-4455-a691-235cbe720980/arguments:0
+#: Favorites/baf07ebb-8a2a-4e63-aa08-d19aa408cd45/arguments:0
 msgid "Navy"
 msgstr ""
 
-#: Favorites/970b8069-50f5-4f6f-8f41-6b2d9f33d623/name:0
+#: Favorites/6e367c0c-65ab-479a-82e3-c597d8e35eef/name:0
 msgid "No Response"
 msgstr ""
 
-#: Favorites/5802813d-6c58-4292-8228-9728778b6c98/name:0
-#: Favorites/8ed05195-68cc-47fa-8e78-3bde7b3370ae/name:0
+#: Favorites/c169352e-1944-4451-8d32-eb39c41cb3ae/name:0
+#: Favorites/e0ec2076-2746-43b4-a410-c3af47d6a121/name:0
 msgid "Other"
 msgstr ""
 
-#: Favorites/44fe8d72-00ed-4736-acca-bbca70987315/name:0
-#: Favorites/b504fe9e-d8a8-47fd-af9c-ff2f1faac4db/arguments:0
+#: Favorites/a03dceb1-7ac1-491d-93ef-23d3e099633b/arguments:0
+#: Favorites/b9d718d3-b5e0-4d26-998e-2da31b24f2f9/name:0
 msgid "Primus"
 msgstr ""
 
-#: Favorites/5ecda5fc-951c-437b-a17e-f85e49829fb9/arguments:0
-#: Favorites/d2f852ec-7b4e-457f-ae7f-f8b243c49ff5/name:0
+#: Favorites/3ffb6f24-2ed8-4fd5-bcc0-b2e2668672a8/arguments:0
+#: Favorites/5563a722-9680-419c-a792-b1fa9df92e06/name:0
 msgid "Red"
 msgstr ""
 
-#: Favorites/3ceb7525-c2e1-40b0-bec9-e032f4f9af5f/arguments:0
-#: Favorites/b52a7f80-f820-4163-9654-8a7258fbaae4/name:0
+#: Favorites/2ba89eb6-6981-4c0d-a19d-3cf1fde52a43/arguments:0
+#: Favorites/dbc3b9d2-e6ce-4ebe-9552-8ddce482c1d1/name:0
 msgid "Skol"
 msgstr ""
 
-#: Favorites/e66ec83f-c2a6-4da7-a3df-faeec74f3533/text:0
+#: Favorites/e92b12c5-1817-468e-aa2f-8791fb6247e9/text:0
 msgid "Sorry you can't participate right now, I'll try again later."
 msgstr ""
 
-#: Favorites/1f33257b-0d4a-45d9-a0f3-f05a62583644/text:0
+#: Favorites/491f3ed1-9154-4acb-8fdd-0a37567e0574/text:0
 msgid "Thanks @results.name, we are all done!"
 msgstr ""
 
-#: Favorites/688e64f9-2456-4b42-afcb-91a2073e5459/name:0
-#: Favorites/f5e0f002-41fc-4565-8d9f-e51d30290005/arguments:0
+#: Favorites/58119801-ed31-4538-888d-23779a01707f/arguments:0
+#: Favorites/f1ca9ac8-d0aa-4758-a969-195be7330267/name:0
 msgid "Turbo King"
 msgstr ""
 
-#: Favorites/ffc903f7-8cbb-443f-9627-87106842d1aa/text:0
+#: Favorites/8c2504ef-0acc-405f-9efe-d5fc2c434a93/text:0
 msgid "What is your favorite color?"
 msgstr ""
 
