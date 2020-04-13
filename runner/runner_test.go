@@ -110,8 +110,8 @@ func TestBatchStart(t *testing.T) {
 
 	// create a start object
 	db.MustExec(
-		`INSERT INTO flows_flowstart(created_on, modified_on, uuid, restart_participants, include_active, contact_count, status, flow_id, created_by_id)
-		 VALUES(NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', $2, 1)`, uuids.New(), models.SingleMessageFlowID)
+		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, created_on, modified_on, restart_participants, include_active, contact_count, status, created_by_id)
+		 VALUES($1, $2, $3, NOW(), NOW(), TRUE, TRUE, 2, 'P', 1)`, uuids.New(), models.Org1, models.SingleMessageFlowID)
 
 	// and our batch object
 	contactIDs := []models.ContactID{models.CathyID, models.BobID}

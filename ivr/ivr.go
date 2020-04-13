@@ -329,7 +329,7 @@ func StartIVRFlow(
 	}
 
 	// get the flow for our start
-	start, err := models.GetFlowStartAttributes(ctx, db, org.OrgID(), startID)
+	start, err := models.GetFlowStartAttributes(ctx, db, startID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
@@ -598,7 +598,7 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 		}
 
 		// on errors we need to look up the flow to know how long to wait before retrying
-		start, err := models.GetFlowStartAttributes(ctx, db, org.OrgID(), conn.StartID())
+		start, err := models.GetFlowStartAttributes(ctx, db, conn.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())
 		}
