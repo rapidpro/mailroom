@@ -608,8 +608,8 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}
 
-		retryWait := time.Minute * time.Duration(flow.IntConfigValue(models.FlowConfigIVRRetryMinutes, models.ConnectionRetryWait))
-		conn.MarkErrored(ctx, db, time.Now(), retryWait)
+		conn.MarkErrored(ctx, db, time.Now(), flow.IVRRetryWait())
+
 		if conn.Status() == models.ConnectionStatusErrored {
 			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
 		}

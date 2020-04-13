@@ -41,8 +41,8 @@ const (
 
 	ConnectionMaxRetries = 3
 
-	// ConnectionRetryWait is our default wait to retry connections in minutes
-	ConnectionRetryWait = 60
+	// ConnectionRetryWait is our default wait to retry connections
+	ConnectionRetryWait = time.Minute * 60
 
 	// ConnectionThrottleWait is our wait between throttle retries
 	ConnectionThrottleWait = time.Minute * 2
