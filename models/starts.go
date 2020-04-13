@@ -161,7 +161,7 @@ func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) 
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
 
 // GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and extra
-func GetFlowStartAttributes(ctx context.Context, db Queryer, orgID OrgID, startID StartID) (*FlowStart, error) {
+func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
 	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra, parent_summary FROM flows_flowstart WHERE id = $1`, startID)
 	if err != nil {
@@ -250,8 +250,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(uuid,  org_id,  created_on,  modified_on,  restart_participants,  include_active,  query, status,  flow_id,  extra,  parent_summary)
-			 VALUES(:uuid, :org_id, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :flow_id, :extra, :parent_summary)
+	flows_flowstart(uuid,  org_id,  flow_id,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary)
+			 VALUES(:uuid, :org_id, :flow_id, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary)
 RETURNING
 	id
 `
