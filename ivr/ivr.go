@@ -79,7 +79,7 @@ type Client interface {
 
 	HangupCall(client *http.Client, externalID string) error
 
-	WriteSessionResponse(session *models.Session, resumeURL string, req *http.Request, w http.ResponseWriter) error
+	WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
 
 	WriteErrorResponse(w http.ResponseWriter, err error) error
 
@@ -392,7 +392,7 @@ func StartIVRFlow(
 	}
 
 	// have our client output our session status
-	err = client.WriteSessionResponse(sessions[0], resumeURL, r, w)
+	err = client.WriteSessionResponse(sessions[0], urn, resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for start")
 	}
@@ -567,7 +567,7 @@ func ResumeIVRFlow(
 
 	// if still active, write out our response
 	if status == models.ConnectionStatusInProgress {
-		err = client.WriteSessionResponse(session, resumeURL, r, w)
+		err = client.WriteSessionResponse(session, urn, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}

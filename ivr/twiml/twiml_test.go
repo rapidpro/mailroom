@@ -41,6 +41,16 @@ func TestResponseForSprint(t *testing.T) {
 			`<Response><Say>hello world</Say><Hangup></Hangup></Response>`,
 		},
 		{
+			[]flows.Event{events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "eng", ""))},
+			nil,
+			`<Response><Say language="en-US">hello world</Say><Hangup></Hangup></Response>`,
+		},
+		{
+			[]flows.Event{events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "ben", ""))},
+			nil,
+			`<Response><Say>hello world</Say><Hangup></Hangup></Response>`,
+		},
+		{
 			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic))},
 			nil,
 			`<Response><Play>https://mailroom.io/recordings/foo.wav</Play><Hangup></Hangup></Response>`,
@@ -76,7 +86,7 @@ func TestResponseForSprint(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		response, err := responseForSprint(resumeURL, tc.Wait, tc.Events)
+		response, err := responseForSprint(urn, resumeURL, tc.Wait, tc.Events)
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, xml.Header+tc.Expected, response, "%d: unexpected response", i)
 	}
