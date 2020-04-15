@@ -97,7 +97,7 @@ type FlowStart struct {
 	s struct {
 		ID        StartID    `json:"start_id"   db:"id"`
 		UUID      uuids.UUID `                  db:"uuid"`
-		StartType StartType  `                  db:"start_type"`
+		StartType StartType  `json:"start_type" db:"start_type"`
 		OrgID     OrgID      `json:"org_id"     db:"org_id"`
 		FlowID    FlowID     `json:"flow_id"    db:"flow_id"`
 		FlowType  FlowType   `json:"flow_type"`

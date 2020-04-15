@@ -84,7 +84,7 @@ func TestCheckSchedules(t *testing.T) {
 
 	// should have one flow start added to our DB ready to go
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowstart WHERE flow_id = $1 AND status = 'P';`,
+		`SELECT count(*) FROM flows_flowstart WHERE flow_id = $1 AND start_type = 'T' AND status = 'P';`,
 		[]interface{}{models.FavoritesFlowID}, 1)
 
 	// with the right count of groups and contacts
