@@ -18,6 +18,15 @@ type StartID null.Int
 // NilStartID is our constant for a nil start id
 var NilStartID = StartID(0)
 
+type StartType string
+
+const (
+	StartTypeManual     = StartType("M")
+	StartTypeAPI        = StartType("A")
+	StartTypeFlowAction = StartType("F")
+	StartTypeTrigger    = StartType("T")
+)
+
 // RestartParticipants is our type for the bool of restarting participatants
 type RestartParticipants bool
 
@@ -86,11 +95,12 @@ func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarsha
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
 	s struct {
-		ID       StartID    `json:"start_id"   db:"id"`
-		UUID     uuids.UUID `                  db:"uuid"`
-		OrgID    OrgID      `json:"org_id"     db:"org_id"`
-		FlowID   FlowID     `json:"flow_id"    db:"flow_id"`
-		FlowType FlowType   `json:"flow_type"`
+		ID        StartID    `json:"start_id"   db:"id"`
+		UUID      uuids.UUID `                  db:"uuid"`
+		StartType StartType  `                  db:"start_type"`
+		OrgID     OrgID      `json:"org_id"     db:"org_id"`
+		FlowID    FlowID     `json:"flow_id"    db:"flow_id"`
+		FlowType  FlowType   `json:"flow_type"`
 
 		GroupIDs   []GroupID   `json:"group_ids,omitempty"`
 		ContactIDs []ContactID `json:"contact_ids,omitempty"`
@@ -171,10 +181,11 @@ func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
-func NewFlowStart(orgID OrgID, flowType FlowType, flowID FlowID, restartParticipants RestartParticipants, includeActive IncludeActive) *FlowStart {
+func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID, restartParticipants RestartParticipants, includeActive IncludeActive) *FlowStart {
 	s := &FlowStart{}
 	s.s.UUID = uuids.New()
 	s.s.OrgID = orgID
+	s.s.StartType = startType
 	s.s.FlowType = flowType
 	s.s.FlowID = flowID
 	s.s.RestartParticipants = restartParticipants
@@ -250,8 +261,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(uuid,  org_id,  flow_id,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary)
-			 VALUES(:uuid, :org_id, :flow_id, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary)
+	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary)
+			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary)
 RETURNING
 	id
 `

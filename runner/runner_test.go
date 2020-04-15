@@ -143,7 +143,7 @@ func TestBatchStart(t *testing.T) {
 	last := time.Now()
 
 	for i, tc := range tcs {
-		start := models.NewFlowStart(models.OrgID(1), models.MessagingFlow, tc.Flow, tc.Restart, tc.IncludeActive).
+		start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.MessagingFlow, tc.Flow, tc.Restart, tc.IncludeActive).
 			WithContactIDs(contactIDs).
 			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs)
