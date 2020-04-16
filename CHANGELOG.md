@@ -1,3 +1,8 @@
+v5.5.10
+----------
+ * Update to goflow v0.82.0
+ * Populate flows_flowstart.start_type
+
 v5.5.9
 ----------
  * Set org on new flow starts
