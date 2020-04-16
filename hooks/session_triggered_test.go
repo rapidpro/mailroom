@@ -50,7 +50,7 @@ func TestSessionTriggered(t *testing.T) {
 					Count: 1,
 				},
 				SQLAssertion{
-					SQL:   "select count(*) from flows_flowstart where org_id = 1 AND flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL;",
+					SQL:   "select count(*) from flows_flowstart where org_id = 1 AND start_type = 'F' AND flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL;",
 					Args:  []interface{}{models.SingleMessageFlowID},
 					Count: 1,
 				},
@@ -109,7 +109,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
-					SQL:   `select count(*) from flows_flowstart where flow_id = $1 AND status = 'P' AND query = 'name ~ "Cathy"' AND parent_summary IS NOT NULL;`,
+					SQL:   `select count(*) from flows_flowstart where flow_id = $1 AND start_type = 'F' AND status = 'P' AND query = 'name ~ "Cathy"' AND parent_summary IS NOT NULL;`,
 					Args:  []interface{}{models.FavoritesFlowID},
 					Count: 1,
 				},

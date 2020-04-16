@@ -232,6 +232,7 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 		SELECT
 			t.id as id,
 			s.org_id as org_id,
+			'T' as start_type,
 			t.flow_id as flow_id,
 			f.flow_type as flow_type,
 			TRUE as restart_participants,
