@@ -345,6 +345,8 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		flows.ContactID(c.id),
 		c.name,
 		c.language,
+		c.isBlocked,
+		c.isStopped,
 		org.Env().Timezone(),
 		c.createdOn,
 		c.urns,
