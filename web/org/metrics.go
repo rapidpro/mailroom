@@ -2,7 +2,6 @@ package org
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -48,7 +47,7 @@ type groupCountRow struct {
 	Count int64            `db:"count"`
 }
 
-func calculateGroupCounts(ctx context.Context, s *web.Server, org *org) (*dto.MetricFamily, error) {
+func calculateGroupCounts(ctx context.Context, s *web.Server, org *models.OrgReference) (*dto.MetricFamily, error) {
 	rows, err := s.DB.QueryxContext(ctx, groupCountsSQL, org.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying group counts for org")
@@ -145,7 +144,7 @@ type channelStats struct {
 	Counts      map[string]int64
 }
 
-func calculateChannelCounts(ctx context.Context, s *web.Server, org *org) (*dto.MetricFamily, error) {
+func calculateChannelCounts(ctx context.Context, s *web.Server, org *models.OrgReference) (*dto.MetricFamily, error) {
 	rows, err := s.DB.QueryxContext(ctx, channelCountsSQL, org.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channel counts for org")
@@ -261,45 +260,6 @@ func calculateChannelCounts(ctx context.Context, s *web.Server, org *org) (*dto.
 	return family, err
 }
 
-const lookupOrgByTokenSQL = `
-SELECT 
-  o.id AS id, 
-  o.name AS name
-FROM 
-  orgs_org o
-JOIN 
-  api_apitoken a
-ON 
-  a.org_id = o.id
-JOIN
-  auth_group g
-ON
-  a.role_id = g.id
-WHERE
-  a.is_active = TRUE AND
-  o.is_active = TRUE AND
-  o.uuid = $1::uuid AND
-  g.name = 'Prometheus' AND
-  a.key = $2;
-`
-
-type org struct {
-	ID   models.OrgID `db:"id"`
-	Name string       `db:"name"`
-}
-
-func lookupOrgByToken(ctx context.Context, s *web.Server, orgUUID uuids.UUID, token string) (*org, error) {
-	org := &org{}
-	err := s.DB.GetContext(ctx, org, lookupOrgByTokenSQL, orgUUID, token)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return org, nil
-}
-
 func handleMetrics(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
 	// we should have basic auth headers, username should be metrics
 	username, token, ok := r.BasicAuth()
@@ -310,7 +270,7 @@ func handleMetrics(ctx context.Context, s *web.Server, r *http.Request, rawW htt
 	}
 
 	orgUUID := uuids.UUID(chi.URLParam(r, "uuid"))
-	org, err := lookupOrgByToken(ctx, s, orgUUID, token)
+	org, err := models.LookupOrgByToken(ctx, s.DB, orgUUID, "Prometheus", token)
 	if err != nil {
 		return errors.Wrapf(err, "error looking up org for token")
 	}

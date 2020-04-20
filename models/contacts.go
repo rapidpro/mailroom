@@ -79,6 +79,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 			language:   e.Language,
 			isStopped:  e.IsStopped,
 			isBlocked:  e.IsBlocked,
+			isPaused:   e.IsPaused,
 			modifiedOn: e.ModifiedOn,
 			createdOn:  e.CreatedOn,
 		}
@@ -388,6 +389,7 @@ type Contact struct {
 	language   envs.Language
 	isStopped  bool
 	isBlocked  bool
+	isPaused   bool
 	fields     map[string]*flows.Value
 	groups     []*Group
 	urns       []urns.URN
@@ -401,6 +403,7 @@ func (c *Contact) Name() string                    { return c.name }
 func (c *Contact) Language() envs.Language         { return c.language }
 func (c *Contact) IsStopped() bool                 { return c.isStopped }
 func (c *Contact) IsBlocked() bool                 { return c.isBlocked }
+func (c *Contact) IsPaused() bool                  { return c.isPaused }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
 func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
@@ -464,6 +467,7 @@ type contactEnvelope struct {
 	Language   envs.Language                            `json:"language"`
 	IsStopped  bool                                     `json:"is_stopped"`
 	IsBlocked  bool                                     `json:"is_blocked"`
+	IsPaused   bool                                     `json:"is_paused"`
 	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
 	GroupIDs   []GroupID                                `json:"group_ids"`
 	URNs       []ContactURN                             `json:"urns"`
@@ -481,6 +485,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	is_stopped,
 	is_blocked,
 	is_active,
+	is_paused,
 	created_on,
 	modified_on,
 	fields,

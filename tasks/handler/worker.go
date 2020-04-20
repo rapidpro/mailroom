@@ -533,6 +533,28 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		}
 	}
 
+	// if this contact is paused
+	if modelContact.IsPaused() {
+		// look up any active tickets for this contact
+		thread, err := models.LookupTicketForContact(ctx, db, org, modelContact)
+		if err != nil {
+			return errors.Wrapf(err, "unable to look up thread for contact")
+		}
+
+		// create a ticket if needbe
+		err = models.InsertAndForwardTicket(ctx, db, org, modelContact, thread, event.Text)
+		if err != nil {
+			return errors.Wrapf(err, "unable to look up thread for contact")
+		}
+
+		// and mark the message as handled
+		err = models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topup)
+		if err != nil {
+			return errors.Wrapf(err, "error marking message as handled by thread")
+		}
+		return nil
+	}
+
 	// find any matching triggers
 	trigger := models.FindMatchingMsgTrigger(org, contact, event.Text)
 

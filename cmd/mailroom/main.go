@@ -34,6 +34,8 @@ import (
 	_ "github.com/nyaruka/mailroom/web/po"
 	_ "github.com/nyaruka/mailroom/web/simulation"
 	_ "github.com/nyaruka/mailroom/web/surveyor"
+	_ "github.com/nyaruka/mailroom/web/tickets/mailgun"
+	_ "github.com/nyaruka/mailroom/web/tickets/zendesk"
 
 	_ "github.com/nyaruka/mailroom/ivr/nexmo"
 	_ "github.com/nyaruka/mailroom/ivr/twiml"
