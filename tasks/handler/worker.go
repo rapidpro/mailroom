@@ -444,7 +444,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction for stopping contact")
 	}
-	err = models.StopContact(ctx, tx, event.OrgID, event.ContactID)
+	err = models.StopContactByCourier(ctx, tx, event.OrgID, event.ContactID)
 	if err != nil {
 		tx.Rollback()
 		return err

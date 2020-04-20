@@ -858,9 +858,9 @@ func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, con
 	return nil
 }
 
-// StopContact stops the contact with the passed in id, removing them from all groups and setting
+// StopContactByCourier stops the contact with the passed in id, removing them from all groups and setting
 // their state to stopped.
-func StopContact(ctx context.Context, tx Queryer, orgID OrgID, contactID ContactID) error {
+func StopContactByCourier(ctx context.Context, tx Queryer, orgID OrgID, contactID ContactID) error {
 	// delete the contact from all groups
 	_, err := tx.ExecContext(ctx, deleteAllContactGroupsSQL, orgID, contactID)
 	if err != nil {
@@ -1271,5 +1271,55 @@ func UpdateContactModifiedBy(ctx context.Context, tx Queryer, contactIDs []Conta
 		return nil
 	}
 	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW(), modified_by_id = $2 WHERE id = ANY($1)`, pq.Array(contactIDs), userID)
+	return err
+}
+
+// BlockContacts blocks the passed contacts
+func BlockContacts(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+	if len(contactIDs) == 0 {
+		return nil
+	}
+
+	_, err := tx.ExecContext(ctx, `DELETE FROM triggers_trigger_contacts WHERE contact_id = ANY($1)`, pq.Array(contactIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error removing contact from triggers")
+	}
+
+	_, err = tx.ExecContext(ctx, `UPDATE contacts_contact SET is_blocked = TRUE, modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
+	return err
+}
+
+// UnblockContacts unblocks the passed contacts
+func UnblockContacts(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+	if len(contactIDs) == 0 {
+		return nil
+	}
+
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET is_blocked = FALSE, modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
+	return err
+}
+
+// StopContacts stops the passed contacts
+func StopContacts(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+	if len(contactIDs) == 0 {
+		return nil
+	}
+
+	_, err := tx.ExecContext(ctx, `DELETE FROM triggers_trigger_contacts WHERE contact_id = ANY($1)`, pq.Array(contactIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error removing contact from triggers")
+	}
+
+	_, err = tx.ExecContext(ctx, `UPDATE contacts_contact SET is_stopped = TRUE, modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
+	return err
+}
+
+// UnstopContacts unstops the passed contacts
+func UnstopContacts(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+	if len(contactIDs) == 0 {
+		return nil
+	}
+
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET is_stopped = FALSE, modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
 	return err
 }

@@ -316,7 +316,7 @@ func TestCreateContact(t *testing.T) {
 	}
 
 	// stop kathy
-	err = StopContact(ctx, db, Org1, CathyID)
+	err = StopContactByCourier(ctx, db, Org1, CathyID)
 	assert.NoError(t, err)
 
 	// verify she's only in the stopped group
