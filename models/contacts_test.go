@@ -347,3 +347,57 @@ func TestUpdateContactModifiedBy(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(1)}, 1)
 
 }
+
+func TestBlockedContacts(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	err := BlockContacts(ctx, db, []ContactID{})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 0)
+
+	err = BlockContacts(ctx, db, []ContactID{CathyID})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 1)
+
+	err = UnblockContacts(ctx, db, []ContactID{})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = FALSE`, []interface{}{CathyID}, 0)
+
+	err = UnblockContacts(ctx, db, []ContactID{CathyID})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = FALSE`, []interface{}{CathyID}, 1)
+
+}
+
+func TestStoppedContacts(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	err := StopContacts(ctx, db, []ContactID{})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 0)
+
+	err = StopContacts(ctx, db, []ContactID{CathyID})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 1)
+
+	err = UnstopContacts(ctx, db, []ContactID{})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = FALSE`, []interface{}{CathyID}, 0)
+
+	err = UnstopContacts(ctx, db, []ContactID{CathyID})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = FALSE`, []interface{}{CathyID}, 1)
+
+}
