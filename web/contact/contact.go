@@ -280,7 +280,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
 
-		result := ModifyResult{
+		result := modifyResult{
 			Contact: flowContact,
 			Events:  make([]flows.Event, 0, len(mods)),
 		}
