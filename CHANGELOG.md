@@ -1,3 +1,12 @@
+v5.5.12
+----------
+ * Update to goflow v0.83.1
+
+v5.5.11
+----------
+ * Update to goflow v0.83.0
+ * Don't blow up if flow is deleted during simulation
+
 v5.5.10
 ----------
  * Update to goflow v0.82.0
