@@ -28,10 +28,17 @@ import (
 
 type ContactActionMap map[models.ContactID][]flows.Action
 type ContactMsgMap map[models.ContactID]*flows.MsgIn
+type ContactModifierMap map[models.ContactID][]flows.Modifier
+
+type modifyResult struct {
+	Contact *flows.Contact `json:"contact"`
+	Events  []flows.Event  `json:"events"`
+}
 
 type HookTestCase struct {
 	Actions       ContactActionMap
 	Msgs          ContactMsgMap
+	Modifiers     ContactModifierMap
 	Assertions    []Assertion
 	SQLAssertions []SQLAssertion
 }
@@ -167,7 +174,7 @@ func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID models.Contact
 	return msg
 }
 
-func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
+func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 	models.FlushCache()
 
 	db := testsuite.DB()
@@ -217,49 +224,45 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		_, err = runner.StartFlow(ctx, db, rp, org, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
 		assert.NoError(t, err)
 
-		// now check our assertions
-		time.Sleep(1 * time.Second)
-		for ii, a := range tc.SQLAssertions {
-			testsuite.AssertQueryCount(t, db, a.SQL, a.Args, a.Count, "%d:%d: mismatch in expected count for query: %s", i, ii, a.SQL)
+		results := make(map[models.ContactID]modifyResult)
+
+		// create scenes for our contacts
+		scenes := make([]*models.Scene, 0, len(tc.Modifiers))
+		for contactID, mods := range tc.Modifiers {
+
+			contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{contactID})
+			assert.NoError(t, err)
+
+			contact := contacts[0]
+			flowContact, err := contact.FlowContact(org)
+			assert.NoError(t, err)
+
+			result := modifyResult{
+				Contact: flowContact,
+				Events:  make([]flows.Event, 0, len(mods)),
+			}
+
+			scene := models.NewSceneForContact(flowContact)
+
+			// apply our modifiers
+			for _, mod := range mods {
+				mod.Apply(org.Env(), org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+			}
+
+			results[contact.ID()] = result
+			scenes = append(scenes, scene)
+
 		}
-
-		rc := rp.Get()
-		for ii, a := range tc.Assertions {
-			err := a(t, db, rc)
-			assert.NoError(t, err, "%d: %d error checking assertion", i, ii)
-		}
-		rc.Close()
-	}
-}
-
-func RunEventsTestCases(t *testing.T, tcs []HookEventsTestCase) {
-	models.FlushCache()
-
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-
-	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
-	assert.NoError(t, err)
-
-	org, err = org.Clone(ctx, db)
-	assert.NoError(t, err)
-	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{models.CathyID})
-	assert.NoError(t, err)
-
-	contact := contacts[0]
-	flowContact, err := contact.FlowContact(org)
-	assert.NoError(t, err)
-
-	scene := models.NewSceneForContact(flowContact)
-
-	for i, tc := range tcs {
 
 		tx, err := db.BeginTxx(ctx, nil)
-		err = models.HandleEvents(ctx, tx, rp, org, scene, tc.Events)
 		assert.NoError(t, err)
 
-		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, org, []*models.Scene{scene})
+		for _, scene := range scenes {
+			err := models.HandleEvents(ctx, tx, rp, org, scene, results[scene.ContactID()].Events)
+			assert.NoError(t, err)
+		}
+
+		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, org, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -268,7 +271,7 @@ func RunEventsTestCases(t *testing.T, tcs []HookEventsTestCase) {
 		tx, err = db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, org, []*models.Scene{scene})
+		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, org, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -287,5 +290,4 @@ func RunEventsTestCases(t *testing.T, tcs []HookEventsTestCase) {
 		}
 		rc.Close()
 	}
-
 }
