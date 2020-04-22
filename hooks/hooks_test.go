@@ -43,12 +43,6 @@ type HookTestCase struct {
 	SQLAssertions []SQLAssertion
 }
 
-type HookEventsTestCase struct {
-	Events        []flows.Event
-	Assertions    []Assertion
-	SQLAssertions []SQLAssertion
-}
-
 type Assertion func(t *testing.T, db *sqlx.DB, rc redis.Conn) error
 
 type SQLAssertion struct {
