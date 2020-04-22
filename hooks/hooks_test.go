@@ -36,6 +36,12 @@ type HookTestCase struct {
 	SQLAssertions []SQLAssertion
 }
 
+type HookEventsTestCase struct {
+	Events        []flows.Event
+	Assertions    []Assertion
+	SQLAssertions []SQLAssertion
+}
+
 type Assertion func(t *testing.T, db *sqlx.DB, rc redis.Conn) error
 
 type SQLAssertion struct {
@@ -224,4 +230,62 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		}
 		rc.Close()
 	}
+}
+
+func RunEventsTestCases(t *testing.T, tcs []HookEventsTestCase) {
+	models.FlushCache()
+
+	db := testsuite.DB()
+	ctx := testsuite.CTX()
+	rp := testsuite.RP()
+
+	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
+	assert.NoError(t, err)
+
+	org, err = org.Clone(ctx, db)
+	assert.NoError(t, err)
+	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{models.CathyID})
+	assert.NoError(t, err)
+
+	contact := contacts[0]
+	flowContact, err := contact.FlowContact(org)
+	assert.NoError(t, err)
+
+	scene := models.NewSceneForContact(flowContact)
+
+	for i, tc := range tcs {
+
+		tx, err := db.BeginTxx(ctx, nil)
+		err = models.HandleEvents(ctx, tx, rp, org, scene, tc.Events)
+		assert.NoError(t, err)
+
+		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, org, []*models.Scene{scene})
+		assert.NoError(t, err)
+
+		err = tx.Commit()
+		assert.NoError(t, err)
+
+		tx, err = db.BeginTxx(ctx, nil)
+		assert.NoError(t, err)
+
+		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, org, []*models.Scene{scene})
+		assert.NoError(t, err)
+
+		err = tx.Commit()
+		assert.NoError(t, err)
+
+		// now check our assertions
+		time.Sleep(1 * time.Second)
+		for ii, a := range tc.SQLAssertions {
+			testsuite.AssertQueryCount(t, db, a.SQL, a.Args, a.Count, "%d:%d: mismatch in expected count for query: %s", i, ii, a.SQL)
+		}
+
+		rc := rp.Get()
+		for ii, a := range tc.Assertions {
+			err := a(t, db, rc)
+			assert.NoError(t, err, "%d: %d error checking assertion", i, ii)
+		}
+		rc.Close()
+	}
+
 }
