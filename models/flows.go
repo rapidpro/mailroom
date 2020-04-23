@@ -68,21 +68,14 @@ func (f *Flow) FlowType() FlowType { return f.f.FlowType }
 // Version returns the version this flow was authored in
 func (f *Flow) Version() string { return f.f.Version }
 
-// IntConfigValue returns the value for the key passed in as an int. If the value
-// is not an integer or is not present then the defaultValue is returned
-func (f *Flow) IntConfigValue(key string, defaultValue int64) int64 {
-	value := f.f.Config.Get(key, defaultValue)
+// IVRRetryWait returns the wait before retrying a failed IVR call
+func (f *Flow) IVRRetryWait() time.Duration {
+	value := f.f.Config.Get(FlowConfigIVRRetryMinutes, nil)
 	fv, isFloat := value.(float64)
 	if isFloat {
-		return int64(fv)
+		return time.Minute * time.Duration(int(fv))
 	}
-	return defaultValue
-}
-
-// StringConfigValue returns the value for the key passed in as a string. If the value
-// is not a string or is not present then the defaultValue is returned
-func (f *Flow) StringConfigValue(key string, defaultValue string) string {
-	return f.f.Config.GetString(key, defaultValue)
+	return ConnectionRetryWait
 }
 
 // IgnoreTriggers returns whether this flow ignores triggers

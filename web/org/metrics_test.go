@@ -73,7 +73,7 @@ func TestMetrics(t *testing.T) {
 			Username: "metrics",
 			Password: promToken,
 			Contains: []string{
-				`rapidpro_group_contact_count{group_name="All Contacts",group_uuid="bea21f3e-da6b-4dee-a869-fbe278360b25",group_type="system",org="UNICEF"} 124`,
+				`rapidpro_group_contact_count{group_name="All Contacts",group_uuid="d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008",group_type="system",org="UNICEF"} 124`,
 				`rapidpro_group_contact_count{group_name="Doctors",group_uuid="c153e265-f7c9-4539-9dbc-9b358714b638",group_type="user",org="UNICEF"} 121`,
 				`rapidpro_channel_msg_count{channel_name="Nexmo",channel_uuid="19012bfd-3ce3-4cae-9bb9-76cf92c73d49",channel_type="NX",msg_direction="out",msg_type="message",org="UNICEF"} 0`,
 			},

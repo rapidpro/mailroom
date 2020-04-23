@@ -1,3 +1,36 @@
+v5.5.12
+----------
+ * Update to goflow v0.83.1
+
+v5.5.11
+----------
+ * Update to goflow v0.83.0
+ * Don't blow up if flow is deleted during simulation
+
+v5.5.10
+----------
+ * Update to goflow v0.82.0
+ * Populate flows_flowstart.start_type
+
+v5.5.9
+----------
+ * Set org on new flow starts
+ * Allow for seeded UUID generation in testing environments with -uuid-seed switch
+ * Set language attribute from ivr_created_event on TwiML say action
+
+v5.5.8
+----------
+ * Update flow start modified_on when making changes
+ * Add method to set modified_by on contacts
+
+v5.5.7
+----------
+ * Update to latest goflow v0.81.0
+
+v5.5.6
+----------
+ * Update to latest goflow v0.79.1
+
 v5.5.5
 ----------
  * Update mailroom test db
