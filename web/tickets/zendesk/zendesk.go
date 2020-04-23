@@ -61,7 +61,6 @@ FROM
 ON
   m.contact_id = c.id
 WHERE
-  c.is_paused = TRUE AND
   c.is_active = TRUE AND
   m.org_id = $1 AND
   m.id > $2

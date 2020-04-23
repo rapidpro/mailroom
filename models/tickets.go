@@ -18,8 +18,8 @@ type Ticket struct {
 		ID         TicketID    `db:"id"`
 		UUID       uuids.UUID  `db:"uuid"`
 		OrgID      OrgID       `db:"org_id"`
-		ServiceID  ServiceID   `db:"service_id"`
 		ContactID  ContactID   `db:"contact_id"`
+		ServiceID  ServiceID   `db:"service_id"`
 		ExternalID null.String `db:"external_id"`
 		Subject    string      `db:"subject"`
 		Config     null.Map    `db:"config"`
@@ -30,29 +30,29 @@ type Ticket struct {
 	}
 }
 
-func (t *Ticket) ContactID() ContactID    { return t.t.ContactID }
-func (t *Ticket) OrgID() OrgID            { return t.t.OrgID }
-func (t *Ticket) ID() uuids.UUID          { return t.t.UUID }
+func (t *Ticket) ID() TicketID            { return t.t.ID }
 func (t *Ticket) UUID() uuids.UUID        { return t.t.UUID }
+func (t *Ticket) OrgID() OrgID            { return t.t.OrgID }
+func (t *Ticket) ContactID() ContactID    { return t.t.ContactID }
 func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
 func (t *Ticket) Status() string          { return t.t.Status }
 func (t *Ticket) Config() null.Map        { return t.t.Config }
 
-const selectActiveTicketSQL = `
+const selectOpenTicketSQL = `
 SELECT
   id,
-  service_id,
   uuid,
+  org_id,
+  contact_id,
+  service_id,
   external_id,
   status,
   subject,
   config,
   opened_on,
-  ended_on,
-  contact_id,
-  org_id
+  closed_on
 FROM
-  threads_thread
+  tickets_ticket
 WHERE
   org_id = $1 AND
   contact_id = $2 AND
@@ -63,9 +63,9 @@ ORDER BY
 
 // LookupTicketForContact looks up the most recent open ticket for the passed in org and contact
 func LookupTicketForContact(ctx context.Context, db Queryer, org *OrgAssets, contact *Contact) (*Ticket, error) {
-	rows, err := db.QueryxContext(ctx, selectActiveTicketSQL, org.OrgID(), contact.ID())
+	rows, err := db.QueryxContext(ctx, selectOpenTicketSQL, org.OrgID(), contact.ID())
 	if err != nil && err != sql.ErrNoRows {
-		return nil, errors.Wrapf(err, "error querying for active ticket for contact: %d", contact.ID())
+		return nil, errors.Wrapf(err, "error querying for open ticket for contact: %d", contact.ID())
 	}
 	defer rows.Close()
 
@@ -85,18 +85,18 @@ func LookupTicketForContact(ctx context.Context, db Queryer, org *OrgAssets, con
 const selectTicketSQL = `
 SELECT
   id,
-  service_id,
   uuid,
+  org_id,
+  contact_id,
+  service_id,
   external_id,
-  subject,
   status,
+  subject,
   config,
   opened_on,
-  closed_on,
-  contact_id,
-  org_id
+  closed_on
 FROM
-  threads_thread
+  tickets_ticket
 WHERE
   uuid = $1
 `
