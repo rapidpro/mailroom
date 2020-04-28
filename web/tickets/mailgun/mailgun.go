@@ -3,6 +3,7 @@ package mailgun
 import (
 	"context"
 	"net/http"
+	"net/mail"
 	"regexp"
 
 	"github.com/nyaruka/goflow/envs"
@@ -40,7 +41,6 @@ type receiveResponse struct {
 	Status     string      `json:"status"`
 }
 
-var emailRegex = regexp.MustCompile(`^.*<(.*?)>$`)
 var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})@.*$`)
 
 func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
@@ -49,7 +49,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
 	}
 
-	// recipient is in the format t+<ticket-uuid>@... parse it out
+	// recipient is in the format ticket+<ticket-uuid>@... parse it out
 	match := addressRegex.FindAllStringSubmatch(request.Recipient, -1)
 	if len(match) != 1 || len(match[0]) != 2 {
 		return errors.Errorf("invalid recipient, ignoring: %s", request.Recipient), http.StatusOK, nil
@@ -64,14 +64,11 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		replyTo = request.From
 	}
 
-	// reply-to and from are in the format `Foo Bar <foo@bar.com>` parse just the address out
-	match = emailRegex.FindAllStringSubmatch(replyTo, -1)
-	if len(match) == 1 && len(match[0]) == 2 {
-		replyTo = match[0][1]
-	}
-	if replyTo == "" {
+	address, err := mail.ParseAddress(replyTo)
+	if err != nil {
 		return errors.New("missing reply-to or from"), http.StatusBadRequest, nil
 	}
+	replyTo = address.Address
 
 	// look up our ticket
 	ticket, err := models.LookupTicketByUUID(ctx, s.DB, uuids.UUID(ticketUUID))
@@ -82,13 +79,13 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Errorf("invalid ticket uuid, ignoring"), http.StatusOK, nil
 	}
 
-	// update our thread
+	// update our ticket
 	config := null.NewMap(map[string]interface{}{
 		"last-message-id": request.MessageID,
-		"subject":         request.Subject,
+		"last-subject":    request.Subject,
 		"reply-to":        replyTo,
 	})
-	err = models.UpdateTicket(ctx, s.DB, ticket, null.String(replyTo), "O", config)
+	err = models.UpdateTicket(ctx, s.DB, ticket, "O", config)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error updating ticket: %s", ticket.UUID())
 	}

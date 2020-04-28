@@ -57,6 +57,9 @@ type OrgAssets struct {
 	labels       []assets.Label
 	labelsByUUID map[assets.LabelUUID]*Label
 
+	ticketers       []assets.Ticketer
+	ticketersByUUID map[assets.TicketerUUID]*Ticketer
+
 	resthooks []assets.Resthook
 	templates []assets.Template
 	triggers  []*Trigger
@@ -266,6 +269,20 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		o.flowByID = prev.flowByID
 	}
 
+	if prev == nil || refresh&RefreshTicketers > 0 {
+		o.ticketers, err = loadTicketers(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading ticketer assets for org %d", orgID)
+		}
+		o.ticketersByUUID = make(map[assets.TicketerUUID]*Ticketer)
+		for _, t := range o.ticketers {
+			o.ticketersByUUID[t.UUID()] = t.(*Ticketer)
+		}
+	} else {
+		o.ticketers = prev.ticketers
+		o.ticketersByUUID = prev.ticketersByUUID
+	}
+
 	// intialize our session assets
 	o.sessionAssets, err = engine.NewSessionAssets(o.Env(), o, goflow.MigrationConfig())
 	if err != nil {
@@ -294,6 +311,7 @@ const (
 	RefreshClassifiers = Refresh(1 << 11)
 	RefreshLabels      = Refresh(1 << 12)
 	RefreshFlows       = Refresh(1 << 13)
+	RefreshTicketers   = Refresh(1 << 14)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -552,4 +570,12 @@ func (a *OrgAssets) Templates() ([]assets.Template, error) {
 
 func (a *OrgAssets) Globals() ([]assets.Global, error) {
 	return a.globals, nil
+}
+
+func (a *OrgAssets) Ticketers() ([]assets.Ticketer, error) {
+	return a.ticketers, nil
+}
+
+func (a *OrgAssets) TicketerByUUID(uuid assets.TicketerUUID) *Ticketer {
+	return a.ticketersByUUID[uuid]
 }
