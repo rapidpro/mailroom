@@ -17,6 +17,7 @@
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
                     "name": "Cathy",
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z"
                 },
@@ -53,6 +54,7 @@
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
                     "name": "Kathy",
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z"
                 },
@@ -96,6 +98,7 @@
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
                     "name": "Nate",
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z"
                 },
@@ -137,6 +140,7 @@
                 "contact": {
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z"
                 },
@@ -185,6 +189,7 @@
                 "contact": {
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "groups": [
@@ -267,6 +272,7 @@
                 "contact": {
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z"
                 },
@@ -336,6 +342,7 @@
                 "contact": {
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "groups": [
@@ -394,6 +401,7 @@
                 "contact": {
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "groups": [
@@ -441,6 +449,7 @@
                 "contact": {
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z"
                 },
@@ -493,6 +502,7 @@
                 "contact": {
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z"
                 },
@@ -529,6 +539,7 @@
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
                     "language": "fra",
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z"
                 },
@@ -572,6 +583,7 @@
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
                     "language": "fra",
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "urns": [
@@ -620,6 +632,7 @@
                     "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
                     "id": 10000,
                     "language": "fra",
+                    "status": "active",
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "urns": [

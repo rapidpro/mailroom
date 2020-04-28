@@ -345,8 +345,7 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		flows.ContactID(c.id),
 		c.name,
 		c.language,
-		c.isBlocked,
-		c.isStopped,
+		c.Status(),
 		org.Env().Timezone(),
 		c.createdOn,
 		c.urns,
@@ -408,6 +407,15 @@ func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
+
+func (c *Contact) Status() flows.ContactStatus {
+	if c.isBlocked {
+		return flows.ContactStatusBlocked
+	} else if c.isStopped {
+		return flows.ContactStatusStopped
+	}
+	return flows.ContactStatusActive
+}
 
 // fieldValueEnvelope is our utility struct for the value of a field
 type fieldValueEnvelope struct {
