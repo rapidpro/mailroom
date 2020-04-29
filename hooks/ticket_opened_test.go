@@ -72,9 +72,14 @@ func TestTicketOpened(t *testing.T) {
 					Args:  []interface{}{models.CathyID, cathyOpenTicket.ID()},
 					Count: 1,
 				},
-				{
+				{ // and cathy's new ticket will have been created
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
 					Args:  []interface{}{models.CathyID, models.MailgunID},
+					Count: 1,
+				},
+				{ // and there's an HTTP log for that
+					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
+					Args:  []interface{}{models.MailgunID},
 					Count: 1,
 				},
 				{
