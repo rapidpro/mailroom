@@ -234,6 +234,7 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 			s.org_id as org_id,
 			t.flow_id as flow_id,
 			f.flow_type as flow_type,
+			coalesce(t.extra, '{}')::jsonb as extra,
 			TRUE as restart_participants,
 			TRUE as include_active,
 			(SELECT ARRAY_AGG(tc.contact_id) FROM (

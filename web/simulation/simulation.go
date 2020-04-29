@@ -241,7 +241,10 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 				}
 
 				if triggeredFlow != nil {
-					trigger := triggers.NewMsg(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
+					triggerExtraXValue := xtypes.JSONToXValue([]byte(trigger.Extra()))
+					triggerExtraXObject, _ := xtypes.ToXObject(org.Env(), triggerExtraXValue)
+
+					trigger := triggers.NewMsg(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match(), triggerExtraXObject)
 					return triggerFlow(ctx, s.DB, org, trigger)
 				}
 			}

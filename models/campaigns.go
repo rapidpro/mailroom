@@ -109,6 +109,7 @@ type CampaignEvent struct {
 		Unit          OffsetUnit        `json:"unit"`
 		DeliveryHour  int               `json:"delivery_hour"`
 		FlowID        FlowID            `json:"flow_id"`
+		Extra         string            `json:"extra"`
 	}
 
 	campaign *Campaign
@@ -241,6 +242,9 @@ func (e *CampaignEvent) Campaign() *Campaign { return e.campaign }
 // StartMode returns the start mode for this campaign event
 func (e *CampaignEvent) StartMode() StartMode { return e.e.StartMode }
 
+// Extra returns the extra data for this campaign event
+func (e *CampaignEvent) Extra() string { return e.e.Extra }
+
 // loadCampaigns loads all the campaigns for the passed in org
 func loadCampaigns(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Campaign, error) {
 	start := time.Now()
@@ -293,7 +297,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
             e.offset as offset,
 			e.unit as unit,
 			e.delivery_hour as delivery_hour,
-			e.flow_id as flow_id
+			e.flow_id as flow_id,
+			e.extra as extra
 		FROM 
 			campaigns_campaignevent e
 			JOIN contacts_contactfield f on e.relative_to_id = f.id
