@@ -23,6 +23,7 @@ import (
 
 type TicketID int
 type TicketerID null.Int
+type TicketStatus string
 
 const (
 	// ticketer types
@@ -38,6 +39,9 @@ const (
 	ZendeskConfigSubdomain = "subdomain"
 	ZendeskConfigUsername  = "username"
 	ZendeskConfigAPIToken  = "api_token"
+
+	TicketStatusOpen   = TicketStatus("O")
+	TicketStatusClosed = TicketStatus("C")
 )
 
 // Register a ticket service factory with the engine
@@ -54,28 +58,44 @@ func init() {
 
 type Ticket struct {
 	t struct {
-		ID         TicketID    `db:"id"`
-		UUID       uuids.UUID  `db:"uuid"`
-		OrgID      OrgID       `db:"org_id"`
-		ContactID  ContactID   `db:"contact_id"`
-		TicketerID TicketerID  `db:"ticketer_id"`
-		ExternalID null.String `db:"external_id"`
-		Subject    string      `db:"subject"`
-		Body       string      `db:"body"`
-		Config     null.Map    `db:"config"`
-		Status     string      `db:"status"`
-		OpenedOn   time.Time   `db:"opened_on"`
-		ModifiedOn time.Time   `db:"modified_on"`
-		ClosedOn   *time.Time  `db:"closed_on"`
+		ID         TicketID         `db:"id"`
+		UUID       flows.TicketUUID `db:"uuid"`
+		OrgID      OrgID            `db:"org_id"`
+		ContactID  ContactID        `db:"contact_id"`
+		TicketerID TicketerID       `db:"ticketer_id"`
+		ExternalID null.String      `db:"external_id"`
+		Status     TicketStatus     `db:"status"`
+		Subject    string           `db:"subject"`
+		Body       string           `db:"body"`
+		Config     null.Map         `db:"config"`
+		OpenedOn   time.Time        `db:"opened_on"`
+		ModifiedOn time.Time        `db:"modified_on"`
+		ClosedOn   *time.Time       `db:"closed_on"`
 	}
 }
 
+// NewTicket creates a new open ticket
+func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID, subject, body string) *Ticket {
+	t := &Ticket{}
+	t.t.UUID = uuid
+	t.t.OrgID = orgID
+	t.t.ContactID = contactID
+	t.t.TicketerID = ticketerID
+	t.t.ExternalID = null.String(externalID)
+	t.t.Status = TicketStatusOpen
+	t.t.Subject = subject
+	t.t.Body = body
+	t.t.OpenedOn = time.Now()
+	t.t.ModifiedOn = time.Now()
+	return t
+}
+
 func (t *Ticket) ID() TicketID            { return t.t.ID }
-func (t *Ticket) UUID() uuids.UUID        { return t.t.UUID }
+func (t *Ticket) UUID() flows.TicketUUID  { return t.t.UUID }
 func (t *Ticket) OrgID() OrgID            { return t.t.OrgID }
 func (t *Ticket) ContactID() ContactID    { return t.t.ContactID }
 func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
-func (t *Ticket) Status() string          { return t.t.Status }
+func (t *Ticket) Status() TicketStatus    { return t.t.Status }
 func (t *Ticket) Config() null.Map        { return t.t.Config }
 
 const selectOpenTicketSQL = `
@@ -91,6 +111,7 @@ SELECT
   body,
   config,
   opened_on,
+  modified_on,
   closed_on
 FROM
   tickets_ticket
@@ -136,6 +157,7 @@ SELECT
   body,
   config,
   opened_on,
+  modified_on,
   closed_on
 FROM
   tickets_ticket
@@ -166,8 +188,8 @@ func LookupTicketByUUID(ctx context.Context, db Queryer, uuid uuids.UUID) (*Tick
 
 const insertTicketSQL = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  service_id,  contact_id,  status,  subject,  body,  opened_on)
-  VALUES(        :uuid, :org_id, :service_id, :contact_id, :status, :subject, :body, :opened_on)
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on,  modified_on,  closed_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, :opened_on, :modified_on, :closed_on)
 RETURNING
   id
 `
@@ -197,7 +219,7 @@ WHERE
 `
 
 // UpdateTicket updates the passed in ticket with the passed in external id, status and config
-func UpdateTicket(ctx context.Context, db Queryer, ticket *Ticket, status string, config null.Map) error {
+func UpdateTicket(ctx context.Context, db Queryer, ticket *Ticket, status TicketStatus, config null.Map) error {
 	t := &ticket.t
 	t.Config = config
 	t.Status = status
@@ -215,7 +237,7 @@ type Ticketer struct {
 	t struct {
 		ID     TicketerID          `json:"id"`
 		UUID   assets.TicketerUUID `json:"uuid"`
-		Type   string              `json:"service_type"`
+		Type   string              `json:"ticketer_type"`
 		Name   string              `json:"name"`
 		Config map[string]string   `json:"config"`
 	}
@@ -260,7 +282,7 @@ func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryCo
 func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Ticketer, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectClassifiersSQL, orgID)
+	rows, err := db.Queryx(selectTicketersSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying ticketers for org: %d", orgID)
 	}
@@ -281,15 +303,15 @@ func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	return ticketers, nil
 }
 
-const selectTicketerSQL = `
+const selectTicketersSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.id as id,
 	t.uuid as uuid,
 	t.name as name,
-	t.service_type as service_type,
-	t.config as config,
+	t.ticketer_type as ticketer_type,
+	t.config as config
 FROM 
-	tickets_ticketservice t
+	tickets_ticketer t
 WHERE 
 	t.org_id = $1 AND 
 	t.is_active = TRUE

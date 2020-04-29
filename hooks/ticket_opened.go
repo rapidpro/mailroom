@@ -53,6 +53,18 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *m
 		return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticket.Ticketer.UUID)
 	}
 
+	ticket := models.NewTicket(
+		event.Ticket.UUID,
+		org.OrgID(),
+		scene.ContactID(),
+		ticketer.ID(),
+		event.Ticket.ExternalID,
+		event.Ticket.Subject,
+		event.Ticket.Body,
+	)
+
+	scene.AppendToEventPreCommitHook(insertTicketsHook, ticket)
+
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":  scene.ContactUUID(),
 		"session_id":    scene.SessionID(),
