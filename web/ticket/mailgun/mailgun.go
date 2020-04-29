@@ -17,7 +17,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/tickets/mailgun/receive", web.RequireAuthToken(handleReceive))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/mailgun/receive", web.RequireAuthToken(handleReceive))
 }
 
 type receiveRequest struct {
@@ -34,11 +34,11 @@ type receiveRequest struct {
 }
 
 type receiveResponse struct {
-	Action     string      `json:"action"`
-	TicketUUID string      `json:"ticket_uuid"`
-	ExternalID null.String `json:"external_id"`
-	Message    string      `json:"message"`
-	Status     string      `json:"status"`
+	Action     string              `json:"action"`
+	TicketUUID string              `json:"ticket_uuid"`
+	ExternalID null.String         `json:"external_id"`
+	Message    string              `json:"message"`
+	Status     models.TicketStatus `json:"status"`
 }
 
 var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})@.*$`)

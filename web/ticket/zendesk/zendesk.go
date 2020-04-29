@@ -20,12 +20,12 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/tickets/zendesk/pull", web.RequireAuthToken(handlePull))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticketszendesk/channelback", web.RequireAuthToken(handleChannelback))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/tickets/zendesk/event_callback", web.RequireAuthToken(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodGet, "/mr/tickets/zendesk/manifest", handleManifest)
-	web.RegisterRoute(http.MethodGet, "/mr/tickets/zendesk/admin_ui", handleAdmin)
-	web.RegisterRoute(http.MethodPost, "/mr/tickets/zendesk/admin_ui", handleAdmin)
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/zendesk/pull", web.RequireAuthToken(handlePull))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticketzendesk/channelback", web.RequireAuthToken(handleChannelback))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/zendesk/event_callback", web.RequireAuthToken(handleEventCallback))
+	web.RegisterJSONRoute(http.MethodGet, "/mr/ticket/zendesk/manifest", handleManifest)
+	web.RegisterRoute(http.MethodGet, "/mr/ticket/zendesk/admin_ui", handleAdmin)
+	web.RegisterRoute(http.MethodPost, "/mr/ticket/zendesk/admin_ui", handleAdmin)
 }
 
 type pullRequest struct {

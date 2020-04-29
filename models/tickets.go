@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/services/ticket/mailgun"
@@ -85,8 +86,6 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketer
 	t.t.Status = TicketStatusOpen
 	t.t.Subject = subject
 	t.t.Body = body
-	t.t.OpenedOn = time.Now()
-	t.t.ModifiedOn = time.Now()
 	return t
 }
 
@@ -186,10 +185,10 @@ func LookupTicketByUUID(ctx context.Context, db Queryer, uuid uuids.UUID) (*Tick
 	return ticket, nil
 }
 
-const insertTicketSQL = `
+const insertOpenTicketSQL = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on,  modified_on,  closed_on)
-  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, :opened_on, :modified_on, :closed_on)
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on,  modified_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, NOW(),      NOW()      )
 RETURNING
   id
 `
@@ -205,7 +204,7 @@ func InsertTickets(ctx context.Context, tx Queryer, tickets []*Ticket) error {
 		ts[i] = &tickets[i].t
 	}
 
-	return BulkSQL(ctx, "inserted tickets", tx, insertTicketSQL, ts)
+	return BulkSQL(ctx, "inserted tickets", tx, insertOpenTicketSQL, ts)
 }
 
 const updateTicketSQL = `
@@ -224,9 +223,26 @@ func UpdateTicket(ctx context.Context, db Queryer, ticket *Ticket, status Ticket
 	t.Config = config
 	t.Status = status
 
-	err := Exec(ctx, "update ticket", db, updateTicketSQL, t.ID, t.Status, t.Config)
+	return Exec(ctx, "update ticket", db, updateTicketSQL, t.ID, t.Status, t.Config)
+}
+
+const closeTicketsForContactsSQL = `
+UPDATE
+  tickets_ticket
+SET
+  status = 'C',
+  modified_on = NOW(),
+  closed_on = NOW()
+WHERE
+  contact_id = ANY($1) AND
+  status = 'O'
+`
+
+// CloseTicketsForContacts closes any open tikcets for the given contacts
+func CloseTicketsForContacts(ctx context.Context, db Queryer, contactIDs []ContactID) error {
+	err := Exec(ctx, "close ticket", db, closeTicketsForContactsSQL, pq.Array(contactIDs))
 	if err != nil {
-		return errors.Wrapf(err, "error updating ticket: %s", t.UUID)
+		return errors.Wrapf(err, "error closing tickets for %d contacts", len(contactIDs))
 	}
 
 	return nil
@@ -278,6 +294,23 @@ func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryCo
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
 }
 
+const selectTicketersSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	t.id as id,
+	t.uuid as uuid,
+	t.name as name,
+	t.ticketer_type as ticketer_type,
+	t.config as config
+FROM 
+	tickets_ticketer t
+WHERE 
+	t.org_id = $1 AND 
+	t.is_active = TRUE
+ORDER BY
+	t.created_on ASC
+) r;
+`
+
 // loadTicketers loads all the ticketers for the passed in org
 func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Ticketer, error) {
 	start := time.Now()
@@ -302,23 +335,6 @@ func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 
 	return ticketers, nil
 }
-
-const selectTicketersSQL = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	t.id as id,
-	t.uuid as uuid,
-	t.name as name,
-	t.ticketer_type as ticketer_type,
-	t.config as config
-FROM 
-	tickets_ticketer t
-WHERE 
-	t.org_id = $1 AND 
-	t.is_active = TRUE
-ORDER BY
-	t.created_on ASC
-) r;
-`
 
 // MarshalJSON marshals into JSON. 0 values will become null
 func (i TicketerID) MarshalJSON() ([]byte, error) {

@@ -7,12 +7,16 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/goflow/utils/httpx"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTicketOpened(t *testing.T) {
 	testsuite.Reset()
+	db := testsuite.DB()
+	ctx := testsuite.CTX()
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
@@ -23,7 +27,29 @@ func TestTicketOpened(t *testing.T) {
 				"message": "Queued. Thank you."
 			}`),
 		},
+		"https://nyaruka.zendesk.com/api/v2/tickets.json": {
+			httpx.NewMockResponse(200, nil, `{
+				"ticket":{
+					"id": 12345,
+					"url": "https://nyaruka.zendesk.com/api/v2/tickets/12345.json",
+					"external_id": "a78c5d9d-283a-4be9-ad6d-690e4307c961",
+					"created_at": "2009-07-20T22:55:29Z",
+					"subject": "Need help"
+				}
+			}`),
+		},
 	}))
+
+	// existing tickets
+	cathyClosedTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "748363", "Very Old Question", "Who?")
+	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyClosedTicket})
+	require.NoError(t, err)
+	err = models.CloseTicketsForContacts(ctx, db, []models.ContactID{models.CathyID})
+	require.NoError(t, err)
+
+	cathyOpenTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "235325", "Old Question", "Why?")
+	err = models.InsertTickets(ctx, db, []*models.Ticket{cathyOpenTicket})
+	require.NoError(t, err)
 
 	tcs := []HookTestCase{
 		{
@@ -36,6 +62,16 @@ func TestTicketOpened(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
+				{ // cathy's open ticket will have been closed
+					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'C'",
+					Args:  []interface{}{models.CathyID},
+					Count: 2,
+				},
+				{ // cathy's closed ticket won't have been modified
+					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'C' AND modified_on >= (select modified_on from tickets_ticket where id = $2)",
+					Args:  []interface{}{models.CathyID, cathyOpenTicket.ID()},
+					Count: 1,
+				},
 				{
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
 					Args:  []interface{}{models.CathyID, models.MailgunID},

@@ -2,8 +2,6 @@ package runner
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -540,12 +538,6 @@ func StartFlowForContacts(
 
 		sessions = append(sessions, session)
 		sprints = append(sprints, sprint)
-
-		fmt.Println("=========================")
-		for _, e := range sprint.Events() {
-			data, _ := json.Marshal(e)
-			fmt.Println(string(data))
-		}
 	}
 
 	if len(sessions) == 0 {
