@@ -69,6 +69,9 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *m
 		event.Ticket.ExternalID,
 		event.Ticket.Subject,
 		event.Ticket.Body,
+		map[string]interface{}{
+			"contact-display": scene.Contact().Format(org.Env()),
+		},
 	)
 
 	scene.AppendToEventPreCommitHook(insertTicketsHook, ticket)

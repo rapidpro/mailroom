@@ -10,6 +10,10 @@ import (
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
+
+	_ "github.com/nyaruka/mailroom/services/ticket/mailgun"
+	_ "github.com/nyaruka/mailroom/services/ticket/zendesk"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,13 +45,13 @@ func TestTicketOpened(t *testing.T) {
 	}))
 
 	// existing tickets
-	cathyClosedTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "748363", "Very Old Question", "Who?")
+	cathyClosedTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "748363", "Very Old Question", "Who?", nil)
 	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyClosedTicket})
 	require.NoError(t, err)
 	err = models.CloseTicketsForContacts(ctx, db, []models.ContactID{models.CathyID})
 	require.NoError(t, err)
 
-	cathyOpenTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "235325", "Old Question", "Why?")
+	cathyOpenTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "235325", "Old Question", "Why?", nil)
 	err = models.InsertTickets(ctx, db, []*models.Ticket{cathyOpenTicket})
 	require.NoError(t, err)
 

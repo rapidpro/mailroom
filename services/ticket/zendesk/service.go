@@ -4,26 +4,40 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
-	"github.com/nyaruka/mailroom/services"
+	"github.com/nyaruka/mailroom/models"
 
 	"github.com/pkg/errors"
 )
+
+const (
+	configSubdomain = "subdomain"
+	configUsername  = "username"
+	configAPIToken  = "api_token"
+)
+
+func init() {
+	models.RegisterTicketService("zendesk", newService)
+}
 
 type service struct {
 	client   *Client
 	ticketer *flows.Ticketer
 }
 
-// NewService creates a new Zendesk ticketing service
-func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, subdomain, username, apiToken string) services.TicketService {
-	return &service{
-		client:   NewClient(httpClient, httpRetries, subdomain, username, apiToken),
-		ticketer: ticketer,
+func newService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+	subdomain := config[configSubdomain]
+	username := config[configUsername]
+	apiToken := config[configAPIToken]
+	if subdomain != "" && username != "" && apiToken != "" {
+		return &service{
+			client:   NewClient(httpClient, httpRetries, subdomain, username, apiToken),
+			ticketer: ticketer,
+		}, nil
 	}
+	return nil, errors.New("missing subdomain or username or api_token in zendesk config")
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
@@ -41,6 +55,6 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	return flows.NewTicket(ticketUUID, s.ticketer, subject, body, strconv.Itoa(ticketResponse.ID)), nil
 }
 
-func (s *service) Forward(env envs.Environment, contact *flows.Contact, ticket *flows.Ticket, text string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, text string, logHTTP flows.HTTPLogCallback) error {
 	return nil
 }

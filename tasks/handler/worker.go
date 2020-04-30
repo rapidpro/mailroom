@@ -542,7 +542,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	if ticket != nil {
-		ticket.ForwardIncoming(ctx, db, org, contact, event.Text, event.Attachments)
+		ticket.ForwardIncoming(ctx, db, org, modelContact, event.Text, event.Attachments)
 	}
 
 	// find any matching triggers

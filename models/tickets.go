@@ -16,9 +16,6 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/services"
-	"github.com/nyaruka/mailroom/services/ticket/mailgun"
-	"github.com/nyaruka/mailroom/services/ticket/zendesk"
 	"github.com/nyaruka/null"
 
 	"github.com/pkg/errors"
@@ -30,20 +27,6 @@ type TicketerID null.Int
 type TicketStatus string
 
 const (
-	// ticketer types
-	TicketerTypeMailgun = "mailgun"
-	TicketerTypeZendesk = "zendesk"
-
-	// Mailgun config options
-	MailgunConfigDomain    = "domain"
-	MailgunConfigAPIKey    = "api_key"
-	MailgunConfigToAddress = "to_address"
-
-	// Zendesk config options
-	ZendeskConfigSubdomain = "subdomain"
-	ZendeskConfigUsername  = "username"
-	ZendeskConfigAPIToken  = "api_token"
-
 	TicketStatusOpen   = TicketStatus("O")
 	TicketStatusClosed = TicketStatus("C")
 )
@@ -79,7 +62,7 @@ type Ticket struct {
 }
 
 // NewTicket creates a new open ticket
-func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID, subject, body string) *Ticket {
+func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID, subject, body string, config map[string]interface{}) *Ticket {
 	t := &Ticket{}
 	t.t.UUID = uuid
 	t.t.OrgID = orgID
@@ -89,6 +72,7 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketer
 	t.t.Status = TicketStatusOpen
 	t.t.Subject = subject
 	t.t.Body = body
+	t.t.Config = null.NewMap(config)
 	return t
 }
 
@@ -98,6 +82,7 @@ func (t *Ticket) OrgID() OrgID            { return t.t.OrgID }
 func (t *Ticket) ContactID() ContactID    { return t.t.ContactID }
 func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
 func (t *Ticket) Status() TicketStatus    { return t.t.Status }
+func (t *Ticket) Subject() string         { return t.t.Subject }
 func (t *Ticket) Config() null.Map        { return t.t.Config }
 
 // CreateReply creates an outgoing reply in this ticket
@@ -124,7 +109,8 @@ func (t *Ticket) CreateReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, t
 	return msgs[0], nil
 }
 
-func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *flows.Contact, text string, attachments []utils.Attachment) error {
+// ForwardIncoming forwards an incoming message from a contact to this ticket
+func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *Contact, text string, attachments []utils.Attachment) error {
 	ticketer := org.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
@@ -136,11 +122,9 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 		return err
 	}
 
-	flowTicket := flows.NewTicket(t.t.UUID, flowTicketer, t.t.Subject, t.t.Body, string(t.t.ExternalID))
-
 	logHTTP := &flows.HTTPLogger{}
 
-	err = service.Forward(org.org.env, contact, flowTicket, text, logHTTP.Log)
+	err = service.Forward(t, text, logHTTP.Log)
 
 	// create a log for each HTTP call
 	httpLogs := make([]*HTTPLog, 0, len(logHTTP.Logs))
@@ -336,26 +320,27 @@ func (t *Ticketer) Name() string { return t.t.Name }
 func (t *Ticketer) Type() string { return t.t.Type }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer) (services.TicketService, error) {
-	switch t.Type() {
-	case TicketerTypeMailgun:
-		domain := t.t.Config[MailgunConfigDomain]
-		apiKey := t.t.Config[MailgunConfigAPIKey]
-		toAddress := t.t.Config[MailgunConfigToAddress]
-		if domain != "" && apiKey != "" && toAddress != "" {
-			return mailgun.NewService(httpClient, httpRetries, ticketer, domain, apiKey, toAddress), nil
-		}
-		return nil, errors.New("missing domain or api_key or to_address in mailgun config")
-	case TicketerTypeZendesk:
-		subdomain := t.t.Config[ZendeskConfigSubdomain]
-		username := t.t.Config[ZendeskConfigUsername]
-		apiToken := t.t.Config[ZendeskConfigAPIToken]
-		if subdomain != "" && username != "" && apiToken != "" {
-			return zendesk.NewService(httpClient, httpRetries, ticketer, subdomain, username, apiToken), nil
-		}
-		return nil, errors.New("missing subdomain or username or api_token in zendesk config")
+func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer) (TicketService, error) {
+	initFunc := ticketServices[t.Type()]
+	if initFunc != nil {
+		return initFunc(httpClient, httpRetries, ticketer, t.t.Config)
 	}
+
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
+}
+
+type TicketService interface {
+	flows.TicketService
+
+	Forward(ticket *Ticket, text string, logHTTP flows.HTTPLogCallback) error
+}
+
+type TicketServiceFunc func(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (TicketService, error)
+
+var ticketServices = map[string]TicketServiceFunc{}
+
+func RegisterTicketService(name string, initFunc TicketServiceFunc) {
+	ticketServices[name] = initFunc
 }
 
 const selectTicketersSQL = `
