@@ -58,6 +58,7 @@ type OrgAssets struct {
 	labelsByUUID map[assets.LabelUUID]*Label
 
 	ticketers       []assets.Ticketer
+	ticketersByID   map[TicketerID]*Ticketer
 	ticketersByUUID map[assets.TicketerUUID]*Ticketer
 
 	resthooks []assets.Resthook
@@ -274,8 +275,10 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading ticketer assets for org %d", orgID)
 		}
+		o.ticketersByID = make(map[TicketerID]*Ticketer)
 		o.ticketersByUUID = make(map[assets.TicketerUUID]*Ticketer)
 		for _, t := range o.ticketers {
+			o.ticketersByID[t.(*Ticketer).ID()] = t.(*Ticketer)
 			o.ticketersByUUID[t.UUID()] = t.(*Ticketer)
 		}
 	} else {
@@ -574,6 +577,10 @@ func (a *OrgAssets) Globals() ([]assets.Global, error) {
 
 func (a *OrgAssets) Ticketers() ([]assets.Ticketer, error) {
 	return a.ticketers, nil
+}
+
+func (a *OrgAssets) TicketerByID(id TicketerID) *Ticketer {
+	return a.ticketersByID[id]
 }
 
 func (a *OrgAssets) TicketerByUUID(uuid assets.TicketerUUID) *Ticketer {

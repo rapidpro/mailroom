@@ -6,8 +6,7 @@ import (
 	"net/mail"
 	"regexp"
 
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
@@ -54,7 +53,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	if len(match) != 1 || len(match[0]) != 2 {
 		return errors.Errorf("invalid recipient, ignoring: %s", request.Recipient), http.StatusOK, nil
 	}
-	ticketUUID := match[0][1]
+	ticketUUID := flows.TicketUUID(match[0][1])
 
 	// parse the reply to
 	replyTo := request.ReplyTo
@@ -71,13 +70,15 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	replyTo = address.Address
 
 	// look up our ticket
-	ticket, err := models.LookupTicketByUUID(ctx, s.DB, uuids.UUID(ticketUUID))
+	ticket, err := models.LookupTicketByUUID(ctx, s.DB, ticketUUID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up ticket: %s", ticketUUID)
 	}
 	if ticket == nil {
 		return errors.Errorf("invalid ticket uuid, ignoring"), http.StatusOK, nil
 	}
+
+	// TODO is it correct to re-open closed tickets? What about other tickets that are open?
 
 	// update our ticket
 	config := null.NewMap(map[string]interface{}{
@@ -90,32 +91,16 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error updating ticket: %s", ticket.UUID())
 	}
 
-	// TODO: below message creation stuff should be moved into models
-
-	// look up our assets
-	assets, err := models.GetOrgAssets(s.CTX, s.DB, ticket.OrgID())
+	msg, err := ticket.CreateReply(s.CTX, s.DB, s.RP, request.StrippedText)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up org: %d", ticket.OrgID())
-	}
-
-	// we build a simple translation
-	translations := map[envs.Language]*models.BroadcastTranslation{
-		envs.Language(""): &models.BroadcastTranslation{Text: request.StrippedText},
-	}
-
-	// we'll use a broadcast to send this message
-	bcast := models.NewBroadcast(assets.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language(""), nil, nil, nil)
-	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
-	msgs, err := models.CreateBroadcastMessages(s.CTX, s.DB, s.RP, assets, batch)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating message batch")
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating ticket reply")
 	}
 
 	// queue our message
 	rc := s.RP.Get()
 	defer rc.Close()
 
-	err = courier.QueueMessages(rc, msgs)
+	err = courier.QueueMessages(rc, []*models.Msg{msg})
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error queuing outgoing message")
 	}

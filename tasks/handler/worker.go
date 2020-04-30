@@ -533,14 +533,16 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		}
 	}
 
-	// look up any active tickets for this contact
+	// TODO optimization to avoid another lookup here?
+
+	// look up any open tickets for this contact
 	ticket, err := models.LookupTicketForContact(ctx, db, org, modelContact)
 	if err != nil {
 		return errors.Wrapf(err, "unable to look up ticket for contact")
 	}
 
 	if ticket != nil {
-		// TODO forward this message to the ticket
+		ticket.ForwardIncoming(ctx, db, org, contact, event.Text, event.Attachments)
 	}
 
 	// find any matching triggers

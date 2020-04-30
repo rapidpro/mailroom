@@ -7,19 +7,22 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/services/ticket/mailgun"
-	"github.com/nyaruka/goflow/services/ticket/zendesk"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/httpx"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/mailroom/services"
+	"github.com/nyaruka/mailroom/services/ticket/mailgun"
+	"github.com/nyaruka/mailroom/services/ticket/zendesk"
 	"github.com/nyaruka/null"
-	"github.com/sirupsen/logrus"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type TicketID int
@@ -97,27 +100,89 @@ func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
 func (t *Ticket) Status() TicketStatus    { return t.t.Status }
 func (t *Ticket) Config() null.Map        { return t.t.Config }
 
+// CreateReply creates an outgoing reply in this ticket
+func (t *Ticket) CreateReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, text string) (*Msg, error) {
+	// look up our assets
+	assets, err := GetOrgAssets(ctx, db, t.OrgID())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error looking up org: %d", t.OrgID())
+	}
+
+	// build a simple translation
+	translations := map[envs.Language]*BroadcastTranslation{
+		envs.Language("base"): {Text: text},
+	}
+
+	// we'll use a broadcast to send this message
+	bcast := NewBroadcast(assets.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, envs.Language("base"), nil, nil, nil)
+	batch := bcast.CreateBatch([]ContactID{t.ContactID()})
+	msgs, err := CreateBroadcastMessages(ctx, db, rp, assets, batch)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating message batch")
+	}
+
+	return msgs[0], nil
+}
+
+func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *flows.Contact, text string, attachments []utils.Attachment) error {
+	ticketer := org.TicketerByID(t.t.TicketerID)
+	if ticketer == nil {
+		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
+	}
+
+	flowTicketer := flows.NewTicketer(ticketer)
+	service, err := ticketer.AsService(http.DefaultClient, nil, flowTicketer)
+	if err != nil {
+		return err
+	}
+
+	flowTicket := flows.NewTicket(t.t.UUID, flowTicketer, t.t.Subject, t.t.Body, string(t.t.ExternalID))
+
+	logHTTP := &flows.HTTPLogger{}
+
+	err = service.Forward(org.org.env, contact, flowTicket, text, logHTTP.Log)
+
+	// create a log for each HTTP call
+	httpLogs := make([]*HTTPLog, 0, len(logHTTP.Logs))
+	for _, httpLog := range logHTTP.Logs {
+		httpLogs = append(httpLogs, NewTicketerCalledLog(
+			org.OrgID(),
+			ticketer.ID(),
+			httpLog.URL,
+			httpLog.Request,
+			httpLog.Response,
+			httpLog.Status != flows.CallStatusSuccess,
+			time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+			httpLog.CreatedOn,
+		))
+
+		InsertHTTPLogs(ctx, db, httpLogs)
+	}
+
+	return err
+}
+
 const selectOpenTicketSQL = `
 SELECT
-  id,
-  uuid,
-  org_id,
-  contact_id,
-  ticketer_id,
-  external_id,
-  status,
-  subject,
-  body,
-  config,
-  opened_on,
-  modified_on,
-  closed_on
+  t.id AS id,
+  t.uuid AS uuid,
+  t.org_id AS org_id,
+  t.contact_id AS contact_id,
+  t.ticketer_id AS ticketer_id,
+  t.external_id AS external_id,
+  t.status AS status,
+  t.subject AS subject,
+  t.body AS body,
+  t.config AS config,
+  t.opened_on AS opened_on,
+  t.modified_on AS modified_on,
+  t.closed_on AS closed_on
 FROM
-  tickets_ticket
+  tickets_ticket t
 WHERE
-  org_id = $1 AND
-  contact_id = $2 AND
-  status = 'O'
+  t.org_id = $1 AND
+  t.contact_id = $2 AND
+  t.status = 'O'
 ORDER BY
   opened_on DESC
 `
@@ -165,7 +230,7 @@ WHERE
 `
 
 // LookupTicketByUUID looks up the ticket with the passed in UUID
-func LookupTicketByUUID(ctx context.Context, db Queryer, uuid uuids.UUID) (*Ticket, error) {
+func LookupTicketByUUID(ctx context.Context, db Queryer, uuid flows.TicketUUID) (*Ticket, error) {
 	rows, err := db.QueryxContext(ctx, selectTicketSQL, string(uuid))
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying for ticket for uuid: %s", string(uuid))
@@ -211,8 +276,8 @@ const updateTicketSQL = `
 UPDATE
   tickets_ticket
 SET
-  status = $3,
-  config = $4
+  status = $2,
+  config = $3
 WHERE
   id = $1
 `
@@ -222,7 +287,6 @@ func UpdateTicket(ctx context.Context, db Queryer, ticket *Ticket, status Ticket
 	t := &ticket.t
 	t.Config = config
 	t.Status = status
-
 	return Exec(ctx, "update ticket", db, updateTicketSQL, t.ID, t.Status, t.Config)
 }
 
@@ -272,7 +336,7 @@ func (t *Ticketer) Name() string { return t.t.Name }
 func (t *Ticketer) Type() string { return t.t.Type }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer) (flows.TicketService, error) {
+func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer) (services.TicketService, error) {
 	switch t.Type() {
 	case TicketerTypeMailgun:
 		domain := t.t.Config[MailgunConfigDomain]
