@@ -3,7 +3,6 @@ package simulation
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -328,7 +327,6 @@ func TestServer(t *testing.T) {
 			json.Unmarshal(content, &parsed)
 			sessionJSON, _ := json.Marshal(parsed["session"])
 			session = string(sessionJSON)
-			fmt.Println(session)
 
 			context, hasContext := parsed["context"]
 			if hasContext {

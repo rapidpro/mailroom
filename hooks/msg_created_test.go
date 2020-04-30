@@ -65,22 +65,22 @@ func TestMsgCreated(t *testing.T) {
 				models.CathyID: msg1,
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND metadata = $2 AND response_to_id = $3 AND high_priority = TRUE",
 					Args:  []interface{}{models.CathyID, `{"quick_replies":["yes","no"]}`, msg1.ID()},
 					Count: 2,
 				},
-				SQLAssertion{
+				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello Attachments' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = FALSE",
 					Args:  []interface{}{models.GeorgeID, "image/png:https://foo.bar.com/images/image1.png"},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1;",
 					Args:  []interface{}{models.BobID},
 					Count: 0,
 				},
-				SQLAssertion{
+				{
 					SQL: "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND text = $2 AND metadata = $3 AND direction = 'O' AND status = 'Q' AND channel_id = $4",
 					Args: []interface{}{
 						models.AlexandriaID,

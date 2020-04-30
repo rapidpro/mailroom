@@ -29,7 +29,7 @@ func TestClassifierCalled(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND is_error = FALSE AND classifier_id = $2 AND url = 'https://api.wit.ai/message?v=20170307&q=book+me+a+flight'`,
 					Args:  []interface{}{models.Org1, models.WitID},
 					Count: 1,
