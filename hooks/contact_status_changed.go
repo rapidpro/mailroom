@@ -21,7 +21,7 @@ type CommitStatusChangesHook struct{}
 
 var commitStatusChangesHook = &CommitStatusChangesHook{}
 
-// Apply commits our contact is_blocked change
+// Apply commits our contact status change
 func (h *CommitStatusChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 
 	statusChanges := make([]*models.ContactStatusChange, 0, len(scenes))
@@ -33,19 +33,19 @@ func (h *CommitStatusChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 
 	err := models.UpdateContactStatus(ctx, tx, statusChanges)
 	if err != nil {
-		return errors.Wrapf(err, "error blocking contacts")
+		return errors.Wrapf(err, "error updating contact statuses")
 	}
 	return nil
 }
 
-// handleContactStatusChanged blocks contact
+// handleContactStatusChanged updates contact status
 func handleContactStatusChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactStatusChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
 		"session_id":   scene.SessionID(),
 		"status":       event.Status,
-	}).Debug("changing contact status")
+	}).Debug("updating contact status")
 
 	scene.AppendToEventPreCommitHook(commitStatusChangesHook, event)
 	return nil

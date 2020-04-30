@@ -1320,15 +1320,15 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 	}
 
 	// remove triggers for contact we'll stop/block
-	_, err := tx.ExecContext(ctx, `DELETE FROM triggers_trigger_contacts WHERE contact_id = ANY($1)`, pq.Array(contactTriggersIDs))
+	_, err := tx.ExecContext(ctx, deleteAllContactTriggersForIDsSQL, pq.Array(contactTriggersIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error removing contact from triggers")
 	}
 
 	// do our status update
-	err = BulkSQL(ctx, "updating contact status", tx, updateContactStatusSQL, statusUpdates)
+	err = BulkSQL(ctx, "updating contact statuses", tx, updateContactStatusSQL, statusUpdates)
 	if err != nil {
-		return errors.Wrapf(err, "error updating contact status")
+		return errors.Wrapf(err, "error updating contact statuses")
 	}
 	return err
 }
