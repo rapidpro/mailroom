@@ -44,22 +44,22 @@ func TestSessionTriggered(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from flows_flowstart where org_id = 1 AND start_type = 'F' AND flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL;",
 					Args:  []interface{}{models.SingleMessageFlowID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from flows_flowstart_contacts where id = 1 AND contact_id = $1",
 					Args:  []interface{}{models.GeorgeID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from flows_flowstart_groups where id = 1 AND contactgroup_id = $1",
 					Args:  []interface{}{models.TestersGroupID},
 					Count: 1,

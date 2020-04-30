@@ -52,8 +52,6 @@ func TestDynamicGroups(t *testing.T) {
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I') RETURNING id`,
 		uuids.New(), DoctorRemindersCampaignID, FavoritesFlowID, JoinedFieldID)
 
-	fmt.Println(eventID)
-
 	// clear Cathy's value
 	testsuite.DB().MustExec(
 		`update contacts_contact set fields = fields - $2

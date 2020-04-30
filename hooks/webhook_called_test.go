@@ -49,37 +49,37 @@ func TestWebhookCalled(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from api_resthooksubscriber where is_active = FALSE",
 					Args:  nil,
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from api_resthooksubscriber where is_active = TRUE and resthook_id = $1",
 					Args:  []interface{}{2},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from api_resthooksubscriber where is_active = TRUE",
 					Args:  nil,
 					Count: 2,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 200",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 410",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from api_webhookresult where contact_id = $1",
 					Args:  []interface{}{models.GeorgeID},
 					Count: 3,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from api_webhookevent where org_id = $1",
 					Args:  []interface{}{models.Org1},
 					Count: 2,
