@@ -30,7 +30,7 @@ const (
 	UserIDKey = "user_id"
 
 	// MaxRequestBytes is the max body size our web server will accept
-	MaxRequestBytes int64 = 1048576
+	MaxRequestBytes int64 = 1048576 * 32 // 32MB
 )
 
 type JSONHandler func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error)

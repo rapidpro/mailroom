@@ -1,7 +1,6 @@
 package search
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -45,9 +44,6 @@ func NewMockElasticServer() *MockElasticServer {
 		// otherwise read our next body and return our next response
 		body, _ := ioutil.ReadAll(r.Body)
 		mock.LastBody = string(body)
-
-		fmt.Println(r.URL)
-		fmt.Println(mock.LastBody)
 
 		w.WriteHeader(200)
 		w.Write([]byte(mock.NextResponse))
