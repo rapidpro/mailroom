@@ -94,7 +94,7 @@ func TestMsgCreated(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 
 	rc := testsuite.RP().Get()
 	defer rc.Close()
@@ -134,7 +134,7 @@ func TestNoTopup(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }
 
 func TestNewURN(t *testing.T) {
@@ -211,5 +211,5 @@ func TestNewURN(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

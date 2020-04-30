@@ -195,6 +195,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 //
 //   {
 //     "org_id": 1,
+//     "user_id": 1,
 //     "contact_ids": [15,235],
 //     "modifiers": [{
 //        "type": "groups",
