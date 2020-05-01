@@ -45,8 +45,8 @@ func TestTicketOpened(t *testing.T) {
 	}))
 
 	// an existing ticket
-	cathyClosedTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "748363", "Old Question", "Who?", nil)
-	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyClosedTicket})
+	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "748363", "Old Question", "Who?", nil)
+	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyTicket})
 	require.NoError(t, err)
 
 	tcs := []HookTestCase{
@@ -79,5 +79,5 @@ func TestTicketOpened(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

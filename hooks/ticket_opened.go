@@ -2,7 +2,6 @@ package hooks
 
 import (
 	"context"
-	"time"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -74,22 +73,6 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *m
 		"ticketer_name": ticketer.Name,
 		"ticketer_uuid": ticketer.UUID,
 	}).Debug("ticket opened")
-
-	// create a log for each HTTP call
-	for _, httpLog := range event.HTTPLogs {
-		log := models.NewTicketerCalledLog(
-			org.OrgID(),
-			ticketer.ID(),
-			httpLog.URL,
-			httpLog.Request,
-			httpLog.Response,
-			httpLog.Status != flows.CallStatusSuccess,
-			time.Duration(httpLog.ElapsedMS)*time.Millisecond,
-			httpLog.CreatedOn,
-		)
-
-		scene.AppendToEventPreCommitHook(insertHTTPLogsHook, log)
-	}
 
 	return nil
 }

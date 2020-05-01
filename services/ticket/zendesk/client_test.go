@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/services/ticket/zendesk"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/services/ticket/zendesk"
 
 	"github.com/stretchr/testify/assert"
 )

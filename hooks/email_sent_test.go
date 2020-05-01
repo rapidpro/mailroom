@@ -24,5 +24,5 @@ func TestEmailSent(t *testing.T) {
 			SQLAssertions: []SQLAssertion{},
 		},
 	}
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

@@ -9,11 +9,11 @@ import (
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/services/ticket/mailgun"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/services/ticket/mailgun"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,14 +41,25 @@ func TestService(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
 
-	svc := mailgun.NewService(
+	_, err = mailgun.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
-		"mr.nyaruka.com",
-		"123456789",
-		"bob@acme.com",
+		map[string]string{},
 	)
+	assert.EqualError(t, err, "missing domain or api_key or to_address in mailgun config")
+
+	svc, err := mailgun.NewService(
+		http.DefaultClient,
+		nil,
+		ticketer,
+		map[string]string{
+			"domain":     "mr.nyaruka.com",
+			"api_key":    "123456789",
+			"to_address": "bob@acme.com",
+		},
+	)
+	require.NoError(t, err)
 
 	httpLogger := &flows.HTTPLogger{}
 

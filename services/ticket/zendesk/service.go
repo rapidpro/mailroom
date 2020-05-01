@@ -19,7 +19,7 @@ const (
 )
 
 func init() {
-	models.RegisterTicketService("zendesk", newService)
+	models.RegisterTicketService("zendesk", NewService)
 }
 
 type service struct {
@@ -27,7 +27,8 @@ type service struct {
 	ticketer *flows.Ticketer
 }
 
-func newService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+// NewService creates a new zendesk ticket service
+func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	subdomain := config[configSubdomain]
 	username := config[configUsername]
 	apiToken := config[configAPIToken]
@@ -52,7 +53,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		return nil, errors.Wrap(err, "error calling zendesk API")
 	}
 
-	return flows.NewTicket(ticketUUID, s.ticketer, subject, body, strconv.Itoa(ticketResponse.ID)), nil
+	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, strconv.Itoa(ticketResponse.ID)), nil
 }
 
 func (s *service) Forward(ticket *models.Ticket, text string, logHTTP flows.HTTPLogCallback) error {

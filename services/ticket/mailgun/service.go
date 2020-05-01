@@ -19,7 +19,7 @@ const (
 )
 
 func init() {
-	models.RegisterTicketService("mailgun", newService)
+	models.RegisterTicketService("mailgun", NewService)
 }
 
 type service struct {
@@ -28,7 +28,8 @@ type service struct {
 	toAddress string
 }
 
-func newService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+// NewService creates a new mailgun email-based ticket service
+func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	domain := config[configDomain]
 	apiKey := config[configAPIKey]
 	toAddress := config[configToAddress]
@@ -57,7 +58,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		return nil, errors.Wrap(err, "error calling mailgun API")
 	}
 
-	return flows.NewTicket(ticketUUID, s.ticketer, subject, body, fromAddress), nil
+	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, fromAddress), nil
 }
 
 func (s *service) Forward(ticket *models.Ticket, text string, logHTTP flows.HTTPLogCallback) error {

@@ -9,11 +9,11 @@ import (
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/services/ticket/zendesk"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/services/ticket/zendesk"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,14 +46,25 @@ func TestService(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
 
-	svc := zendesk.NewService(
+	_, err = zendesk.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
-		"nyaruka",
-		"zen@nyaruka.com",
-		"123456789",
+		map[string]string{},
 	)
+	assert.EqualError(t, err, "missing subdomain or username or api_token in zendesk config")
+
+	svc, err := zendesk.NewService(
+		http.DefaultClient,
+		nil,
+		ticketer,
+		map[string]string{
+			"subdomain": "nyaruka",
+			"username":  "zen@nyaruka.com",
+			"api_token": "123456789",
+		},
+	)
+	require.NoError(t, err)
 
 	httpLogger := &flows.HTTPLogger{}
 
