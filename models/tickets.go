@@ -264,10 +264,14 @@ WHERE
 `
 
 // UpdateTicket updates the passed in ticket with the passed in external id, status and config
-func UpdateTicket(ctx context.Context, db Queryer, ticket *Ticket, status TicketStatus, config null.Map) error {
+func UpdateTicket(ctx context.Context, db Queryer, ticket *Ticket, status TicketStatus, config map[string]string) error {
 	t := &ticket.t
-	t.Config = config
 	t.Status = status
+
+	for key, value := range config {
+		t.Config.Map()[key] = value
+	}
+
 	return Exec(ctx, "update ticket", db, updateTicketSQL, t.ID, t.Status, t.Config)
 }
 

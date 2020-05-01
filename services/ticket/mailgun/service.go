@@ -48,9 +48,9 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	ticketUUID := flows.TicketUUID(uuids.New())
 	contactDisplay := session.Contact().Format(session.Environment())
 
-	fromAddress, from := s.fromAddress(contactDisplay, ticketUUID)
+	from := s.fromAddress(contactDisplay, ticketUUID)
 
-	_, trace, err := s.client.SendMessage(from, s.toAddress, subject, body)
+	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, body, "")
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode))
 	}
@@ -58,16 +58,22 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		return nil, errors.Wrap(err, "error calling mailgun API")
 	}
 
-	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, fromAddress), nil
+	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, msgID), nil
 }
 
 func (s *service) Forward(ticket *models.Ticket, text string, logHTTP flows.HTTPLogCallback) error {
 	ticketConfig := ticket.Config()
 	contactDisplay, _ := ticketConfig.Map()["contact-display"].(string)
+	lastMessageID, _ := ticketConfig.Map()["last-message-id"].(string)
+	lastSubject, _ := ticketConfig.Map()["last-subject"].(string)
 
-	_, from := s.fromAddress(contactDisplay, ticket.UUID())
+	if lastSubject == "" {
+		lastSubject = ticket.Subject()
+	}
 
-	_, trace, err := s.client.SendMessage(from, s.toAddress, ticket.Subject(), text)
+	from := s.fromAddress(contactDisplay, ticket.UUID())
+
+	_, trace, err := s.client.SendMessage(from, s.toAddress, lastSubject, text, lastMessageID)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode))
 	}
@@ -78,12 +84,12 @@ func (s *service) Forward(ticket *models.Ticket, text string, logHTTP flows.HTTP
 	return nil
 }
 
-func (s *service) fromAddress(contactDisplay string, ticketUUID flows.TicketUUID) (string, string) {
-	if contactDisplay == "" {
-		contactDisplay = "Contact"
-	}
+func (s *service) fromAddress(contactDisplay string, ticketUUID flows.TicketUUID) string {
 	address := fmt.Sprintf("ticket+%s@%s", ticketUUID, s.client.domain)
-	withName := fmt.Sprintf("%s <%s>", contactDisplay, address)
 
-	return address, withName
+	if contactDisplay == "" {
+		return address
+	}
+
+	return fmt.Sprintf("%s <%s>", contactDisplay, address)
 }

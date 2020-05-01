@@ -3,7 +3,6 @@ package mailgun
 import (
 	"context"
 	"net/http"
-	"net/mail"
 	"regexp"
 
 	"github.com/nyaruka/goflow/flows"
@@ -55,20 +54,6 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	}
 	ticketUUID := flows.TicketUUID(match[0][1])
 
-	// parse the reply to
-	replyTo := request.ReplyTo
-
-	// no reply-to header? just use from
-	if replyTo == "" {
-		replyTo = request.From
-	}
-
-	address, err := mail.ParseAddress(replyTo)
-	if err != nil {
-		return errors.New("missing reply-to or from"), http.StatusBadRequest, nil
-	}
-	replyTo = address.Address
-
 	// look up our ticket
 	ticket, err := models.LookupTicketByUUID(ctx, s.DB, ticketUUID)
 	if err != nil {
@@ -78,15 +63,12 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Errorf("invalid ticket uuid, ignoring"), http.StatusOK, nil
 	}
 
-	// TODO is it correct to re-open closed tickets? What about other tickets that are open?
-
 	// update our ticket
-	config := null.NewMap(map[string]interface{}{
+	config := map[string]string{
 		"last-message-id": request.MessageID,
 		"last-subject":    request.Subject,
-		"reply-to":        replyTo,
-	})
-	err = models.UpdateTicket(ctx, s.DB, ticket, "O", config)
+	}
+	err = models.UpdateTicket(ctx, s.DB, ticket, models.TicketStatusOpen, config)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error updating ticket: %s", ticket.UUID())
 	}
