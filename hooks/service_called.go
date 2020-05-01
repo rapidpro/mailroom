@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	models.RegisterEventHandler(events.TypeClassifierCalled, handleClassifierCalled)
+	models.RegisterEventHandler(events.TypeServiceCalled, handleServiceCalled)
 }
 
 // InsertHTTPLogsHook is our hook for inserting classifier logs
@@ -41,37 +41,42 @@ func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 	return nil
 }
 
-// handleClassifierCalled is called for each classifier called event
-func handleClassifierCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
-	event := e.(*events.ClassifierCalledEvent)
+// handleServiceCalled is called for each service called event
+func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+	event := e.(*events.ServiceCalledEvent)
+	var classifier *models.Classifier
 
-	classifier := org.ClassifierByUUID(event.Classifier.UUID)
-	if classifier == nil {
-		return errors.Errorf("unable to find classifier with UUID: %s", event.Classifier.UUID)
+	if event.Service == "classifier" {
+		classifier = org.ClassifierByUUID(event.Classifier.UUID)
+		if classifier == nil {
+			return errors.Errorf("unable to find classifier with UUID: %s", event.Classifier.UUID)
+		}
 	}
 
 	// create a log for each HTTP call
 	for _, httpLog := range event.HTTPLogs {
 		logrus.WithFields(logrus.Fields{
-			"contact_uuid":    scene.ContactUUID(),
-			"session_id":      scene.SessionID(),
-			"url":             httpLog.URL,
-			"status":          httpLog.Status,
-			"elapsed_ms":      httpLog.ElapsedMS,
-			"classifier_name": event.Classifier.Name,
-			"classifier_uuid": event.Classifier.UUID,
-		}).Debug("classifier called")
+			"contact_uuid": scene.ContactUUID(),
+			"session_id":   scene.SessionID(),
+			"url":          httpLog.URL,
+			"status":       httpLog.Status,
+			"elapsed_ms":   httpLog.ElapsedMS,
+		}).Debug("service called")
 
-		log := models.NewClassifierCalledLog(
-			org.OrgID(),
-			classifier.ID(),
-			httpLog.URL,
-			httpLog.Request,
-			httpLog.Response,
-			httpLog.Status != flows.CallStatusSuccess,
-			time.Duration(httpLog.ElapsedMS)*time.Millisecond,
-			httpLog.CreatedOn,
-		)
+		var log *models.HTTPLog
+
+		if event.Service == "classifier" {
+			log = models.NewClassifierCalledLog(
+				org.OrgID(),
+				classifier.ID(),
+				httpLog.URL,
+				httpLog.Request,
+				httpLog.Response,
+				httpLog.Status != flows.CallStatusSuccess,
+				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+				httpLog.CreatedOn,
+			)
+		}
 
 		scene.AppendToEventPreCommitHook(insertHTTPLogsHook, log)
 	}

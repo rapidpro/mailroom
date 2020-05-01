@@ -20,6 +20,9 @@ const (
 
 	// LogTypeClassifierCalled is our type for when we call a classifier
 	LogTypeClassifierCalled = "classifier_called"
+
+	// LogTypeAirtimeTransferred is our type for when we make an airtime transfer
+	LogTypeAirtimeTransferred = "airtime_transferred"
 )
 
 // HTTPLog is our type for a HTTPLog
@@ -39,10 +42,9 @@ type HTTPLog struct {
 	}
 }
 
-// NewHTTPLog creates a new HTTPLog
-func NewHTTPLog(orgID OrgID, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
+func newHTTPLog(orgID OrgID, logType HTTPLogType, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
 	h := &HTTPLog{}
-	h.h.LogType = LogTypeClassifierCalled
+	h.h.LogType = logType
 	h.h.OrgID = orgID
 	h.h.URL = url
 	h.h.Request = request
@@ -53,19 +55,16 @@ func NewHTTPLog(orgID OrgID, url string, request string, response string, isErro
 	return h
 }
 
-// NewClassifierCalledLog creates a new HTTPLog for a classifier call
+// NewClassifierCalledLog creates a new HTTP log for a classifier call
 func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
-	h := &HTTPLog{}
-	h.h.LogType = LogTypeClassifierCalled
-	h.h.OrgID = orgID
+	h := newHTTPLog(orgID, LogTypeClassifierCalled, url, request, response, isError, elapsed, createdOn)
 	h.h.ClassifierID = cid
-	h.h.URL = url
-	h.h.Request = request
-	h.h.Response = null.String(response)
-	h.h.IsError = isError
-	h.h.RequestTime = int(elapsed / time.Millisecond)
-	h.h.CreatedOn = createdOn
 	return h
+}
+
+// NewAirtimeTransferredLog creates a new HTTP log for an airtime transfer
+func NewAirtimeTransferredLog(orgID OrgID, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
+	return newHTTPLog(orgID, LogTypeAirtimeTransferred, url, request, response, isError, elapsed, createdOn)
 }
 
 // SetAirtimeTransferID sets the transfer ID on a log
