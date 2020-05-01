@@ -25,26 +25,17 @@ var insertTicketsHook = &InsertTicketsHook{}
 
 // Apply inserts all the airtime transfers that were created
 func (h *InsertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
-	// gather all our tickets and contact IDs
+	// gather all our tickets
 	tickets := make([]*models.Ticket, 0, len(scenes))
-	contactIDs := make([]models.ContactID, 0, len(scenes))
 
 	for _, ts := range scenes {
 		for _, t := range ts {
-			ticket := t.(*models.Ticket)
-			tickets = append(tickets, ticket)
-			contactIDs = append(contactIDs, ticket.ContactID())
+			tickets = append(tickets, t.(*models.Ticket))
 		}
 	}
 
-	// close any open tickets belonging to these contacts
-	err := models.CloseTicketsForContacts(ctx, tx, contactIDs)
-	if err != nil {
-		return errors.Wrapf(err, "error closing open tickets")
-	}
-
 	// insert the tickets
-	err = models.InsertTickets(ctx, tx, tickets)
+	err := models.InsertTickets(ctx, tx, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting tickets")
 	}

@@ -533,15 +533,12 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		}
 	}
 
-	// TODO optimization to avoid another lookup here?
-
-	// look up any open tickets for this contact
-	ticket, err := models.LookupTicketForContact(ctx, db, org, modelContact)
+	// look up any open tickets for this contact and forward this message to them
+	tickets, err := models.TicketsOpenForContact(ctx, db, org, modelContact)
 	if err != nil {
-		return errors.Wrapf(err, "unable to look up ticket for contact")
+		return errors.Wrapf(err, "unable to look up open tickets for contact")
 	}
-
-	if ticket != nil {
+	for _, ticket := range tickets {
 		ticket.ForwardIncoming(ctx, db, org, modelContact, event.Text, event.Attachments)
 	}
 

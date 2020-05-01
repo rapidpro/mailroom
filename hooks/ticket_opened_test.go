@@ -44,15 +44,9 @@ func TestTicketOpened(t *testing.T) {
 		},
 	}))
 
-	// existing tickets
-	cathyClosedTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "748363", "Very Old Question", "Who?", nil)
+	// an existing ticket
+	cathyClosedTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "748363", "Old Question", "Who?", nil)
 	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyClosedTicket})
-	require.NoError(t, err)
-	err = models.CloseTicketsForContacts(ctx, db, []models.ContactID{models.CathyID})
-	require.NoError(t, err)
-
-	cathyOpenTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "235325", "Old Question", "Why?", nil)
-	err = models.InsertTickets(ctx, db, []*models.Ticket{cathyOpenTicket})
 	require.NoError(t, err)
 
 	tcs := []HookTestCase{
@@ -66,20 +60,10 @@ func TestTicketOpened(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				{ // cathy's open ticket will have been closed
-					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'C'",
-					Args:  []interface{}{models.CathyID},
-					Count: 2,
-				},
-				{ // cathy's closed ticket won't have been modified
-					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'C' AND modified_on >= (select modified_on from tickets_ticket where id = $2)",
-					Args:  []interface{}{models.CathyID, cathyOpenTicket.ID()},
-					Count: 1,
-				},
-				{ // and cathy's new ticket will have been created
+				{ // cathy's old ticket will still be open and cathy's new ticket will have been created
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
 					Args:  []interface{}{models.CathyID, models.MailgunID},
-					Count: 1,
+					Count: 2,
 				},
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",

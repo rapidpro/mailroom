@@ -9,7 +9,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
@@ -167,29 +166,27 @@ WHERE
   t.org_id = $1 AND
   t.contact_id = $2 AND
   t.status = 'O'
-ORDER BY
-  opened_on DESC
 `
 
-// LookupTicketForContact looks up the most recent open ticket for the passed in org and contact
-func LookupTicketForContact(ctx context.Context, db Queryer, org *OrgAssets, contact *Contact) (*Ticket, error) {
+// TicketsOpenForContact looks up the open tickets for the passed in contact
+func TicketsOpenForContact(ctx context.Context, db Queryer, org *OrgAssets, contact *Contact) ([]*Ticket, error) {
 	rows, err := db.QueryxContext(ctx, selectOpenTicketSQL, org.OrgID(), contact.ID())
 	if err != nil && err != sql.ErrNoRows {
-		return nil, errors.Wrapf(err, "error querying for open ticket for contact: %d", contact.ID())
+		return nil, errors.Wrapf(err, "error querying for open tickets for contact: %d", contact.ID())
 	}
 	defer rows.Close()
 
-	if err == sql.ErrNoRows || !rows.Next() {
-		return nil, nil
+	tickets := make([]*Ticket, 0, 2)
+	for rows.Next() {
+		ticket := &Ticket{}
+		err = rows.StructScan(&ticket.t)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error unmarshalling ticket")
+		}
+		tickets = append(tickets, ticket)
 	}
 
-	ticket := &Ticket{}
-	err = rows.StructScan(&ticket.t)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error reading open ticket for contact: %d", contact.ID())
-	}
-
-	return ticket, nil
+	return tickets, nil
 }
 
 const selectTicketSQL = `
@@ -274,28 +271,6 @@ func UpdateTicket(ctx context.Context, db Queryer, ticket *Ticket, status Ticket
 	return Exec(ctx, "update ticket", db, updateTicketSQL, t.ID, t.Status, t.Config)
 }
 
-const closeTicketsForContactsSQL = `
-UPDATE
-  tickets_ticket
-SET
-  status = 'C',
-  modified_on = NOW(),
-  closed_on = NOW()
-WHERE
-  contact_id = ANY($1) AND
-  status = 'O'
-`
-
-// CloseTicketsForContacts closes any open tikcets for the given contacts
-func CloseTicketsForContacts(ctx context.Context, db Queryer, contactIDs []ContactID) error {
-	err := Exec(ctx, "close ticket", db, closeTicketsForContactsSQL, pq.Array(contactIDs))
-	if err != nil {
-		return errors.Wrapf(err, "error closing tickets for %d contacts", len(contactIDs))
-	}
-
-	return nil
-}
-
 // Ticketer is our type for a ticketer asset
 type Ticketer struct {
 	t struct {
@@ -365,7 +340,7 @@ func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	start := time.Now()
 
 	rows, err := db.Queryx(selectTicketersSQL, orgID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying ticketers for org: %d", orgID)
 	}
 	defer rows.Close()
