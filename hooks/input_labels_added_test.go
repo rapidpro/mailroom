@@ -58,5 +58,5 @@ func TestInputLabelsAdded(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }
