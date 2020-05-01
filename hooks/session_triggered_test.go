@@ -83,7 +83,7 @@ func TestSessionTriggered(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }
 
 func TestQuerySessionTriggered(t *testing.T) {
@@ -133,5 +133,5 @@ func TestQuerySessionTriggered(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }
