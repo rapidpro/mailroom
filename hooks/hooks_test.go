@@ -205,7 +205,7 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 			if msg == nil {
 				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil), nil
 			}
-			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil), nil
+			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil, nil), nil
 		}
 
 		_, err = runner.StartFlow(ctx, db, rp, org, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)

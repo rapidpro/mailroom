@@ -308,7 +308,9 @@ func FireCampaignEvents(
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
 		delete(skippedContacts, models.ContactID(contact.ID()))
-		return triggers.NewCampaign(org.Env(), flowRef, contact, event), nil
+		eventExtraXValue := types.JSONToXValue([]byte(dbEvent.Extra()))
+		eventExtraXObject, _ := types.ToXObject(org.Env(), eventExtraXValue)
+		return triggers.NewCampaign(org.Env(), flowRef, contact, event, eventExtraXObject), nil
 	}
 
 	// this is our pre commit callback for our sessions, we'll mark the event fires associated

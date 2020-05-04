@@ -46,6 +46,7 @@ type Trigger struct {
 		ReferrerID  string      `json:"referrer_id"`
 		GroupIDs    []GroupID   `json:"group_ids"`
 		ContactIDs  []ContactID `json:"contact_ids,omitempty"`
+		Extra       string      `json:"extra"`
 	}
 }
 
@@ -63,6 +64,9 @@ func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 		return triggers.KeywordMatchTypeFirstWord
 	}
 	return triggers.KeywordMatchTypeOnlyWord
+}
+func (t *Trigger) Extra() string {
+	return t.t.Extra
 }
 
 // Match returns the match for this trigger, if any
@@ -281,6 +285,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.keyword as keyword,
 	t.match_type as match_type,
 	t.channel_id as channel_id,
+	t.extra as extra,
 	COALESCE(t.referrer_id, '') as referrer_id,
 	ARRAY_REMOVE(ARRAY_AGG(g.contactgroup_id), NULL) as group_ids
 FROM 
