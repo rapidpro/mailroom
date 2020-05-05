@@ -97,7 +97,8 @@ func (c *Client) post(endpoint string, payload interface{}) (*httpx.Trace, error
 	if err != nil {
 		return nil, err
 	}
-	req.SetBasicAuth(c.username, c.apiToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(c.username+"/token", c.apiToken)
 
 	return httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 }
