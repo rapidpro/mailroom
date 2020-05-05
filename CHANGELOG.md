@@ -1,3 +1,10 @@
+v5.5.13
+----------
+ * Update to goflow v0.85.0
+ * Use go 1.14 and do some minor dep updatse
+ * Bump max request bytes to 32MB for web server
+ * Implement hooks for status modifier events
+
 v5.5.12
 ----------
  * Update to goflow v0.83.1
