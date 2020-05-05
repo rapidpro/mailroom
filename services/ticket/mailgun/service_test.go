@@ -75,7 +75,7 @@ func TestService(t *testing.T) {
 		Ticketer:   ticketer.Reference(),
 		Subject:    "Need help",
 		Body:       "Where are my cookies?",
-		ExternalID: "ticket+9688d21d-95aa-4bed-afc7-f31b35731a3d@mr.nyaruka.com",
+		ExternalID: "<20200426161758.1.590432020254B2BF@mr.nyaruka.com>",
 	}, ticket)
 
 	assert.Equal(t, 1, len(httpLogger.Logs))

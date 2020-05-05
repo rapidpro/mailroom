@@ -49,6 +49,6 @@ func TestCreateTicket(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 12345, zenTicket.ID)
 	assert.Equal(t, time.Date(2009, 7, 20, 22, 55, 29, 0, time.UTC), zenTicket.CreatedAt)
-	assert.Equal(t, "POST /api/v2/tickets.json HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nContent-Length: 94\r\nAuthorization: Basic emVuQG55YXJ1a2EuY29tOjEyMzQ1Njc4OQ==\r\nAccept-Encoding: gzip\r\n\r\n{\"ticket\":{\"subject\":\"Need help\",\"comment\":{\"body\":\"Where are my cookies?\"},\"external_id\":\"\"}}", string(trace.RequestTrace))
+	assert.Equal(t, "POST /api/v2/tickets.json HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nContent-Length: 94\r\nAuthorization: Basic emVuQG55YXJ1a2EuY29tL3Rva2VuOjEyMzQ1Njc4OQ==\r\nContent-Type: application/json\r\nAccept-Encoding: gzip\r\n\r\n{\"ticket\":{\"subject\":\"Need help\",\"comment\":{\"body\":\"Where are my cookies?\"},\"external_id\":\"\"}}", string(trace.RequestTrace))
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 245\r\n\r\n", string(trace.ResponseTrace))
 }
