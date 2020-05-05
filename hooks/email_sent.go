@@ -24,6 +24,7 @@ func handleEmailSent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mode
 		"session_id":   scene.SessionID(),
 		"body":         event.Body,
 		"to":           event.To,
+		"attachments":  event.Attachments,
 	}).Debug("email sent")
 
 	return nil

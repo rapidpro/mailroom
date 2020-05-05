@@ -123,7 +123,7 @@ func simulatorEmailServiceFactory(session flows.Session) (flows.EmailService, er
 
 type simulatorEmailService struct{}
 
-func (s *simulatorEmailService) Send(session flows.Session, addresses []string, subject, body string) error {
+func (s *simulatorEmailService) Send(session flows.Session, addresses []string, subject, body string, attachments []string) error {
 	return nil
 }
 
