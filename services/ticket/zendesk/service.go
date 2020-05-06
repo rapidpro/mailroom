@@ -1,8 +1,8 @@
 package zendesk
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils/httpx"
@@ -13,9 +13,8 @@ import (
 )
 
 const (
-	configSubdomain = "subdomain"
-	configUsername  = "username"
-	configAPIToken  = "api_token"
+	configSubdomain  = "subdomain"
+	configOAuthToken = "oauth_token"
 )
 
 func init() {
@@ -30,30 +29,39 @@ type service struct {
 // NewService creates a new zendesk ticket service
 func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	subdomain := config[configSubdomain]
-	username := config[configUsername]
-	apiToken := config[configAPIToken]
-	if subdomain != "" && username != "" && apiToken != "" {
+	oAuthToken := config[configOAuthToken]
+	if subdomain != "" && oAuthToken != "" {
 		return &service{
-			client:   NewClient(httpClient, httpRetries, subdomain, username, apiToken),
+			client:   NewClient(httpClient, httpRetries, subdomain, oAuthToken),
 			ticketer: ticketer,
 		}, nil
 	}
-	return nil, errors.New("missing subdomain or username or api_token in zendesk config")
+	return nil, errors.New("missing subdomain or oauth_token in zendesk config")
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticketUUID := flows.TicketUUID(uuids.New())
 
-	ticketResponse, trace, err := s.client.CreateTicket(subject, body)
+	name := session.Contact().Format(session.Environment())
+
+	zenUser, trace, err := s.client.CreateOrUpdateUser(name, "end-user", string(session.Contact().UUID()))
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode))
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "error calling zendesk API")
+		return nil, errors.Wrap(err, "error creating zendesk user")
 	}
 
-	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, strconv.Itoa(ticketResponse.ID)), nil
+	zenTicket, trace, err := s.client.CreateTicket(zenUser.ID, subject, body)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode))
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating zendesk ticket")
+	}
+
+	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, fmt.Sprintf("%d", zenTicket.ID)), nil
 }
 
 func (s *service) Forward(ticket *models.Ticket, text string, logHTTP flows.HTTPLogCallback) error {

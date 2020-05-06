@@ -30,6 +30,29 @@ func TestService(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 123456789, time.UTC)))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://nyaruka.zendesk.com/api/v2/users/create_or_update.json": {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(201, nil, `{
+				"user": {
+					"id": 12345,
+					"url": "https://nyaruka.zendesk.com/api/v2/users/12345.json",
+					"name": "Jim",
+					"role": "end-user",
+					"external_id": "a78c5d9d-283a-4be9-ad6d-690e4307c961",
+					"created_at": "2009-07-20T22:55:29Z"
+				}
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"user": {
+					"id": 12345,
+					"url": "https://nyaruka.zendesk.com/api/v2/users/12345.json",
+					"name": "Jim",
+					"role": "end-user",
+					"external_id": "a78c5d9d-283a-4be9-ad6d-690e4307c961",
+					"created_at": "2009-07-20T22:55:29Z"
+				}
+			}`),
+		},
 		"https://nyaruka.zendesk.com/api/v2/tickets.json": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, `{
@@ -52,24 +75,30 @@ func TestService(t *testing.T) {
 		ticketer,
 		map[string]string{},
 	)
-	assert.EqualError(t, err, "missing subdomain or username or api_token in zendesk config")
+	assert.EqualError(t, err, "missing subdomain or oauth_token in zendesk config")
 
 	svc, err := zendesk.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
 		map[string]string{
-			"subdomain": "nyaruka",
-			"username":  "zen@nyaruka.com",
-			"api_token": "123456789",
+			"subdomain":   "nyaruka",
+			"oauth_token": "123456789",
 		},
 	)
 	require.NoError(t, err)
 
 	httpLogger := &flows.HTTPLogger{}
 
+	// call to create user can fail
 	_, err = svc.Open(session, "Need help", "Where are my cookies?", httpLogger.Log)
-	assert.EqualError(t, err, "error calling zendesk API: unable to connect to server")
+	assert.EqualError(t, err, "error creating zendesk user: unable to connect to server")
+
+	httpLogger = &flows.HTTPLogger{}
+
+	// as can call to create ticket
+	_, err = svc.Open(session, "Need help", "Where are my cookies?", httpLogger.Log)
+	assert.EqualError(t, err, "error creating zendesk ticket: unable to connect to server")
 
 	httpLogger = &flows.HTTPLogger{}
 
@@ -77,13 +106,14 @@ func TestService(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, &flows.Ticket{
-		UUID:       flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"),
+		UUID:       flows.TicketUUID("9688d21d-95aa-4bed-afc7-f31b35731a3d"),
 		Ticketer:   ticketer.Reference(),
 		Subject:    "Need help",
 		Body:       "Where are my cookies?",
 		ExternalID: "12345",
 	}, ticket)
 
-	assert.Equal(t, 1, len(httpLogger.Logs))
-	assert.Equal(t, "https://nyaruka.zendesk.com/api/v2/tickets.json", httpLogger.Logs[0].URL)
+	assert.Equal(t, 2, len(httpLogger.Logs))
+	assert.Equal(t, "https://nyaruka.zendesk.com/api/v2/users/create_or_update.json", httpLogger.Logs[0].URL)
+	assert.Equal(t, "https://nyaruka.zendesk.com/api/v2/tickets.json", httpLogger.Logs[1].URL)
 }

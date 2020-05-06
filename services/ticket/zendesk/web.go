@@ -19,7 +19,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+var authForm *template.Template
+var authSuccess *template.Template
+
 func init() {
+	authForm = template.Must(template.New("form").Option("missingkey=zero").Parse(authFormHTML))
+	authSuccess = template.Must(template.New("success").Option("missingkey=zero").Parse(authSuccessHTML))
+
 	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/zendesk/pull", web.RequireAuthToken(handlePull))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/ticketzendesk/channelback", web.RequireAuthToken(handleChannelback))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/zendesk/event_callback", web.RequireAuthToken(handleEventCallback))
@@ -318,7 +324,7 @@ func handleAdmin(ctx context.Context, s *web.Server, r *http.Request, w http.Res
 
 const authFormHTML = `
 <!DOCTYPE html>
-	<html lang="en">
+<html lang="en">
 	<head>
 		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@zendeskgarden/css-buttons@7.0.19/dist/index.min.css">
 		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@zendeskgarden/css-forms@7.0.20/dist/index.min.css">
@@ -343,7 +349,7 @@ const authFormHTML = `
 	</head>
 	<body>
 		<div class="preamble">
-			This will connect your TextIt account with ZenDesk. You can find your ZenDesk integration username and
+			This will connect your TextIt account with Zendesk. You can find your Zendesk integration username and
 			password on your account page where you can enable this integration.
 		</div>
 
@@ -353,38 +359,31 @@ const authFormHTML = `
 		<div class="first c-txt u-mb-sm">
 			<label class="c-txt__label" for="username">Username</label>
 			<input class="c-txt__input" type="text" name="username" value="{{.username}}"></input>
-			<small class="c-txt__message"><span dir="ltr">Your ZenDesk integration username</span></small>
+			<small class="c-txt__message"><span dir="ltr">Your Zendesk integration username</span></small>
 		</div>
 
 		<div class="c-txt u-mb-sm">
 			<label class="c-txt__label" for="username">Password</label>
 			<input class="c-txt__input" type="text" name="token" value="{{.token}}"></input>
-			<small class="c-txt__message"><span dir="ltr">Your ZenDesk integration password</span></small>
+			<small class="c-txt__message"><span dir="ltr">Your Zendesk integration password</span></small>
 		</div>		
 
-   		<input type="hidden" name="return_url" value="{{.return_url}}"></input>
-    	<input type="submit" class="c-btn u-mt-sm" value="Add Account">
+		<input type="hidden" name="return_url" value="{{.return_url}}"></input>
+		<input type="submit" class="c-btn u-mt-sm" value="Add Account">
 		</form>
 	</body>
-	</html>
-`
+</html>`
 
 const authSuccessHTML = `
-	<html><body>
+<html>
+	<body>
 		<form id="finish" method="post" action="{{.return_url}}">
-  			<input type="hidden" name="name" value="{{.name}}"></input>
-  			<input type="hidden" name="metadata" value="{{.metadata}}"></input>
+			<input type="hidden" name="name" value="{{.name}}"></input>
+			<input type="hidden" name="metadata" value="{{.metadata}}"></input>
 		</form>
 		<script type="text/javascript">
-		var form = document.forms['finish'];
-	  	form.submit();
+			var form = document.forms['finish'];
+			form.submit();
 		</script>
-	</body></html>`
-
-var authForm *template.Template
-var authSuccess *template.Template
-
-func init() {
-	authForm = template.Must(template.New("form").Option("missingkey=zero").Parse(authFormHTML))
-	authSuccess = template.Must(template.New("success").Option("missingkey=zero").Parse(authSuccessHTML))
-}
+	</body>
+</html>`

@@ -11,23 +11,21 @@ import (
 	"github.com/nyaruka/goflow/utils/jsonx"
 )
 
-// Client is a basic zendesk client
+// Client is a basic zendesk client which uses OAuth
 type Client struct {
 	httpClient  *http.Client
 	httpRetries *httpx.RetryConfig
 	subdomain   string
-	username    string
-	apiToken    string
+	token       string
 }
 
 // NewClient creates a new zendesk client
-func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, username, apiToken string) *Client {
+func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) *Client {
 	return &Client{
 		httpClient:  httpClient,
 		httpRetries: httpRetries,
 		subdomain:   subdomain,
-		username:    username,
-		apiToken:    apiToken,
+		token:       token,
 	}
 }
 
@@ -36,58 +34,81 @@ type errorResponse struct {
 	Description string `json:"description"`
 }
 
+type User struct {
+	ID         int64  `json:"id,omitempty"`
+	URL        string `json:"url,omitempty"`
+	Name       string `json:"name"`
+	Role       string `json:"role"`
+	ExternalID string `json:"external_id"`
+}
+
+// CreateOrUpdateUser creates or updates a user matching on external ID
+// see https://developer.zendesk.com/rest_api/docs/support/users#create-or-update-user
+func (c *Client) CreateOrUpdateUser(name, role, externalID string) (*User, *httpx.Trace, error) {
+	user := &struct {
+		User User `json:"user"`
+	}{
+		User: User{
+			Name:       name,
+			Role:       role,
+			ExternalID: externalID,
+		},
+	}
+
+	trace, err := c.post("users/create_or_update", user, user)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return &user.User, trace, nil
+}
+
 type ticketComment struct {
 	Body string `json:"body"`
 }
 
 type newTicket struct {
-	Subject    string        `json:"subject"`
-	Comment    ticketComment `json:"comment"`
-	ExternalID string        `json:"external_id"`
+	RequesterID int64         `json:"requester_id"`
+	Subject     string        `json:"subject"`
+	Comment     ticketComment `json:"comment"`
+	ExternalID  string        `json:"external_id"`
 }
 
 // Ticket is a ticket in Zendesk
 type Ticket struct {
-	ID         int       `json:"id"`
-	URL        string    `json:"url"`
-	ExternalID string    `json:"external_id"`
-	CreatedAt  time.Time `json:"created_at"`
-	Subject    string    `json:"subject"`
+	ID          int64     `json:"id"`
+	URL         string    `json:"url"`
+	RequesterID int64     `json:"requester_id"`
+	Subject     string    `json:"subject"`
+	ExternalID  string    `json:"external_id"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // CreateTicket creates a new ticket
-func (c *Client) CreateTicket(subject, body string) (*Ticket, *httpx.Trace, error) {
-	r := struct {
+// see https://developer.zendesk.com/rest_api/docs/support/tickets#create-ticket
+func (c *Client) CreateTicket(requesterID int64, subject, body string) (*Ticket, *httpx.Trace, error) {
+	newTicket := &struct {
 		Ticket newTicket `json:"ticket"`
 	}{
 		Ticket: newTicket{
-			Subject: subject,
-			Comment: ticketComment{Body: body},
+			RequesterID: requesterID,
+			Subject:     subject,
+			Comment:     ticketComment{Body: body},
 		},
 	}
+	ticket := &struct {
+		Ticket Ticket `json:"ticket"`
+	}{}
 
-	trace, err := c.post("tickets", &r)
+	trace, err := c.post("tickets", newTicket, ticket)
 	if err != nil {
 		return nil, trace, err
 	}
 
-	if trace.Response.StatusCode >= 400 {
-		response := &errorResponse{}
-		jsonx.Unmarshal(trace.ResponseBody, response)
-		return nil, trace, errors.New(response.Description)
-	}
-
-	response := struct {
-		Ticket Ticket `json:"ticket"`
-	}{}
-	if err := jsonx.Unmarshal(trace.ResponseBody, &response); err != nil {
-		return nil, trace, err
-	}
-
-	return &response.Ticket, trace, nil
+	return &ticket.Ticket, trace, nil
 }
 
-func (c *Client) post(endpoint string, payload interface{}) (*httpx.Trace, error) {
+func (c *Client) post(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
 	data, err := jsonx.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -98,7 +119,18 @@ func (c *Client) post(endpoint string, payload interface{}) (*httpx.Trace, error
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(c.username+"/token", c.apiToken)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 
-	return httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	if err != nil {
+		return trace, err
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		response := &errorResponse{}
+		jsonx.Unmarshal(trace.ResponseBody, response)
+		return trace, errors.New(response.Description)
+	}
+
+	return trace, jsonx.Unmarshal(trace.ResponseBody, response)
 }
