@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
@@ -26,6 +27,7 @@ type service struct {
 	client    *Client
 	ticketer  *flows.Ticketer
 	toAddress string
+	redactor  utils.Redactor
 }
 
 // NewService creates a new mailgun email-based ticket service
@@ -38,6 +40,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 			client:    NewClient(httpClient, httpRetries, domain, apiKey),
 			ticketer:  ticketer,
 			toAddress: toAddress,
+			redactor:  utils.NewRedactor(flows.RedactionMask, apiKey),
 		}, nil
 	}
 	return nil, errors.New("missing domain or api_key or to_address in mailgun config")
@@ -52,7 +55,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, body, "")
 	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode))
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "error calling mailgun API")
@@ -75,7 +78,7 @@ func (s *service) Forward(ticket *models.Ticket, text string, logHTTP flows.HTTP
 
 	_, trace, err := s.client.SendMessage(from, s.toAddress, lastSubject, text, lastMessageID)
 	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode))
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
 		return errors.Wrap(err, "error calling mailgun API")

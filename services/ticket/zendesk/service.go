@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
@@ -24,6 +25,7 @@ func init() {
 type service struct {
 	client   *Client
 	ticketer *flows.Ticketer
+	redactor utils.Redactor
 }
 
 // NewService creates a new zendesk ticket service
@@ -34,6 +36,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 		return &service{
 			client:   NewClient(httpClient, httpRetries, subdomain, oAuthToken),
 			ticketer: ticketer,
+			redactor: utils.NewRedactor(flows.RedactionMask, oAuthToken),
 		}, nil
 	}
 	return nil, errors.New("missing subdomain or oauth_token in zendesk config")
@@ -47,7 +50,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 	zenUser, trace, err := s.client.CreateOrUpdateUser(name, "end-user", string(session.Contact().UUID()))
 	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode))
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating zendesk user")
@@ -55,7 +58,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 	zenTicket, trace, err := s.client.CreateTicket(zenUser.ID, subject, body)
 	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode))
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating zendesk ticket")
