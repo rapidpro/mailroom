@@ -270,7 +270,7 @@ func handleMetrics(ctx context.Context, s *web.Server, r *http.Request, rawW htt
 	}
 
 	orgUUID := uuids.UUID(chi.URLParam(r, "uuid"))
-	org, err := models.LookupOrgByToken(ctx, s.DB, orgUUID, "Prometheus", token)
+	org, err := models.LookupOrgByUUIDAndToken(ctx, s.DB, orgUUID, "Prometheus", token)
 	if err != nil {
 		return errors.Wrapf(err, "error looking up org for token")
 	}
