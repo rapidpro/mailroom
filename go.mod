@@ -24,6 +24,7 @@ require (
 	github.com/lib/pq v1.0.0
 	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.2.0
 	github.com/nyaruka/librato v1.0.0

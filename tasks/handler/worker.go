@@ -23,8 +23,17 @@ import (
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/nfnt/resize"
 	"github.com/gofrs/uuid"
 	"strings"
+	"os"
+	"image/jpeg"
+	"github.com/nyaruka/mailroom/s3utils"
+	"github.com/nyaruka/mailroom/config"
+	"path"
+	"path/filepath"
+	"io/ioutil"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 )
 
 const (
@@ -80,12 +89,12 @@ func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, 
 }
 
 func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	return handleContactEvent(ctx, mr.DB, mr.RP, task)
+	return handleContactEvent(ctx, mr.DB, mr.RP, task, mr.S3Client, mr.Config)
 }
 
 // handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
 // a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
+func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task, s3Client s3iface.S3API, config *config.Config) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -158,7 +167,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
 			}
-			err = handleMsgEvent(ctx, db, rp, msg)
+			err = handleMsgEvent(ctx, db, rp, msg, s3Client, config)
 
 		case TimeoutEventType, ExpirationEventType:
 			evt := &TimedEvent{}
@@ -459,7 +468,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 }
 
 // handleMsgEvent is called when a new message arrives from a contact
-func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent) error {
+func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent, s3Client s3iface.S3API, config *config.Config) error {
 	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -560,7 +569,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		}
 
 		if len(event.Attachments) > 0 {
-			flowImageErr := NewHandleFlowImage(ctx, db, event.OrgID, event.ContactID, flow.ID(), event.Attachments[0])
+			flowImageErr := NewHandleFlowImage(ctx, db, s3Client, config, event.OrgID, event.ContactID, flow.ID(), event.Attachments[0])
 			if flowImageErr != nil {
 				return errors.Wrapf(err, "error handling flow image")
 			}
@@ -704,7 +713,7 @@ func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID
 	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, runID, time)
 }
 
-func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, orgID models.OrgID, contactID models.ContactID, flowID models.FlowID, attachment utils.Attachment) error {
+func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API, config *config.Config, orgID models.OrgID, contactID models.ContactID, flowID models.FlowID, attachment utils.Attachment) error {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction")
@@ -712,6 +721,31 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, orgID models.OrgID, co
 
 	flowImageUUID, _ := uuid.NewV4()
 	nowDate := time.Now()
+
+	_, fileDownloaded := attachment.DownloadFile()
+	file, _ := os.Open(fileDownloaded)
+	img, _ := jpeg.Decode(file)
+	file.Close()
+
+	thumb := resize.Thumbnail(50, 50, img, resize.NearestNeighbor)
+	tmpImageName := fmt.Sprintf("/tmp/%s.jpg", flowImageUUID.String())
+	outThumbnail, _ := os.Create(tmpImageName)
+	defer outThumbnail.Close()
+
+	// write new image to file
+	jpeg.Encode(outThumbnail, thumb, nil)
+
+	pathName := flowImageUUID.String() + path.Ext(attachment.URL())
+	path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", orgID), pathName[:4], pathName[4:8], "thumbnail_" + pathName)
+	if !strings.HasPrefix(path, "/") {
+		path = fmt.Sprintf("/%s", path)
+	}
+
+	content, _ := ioutil.ReadFile(tmpImageName)
+	thumbnailURL, errS3 := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, "image/jpeg", content)
+	if errS3 != nil {
+		return errors.Wrapf(err, "error uploading flow image to S3")
+	}
 
 	urlSplitted := strings.Split(attachment.URL(), "/")
 	filename := urlSplitted[len(urlSplitted) - 1]
@@ -722,7 +756,7 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, orgID models.OrgID, co
 			flows_flowimage(created_on, modified_on, uuid, name, path, path_thumbnail, exif, contact_id, flow_id, org_id, is_active)
 		VALUES
 			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		nowDate, nowDate, flowImageUUID, filename, attachment.URL(), nil, nil, contactID, flowID, orgID, true)
+		nowDate, nowDate, flowImageUUID, filename, attachment.URL(), thumbnailURL, nil, contactID, flowID, orgID, true)
 
 	if errExec != nil {
 		tx.Rollback()
