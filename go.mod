@@ -13,6 +13,7 @@ require (
 	github.com/go-chi/chi v3.3.3+incompatible
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
+	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/gorilla/schema v1.0.2

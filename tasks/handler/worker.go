@@ -23,6 +23,8 @@ import (
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/gofrs/uuid"
+	"strings"
 )
 
 const (
@@ -556,6 +558,14 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		if err != nil {
 			return errors.Wrapf(err, "error loading flow for session")
 		}
+
+		if len(event.Attachments) > 0 {
+			flowImageErr := NewHandleFlowImage(ctx, db, event.OrgID, event.ContactID, flow.ID(), event.Attachments[0])
+			if flowImageErr != nil {
+				return errors.Wrapf(err, "error handling flow image")
+			}
+		}
+
 	}
 
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
@@ -692,4 +702,40 @@ func NewTimeoutTask(orgID models.OrgID, contactID models.ContactID, sessionID mo
 // NewExpirationTask creates a new event task for the passed in expiration event
 func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
 	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, runID, time)
+}
+
+func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, orgID models.OrgID, contactID models.ContactID, flowID models.FlowID, attachment utils.Attachment) error {
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return errors.Wrapf(err, "unable to start transaction")
+	}
+
+	flowImageUUID, _ := uuid.NewV4()
+	nowDate := time.Now()
+
+	urlSplitted := strings.Split(attachment.URL(), "/")
+	filename := urlSplitted[len(urlSplitted) - 1]
+
+	_, errExec := tx.Exec(
+		`
+		INSERT INTO
+			flows_flowimage(created_on, modified_on, uuid, name, path, path_thumbnail, exif, contact_id, flow_id, org_id, is_active)
+		VALUES
+			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		nowDate, nowDate, flowImageUUID, filename, attachment.URL(), nil, nil, contactID, flowID, orgID, true)
+
+	if errExec != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error inserting new flow image")
+	}
+
+	// try to commit
+	err = tx.Commit()
+
+	if err != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error inserting new flow image")
+	}
+
+	return nil
 }
