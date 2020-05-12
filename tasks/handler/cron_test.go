@@ -49,7 +49,7 @@ func TestRetryMsgs(t *testing.T) {
 	// should have one message requeued
 	task, _ := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handleContactEvent(ctx, db, rp, task, nil, nil)
 	assert.NoError(t, err)
 
 	// message should be handled now

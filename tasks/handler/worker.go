@@ -20,9 +20,22 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/nyaruka/mailroom/s3utils"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/nfnt/resize"
+	"github.com/gofrs/uuid"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/rwcarlsen/goexif/exif"
+	"strings"
+	"os"
+	"path"
+	"path/filepath"
+	"image/jpeg"
+	"io/ioutil"
+	"database/sql"
 )
 
 const (
@@ -78,12 +91,12 @@ func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, 
 }
 
 func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	return handleContactEvent(ctx, mr.DB, mr.RP, task)
+	return handleContactEvent(ctx, mr.DB, mr.RP, task, mr.S3Client, mr.Config)
 }
 
 // handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
 // a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
+func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task, s3Client s3iface.S3API, config *config.Config) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -156,7 +169,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
 			}
-			err = handleMsgEvent(ctx, db, rp, msg)
+			err = handleMsgEvent(ctx, db, rp, msg, s3Client, config)
 
 		case TimeoutEventType, ExpirationEventType:
 			evt := &TimedEvent{}
@@ -457,7 +470,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 }
 
 // handleMsgEvent is called when a new message arrives from a contact
-func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent) error {
+func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent, s3Client s3iface.S3API, config *config.Config) error {
 	org, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -556,6 +569,14 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		if err != nil {
 			return errors.Wrapf(err, "error loading flow for session")
 		}
+
+		if len(event.Attachments) > 0 {
+			flowImageErr := NewHandleFlowImage(ctx, db, s3Client, config, event.OrgID, event.ContactID, flow.ID(), event.Attachments[0])
+			if flowImageErr != nil {
+				return errors.Wrapf(err, "error handling flow image")
+			}
+		}
+
 	}
 
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
@@ -692,4 +713,109 @@ func NewTimeoutTask(orgID models.OrgID, contactID models.ContactID, sessionID mo
 // NewExpirationTask creates a new event task for the passed in expiration event
 func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
 	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, runID, time)
+}
+
+func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API, config *config.Config, orgID models.OrgID, contactID models.ContactID, flowID models.FlowID, attachment utils.Attachment) error {
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return errors.Wrapf(err, "unable to start transaction")
+	}
+
+	attachmentContentType := attachment.ContentType()
+	isValidContentType := stringInSlice(attachmentContentType, []string{"image/png", "image/jpeg", "image/jpg", "image/gif"})
+	if !isValidContentType {
+		return nil
+	}
+
+	urlSplitted := strings.Split(attachment.URL(), "/")
+	filename := urlSplitted[len(urlSplitted) - 1]
+	filenameSplitted := strings.Split(filename, ".")
+	extension := filenameSplitted[len(filenameSplitted) - 1]
+
+	flowImageUUID, _ := uuid.NewV4()
+	nowDate := time.Now()
+
+	_, fileDownloaded := attachment.DownloadFile()
+	file, _ := os.Open(fileDownloaded)
+	img, _ := jpeg.Decode(file)
+
+	// Extracting EXIF
+	var exifJsonString string
+	exifMetaData, _ := exif.Decode(file)
+	if exifMetaData != nil {
+		exifJsonByte, _ := exifMetaData.MarshalJSON()
+		exifJsonString = string(exifJsonByte)
+	}
+
+	file.Close()
+
+	var thumbnailURL string
+
+	generateThumbnail := stringInSlice(extension, []string{"jpg", "jpeg"})
+	if generateThumbnail {
+		thumb := resize.Thumbnail(50, 50, img, resize.NearestNeighbor)
+		tmpImageName := fmt.Sprintf("/tmp/%s.jpg", flowImageUUID.String())
+		outThumbnail, _ := os.Create(tmpImageName)
+		defer outThumbnail.Close()
+
+		// write new image to file
+		jpeg.Encode(outThumbnail, thumb, nil)
+
+		pathName := flowImageUUID.String() + path.Ext(attachment.URL())
+		s3Path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", orgID), pathName[:4], pathName[4:8], "thumbnail_" + pathName)
+		if !strings.HasPrefix(s3Path, "/") {
+			s3Path = fmt.Sprintf("/%s", s3Path)
+		}
+
+		content, _ := ioutil.ReadFile(tmpImageName)
+		thumbnailURL, _ = s3utils.PutS3File(s3Client, config.S3MediaBucket, s3Path, "image/jpeg", content)
+
+		// Removing the file created on /tmp directory
+		os.Remove(tmpImageName)
+	}
+
+	_, errExec := tx.Exec(
+		`
+		INSERT INTO
+			flows_flowimage(created_on, modified_on, uuid, name, path, path_thumbnail, exif, contact_id, flow_id, org_id, is_active)
+		VALUES
+			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		nowDate, nowDate, flowImageUUID, filename, attachment.URL(), NewNullString(thumbnailURL), NewNullString(exifJsonString), contactID, flowID, orgID, true)
+
+	if errExec != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error inserting new flow image")
+	}
+
+	// try to commit
+	err = tx.Commit()
+
+	if err != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error inserting new flow image")
+	}
+
+	// Removing the file created on /tmp directory
+	os.Remove(fileDownloaded)
+
+	return nil
+}
+
+func NewNullString(s string) sql.NullString {
+	if len(s) == 0 {
+		return sql.NullString{}
+	}
+	return sql.NullString{
+		String: s,
+		Valid: true,
+	}
+}
+
+func stringInSlice(s string, list []string) bool {
+	for _, ext := range list {
+		if ext == s {
+			return true
+		}
+	}
+	return false
 }
