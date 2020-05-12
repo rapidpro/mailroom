@@ -1,7 +1,6 @@
 package zendesk_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -61,7 +60,7 @@ func TestPush(t *testing.T) {
 			DisplayInfo: []zendesk.DisplayInfo{
 				{
 					Type: "9ef45ff7-4aaa-4a58-8e77-a7c74dfa51c4",
-					Data: json.RawMessage(`{"whatever": "I want"}`),
+					Data: map[string]string{"whatever": "I want"},
 				},
 			},
 			AllowChannelback: true,

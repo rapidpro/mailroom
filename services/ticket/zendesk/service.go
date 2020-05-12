@@ -60,6 +60,13 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 			ExternalID: string(session.Contact().UUID()),
 			Name:       contactDisplay,
 		},
+		DisplayInfo: []DisplayInfo{
+			{
+				// need to also include our ticket UUID in here so the Zendesk app can access it
+				Type: "temba-ticket",
+				Data: map[string]string{"uuid": string(ticketUUID)},
+			},
+		},
 		AllowChannelback: true,
 	}
 
@@ -82,6 +89,12 @@ func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUI
 		Author: Author{
 			ExternalID: string(contact.UUID()),
 			Name:       contactDisplay,
+		},
+		DisplayInfo: []DisplayInfo{
+			{
+				Type: "temba-ticket",
+				Data: map[string]string{"uuid": string(ticket.UUID())},
+			},
 		},
 		AllowChannelback: true,
 	}

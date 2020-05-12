@@ -46,8 +46,8 @@ type Author struct {
 
 // DisplayInfo see https://developer.zendesk.com/rest_api/docs/support/channel_framework#display_info-object
 type DisplayInfo struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
+	Type string            `json:"type"`
+	Data map[string]string `json:"data"`
 }
 
 // ExternalResource see https://developer.zendesk.com/rest_api/docs/support/channel_framework#external_resource-object
