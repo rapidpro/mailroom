@@ -20,20 +20,22 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/nyaruka/mailroom/s3utils"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/nfnt/resize"
 	"github.com/gofrs/uuid"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/rwcarlsen/goexif/exif"
 	"strings"
 	"os"
-	"image/jpeg"
-	"github.com/nyaruka/mailroom/s3utils"
-	"github.com/nyaruka/mailroom/config"
 	"path"
 	"path/filepath"
+	"image/jpeg"
 	"io/ioutil"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"database/sql"
 )
 
 const (
@@ -719,36 +721,58 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API
 		return errors.Wrapf(err, "unable to start transaction")
 	}
 
+	attachmentContentType := attachment.ContentType()
+	isValidContentType := stringInSlice(attachmentContentType, []string{"image/png", "image/jpeg", "image/jpg", "image/gif"})
+	if !isValidContentType {
+		return nil
+	}
+
+	urlSplitted := strings.Split(attachment.URL(), "/")
+	filename := urlSplitted[len(urlSplitted) - 1]
+	filenameSplitted := strings.Split(filename, ".")
+	extension := filenameSplitted[len(filenameSplitted) - 1]
+
 	flowImageUUID, _ := uuid.NewV4()
 	nowDate := time.Now()
 
 	_, fileDownloaded := attachment.DownloadFile()
 	file, _ := os.Open(fileDownloaded)
 	img, _ := jpeg.Decode(file)
+
+	// Extracting EXIF
+	var exifJsonString string
+	exifMetaData, _ := exif.Decode(file)
+	if exifMetaData != nil {
+		exifJsonByte, _ := exifMetaData.MarshalJSON()
+		exifJsonString = string(exifJsonByte)
+	}
+
 	file.Close()
 
-	thumb := resize.Thumbnail(50, 50, img, resize.NearestNeighbor)
-	tmpImageName := fmt.Sprintf("/tmp/%s.jpg", flowImageUUID.String())
-	outThumbnail, _ := os.Create(tmpImageName)
-	defer outThumbnail.Close()
+	var thumbnailURL string
 
-	// write new image to file
-	jpeg.Encode(outThumbnail, thumb, nil)
+	generateThumbnail := stringInSlice(extension, []string{"jpg", "jpeg"})
+	if generateThumbnail {
+		thumb := resize.Thumbnail(50, 50, img, resize.NearestNeighbor)
+		tmpImageName := fmt.Sprintf("/tmp/%s.jpg", flowImageUUID.String())
+		outThumbnail, _ := os.Create(tmpImageName)
+		defer outThumbnail.Close()
 
-	pathName := flowImageUUID.String() + path.Ext(attachment.URL())
-	path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", orgID), pathName[:4], pathName[4:8], "thumbnail_" + pathName)
-	if !strings.HasPrefix(path, "/") {
-		path = fmt.Sprintf("/%s", path)
+		// write new image to file
+		jpeg.Encode(outThumbnail, thumb, nil)
+
+		pathName := flowImageUUID.String() + path.Ext(attachment.URL())
+		s3Path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", orgID), pathName[:4], pathName[4:8], "thumbnail_" + pathName)
+		if !strings.HasPrefix(s3Path, "/") {
+			s3Path = fmt.Sprintf("/%s", s3Path)
+		}
+
+		content, _ := ioutil.ReadFile(tmpImageName)
+		thumbnailURL, _ = s3utils.PutS3File(s3Client, config.S3MediaBucket, s3Path, "image/jpeg", content)
+
+		// Removing the file created on /tmp directory
+		os.Remove(tmpImageName)
 	}
-
-	content, _ := ioutil.ReadFile(tmpImageName)
-	thumbnailURL, errS3 := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, "image/jpeg", content)
-	if errS3 != nil {
-		return errors.Wrapf(err, "error uploading flow image to S3")
-	}
-
-	urlSplitted := strings.Split(attachment.URL(), "/")
-	filename := urlSplitted[len(urlSplitted) - 1]
 
 	_, errExec := tx.Exec(
 		`
@@ -756,7 +780,7 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API
 			flows_flowimage(created_on, modified_on, uuid, name, path, path_thumbnail, exif, contact_id, flow_id, org_id, is_active)
 		VALUES
 			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		nowDate, nowDate, flowImageUUID, filename, attachment.URL(), thumbnailURL, nil, contactID, flowID, orgID, true)
+		nowDate, nowDate, flowImageUUID, filename, attachment.URL(), NewNullString(thumbnailURL), NewNullString(exifJsonString), contactID, flowID, orgID, true)
 
 	if errExec != nil {
 		tx.Rollback()
@@ -771,8 +795,27 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API
 		return errors.Wrapf(err, "error inserting new flow image")
 	}
 
-	// Removing tmp file created
-	os.Remove(tmpImageName)
+	// Removing the file created on /tmp directory
+	os.Remove(fileDownloaded)
 
 	return nil
+}
+
+func NewNullString(s string) sql.NullString {
+	if len(s) == 0 {
+		return sql.NullString{}
+	}
+	return sql.NullString{
+		String: s,
+		Valid: true,
+	}
+}
+
+func stringInSlice(s string, list []string) bool {
+	for _, ext := range list {
+		if ext == s {
+			return true
+		}
+	}
+	return false
 }
