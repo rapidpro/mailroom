@@ -771,7 +771,7 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API
 		return errors.Wrapf(err, "error inserting new flow image")
 	}
 
-	// Removing tmp files created after email sent
+	// Removing tmp file created
 	os.Remove(tmpImageName)
 
 	return nil
