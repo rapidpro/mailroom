@@ -64,7 +64,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, msgID), nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgID flows.MsgID, text string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
 	ticketConfig := ticket.Config()
 	contactDisplay, _ := ticketConfig.Map()["contact-display"].(string)
 	lastMessageID, _ := ticketConfig.Map()["last-message-id"].(string)

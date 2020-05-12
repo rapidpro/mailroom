@@ -109,7 +109,7 @@ func (t *Ticket) CreateReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, t
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
-func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *Contact, msgID flows.MsgID, text string, attachments []utils.Attachment) error {
+func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *Contact, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
 	ticketer := org.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
@@ -123,7 +123,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 
 	logHTTP := &flows.HTTPLogger{}
 
-	err = service.Forward(t, contact, msgID, text, logHTTP.Log)
+	err = service.Forward(t, contact, msgUUID, text, logHTTP.Log)
 
 	// create a log for each HTTP call
 	httpLogs := make([]*HTTPLog, 0, len(logHTTP.Logs))
@@ -231,7 +231,7 @@ func LookupTicketByUUID(ctx context.Context, db Queryer, uuid flows.TicketUUID) 
 	return ticket, nil
 }
 
-const insertOpenTicketSQL = `
+const insertTicketSQL = `
 INSERT INTO 
   tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on,  modified_on)
   VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, NOW(),      NOW()      )
@@ -250,7 +250,23 @@ func InsertTickets(ctx context.Context, tx Queryer, tickets []*Ticket) error {
 		ts[i] = &tickets[i].t
 	}
 
-	return BulkSQL(ctx, "inserted tickets", tx, insertOpenTicketSQL, ts)
+	return BulkSQL(ctx, "inserted tickets", tx, insertTicketSQL, ts)
+}
+
+const updateTicketExternalIDSQL = `
+UPDATE
+  tickets_ticket
+SET
+  external_id = $2
+WHERE
+  id = $1
+`
+
+// UpdateTicketExternalID updates the external ID of the given ticket
+func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, externalID string) error {
+	t := &ticket.t
+	t.ExternalID = null.String(externalID)
+	return Exec(ctx, "update ticket external ID", db, updateTicketExternalIDSQL, t.ID, t.ExternalID)
 }
 
 const updateTicketSQL = `
@@ -311,7 +327,7 @@ func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryCo
 type TicketService interface {
 	flows.TicketService
 
-	Forward(ticket *Ticket, contact *Contact, msgID flows.MsgID, text string, logHTTP flows.HTTPLogCallback) error
+	Forward(*Ticket, *Contact, flows.MsgUUID, string, flows.HTTPLogCallback) error
 }
 
 type TicketServiceFunc func(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (TicketService, error)

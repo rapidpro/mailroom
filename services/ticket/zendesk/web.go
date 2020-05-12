@@ -2,14 +2,14 @@ package zendesk
 
 import (
 	"context"
-	"database/sql"
+	"encoding/json"
+	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
@@ -18,133 +18,12 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/zendesk/pull", handlePull)
 	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/zendesk/channelback", handleChannelback)
 	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/zendesk/event_callback", handleEventCallback)
 }
 
-type pullRequest struct {
-	State    string `form:"state"`
-	Metadata string `form:"metadata" validate:"required"`
-}
-
-type pullResponse struct {
-	ExternalResources []*Message `json:"external_resources"`
-	State             string     `json:"state"`
-}
-
-type PendingMsg struct {
-	ContactUUID string           `db:"contact_uuid"`
-	ContactID   models.ContactID `db:"contact_id"`
-	ContactName string           `db:"contact_name"`
-	ID          int64            `db:"id"`
-	Text        string           `db:"text"`
-	CreatedOn   time.Time        `db:"created_on"`
-}
-
-const selectPendingMsgs = `
-SELECT
-  c.uuid as contact_uuid,
-  c.id as contact_id,
-  c.name as contact_name,
-  m.id as id,
-  m.text as text,
-  m.created_on as created_on
-FROM
-  msgs_msg m JOIN
-  contacts_contact c
-ON
-  m.contact_id = c.id
-WHERE
-  c.is_active = TRUE AND
-  m.org_id = $1 AND
-  m.id > $2
-`
-
-func handlePull(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	request := &pullRequest{}
-	if err := web.DecodeAndValidateForm(request, r); err != nil {
-		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
-	}
-
-	// decode our metadata
-	metadata := &Metadata{}
-	if err := utils.UnmarshalAndValidate([]byte(request.Metadata), metadata); err != nil {
-		return errors.Wrapf(err, "error unmarshaling metadata"), http.StatusBadRequest, nil
-	}
-
-	// validate our token
-	org, err := models.LookupOrgByToken(ctx, s.DB, metadata.Token)
-	if err != nil {
-		return errors.Wrapf(err, "invalid authentication token"), http.StatusUnauthorized, nil
-	}
-
-	// decode our state
-	state := &State{}
-	if request.State != "" {
-		if err := utils.UnmarshalAndValidate([]byte(request.State), state); err != nil {
-			return errors.Wrapf(err, "error unmarshaling state"), http.StatusBadRequest, nil
-		}
-	}
-
-	// select our messages
-	rows, err := s.DB.QueryxContext(s.CTX, selectPendingMsgs, org.ID, state.LastMessageID)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error querying for pending messages")
-	}
-	defer rows.Close()
-
-	response := &pullResponse{
-		State:             "",
-		ExternalResources: make([]*Message, 0),
-	}
-
-	if rows != nil {
-		for rows.Next() {
-			msg := &PendingMsg{}
-			err := rows.StructScan(msg)
-			if err != nil {
-				return nil, http.StatusInternalServerError, errors.Wrapf(err, "error reading pending message row")
-			}
-
-			response.ExternalResources = append(
-				response.ExternalResources,
-				&Message{
-					ExternalID: strconv.FormatInt(msg.ID, 10),
-					Message:    msg.Text,
-					CreatedAt:  msg.CreatedOn,
-					Author: Author{
-						ExternalID: strconv.FormatInt(int64(msg.ContactID), 10),
-						Name:       msg.ContactName,
-					},
-					ThreadID:         string(msg.ContactUUID),
-					AllowChannelBack: true,
-				},
-			)
-		}
-	}
-
-	// get the latest messages
-	return response, http.StatusOK, nil
-}
-
-type Metadata struct {
-	OrgUUID uuids.UUID `json:"org_uuid"`
-	Token   string     `json:"token"`
-}
-
-type State struct {
-	LastMessageID int64 `json:"last_message_id"`
-}
-
-type Message struct {
-	ExternalID string    `json:"external_id"`
-	Message    string    `json:"message"`
-	CreatedAt  time.Time `json:"created_at"`
-	Author     Author    `json:"author"`
-
-	ThreadID         string `json:"thread_id"`
-	AllowChannelBack bool   `json:"allow_channelback"`
+type metadata struct {
+	Token string `json:"token"`
 }
 
 type channelbackRequest struct {
@@ -166,8 +45,10 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
 	}
 
+	fmt.Printf("== channel-back: %+v\n", request)
+
 	// decode our metadata
-	metadata := &Metadata{}
+	metadata := &metadata{}
 	if err := utils.UnmarshalAndValidate([]byte(request.Metadata), metadata); err != nil {
 		return errors.Wrapf(err, "error unmarshaling metadata"), http.StatusBadRequest, nil
 	}
@@ -189,14 +70,16 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up org: %d", org.ID)
 	}
 
-	cid, err := strconv.Atoi(request.RecipientID)
+	// look up our contact
+	contactRef := flows.NewContactReference(flows.ContactUUID(request.RecipientID), "")
+	contactIDs, err := models.ContactIDsFromReferences(ctx, s.DB, assets, []*flows.ContactReference{contactRef})
 	if err != nil {
-		return errors.Wrapf(err, "invalid contact id: %s", request.RecipientID), http.StatusBadRequest, nil
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up contact: %s", request.RecipientID)
 	}
 
 	// we'll use a broadcast to send this message
 	bcast := models.NewBroadcast(org.ID, models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language(""), nil, nil, nil)
-	batch := bcast.CreateBatch([]models.ContactID{models.ContactID(cid)})
+	batch := bcast.CreateBatch(contactIDs)
 	msgs, err := models.CreateBroadcastMessages(s.CTX, s.DB, s.RP, assets, batch)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating message batch")
@@ -211,12 +94,66 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error queuing outgoing message")
 	}
 
-	return &channelbackResponse{
-		ExternalID:       strconv.FormatInt(int64(msgs[0].ID()), 10),
-		AllowChannelback: true,
-	}, http.StatusOK, nil
+	msgOutID := fmt.Sprintf("%d", msgs[0].ID())
+	return &channelbackResponse{ExternalID: msgOutID, AllowChannelback: true}, http.StatusOK, nil
+}
+
+type event struct {
+	TypeID          string          `json:"type_id"`
+	Timestamp       time.Time       `json:"timestamp"`
+	Subdomain       string          `json:"subdomain"`
+	IntegrationName string          `json:"integration_name"`
+	IntegrationID   string          `json:"integration_id"`
+	Error           string          `json:"error"`
+	Data            json.RawMessage `json:"data"`
+}
+
+type resourceEvent struct {
+	TypeID     string `json:"type_id"`
+	TicketID   int64  `json:"ticket_id"`
+	CommentID  int64  `json:"comment_id"`
+	ExternalID string `json:"external_id"`
+}
+
+type resourcesCreatedEvent struct {
+	RequestID      string          `json:"request_id"`
+	ResourceEvents []resourceEvent `json:"resource_events"`
+}
+
+type eventCallbackRequest struct {
+	Events []*event `json:"events"`
 }
 
 func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &eventCallbackRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	for _, e := range request.Events {
+		// TODO lookup ticketer by subdomain.. check integration_id ?
+
+		if e.TypeID == "resources_created_from_external_ids" {
+			event := &resourcesCreatedEvent{}
+			if err := utils.UnmarshalAndValidate(e.Data, event); err != nil {
+				return nil, http.StatusBadRequest, err
+			}
+
+			for _, re := range event.ResourceEvents {
+				if re.TypeID == "comment_on_new_ticket" {
+					// new tickets aren't created from actual messages - the external_id on the "message" we push
+					// to Zendesk is actually the UUID of the ticket we just created
+					ticket, err := models.LookupTicketByUUID(ctx, s.DB, flows.TicketUUID(re.ExternalID))
+					if err != nil {
+						return nil, http.StatusBadRequest, err
+					}
+
+					// update the ticket with the ID from Zendesk
+					models.UpdateTicketExternalID(ctx, s.DB, ticket, fmt.Sprintf("%d", re.TicketID))
+				}
+			}
+		}
+	}
+
 	return map[string]string{"status": "OK"}, http.StatusOK, nil
 }

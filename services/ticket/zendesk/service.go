@@ -49,11 +49,10 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 // Open opens a ticket which for mailgun means just sending an initial email
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticketUUID := flows.TicketUUID(uuids.New())
-
 	contactDisplay := session.Contact().Format(session.Environment())
 
 	msg := &ExternalResource{
-		ExternalID: string(uuids.New()),
+		ExternalID: string(ticketUUID),
 		Message:    body,
 		ThreadID:   string(ticketUUID),
 		CreatedAt:  dates.Now(),
@@ -71,12 +70,12 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, ""), nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgID flows.MsgID, text string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
 	ticketConfig := ticket.Config()
 	contactDisplay, _ := ticketConfig.Map()["contact-display"].(string)
 
 	msg := &ExternalResource{
-		ExternalID: string(msgID),
+		ExternalID: string(msgUUID),
 		Message:    text,
 		ThreadID:   string(ticket.UUID()),
 		CreatedAt:  dates.Now(),
