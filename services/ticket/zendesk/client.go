@@ -2,6 +2,7 @@ package zendesk
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,7 +12,7 @@ import (
 	"github.com/nyaruka/goflow/utils/jsonx"
 )
 
-// Client is a basic zendesk client which uses OAuth
+// Client is a basic Zendesk client
 type Client struct {
 	httpClient  *http.Client
 	httpRetries *httpx.RetryConfig
@@ -19,7 +20,7 @@ type Client struct {
 	token       string
 }
 
-// NewClient creates a new zendesk client
+// NewClient creates a new Zendesk client
 func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) *Client {
 	return &Client{
 		httpClient:  httpClient,
@@ -34,78 +35,66 @@ type errorResponse struct {
 	Description string `json:"description"`
 }
 
-type User struct {
-	ID         int64  `json:"id,omitempty"`
-	URL        string `json:"url,omitempty"`
-	Name       string `json:"name"`
-	Role       string `json:"role"`
-	ExternalID string `json:"external_id"`
+// Author see https://developer.zendesk.com/rest_api/docs/support/channel_framework#author-object
+type Author struct {
+	ExternalID string          `json:"external_id"`
+	Name       string          `json:"name,omitempty"`
+	ImageURL   string          `json:"image_url,omitempty"`
+	Locale     string          `json:"locale,omitempty"`
+	Fields     json.RawMessage `json:"fields,omitempty"`
 }
 
-// CreateOrUpdateUser creates or updates a user matching on external ID
-// see https://developer.zendesk.com/rest_api/docs/support/users#create-or-update-user
-func (c *Client) CreateOrUpdateUser(name, role, externalID string) (*User, *httpx.Trace, error) {
-	user := &struct {
-		User User `json:"user"`
+// DisplayInfo see https://developer.zendesk.com/rest_api/docs/support/channel_framework#display_info-object
+type DisplayInfo struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
+}
+
+// ExternalResource see https://developer.zendesk.com/rest_api/docs/support/channel_framework#external_resource-object
+type ExternalResource struct {
+	ExternalID       string        `json:"external_id"`
+	Message          string        `json:"message"`
+	HTMLMessage      string        `json:"html_message,omitempty"`
+	ParentID         string        `json:"parent_id,omitempty"`
+	ThreadID         string        `json:"thread_id,omitempty"`
+	CreatedAt        time.Time     `json:"created_at"`
+	Author           Author        `json:"author"`
+	DisplayInfo      []DisplayInfo `json:"display_info,omitempty"`
+	AllowChannelback bool          `json:"allow_channelback"`
+}
+
+// Status see https://developer.zendesk.com/rest_api/docs/support/channel_framework#status-object
+type Status struct {
+	Code        string `json:"code"`
+	Description string `json:"description"`
+}
+
+// Result see https://developer.zendesk.com/rest_api/docs/support/channel_framework#result-object
+type Result struct {
+	ExternalResourceID string `json:"external_resource_id"`
+	Status             Status `json:"status"`
+}
+
+// Push pushes the given external resources
+func (c *Client) Push(instanceID string, externalResources []*ExternalResource) ([]*Result, *httpx.Trace, error) {
+	push := struct {
+		InstancePushID    string              `json:"instance_push_id"`
+		ExternalResources []*ExternalResource `json:"external_resources"`
 	}{
-		User: User{
-			Name:       name,
-			Role:       role,
-			ExternalID: externalID,
-		},
+		InstancePushID:    instanceID,
+		ExternalResources: externalResources,
 	}
 
-	trace, err := c.post("users/create_or_update", user, user)
-	if err != nil {
-		return nil, trace, err
-	}
-
-	return &user.User, trace, nil
-}
-
-type ticketComment struct {
-	Body string `json:"body"`
-}
-
-type newTicket struct {
-	RequesterID int64         `json:"requester_id"`
-	Subject     string        `json:"subject"`
-	Comment     ticketComment `json:"comment"`
-	ExternalID  string        `json:"external_id"`
-}
-
-// Ticket is a ticket in Zendesk
-type Ticket struct {
-	ID          int64     `json:"id"`
-	URL         string    `json:"url"`
-	RequesterID int64     `json:"requester_id"`
-	Subject     string    `json:"subject"`
-	ExternalID  string    `json:"external_id"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-// CreateTicket creates a new ticket
-// see https://developer.zendesk.com/rest_api/docs/support/tickets#create-ticket
-func (c *Client) CreateTicket(requesterID int64, subject, body string) (*Ticket, *httpx.Trace, error) {
-	newTicket := &struct {
-		Ticket newTicket `json:"ticket"`
-	}{
-		Ticket: newTicket{
-			RequesterID: requesterID,
-			Subject:     subject,
-			Comment:     ticketComment{Body: body},
-		},
-	}
-	ticket := &struct {
-		Ticket Ticket `json:"ticket"`
+	response := &struct {
+		Results []*Result `json:"results"`
 	}{}
 
-	trace, err := c.post("tickets", newTicket, ticket)
+	trace, err := c.post("any_channel/push", push, response)
 	if err != nil {
 		return nil, trace, err
 	}
 
-	return &ticket.Ticket, trace, nil
+	return response.Results, trace, nil
 }
 
 func (c *Client) post(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {

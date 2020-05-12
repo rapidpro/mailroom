@@ -539,7 +539,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		return errors.Wrapf(err, "unable to look up open tickets for contact")
 	}
 	for _, ticket := range tickets {
-		ticket.ForwardIncoming(ctx, db, org, modelContact, event.Text, event.Attachments)
+		ticket.ForwardIncoming(ctx, db, org, modelContact, event.MsgID, event.Text, event.Attachments)
 	}
 
 	// find any matching triggers

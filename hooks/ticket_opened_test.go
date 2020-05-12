@@ -31,27 +31,14 @@ func TestTicketOpened(t *testing.T) {
 				"message": "Queued. Thank you."
 			}`),
 		},
-		"https://nyaruka.zendesk.com/api/v2/users/create_or_update.json": {
+		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
 			httpx.NewMockResponse(201, nil, `{
-				"user": {
-					"id": 12345,
-					"url": "https://nyaruka.zendesk.com/api/v2/users/12345.json",
-					"name": "Jim",
-					"role": "end-user",
-					"external_id": "a78c5d9d-283a-4be9-ad6d-690e4307c961",
-					"created_at": "2009-07-20T22:55:29Z"
-				}
-			}`),
-		},
-		"https://nyaruka.zendesk.com/api/v2/tickets.json": {
-			httpx.NewMockResponse(200, nil, `{
-				"ticket":{
-					"id": 12345,
-					"url": "https://nyaruka.zendesk.com/api/v2/tickets/12345.json",
-					"external_id": "a78c5d9d-283a-4be9-ad6d-690e4307c961",
-					"created_at": "2009-07-20T22:55:29Z",
-					"subject": "Need help"
-				}
+				"results": [
+					{
+						"external_resource_id": "123",
+						"status": {"code": "success"}
+					}
+				]
 			}`),
 		},
 	}))

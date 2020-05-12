@@ -109,7 +109,7 @@ func (t *Ticket) CreateReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, t
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
-func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *Contact, text string, attachments []utils.Attachment) error {
+func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *Contact, msgID flows.MsgID, text string, attachments []utils.Attachment) error {
 	ticketer := org.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
@@ -123,7 +123,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 
 	logHTTP := &flows.HTTPLogger{}
 
-	err = service.Forward(t, text, logHTTP.Log)
+	err = service.Forward(t, contact, msgID, text, logHTTP.Log)
 
 	// create a log for each HTTP call
 	httpLogs := make([]*HTTPLog, 0, len(logHTTP.Logs))
@@ -311,7 +311,7 @@ func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryCo
 type TicketService interface {
 	flows.TicketService
 
-	Forward(ticket *Ticket, text string, logHTTP flows.HTTPLogCallback) error
+	Forward(ticket *Ticket, contact *Contact, msgID flows.MsgID, text string, logHTTP flows.HTTPLogCallback) error
 }
 
 type TicketServiceFunc func(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (TicketService, error)

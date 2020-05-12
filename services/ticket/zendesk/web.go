@@ -137,13 +137,6 @@ type State struct {
 	LastMessageID int64 `json:"last_message_id"`
 }
 
-type Author struct {
-	ExternalID string `json:"external_id"`
-	Name       string `json:"name"`
-	// Locale string `json:"locale"`
-	// Fields map[string]string `json:"fields"`
-}
-
 type Message struct {
 	ExternalID string    `json:"external_id"`
 	Message    string    `json:"message"`
@@ -187,7 +180,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 
 	// we build a simple translation
 	translations := map[envs.Language]*models.BroadcastTranslation{
-		envs.Language(""): &models.BroadcastTranslation{Text: request.Message},
+		envs.Language(""): {Text: request.Message},
 	}
 
 	// look up our assets
