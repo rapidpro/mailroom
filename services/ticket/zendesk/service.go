@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	configSubdomain      = "subdomain"
-	configInstancePushID = "instance_push_id"
-	configPushToken      = "push_token"
+	configSubdomain = "subdomain"
+	configPushID    = "push_id"
+	configPushToken = "push_token"
 )
 
 func init() {
@@ -33,7 +33,7 @@ type service struct {
 // NewService creates a new zendesk ticket service
 func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	subdomain := config[configSubdomain]
-	instancePushID := config[configInstancePushID]
+	instancePushID := config[configPushID]
 	pushToken := config[configPushToken]
 	if subdomain != "" && instancePushID != "" && pushToken != "" {
 		return &service{
@@ -43,7 +43,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 			instancePushID: instancePushID,
 		}, nil
 	}
-	return nil, errors.New("missing subdomain or instance_push_id or push_token in zendesk config")
+	return nil, errors.New("missing subdomain or push_id or push_token in zendesk config")
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
@@ -63,7 +63,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		DisplayInfo: []DisplayInfo{
 			{
 				// need to also include our ticket UUID in here so the Zendesk app can access it
-				Type: "temba-ticket",
+				Type: "temba",
 				Data: map[string]string{"uuid": string(ticketUUID)},
 			},
 		},

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -23,7 +24,8 @@ func init() {
 }
 
 type metadata struct {
-	Token string `json:"token"`
+	TicketerUUID assets.TicketerUUID `json:"ticketer" validate:"required"`
+	Secret       string              `json:"secret"   validate:"required"`
 }
 
 type channelbackRequest struct {
@@ -45,18 +47,21 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
 	}
 
-	fmt.Printf("== channel-back: %+v\n", request)
-
 	// decode our metadata
 	metadata := &metadata{}
 	if err := utils.UnmarshalAndValidate([]byte(request.Metadata), metadata); err != nil {
 		return errors.Wrapf(err, "error unmarshaling metadata"), http.StatusBadRequest, nil
 	}
 
-	// validate our token
-	org, err := models.LookupOrgByToken(ctx, s.DB, metadata.Token)
+	// lookup the ticketer associated with this Zendesk channel
+	ticketer, err := models.LookupTicketerByUUID(ctx, s.DB, metadata.TicketerUUID)
 	if err != nil {
-		return errors.Wrapf(err, "invalid authentication token"), http.StatusUnauthorized, nil
+		return errors.Wrapf(err, "error loading ticketer"), http.StatusBadRequest, nil
+	}
+
+	// check secret is correct
+	if ticketer.Config("secret") != metadata.Secret {
+		return errors.Wrapf(err, "ticketer secret mismatch"), http.StatusUnauthorized, nil
 	}
 
 	// we build a simple translation
@@ -65,9 +70,9 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 	}
 
 	// look up our assets
-	assets, err := models.GetOrgAssets(s.CTX, s.DB, org.ID)
+	assets, err := models.GetOrgAssets(s.CTX, s.DB, ticketer.OrgID())
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up org: %d", org.ID)
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up org: %d", ticketer.OrgID())
 	}
 
 	// look up our contact
@@ -78,7 +83,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 	}
 
 	// we'll use a broadcast to send this message
-	bcast := models.NewBroadcast(org.ID, models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language(""), nil, nil, nil)
+	bcast := models.NewBroadcast(ticketer.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language(""), nil, nil, nil)
 	batch := bcast.CreateBatch(contactIDs)
 	msgs, err := models.CreateBroadcastMessages(s.CTX, s.DB, s.RP, assets, batch)
 	if err != nil {

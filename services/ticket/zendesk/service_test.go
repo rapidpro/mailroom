@@ -51,16 +51,16 @@ func TestService(t *testing.T) {
 		ticketer,
 		map[string]string{},
 	)
-	assert.EqualError(t, err, "missing subdomain or instance_push_id or push_token in zendesk config")
+	assert.EqualError(t, err, "missing subdomain or push_id or push_token in zendesk config")
 
 	svc, err := zendesk.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
 		map[string]string{
-			"subdomain":        "nyaruka",
-			"instance_push_id": "1234-abcd",
-			"push_token":       "123456789",
+			"subdomain":  "nyaruka",
+			"push_id":    "1234-abcd",
+			"push_token": "123456789",
 		},
 	)
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestService(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, &flows.Ticket{
-		UUID:       flows.TicketUUID("9688d21d-95aa-4bed-afc7-f31b35731a3d"),
+		UUID:       flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"),
 		Ticketer:   ticketer.Reference(),
 		Subject:    "Need help",
 		Body:       "Where are my cookies?",

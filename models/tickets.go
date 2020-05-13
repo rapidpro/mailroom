@@ -296,6 +296,7 @@ type Ticketer struct {
 	t struct {
 		ID     TicketerID          `json:"id"`
 		UUID   assets.TicketerUUID `json:"uuid"`
+		OrgID  OrgID               `json:"org_id"`
 		Type   string              `json:"ticketer_type"`
 		Name   string              `json:"name"`
 		Config map[string]string   `json:"config"`
@@ -308,11 +309,17 @@ func (t *Ticketer) ID() TicketerID { return t.t.ID }
 // UUID returns the UUID
 func (t *Ticketer) UUID() assets.TicketerUUID { return t.t.UUID }
 
+// OrgID returns the org ID
+func (t *Ticketer) OrgID() OrgID { return t.t.OrgID }
+
 // Name returns the name
 func (t *Ticketer) Name() string { return t.t.Name }
 
 // Type returns the type
 func (t *Ticketer) Type() string { return t.t.Type }
+
+// Config returns the named config value
+func (t *Ticketer) Config(key string) string { return t.t.Config[key] }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
 func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer) (TicketService, error) {
@@ -338,17 +345,55 @@ func RegisterTicketService(name string, initFunc TicketServiceFunc) {
 	ticketServices[name] = initFunc
 }
 
-const selectTicketersSQL = `
+const selectTicketerByUUIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.id as id,
 	t.uuid as uuid,
+	t.org_id as org_id,
 	t.name as name,
 	t.ticketer_type as ticketer_type,
 	t.config as config
 FROM 
 	tickets_ticketer t
 WHERE 
-	t.org_id = $1 AND 
+	t.uuid = $1 AND 
+	t.is_active = TRUE
+) r;
+`
+
+// LookupTicketerByUUID looks up the ticketer with the passed in UUID
+func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerUUID) (*Ticketer, error) {
+	rows, err := db.QueryxContext(ctx, selectTicketerByUUIDSQL, string(uuid))
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrapf(err, "error querying for ticketer for uuid: %s", string(uuid))
+	}
+	defer rows.Close()
+
+	if err == sql.ErrNoRows || !rows.Next() {
+		return nil, nil
+	}
+
+	ticketer := &Ticketer{}
+	err = readJSONRow(rows, &ticketer.t)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error unmarshalling ticketer")
+	}
+
+	return ticketer, nil
+}
+
+const selectTicketersSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	t.id as id,
+	t.uuid as uuid,
+	t.org_id as org_id,
+	t.name as name,
+	t.ticketer_type as ticketer_type,
+	t.config as config
+FROM
+	tickets_ticketer t
+WHERE
+	t.org_id = $1 AND
 	t.is_active = TRUE
 ORDER BY
 	t.created_on ASC

@@ -49,33 +49,3 @@ func LookupOrgByUUIDAndToken(ctx context.Context, db Queryer, orgUUID uuids.UUID
 	}
 	return org, nil
 }
-
-const lookupOrgByTokenSQL = `
-SELECT 
-  o.id AS id, 
-  o.uuid as uuid,
-  o.name AS name
-FROM 
-  orgs_org o
-JOIN 
-  api_apitoken a
-ON 
-  a.org_id = o.id
-WHERE
-  a.is_active = TRUE AND
-  o.is_active = TRUE AND
-  a.key = $1;
-`
-
-// LookupOrgByToken looks up an OrgReference for the given token and permission
-func LookupOrgByToken(ctx context.Context, db Queryer, token string) (*OrgReference, error) {
-	org := &OrgReference{}
-	err := db.GetContext(ctx, org, lookupOrgByTokenSQL, token)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return org, nil
-}
