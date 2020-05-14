@@ -43,6 +43,7 @@ type messageResponse struct {
 }
 
 // SendMessage sends a new email message and returns the ID
+// see https://documentation.mailgun.com/en/latest/api-sending.html
 func (c *Client) SendMessage(from, to, subject, text, inReplyTo string) (string, *httpx.Trace, error) {
 	writeBody := func(w *multipart.Writer) {
 		w.WriteField("from", from)

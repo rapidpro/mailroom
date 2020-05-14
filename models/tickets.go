@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
@@ -274,21 +275,41 @@ UPDATE
   tickets_ticket
 SET
   status = $2,
-  config = $3
+  config = $3,
+  closed_on = NULL
 WHERE
   id = $1
 `
 
-// UpdateTicket updates the passed in ticket with the passed in external id, status and config
-func UpdateTicket(ctx context.Context, db Queryer, ticket *Ticket, status TicketStatus, config map[string]string) error {
+// EnsureOpenTicket updates the passed in ticket to ensure it's open and updates the config with any passed in values
+func EnsureOpenTicket(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
 	t := &ticket.t
-	t.Status = status
-
+	t.Status = TicketStatusOpen
 	for key, value := range config {
 		t.Config.Map()[key] = value
 	}
 
 	return Exec(ctx, "update ticket", db, updateTicketSQL, t.ID, t.Status, t.Config)
+}
+
+const closeTicketSQL = `
+UPDATE
+  tickets_ticket
+SET
+  status = 'C',
+  closed_on = $2
+WHERE
+  id = $1
+`
+
+// CloseTicket updates the passed in ticket with the passed in external id, status and config
+func CloseTicket(ctx context.Context, db Queryer, ticket *Ticket) error {
+	now := dates.Now()
+	t := &ticket.t
+	t.Status = TicketStatusClosed
+	t.ClosedOn = &now
+
+	return Exec(ctx, "close ticket", db, closeTicketSQL, t.ID, t.ClosedOn)
 }
 
 // Ticketer is our type for a ticketer asset
@@ -331,16 +352,19 @@ func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryCo
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
 }
 
+// TicketService extends the engine's ticket service and adds support for forwarding new incoming messages
 type TicketService interface {
 	flows.TicketService
 
 	Forward(*Ticket, *Contact, flows.MsgUUID, string, flows.HTTPLogCallback) error
 }
 
+// TicketServiceFunc is a func which creates a ticket service
 type TicketServiceFunc func(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (TicketService, error)
 
 var ticketServices = map[string]TicketServiceFunc{}
 
+// RegisterTicketService registers a new ticket service
 func RegisterTicketService(name string, initFunc TicketServiceFunc) {
 	ticketServices[name] = initFunc
 }

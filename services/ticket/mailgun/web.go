@@ -4,12 +4,12 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
-	"github.com/nyaruka/null"
 
 	"github.com/pkg/errors"
 )
@@ -32,11 +32,8 @@ type receiveRequest struct {
 }
 
 type receiveResponse struct {
-	Action     string              `json:"action"`
-	TicketUUID string              `json:"ticket_uuid"`
-	ExternalID null.String         `json:"external_id"`
-	Message    string              `json:"message"`
-	Status     models.TicketStatus `json:"status"`
+	Action     string `json:"action"`
+	TicketUUID string `json:"ticket_uuid"`
 }
 
 var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})@.*$`)
@@ -63,12 +60,22 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Errorf("invalid ticket uuid, ignoring"), http.StatusOK, nil
 	}
 
+	// check if reply is actually a command
+	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
+		err = models.CloseTicket(ctx, s.DB, ticket)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error closing ticket: %s", ticket.UUID())
+		}
+
+		return &receiveResponse{Action: "closed", TicketUUID: string(ticket.UUID())}, http.StatusOK, nil
+	}
+
 	// update our ticket
 	config := map[string]string{
 		"last-message-id": request.MessageID,
 		"last-subject":    request.Subject,
 	}
-	err = models.UpdateTicket(ctx, s.DB, ticket, models.TicketStatusOpen, config)
+	err = models.EnsureOpenTicket(ctx, s.DB, ticket, config)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error updating ticket: %s", ticket.UUID())
 	}
@@ -87,11 +94,5 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error queuing outgoing message")
 	}
 
-	return &receiveResponse{
-		Action:     "forwarded",
-		TicketUUID: string(ticket.UUID()),
-		ExternalID: ticket.ExternalID(),
-		Status:     ticket.Status(),
-		Message:    request.StrippedText,
-	}, http.StatusOK, nil
+	return &receiveResponse{Action: "forwarded", TicketUUID: string(ticket.UUID())}, http.StatusOK, nil
 }

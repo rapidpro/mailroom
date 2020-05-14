@@ -17,6 +17,14 @@ const (
 	configDomain    = "domain"
 	configAPIKey    = "api_key"
 	configToAddress = "to_address"
+	configURLBase   = "url_base"
+
+	bodyTextTemplate = `%s
+
+------------------------------------------------
+You can close this ticket by replying with CLOSE
+You can view this contact at %s
+`
 )
 
 func init() {
@@ -27,6 +35,7 @@ type service struct {
 	client    *Client
 	ticketer  *flows.Ticketer
 	toAddress string
+	urlBase   string
 	redactor  utils.Redactor
 }
 
@@ -35,15 +44,18 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 	domain := config[configDomain]
 	apiKey := config[configAPIKey]
 	toAddress := config[configToAddress]
-	if domain != "" && apiKey != "" && toAddress != "" {
+	urlBase := config[configURLBase]
+
+	if domain != "" && apiKey != "" && toAddress != "" && urlBase != "" {
 		return &service{
 			client:    NewClient(httpClient, httpRetries, domain, apiKey),
 			ticketer:  ticketer,
 			toAddress: toAddress,
+			urlBase:   urlBase,
 			redactor:  utils.NewRedactor(flows.RedactionMask, apiKey),
 		}, nil
 	}
-	return nil, errors.New("missing domain or api_key or to_address in mailgun config")
+	return nil, errors.New("missing domain or api_key or to_address or url_base in mailgun config")
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
@@ -52,6 +64,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	contactDisplay := session.Contact().Format(session.Environment())
 
 	from := s.fromAddress(contactDisplay, ticketUUID)
+	body = s.createBody(body, session.Contact().UUID())
 
 	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, body, "")
 	if trace != nil {
@@ -75,8 +88,9 @@ func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUI
 	}
 
 	from := s.fromAddress(contactDisplay, ticket.UUID())
+	body := s.createBody(text, contact.UUID())
 
-	_, trace, err := s.client.SendMessage(from, s.toAddress, lastSubject, text, lastMessageID)
+	_, trace, err := s.client.SendMessage(from, s.toAddress, lastSubject, body, lastMessageID)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -95,4 +109,10 @@ func (s *service) fromAddress(contactDisplay string, ticketUUID flows.TicketUUID
 	}
 
 	return fmt.Sprintf("%s <%s>", contactDisplay, address)
+}
+
+func (s *service) createBody(base string, contactUUID flows.ContactUUID) string {
+	contactURL := fmt.Sprintf("%s/contact/read/%s/", s.urlBase, contactUUID)
+
+	return fmt.Sprintf(bodyTextTemplate, base, contactURL)
 }
