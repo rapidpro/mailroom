@@ -30,10 +30,10 @@ func TestService(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 123456789, time.UTC)))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://api.mailgun.net/v3/mr.nyaruka.com/messages": {
+		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(200, nil, `{
-				"id": "<20200426161758.1.590432020254B2BF@mr.nyaruka.com>",
+				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
 			}`),
 		},
@@ -47,16 +47,17 @@ func TestService(t *testing.T) {
 		ticketer,
 		map[string]string{},
 	)
-	assert.EqualError(t, err, "missing domain or api_key or to_address in mailgun config")
+	assert.EqualError(t, err, "missing domain or api_key or to_address or url_base in mailgun config")
 
 	svc, err := mailgun.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
 		map[string]string{
-			"domain":     "mr.nyaruka.com",
+			"domain":     "tickets.rapidpro.io",
 			"api_key":    "123456789",
 			"to_address": "bob@acme.com",
+			"url_base":   "http://app.rapidpro.io",
 		},
 	)
 	require.NoError(t, err)
@@ -75,9 +76,9 @@ func TestService(t *testing.T) {
 		Ticketer:   ticketer.Reference(),
 		Subject:    "Need help",
 		Body:       "Where are my cookies?",
-		ExternalID: "<20200426161758.1.590432020254B2BF@mr.nyaruka.com>",
+		ExternalID: "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 	}, ticket)
 
 	assert.Equal(t, 1, len(httpLogger.Logs))
-	assert.Equal(t, "https://api.mailgun.net/v3/mr.nyaruka.com/messages", httpLogger.Logs[0].URL)
+	assert.Equal(t, "https://api.mailgun.net/v3/tickets.rapidpro.io/messages", httpLogger.Logs[0].URL)
 }

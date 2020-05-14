@@ -270,26 +270,29 @@ func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, ext
 	return Exec(ctx, "update ticket external ID", db, updateTicketExternalIDSQL, t.ID, t.ExternalID)
 }
 
-const updateTicketSQL = `
+const updateTicketAndKeepOpenSQL = `
 UPDATE
   tickets_ticket
 SET
   status = $2,
   config = $3,
+  modified_on = $4,
   closed_on = NULL
 WHERE
   id = $1
 `
 
-// EnsureOpenTicket updates the passed in ticket to ensure it's open and updates the config with any passed in values
-func EnsureOpenTicket(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
+// UpdateAndKeepOpenTicket updates the passed in ticket to ensure it's open and updates the config with any passed in values
+func UpdateAndKeepOpenTicket(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
+	now := dates.Now()
 	t := &ticket.t
 	t.Status = TicketStatusOpen
+	t.ModifiedOn = now
 	for key, value := range config {
 		t.Config.Map()[key] = value
 	}
 
-	return Exec(ctx, "update ticket", db, updateTicketSQL, t.ID, t.Status, t.Config)
+	return Exec(ctx, "update ticket", db, updateTicketAndKeepOpenSQL, t.ID, t.Status, t.Config, t.ModifiedOn)
 }
 
 const closeTicketSQL = `
@@ -297,6 +300,7 @@ UPDATE
   tickets_ticket
 SET
   status = 'C',
+  modified_on = $2,
   closed_on = $2
 WHERE
   id = $1
@@ -307,6 +311,7 @@ func CloseTicket(ctx context.Context, db Queryer, ticket *Ticket) error {
 	now := dates.Now()
 	t := &ticket.t
 	t.Status = TicketStatusClosed
+	t.ModifiedOn = now
 	t.ClosedOn = &now
 
 	return Exec(ctx, "close ticket", db, closeTicketSQL, t.ID, t.ClosedOn)

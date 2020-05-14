@@ -64,9 +64,9 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	contactDisplay := session.Contact().Format(session.Environment())
 
 	from := s.fromAddress(contactDisplay, ticketUUID)
-	body = s.createBody(body, session.Contact().UUID())
+	emailBody := s.createBody(body, session.Contact().UUID())
 
-	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, body, "")
+	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, emailBody, "")
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}

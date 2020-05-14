@@ -25,9 +25,9 @@ func TestTicketOpened(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://api.mailgun.net/v3/mr.nyaruka.com/messages": {
+		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.NewMockResponse(200, nil, `{
-				"id": "<20200426161758.1.590432020254B2BF@mr.nyaruka.com>",
+				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
 			}`),
 		},

@@ -2,6 +2,9 @@ package mailgun
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"regexp"
 	"strings"
@@ -15,7 +18,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/mailgun/receive", web.RequireAuthToken(handleReceive))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/mailgun/receive", handleReceive)
 }
 
 type receiveRequest struct {
@@ -27,8 +30,20 @@ type receiveRequest struct {
 	PlainBody    string `form:"body-plain"    validate:"required"`
 	StrippedText string `form:"stripped-text" validate:"required"`
 	HTMLBody     string `form:"body-html"`
-	Token        string `form:"token"         validate:"required"` // TODO: should be validated
-	Signature    string `form:"signature"     validate:"required"` // TODO: should be validated
+	Timestamp    string `form:"timestamp"     validate:"required"`
+	Token        string `form:"token"         validate:"required"`
+	Signature    string `form:"signature"     validate:"required"`
+}
+
+// see https://documentation.mailgun.com/en/latest/user_manual.html#securing-webhooks
+func (r *receiveRequest) verify(signingKey string) bool {
+	v := r.Timestamp + r.Token
+
+	mac := hmac.New(sha256.New, []byte(signingKey))
+	mac.Write([]byte(v))
+	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(r.Signature), []byte(expectedMAC))
 }
 
 type receiveResponse struct {
@@ -42,6 +57,10 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	request := &receiveRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
+	}
+
+	if !request.verify(s.Config.MailgunSigningKey) {
+		return errors.New("request signature validation failed"), http.StatusBadRequest, nil
 	}
 
 	// recipient is in the format ticket+<ticket-uuid>@... parse it out
@@ -75,7 +94,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		"last-message-id": request.MessageID,
 		"last-subject":    request.Subject,
 	}
-	err = models.EnsureOpenTicket(ctx, s.DB, ticket, config)
+	err = models.UpdateAndKeepOpenTicket(ctx, s.DB, ticket, config)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error updating ticket: %s", ticket.UUID())
 	}
