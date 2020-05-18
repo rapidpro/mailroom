@@ -101,6 +101,16 @@ func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUI
 	return nil
 }
 
+func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	// TODO implement
+	return nil
+}
+
+func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	// TODO implement
+	return nil
+}
+
 func (s *service) fromAddress(contactDisplay string, ticketUUID flows.TicketUUID) string {
 	address := fmt.Sprintf("ticket+%s@%s", ticketUUID, s.client.domain)
 

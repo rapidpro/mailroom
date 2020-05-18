@@ -24,7 +24,7 @@ func init() {
 type receiveRequest struct {
 	Recipient    string `form:"recipient"     validate:"email"`
 	ReplyTo      string `form:"Reply-To"`
-	From         string `form:"From"          validate:"required"` // TODO: should be validated against org config?
+	From         string `form:"From"          validate:"required"`
 	MessageID    string `form:"Message-Id"    validate:"required"`
 	Subject      string `form:"subject"       validate:"required"`
 	PlainBody    string `form:"body-plain"    validate:"required"`
@@ -79,9 +79,26 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return errors.Errorf("invalid ticket uuid, ignoring"), http.StatusOK, nil
 	}
 
+	// look up our assets and get the ticketer for this ticket
+	assets, err := models.GetOrgAssets(s.CTX, s.DB, ticket.OrgID())
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up org: %d", ticket.OrgID())
+	}
+	ticketer := assets.TicketerByID(ticket.TicketerID())
+	if ticketer == nil {
+		return nil, http.StatusInternalServerError, errors.Errorf("error looking up ticketer: %d", ticket.TicketerID())
+	}
+
+	configuredAddress := ticketer.Config(configToAddress)
+	if request.From != configuredAddress {
+		// TODO reply back to the sender to explain this
+
+		return nil, http.StatusInternalServerError, errors.Errorf("address %s not permitted to reply to this ticket", request.From)
+	}
+
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		err = models.CloseTicket(ctx, s.DB, ticket)
+		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket})
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error closing ticket: %s", ticket.UUID())
 		}

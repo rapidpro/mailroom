@@ -102,6 +102,16 @@ func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUI
 	return s.push(msg, logHTTP)
 }
 
+func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	// TODO implement
+	return nil
+}
+
+func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	// TODO implement
+	return nil
+}
+
 func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) error {
 	results, trace, err := s.client.Push(s.instancePushID, []*ExternalResource{msg})
 	if trace != nil {
