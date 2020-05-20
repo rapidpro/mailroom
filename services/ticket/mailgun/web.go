@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"net/mail"
 	"regexp"
 	"strings"
 
@@ -89,8 +90,10 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return nil, http.StatusInternalServerError, errors.Errorf("error looking up ticketer: %d", ticket.TicketerID())
 	}
 
+	// check that this sender is allowed to send to this ticket
 	configuredAddress := ticketer.Config(configToAddress)
-	if request.From != configuredAddress {
+	fromAddress, _ := mail.ParseAddress(request.From)
+	if fromAddress == nil || fromAddress.Address != configuredAddress {
 		// TODO reply back to the sender to explain this
 
 		return nil, http.StatusInternalServerError, errors.Errorf("address %s not permitted to reply to this ticket", request.From)
