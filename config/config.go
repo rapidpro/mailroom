@@ -57,7 +57,7 @@ type Config struct {
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
 
 	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
-	MailgunSigningKey string `help:"the signing key used to secure incoming requests from mailgun"`
+	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 
 	AuthToken string `help:"the token clients will need to authenticate web requests"`
 	Address   string `help:"the address to bind our web server to"`

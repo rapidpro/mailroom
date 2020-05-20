@@ -76,7 +76,7 @@ func TestTickets(t *testing.T) {
 	cathy, err := models.LoadContact(ctx, db, org1, models.CathyID)
 	require.NoError(t, err)
 
-	tks, err := models.LoadOpenTicketsForContact(ctx, db, models.Org1, cathy)
+	tks, err := models.LoadOpenTicketsForContact(ctx, db, cathy)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tks))
 	assert.Equal(t, "New Ticket", tks[0].Subject())

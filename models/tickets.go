@@ -156,14 +156,13 @@ SELECT
 FROM
   tickets_ticket t
 WHERE
-  t.org_id = $1 AND
-  t.contact_id = $2 AND
+  t.contact_id = $1 AND
   t.status = 'O'
 `
 
 // LoadOpenTicketsForContact looks up the open tickets for the passed in contact
-func LoadOpenTicketsForContact(ctx context.Context, db Queryer, orgID OrgID, contact *Contact) ([]*Ticket, error) {
-	return loadTickets(ctx, db, selectOpenTicketsSQL, orgID, contact.ID())
+func LoadOpenTicketsForContact(ctx context.Context, db Queryer, contact *Contact) ([]*Ticket, error) {
+	return loadTickets(ctx, db, selectOpenTicketsSQL, contact.ID())
 }
 
 const selectTicketsByIDSQL = `

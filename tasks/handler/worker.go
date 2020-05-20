@@ -534,7 +534,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// look up any open tickets for this contact and forward this message to them
-	tickets, err := models.LoadOpenTicketsForContact(ctx, db, org.OrgID(), modelContact)
+	tickets, err := models.LoadOpenTicketsForContact(ctx, db, modelContact)
 	if err != nil {
 		return errors.Wrapf(err, "unable to look up open tickets for contact")
 	}
