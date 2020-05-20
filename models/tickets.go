@@ -91,7 +91,9 @@ func (t *Ticket) TicketerID() TicketerID  { return t.t.TicketerID }
 func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
 func (t *Ticket) Status() TicketStatus    { return t.t.Status }
 func (t *Ticket) Subject() string         { return t.t.Subject }
-func (t *Ticket) Config() null.Map        { return t.t.Config }
+func (t *Ticket) Config(key string) string {
+	return t.t.Config.GetString(key, "")
+}
 
 // CreateReply creates an outgoing reply in this ticket
 func (t *Ticket) CreateReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, text string) (*Msg, error) {
@@ -118,7 +120,7 @@ func (t *Ticket) CreateReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, t
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
-func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, contact *Contact, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
+func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
 	ticketer := org.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
@@ -130,7 +132,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 	}
 
 	logHTTP := &flows.HTTPLogger{}
-	err = service.Forward(t, contact, msgUUID, text, logHTTP.Log)
+	err = service.Forward(t, msgUUID, text, logHTTP.Log)
 
 	// create a log for each HTTP call
 	return ticketer.writeHTTPLogs(ctx, db, logHTTP.Logs)
@@ -477,7 +479,7 @@ func (t *Ticketer) writeHTTPLogs(ctx context.Context, db Queryer, logs []*flows.
 type TicketService interface {
 	flows.TicketService
 
-	Forward(*Ticket, *Contact, flows.MsgUUID, string, flows.HTTPLogCallback) error
+	Forward(*Ticket, flows.MsgUUID, string, flows.HTTPLogCallback) error
 	Close([]*Ticket, flows.HTTPLogCallback) error
 	Reopen([]*Ticket, flows.HTTPLogCallback) error
 }

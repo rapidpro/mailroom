@@ -3,6 +3,8 @@ package mailgun
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"text/template"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -18,14 +20,15 @@ const (
 	configAPIKey    = "api_key"
 	configToAddress = "to_address"
 	configURLBase   = "url_base"
+)
 
-	bodyTextTemplate = `%s
+// body text template for messages being forwarded from contact
+var forwardTextTemplate = template.Must(template.New("forward_text").Parse(`{{.message}}
 
 ------------------------------------------------
 You can close this ticket by replying with CLOSE
-You can view this contact at %s
-`
-)
+You can view this contact at {{.contact_url}}
+`))
 
 func init() {
 	models.RegisterTicketService("mailgun", NewService)
@@ -64,9 +67,9 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	contactDisplay := session.Contact().Format(session.Environment())
 
 	from := s.fromAddress(contactDisplay, ticketUUID)
-	emailBody := s.createBody(body, session.Contact().UUID())
+	emailBody := s.createBody(forwardTextTemplate, body, string(session.Contact().UUID()))
 
-	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, emailBody, "")
+	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, emailBody, nil)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -77,20 +80,34 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, msgID), nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
-	ticketConfig := ticket.Config()
-	contactDisplay, _ := ticketConfig.Map()["contact-display"].(string)
-	lastMessageID, _ := ticketConfig.Map()["last-message-id"].(string)
-	lastSubject, _ := ticketConfig.Map()["last-subject"].(string)
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
+	contactUUID := ticket.Config("contact-uuid")
+	body := s.createBody(forwardTextTemplate, text, contactUUID)
 
+	lastSubject := ticket.Config("last-subject")
 	if lastSubject == "" {
 		lastSubject = ticket.Subject()
 	}
 
-	from := s.fromAddress(contactDisplay, ticket.UUID())
-	body := s.createBody(text, contact.UUID())
+	return s.send(ticket, lastSubject, body, logHTTP)
+}
 
-	_, trace, err := s.client.SendMessage(from, s.toAddress, lastSubject, body, lastMessageID)
+func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	// TODO send emails to tell ticket handlers that they've been closed
+	return nil
+}
+
+func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	// TODO send emails to tell ticket handlers that they've been reopend
+	return nil
+}
+
+func (s *service) send(ticket *models.Ticket, subject, text string, logHTTP flows.HTTPLogCallback) error {
+	contactDisplay := ticket.Config("contact-display")
+	lastMessageID := ticket.Config("last-message-id")
+	from := s.fromAddress(contactDisplay, ticket.UUID())
+
+	_, trace, err := s.client.SendMessage(from, s.toAddress, subject, text, map[string]string{"In-Reply-To": lastMessageID})
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -98,16 +115,6 @@ func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUI
 		return errors.Wrap(err, "error calling mailgun API")
 	}
 
-	return nil
-}
-
-func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO implement
-	return nil
-}
-
-func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO implement
 	return nil
 }
 
@@ -121,8 +128,13 @@ func (s *service) fromAddress(contactDisplay string, ticketUUID flows.TicketUUID
 	return fmt.Sprintf("%s <%s>", contactDisplay, address)
 }
 
-func (s *service) createBody(base string, contactUUID flows.ContactUUID) string {
-	contactURL := fmt.Sprintf("%s/contact/read/%s/", s.urlBase, contactUUID)
+func (s *service) createBody(tpl *template.Template, message, contactUUID string) string {
+	context := map[string]string{
+		"message":     message,
+		"contact_url": fmt.Sprintf("%s/contact/read/%s/", s.urlBase, contactUUID),
+	}
 
-	return fmt.Sprintf(bodyTextTemplate, base, contactURL)
+	b := &strings.Builder{}
+	tpl.Execute(b, context)
+	return b.String()
 }

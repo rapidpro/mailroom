@@ -44,14 +44,14 @@ type messageResponse struct {
 
 // SendMessage sends a new email message and returns the ID
 // see https://documentation.mailgun.com/en/latest/api-sending.html
-func (c *Client) SendMessage(from, to, subject, text, inReplyTo string) (string, *httpx.Trace, error) {
+func (c *Client) SendMessage(from, to, subject, text string, headers map[string]string) (string, *httpx.Trace, error) {
 	writeBody := func(w *multipart.Writer) {
 		w.WriteField("from", from)
 		w.WriteField("to", to)
 		w.WriteField("subject", subject)
 		w.WriteField("text", text)
-		if inReplyTo != "" {
-			w.WriteField("h:In-Reply-To", inReplyTo)
+		for k, v := range headers {
+			w.WriteField("h:"+k, v)
 		}
 	}
 

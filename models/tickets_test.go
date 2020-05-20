@@ -57,7 +57,8 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, models.MailgunID, ticket1.TicketerID())
 	assert.Equal(t, null.String("EX12345"), ticket1.ExternalID())
 	assert.Equal(t, "New Ticket", ticket1.Subject())
-	assert.Equal(t, null.NewMap(map[string]interface{}{"contact-display": "Cathy"}), ticket1.Config())
+	assert.Equal(t, "Cathy", ticket1.Config("contact-display"))
+	assert.Equal(t, "", ticket1.Config("xyz"))
 
 	err := models.InsertTickets(ctx, db, []*models.Ticket{ticket1, ticket2, ticket3})
 	assert.NoError(t, err)

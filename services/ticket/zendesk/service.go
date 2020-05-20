@@ -77,9 +77,9 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, ""), nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
-	ticketConfig := ticket.Config()
-	contactDisplay, _ := ticketConfig.Map()["contact-display"].(string)
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
+	contactUUID := ticket.Config("contact-uuid")
+	contactDisplay := ticket.Config("contact-display")
 
 	msg := &ExternalResource{
 		ExternalID: string(msgUUID),
@@ -87,7 +87,7 @@ func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUI
 		ThreadID:   string(ticket.UUID()),
 		CreatedAt:  dates.Now(),
 		Author: Author{
-			ExternalID: string(contact.UUID()),
+			ExternalID: contactUUID,
 			Name:       contactDisplay,
 		},
 		DisplayInfo: []DisplayInfo{
@@ -103,12 +103,12 @@ func (s *service) Forward(ticket *models.Ticket, contact *models.Contact, msgUUI
 }
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO implement
+	// TODO call API to mark tickets as solved
 	return nil
 }
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO implement
+	// TODO call API to mark tickets as open
 	return nil
 }
 
