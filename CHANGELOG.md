@@ -1,3 +1,7 @@
+v5.5.14
+----------
+ * Basic handling of tickets (mailgun and zendesk ticketer types)
+
 v5.5.13
 ----------
  * Update to goflow v0.85.0
