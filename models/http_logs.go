@@ -21,6 +21,9 @@ const (
 	// LogTypeClassifierCalled is our type for when we call a classifier
 	LogTypeClassifierCalled = "classifier_called"
 
+	// LogTypeTicketerCalled is our type for when we call a ticketer
+	LogTypeTicketerCalled = "ticketer_called"
+
 	// LogTypeAirtimeTransferred is our type for when we make an airtime transfer
 	LogTypeAirtimeTransferred = "airtime_transferred"
 )
@@ -31,6 +34,7 @@ type HTTPLog struct {
 		ID                HTTPLogID         `db:"id"`
 		LogType           HTTPLogType       `db:"log_type"`
 		ClassifierID      ClassifierID      `db:"classifier_id"`
+		TicketerID        TicketerID        `db:"ticketer_id"`
 		AirtimeTransferID AirtimeTransferID `db:"airtime_transfer_id"`
 		URL               string            `db:"url"`
 		Request           string            `db:"request"`
@@ -62,19 +66,26 @@ func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, request s
 	return h
 }
 
+// NewTicketerCalledLog creates a new HTTP log for a ticketer call
+func NewTicketerCalledLog(orgID OrgID, tid TicketerID, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
+	h := newHTTPLog(orgID, LogTypeTicketerCalled, url, request, response, isError, elapsed, createdOn)
+	h.h.TicketerID = tid
+	return h
+}
+
 // NewAirtimeTransferredLog creates a new HTTP log for an airtime transfer
 func NewAirtimeTransferredLog(orgID OrgID, url string, request string, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
 	return newHTTPLog(orgID, LogTypeAirtimeTransferred, url, request, response, isError, elapsed, createdOn)
 }
 
-// SetAirtimeTransferID sets the transfer ID on a log
-func (h *HTTPLog) SetAirtimeTransferID(transferID AirtimeTransferID) {
-	h.h.AirtimeTransferID = transferID
+// SetAirtimeTransferID called to set the transfer ID on a log after the transfer has been created
+func (h *HTTPLog) SetAirtimeTransferID(tid AirtimeTransferID) {
+	h.h.AirtimeTransferID = tid
 }
 
 const insertHTTPLogsSQL = `
-INSERT INTO request_logs_httplog( log_type,  org_id,  classifier_id,  airtime_transfer_id,  url,  request,  response,  is_error,  request_time,  created_on)
-					      VALUES(:log_type, :org_id, :classifier_id, :airtime_transfer_id, :url, :request, :response, :is_error, :request_time, :created_on)
+INSERT INTO request_logs_httplog( log_type,  org_id,  classifier_id, ticketer_id,  airtime_transfer_id,  url,  request,  response,  is_error,  request_time,  created_on)
+					      VALUES(:log_type, :org_id, :classifier_id, :ticketer_id, :airtime_transfer_id, :url, :request, :response, :is_error, :request_time, :created_on)
 RETURNING id
 `
 

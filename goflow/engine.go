@@ -25,6 +25,7 @@ var webhookHTTPAccess *httpx.AccessConfig
 
 var emailFactory engine.EmailServiceFactory
 var classificationFactory engine.ClassificationServiceFactory
+var ticketFactory engine.TicketServiceFactory
 var airtimeFactory engine.AirtimeServiceFactory
 
 // RegisterEmailServiceFactory can be used by outside callers to register a email factory
@@ -37,6 +38,12 @@ func RegisterEmailServiceFactory(factory engine.EmailServiceFactory) {
 // for use by the engine
 func RegisterClassificationServiceFactory(factory engine.ClassificationServiceFactory) {
 	classificationFactory = factory
+}
+
+// RegisterTicketServiceFactory can be used by outside callers to register a ticket service factory
+// for use by the engine
+func RegisterTicketServiceFactory(factory engine.TicketServiceFactory) {
+	ticketFactory = factory
 }
 
 // RegisterAirtimeServiceFactory can be used by outside callers to register a airtime factory
@@ -59,6 +66,7 @@ func Engine() flows.Engine {
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
 			WithEmailServiceFactory(emailFactory).
 			WithClassificationServiceFactory(classificationFactory).
+			WithTicketServiceFactory(ticketFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()

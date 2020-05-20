@@ -45,11 +45,17 @@ func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ServiceCalledEvent)
 	var classifier *models.Classifier
+	var ticketer *models.Ticketer
 
 	if event.Service == "classifier" {
 		classifier = org.ClassifierByUUID(event.Classifier.UUID)
 		if classifier == nil {
 			return errors.Errorf("unable to find classifier with UUID: %s", event.Classifier.UUID)
+		}
+	} else if event.Service == "ticketer" {
+		ticketer = org.TicketerByUUID(event.Ticketer.UUID)
+		if ticketer == nil {
+			return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticketer.UUID)
 		}
 	}
 
@@ -69,6 +75,17 @@ func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 			log = models.NewClassifierCalledLog(
 				org.OrgID(),
 				classifier.ID(),
+				httpLog.URL,
+				httpLog.Request,
+				httpLog.Response,
+				httpLog.Status != flows.CallStatusSuccess,
+				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+				httpLog.CreatedOn,
+			)
+		} else if event.Service == "ticketer" {
+			log = models.NewTicketerCalledLog(
+				org.OrgID(),
+				ticketer.ID(),
 				httpLog.URL,
 				httpLog.Request,
 				httpLog.Response,
