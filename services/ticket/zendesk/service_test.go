@@ -86,4 +86,8 @@ func TestService(t *testing.T) {
 
 	assert.Equal(t, 1, len(httpLogger.Logs))
 	assert.Equal(t, "https://nyaruka.zendesk.com/api/v2/any_channel/push.json", httpLogger.Logs[0].URL)
+	assert.Contains(t, httpLogger.Logs[0].Request, "****************") // check token redacted
+	assert.NotContains(t, httpLogger.Logs[0].Request, "523562")
+	assert.NotContains(t, httpLogger.Logs[0].Request, "sesame")
+	assert.NotContains(t, httpLogger.Logs[0].Request, "754845822")
 }

@@ -769,7 +769,6 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 
 	// utility method to build up our message
 	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
-		logrus.WithField("contact_id", c.ID()).WithField("urn", forceURN).Info("building message for broadcast")
 		if c.IsStopped() || c.IsBlocked() {
 			return nil, nil
 		}
@@ -806,8 +805,6 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 				}
 			}
 		}
-
-		logrus.WithField("channel", channel).Info("have channel")
 
 		// no urn and channel? move on
 		if channel == nil {

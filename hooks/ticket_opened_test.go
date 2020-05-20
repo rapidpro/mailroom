@@ -69,10 +69,25 @@ func TestTicketOpened(t *testing.T) {
 					Args:  []interface{}{models.MailgunID},
 					Count: 1,
 				},
-				{
+				{ // which doesn't include our API token
+					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%sesame%'",
+					Args:  []interface{}{models.MailgunID},
+					Count: 0,
+				},
+				{ // bob's ticket will have been created too
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
 					Args:  []interface{}{models.BobID, models.ZendeskID},
 					Count: 1,
+				},
+				{ // and there's an HTTP log for that
+					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
+					Args:  []interface{}{models.ZendeskID},
+					Count: 1,
+				},
+				{ // which doesn't include our API token
+					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%523562%'",
+					Args:  []interface{}{models.ZendeskID},
+					Count: 0,
 				},
 			},
 		},

@@ -1,6 +1,7 @@
 package mailgun
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -50,12 +51,15 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 	urlBase := config[configURLBase]
 
 	if domain != "" && apiKey != "" && toAddress != "" && urlBase != "" {
+		// need to redact the string used for basic auth
+		basicAuth := base64.StdEncoding.EncodeToString([]byte("api:" + apiKey))
+
 		return &service{
 			client:    NewClient(httpClient, httpRetries, domain, apiKey),
 			ticketer:  ticketer,
 			toAddress: toAddress,
 			urlBase:   urlBase,
-			redactor:  utils.NewRedactor(flows.RedactionMask, apiKey),
+			redactor:  utils.NewRedactor(flows.RedactionMask, apiKey, basicAuth),
 		}, nil
 	}
 	return nil, errors.New("missing domain or api_key or to_address or url_base in mailgun config")

@@ -81,4 +81,7 @@ func TestService(t *testing.T) {
 
 	assert.Equal(t, 1, len(httpLogger.Logs))
 	assert.Equal(t, "https://api.mailgun.net/v3/tickets.rapidpro.io/messages", httpLogger.Logs[0].URL)
+	assert.Contains(t, httpLogger.Logs[0].Request, "****************") // check token redacted
+	assert.NotContains(t, httpLogger.Logs[0].Request, "YXBpOjEyMzQ1Njc4OQ==")
+	assert.NotContains(t, httpLogger.Logs[0].Request, "sesame")
 }
