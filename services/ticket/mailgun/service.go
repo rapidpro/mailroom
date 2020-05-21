@@ -17,6 +17,8 @@ import (
 )
 
 const (
+	typeMailgun = "mailgun"
+
 	configDomain    = "domain"
 	configAPIKey    = "api_key"
 	configToAddress = "to_address"
@@ -32,7 +34,7 @@ You can view this contact at {{.contact_url}}
 `))
 
 func init() {
-	models.RegisterTicketService("mailgun", NewService)
+	models.RegisterTicketService(typeMailgun, NewService)
 }
 
 type service struct {

@@ -86,7 +86,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up org: %d", ticket.OrgID())
 	}
 	ticketer := assets.TicketerByID(ticket.TicketerID())
-	if ticketer == nil {
+	if ticketer == nil || ticketer.Type() != typeMailgun {
 		return nil, http.StatusInternalServerError, errors.Errorf("error looking up ticketer: %d", ticket.TicketerID())
 	}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/goflow/utils/httpx"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 
 	"github.com/shopspring/decimal"
@@ -64,8 +65,8 @@ func Engine() flows.Engine {
 
 		eng = engine.NewBuilder().
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
-			WithEmailServiceFactory(emailFactory).
 			WithClassificationServiceFactory(classificationFactory).
+			WithEmailServiceFactory(emailFactory).
 			WithTicketServiceFactory(ticketFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
@@ -89,6 +90,7 @@ func Simulator() flows.Engine {
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
 			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
 			WithEmailServiceFactory(simulatorEmailServiceFactory).     // but faked emails
+			WithTicketServiceFactory(simulatorTicketServiceFactory).   // and faked tickets
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // and faked airtime transfers
 			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
 			Build()
@@ -133,6 +135,18 @@ type simulatorEmailService struct{}
 
 func (s *simulatorEmailService) Send(session flows.Session, addresses []string, subject, body string) error {
 	return nil
+}
+
+func simulatorTicketServiceFactory(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
+	return &simulatorTicketService{}, nil
+}
+
+type simulatorTicketService struct {
+	ticketer *flows.Ticketer
+}
+
+func (s *simulatorTicketService) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+	return flows.NewTicket(flows.TicketUUID(uuids.New()), s.ticketer.Reference(), subject, body, ""), nil
 }
 
 func simulatorAirtimeServiceFactory(session flows.Session) (flows.AirtimeService, error) {
