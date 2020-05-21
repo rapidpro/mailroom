@@ -122,11 +122,10 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 		return err
 	}
 
-	logHTTP := &flows.HTTPLogger{}
-	err = service.Forward(t, msgUUID, text, logHTTP.Log)
+	logger := &HTTPLogger{}
+	err = service.Forward(t, msgUUID, text, logger.Ticketer(ticketer))
 
-	// create a log for each HTTP call
-	return ticketer.writeHTTPLogs(ctx, db, logHTTP.Logs)
+	return logger.Insert(ctx, db)
 }
 
 const selectOpenTicketsSQL = `
@@ -435,24 +434,6 @@ func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {
 	}
 
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
-}
-
-func (t *Ticketer) writeHTTPLogs(ctx context.Context, db Queryer, logs []*flows.HTTPLog) error {
-	// create a log for each HTTP call
-	dbLogs := make([]*HTTPLog, 0, len(logs))
-	for _, log := range logs {
-		dbLogs = append(dbLogs, NewTicketerCalledLog(
-			t.OrgID(),
-			t.ID(),
-			log.URL,
-			log.Request,
-			log.Response,
-			log.Status != flows.CallStatusSuccess,
-			time.Duration(log.ElapsedMS)*time.Millisecond,
-			log.CreatedOn,
-		))
-	}
-	return InsertHTTPLogs(ctx, db, dbLogs)
 }
 
 // TicketService extends the engine's ticket service and adds support for forwarding new incoming messages

@@ -86,7 +86,8 @@ func RunWebTests(t *testing.T, truthFile string) {
 
 			req, err = MakeMultipartRequest(tc.Method, testURL, values, tc.Files)
 		} else {
-			if tc.Body[0] == '"' {
+			// if body is a string, treat it as a URL encoded submission
+			if len(tc.Body) >= 2 && tc.Body[0] == '"' {
 				bodyStr := ""
 				json.Unmarshal(tc.Body, &bodyStr)
 				bodyReader := strings.NewReader(bodyStr)
