@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"net/mail"
 	"regexp"
 	"strings"
 
@@ -24,12 +23,13 @@ func init() {
 }
 
 type receiveRequest struct {
-	Recipient    string `form:"recipient"     validate:"email"`
+	Recipient    string `form:"recipient"     validate:"required,email"`
+	Sender       string `form:"sender"        validate:"required,email"`
+	From         string `form:"From"`
 	ReplyTo      string `form:"Reply-To"`
-	From         string `form:"From"          validate:"required"`
 	MessageID    string `form:"Message-Id"    validate:"required"`
 	Subject      string `form:"subject"       validate:"required"`
-	PlainBody    string `form:"body-plain"    validate:"required"`
+	PlainBody    string `form:"body-plain"`
 	StrippedText string `form:"stripped-text" validate:"required"`
 	HTMLBody     string `form:"body-html"`
 	Timestamp    string `form:"timestamp"     validate:"required"`
@@ -44,6 +44,8 @@ func (r *receiveRequest) verify(signingKey string) bool {
 	mac := hmac.New(sha256.New, []byte(signingKey))
 	mac.Write([]byte(v))
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+
+	fmt.Println(expectedMAC)
 
 	return hmac.Equal([]byte(r.Signature), []byte(expectedMAC))
 }
@@ -85,17 +87,14 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 	// recipient is in the format ticket+<ticket-uuid>@... parse it out
 	match := addressRegex.FindAllStringSubmatch(request.Recipient, -1)
 	if len(match) != 1 || len(match[0]) != 2 {
-		return nil, errors.Errorf("invalid recipient, ignoring: %s", request.Recipient)
+		return nil, errors.Errorf("invalid recipient: %s", request.Recipient)
 	}
 	ticketUUID := flows.TicketUUID(match[0][1])
 
 	// look up our ticket
 	ticket, err := models.LookupTicketByUUID(ctx, s.DB, ticketUUID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error looking up ticket: %s", ticketUUID)
-	}
-	if ticket == nil {
-		return nil, errors.Errorf("invalid ticket uuid, ignoring")
+	if err != nil || ticket == nil {
+		return nil, errors.Errorf("unable to find ticket with UUID: %s", ticketUUID)
 	}
 
 	// look up our assets and get the ticketer for this ticket
@@ -117,9 +116,8 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 
 	// check that this sender is allowed to send to this ticket
 	configuredAddress := ticketer.Config(configToAddress)
-	fromAddress, _ := mail.ParseAddress(request.From)
-	if fromAddress.Address != configuredAddress {
-		body := fmt.Sprintf("The address %s is not allowed to reply to this ticket\n", fromAddress.Address)
+	if request.Sender != configuredAddress {
+		body := fmt.Sprintf("The address %s is not allowed to reply to this ticket\n", request.Sender)
 
 		mailgun.send(mailgun.noReplyAddress(), request.From, "Ticket reply rejected", body, nil, logger.Ticketer(ticketer))
 

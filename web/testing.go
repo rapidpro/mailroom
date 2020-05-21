@@ -15,6 +15,7 @@ import (
 
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils/dates"
+	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
@@ -41,14 +42,15 @@ func RunWebTests(t *testing.T, truthFile string) {
 	time.Sleep(time.Second)
 
 	type TestCase struct {
-		Label        string            `json:"label"`
-		Method       string            `json:"method"`
-		Path         string            `json:"path"`
-		Body         json.RawMessage   `json:"body,omitempty"`
-		Files        map[string]string `json:"files,omitempty"`
-		Status       int               `json:"status"`
-		Response     json.RawMessage   `json:"response,omitempty"`
-		ResponseFile string            `json:"response_file,omitempty"`
+		Label        string               `json:"label"`
+		HTTPMocks    *httpx.MockRequestor `json:"http_mocks,omitempty"`
+		Method       string               `json:"method"`
+		Path         string               `json:"path"`
+		Body         json.RawMessage      `json:"body,omitempty"`
+		Files        map[string]string    `json:"files,omitempty"`
+		Status       int                  `json:"status"`
+		Response     json.RawMessage      `json:"response,omitempty"`
+		ResponseFile string               `json:"response_file,omitempty"`
 		DBAssertions []struct {
 			Query string `json:"query"`
 			Count int    `json:"count"`
@@ -67,15 +69,32 @@ func RunWebTests(t *testing.T, truthFile string) {
 		uuids.SetGenerator(uuids.NewSeededGenerator(123456))
 		dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
 
+		var clonedMocks *httpx.MockRequestor
+		if tc.HTTPMocks != nil {
+			httpx.SetRequestor(tc.HTTPMocks)
+			clonedMocks = tc.HTTPMocks.Clone()
+		} else {
+			httpx.SetRequestor(httpx.DefaultRequestor)
+		}
+
+		testURL := "http://localhost:8090" + tc.Path
 		var req *http.Request
 		if len(tc.Files) > 0 {
 			values := make(map[string][]string)
 			err = json.Unmarshal(tc.Body, &values)
 			require.NoError(t, err)
 
-			req, err = MakeMultipartRequest(tc.Method, "http://localhost:8090"+tc.Path, values, tc.Files)
+			req, err = MakeMultipartRequest(tc.Method, testURL, values, tc.Files)
 		} else {
-			req, err = http.NewRequest(tc.Method, "http://localhost:8090"+tc.Path, bytes.NewReader([]byte(tc.Body)))
+			if tc.Body[0] == '"' {
+				bodyStr := ""
+				json.Unmarshal(tc.Body, &bodyStr)
+				bodyReader := strings.NewReader(bodyStr)
+				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, map[string]string{"Content-Type": "application/x-www-form-urlencoded"})
+			} else {
+				bodyReader := bytes.NewReader([]byte(tc.Body))
+				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, map[string]string{"Content-Type": "application/json"})
+			}
 		}
 		assert.NoError(t, err, "%s: error creating request", tc.Label)
 
@@ -84,6 +103,12 @@ func RunWebTests(t *testing.T, truthFile string) {
 
 		assert.Equal(t, tc.Status, resp.StatusCode, "%s: unexpected status", tc.Label)
 
+		// check all http mocks were used
+		if tc.HTTPMocks != nil {
+			assert.False(t, tc.HTTPMocks.HasUnused(), "%s: unused HTTP mocks in %s", tc.Label)
+		}
+
+		tc.HTTPMocks = clonedMocks
 		tc.actualResponse, err = ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%s: error reading body", tc.Label)
 
