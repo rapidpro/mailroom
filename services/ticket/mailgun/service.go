@@ -22,16 +22,19 @@ const (
 	configDomain    = "domain"
 	configAPIKey    = "api_key"
 	configToAddress = "to_address"
+	configBrandName = "brand_name"
 	configURLBase   = "url_base"
 )
 
-// body text template for messages being forwarded from contact
-var forwardTextTemplate = template.Must(template.New("forward_text").Parse(`{{.message}}
+// subject and body templates for messages being forwarded from contact
+var forwardSubjectTemplate = newTemplate("forward_subject", `[{{.brand}}-Tickets] {{.subject}}`)
+var forwardBodyTemplate = newTemplate("forward_text", `{{.message}}
 
 ------------------------------------------------
-You can close this ticket by replying with CLOSE
-You can view this contact at {{.contact_url}}
-`))
+* Reply to the contact by replying to this email
+* Close this ticket by replying with CLOSE
+* View this contact at {{.contact_url}}
+`)
 
 func init() {
 	models.RegisterTicketService(typeMailgun, NewService)
@@ -41,6 +44,7 @@ type service struct {
 	client    *Client
 	ticketer  *flows.Ticketer
 	toAddress string
+	brandName string
 	urlBase   string
 	redactor  utils.Redactor
 }
@@ -50,6 +54,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 	domain := config[configDomain]
 	apiKey := config[configAPIKey]
 	toAddress := config[configToAddress]
+	brandName := config[configBrandName]
 	urlBase := config[configURLBase]
 
 	if domain != "" && apiKey != "" && toAddress != "" && urlBase != "" {
@@ -60,6 +65,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 			client:    NewClient(httpClient, httpRetries, domain, apiKey),
 			ticketer:  ticketer,
 			toAddress: toAddress,
+			brandName: brandName,
 			urlBase:   urlBase,
 			redactor:  utils.NewRedactor(flows.RedactionMask, apiKey, basicAuth),
 		}, nil
@@ -72,10 +78,12 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	ticketUUID := flows.TicketUUID(uuids.New())
 	contactDisplay := session.Contact().Format(session.Environment())
 
-	from := s.fromAddress(contactDisplay, ticketUUID)
-	emailBody := s.createBody(forwardTextTemplate, body, string(session.Contact().UUID()))
+	from := s.ticketAddress(contactDisplay, ticketUUID)
+	context := s.templateContext(subject, body, string(session.Contact().UUID()))
+	fullSubject := evaluateTemplate(forwardSubjectTemplate, context)
+	fullBody := evaluateTemplate(forwardBodyTemplate, context)
 
-	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, emailBody, nil)
+	msgID, trace, err := s.client.SendMessage(from, s.toAddress, fullSubject, fullBody, nil)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -88,14 +96,13 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
 	contactUUID := ticket.Config("contact-uuid")
-	body := s.createBody(forwardTextTemplate, text, contactUUID)
 
-	lastSubject := ticket.Config("last-subject")
-	if lastSubject == "" {
-		lastSubject = ticket.Subject()
-	}
+	context := s.templateContext(ticket.Subject(), text, contactUUID)
+	subject := evaluateTemplate(forwardSubjectTemplate, context)
+	body := evaluateTemplate(forwardBodyTemplate, context)
 
-	return s.send(ticket, lastSubject, body, logHTTP)
+	_, err := s.sendInTicket(ticket, subject, body, logHTTP)
+	return err
 }
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
@@ -108,23 +115,27 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return nil
 }
 
-func (s *service) send(ticket *models.Ticket, subject, text string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) sendInTicket(ticket *models.Ticket, subject, text string, logHTTP flows.HTTPLogCallback) (string, error) {
 	contactDisplay := ticket.Config("contact-display")
 	lastMessageID := ticket.Config("last-message-id")
-	from := s.fromAddress(contactDisplay, ticket.UUID())
+	from := s.ticketAddress(contactDisplay, ticket.UUID())
 
-	_, trace, err := s.client.SendMessage(from, s.toAddress, subject, text, map[string]string{"In-Reply-To": lastMessageID})
+	return s.send(from, s.toAddress, subject, text, map[string]string{"In-Reply-To": lastMessageID}, logHTTP)
+}
+
+func (s *service) send(from, to, subject, text string, headers map[string]string, logHTTP flows.HTTPLogCallback) (string, error) {
+	msgID, trace, err := s.client.SendMessage(from, to, subject, text, headers)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
-		return errors.Wrap(err, "error calling mailgun API")
+		return "", errors.Wrap(err, "error calling mailgun API")
 	}
 
-	return nil
+	return msgID, nil
 }
 
-func (s *service) fromAddress(contactDisplay string, ticketUUID flows.TicketUUID) string {
+func (s *service) ticketAddress(contactDisplay string, ticketUUID flows.TicketUUID) string {
 	address := fmt.Sprintf("ticket+%s@%s", ticketUUID, s.client.domain)
 
 	if contactDisplay == "" {
@@ -134,13 +145,25 @@ func (s *service) fromAddress(contactDisplay string, ticketUUID flows.TicketUUID
 	return fmt.Sprintf("%s <%s>", contactDisplay, address)
 }
 
-func (s *service) createBody(tpl *template.Template, message, contactUUID string) string {
-	context := map[string]string{
-		"message":     message,
-		"contact_url": fmt.Sprintf("%s/contact/read/%s/", s.urlBase, contactUUID),
-	}
+func (s *service) noReplyAddress() string {
+	return fmt.Sprintf("no-reply@%s", s.client.domain)
+}
 
+func (s *service) templateContext(subject, message, contactUUID string) map[string]string {
+	return map[string]string{
+		"brand":       s.brandName,                                                // rapidpro brand
+		"subject":     subject,                                                    // original ticket subject
+		"message":     message,                                                    // new message if this is a forward
+		"contact_url": fmt.Sprintf("%s/contact/read/%s/", s.urlBase, contactUUID), // link to contact
+	}
+}
+
+func newTemplate(name, value string) *template.Template {
+	return template.Must(template.New(name).Parse(value))
+}
+
+func evaluateTemplate(t *template.Template, c map[string]string) string {
 	b := &strings.Builder{}
-	tpl.Execute(b, context)
+	t.Execute(b, c)
 	return b.String()
 }
