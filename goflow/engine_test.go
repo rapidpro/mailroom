@@ -57,6 +57,8 @@ func TestSimulatorAirtime(t *testing.T) {
 func TestSimulatorTicket(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
+	testsuite.ResetDB()
+
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, models.MailgunUUID)
 	require.NoError(t, err)
 
