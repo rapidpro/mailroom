@@ -32,22 +32,13 @@ const (
 	TicketStatusClosed = TicketStatus("C")
 )
 
-var ticketerToService func(t *Ticketer) (TicketService, error)
-
 // Register a ticket service factory with the engine
 func init() {
-	httpClient := &http.Client{Timeout: time.Duration(15 * time.Second)}
-	httpRetries := httpx.NewFixedRetries(3, 10)
-
 	goflow.RegisterTicketServiceFactory(
 		func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-			return ticketer.Asset().(*Ticketer).AsService(httpClient, httpRetries, ticketer)
+			return ticketer.Asset().(*Ticketer).AsService(ticketer)
 		},
 	)
-
-	ticketerToService = func(t *Ticketer) (TicketService, error) {
-		return t.AsService(httpClient, httpRetries, flows.NewTicketer(t))
-	}
 }
 
 type Ticket struct {
@@ -126,7 +117,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
 	}
 
-	service, err := ticketerToService(ticketer)
+	service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 	if err != nil {
 		return err
 	}
@@ -346,7 +337,7 @@ func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ti
 	for ticketerID, ticketerTickets := range byTicketer {
 		ticketer := org.TicketerByID(ticketerID)
 		if ticketer != nil {
-			service, err := ticketerToService(ticketer)
+			service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 			if err != nil {
 				return err
 			}
@@ -395,7 +386,7 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 	for ticketerID, ticketerTickets := range byTicketer {
 		ticketer := org.TicketerByID(ticketerID)
 		if ticketer != nil {
-			service, err := ticketerToService(ticketer)
+			service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 			if err != nil {
 				return err
 			}
@@ -447,7 +438,9 @@ func (t *Ticketer) Type() string { return t.t.Type }
 func (t *Ticketer) Config(key string) string { return t.t.Config[key] }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer) (TicketService, error) {
+func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {
+	httpClient, httpRetries, _ := goflow.HTTP()
+
 	initFunc := ticketServices[t.Type()]
 	if initFunc != nil {
 		return initFunc(httpClient, httpRetries, ticketer, t.t.Config)
