@@ -102,7 +102,7 @@ func (s *simulatorEmailService) Send(session flows.Session, addresses []string, 
 }
 
 func simulatorTicketServiceFactory(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-	return &simulatorTicketService{}, nil
+	return &simulatorTicketService{ticketer: ticketer}, nil
 }
 
 type simulatorTicketService struct {
