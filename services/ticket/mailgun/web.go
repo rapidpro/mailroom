@@ -56,21 +56,23 @@ type receiveResponse struct {
 var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})@.*$`)
 
 func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	httpLogger := &flows.HTTPLogger{}
+	logger := &models.HTTPLogger{}
 
-	// TODO log this incoming call
+	// TODO log this incoming call.. or wait til we've resolve the ticketer?
 
-	resp, err := handleReceiveRequest(ctx, s, r, httpLogger.Log)
-
-	// TODO save HTTP logs
-
+	resp, err := handleReceiveRequest(ctx, s, r, logger)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
+
+	if err := logger.Insert(ctx, s.DB); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrap(err, "error writing HTTP logs")
+	}
+
 	return resp, http.StatusOK, nil
 }
 
-func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, logHTTP flows.HTTPLogCallback) (*receiveResponse, error) {
+func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, logger *models.HTTPLogger) (*receiveResponse, error) {
 	request := &receiveRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
 		return nil, errors.Wrapf(err, "error decoding form")
@@ -106,26 +108,27 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 		return nil, errors.Errorf("error looking up ticketer: %d", ticket.TicketerID())
 	}
 
+	// and load it as a service
 	svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading ticketer service")
 	}
+	mailgun := svc.(*service)
 
 	// check that this sender is allowed to send to this ticket
 	configuredAddress := ticketer.Config(configToAddress)
 	fromAddress, _ := mail.ParseAddress(request.From)
 	if fromAddress.Address != configuredAddress {
-		mailgun := svc.(*service)
 		body := fmt.Sprintf("The address %s is not allowed to reply to this ticket\n", fromAddress.Address)
 
-		mailgun.send(mailgun.noReplyAddress(), request.From, "Ticket reply rejected", body, nil, logHTTP)
+		mailgun.send(mailgun.noReplyAddress(), request.From, "Ticket reply rejected", body, nil, logger.Ticketer(ticketer))
 
 		return &receiveResponse{Action: "rejected", TicketUUID: string(ticket.UUID())}, nil
 	}
 
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket})
+		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket}, logger)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error closing ticket: %s", ticket.UUID())
 		}

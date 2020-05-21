@@ -321,7 +321,7 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket) error {
+func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, logger *HTTPLogger) error {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
@@ -342,15 +342,9 @@ func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ti
 				return err
 			}
 
-			logHTTP := &flows.HTTPLogger{}
-			err = service.Close(ticketerTickets, logHTTP.Log)
+			err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
 			if err != nil {
 				return err
-			}
-
-			err = ticketer.writeHTTPLogs(ctx, db, logHTTP.Logs)
-			if err != nil {
-				return errors.Wrapf(err, "error writing HTTP logs for ticketer %s", ticketer.UUID())
 			}
 		}
 	}
@@ -370,7 +364,7 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket) error {
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, logger *HTTPLogger) error {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
@@ -391,15 +385,9 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 				return err
 			}
 
-			logHTTP := &flows.HTTPLogger{}
-			err = service.Reopen(ticketerTickets, logHTTP.Log)
+			err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
 			if err != nil {
 				return err
-			}
-
-			err = ticketer.writeHTTPLogs(ctx, db, logHTTP.Logs)
-			if err != nil {
-				return errors.Wrapf(err, "error writing HTTP logs for ticketer %s", ticketer.UUID())
 			}
 		}
 	}
@@ -452,16 +440,16 @@ func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {
 func (t *Ticketer) writeHTTPLogs(ctx context.Context, db Queryer, logs []*flows.HTTPLog) error {
 	// create a log for each HTTP call
 	dbLogs := make([]*HTTPLog, 0, len(logs))
-	for _, httpLog := range logs {
+	for _, log := range logs {
 		dbLogs = append(dbLogs, NewTicketerCalledLog(
 			t.OrgID(),
 			t.ID(),
-			httpLog.URL,
-			httpLog.Request,
-			httpLog.Response,
-			httpLog.Status != flows.CallStatusSuccess,
-			time.Duration(httpLog.ElapsedMS)*time.Millisecond,
-			httpLog.CreatedOn,
+			log.URL,
+			log.Request,
+			log.Response,
+			log.Status != flows.CallStatusSuccess,
+			time.Duration(log.ElapsedMS)*time.Millisecond,
+			log.CreatedOn,
 		))
 	}
 	return InsertHTTPLogs(ctx, db, dbLogs)

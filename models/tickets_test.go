@@ -87,7 +87,9 @@ func TestTickets(t *testing.T) {
 	// check ticket remains open and config was updated
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND config='{"contact-display": "Cathy", "last-message-id": "2352"}'::jsonb AND closed_on IS NULL`, []interface{}{models.Org1}, 1)
 
-	err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1})
+	logger := &flows.HTTPLogger{}
+
+	err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, logger.Log)
 	assert.NoError(t, err)
 
 	// check ticket is now closed

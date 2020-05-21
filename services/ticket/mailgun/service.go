@@ -36,6 +36,14 @@ var forwardBodyTemplate = newTemplate("forward_text", `{{.message}}
 * View this contact at {{.contact_url}}
 `)
 
+// subject and body templates for ticket being closed
+var closedSubjectTemplate = newTemplate("closed_subject", `[{{.brand}}-Tickets] {{.subject}} CLOSED`)
+var closedBodyTemplate = newTemplate("closed_text", `{{.message}}
+* Ticket has been closed
+* Replying to the contact will reopen this ticket
+* View this contact at {{.contact_url}}
+`)
+
 func init() {
 	models.RegisterTicketService(typeMailgun, NewService)
 }
@@ -95,9 +103,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
-	contactUUID := ticket.Config("contact-uuid")
-
-	context := s.templateContext(ticket.Subject(), text, contactUUID)
+	context := s.templateContext(ticket.Subject(), text, ticket.Config("contact-uuid"))
 	subject := evaluateTemplate(forwardSubjectTemplate, context)
 	body := evaluateTemplate(forwardBodyTemplate, context)
 
@@ -106,7 +112,16 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 }
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO send emails to tell ticket handlers that they've been closed
+	for _, ticket := range tickets {
+		context := s.templateContext(ticket.Subject(), "", ticket.Config("contact-uuid"))
+		subject := evaluateTemplate(closedSubjectTemplate, context)
+		body := evaluateTemplate(closedBodyTemplate, context)
+
+		_, err := s.sendInTicket(ticket, subject, body, logHTTP)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
