@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"time"
 
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/null"
 )
 
@@ -121,4 +122,30 @@ func (i HTTPLogID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *HTTPLogID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
+}
+
+// HTTPLogger is a logger for HTTPLogs
+type HTTPLogger struct {
+	logs []*HTTPLog
+}
+
+// Ticketer creates a callback for engine HTTP logs which are associated with the given ticketer
+func (h *HTTPLogger) Ticketer(t *Ticketer) flows.HTTPLogCallback {
+	return func(l *flows.HTTPLog) {
+		h.logs = append(h.logs, NewTicketerCalledLog(
+			t.OrgID(),
+			t.ID(),
+			l.URL,
+			l.Request,
+			l.Response,
+			l.Status != flows.CallStatusSuccess,
+			time.Duration(l.ElapsedMS)*time.Millisecond,
+			l.CreatedOn,
+		))
+	}
+}
+
+// Insert this logger's logs into the database
+func (h *HTTPLogger) Insert(ctx context.Context, tx Queryer) error {
+	return InsertHTTPLogs(ctx, tx, h.logs)
 }

@@ -57,9 +57,15 @@ func handleClose(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	err = models.CloseTickets(ctx, s.DB, org, tickets)
+	logger := &models.HTTPLogger{}
+
+	err = models.CloseTickets(ctx, s.DB, org, tickets, logger)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error closing tickets for org: %d", request.OrgID)
+	}
+
+	if err := logger.Insert(ctx, s.DB); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrap(err, "error writing HTTP logs")
 	}
 
 	return newBulkResponse(tickets), http.StatusOK, nil
@@ -89,9 +95,15 @@ func handleReopen(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	err = models.ReopenTickets(ctx, s.DB, org, tickets)
+	logger := &models.HTTPLogger{}
+
+	err = models.ReopenTickets(ctx, s.DB, org, tickets, logger)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
+	}
+
+	if err := logger.Insert(ctx, s.DB); err != nil {
+		return nil, http.StatusBadRequest, errors.Wrap(err, "error writing HTTP logs")
 	}
 
 	return newBulkResponse(tickets), http.StatusOK, nil

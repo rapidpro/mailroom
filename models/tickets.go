@@ -32,22 +32,13 @@ const (
 	TicketStatusClosed = TicketStatus("C")
 )
 
-var ticketerToService func(t *Ticketer) (TicketService, error)
-
 // Register a ticket service factory with the engine
 func init() {
-	httpClient := &http.Client{Timeout: time.Duration(15 * time.Second)}
-	httpRetries := httpx.NewFixedRetries(3, 10)
-
 	goflow.RegisterTicketServiceFactory(
 		func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-			return ticketer.Asset().(*Ticketer).AsService(httpClient, httpRetries, ticketer)
+			return ticketer.Asset().(*Ticketer).AsService(ticketer)
 		},
 	)
-
-	ticketerToService = func(t *Ticketer) (TicketService, error) {
-		return t.AsService(httpClient, httpRetries, flows.NewTicketer(t))
-	}
 }
 
 type Ticket struct {
@@ -126,16 +117,15 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
 	}
 
-	service, err := ticketerToService(ticketer)
+	service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 	if err != nil {
 		return err
 	}
 
-	logHTTP := &flows.HTTPLogger{}
-	err = service.Forward(t, msgUUID, text, logHTTP.Log)
+	logger := &HTTPLogger{}
+	err = service.Forward(t, msgUUID, text, logger.Ticketer(ticketer))
 
-	// create a log for each HTTP call
-	return ticketer.writeHTTPLogs(ctx, db, logHTTP.Logs)
+	return logger.Insert(ctx, db)
 }
 
 const selectOpenTicketsSQL = `
@@ -330,7 +320,7 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket) error {
+func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, logger *HTTPLogger) error {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
@@ -346,20 +336,14 @@ func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ti
 	for ticketerID, ticketerTickets := range byTicketer {
 		ticketer := org.TicketerByID(ticketerID)
 		if ticketer != nil {
-			service, err := ticketerToService(ticketer)
+			service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 			if err != nil {
 				return err
 			}
 
-			logHTTP := &flows.HTTPLogger{}
-			err = service.Close(ticketerTickets, logHTTP.Log)
+			err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
 			if err != nil {
 				return err
-			}
-
-			err = ticketer.writeHTTPLogs(ctx, db, logHTTP.Logs)
-			if err != nil {
-				return errors.Wrapf(err, "error writing HTTP logs for ticketer %s", ticketer.UUID())
 			}
 		}
 	}
@@ -379,7 +363,7 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket) error {
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, logger *HTTPLogger) error {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
@@ -395,20 +379,14 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 	for ticketerID, ticketerTickets := range byTicketer {
 		ticketer := org.TicketerByID(ticketerID)
 		if ticketer != nil {
-			service, err := ticketerToService(ticketer)
+			service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 			if err != nil {
 				return err
 			}
 
-			logHTTP := &flows.HTTPLogger{}
-			err = service.Reopen(ticketerTickets, logHTTP.Log)
+			err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
 			if err != nil {
 				return err
-			}
-
-			err = ticketer.writeHTTPLogs(ctx, db, logHTTP.Logs)
-			if err != nil {
-				return errors.Wrapf(err, "error writing HTTP logs for ticketer %s", ticketer.UUID())
 			}
 		}
 	}
@@ -447,31 +425,15 @@ func (t *Ticketer) Type() string { return t.t.Type }
 func (t *Ticketer) Config(key string) string { return t.t.Config[key] }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer) (TicketService, error) {
+func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {
+	httpClient, httpRetries, _ := goflow.HTTP()
+
 	initFunc := ticketServices[t.Type()]
 	if initFunc != nil {
 		return initFunc(httpClient, httpRetries, ticketer, t.t.Config)
 	}
 
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
-}
-
-func (t *Ticketer) writeHTTPLogs(ctx context.Context, db Queryer, logs []*flows.HTTPLog) error {
-	// create a log for each HTTP call
-	dbLogs := make([]*HTTPLog, 0, len(logs))
-	for _, httpLog := range logs {
-		dbLogs = append(dbLogs, NewTicketerCalledLog(
-			t.OrgID(),
-			t.ID(),
-			httpLog.URL,
-			httpLog.Request,
-			httpLog.Response,
-			httpLog.Status != flows.CallStatusSuccess,
-			time.Duration(httpLog.ElapsedMS)*time.Millisecond,
-			httpLog.CreatedOn,
-		))
-	}
-	return InsertHTTPLogs(ctx, db, dbLogs)
 }
 
 // TicketService extends the engine's ticket service and adds support for forwarding new incoming messages

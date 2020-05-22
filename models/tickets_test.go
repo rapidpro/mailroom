@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/models"
 	_ "github.com/nyaruka/mailroom/services/ticket/mailgun"
 	_ "github.com/nyaruka/mailroom/services/ticket/zendesk"
@@ -17,6 +18,17 @@ import (
 func TestTickets(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
+			httpx.NewMockResponse(200, nil, `{
+				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
+				"message": "Queued. Thank you."
+			}`),
+		},
+	}))
 
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
@@ -87,7 +99,9 @@ func TestTickets(t *testing.T) {
 	// check ticket remains open and config was updated
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND config='{"contact-display": "Cathy", "last-message-id": "2352"}'::jsonb AND closed_on IS NULL`, []interface{}{models.Org1}, 1)
 
-	err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1})
+	logger := &models.HTTPLogger{}
+
+	err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, logger)
 	assert.NoError(t, err)
 
 	// check ticket is now closed

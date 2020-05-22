@@ -14,13 +14,15 @@ import (
 )
 
 const (
+	typeZendesk = "zendesk"
+
 	configSubdomain = "subdomain"
 	configPushID    = "push_id"
 	configPushToken = "push_token"
 )
 
 func init() {
-	models.RegisterTicketService("zendesk", NewService)
+	models.RegisterTicketService(typeZendesk, NewService)
 }
 
 type service struct {

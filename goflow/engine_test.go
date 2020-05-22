@@ -1,4 +1,4 @@
-package goflow
+package goflow_test
 
 import (
 	"net/http"
@@ -7,6 +7,9 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils/httpx"
+	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -14,12 +17,12 @@ import (
 )
 
 func TestEngineWebhook(t *testing.T) {
-	svc, err := Engine().Services().Webhook(nil)
+	svc, err := goflow.Engine().Services().Webhook(nil)
 	assert.NoError(t, err)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://rapidpro.io": []httpx.MockResponse{httpx.NewMockResponse(200, nil, "OK")},
+		"http://rapidpro.io": {httpx.NewMockResponse(200, nil, "OK")},
 	}))
 
 	request, err := http.NewRequest("GET", "http://rapidpro.io", nil)
@@ -34,7 +37,7 @@ func TestEngineWebhook(t *testing.T) {
 }
 
 func TestSimulatorAirtime(t *testing.T) {
-	svc, err := Simulator().Services().Airtime(nil)
+	svc, err := goflow.Simulator().Services().Airtime(nil)
 	assert.NoError(t, err)
 
 	amounts := map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.50`)}
@@ -51,13 +54,31 @@ func TestSimulatorAirtime(t *testing.T) {
 	}, transfer)
 }
 
+func TestSimulatorTicket(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.ResetDB()
+
+	ticketer, err := models.LookupTicketerByUUID(ctx, db, models.MailgunUUID)
+	require.NoError(t, err)
+
+	svc, err := goflow.Simulator().Services().Ticket(nil, flows.NewTicketer(ticketer))
+	assert.NoError(t, err)
+
+	ticket, err := svc.Open(nil, "New ticket", "Where are my cookies?", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, models.MailgunUUID, ticket.Ticketer.UUID)
+	assert.Equal(t, "New ticket", ticket.Subject)
+	assert.Equal(t, "Where are my cookies?", ticket.Body)
+}
+
 func TestSimulatorWebhook(t *testing.T) {
-	svc, err := Simulator().Services().Webhook(nil)
+	svc, err := goflow.Simulator().Services().Webhook(nil)
 	assert.NoError(t, err)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://rapidpro.io": []httpx.MockResponse{httpx.NewMockResponse(200, nil, "OK")},
+		"http://rapidpro.io": {httpx.NewMockResponse(200, nil, "OK")},
 	}))
 
 	request, err := http.NewRequest("GET", "http://rapidpro.io", nil)
