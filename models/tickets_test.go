@@ -6,8 +6,8 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/models"
-	_ "github.com/nyaruka/mailroom/services/ticket/mailgun"
-	_ "github.com/nyaruka/mailroom/services/ticket/zendesk"
+	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
+	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/null"
 

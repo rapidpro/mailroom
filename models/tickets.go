@@ -7,18 +7,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
-
+	
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -84,30 +82,6 @@ func (t *Ticket) Status() TicketStatus    { return t.t.Status }
 func (t *Ticket) Subject() string         { return t.t.Subject }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
-}
-
-// CreateReply creates an outgoing reply in this ticket
-func (t *Ticket) CreateReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, text string) (*Msg, error) {
-	// look up our assets
-	assets, err := GetOrgAssets(ctx, db, t.OrgID())
-	if err != nil {
-		return nil, errors.Wrapf(err, "error looking up org: %d", t.OrgID())
-	}
-
-	// build a simple translation
-	translations := map[envs.Language]*BroadcastTranslation{
-		envs.Language("base"): {Text: text},
-	}
-
-	// we'll use a broadcast to send this message
-	bcast := NewBroadcast(assets.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, envs.Language("base"), nil, nil, nil)
-	batch := bcast.CreateBatch([]ContactID{t.ContactID()})
-	msgs, err := CreateBroadcastMessages(ctx, db, rp, assets, batch)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error creating message batch")
-	}
-
-	return msgs[0], nil
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket

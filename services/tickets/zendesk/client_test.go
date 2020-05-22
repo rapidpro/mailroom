@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/utils/httpx"
-	"github.com/nyaruka/mailroom/services/ticket/zendesk"
+	"github.com/nyaruka/mailroom/services/tickets/zendesk"
 
 	"github.com/stretchr/testify/assert"
 )

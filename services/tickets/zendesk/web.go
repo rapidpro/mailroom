@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -32,6 +31,7 @@ type channelbackRequest struct {
 	Message     string   `form:"message" validate:"required"`
 	FileURLs    []string `form:"file_urls"`
 	ParentID    string   `form:"parent_id"`
+	ThreadID    string   `form:"thread_id"`
 	RecipientID string   `form:"recipient_id" validate:"required"`
 	Metadata    string   `form:"metadata" validate:"required"`
 }
@@ -64,43 +64,22 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return errors.Wrapf(err, "ticketer secret mismatch"), http.StatusUnauthorized, nil
 	}
 
-	// we build a simple translation
-	translations := map[envs.Language]*models.BroadcastTranslation{
-		envs.Language(""): {Text: request.Message},
-	}
-
-	// look up our assets
-	assets, err := models.GetOrgAssets(s.CTX, s.DB, ticketer.OrgID())
+	ticket, err := models.LookupTicketByUUID(ctx, s.DB, flows.TicketUUID(request.ThreadID))
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up org: %d", ticketer.OrgID())
+		return errors.Wrapf(err, "error loading ticket"), http.StatusBadRequest, nil
 	}
 
-	// look up our contact
-	contactRef := flows.NewContactReference(flows.ContactUUID(request.RecipientID), "")
-	contactIDs, err := models.ContactIDsFromReferences(ctx, s.DB, assets, []*flows.ContactReference{contactRef})
+	err = models.UpdateAndKeepOpenTicket(ctx, s.DB, ticket, nil)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error looking up contact: %s", request.RecipientID)
+		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusBadRequest, nil
 	}
 
-	// we'll use a broadcast to send this message
-	bcast := models.NewBroadcast(ticketer.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language(""), nil, nil, nil)
-	batch := bcast.CreateBatch(contactIDs)
-	msgs, err := models.CreateBroadcastMessages(s.CTX, s.DB, s.RP, assets, batch)
+	msg, err := tickets.SendReply(ctx, s.DB, s.RP, ticket, request.Message)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating message batch")
+		return err, http.StatusBadRequest, nil
 	}
 
-	// queue our message
-	rc := s.RP.Get()
-	defer rc.Close()
-
-	err = courier.QueueMessages(rc, msgs)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error queuing outgoing message")
-	}
-
-	msgOutID := fmt.Sprintf("%d", msgs[0].ID())
-	return &channelbackResponse{ExternalID: msgOutID, AllowChannelback: true}, http.StatusOK, nil
+	return &channelbackResponse{ExternalID: fmt.Sprintf("%d", msg.ID()), AllowChannelback: true}, http.StatusOK, nil
 }
 
 type event struct {
