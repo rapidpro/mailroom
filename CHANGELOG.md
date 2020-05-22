@@ -1,3 +1,11 @@
+v5.5.15
+----------
+ * Send close notification emails in mailgun tickets
+ * Reply back to users who replies aren't permitted to go to the ticket
+ * Simplify sharing of HTTP configuration between services
+ * Add simulator ticket service to fake creating tickets
+ * Fix verifying sender when receiving mailgun reply
+
 v5.5.14
 ----------
  * Basic handling of tickets (mailgun and zendesk ticketer types)
