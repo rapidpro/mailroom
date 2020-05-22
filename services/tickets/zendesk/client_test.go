@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPush(t *testing.T) {
+func TestPushClient(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
@@ -34,7 +34,7 @@ func TestPush(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewClient(http.DefaultClient, nil, "nyaruka", "123456789")
+	client := zendesk.NewPushClient(http.DefaultClient, nil, "nyaruka", "123456789")
 
 	_, _, err := client.Push("1234-abcd", []*zendesk.ExternalResource{})
 	assert.EqualError(t, err, "unable to connect to server")

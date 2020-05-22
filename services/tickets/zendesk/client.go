@@ -12,17 +12,15 @@ import (
 	"github.com/nyaruka/goflow/utils/jsonx"
 )
 
-// Client is a basic Zendesk client
-type Client struct {
+type baseClient struct {
 	httpClient  *http.Client
 	httpRetries *httpx.RetryConfig
 	subdomain   string
 	token       string
 }
 
-// NewClient creates a new Zendesk client
-func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) *Client {
-	return &Client{
+func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) baseClient {
+	return baseClient{
 		httpClient:  httpClient,
 		httpRetries: httpRetries,
 		subdomain:   subdomain,
@@ -33,6 +31,128 @@ func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomai
 type errorResponse struct {
 	Error       string `json:"error"`
 	Description string `json:"description"`
+}
+
+func (c *baseClient) post(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+	data, err := jsonx.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s.zendesk.com/api/v2/%s.json", c.subdomain, endpoint), bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+
+	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	if err != nil {
+		return trace, err
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		response := &errorResponse{}
+		jsonx.Unmarshal(trace.ResponseBody, response)
+		return trace, errors.New(response.Description)
+	}
+
+	return trace, jsonx.Unmarshal(trace.ResponseBody, response)
+}
+
+// RESTClient is a client for the Zendesk REST API
+type RESTClient struct {
+	baseClient
+}
+
+// NewRESTClient creates a new REST client
+func NewRESTClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) *RESTClient {
+	return &RESTClient{baseClient: newBaseClient(httpClient, httpRetries, subdomain, token)}
+}
+
+// Target see https://developer.zendesk.com/rest_api/docs/support/targets
+type Target struct {
+	ID          int64  `json:"id"`
+	Title       string `json:"title"`
+	Type        string `json:"type"`
+	TargetURL   string `json:"target_url"`
+	Method      string `json:"method"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	ContentType string `json:"content_type"`
+}
+
+// CreateTarget see https://developer.zendesk.com/rest_api/docs/support/targets#create-target
+func (c *RESTClient) CreateTarget(target *Target) (*Target, *httpx.Trace, error) {
+	payload := struct {
+		Target *Target `json:"target"`
+	}{Target: target}
+
+	response := &struct {
+		Target *Target `json:"target"`
+	}{}
+
+	trace, err := c.post("targets", payload, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return response.Target, trace, nil
+}
+
+// Condition see https://developer.zendesk.com/rest_api/docs/support/triggers#conditions
+type Condition struct {
+	Field    string `json:"field"`
+	Operator string `json:"operator"`
+	Value    string `json:"value"`
+}
+
+// Conditions see https://developer.zendesk.com/rest_api/docs/support/triggers#conditions
+type Conditions struct {
+	All []Condition `json:"all"`
+	Any []Condition `json:"any"`
+}
+
+// Action see https://developer.zendesk.com/rest_api/docs/support/triggers#actions
+type Action struct {
+	Field string   `json:"field"`
+	Value []string `json:"value"`
+}
+
+// Trigger see https://developer.zendesk.com/rest_api/docs/support/triggers
+type Trigger struct {
+	ID         int64      `json:"id"`
+	Title      string     `json:"title"`
+	Conditions Conditions `json:"conditions"`
+	Actions    []Action   `json:"actions"`
+}
+
+// CreateTrigger see https://developer.zendesk.com/rest_api/docs/support/triggers#create-trigger
+func (c *RESTClient) CreateTrigger(trigger *Trigger) (*Trigger, *httpx.Trace, error) {
+	payload := struct {
+		Trigger *Trigger `json:"trigger"`
+	}{Trigger: trigger}
+
+	response := &struct {
+		Trigger *Trigger `json:"trigger"`
+	}{}
+
+	trace, err := c.post("triggers", payload, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return response.Trigger, trace, nil
+}
+
+// PushClient is a client for the Zendesk channel push API and requires a special push token
+type PushClient struct {
+	baseClient
+}
+
+// NewPushClient creates a new push client
+func NewPushClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) *PushClient {
+	return &PushClient{baseClient: newBaseClient(httpClient, httpRetries, subdomain, token)}
 }
 
 // Author see https://developer.zendesk.com/rest_api/docs/support/channel_framework#author-object
@@ -76,50 +196,20 @@ type Result struct {
 }
 
 // Push pushes the given external resources
-func (c *Client) Push(instanceID string, externalResources []*ExternalResource) ([]*Result, *httpx.Trace, error) {
-	push := struct {
+func (c *PushClient) Push(instanceID string, externalResources []*ExternalResource) ([]*Result, *httpx.Trace, error) {
+	payload := struct {
 		InstancePushID    string              `json:"instance_push_id"`
 		ExternalResources []*ExternalResource `json:"external_resources"`
-	}{
-		InstancePushID:    instanceID,
-		ExternalResources: externalResources,
-	}
+	}{InstancePushID: instanceID, ExternalResources: externalResources}
 
 	response := &struct {
 		Results []*Result `json:"results"`
 	}{}
 
-	trace, err := c.post("any_channel/push", push, response)
+	trace, err := c.post("any_channel/push", payload, response)
 	if err != nil {
 		return nil, trace, err
 	}
 
 	return response.Results, trace, nil
-}
-
-func (c *Client) post(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
-	data, err := jsonx.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s.zendesk.com/api/v2/%s.json", c.subdomain, endpoint), bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-
-	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
-	if err != nil {
-		return trace, err
-	}
-
-	if trace.Response.StatusCode >= 400 {
-		response := &errorResponse{}
-		jsonx.Unmarshal(trace.ResponseBody, response)
-		return trace, errors.New(response.Description)
-	}
-
-	return trace, jsonx.Unmarshal(trace.ResponseBody, response)
 }

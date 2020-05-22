@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// SendReply sends a message reply from the ticket system user to the contact
 func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.Ticket, text string) (*models.Msg, error) {
 	// look up our assets
 	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())

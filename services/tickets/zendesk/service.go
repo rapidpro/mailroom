@@ -1,6 +1,7 @@
 package zendesk
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows"
@@ -16,9 +17,11 @@ import (
 const (
 	typeZendesk = "zendesk"
 
-	configSubdomain = "subdomain"
-	configPushID    = "push_id"
-	configPushToken = "push_token"
+	configSubdomain  = "subdomain"
+	configSecret     = "secret"
+	configOAuthToken = "oauth_token"
+	configPushID     = "push_id"
+	configPushToken  = "push_token"
 )
 
 func init() {
@@ -26,7 +29,8 @@ func init() {
 }
 
 type service struct {
-	client         *Client
+	restClient     *RESTClient
+	pushClient     *PushClient
 	ticketer       *flows.Ticketer
 	redactor       utils.Redactor
 	instancePushID string
@@ -35,17 +39,19 @@ type service struct {
 // NewService creates a new zendesk ticket service
 func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	subdomain := config[configSubdomain]
+	oAuthToken := config[configOAuthToken]
 	instancePushID := config[configPushID]
 	pushToken := config[configPushToken]
-	if subdomain != "" && instancePushID != "" && pushToken != "" {
+	if subdomain != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
 		return &service{
-			client:         NewClient(httpClient, httpRetries, subdomain, pushToken),
+			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
+			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
 			ticketer:       ticketer,
 			redactor:       utils.NewRedactor(flows.RedactionMask, pushToken),
 			instancePushID: instancePushID,
 		}, nil
 	}
-	return nil, errors.New("missing subdomain or push_id or push_token in zendesk config")
+	return nil, errors.New("missing subdomain or oauth_token or push_id or push_token in zendesk config")
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
@@ -114,8 +120,69 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return nil
 }
 
+func (s *service) addCloseCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
+	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/ticket_callback", domain)
+
+	// TODO check for existing target with this URL
+
+	target := &Target{
+		Type:        "http_target",
+		Title:       fmt.Sprintf("%s Tickets", name),
+		TargetURL:   targetURL,
+		Method:      "POST",
+		ContentType: "application/json",
+	}
+
+	target, trace, err := s.restClient.CreateTarget(target)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if err != nil {
+		return err
+	}
+
+	payload := `{
+		"event": "status_changed",
+		"ticket": {
+			"id": {{ticket.id}},
+			"external_id": "{{ticket.external_id}}",
+			"status": "{{ticket.status}}",
+			"via": "{{ticket.via}}",
+			"link": "{{ticket.link}}"
+		}
+	}`
+
+	trigger := &Trigger{
+		Title: fmt.Sprintf("Notify %s on ticket status change", name),
+		Conditions: Conditions{
+			All: []Condition{
+				{Field: "status", Operator: "changed"},
+				{Field: "via_id", Operator: "is", Value: "55"}, // see https://developer.zendesk.com/rest_api/docs/support/triggers#via-types
+			},
+		},
+		Actions: []Action{
+			{Field: "notification_target", Value: []string{fmt.Sprintf("%d", target.ID), string(payload)}},
+		},
+	}
+
+	trigger, trace, err = s.restClient.CreateTrigger(trigger)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *service) removeCloseCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
+	// TODO.. check if we're the last ticketer using this integration and then remove?
+	return nil
+}
+
 func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) error {
-	results, trace, err := s.client.Push(s.instancePushID, []*ExternalResource{msg})
+	results, trace, err := s.pushClient.Push(s.instancePushID, []*ExternalResource{msg})
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}

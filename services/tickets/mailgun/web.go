@@ -19,7 +19,9 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/mailgun/receive", handleReceive)
+	base := "/mr/tickets/types/mailgun"
+
+	web.RegisterJSONRoute(http.MethodPost, base+"/receive", handleReceive)
 }
 
 type receiveRequest struct {
@@ -68,7 +70,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	}
 
 	if err := logger.Insert(ctx, s.DB); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrap(err, "error writing HTTP logs")
+		return nil, http.StatusInternalServerError, errors.Wrap(err, "error writing HTTP logs")
 	}
 
 	return resp, http.StatusOK, nil
@@ -126,7 +128,7 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket}, logger)
+		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket}, true, logger)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error closing ticket: %s", ticket.UUID())
 		}
@@ -148,6 +150,6 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &receiveResponse{Action: "forwarded", TicketUUID: ticket.UUID(), MsgUUID: msg.UUID()}, nil
 }

@@ -51,16 +51,17 @@ func TestService(t *testing.T) {
 		ticketer,
 		map[string]string{},
 	)
-	assert.EqualError(t, err, "missing subdomain or push_id or push_token in zendesk config")
+	assert.EqualError(t, err, "missing subdomain or oauth_token or push_id or push_token in zendesk config")
 
 	svc, err := zendesk.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
 		map[string]string{
-			"subdomain":  "nyaruka",
-			"push_id":    "1234-abcd",
-			"push_token": "123456789",
+			"subdomain":   "nyaruka",
+			"oauth_token": "987654321",
+			"push_id":     "1234-abcd",
+			"push_token":  "123456789",
 		},
 	)
 	require.NoError(t, err)

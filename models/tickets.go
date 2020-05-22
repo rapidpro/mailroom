@@ -14,7 +14,7 @@ import (
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
-	
+
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
@@ -294,7 +294,7 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, logger *HTTPLogger) error {
+func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
@@ -307,17 +307,19 @@ func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ti
 		t.ClosedOn = &now
 	}
 
-	for ticketerID, ticketerTickets := range byTicketer {
-		ticketer := org.TicketerByID(ticketerID)
-		if ticketer != nil {
-			service, err := ticketer.AsService(flows.NewTicketer(ticketer))
-			if err != nil {
-				return err
-			}
+	if externally {
+		for ticketerID, ticketerTickets := range byTicketer {
+			ticketer := org.TicketerByID(ticketerID)
+			if ticketer != nil {
+				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+				if err != nil {
+					return err
+				}
 
-			err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
-			if err != nil {
-				return err
+				err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -337,7 +339,7 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, logger *HTTPLogger) error {
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
@@ -350,17 +352,19 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 		t.ClosedOn = nil
 	}
 
-	for ticketerID, ticketerTickets := range byTicketer {
-		ticketer := org.TicketerByID(ticketerID)
-		if ticketer != nil {
-			service, err := ticketer.AsService(flows.NewTicketer(ticketer))
-			if err != nil {
-				return err
-			}
+	if externally {
+		for ticketerID, ticketerTickets := range byTicketer {
+			ticketer := org.TicketerByID(ticketerID)
+			if ticketer != nil {
+				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+				if err != nil {
+					return err
+				}
 
-			err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
-			if err != nil {
-				return err
+				err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
