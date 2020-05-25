@@ -1,3 +1,7 @@
+v5.5.16
+----------
+ * Implement closing of tickets in zendesk from mailroom
+
 v5.5.15
 ----------
  * Send close notification emails in mailgun tickets
