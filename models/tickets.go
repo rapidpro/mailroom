@@ -7,11 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/dates"
@@ -19,6 +15,8 @@ import (
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -84,30 +82,6 @@ func (t *Ticket) Status() TicketStatus    { return t.t.Status }
 func (t *Ticket) Subject() string         { return t.t.Subject }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
-}
-
-// CreateReply creates an outgoing reply in this ticket
-func (t *Ticket) CreateReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, text string) (*Msg, error) {
-	// look up our assets
-	assets, err := GetOrgAssets(ctx, db, t.OrgID())
-	if err != nil {
-		return nil, errors.Wrapf(err, "error looking up org: %d", t.OrgID())
-	}
-
-	// build a simple translation
-	translations := map[envs.Language]*BroadcastTranslation{
-		envs.Language("base"): {Text: text},
-	}
-
-	// we'll use a broadcast to send this message
-	bcast := NewBroadcast(assets.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, envs.Language("base"), nil, nil, nil)
-	batch := bcast.CreateBatch([]ContactID{t.ContactID()})
-	msgs, err := CreateBroadcastMessages(ctx, db, rp, assets, batch)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error creating message batch")
-	}
-
-	return msgs[0], nil
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
@@ -320,7 +294,7 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, logger *HTTPLogger) error {
+func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
@@ -333,17 +307,19 @@ func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ti
 		t.ClosedOn = &now
 	}
 
-	for ticketerID, ticketerTickets := range byTicketer {
-		ticketer := org.TicketerByID(ticketerID)
-		if ticketer != nil {
-			service, err := ticketer.AsService(flows.NewTicketer(ticketer))
-			if err != nil {
-				return err
-			}
+	if externally {
+		for ticketerID, ticketerTickets := range byTicketer {
+			ticketer := org.TicketerByID(ticketerID)
+			if ticketer != nil {
+				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+				if err != nil {
+					return err
+				}
 
-			err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
-			if err != nil {
-				return err
+				err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -363,7 +339,7 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, logger *HTTPLogger) error {
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
@@ -376,17 +352,19 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 		t.ClosedOn = nil
 	}
 
-	for ticketerID, ticketerTickets := range byTicketer {
-		ticketer := org.TicketerByID(ticketerID)
-		if ticketer != nil {
-			service, err := ticketer.AsService(flows.NewTicketer(ticketer))
-			if err != nil {
-				return err
-			}
+	if externally {
+		for ticketerID, ticketerTickets := range byTicketer {
+			ticketer := org.TicketerByID(ticketerID)
+			if ticketer != nil {
+				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+				if err != nil {
+					return err
+				}
 
-			err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
-			if err != nil {
-				return err
+				err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
-	"github.com/nyaruka/mailroom/services/ticket/mailgun"
+	"github.com/nyaruka/mailroom/services/tickets/mailgun"
 
 	"github.com/stretchr/testify/assert"
 )

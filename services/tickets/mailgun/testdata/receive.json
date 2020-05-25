@@ -2,7 +2,7 @@
     {
         "label": "error response if missing required field",
         "method": "POST",
-        "path": "/mr/ticket/mailgun/receive",
+        "path": "/mr/tickets/types/mailgun/receive",
         "body": "sender=bob%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=929fa5cb&signature=123456",
         "status": 400,
         "response": {
@@ -13,7 +13,7 @@
     {
         "label": "error response if signature validation fails",
         "method": "POST",
-        "path": "/mr/ticket/mailgun/receive",
+        "path": "/mr/tickets/types/mailgun/receive",
         "body": "recipient=ticket%2Bc69f103c-db64-4481-815b-1112890419ef%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=123456",
         "status": 400,
         "response": {
@@ -24,7 +24,7 @@
     {
         "label": "error response if recipient address isn't a valid ticket address",
         "method": "POST",
-        "path": "/mr/ticket/mailgun/receive",
+        "path": "/mr/tickets/types/mailgun/receive",
         "body": "recipient=foo%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
         "status": 400,
         "response": {
@@ -35,7 +35,7 @@
     {
         "label": "error response if ticket doesn't exist",
         "method": "POST",
-        "path": "/mr/ticket/mailgun/receive",
+        "path": "/mr/tickets/types/mailgun/receive",
         "body": "recipient=ticket%2Bf73e94ab-0b4a-4f47-ac3c-1746b80ace5a%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
         "status": 400,
         "response": {
@@ -46,7 +46,7 @@
     {
         "label": "rejected response if sender address isn't configured on ticketer",
         "method": "POST",
-        "path": "/mr/ticket/mailgun/receive",
+        "path": "/mr/tickets/types/mailgun/receive",
         "body": "recipient=ticket%2Bc69f103c-db64-4481-815b-1112890419ef%40mr.nyaruka.com&sender=jim%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
         "status": 200,
         "response": {
@@ -58,11 +58,12 @@
     {
         "label": "forwarded response if message was created",
         "method": "POST",
-        "path": "/mr/ticket/mailgun/receive",
+        "path": "/mr/tickets/types/mailgun/receive",
         "body": "recipient=ticket%2Bc69f103c-db64-4481-815b-1112890419ef%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
         "status": 200,
         "response": {
             "action": "forwarded",
+            "msg_uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5",
             "ticket_uuid": "c69f103c-db64-4481-815b-1112890419ef"
         },
         "db_assertions": [
@@ -87,7 +88,7 @@
             ]
         },
         "method": "POST",
-        "path": "/mr/ticket/mailgun/receive",
+        "path": "/mr/tickets/types/mailgun/receive",
         "body": "recipient=ticket%2Bc69f103c-db64-4481-815b-1112890419ef%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Close&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
         "status": 200,
         "response": {

@@ -59,7 +59,7 @@ func handleClose(ctx context.Context, s *web.Server, r *http.Request) (interface
 
 	logger := &models.HTTPLogger{}
 
-	err = models.CloseTickets(ctx, s.DB, org, tickets, logger)
+	err = models.CloseTickets(ctx, s.DB, org, tickets, true, logger)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error closing tickets for org: %d", request.OrgID)
 	}
@@ -97,7 +97,7 @@ func handleReopen(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	logger := &models.HTTPLogger{}
 
-	err = models.ReopenTickets(ctx, s.DB, org, tickets, logger)
+	err = models.ReopenTickets(ctx, s.DB, org, tickets, true, logger)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
 	}

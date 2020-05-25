@@ -6,8 +6,8 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/models"
-	_ "github.com/nyaruka/mailroom/services/ticket/mailgun"
-	_ "github.com/nyaruka/mailroom/services/ticket/zendesk"
+	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
+	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/null"
 
@@ -101,7 +101,7 @@ func TestTickets(t *testing.T) {
 
 	logger := &models.HTTPLogger{}
 
-	err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, logger)
+	err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, true, logger)
 	assert.NoError(t, err)
 
 	// check ticket is now closed

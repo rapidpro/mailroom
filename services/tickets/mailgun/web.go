@@ -11,15 +11,17 @@ import (
 	"strings"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/mailgun/receive", handleReceive)
+	base := "/mr/tickets/types/mailgun"
+
+	web.RegisterJSONRoute(http.MethodPost, base+"/receive", handleReceive)
 }
 
 type receiveRequest struct {
@@ -45,14 +47,14 @@ func (r *receiveRequest) verify(signingKey string) bool {
 	mac.Write([]byte(v))
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
-	fmt.Println(expectedMAC)
-
 	return hmac.Equal([]byte(r.Signature), []byte(expectedMAC))
 }
 
+// what we send back to mailgun.. this is mostly for our own since logging since they don't parse this
 type receiveResponse struct {
-	Action     string `json:"action"`
-	TicketUUID string `json:"ticket_uuid"`
+	Action     string           `json:"action"`
+	TicketUUID flows.TicketUUID `json:"ticket_uuid"`
+	MsgUUID    flows.MsgUUID    `json:"msg_uuid,omitempty"`
 }
 
 var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})@.*$`)
@@ -68,7 +70,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	}
 
 	if err := logger.Insert(ctx, s.DB); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrap(err, "error writing HTTP logs")
+		return nil, http.StatusInternalServerError, errors.Wrap(err, "error writing HTTP logs")
 	}
 
 	return resp, http.StatusOK, nil
@@ -121,17 +123,17 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 
 		mailgun.send(mailgun.noReplyAddress(), request.From, "Ticket reply rejected", body, nil, logger.Ticketer(ticketer))
 
-		return &receiveResponse{Action: "rejected", TicketUUID: string(ticket.UUID())}, nil
+		return &receiveResponse{Action: "rejected", TicketUUID: ticket.UUID()}, nil
 	}
 
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket}, logger)
+		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket}, true, logger)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error closing ticket: %s", ticket.UUID())
 		}
 
-		return &receiveResponse{Action: "closed", TicketUUID: string(ticket.UUID())}, nil
+		return &receiveResponse{Action: "closed", TicketUUID: ticket.UUID()}, nil
 	}
 
 	// update our ticket
@@ -144,19 +146,10 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 		return nil, errors.Wrapf(err, "error updating ticket: %s", ticket.UUID())
 	}
 
-	msg, err := ticket.CreateReply(s.CTX, s.DB, s.RP, request.StrippedText)
+	msg, err := tickets.SendReply(ctx, s.DB, s.RP, ticket, request.StrippedText)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating ticket reply")
+		return nil, err
 	}
 
-	// queue our message
-	rc := s.RP.Get()
-	defer rc.Close()
-
-	err = courier.QueueMessages(rc, []*models.Msg{msg})
-	if err != nil {
-		return nil, errors.Wrapf(err, "error queuing outgoing message")
-	}
-
-	return &receiveResponse{Action: "forwarded", TicketUUID: string(ticket.UUID())}, nil
+	return &receiveResponse{Action: "forwarded", TicketUUID: ticket.UUID(), MsgUUID: msg.UUID()}, nil
 }
