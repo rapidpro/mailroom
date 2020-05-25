@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/nyaruka/goflow/utils/httpx"
@@ -34,12 +35,20 @@ type errorResponse struct {
 }
 
 func (c *baseClient) post(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+	return c.request("POST", endpoint, payload, response)
+}
+
+func (c *baseClient) put(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+	return c.request("PUT", endpoint, payload, response)
+}
+
+func (c *baseClient) request(method, endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
 	data, err := jsonx.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s.zendesk.com/api/v2/%s.json", c.subdomain, endpoint), bytes.NewReader(data))
+	req, err := http.NewRequest(method, fmt.Sprintf("https://%s.zendesk.com/api/v2/%s", c.subdomain, endpoint), bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +101,7 @@ func (c *RESTClient) CreateTarget(target *Target) (*Target, *httpx.Trace, error)
 		Target *Target `json:"target"`
 	}{}
 
-	trace, err := c.post("targets", payload, response)
+	trace, err := c.post("targets.json", payload, response)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -137,12 +146,44 @@ func (c *RESTClient) CreateTrigger(trigger *Trigger) (*Trigger, *httpx.Trace, er
 		Trigger *Trigger `json:"trigger"`
 	}{}
 
-	trace, err := c.post("triggers", payload, response)
+	trace, err := c.post("triggers.json", payload, response)
 	if err != nil {
 		return nil, trace, err
 	}
 
 	return response.Trigger, trace, nil
+}
+
+// Ticket see https://developer.zendesk.com/rest_api/docs/support/tickets#json-format
+type Ticket struct {
+	Status string `json:"status,omitempty"`
+}
+
+// JobStatus see https://developer.zendesk.com/rest_api/docs/support/job_statuses#job-statuses
+type JobStatus struct {
+	ID     string `json:"id"`
+	URL    string `json:"url"`
+	Status string `json:"status"`
+}
+
+// UpdateManyTickets see https://developer.zendesk.com/rest_api/docs/support/tickets#update-many-tickets
+func (c *RESTClient) UpdateManyTickets(ids []int64, status string) (*JobStatus, *httpx.Trace, error) {
+	payload := struct {
+		Ticket *Ticket `json:"ticket"`
+	}{
+		Ticket: &Ticket{Status: status},
+	}
+
+	response := &struct {
+		JobStatus *JobStatus `json:"job_status"`
+	}{}
+
+	trace, err := c.put("tickets/update_many.json?ids="+encodeIds(ids), payload, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return response.JobStatus, trace, nil
 }
 
 // PushClient is a client for the Zendesk channel push API and requires a special push token
@@ -196,20 +237,29 @@ type Result struct {
 }
 
 // Push pushes the given external resources
-func (c *PushClient) Push(instanceID string, externalResources []*ExternalResource) ([]*Result, *httpx.Trace, error) {
+func (c *PushClient) Push(instanceID, requestID string, externalResources []*ExternalResource) ([]*Result, *httpx.Trace, error) {
 	payload := struct {
 		InstancePushID    string              `json:"instance_push_id"`
+		RequestID         string              `json:"request_id,omitempty"`
 		ExternalResources []*ExternalResource `json:"external_resources"`
-	}{InstancePushID: instanceID, ExternalResources: externalResources}
+	}{InstancePushID: instanceID, RequestID: requestID, ExternalResources: externalResources}
 
 	response := &struct {
 		Results []*Result `json:"results"`
 	}{}
 
-	trace, err := c.post("any_channel/push", payload, response)
+	trace, err := c.post("any_channel/push.json", payload, response)
 	if err != nil {
 		return nil, trace, err
 	}
 
 	return response.Results, trace, nil
+}
+
+func encodeIds(ids []int64) string {
+	idStrs := make([]string, len(ids))
+	for i := range ids {
+		idStrs[i] = fmt.Sprintf("%d", ids[i])
+	}
+	return strings.Join(idStrs, ",")
 }

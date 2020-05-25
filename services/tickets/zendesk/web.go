@@ -210,6 +210,8 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 
 				// update the ticket with the ID from Zendesk
 				models.UpdateTicketExternalID(ctx, db, ticket, fmt.Sprintf("%d", re.TicketID))
+
+				// TODO update external ID on zendesk side to use to handle ticket changes there
 			}
 		}
 	}
@@ -238,6 +240,8 @@ func handleTicketCallback(ctx context.Context, s *web.Server, r *http.Request) (
 	// TODO authentication?
 
 	if request.Event == "status_changed" && request.Ticket.Status == "Solved" {
+		// TODO zendesk IDs aren't unique.. combine with subdomain.. update zendesk tickets to have your ticket UUID as external ID?
+
 		// models.CloseTickets(ctx, s.DB, false)
 	}
 

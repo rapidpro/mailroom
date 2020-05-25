@@ -3,6 +3,7 @@ package zendesk
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -22,6 +23,9 @@ const (
 	configOAuthToken = "oauth_token"
 	configPushID     = "push_id"
 	configPushToken  = "push_token"
+
+	statusOpen   = "open"
+	statusSolved = "solved"
 )
 
 func init() {
@@ -47,7 +51,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
 			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
 			ticketer:       ticketer,
-			redactor:       utils.NewRedactor(flows.RedactionMask, pushToken),
+			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
 			instancePushID: instancePushID,
 		}, nil
 	}
@@ -111,13 +115,29 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 }
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO call API to mark tickets as solved
-	return nil
+	ids, err := ticketsToZendeskIDs(tickets)
+	if err != nil {
+		return nil
+	}
+
+	_, trace, err := s.restClient.UpdateManyTickets(ids, statusSolved)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	return err
 }
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO call API to mark tickets as open
-	return nil
+	ids, err := ticketsToZendeskIDs(tickets)
+	if err != nil {
+		return nil
+	}
+
+	_, trace, err := s.restClient.UpdateManyTickets(ids, statusOpen)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	return err
 }
 
 func (s *service) addCloseCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
@@ -169,11 +189,7 @@ func (s *service) addCloseCallback(name, domain string, logHTTP flows.HTTPLogCal
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (s *service) removeCloseCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
@@ -182,7 +198,7 @@ func (s *service) removeCloseCallback(name, domain string, logHTTP flows.HTTPLog
 }
 
 func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) error {
-	results, trace, err := s.pushClient.Push(s.instancePushID, []*ExternalResource{msg})
+	results, trace, err := s.pushClient.Push(s.instancePushID, "", []*ExternalResource{msg})
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -193,4 +209,18 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 		return errors.Wrap(err, "error pushing message to zendesk")
 	}
 	return nil
+}
+
+// parses out the zendesk ticket IDs from our external ID field
+func ticketsToZendeskIDs(tickets []*models.Ticket) ([]int64, error) {
+	ids := make([]int64, len(tickets))
+	for i := range tickets {
+		idStr := string(tickets[i].ExternalID())
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			return nil, errors.Errorf("%s is not a valid zendesk ticket id", idStr)
+		}
+		ids[i] = id
+	}
+	return ids, nil
 }
