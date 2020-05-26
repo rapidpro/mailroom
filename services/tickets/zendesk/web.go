@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
@@ -66,7 +67,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 
 	// check secret is correct
 	if ticketer.Config(configSecret) != metadata.Secret {
-		return errors.Wrapf(err, "ticketer secret mismatch"), http.StatusUnauthorized, nil
+		return errors.New("ticketer secret mismatch"), http.StatusUnauthorized, nil
 	}
 
 	ticket, err := models.LookupTicketByUUID(ctx, s.DB, flows.TicketUUID(request.ThreadID))
@@ -197,7 +198,13 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 			return err
 		}
 
-		// TODO lookup ticketer by subdomain.. check integration_id ?
+		// parse the request ID we passed to zendesk which is <ticketer-uuid>:<secret>:<timestamp>
+		parts := strings.Split(data.RequestID, ":")
+		if len(parts) != 2 {
+			return errors.New("unspected request ID format")
+		}
+		ticketerUUID := assets.TicketerUUID(parts[0])
+		ticketerSecret := parts[1]
 
 		for _, re := range data.ResourceEvents {
 			if re.TypeID == "comment_on_new_ticket" {
@@ -206,6 +213,14 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 				ticket, err := models.LookupTicketByUUID(ctx, db, flows.TicketUUID(re.ExternalID))
 				if err != nil {
 					return err
+				}
+
+				ticketer, err := models.LookupTicketerByUUID(ctx, db, ticketerUUID)
+				if err != nil {
+					return err
+				}
+				if ticketer.Config(configSecret) != ticketerSecret {
+					return errors.New("ticketer secret mismatch")
 				}
 
 				// update the ticket with the ID from Zendesk

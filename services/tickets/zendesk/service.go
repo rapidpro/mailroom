@@ -37,25 +37,28 @@ type service struct {
 	pushClient     *PushClient
 	ticketer       *flows.Ticketer
 	redactor       utils.Redactor
+	secret         string
 	instancePushID string
 }
 
 // NewService creates a new zendesk ticket service
 func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	subdomain := config[configSubdomain]
+	secret := config[configSecret]
 	oAuthToken := config[configOAuthToken]
 	instancePushID := config[configPushID]
 	pushToken := config[configPushToken]
-	if subdomain != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
+	if subdomain != "" && secret != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
 		return &service{
 			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
 			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
 			ticketer:       ticketer,
 			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
+			secret:         secret,
 			instancePushID: instancePushID,
 		}, nil
 	}
-	return nil, errors.New("missing subdomain or oauth_token or push_id or push_token in zendesk config")
+	return nil, errors.New("missing subdomain or secret or oauth_token or push_id or push_token in zendesk config")
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
@@ -198,7 +201,9 @@ func (s *service) removeCloseCallback(name, domain string, logHTTP flows.HTTPLog
 }
 
 func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) error {
-	results, trace, err := s.pushClient.Push(s.instancePushID, "", []*ExternalResource{msg})
+	requestID := fmt.Sprintf("%s:%s:%s", s.ticketer.UUID(), s.secret, fmt.Sprintf("%d", dates.Now().UnixNano()))
+
+	results, trace, err := s.pushClient.Push(s.instancePushID, requestID, []*ExternalResource{msg})
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
