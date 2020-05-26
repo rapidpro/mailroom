@@ -161,5 +161,4 @@ func TestCloseAndReopen(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "PUT /api/v2/tickets/update_many.json?ids=14 HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nContent-Length: 28\r\nAuthorization: Bearer ****************\r\nContent-Type: application/json\r\nAccept-Encoding: gzip\r\n\r\n{\"ticket\":{\"status\":\"open\"}}", logger.Logs[1].Request)
-
 }

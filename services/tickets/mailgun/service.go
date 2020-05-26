@@ -28,7 +28,7 @@ const (
 
 // subject and body templates for messages being forwarded from contact
 var forwardSubjectTemplate = newTemplate("forward_subject", `[{{.brand}}-Tickets] {{.subject}}`)
-var forwardBodyTemplate = newTemplate("forward_text", `{{.message}}
+var forwardBodyTemplate = newTemplate("forward_body", `{{.message}}
 
 ------------------------------------------------
 * Reply to the contact by replying to this email
@@ -38,9 +38,17 @@ var forwardBodyTemplate = newTemplate("forward_text", `{{.message}}
 
 // subject and body templates for ticket being closed
 var closedSubjectTemplate = newTemplate("closed_subject", `[{{.brand}}-Tickets] {{.subject}} CLOSED`)
-var closedBodyTemplate = newTemplate("closed_text", `{{.message}}
+var closedBodyTemplate = newTemplate("closed_body", `{{.message}}
 * Ticket has been closed
 * Replying to the contact will reopen this ticket
+* View this contact at {{.contact_url}}
+`)
+
+// subject and body templates for ticket being reopened
+var reopenedSubjectTemplate = newTemplate("reopened_subject", `[{{.brand}}-Tickets] {{.subject}} REOPENED`)
+var reopenedBodyTemplate = newTemplate("reopened_body", `{{.message}}
+* Ticket has been reopened
+* Close this ticket by replying with CLOSE
 * View this contact at {{.contact_url}}
 `)
 
@@ -126,7 +134,16 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 }
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO send emails to tell ticket handlers that they've been reopend
+	for _, ticket := range tickets {
+		context := s.templateContext(ticket.Subject(), "", ticket.Config("contact-uuid"))
+		subject := evaluateTemplate(reopenedSubjectTemplate, context)
+		body := evaluateTemplate(reopenedBodyTemplate, context)
+
+		_, err := s.sendInTicket(ticket, subject, body, logHTTP)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
