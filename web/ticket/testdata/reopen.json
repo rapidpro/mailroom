@@ -1,6 +1,14 @@
 [
     {
         "label": "reopens the given tickets",
+        "http_mocks": {
+            "https://api.mailgun.net/v3/tickets.rapidpro.io/messages": [
+                {
+                    "status": 200,
+                    "body": "{\"id\": \"<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>\", \"message\": \"Queued. Thank you.\"}"
+                }
+            ]
+        },
         "method": "POST",
         "path": "/mr/ticket/reopen",
         "body": {
