@@ -1,3 +1,7 @@
+v5.5.17
+----------
+ * Send email when reopening mailgun ticket
+
 v5.5.16
 ----------
  * Implement closing of tickets in zendesk from mailroom
