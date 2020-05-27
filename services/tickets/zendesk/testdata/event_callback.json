@@ -7,7 +7,6 @@
         "status": 400,
         "response": {
             "error": "field 'events' is required"
-        },
-        "db_assertions": []
+        }
     }
 ]
