@@ -2,16 +2,35 @@ package tickets
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/web"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
 )
+
+type LoggingJSONHandler func(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error)
+
+// WithHTTPLogs wraps a handler to require that our request to have our global authorization header
+func WithHTTPLogs(handler LoggingJSONHandler) web.JSONHandler {
+	return func(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+		logger := &models.HTTPLogger{}
+
+		response, status, err := handler(ctx, s, r, logger)
+
+		if err := logger.Insert(ctx, s.DB); err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrap(err, "error writing HTTP logs")
+		}
+
+		return response, status, err
+	}
+}
 
 // SendReply sends a message reply from the ticket system user to the contact
 func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.Ticket, text string) (*models.Msg, error) {

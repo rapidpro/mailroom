@@ -14,7 +14,7 @@
         "method": "POST",
         "path": "/mr/tickets/types/mailgun/receive",
         "body": "recipient=ticket%2Bc69f103c-db64-4481-815b-1112890419ef%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=123456",
-        "status": 400,
+        "status": 403,
         "response": {
             "error": "request signature validation failed"
         }

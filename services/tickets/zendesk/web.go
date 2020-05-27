@@ -24,8 +24,8 @@ func init() {
 	base := "/mr/tickets/types/zendesk"
 
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
-	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", handleEventCallback)
-	web.RegisterJSONRoute(http.MethodPost, base+"/ticket_callback", handleTicketCallback)
+	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", tickets.WithHTTPLogs(handleEventCallback))
+	web.RegisterJSONRoute(http.MethodPost, base+"/ticket_callback", tickets.WithHTTPLogs(handleTicketCallback))
 }
 
 type integrationMetadata struct {
@@ -119,28 +119,22 @@ type eventCallbackRequest struct {
 	Events []*channelEvent `json:"events" validate:"required"`
 }
 
-func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	logger := &models.HTTPLogger{}
-
+func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &eventCallbackRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
 	for _, e := range request.Events {
-		if err := processChannelEvent(ctx, s.DB, e, logger); err != nil {
+		if err := processChannelEvent(ctx, s.DB, e, l); err != nil {
 			return err, http.StatusBadRequest, nil
 		}
-	}
-
-	if err := logger.Insert(ctx, s.DB); err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error writing HTTP logs")
 	}
 
 	return map[string]string{"status": "OK"}, http.StatusOK, nil
 }
 
-func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, logger *models.HTTPLogger) error {
+func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, l *models.HTTPLogger) error {
 	lr := logrus.WithField("integration_id", event.IntegrationID).WithField("subdomain", event.Subdomain)
 
 	switch event.TypeID {
@@ -168,14 +162,14 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 
 		if event.TypeID == "create_integration_instance" {
 			// user has added an account through the admin UI
-			if err := svc.addStatusCallback(event.IntegrationName, event.IntegrationID, logger.Ticketer(ticketer)); err != nil {
+			if err := svc.addStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer)); err != nil {
 				return err
 			}
 
 			lr.Info("zendesk channel account added")
 		} else {
 			// user has removed a channel account
-			if err := svc.removeStatusCallback(event.IntegrationName, event.IntegrationID, logger.Ticketer(ticketer)); err != nil {
+			if err := svc.removeStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer)); err != nil {
 				return err
 			}
 
@@ -218,7 +212,7 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 				models.UpdateTicketExternalID(ctx, db, ticket, fmt.Sprintf("%d", re.TicketID))
 
 				// update zendesk ticket with our UUID
-				zendesk.setExternalID(ticket, logger.Ticketer(ticketer))
+				zendesk.setExternalID(ticket, l.Ticketer(ticketer))
 			}
 		}
 	}
@@ -238,9 +232,7 @@ type ticketCallbackRequest struct {
 	Ticket ticketCallbackTicket `json:"ticket"`
 }
 
-func handleTicketCallback(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	logger := &models.HTTPLogger{}
-
+func handleTicketCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &ticketCallbackRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, err
@@ -254,7 +246,7 @@ func handleTicketCallback(ctx context.Context, s *web.Server, r *http.Request) (
 	}
 
 	if request.Event == "status_changed" {
-		if err := processTicketStatusChange(ctx, s.DB, &request.Ticket, logger); err != nil {
+		if err := processTicketStatusChange(ctx, s.DB, &request.Ticket, l); err != nil {
 			return err, http.StatusBadRequest, nil
 		}
 	}
@@ -262,7 +254,7 @@ func handleTicketCallback(ctx context.Context, s *web.Server, r *http.Request) (
 	return map[string]string{"status": "handled"}, http.StatusOK, nil
 }
 
-func processTicketStatusChange(ctx context.Context, db *sqlx.DB, callback *ticketCallbackTicket, logger *models.HTTPLogger) error {
+func processTicketStatusChange(ctx context.Context, db *sqlx.DB, callback *ticketCallbackTicket, l *models.HTTPLogger) error {
 	ticket, err := models.LookupTicketByUUID(ctx, db, flows.TicketUUID(callback.ExternalID))
 	if err != nil {
 		return err
@@ -270,9 +262,9 @@ func processTicketStatusChange(ctx context.Context, db *sqlx.DB, callback *ticke
 
 	switch strings.ToLower(callback.Status) {
 	case statusSolved:
-		err = models.CloseTickets(ctx, db, nil, []*models.Ticket{ticket}, false, logger)
+		err = models.CloseTickets(ctx, db, nil, []*models.Ticket{ticket}, false, l)
 	case statusOpen:
-		err = models.ReopenTickets(ctx, db, nil, []*models.Ticket{ticket}, false, logger)
+		err = models.ReopenTickets(ctx, db, nil, []*models.Ticket{ticket}, false, l)
 	}
 
 	return err
