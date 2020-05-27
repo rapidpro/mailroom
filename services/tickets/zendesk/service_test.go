@@ -15,6 +15,7 @@ import (
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/services/tickets/zendesk"
+	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,8 +96,7 @@ func TestOpenAndForward(t *testing.T) {
 	}, ticket)
 
 	assert.Equal(t, 1, len(logger.Logs))
-	assert.Equal(t, "https://nyaruka.zendesk.com/api/v2/any_channel/push.json", logger.Logs[0].URL)
-	assert.Equal(t, "POST /api/v2/any_channel/push.json HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nContent-Length: 429\r\nAuthorization: Bearer ****************\r\nContent-Type: application/json\r\nAccept-Encoding: gzip\r\n\r\n{\"instance_push_id\":\"1234-abcd\",\"external_resources\":[{\"external_id\":\"59d74b86-3e2f-4a93-aece-b05d2fdcde0c\",\"message\":\"Where are my cookies?\",\"thread_id\":\"59d74b86-3e2f-4a93-aece-b05d2fdcde0c\",\"created_at\":\"2019-10-07T15:21:33Z\",\"author\":{\"external_id\":\"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f\",\"name\":\"Ryan Lewis\"},\"display_info\":[{\"type\":\"temba\",\"data\":{\"uuid\":\"59d74b86-3e2f-4a93-aece-b05d2fdcde0c\"}}],\"allow_channelback\":true}]}", logger.Logs[0].Request)
+	testsuite.AssertSnapshot(t, "open_ticket.dump", logger.Logs[0].Request)
 
 	dbTicket := models.NewTicket(ticket.UUID, models.Org1, models.CathyID, models.ZendeskID, "", "Need help", "Where are my cookies?", map[string]interface{}{
 		"contact-uuid":    string(models.CathyUUID),
@@ -108,7 +108,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
-	assert.Equal(t, "POST /api/v2/any_channel/push.json HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nContent-Length: 421\r\nAuthorization: Bearer ****************\r\nContent-Type: application/json\r\nAccept-Encoding: gzip\r\n\r\n{\"instance_push_id\":\"1234-abcd\",\"external_resources\":[{\"external_id\":\"ca5607f0-cba8-4c94-9cd5-c4fbc24aa767\",\"message\":\"It's urgent\",\"thread_id\":\"59d74b86-3e2f-4a93-aece-b05d2fdcde0c\",\"created_at\":\"2019-10-07T15:21:36Z\",\"author\":{\"external_id\":\"6393abc0-283d-4c9b-a1b3-641a035c34bf\",\"name\":\"Cathy\"},\"display_info\":[{\"type\":\"temba-ticket\",\"data\":{\"uuid\":\"59d74b86-3e2f-4a93-aece-b05d2fdcde0c\"}}],\"allow_channelback\":true}]}", logger.Logs[0].Request)
+	testsuite.AssertSnapshot(t, "forward_message.dump", logger.Logs[0].Request)
 }
 
 func TestCloseAndReopen(t *testing.T) {
@@ -155,10 +155,10 @@ func TestCloseAndReopen(t *testing.T) {
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "PUT /api/v2/tickets/update_many.json?ids=12,14 HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nContent-Length: 30\r\nAuthorization: Bearer ****************\r\nContent-Type: application/json\r\nAccept-Encoding: gzip\r\n\r\n{\"ticket\":{\"status\":\"solved\"}}", logger.Logs[0].Request)
+	testsuite.AssertSnapshot(t, "close_tickets.dump", logger.Logs[0].Request)
 
 	err = svc.Reopen([]*models.Ticket{ticket2}, logger.Log)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "PUT /api/v2/tickets/update_many.json?ids=14 HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nContent-Length: 28\r\nAuthorization: Bearer ****************\r\nContent-Type: application/json\r\nAccept-Encoding: gzip\r\n\r\n{\"ticket\":{\"status\":\"open\"}}", logger.Logs[1].Request)
+	testsuite.AssertSnapshot(t, "reopen_tickets.dump", logger.Logs[1].Request)
 }
