@@ -99,20 +99,10 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 		return nil, errors.Errorf("unable to find ticket with UUID: %s", ticketUUID)
 	}
 
-	// look up our assets and get the ticketer for this ticket
-	assets, err := models.GetOrgAssets(s.CTX, s.DB, ticket.OrgID())
+	// and then the ticketer that created it
+	ticketer, svc, err := tickets.TicketerFromTicket(s.CTX, s.DB, ticket, typeMailgun)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error looking up org: %d", ticket.OrgID())
-	}
-	ticketer := assets.TicketerByID(ticket.TicketerID())
-	if ticketer == nil || ticketer.Type() != typeMailgun {
-		return nil, errors.Errorf("error looking up ticketer: %d", ticket.TicketerID())
-	}
-
-	// and load it as a service
-	svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
-	if err != nil {
-		return nil, errors.Wrap(err, "error loading ticketer service")
+		return nil, err
 	}
 	mailgun := svc.(*service)
 
@@ -128,7 +118,8 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket}, true, logger)
+		org, _ := models.GetOrgAssets(ctx, s.DB, ticket.OrgID())
+		err = models.CloseTickets(ctx, s.DB, org, []*models.Ticket{ticket}, true, logger)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error closing ticket: %s", ticket.UUID())
 		}

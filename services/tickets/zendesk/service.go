@@ -3,7 +3,6 @@ package zendesk
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -37,6 +36,7 @@ type service struct {
 	pushClient     *PushClient
 	ticketer       *flows.Ticketer
 	redactor       utils.Redactor
+	integrationID  string
 	secret         string
 	instancePushID string
 }
@@ -67,20 +67,13 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	contactDisplay := session.Contact().Format(session.Environment())
 
 	msg := &ExternalResource{
-		ExternalID: string(ticketUUID),
+		ExternalID: string(ticketUUID), // there's no local msg so use ticket UUID instead
 		Message:    body,
 		ThreadID:   string(ticketUUID),
 		CreatedAt:  dates.Now(),
 		Author: Author{
 			ExternalID: string(session.Contact().UUID()),
 			Name:       contactDisplay,
-		},
-		DisplayInfo: []DisplayInfo{
-			{
-				// need to also include our ticket UUID in here so the Zendesk app can access it
-				Type: "temba",
-				Data: map[string]string{"uuid": string(ticketUUID)},
-			},
 		},
 		AllowChannelback: true,
 	}
@@ -104,12 +97,6 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Author: Author{
 			ExternalID: contactUUID,
 			Name:       contactDisplay,
-		},
-		DisplayInfo: []DisplayInfo{
-			{
-				Type: "temba-ticket",
-				Data: map[string]string{"uuid": string(ticket.UUID())},
-			},
 		},
 		AllowChannelback: true,
 	}
@@ -143,7 +130,20 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return err
 }
 
-func (s *service) addCloseCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) setExternalID(ticket *models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	id, err := ticketToZendeskID(ticket)
+	if err != nil {
+		return nil
+	}
+
+	_, trace, err := s.restClient.UpdateTicket(&Ticket{ID: id, ExternalID: string(ticket.UUID())})
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	return err
+}
+
+func (s *service) addStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
 	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/ticket_callback", domain)
 
 	// TODO check for existing target with this URL
@@ -195,15 +195,15 @@ func (s *service) addCloseCallback(name, domain string, logHTTP flows.HTTPLogCal
 	return err
 }
 
-func (s *service) removeCloseCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) removeStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
 	// TODO.. check if we're the last ticketer using this integration and then remove?
 	return nil
 }
 
 func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) error {
-	requestID := fmt.Sprintf("%s:%s:%s", s.ticketer.UUID(), s.secret, fmt.Sprintf("%d", dates.Now().UnixNano()))
+	rid := NewRequestID(s.secret)
 
-	results, trace, err := s.pushClient.Push(s.instancePushID, requestID, []*ExternalResource{msg})
+	results, trace, err := s.pushClient.Push(s.instancePushID, rid.String(), []*ExternalResource{msg})
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -214,18 +214,4 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 		return errors.Wrap(err, "error pushing message to zendesk")
 	}
 	return nil
-}
-
-// parses out the zendesk ticket IDs from our external ID field
-func ticketsToZendeskIDs(tickets []*models.Ticket) ([]int64, error) {
-	ids := make([]int64, len(tickets))
-	for i := range tickets {
-		idStr := string(tickets[i].ExternalID())
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			return nil, errors.Errorf("%s is not a valid zendesk ticket id", idStr)
-		}
-		ids[i] = id
-	}
-	return ids, nil
 }

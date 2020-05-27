@@ -5,6 +5,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
 
@@ -44,4 +45,27 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.
 		return msg, errors.Wrapf(err, "error queuing ticket reply")
 	}
 	return msg, nil
+}
+
+// TicketerFromTicket returns the ticketer and its service for the given ticket
+func TicketerFromTicket(ctx context.Context, db *sqlx.DB, ticket *models.Ticket, ticketerType string) (*models.Ticketer, models.TicketService, error) {
+	// look up our assets
+	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error looking up org: %d", ticket.OrgID())
+	}
+
+	// and get the ticketer for this ticket
+	ticketer := assets.TicketerByID(ticket.TicketerID())
+	if ticketer == nil || ticketer.Type() != ticketerType {
+		return nil, nil, errors.Errorf("error looking up ticketer: %d", ticket.TicketerID())
+	}
+
+	// and load it as a service
+	svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "error loading ticketer service")
+	}
+
+	return ticketer, svc, nil
 }

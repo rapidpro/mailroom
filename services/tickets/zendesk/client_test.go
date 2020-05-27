@@ -7,6 +7,7 @@ import (
 
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/services/tickets/zendesk"
+	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -109,6 +110,29 @@ func TestCreateTrigger(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1234567), trigger.ID)
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 317\r\n\r\n", string(trace.ResponseTrace))
+}
+
+func TestUpdateTicket(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://nyaruka.zendesk.com/api/v2/tickets/123.json": {
+			httpx.NewMockResponse(200, nil, `{
+				"ticket": {
+					"id": 123,
+					"external_id": "EX234",
+					"status": "Open"
+				}
+			}`),
+		},
+	}))
+
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
+
+	ticket, trace, err := client.UpdateTicket(&zendesk.Ticket{ID: 123, ExternalID: "EX234"})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(123), ticket.ID)
+	testsuite.AssertSnapshot(t, "update_ticket.dump", string(trace.RequestTrace))
 }
 
 func TestUpdateManyTickets(t *testing.T) {

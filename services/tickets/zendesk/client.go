@@ -156,7 +156,27 @@ func (c *RESTClient) CreateTrigger(trigger *Trigger) (*Trigger, *httpx.Trace, er
 
 // Ticket see https://developer.zendesk.com/rest_api/docs/support/tickets#json-format
 type Ticket struct {
-	Status string `json:"status,omitempty"`
+	ID         int64  `json:"id,omitempty"`
+	ExternalID string `json:"external_id,omitempty"`
+	Status     string `json:"status,omitempty"`
+}
+
+// UpdateTicket see https://developer.zendesk.com/rest_api/docs/support/tickets#update-ticket
+func (c *RESTClient) UpdateTicket(ticket *Ticket) (*Ticket, *httpx.Trace, error) {
+	payload := struct {
+		Ticket *Ticket `json:"ticket"`
+	}{Ticket: ticket}
+
+	response := &struct {
+		Ticket *Ticket `json:"ticket"`
+	}{}
+
+	trace, err := c.put(fmt.Sprintf("tickets/%d.json", ticket.ID), payload, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return response.Ticket, trace, nil
 }
 
 // JobStatus see https://developer.zendesk.com/rest_api/docs/support/job_statuses#job-statuses
