@@ -283,6 +283,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		}
 	} else {
 		o.ticketers = prev.ticketers
+		o.ticketersByID = prev.ticketersByID
 		o.ticketersByUUID = prev.ticketersByUUID
 	}
 

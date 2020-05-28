@@ -130,7 +130,7 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return err
 }
 
-func (s *service) setExternalID(ticket *models.Ticket, logHTTP flows.HTTPLogCallback) error {
+func (s *service) SetExternalID(ticket *models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	id, err := ticketToZendeskID(ticket)
 	if err != nil {
 		return nil
@@ -143,7 +143,7 @@ func (s *service) setExternalID(ticket *models.Ticket, logHTTP flows.HTTPLogCall
 	return err
 }
 
-func (s *service) addStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
 	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/ticket_callback", domain)
 
 	// TODO check for existing target with this URL
@@ -153,6 +153,8 @@ func (s *service) addStatusCallback(name, domain string, logHTTP flows.HTTPLogCa
 		Title:       fmt.Sprintf("%s Tickets", name),
 		TargetURL:   targetURL,
 		Method:      "POST",
+		Username:    "mailroom",
+		Password:    s.secret,
 		ContentType: "application/json",
 	}
 
@@ -195,7 +197,7 @@ func (s *service) addStatusCallback(name, domain string, logHTTP flows.HTTPLogCa
 	return err
 }
 
-func (s *service) removeStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) RemoveStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
 	// TODO.. check if we're the last ticketer using this integration and then remove?
 	return nil
 }

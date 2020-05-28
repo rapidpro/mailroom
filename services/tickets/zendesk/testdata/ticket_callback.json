@@ -1,0 +1,72 @@
+[
+    {
+        "label": "error response if missing required field",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/ticket_callback",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "field 'event' is required, field 'ticket.id' is required, field 'ticket.status' is required"
+        }
+    },
+    {
+        "label": "ignored response if missing external ID",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/ticket_callback",
+        "body": {
+            "event": "status_changed",
+            "ticket": {
+                "id": 1234,
+                "external_id": "",
+                "status": "New"
+            }
+        },
+        "status": 200,
+        "response": {
+            "status": "ignored"
+        }
+    },
+    {
+        "label": "unauthorized response if basic auth fails",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/ticket_callback",
+        "body": {
+            "event": "status_changed",
+            "ticket": {
+                "id": 1234,
+                "external_id": "c69f103c-db64-4481-815b-1112890419ef",
+                "status": "New"
+            }
+        },
+        "status": 401,
+        "response": {
+            "status": "unauthorized"
+        }
+    },
+    {
+        "label": "ticket updated if credentials correct",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/ticket_callback",
+        "headers": {
+            "Authorization": "Basic bWFpbHJvb206c2VzYW1l"
+        },
+        "body": {
+            "event": "status_changed",
+            "ticket": {
+                "id": 1234,
+                "external_id": "c69f103c-db64-4481-815b-1112890419ef",
+                "status": "Solved"
+            }
+        },
+        "status": 200,
+        "response": {
+            "status": "handled"
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from tickets_ticket where status = 'C'",
+                "count": 1
+            }
+        ]
+    }
+]

@@ -36,7 +36,7 @@
         "body": "recipient=ticket%2Bf73e94ab-0b4a-4f47-ac3c-1746b80ace5a%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A+%5BRapidPro-Tickets%5D+New+ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
         "status": 400,
         "response": {
-            "error": "unable to find ticket with UUID: f73e94ab-0b4a-4f47-ac3c-1746b80ace5a"
+            "error": "error looking up ticket f73e94ab-0b4a-4f47-ac3c-1746b80ace5a"
         }
     },
     {

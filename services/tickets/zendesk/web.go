@@ -150,21 +150,33 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 			return errors.Wrapf(err, "error unmarshaling metadata")
 		}
 
-		ticketer, svc, err := loadTicketer(ctx, db, metadata.TicketerUUID, metadata.Secret)
+		ticketer, err := models.LookupTicketerByUUID(ctx, db, metadata.TicketerUUID)
 		if err != nil {
 			return err
 		}
 
+		// check secret
+		if ticketer.Config(configSecret) != metadata.Secret {
+			return errors.New("ticketer secret mismatch")
+		}
+
+		// and load it as a service
+		svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
+		if err != nil {
+			return errors.Wrap(err, "error loading ticketer service")
+		}
+		zendesk := svc.(*service)
+
 		if event.TypeID == "create_integration_instance" {
 			// user has added an account through the admin UI
-			if err := svc.addStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer)); err != nil {
+			if err := zendesk.AddStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer)); err != nil {
 				return err
 			}
 
 			lr.Info("zendesk channel account added")
 		} else {
 			// user has removed a channel account
-			if err := svc.removeStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer)); err != nil {
+			if err := zendesk.RemoveStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer)); err != nil {
 				return err
 			}
 
@@ -185,96 +197,83 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 
 		for _, re := range data.ResourceEvents {
 			if re.TypeID == "comment_on_new_ticket" {
-				// look up our ticket and ticketer
-				ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, flows.TicketUUID(re.ExternalID), typeZendesk)
-				if err != nil {
+				if err := processCommentOnNewTicket(ctx, db, reqID, re, l); err != nil {
 					return err
 				}
-				zendesk := svc.(*service)
-
-				// check ticketer secret
-				if ticketer.Config(configSecret) != reqID.Secret {
-					return errors.New("ticketer secret mismatch")
-				}
-
-				// update our local ticket with the ID from Zendesk
-				models.UpdateTicketExternalID(ctx, db, ticket, fmt.Sprintf("%d", re.TicketID))
-
-				// update zendesk ticket with our UUID
-				zendesk.setExternalID(ticket, l.Ticketer(ticketer))
 			}
 		}
 	}
 	return nil
 }
 
+func processCommentOnNewTicket(ctx context.Context, db *sqlx.DB, reqID RequestID, re resourceEvent, l *models.HTTPLogger) error {
+	// look up our ticket and ticketer
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, flows.TicketUUID(re.ExternalID), typeZendesk)
+	if err != nil {
+		return err
+	}
+	zendesk := svc.(*service)
+
+	// check ticketer secret
+	if ticketer.Config(configSecret) != reqID.Secret {
+		return errors.New("ticketer secret mismatch")
+	}
+
+	// update our local ticket with the ID from Zendesk
+	if err := models.UpdateTicketExternalID(ctx, db, ticket, fmt.Sprintf("%d", re.TicketID)); err != nil {
+		return err
+	}
+
+	// update zendesk ticket with our UUID
+	return zendesk.SetExternalID(ticket, l.Ticketer(ticketer))
+}
+
 type ticketCallbackTicket struct {
-	ID         int64  `json:"id"`
+	ID         int64  `json:"id"            validate:"required"`
 	ExternalID string `json:"external_id"`
-	Status     string `json:"status"`
+	Status     string `json:"status"        validate:"required"`
 	Via        string `json:"via"`
 	Link       string `json:"link"`
 }
 
 type ticketCallbackRequest struct {
-	Event  string               `json:"event"`
-	Ticket ticketCallbackTicket `json:"ticket"`
+	Event  string               `json:"event"  validate:"required"`
+	Ticket ticketCallbackTicket `json:"ticket" validate:"required"`
 }
 
 func handleTicketCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &ticketCallbackRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
-		return nil, http.StatusBadRequest, err
+		return err, http.StatusBadRequest, nil
 	}
-
-	// TODO authentication?
 
 	// if this ticket doesn't have an external ID then it doesn't belong to us
 	if request.Ticket.ExternalID == "" {
 		return map[string]string{"status": "ignored"}, http.StatusOK, nil
 	}
 
+	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, s.DB, flows.TicketUUID(request.Ticket.ExternalID), typeZendesk)
+	if err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
+	username, password, _ := r.BasicAuth()
+	if username != "mailroom" || password != ticketer.Config(configSecret) {
+		return map[string]string{"status": "unauthorized"}, http.StatusUnauthorized, nil
+	}
+
 	if request.Event == "status_changed" {
-		if err := processTicketStatusChange(ctx, s.DB, &request.Ticket, l); err != nil {
+		switch strings.ToLower(request.Ticket.Status) {
+		case statusSolved:
+			err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)
+		case statusOpen:
+			err = models.ReopenTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)
+		}
+
+		if err != nil {
 			return err, http.StatusBadRequest, nil
 		}
 	}
 
 	return map[string]string{"status": "handled"}, http.StatusOK, nil
-}
-
-func processTicketStatusChange(ctx context.Context, db *sqlx.DB, callback *ticketCallbackTicket, l *models.HTTPLogger) error {
-	ticket, err := models.LookupTicketByUUID(ctx, db, flows.TicketUUID(callback.ExternalID))
-	if err != nil {
-		return err
-	}
-
-	switch strings.ToLower(callback.Status) {
-	case statusSolved:
-		err = models.CloseTickets(ctx, db, nil, []*models.Ticket{ticket}, false, l)
-	case statusOpen:
-		err = models.ReopenTickets(ctx, db, nil, []*models.Ticket{ticket}, false, l)
-	}
-
-	return err
-}
-
-func loadTicketer(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID, secret string) (*models.Ticketer, *service, error) {
-	ticketer, err := models.LookupTicketerByUUID(ctx, db, uuid)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// check secret
-	if ticketer.Config(configSecret) != secret {
-		return nil, nil, errors.New("ticketer secret mismatch")
-	}
-
-	// and load it as a service
-	svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "error loading ticketer service")
-	}
-
-	return ticketer, svc.(*service), nil
 }
