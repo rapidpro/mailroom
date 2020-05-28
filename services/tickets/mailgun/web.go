@@ -12,6 +12,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/services"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
@@ -21,7 +22,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/mailgun"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/receive", tickets.WithHTTPLogs(handleReceive))
+	web.RegisterJSONRoute(http.MethodPost, base+"/receive", services.WithHTTPLogs(handleReceive))
 }
 
 type receiveRequest struct {
@@ -74,16 +75,9 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *model
 	if len(match) != 1 || len(match[0]) != 2 {
 		return errors.Errorf("invalid recipient: %s", request.Recipient), http.StatusBadRequest, nil
 	}
-	ticketUUID := flows.TicketUUID(match[0][1])
 
-	// look up our ticket
-	ticket, err := models.LookupTicketByUUID(ctx, s.DB, ticketUUID)
-	if err != nil || ticket == nil {
-		return errors.Errorf("unable to find ticket with UUID: %s", ticketUUID), http.StatusBadRequest, nil
-	}
-
-	// and then the ticketer that created it
-	ticketer, svc, err := tickets.TicketerFromTicket(s.CTX, s.DB, ticket, typeMailgun)
+	// look up the ticket and ticketer
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(s.CTX, s.DB, flows.TicketUUID(match[0][1]), typeMailgun)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

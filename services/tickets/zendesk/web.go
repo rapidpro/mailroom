@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/services"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
@@ -24,8 +25,8 @@ func init() {
 	base := "/mr/tickets/types/zendesk"
 
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
-	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", tickets.WithHTTPLogs(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodPost, base+"/ticket_callback", tickets.WithHTTPLogs(handleTicketCallback))
+	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", services.WithHTTPLogs(handleEventCallback))
+	web.RegisterJSONRoute(http.MethodPost, base+"/ticket_callback", services.WithHTTPLogs(handleTicketCallback))
 }
 
 type integrationMetadata struct {
@@ -59,14 +60,8 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return errors.Wrapf(err, "error unmarshaling metadata"), http.StatusBadRequest, nil
 	}
 
-	// load our ticket
-	ticket, err := models.LookupTicketByUUID(ctx, s.DB, flows.TicketUUID(request.ThreadID))
-	if err != nil {
-		return errors.Wrapf(err, "error loading ticket"), http.StatusBadRequest, nil
-	}
-
-	// and then the ticketer that created it
-	ticketer, _, err := tickets.TicketerFromTicket(ctx, s.DB, ticket, typeZendesk)
+	// lookup the ticket and ticketer
+	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, s.DB, flows.TicketUUID(request.ThreadID), typeZendesk)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -190,14 +185,8 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 
 		for _, re := range data.ResourceEvents {
 			if re.TypeID == "comment_on_new_ticket" {
-				// look up our ticket
-				ticket, err := models.LookupTicketByUUID(ctx, db, flows.TicketUUID(re.ExternalID))
-				if err != nil {
-					return err
-				}
-
-				// and then the ticketer that created it
-				ticketer, svc, err := tickets.TicketerFromTicket(ctx, db, ticket, typeZendesk)
+				// look up our ticket and ticketer
+				ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, flows.TicketUUID(re.ExternalID), typeZendesk)
 				if err != nil {
 					return err
 				}

@@ -2,34 +2,44 @@ package tickets
 
 import (
 	"context"
-	"net/http"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/web"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
-type LoggingJSONHandler func(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error)
-
-// WithHTTPLogs wraps a handler to require that our request to have our global authorization header
-func WithHTTPLogs(handler LoggingJSONHandler) web.JSONHandler {
-	return func(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-		logger := &models.HTTPLogger{}
-
-		response, status, err := handler(ctx, s, r, logger)
-
-		if err := logger.Insert(ctx, s.DB); err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrap(err, "error writing HTTP logs")
-		}
-
-		return response, status, err
+// FromTicketUUID takes a ticket UUID and looks up the ticket and ticketer
+func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, ticketerType string) (*models.Ticket, *models.Ticketer, models.TicketService, error) {
+	// look up our ticket
+	ticket, err := models.LookupTicketByUUID(ctx, db, uuid)
+	if err != nil || ticket == nil {
+		return nil, nil, nil, errors.Errorf("error looking up ticket %s", uuid)
 	}
+
+	// look up our assets
+	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
+	if err != nil {
+		return nil, nil, nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
+	}
+
+	// and get the ticketer for this ticket
+	ticketer := assets.TicketerByID(ticket.TicketerID())
+	if ticketer == nil || ticketer.Type() != ticketerType {
+		return nil, nil, nil, errors.Errorf("error looking up ticketer #%d", ticket.TicketerID())
+	}
+
+	// and load it as a service
+	svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "error loading ticketer service")
+	}
+
+	return ticket, ticketer, svc, nil
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
@@ -64,27 +74,4 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.
 		return msg, errors.Wrapf(err, "error queuing ticket reply")
 	}
 	return msg, nil
-}
-
-// TicketerFromTicket returns the ticketer and its service for the given ticket
-func TicketerFromTicket(ctx context.Context, db *sqlx.DB, ticket *models.Ticket, ticketerType string) (*models.Ticketer, models.TicketService, error) {
-	// look up our assets
-	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "error looking up org: %d", ticket.OrgID())
-	}
-
-	// and get the ticketer for this ticket
-	ticketer := assets.TicketerByID(ticket.TicketerID())
-	if ticketer == nil || ticketer.Type() != ticketerType {
-		return nil, nil, errors.Errorf("error looking up ticketer: %d", ticket.TicketerID())
-	}
-
-	// and load it as a service
-	svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "error loading ticketer service")
-	}
-
-	return ticketer, svc, nil
 }
