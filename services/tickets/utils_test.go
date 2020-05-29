@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFromTicketUUID(t *testing.T) {
@@ -49,4 +50,52 @@ func TestFromTicketUUID(t *testing.T) {
 	assert.Equal(t, ticket2UUID, ticket.UUID())
 	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
+}
+
+func TestFromTicketerUUID(t *testing.T) {
+	testsuite.ResetDB()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	// break mailgun configuration
+	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, models.MailgunID)
+
+	// err if no ticketer with UUID
+	_, _, err := tickets.FromTicketerUUID(ctx, db, "33c54d0c-bd49-4edf-87a9-c391a75a630c", "mailgun")
+	assert.EqualError(t, err, "error looking up ticketer 33c54d0c-bd49-4edf-87a9-c391a75a630c")
+
+	// err if no ticketer type doesn't match
+	_, _, err = tickets.FromTicketerUUID(ctx, db, models.MailgunUUID, "zendesk")
+	assert.EqualError(t, err, "error looking up ticketer f9c9447f-a291-4f3c-8c79-c089bbd4e713")
+
+	// err if ticketer isn't configured correctly and can't be loaded as a service
+	_, _, err = tickets.FromTicketerUUID(ctx, db, models.MailgunUUID, "mailgun")
+	assert.EqualError(t, err, "error loading ticketer service: missing domain or api_key or to_address or url_base in mailgun config")
+
+	// if all is correct, returns the ticketer asset and ticket service
+	ticketer, svc, err := tickets.FromTicketerUUID(ctx, db, models.ZendeskUUID, "zendesk")
+
+	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	assert.Implements(t, (*models.TicketService)(nil), svc)
+}
+
+func TestSendReply(t *testing.T) {
+	testsuite.ResetDB()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	ticketUUID := flows.TicketUUID("f7358870-c3dd-450d-b5ae-db2eb50216ba")
+
+	// create a ticket
+	db.MustExec(`INSERT INTO tickets_ticket(id, uuid,  org_id, contact_id, ticketer_id, status, subject, body, opened_on, modified_on)
+	VALUES(1, $1, $2, $3, $4, 'O', 'Need help', 'Have you seen my cookies?', NOW(), NOW())`, ticketUUID, models.Org1, models.CathyID, models.MailgunID)
+
+	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
+	require.NoError(t, err)
+
+	msg, err := tickets.SendReply(ctx, db, testsuite.RP(), ticket, "I'll get back to you")
+	require.NoError(t, err)
+
+	assert.Equal(t, "I'll get back to you", msg.Text())
+	assert.Equal(t, models.CathyID, msg.ContactID())
 }

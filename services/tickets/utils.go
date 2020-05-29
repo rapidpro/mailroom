@@ -3,6 +3,7 @@ package tickets
 import (
 	"context"
 
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/courier"
@@ -13,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// FromTicketUUID takes a ticket UUID and looks up the ticket and ticketer
+// FromTicketUUID takes a ticket UUID and looks up the ticket and ticketer, and creates the service
 func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, ticketerType string) (*models.Ticket, *models.Ticketer, models.TicketService, error) {
 	// look up our ticket
 	ticket, err := models.LookupTicketByUUID(ctx, db, uuid)
@@ -42,12 +43,28 @@ func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, tic
 	return ticket, ticketer, svc, nil
 }
 
+// FromTicketerUUID takes a ticketer UUID and looks up the ticketer and creates the service
+func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID, ticketerType string) (*models.Ticketer, models.TicketService, error) {
+	ticketer, err := models.LookupTicketerByUUID(ctx, db, uuid)
+	if err != nil || ticketer == nil || ticketer.Type() != ticketerType {
+		return nil, nil, errors.Errorf("error looking up ticketer %s", uuid)
+	}
+
+	// and load it as a service
+	svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "error loading ticketer service")
+	}
+
+	return ticketer, svc, nil
+}
+
 // SendReply sends a message reply from the ticket system user to the contact
 func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.Ticket, text string) (*models.Msg, error) {
 	// look up our assets
 	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
 	if err != nil {
-		return nil, errors.Wrapf(err, "error looking up org: %d", ticket.OrgID())
+		return nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
 
 	// build a simple translation

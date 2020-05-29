@@ -35,12 +35,12 @@ type integrationMetadata struct {
 }
 
 type channelbackRequest struct {
-	Message     string   `form:"message" validate:"required"`
+	Message     string   `form:"message"      validate:"required"`
 	FileURLs    []string `form:"file_urls"`
 	ParentID    string   `form:"parent_id"`
-	ThreadID    string   `form:"thread_id"`
+	ThreadID    string   `form:"thread_id"    validate:"required"`
 	RecipientID string   `form:"recipient_id" validate:"required"`
-	Metadata    string   `form:"metadata" validate:"required"`
+	Metadata    string   `form:"metadata"     validate:"required"`
 }
 
 type channelbackResponse struct {
@@ -68,7 +68,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 
 	// check ticketer secret
 	if ticketer.Config(configSecret) != metadata.Secret {
-		return errors.New("ticketer secret mismatch"), http.StatusBadRequest, nil
+		return errors.New("ticketer secret mismatch"), http.StatusUnauthorized, nil
 	}
 
 	err = models.UpdateAndKeepOpenTicket(ctx, s.DB, ticket, nil)
@@ -150,22 +150,17 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 			return errors.Wrapf(err, "error unmarshaling metadata")
 		}
 
-		ticketer, err := models.LookupTicketerByUUID(ctx, db, metadata.TicketerUUID)
+		// look up our ticketer
+		ticketer, svc, err := tickets.FromTicketerUUID(ctx, db, metadata.TicketerUUID, typeZendesk)
 		if err != nil {
 			return err
 		}
+		zendesk := svc.(*service)
 
 		// check secret
 		if ticketer.Config(configSecret) != metadata.Secret {
 			return errors.New("ticketer secret mismatch")
 		}
-
-		// and load it as a service
-		svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
-		if err != nil {
-			return errors.Wrap(err, "error loading ticketer service")
-		}
-		zendesk := svc.(*service)
 
 		if event.TypeID == "create_integration_instance" {
 			// user has added an account through the admin UI

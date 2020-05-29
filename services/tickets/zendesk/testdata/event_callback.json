@@ -8,5 +8,197 @@
         "response": {
             "error": "field 'events' is required"
         }
+    },
+    {
+        "label": "NOOP for create_integration event",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {
+            "events": [
+                {
+                    "type_id": "create_integration",
+                    "timestamp": "2015-09-08T22:48:09Z",
+                    "subdomain": "nyaruka",
+                    "integration_name": "Temba",
+                    "integration_id": "25e2b1b2-e7f9-4485-8331-9f890aa9e2b8",
+                    "data": {
+                        "manifest_url": "https://temba.io/mainfest.json"
+                    }
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "status": "OK"
+        }
+    },
+    {
+        "label": "NOOP for destroy_integration event",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {
+            "events": [
+                {
+                    "type_id": "destroy_integration",
+                    "timestamp": "2015-09-08T22:48:09Z",
+                    "subdomain": "nyaruka",
+                    "integration_name": "Temba",
+                    "integration_id": "25e2b1b2-e7f9-4485-8331-9f890aa9e2b8",
+                    "data": {
+                        "manifest_url": "https://temba.io/mainfest.json"
+                    }
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "status": "OK"
+        }
+    },
+    {
+        "label": "error if can't parse metadata from create_integration_instance event",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {
+            "events": [
+                {
+                    "type_id": "create_integration_instance",
+                    "timestamp": "2015-09-08T22:48:09Z",
+                    "subdomain": "nyaruka",
+                    "integration_name": "Temba",
+                    "integration_id": "25e2b1b2-e7f9-4485-8331-9f890aa9e2b8",
+                    "data": {
+                        "metadata": "xxx"
+                    }
+                }
+            ]
+        },
+        "status": 400,
+        "response": {
+            "error": "error unmarshaling metadata: invalid character 'x' looking for beginning of value"
+        }
+    },
+    {
+        "label": "error if can't load ticketer specified in create_integration_instance event",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {
+            "events": [
+                {
+                    "type_id": "create_integration_instance",
+                    "timestamp": "2015-09-08T22:48:09Z",
+                    "subdomain": "nyaruka",
+                    "integration_name": "Temba",
+                    "integration_id": "25e2b1b2-e7f9-4485-8331-9f890aa9e2b8",
+                    "data": {
+                        "metadata": "{\"ticketer\":\"4ee6d4f3-f92b-439b-9718-8da90c05490c\",\"secret\":\"sesame\"}"
+                    }
+                }
+            ]
+        },
+        "status": 400,
+        "response": {
+            "error": "error looking up ticketer 4ee6d4f3-f92b-439b-9718-8da90c05490c"
+        }
+    },
+    {
+        "label": "target and trigger created for create_integration_instance event",
+        "http_mocks": {
+            "https://nyaruka.zendesk.com/api/v2/targets.json": [
+                {
+                    "status": 200,
+                    "body": "{\"target\":{\"id\":12324}}"
+                }
+            ],
+            "https://nyaruka.zendesk.com/api/v2/triggers.json": [
+                {
+                    "status": 200,
+                    "body": "{\"trigger\":{\"id\":23456}}"
+                }
+            ]
+        },
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {
+            "events": [
+                {
+                    "type_id": "create_integration_instance",
+                    "timestamp": "2015-09-08T22:48:09Z",
+                    "subdomain": "nyaruka",
+                    "integration_name": "Temba",
+                    "integration_id": "25e2b1b2-e7f9-4485-8331-9f890aa9e2b8",
+                    "data": {
+                        "metadata": "{\"ticketer\":\"4ee6d4f3-f92b-439b-9718-8da90c05490b\",\"secret\":\"sesame\"}"
+                    }
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "status": "OK"
+        }
+    },
+    {
+        "label": "error for resources_created_from_external_ids event with invalid request ID",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {
+            "events": [
+                {
+                    "type_id": "resources_created_from_external_ids",
+                    "timestamp": "2015-09-08T22:48:09Z",
+                    "subdomain": "nyaruka",
+                    "integration_name": "Temba",
+                    "integration_id": "25e2b1b2-e7f9-4485-8331-9f890aa9e2b8",
+                    "data": {
+                        "request_id": "xxxx",
+                        "resource_events": []
+                    }
+                }
+            ]
+        },
+        "status": 400,
+        "response": {
+            "error": "invalid request ID format"
+        }
+    },
+    {
+        "label": "set our id as external id in zendesk for resources_created_from_external_ids event for comment_on_new_ticket",
+        "http_mocks": {
+            "https://nyaruka.zendesk.com/api/v2/tickets/222.json": [
+                {
+                    "status": 200,
+                    "body": "{}"
+                }
+            ]
+        },
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {
+            "events": [
+                {
+                    "type_id": "resources_created_from_external_ids",
+                    "timestamp": "2015-09-08T22:48:09Z",
+                    "subdomain": "nyaruka",
+                    "integration_name": "Temba",
+                    "integration_id": "25e2b1b2-e7f9-4485-8331-9f890aa9e2b8",
+                    "data": {
+                        "request_id": "sesame:1242663456373",
+                        "resource_events": [
+                            {
+                                "type_id": "comment_on_new_ticket",
+                                "external_id": "c69f103c-db64-4481-815b-1112890419ef",
+                                "comment_id": 111,
+                                "ticket_id": 222
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "status": "OK"
+        }
     }
 ]
