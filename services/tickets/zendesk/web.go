@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -26,7 +27,7 @@ func init() {
 
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
 	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", services.WithHTTPLogs(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodPost, base+"/ticket_callback", services.WithHTTPLogs(handleTicketCallback))
+	web.RegisterJSONRoute(http.MethodPost, base+"/target/{ticketer:[a-f0-9\\-]+}", services.WithHTTPLogs(handleTicketerTarget))
 }
 
 type integrationMetadata struct {
@@ -203,11 +204,10 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 
 func processCommentOnNewTicket(ctx context.Context, db *sqlx.DB, reqID RequestID, re resourceEvent, l *models.HTTPLogger) error {
 	// look up our ticket and ticketer
-	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, flows.TicketUUID(re.ExternalID), typeZendesk)
+	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, db, flows.TicketUUID(re.ExternalID), typeZendesk)
 	if err != nil {
 		return err
 	}
-	zendesk := svc.(*service)
 
 	// check ticketer secret
 	if ticketer.Config(configSecret) != reqID.Secret {
@@ -215,50 +215,45 @@ func processCommentOnNewTicket(ctx context.Context, db *sqlx.DB, reqID RequestID
 	}
 
 	// update our local ticket with the ID from Zendesk
-	if err := models.UpdateTicketExternalID(ctx, db, ticket, fmt.Sprintf("%d", re.TicketID)); err != nil {
-		return err
+	return models.UpdateTicketExternalID(ctx, db, ticket, fmt.Sprintf("%d", re.TicketID))
+}
+
+type targetRequest struct {
+	Event  string `json:"event"   validate:"required"`
+	ID     int64  `json:"id"      validate:"required"`
+	Status string `json:"status"`
+}
+
+func handleTicketerTarget(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
+
+	// look up our ticketer
+	ticketer, _, err := tickets.FromTicketerUUID(ctx, s.DB, ticketerUUID, typeZendesk)
+	if err != nil || ticketer == nil {
+		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
 
-	// update zendesk ticket with our UUID
-	return zendesk.SetExternalID(ticket, l.Ticketer(ticketer))
-}
+	// check authentication
+	username, password, _ := r.BasicAuth()
+	if username != "zendesk" || password != ticketer.Config(configSecret) {
+		return map[string]string{"status": "unauthorized"}, http.StatusUnauthorized, nil
+	}
 
-type ticketCallbackTicket struct {
-	ID         int64  `json:"id"            validate:"required"`
-	ExternalID string `json:"external_id"`
-	Status     string `json:"status"        validate:"required"`
-	Via        string `json:"via"`
-	Link       string `json:"link"`
-}
-
-type ticketCallbackRequest struct {
-	Event  string               `json:"event"  validate:"required"`
-	Ticket ticketCallbackTicket `json:"ticket" validate:"required"`
-}
-
-func handleTicketCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
-	request := &ticketCallbackRequest{}
+	// parse request payload
+	request := &targetRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
-	// if this ticket doesn't have an external ID then it doesn't belong to us
-	if request.Ticket.ExternalID == "" {
+	// lookup ticket
+	ticket, err := models.LookupTicketByExternalID(ctx, s.DB, ticketer.ID(), fmt.Sprintf("%d", request.ID))
+	if err != nil || ticket == nil {
+		// we don't return an error here, because ticket might just belong to a different ticketer
 		return map[string]string{"status": "ignored"}, http.StatusOK, nil
 	}
 
-	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, s.DB, flows.TicketUUID(request.Ticket.ExternalID), typeZendesk)
-	if err != nil {
-		return err, http.StatusBadRequest, nil
-	}
-
-	username, password, _ := r.BasicAuth()
-	if username != "mailroom" || password != ticketer.Config(configSecret) {
-		return map[string]string{"status": "unauthorized"}, http.StatusUnauthorized, nil
-	}
-
 	if request.Event == "status_changed" {
-		switch strings.ToLower(request.Ticket.Status) {
+		switch strings.ToLower(request.Status) {
 		case statusSolved:
 			err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)
 		case statusOpen:

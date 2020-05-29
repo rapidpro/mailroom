@@ -163,15 +163,7 @@
         }
     },
     {
-        "label": "set our id as external id in zendesk for resources_created_from_external_ids event for comment_on_new_ticket",
-        "http_mocks": {
-            "https://nyaruka.zendesk.com/api/v2/tickets/222.json": [
-                {
-                    "status": 200,
-                    "body": "{}"
-                }
-            ]
-        },
+        "label": "set local external id to zendesk ID for resources_created_from_external_ids event for comment_on_new_ticket",
         "method": "POST",
         "path": "/mr/tickets/types/zendesk/event_callback",
         "body": {
@@ -199,6 +191,12 @@
         "status": 200,
         "response": {
             "status": "OK"
-        }
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from tickets_ticket where external_id = '222'",
+                "count": 1
+            }
+        ]
     }
 ]

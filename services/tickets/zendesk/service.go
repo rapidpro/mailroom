@@ -130,30 +130,17 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return err
 }
 
-func (s *service) SetExternalID(ticket *models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	id, err := ticketToZendeskID(ticket)
-	if err != nil {
-		return nil
-	}
-
-	_, trace, err := s.restClient.UpdateTicket(&Ticket{ID: id, ExternalID: string(ticket.UUID())})
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	return err
-}
-
 func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
-	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/ticket_callback", domain)
+	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/target/%s", domain, s.ticketer.UUID())
 
-	// TODO check for existing target with this URL
+	// TODO check for existing target with this URL and remove it
 
 	target := &Target{
 		Type:        "http_target",
 		Title:       fmt.Sprintf("%s Tickets", name),
 		TargetURL:   targetURL,
 		Method:      "POST",
-		Username:    "mailroom",
+		Username:    "zendesk",
 		Password:    s.secret,
 		ContentType: "application/json",
 	}
@@ -168,13 +155,8 @@ func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCa
 
 	payload := `{
 		"event": "status_changed",
-		"ticket": {
-			"id": {{ticket.id}},
-			"external_id": "{{ticket.external_id}}",
-			"status": "{{ticket.status}}",
-			"via": "{{ticket.via}}",
-			"link": "{{ticket.link}}"
-		}
+		"id": {{ticket.id}},
+		"status": "{{ticket.status}}"
 	}`
 
 	trigger := &Trigger{

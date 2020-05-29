@@ -177,7 +177,7 @@ func loadTickets(ctx context.Context, db Queryer, query string, params ...interf
 	return tickets, nil
 }
 
-const selectTicketSQL = `
+const selectTicketByUUIDSQL = `
 SELECT
   id,
   uuid,
@@ -200,9 +200,40 @@ WHERE
 
 // LookupTicketByUUID looks up the ticket with the passed in UUID
 func LookupTicketByUUID(ctx context.Context, db Queryer, uuid flows.TicketUUID) (*Ticket, error) {
-	rows, err := db.QueryxContext(ctx, selectTicketSQL, string(uuid))
+	return lookupTicket(ctx, db, selectTicketByUUIDSQL, uuid)
+}
+
+const selectTicketByExternalIDSQL = `
+SELECT
+  id,
+  uuid,
+  org_id,
+  contact_id,
+  ticketer_id,
+  external_id,
+  status,
+  subject,
+  body,
+  config,
+  opened_on,
+  modified_on,
+  closed_on
+FROM
+  tickets_ticket
+WHERE
+  ticketer_id = $1 AND
+  external_id = $2
+`
+
+// LookupTicketByExternalID looks up the ticket with the passed in ticketer and external ID
+func LookupTicketByExternalID(ctx context.Context, db Queryer, ticketerID TicketerID, externalID string) (*Ticket, error) {
+	return lookupTicket(ctx, db, selectTicketByExternalIDSQL, ticketerID, externalID)
+}
+
+func lookupTicket(ctx context.Context, db Queryer, query string, params ...interface{}) (*Ticket, error) {
+	rows, err := db.QueryxContext(ctx, query, params...)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, errors.Wrapf(err, "error querying for ticket for uuid: %s", string(uuid))
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -213,7 +244,7 @@ func LookupTicketByUUID(ctx context.Context, db Queryer, uuid flows.TicketUUID) 
 	ticket := &Ticket{}
 	err = rows.StructScan(&ticket.t)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading ticket for uuid: %s", string(uuid))
+		return nil, err
 	}
 
 	return ticket, nil
