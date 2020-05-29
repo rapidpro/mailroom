@@ -161,10 +161,10 @@ func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCa
 	}
 
 	payload := `{
-		"event": "status_changed",
-		"id": {{ticket.id}},
-		"status": "{{ticket.status}}"
-	}`
+	"event": "status_changed",
+	"id": {{ticket.id}},
+	"status": "{{ticket.status}}"
+}`
 
 	trigger := &Trigger{
 		Title: fmt.Sprintf("Notify %s on ticket status change", name),

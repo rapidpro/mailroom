@@ -57,7 +57,7 @@ func TestTickets(t *testing.T) {
 		models.Org2,
 		models.AlexandriaID,
 		models.ZendeskID,
-		"EX7869",
+		"EX6677",
 		"Other Org Ticket",
 		"Where are my pants?",
 		nil,
@@ -79,9 +79,14 @@ func TestTickets(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE status = 'O' AND closed_on IS NULL`, nil, 3)
 
 	// can lookup a ticket by UUID
-	tk, err := models.LookupTicketByUUID(ctx, db, "2ef57efc-d85f-4291-b330-e4afe68af5fe")
+	tk1, err := models.LookupTicketByUUID(ctx, db, "2ef57efc-d85f-4291-b330-e4afe68af5fe")
 	assert.NoError(t, err)
-	assert.Equal(t, "New Ticket", tk.Subject())
+	assert.Equal(t, "New Ticket", tk1.Subject())
+
+	// can lookup a ticket by external ID and ticketer
+	tk2, err := models.LookupTicketByExternalID(ctx, db, models.ZendeskID, "EX7869")
+	assert.NoError(t, err)
+	assert.Equal(t, "New Zen Ticket", tk2.Subject())
 
 	// can lookup open tickets by contact
 	org1, _ := models.GetOrgAssets(ctx, db, models.Org1)
