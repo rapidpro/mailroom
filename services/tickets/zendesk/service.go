@@ -27,6 +27,7 @@ const (
 
 	statusOpen   = "open"
 	statusSolved = "solved"
+	statusClosed = "closed"
 )
 
 func init() {
@@ -118,7 +119,7 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 		return nil
 	}
 
-	_, trace, err := s.restClient.UpdateManyTickets(ids, statusSolved)
+	_, trace, err := s.restClient.UpdateManyTickets(ids, statusClosed)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
