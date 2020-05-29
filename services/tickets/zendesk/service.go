@@ -22,6 +22,8 @@ const (
 	configOAuthToken = "oauth_token"
 	configPushID     = "push_id"
 	configPushToken  = "push_token"
+	configTargetID   = "target_id"
+	configTriggerID  = "trigger_id"
 
 	statusOpen   = "open"
 	statusSolved = "solved"
@@ -36,9 +38,10 @@ type service struct {
 	pushClient     *PushClient
 	ticketer       *flows.Ticketer
 	redactor       utils.Redactor
-	integrationID  string
 	secret         string
 	instancePushID string
+	targetID       string
+	triggerID      string
 }
 
 // NewService creates a new zendesk ticket service
@@ -48,6 +51,9 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 	oAuthToken := config[configOAuthToken]
 	instancePushID := config[configPushID]
 	pushToken := config[configPushToken]
+	targetID := config[configTargetID]
+	triggerID := config[configTriggerID]
+
 	if subdomain != "" && secret != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
 		return &service{
 			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
@@ -56,6 +62,8 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
 			secret:         secret,
 			instancePushID: instancePushID,
+			targetID:       targetID,
+			triggerID:      triggerID,
 		}, nil
 	}
 	return nil, errors.New("missing subdomain or secret or oauth_token or push_id or push_token in zendesk config")
@@ -130,10 +138,9 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return err
 }
 
-func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
+// AddStatusCallback adds a target and trigger to callback to us when ticket status is changed
+func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) (map[string]string, error) {
 	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/target/%s", domain, s.ticketer.UUID())
-
-	// TODO check for existing target with this URL and remove it
 
 	target := &Target{
 		Type:        "http_target",
@@ -150,7 +157,7 @@ func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCa
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	payload := `{
@@ -176,11 +183,37 @@ func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCa
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]string{
+		configTargetID:  NumericIDToString(target.ID),
+		configTriggerID: NumericIDToString(trigger.ID),
+	}, nil
 }
 
-func (s *service) RemoveStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
-	// TODO.. check if we're the last ticketer using this integration and then remove?
+func (s *service) RemoveStatusCallback(logHTTP flows.HTTPLogCallback) error {
+	if s.triggerID != "" {
+		id, _ := ParseNumericID(s.triggerID)
+		trace, err := s.restClient.DeleteTrigger(id)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if s.targetID != "" {
+		id, _ := ParseNumericID(s.targetID)
+		trace, err := s.restClient.DeleteTarget(id)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

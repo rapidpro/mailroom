@@ -445,6 +445,33 @@ func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
 }
 
+const updateTicketerConfigSQL = `
+UPDATE 
+	tickets_ticketer
+SET
+	config = $2
+WHERE 
+	id = $1
+`
+
+// UpdateConfig updates the configuration of this ticketer with the given values
+func (t *Ticketer) UpdateConfig(ctx context.Context, db *sqlx.DB, add map[string]string, remove map[string]bool) error {
+	for key, value := range add {
+		t.t.Config[key] = value
+	}
+	for key := range remove {
+		delete(t.t.Config, key)
+	}
+
+	// convert to null.Map to save
+	dbMap := make(map[string]interface{}, len(t.t.Config))
+	for key, value := range t.t.Config {
+		dbMap[key] = value
+	}
+
+	return Exec(ctx, "update ticketer config", db, updateTicketerConfigSQL, t.t.ID, null.NewMap(dbMap))
+}
+
 // TicketService extends the engine's ticket service and adds support for forwarding new incoming messages
 type TicketService interface {
 	flows.TicketService
@@ -501,7 +528,7 @@ func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerU
 	return ticketer, nil
 }
 
-const selectTicketersSQL = `
+const selectOrgTicketersSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.id as id,
 	t.uuid as uuid,
@@ -523,7 +550,7 @@ ORDER BY
 func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Ticketer, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectTicketersSQL, orgID)
+	rows, err := db.Queryx(selectOrgTicketersSQL, orgID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying ticketers for org: %d", orgID)
 	}

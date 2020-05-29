@@ -107,13 +107,13 @@
             "https://nyaruka.zendesk.com/api/v2/targets.json": [
                 {
                     "status": 200,
-                    "body": "{\"target\":{\"id\":12324}}"
+                    "body": "{\"target\":{\"id\":15}}"
                 }
             ],
             "https://nyaruka.zendesk.com/api/v2/triggers.json": [
                 {
                     "status": 200,
-                    "body": "{\"trigger\":{\"id\":23456}}"
+                    "body": "{\"trigger\":{\"id\":23}}"
                 }
             ]
         },
@@ -136,7 +136,56 @@
         "status": 200,
         "response": {
             "status": "OK"
-        }
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from tickets_ticketer where config @> '{\"target_id\": \"15\", \"trigger_id\": \"23\"}'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "target and trigger deleted for destroy_integration_instance event",
+        "http_mocks": {
+            "https://nyaruka.zendesk.com/api/v2/targets/15.json": [
+                {
+                    "status": 200,
+                    "body": ""
+                }
+            ],
+            "https://nyaruka.zendesk.com/api/v2/triggers/23.json": [
+                {
+                    "status": 200,
+                    "body": ""
+                }
+            ]
+        },
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {
+            "events": [
+                {
+                    "type_id": "destroy_integration_instance",
+                    "timestamp": "2015-09-08T22:48:09Z",
+                    "subdomain": "nyaruka",
+                    "integration_name": "Temba",
+                    "integration_id": "25e2b1b2-e7f9-4485-8331-9f890aa9e2b8",
+                    "data": {
+                        "metadata": "{\"ticketer\":\"4ee6d4f3-f92b-439b-9718-8da90c05490b\",\"secret\":\"sesame\"}"
+                    }
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "status": "OK"
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from tickets_ticketer where config @> '{\"target_id\": \"15\", \"trigger_id\": \"23\"}'",
+                "count": 0
+            }
+        ]
     },
     {
         "label": "error for resources_created_from_external_ids event with invalid request ID",

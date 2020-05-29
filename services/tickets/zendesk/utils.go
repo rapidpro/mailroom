@@ -12,6 +12,18 @@ import (
 	"github.com/pkg/errors"
 )
 
+func ParseNumericID(s string) (int64, error) {
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, errors.Errorf("%s is not a valid zendesk numeric id", s)
+	}
+	return n, nil
+}
+
+func NumericIDToString(n int64) string {
+	return fmt.Sprintf("%d", n)
+}
+
 // RequestID is a helper class to construct and later parse requests IDs for push requests
 type RequestID struct {
 	Secret    string
@@ -45,20 +57,10 @@ func ticketsToZendeskIDs(tickets []*models.Ticket) ([]int64, error) {
 	var err error
 	ids := make([]int64, len(tickets))
 	for i := range tickets {
-		ids[i], err = ticketToZendeskID(tickets[i])
+		ids[i], err = ParseNumericID(string(tickets[i].ExternalID()))
 		if err != nil {
 			return nil, err
 		}
 	}
 	return ids, nil
-}
-
-// parses out the zendesk ticket ID from our local external ID field
-func ticketToZendeskID(ticket *models.Ticket) (int64, error) {
-	idStr := string(ticket.ExternalID())
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		return 0, errors.Errorf("%s is not a valid zendesk ticket id", idStr)
-	}
-	return id, nil
 }

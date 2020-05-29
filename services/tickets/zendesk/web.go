@@ -165,15 +165,27 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 
 		if event.TypeID == "create_integration_instance" {
 			// user has added an account through the admin UI
-			if err := zendesk.AddStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer)); err != nil {
+			newConfig, err := zendesk.AddStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer))
+			if err != nil {
 				return err
+			}
+
+			// save away the target and trigger zendesk ids
+			if err := ticketer.UpdateConfig(ctx, db, newConfig, nil); err != nil {
+				return errors.Wrapf(err, "error updating config for ticketer %s", ticketer.UUID())
 			}
 
 			lr.Info("zendesk channel account added")
 		} else {
 			// user has removed a channel account
-			if err := zendesk.RemoveStatusCallback(event.IntegrationName, event.IntegrationID, l.Ticketer(ticketer)); err != nil {
+			if err := zendesk.RemoveStatusCallback(l.Ticketer(ticketer)); err != nil {
 				return err
+			}
+
+			// delete config values that came from adding this account
+			remConfig := utils.StringSet([]string{configPushID, configPushToken, configTargetID, configTriggerID})
+			if err := ticketer.UpdateConfig(ctx, db, nil, remConfig); err != nil {
+				return errors.Wrapf(err, "error updating config for ticketer %s", ticketer.UUID())
 			}
 
 			lr.Info("zendesk channel account removed")
