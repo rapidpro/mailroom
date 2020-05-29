@@ -13,7 +13,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/services"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
@@ -26,8 +25,8 @@ func init() {
 	base := "/mr/tickets/types/zendesk"
 
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
-	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", services.WithHTTPLogs(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodPost, base+"/target/{ticketer:[a-f0-9\\-]+}", services.WithHTTPLogs(handleTicketerTarget))
+	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
+	web.RegisterJSONRoute(http.MethodPost, base+"/target/{ticketer:[a-f0-9\\-]+}", web.WithHTTPLogs(handleTicketerTarget))
 }
 
 type integrationMetadata struct {

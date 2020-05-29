@@ -1,4 +1,4 @@
-package services_test
+package web_test
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/services"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +48,7 @@ func TestWithHTTPLogs(t *testing.T) {
 
 	// simulate handler being invoked by server
 	server := &web.Server{DB: testsuite.DB()}
-	wrapped := services.WithHTTPLogs(handler)
+	wrapped := web.WithHTTPLogs(handler)
 	response, status, err := wrapped(testsuite.CTX(), server, nil)
 
 	// check response from handler

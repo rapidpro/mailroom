@@ -12,7 +12,6 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/services"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
@@ -22,7 +21,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/mailgun"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/receive", services.WithHTTPLogs(handleReceive))
+	web.RegisterJSONRoute(http.MethodPost, base+"/receive", web.WithHTTPLogs(handleReceive))
 }
 
 type receiveRequest struct {

@@ -12,8 +12,8 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/close", web.RequireAuthToken(handleClose))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/reopen", web.RequireAuthToken(handleReopen))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/close", web.RequireAuthToken(web.WithHTTPLogs(handleClose)))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/reopen", web.RequireAuthToken(web.WithHTTPLogs(handleReopen)))
 }
 
 type bulkTicketRequest struct {
@@ -40,7 +40,7 @@ func newBulkResponse(changed []*models.Ticket) *bulkTicketResponse {
 //     "ticket_ids": [1234, 2345]
 //   }
 //
-func handleClose(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleClose(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &bulkTicketRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -57,15 +57,9 @@ func handleClose(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	logger := &models.HTTPLogger{}
-
-	err = models.CloseTickets(ctx, s.DB, org, tickets, true, logger)
+	err = models.CloseTickets(ctx, s.DB, org, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error closing tickets for org: %d", request.OrgID)
-	}
-
-	if err := logger.Insert(ctx, s.DB); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrap(err, "error writing HTTP logs")
 	}
 
 	return newBulkResponse(tickets), http.StatusOK, nil
@@ -78,7 +72,7 @@ func handleClose(ctx context.Context, s *web.Server, r *http.Request) (interface
 //     "ticket_ids": [1234, 2345]
 //   }
 //
-func handleReopen(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleReopen(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &bulkTicketRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -95,15 +89,9 @@ func handleReopen(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	logger := &models.HTTPLogger{}
-
-	err = models.ReopenTickets(ctx, s.DB, org, tickets, true, logger)
+	err = models.ReopenTickets(ctx, s.DB, org, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
-	}
-
-	if err := logger.Insert(ctx, s.DB); err != nil {
-		return nil, http.StatusBadRequest, errors.Wrap(err, "error writing HTTP logs")
 	}
 
 	return newBulkResponse(tickets), http.StatusOK, nil
