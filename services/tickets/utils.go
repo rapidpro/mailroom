@@ -14,6 +14,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// GetContactDisplay gets a non-empty display value for a contact for use on a ticket
+func GetContactDisplay(env envs.Environment, contact *flows.Contact) string {
+	display := contact.Format(env)
+	if display == "" {
+		return "Anonymous"
+	}
+	return display
+}
+
 // FromTicketUUID takes a ticket UUID and looks up the ticket and ticketer, and creates the service
 func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, ticketerType string) (*models.Ticket, *models.Ticketer, models.TicketService, error) {
 	// look up our ticket

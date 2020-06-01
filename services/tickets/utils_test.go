@@ -3,6 +3,7 @@ package tickets_test
 import (
 	"testing"
 
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/services/tickets"
@@ -13,6 +14,32 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGetContactDisplay(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	require.NoError(t, err)
+
+	contact, err := models.LoadContact(ctx, db, org, models.CathyID)
+	require.NoError(t, err)
+
+	flowContact, err := contact.FlowContact(org)
+	require.NoError(t, err)
+
+	// name if they have one
+	assert.Equal(t, "Cathy", tickets.GetContactDisplay(org.Env(), flowContact))
+
+	flowContact.SetName("")
+
+	// or primary URN
+	assert.Equal(t, "(605) 574-1111", tickets.GetContactDisplay(org.Env(), flowContact))
+
+	// but not if org is anon
+	anonEnv := envs.NewBuilder().WithRedactionPolicy(envs.RedactionPolicyURNs).Build()
+	assert.Equal(t, "10000", tickets.GetContactDisplay(anonEnv, flowContact))
+}
 
 func TestFromTicketUUID(t *testing.T) {
 	testsuite.ResetDB()
@@ -31,6 +58,8 @@ func TestFromTicketUUID(t *testing.T) {
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, models.MailgunID)
+
+	models.FlushCache()
 
 	// err if no ticket with UUID
 	_, _, _, err := tickets.FromTicketUUID(ctx, db, "33c54d0c-bd49-4edf-87a9-c391a75a630c", "mailgun")

@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/services/tickets"
 
 	"github.com/pkg/errors"
 )
@@ -24,11 +25,17 @@ const (
 	configToAddress = "to_address"
 	configBrandName = "brand_name"
 	configURLBase   = "url_base"
+
+	ticketConfigContactUUID    = "contact-uuid"
+	ticketConfigContactDisplay = "contact-display"
 )
 
 // subject and body templates for messages being forwarded from contact
-var forwardSubjectTemplate = newTemplate("forward_subject", `[{{.brand}}-Tickets] {{.subject}}`)
-var forwardBodyTemplate = newTemplate("forward_body", `{{.message}}
+var forwardSubjectTemplate = newTemplate("forward_subject", `[{{.brand}}] {{.contact}}: {{.subject}}`)
+var forwardBodyTemplate = newTemplate("forward_body", `{{.contact}}:
+------------------------------------------------
+
+{{.message}}
 
 ------------------------------------------------
 * Reply to the contact by replying to this email
@@ -37,7 +44,7 @@ var forwardBodyTemplate = newTemplate("forward_body", `{{.message}}
 `)
 
 // subject and body templates for ticket being closed
-var closedSubjectTemplate = newTemplate("closed_subject", `[{{.brand}}-Tickets] {{.subject}} CLOSED`)
+var closedSubjectTemplate = newTemplate("closed_subject", `[{{.brand}}] {{.contact}}: {{.subject}} CLOSED`)
 var closedBodyTemplate = newTemplate("closed_body", `{{.message}}
 * Ticket has been closed
 * Replying to the contact will reopen this ticket
@@ -45,7 +52,7 @@ var closedBodyTemplate = newTemplate("closed_body", `{{.message}}
 `)
 
 // subject and body templates for ticket being reopened
-var reopenedSubjectTemplate = newTemplate("reopened_subject", `[{{.brand}}-Tickets] {{.subject}} REOPENED`)
+var reopenedSubjectTemplate = newTemplate("reopened_subject", `[{{.brand}}] {{.contact}}: {{.subject}} REOPENED`)
 var reopenedBodyTemplate = newTemplate("reopened_body", `{{.message}}
 * Ticket has been reopened
 * Close this ticket by replying with CLOSE
@@ -92,10 +99,10 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 // Open opens a ticket which for mailgun means just sending an initial email
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticketUUID := flows.TicketUUID(uuids.New())
-	contactDisplay := session.Contact().Format(session.Environment())
+	contactDisplay := tickets.GetContactDisplay(session.Environment(), session.Contact())
 
 	from := s.ticketAddress(contactDisplay, ticketUUID)
-	context := s.templateContext(subject, body, string(session.Contact().UUID()))
+	context := s.templateContext(subject, body, string(session.Contact().UUID()), contactDisplay)
 	fullSubject := evaluateTemplate(forwardSubjectTemplate, context)
 	fullBody := evaluateTemplate(forwardBodyTemplate, context)
 
@@ -111,7 +118,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
-	context := s.templateContext(ticket.Subject(), text, ticket.Config("contact-uuid"))
+	context := s.templateContext(ticket.Subject(), text, ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
 	subject := evaluateTemplate(forwardSubjectTemplate, context)
 	body := evaluateTemplate(forwardBodyTemplate, context)
 
@@ -121,7 +128,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, ticket := range tickets {
-		context := s.templateContext(ticket.Subject(), "", ticket.Config("contact-uuid"))
+		context := s.templateContext(ticket.Subject(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
 		subject := evaluateTemplate(closedSubjectTemplate, context)
 		body := evaluateTemplate(closedBodyTemplate, context)
 
@@ -135,7 +142,7 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, ticket := range tickets {
-		context := s.templateContext(ticket.Subject(), "", ticket.Config("contact-uuid"))
+		context := s.templateContext(ticket.Subject(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
 		subject := evaluateTemplate(reopenedSubjectTemplate, context)
 		body := evaluateTemplate(reopenedBodyTemplate, context)
 
@@ -148,7 +155,7 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 }
 
 func (s *service) sendInTicket(ticket *models.Ticket, subject, text string, logHTTP flows.HTTPLogCallback) (string, error) {
-	contactDisplay := ticket.Config("contact-display")
+	contactDisplay := ticket.Config(ticketConfigContactDisplay)
 	lastMessageID := ticket.Config("last-message-id")
 	from := s.ticketAddress(contactDisplay, ticket.UUID())
 
@@ -169,23 +176,19 @@ func (s *service) send(from, to, subject, text string, headers map[string]string
 
 func (s *service) ticketAddress(contactDisplay string, ticketUUID flows.TicketUUID) string {
 	address := fmt.Sprintf("ticket+%s@%s", ticketUUID, s.client.domain)
-
-	if contactDisplay == "" {
-		return address
-	}
-
-	return fmt.Sprintf("%s <%s>", contactDisplay, address)
+	return fmt.Sprintf("%s via %s <%s>", contactDisplay, s.brandName, address)
 }
 
 func (s *service) noReplyAddress() string {
 	return fmt.Sprintf("no-reply@%s", s.client.domain)
 }
 
-func (s *service) templateContext(subject, message, contactUUID string) map[string]string {
+func (s *service) templateContext(subject, message, contactUUID, contactDisplay string) map[string]string {
 	return map[string]string{
 		"brand":       s.brandName,                                                // rapidpro brand
 		"subject":     subject,                                                    // original ticket subject
 		"message":     message,                                                    // new message if this is a forward
+		"contact":     contactDisplay,                                             // display name contact
 		"contact_url": fmt.Sprintf("%s/contact/read/%s/", s.urlBase, contactUUID), // link to contact
 	}
 }
