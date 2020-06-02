@@ -80,6 +80,7 @@ func (t *Ticket) TicketerID() TicketerID  { return t.t.TicketerID }
 func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
 func (t *Ticket) Status() TicketStatus    { return t.t.Status }
 func (t *Ticket) Subject() string         { return t.t.Subject }
+func (t *Ticket) Body() string            { return t.t.Body }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
 }
