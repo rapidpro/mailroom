@@ -31,7 +31,9 @@ const (
 	ticketConfigLastMessageID  = "last-message-id"
 )
 
-var openSubjectTemplate = newTemplate("open_subject", `[{{.brand}}] {{.contact}}: {{.subject}}`)
+var subjectTemplate = newTemplate("subject", `[{{.brand}}] {{.contact}}: {{.subject}}`)
+
+// body template for new ticket being opened
 var openBodyTemplate = newTemplate("open_body", `New ticket opened
 ------------------------------------------------
 
@@ -43,8 +45,7 @@ var openBodyTemplate = newTemplate("open_body", `New ticket opened
 * View this contact at {{.contact_url}}
 `)
 
-// subject and body templates for messages being forwarded from contact
-var forwardSubjectTemplate = newTemplate("forward_subject", `[{{.brand}}] {{.contact}}: {{.subject}}`)
+// body template for message being forwarded from contact
 var forwardBodyTemplate = newTemplate("forward_body", `{{.contact}} replied:
 ------------------------------------------------
 
@@ -56,16 +57,14 @@ var forwardBodyTemplate = newTemplate("forward_body", `{{.contact}} replied:
 * View this contact at {{.contact_url}}
 `)
 
-// subject and body templates for ticket being closed
-var closedSubjectTemplate = newTemplate("closed_subject", `[{{.brand}}] {{.contact}}: {{.subject}} CLOSED`)
+// body template for ticket being closed
 var closedBodyTemplate = newTemplate("closed_body", `{{.message}}
 * Ticket has been closed
 * Replying to the contact will reopen this ticket
 * View this contact at {{.contact_url}}
 `)
 
-// subject and body templates for ticket being reopened
-var reopenedSubjectTemplate = newTemplate("reopened_subject", `[{{.brand}}] {{.contact}}: {{.subject}} REOPENED`)
+// body template for ticket being reopened
 var reopenedBodyTemplate = newTemplate("reopened_body", `{{.message}}
 * Ticket has been reopened
 * Close this ticket by replying with CLOSE
@@ -116,7 +115,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 	from := s.ticketAddress(contactDisplay, ticketUUID)
 	context := s.templateContext(subject, body, "", string(session.Contact().UUID()), contactDisplay)
-	fullSubject := evaluateTemplate(openSubjectTemplate, context)
+	fullSubject := evaluateTemplate(subjectTemplate, context)
 	fullBody := evaluateTemplate(openBodyTemplate, context)
 
 	msgID, trace, err := s.client.SendMessage(from, s.toAddress, fullSubject, fullBody, nil)
@@ -132,7 +131,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
 	context := s.templateContext(ticket.Subject(), ticket.Body(), text, ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
-	subject := evaluateTemplate(forwardSubjectTemplate, context)
+	subject := evaluateTemplate(subjectTemplate, context)
 	body := evaluateTemplate(forwardBodyTemplate, context)
 
 	_, err := s.sendInTicket(ticket, subject, body, logHTTP)
@@ -142,7 +141,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, ticket := range tickets {
 		context := s.templateContext(ticket.Subject(), ticket.Body(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
-		subject := evaluateTemplate(closedSubjectTemplate, context)
+		subject := evaluateTemplate(subjectTemplate, context)
 		body := evaluateTemplate(closedBodyTemplate, context)
 
 		_, err := s.sendInTicket(ticket, subject, body, logHTTP)
@@ -156,7 +155,7 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, ticket := range tickets {
 		context := s.templateContext(ticket.Subject(), ticket.Body(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
-		subject := evaluateTemplate(reopenedSubjectTemplate, context)
+		subject := evaluateTemplate(subjectTemplate, context)
 		body := evaluateTemplate(reopenedBodyTemplate, context)
 
 		_, err := s.sendInTicket(ticket, subject, body, logHTTP)
