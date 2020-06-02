@@ -28,6 +28,7 @@ const (
 
 	ticketConfigContactUUID    = "contact-uuid"
 	ticketConfigContactDisplay = "contact-display"
+	ticketConfigLastMessageID  = "last-message-id"
 )
 
 var openSubjectTemplate = newTemplate("open_subject", `[{{.brand}}] {{.contact}}: {{.subject}}`)
@@ -166,12 +167,20 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return nil
 }
 
+// sends an email as part of the thread for the given ticket
 func (s *service) sendInTicket(ticket *models.Ticket, subject, text string, logHTTP flows.HTTPLogCallback) (string, error) {
 	contactDisplay := ticket.Config(ticketConfigContactDisplay)
-	lastMessageID := ticket.Config("last-message-id")
+	lastMessageID := ticket.Config(ticketConfigLastMessageID)
+	if lastMessageID == "" {
+		lastMessageID = string(ticket.ExternalID()) // id of first message sent becomes external ID
+	}
+	headers := map[string]string{
+		"In-Reply-To": lastMessageID,
+		"References":  lastMessageID,
+	}
 	from := s.ticketAddress(contactDisplay, ticket.UUID())
 
-	return s.send(from, s.toAddress, subject, text, map[string]string{"In-Reply-To": lastMessageID}, logHTTP)
+	return s.send(from, s.toAddress, subject, text, headers, logHTTP)
 }
 
 func (s *service) send(from, to, subject, text string, headers map[string]string, logHTTP flows.HTTPLogCallback) (string, error) {

@@ -105,8 +105,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *model
 
 	// update our ticket
 	config := map[string]string{
-		"last-message-id": request.MessageID,
-		"last-subject":    request.Subject,
+		ticketConfigLastMessageID: request.MessageID,
 	}
 	err = models.UpdateAndKeepOpenTicket(ctx, s.DB, ticket, config)
 	if err != nil {
