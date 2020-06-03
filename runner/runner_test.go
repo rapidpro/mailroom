@@ -146,8 +146,7 @@ func TestBatchStart(t *testing.T) {
 		start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.MessagingFlow, tc.Flow, tc.Restart, tc.IncludeActive).
 			WithContactIDs(contactIDs).
 			WithExtra(tc.Extra)
-		batch := start.CreateBatch(contactIDs)
-		batch.SetIsLast(true)
+		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
 		sessions, err := StartFlowBatch(ctx, db, rp, batch)
 		assert.NoError(t, err)
@@ -197,7 +196,7 @@ func TestContactRuns(t *testing.T) {
 	contact, err := contacts[0].FlowContact(org)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
+	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, false, nil)
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
