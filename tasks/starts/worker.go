@@ -141,8 +141,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	contacts := make([]models.ContactID, 0, 100)
 	queueBatch := func(last bool) {
-		batch := start.CreateBatch(contacts)
-		batch.SetIsLast(last)
+		batch := start.CreateBatch(contacts, last, len(contactIDs))
 		err = queue.AddTask(rc, q, taskType, int(start.OrgID()), batch, queue.DefaultPriority)
 		if err != nil {
 			// TODO: is continuing the right thing here? what do we do if redis is down? (panic!)
