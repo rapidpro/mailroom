@@ -210,7 +210,7 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 		options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
 			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil), nil
+				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, false, nil), nil
 			}
 			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil), nil
 		}

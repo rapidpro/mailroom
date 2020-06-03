@@ -174,19 +174,22 @@ func StartFlowBatch(
 		}
 	}
 
+	// whether engine allows some functions is based on whether there is more than one contact being started
+	batchStart := batch.TotalContacts() > 1
+
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) (flows.Trigger, error) {
 		if batch.ParentSummary() != nil {
-			trigger, err := triggers.NewFlowAction(org.Env(), flow.FlowReference(), contact, batch.ParentSummary())
+			trigger, err := triggers.NewFlowAction(org.Env(), flow.FlowReference(), contact, batch.ParentSummary(), batchStart)
 			if err != nil {
 				return nil, errors.Wrap(err, "unable to create flow action trigger")
 			}
 			return trigger, nil
 		}
 		if batch.Extra() != nil {
-			return triggers.NewManual(org.Env(), flow.FlowReference(), contact, params), nil
+			return triggers.NewManual(org.Env(), flow.FlowReference(), contact, batchStart, params), nil
 		}
-		return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil), nil
+		return triggers.NewManual(org.Env(), flow.FlowReference(), contact, batchStart, nil), nil
 	}
 
 	// before committing our runs we want to set the start they are associated with
@@ -720,8 +723,7 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 	}
 
 	// create our batch of all our contacts
-	task := start.CreateBatch(contactIDs)
-	task.SetIsLast(true)
+	task := start.CreateBatch(contactIDs, true, len(contactIDs))
 
 	// queue this to our ivr starter, it will take care of creating the connections then calling back in
 	rc := rp.Get()
