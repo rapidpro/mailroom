@@ -73,7 +73,8 @@ type FlowStartBatch struct {
 		RestartParticipants RestartParticipants `json:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"`
 
-		IsLast bool `json:"is_last,omitempty"`
+		IsLast        bool `json:"is_last,omitempty"`
+		TotalContacts int  `json:"total_contacts"`
 	}
 }
 
@@ -84,7 +85,7 @@ func (b *FlowStartBatch) ContactIDs() []ContactID                  { return b.b.
 func (b *FlowStartBatch) RestartParticipants() RestartParticipants { return b.b.RestartParticipants }
 func (b *FlowStartBatch) IncludeActive() IncludeActive             { return b.b.IncludeActive }
 func (b *FlowStartBatch) IsLast() bool                             { return b.b.IsLast }
-func (b *FlowStartBatch) SetIsLast(last bool)                      { b.b.IsLast = last }
+func (b *FlowStartBatch) TotalContacts() int                       { return b.b.TotalContacts }
 
 func (b *FlowStartBatch) ParentSummary() json.RawMessage { return json.RawMessage(b.b.ParentSummary) }
 func (b *FlowStartBatch) Extra() json.RawMessage         { return json.RawMessage(b.b.Extra) }
@@ -280,7 +281,7 @@ INSERT INTO
 `
 
 // CreateBatch creates a batch for this start using the passed in contact ids
-func (s *FlowStart) CreateBatch(contactIDs []ContactID) *FlowStartBatch {
+func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {
 	b := &FlowStartBatch{}
 	b.b.StartID = s.ID()
 	b.b.OrgID = s.OrgID()
@@ -291,6 +292,8 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID) *FlowStartBatch {
 	b.b.IncludeActive = s.IncludeActive()
 	b.b.ParentSummary = null.JSON(s.ParentSummary())
 	b.b.Extra = null.JSON(s.Extra())
+	b.b.IsLast = last
+	b.b.TotalContacts = totalContacts
 	return b
 }
 
