@@ -3,17 +3,20 @@ package testsuite
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"testing"
 
+	"github.com/nyaruka/goflow/test"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Reset clears out both our database and redis DB
@@ -115,4 +118,16 @@ func AssertQueryCount(t *testing.T, db *sqlx.DB, sql string, args []interface{},
 		assert.Fail(t, "error performing query: %s - %s", sql, err)
 	}
 	assert.Equal(t, count, c, errMsg...)
+}
+
+// AssertSnapshot checks that the file contains the expected text, or updates the file if -update was set
+func AssertSnapshot(t *testing.T, name, expected string) {
+	if test.UpdateSnapshots {
+		err := ioutil.WriteFile("testdata/"+name, []byte(expected), 0666)
+		require.NoError(t, err)
+	} else {
+		data, err := ioutil.ReadFile("testdata/" + name)
+		require.NoError(t, err)
+		assert.Equal(t, string(data), expected)
+	}
 }

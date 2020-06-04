@@ -1,3 +1,89 @@
+v5.5.17
+----------
+ * Send email when reopening mailgun ticket
+
+v5.5.16
+----------
+ * Implement closing of tickets in zendesk from mailroom
+
+v5.5.15
+----------
+ * Send close notification emails in mailgun tickets
+ * Reply back to users who replies aren't permitted to go to the ticket
+ * Simplify sharing of HTTP configuration between services
+ * Add simulator ticket service to fake creating tickets
+ * Fix verifying sender when receiving mailgun reply
+
+v5.5.14
+----------
+ * Basic handling of tickets (mailgun and zendesk ticketer types)
+
+v5.5.13
+----------
+ * Update to goflow v0.85.0
+ * Use go 1.14 and do some minor dep updatse
+ * Bump max request bytes to 32MB for web server
+ * Implement hooks for status modifier events
+
+v5.5.12
+----------
+ * Update to goflow v0.83.1
+
+v5.5.11
+----------
+ * Update to goflow v0.83.0
+ * Don't blow up if flow is deleted during simulation
+
+v5.5.10
+----------
+ * Update to goflow v0.82.0
+ * Populate flows_flowstart.start_type
+
+v5.5.9
+----------
+ * Set org on new flow starts
+ * Allow for seeded UUID generation in testing environments with -uuid-seed switch
+ * Set language attribute from ivr_created_event on TwiML say action
+
+v5.5.8
+----------
+ * Update flow start modified_on when making changes
+ * Add method to set modified_by on contacts
+
+v5.5.7
+----------
+ * Update to latest goflow v0.81.0
+
+v5.5.6
+----------
+ * Update to latest goflow v0.79.1
+
+v5.5.5
+----------
+ * Update mailroom test db
+ * Only Prometheus group can access metrics
+
+v5.5.4
+----------
+ * Drop no longer used validate_with_org_id param on inspect endpoint
+ * Add endpoints to export and import PO files from flows
+
+v5.5.3
+----------
+ * Add decode_html Excellent function
+
+v5.5.2
+----------
+ * Change to using basic auth for org specific prom metrics endpoint
+
+v5.5.1
+----------
+ * Update to latest goflow v0.78.0
+
+v5.5.0
+----------
+ * Add prometheus endpoint for org level metrics
+
 v5.4.4
 ----------
  * Update to latest goflow v0.77.4

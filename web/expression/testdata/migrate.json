@@ -1,0 +1,48 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/expression/migrate",
+        "body": null,
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "migrate valid expression",
+        "method": "POST",
+        "path": "/mr/expression/migrate",
+        "body": {
+            "expression": "@contact.age"
+        },
+        "status": 200,
+        "response": {
+            "migrated": "@fields.age"
+        }
+    },
+    {
+        "label": "migrate another valid expression",
+        "method": "POST",
+        "path": "/mr/expression/migrate",
+        "body": {
+            "expression": "@(UPPER(contact.tel))"
+        },
+        "status": 200,
+        "response": {
+            "migrated": "@(upper(format_urn(urns.tel)))"
+        }
+    },
+    {
+        "label": "migrate invalid expression",
+        "method": "POST",
+        "path": "/mr/expression/migrate",
+        "body": {
+            "expression": "@(+)"
+        },
+        "status": 422,
+        "response": {
+            "error": "unable to migrate expression: error evaluating @(+): syntax error at +"
+        }
+    }
+]

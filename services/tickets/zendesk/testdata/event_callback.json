@@ -1,0 +1,12 @@
+[
+    {
+        "label": "error response if missing required field",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/event_callback",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "field 'events' is required"
+        }
+    }
+]

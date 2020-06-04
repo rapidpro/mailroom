@@ -1423,6 +1423,62 @@
         "error": "comparisons with > can only be used with date and number fields"
     },
     {
+        "label": "valid tel is set on anon org",
+        "search": "tel!=\"\"",
+        "is_anon": true,
+        "query": {
+            "nested": {
+                "path": "urns",
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "term": {
+                                    "urns.scheme": "tel"
+                                }
+                            },
+                            {
+                                "exists": {
+                                    "field": "urns.path"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "valid tel is unset on anon org",
+        "search": "tel=\"\"",
+        "is_anon": true,
+        "query": {
+            "bool": {
+                "must_not": {
+                    "nested": {
+                        "path": "urns",
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "term": {
+                                            "urns.scheme": "tel"
+                                        }
+                                    },
+                                    {
+                                        "exists": {
+                                            "field": "urns.path"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
         "label": "tel on anon org",
         "search": "tel=12345",
         "is_anon": true,

@@ -1,0 +1,37 @@
+[
+    {
+        "label": "closes the given tickets",
+        "http_mocks": {
+            "https://api.mailgun.net/v3/tickets.rapidpro.io/messages": [
+                {
+                    "status": 200,
+                    "body": "{\"id\": \"<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>\", \"message\": \"Queued. Thank you.\"}"
+                }
+            ]
+        },
+        "method": "POST",
+        "path": "/mr/ticket/close",
+        "body": {
+            "org_id": 1,
+            "ticket_ids": [
+                1
+            ]
+        },
+        "status": 200,
+        "response": {
+            "changed_ids": [
+                1
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'C'",
+                "count": 2
+            }
+        ]
+    }
+]

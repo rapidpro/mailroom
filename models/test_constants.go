@@ -4,6 +4,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils/uuids"
 )
 
 // Constants used in tests, these are tied to the DB created by the
@@ -18,6 +19,8 @@ import (
 // we could start deriving these instead from the UUIDs.
 
 var Org1 = OrgID(1)
+var Org1UUID = uuids.UUID("bf0514a5-9407-44c9-b0f9-3f36f9c18414")
+
 var TwilioChannelID = ChannelID(10000)
 var TwilioChannelUUID = assets.ChannelUUID("74729f45-7f29-4868-9dc4-90e491e3c7d8")
 
@@ -99,6 +102,8 @@ var ReportingLabelUUID = assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"
 var TestingLabelID = LabelID(10001)
 var TestingLabelUUID = assets.LabelUUID("a6338cdc-7938-4437-8b05-2d5d785e3a08")
 
+// classifiers
+
 var LuisID = ClassifierID(1)
 var LuisUUID = assets.ClassifierUUID("097e026c-ae79-4740-af67-656dbedf0263")
 
@@ -108,9 +113,19 @@ var WitUUID = assets.ClassifierUUID("ff2a817c-040a-4eb2-8404-7d92e8b79dd0")
 var BothubID = ClassifierID(3)
 var BothubUUID = assets.ClassifierUUID("859b436d-3005-4e43-9ad5-3de5f26ede4c")
 
+// ticketers
+
+var MailgunID = TicketerID(1)
+var MailgunUUID = assets.TicketerUUID("f9c9447f-a291-4f3c-8c79-c089bbd4e713")
+
+var ZendeskID = TicketerID(2)
+var ZendeskUUID = assets.TicketerUUID("4ee6d4f3-f92b-439b-9718-8da90c05490b")
+
 // constants for org 2, just a few here
 
 var Org2 = OrgID(2)
+var Org2UUID = uuids.UUID("3ae7cdeb-fd96-46e5-abc4-a4622f349921")
+
 var Org2ChannelID = ChannelID(20000)
 var Org2ChannelUUID = assets.ChannelUUID("a89bc872-3763-4b95-91d9-31d4e56c6651")
 

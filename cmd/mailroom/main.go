@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/nyaruka/ezconf"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/logrus_sentry"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
@@ -17,9 +18,9 @@ import (
 	_ "github.com/nyaruka/mailroom/tasks/broadcasts"
 	_ "github.com/nyaruka/mailroom/tasks/campaigns"
 	_ "github.com/nyaruka/mailroom/tasks/expirations"
+	_ "github.com/nyaruka/mailroom/tasks/groups"
 	_ "github.com/nyaruka/mailroom/tasks/interrupts"
 	_ "github.com/nyaruka/mailroom/tasks/ivr"
-	_ "github.com/nyaruka/mailroom/tasks/groups"
 	_ "github.com/nyaruka/mailroom/tasks/schedules"
 	_ "github.com/nyaruka/mailroom/tasks/starts"
 	_ "github.com/nyaruka/mailroom/tasks/stats"
@@ -30,8 +31,14 @@ import (
 	_ "github.com/nyaruka/mailroom/web/expression"
 	_ "github.com/nyaruka/mailroom/web/flow"
 	_ "github.com/nyaruka/mailroom/web/ivr"
+	_ "github.com/nyaruka/mailroom/web/org"
+	_ "github.com/nyaruka/mailroom/web/po"
 	_ "github.com/nyaruka/mailroom/web/simulation"
 	_ "github.com/nyaruka/mailroom/web/surveyor"
+	_ "github.com/nyaruka/mailroom/web/ticket"
+
+	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
+	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 
 	_ "github.com/nyaruka/mailroom/ivr/nexmo"
 	_ "github.com/nyaruka/mailroom/ivr/twiml"
@@ -73,6 +80,11 @@ func main() {
 			logrus.Fatalf("invalid sentry DSN: '%s': %s", config.SentryDSN, err)
 		}
 		logrus.StandardLogger().Hooks.Add(hook)
+	}
+
+	if config.UUIDSeed != 0 {
+		uuids.SetGenerator(uuids.NewSeededGenerator(int64(config.UUIDSeed)))
+		logrus.WithField("uuid-seed", config.UUIDSeed).Warn("using seeded UUID generation which is only appropriate for testing environments")
 	}
 
 	mr := mailroom.NewMailroom(config)

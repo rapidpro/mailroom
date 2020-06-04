@@ -29,22 +29,22 @@ func TestContactGroupsChanged(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.CathyID, models.DoctorsGroupID},
 					Count: 0,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.CathyID, models.TestersGroupID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.GeorgeID, models.TestersGroupID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.BobID, models.TestersGroupID},
 					Count: 0,
@@ -53,5 +53,5 @@ func TestContactGroupsChanged(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

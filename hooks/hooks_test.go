@@ -28,10 +28,17 @@ import (
 
 type ContactActionMap map[models.ContactID][]flows.Action
 type ContactMsgMap map[models.ContactID]*flows.MsgIn
+type ContactModifierMap map[models.ContactID][]flows.Modifier
+
+type modifyResult struct {
+	Contact *flows.Contact `json:"contact"`
+	Events  []flows.Event  `json:"events"`
+}
 
 type HookTestCase struct {
 	Actions       ContactActionMap
 	Msgs          ContactMsgMap
+	Modifiers     ContactModifierMap
 	Assertions    []Assertion
 	SQLAssertions []SQLAssertion
 }
@@ -71,7 +78,7 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	defaultExitUUID := flows.ExitUUID(uuids.New())
 
 	cases := make([]*routers.Case, len(tc.Actions))
-	categories := make([]*routers.Category, len(tc.Actions))
+	categories := make([]flows.Category, len(tc.Actions))
 	exits := make([]flows.Exit, len(tc.Actions))
 	exitNodes := make([]flows.Node, len(tc.Actions))
 	i = 0
@@ -161,7 +168,7 @@ func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID models.Contact
 	return msg
 }
 
-func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
+func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 	models.FlushCache()
 
 	db := testsuite.DB()
@@ -203,12 +210,65 @@ func RunActionTestCases(t *testing.T, tcs []HookTestCase) {
 		options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
 			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil), nil
+				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, false, nil), nil
 			}
 			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil), nil
 		}
 
 		_, err = runner.StartFlow(ctx, db, rp, org, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
+		assert.NoError(t, err)
+
+		results := make(map[models.ContactID]modifyResult)
+
+		// create scenes for our contacts
+		scenes := make([]*models.Scene, 0, len(tc.Modifiers))
+		for contactID, mods := range tc.Modifiers {
+
+			contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{contactID})
+			assert.NoError(t, err)
+
+			contact := contacts[0]
+			flowContact, err := contact.FlowContact(org)
+			assert.NoError(t, err)
+
+			result := modifyResult{
+				Contact: flowContact,
+				Events:  make([]flows.Event, 0, len(mods)),
+			}
+
+			scene := models.NewSceneForContact(flowContact)
+
+			// apply our modifiers
+			for _, mod := range mods {
+				mod.Apply(org.Env(), org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+			}
+
+			results[contact.ID()] = result
+			scenes = append(scenes, scene)
+
+		}
+
+		tx, err := db.BeginTxx(ctx, nil)
+		assert.NoError(t, err)
+
+		for _, scene := range scenes {
+			err := models.HandleEvents(ctx, tx, rp, org, scene, results[scene.ContactID()].Events)
+			assert.NoError(t, err)
+		}
+
+		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, org, scenes)
+		assert.NoError(t, err)
+
+		err = tx.Commit()
+		assert.NoError(t, err)
+
+		tx, err = db.BeginTxx(ctx, nil)
+		assert.NoError(t, err)
+
+		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, org, scenes)
+		assert.NoError(t, err)
+
+		err = tx.Commit()
 		assert.NoError(t, err)
 
 		// now check our assertions

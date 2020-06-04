@@ -28,15 +28,9 @@ func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.
 	defer rc.Close()
 
 	// for each of our scene
-	for s, es := range scenes {
+	for _, es := range scenes {
 		for _, e := range es {
 			event := e.(*events.BroadcastCreatedEvent)
-
-			// we skip over any scene starts that involve groups if we are in a batch start
-			if len(scenes) > 1 && len(event.Groups) > 0 {
-				logrus.WithField("session_id", s.SessionID).Error("ignoring broadcast on group in batch")
-				continue
-			}
 
 			bcast, err := models.NewBroadcastFromEvent(ctx, tx, org, event)
 			if err != nil {
