@@ -21,7 +21,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/mailgun"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/receive", handleReceive)
+	web.RegisterJSONRoute(http.MethodPost, base+"/receive", web.WithHTTPLogs(handleReceive))
 }
 
 type receiveRequest struct {
@@ -59,60 +59,26 @@ type receiveResponse struct {
 
 var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})@.*$`)
 
-func handleReceive(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	logger := &models.HTTPLogger{}
-
-	// TODO log this incoming call.. or wait til we've resolve the ticketer?
-
-	resp, err := handleReceiveRequest(ctx, s, r, logger)
-	if err != nil {
-		return err, http.StatusBadRequest, nil
-	}
-
-	if err := logger.Insert(ctx, s.DB); err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error writing HTTP logs")
-	}
-
-	return resp, http.StatusOK, nil
-}
-
-func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, logger *models.HTTPLogger) (*receiveResponse, error) {
+func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &receiveRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
-		return nil, errors.Wrapf(err, "error decoding form")
+		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
 	}
 
 	if !request.verify(s.Config.MailgunSigningKey) {
-		return nil, errors.New("request signature validation failed")
+		return errors.New("request signature validation failed"), http.StatusForbidden, nil
 	}
 
 	// recipient is in the format ticket+<ticket-uuid>@... parse it out
 	match := addressRegex.FindAllStringSubmatch(request.Recipient, -1)
 	if len(match) != 1 || len(match[0]) != 2 {
-		return nil, errors.Errorf("invalid recipient: %s", request.Recipient)
-	}
-	ticketUUID := flows.TicketUUID(match[0][1])
-
-	// look up our ticket
-	ticket, err := models.LookupTicketByUUID(ctx, s.DB, ticketUUID)
-	if err != nil || ticket == nil {
-		return nil, errors.Errorf("unable to find ticket with UUID: %s", ticketUUID)
+		return errors.Errorf("invalid recipient: %s", request.Recipient), http.StatusBadRequest, nil
 	}
 
-	// look up our assets and get the ticketer for this ticket
-	assets, err := models.GetOrgAssets(s.CTX, s.DB, ticket.OrgID())
+	// look up the ticket and ticketer
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(s.CTX, s.DB, flows.TicketUUID(match[0][1]), typeMailgun)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error looking up org: %d", ticket.OrgID())
-	}
-	ticketer := assets.TicketerByID(ticket.TicketerID())
-	if ticketer == nil || ticketer.Type() != typeMailgun {
-		return nil, errors.Errorf("error looking up ticketer: %d", ticket.TicketerID())
-	}
-
-	// and load it as a service
-	svc, err := ticketer.AsService(flows.NewTicketer(ticketer))
-	if err != nil {
-		return nil, errors.Wrap(err, "error loading ticketer service")
+		return err, http.StatusBadRequest, nil
 	}
 	mailgun := svc.(*service)
 
@@ -121,35 +87,35 @@ func handleReceiveRequest(ctx context.Context, s *web.Server, r *http.Request, l
 	if request.Sender != configuredAddress {
 		body := fmt.Sprintf("The address %s is not allowed to reply to this ticket\n", request.Sender)
 
-		mailgun.send(mailgun.noReplyAddress(), request.From, "Ticket reply rejected", body, nil, logger.Ticketer(ticketer))
+		mailgun.send(mailgun.noReplyAddress(), request.From, "Ticket reply rejected", body, nil, l.Ticketer(ticketer))
 
-		return &receiveResponse{Action: "rejected", TicketUUID: ticket.UUID()}, nil
+		return &receiveResponse{Action: "rejected", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}
 
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		err = models.CloseTickets(ctx, s.DB, assets, []*models.Ticket{ticket}, true, logger)
+		org, _ := models.GetOrgAssets(ctx, s.DB, ticket.OrgID())
+		err = models.CloseTickets(ctx, s.DB, org, []*models.Ticket{ticket}, true, l)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error closing ticket: %s", ticket.UUID())
+			return errors.Wrapf(err, "error closing ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 		}
 
-		return &receiveResponse{Action: "closed", TicketUUID: ticket.UUID()}, nil
+		return &receiveResponse{Action: "closed", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}
 
 	// update our ticket
 	config := map[string]string{
-		"last-message-id": request.MessageID,
-		"last-subject":    request.Subject,
+		ticketConfigLastMessageID: request.MessageID,
 	}
 	err = models.UpdateAndKeepOpenTicket(ctx, s.DB, ticket, config)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error updating ticket: %s", ticket.UUID())
+		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 	}
 
 	msg, err := tickets.SendReply(ctx, s.DB, s.RP, ticket, request.StrippedText)
 	if err != nil {
-		return nil, err
+		return err, http.StatusInternalServerError, nil
 	}
 
-	return &receiveResponse{Action: "forwarded", TicketUUID: ticket.UUID(), MsgUUID: msg.UUID()}, nil
+	return &receiveResponse{Action: "forwarded", TicketUUID: ticket.UUID(), MsgUUID: msg.UUID()}, http.StatusOK, nil
 }

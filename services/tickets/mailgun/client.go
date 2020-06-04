@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"sort"
 
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/httpx"
@@ -50,8 +51,16 @@ func (c *Client) SendMessage(from, to, subject, text string, headers map[string]
 		w.WriteField("to", to)
 		w.WriteField("subject", subject)
 		w.WriteField("text", text)
-		for k, v := range headers {
-			w.WriteField("h:"+k, v)
+
+		// for the sake of tests, we want to output headers in consistent order
+		headerKeys := make([]string, 0, len(headers))
+		for k := range headers {
+			headerKeys = append(headerKeys, k)
+		}
+		sort.Strings(headerKeys)
+
+		for _, k := range headerKeys {
+			w.WriteField("h:"+k, headers[k])
 		}
 	}
 
