@@ -6,4 +6,4 @@ Authorization: Bearer ****************
 Content-Type: application/json
 Accept-Encoding: gzip
 
-{"ticket":{"status":"solved"}}
+{"ticket":{"status":"closed"}}

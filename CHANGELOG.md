@@ -1,3 +1,8 @@
+v5.5.24
+----------
+ * Tickets fixes and improvements
+ * Update to goflow v0.87.0
+
 v5.5.17
 ----------
  * Send email when reopening mailgun ticket

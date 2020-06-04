@@ -46,6 +46,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 		HTTPMocks    *httpx.MockRequestor `json:"http_mocks,omitempty"`
 		Method       string               `json:"method"`
 		Path         string               `json:"path"`
+		Headers      map[string]string    `json:"headers,omitempty"`
 		Body         json.RawMessage      `json:"body,omitempty"`
 		Files        map[string]string    `json:"files,omitempty"`
 		Status       int                  `json:"status"`
@@ -84,17 +85,19 @@ func RunWebTests(t *testing.T, truthFile string) {
 			err = json.Unmarshal(tc.Body, &values)
 			require.NoError(t, err)
 
-			req, err = MakeMultipartRequest(tc.Method, testURL, values, tc.Files)
+			req, err = MakeMultipartRequest(tc.Method, testURL, values, tc.Files, tc.Headers)
 		} else {
 			// if body is a string, treat it as a URL encoded submission
 			if len(tc.Body) >= 2 && tc.Body[0] == '"' {
 				bodyStr := ""
 				json.Unmarshal(tc.Body, &bodyStr)
 				bodyReader := strings.NewReader(bodyStr)
-				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, map[string]string{"Content-Type": "application/x-www-form-urlencoded"})
+				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			} else {
 				bodyReader := bytes.NewReader([]byte(tc.Body))
-				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, map[string]string{"Content-Type": "application/json"})
+				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			}
 		}
 		assert.NoError(t, err, "%s: error creating request", tc.Label)
@@ -158,7 +161,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 	}
 }
 
-func MakeMultipartRequest(method, url string, fields map[string][]string, files map[string]string) (*http.Request, error) {
+func MakeMultipartRequest(method, url string, fields map[string][]string, files map[string]string, headers map[string]string) (*http.Request, error) {
 	b := &bytes.Buffer{}
 	w := multipart.NewWriter(b)
 
@@ -181,7 +184,7 @@ func MakeMultipartRequest(method, url string, fields map[string][]string, files 
 
 	w.Close()
 
-	req, _ := http.NewRequest(method, url, bytes.NewReader(b.Bytes()))
+	req, _ := httpx.NewRequest(method, url, bytes.NewReader(b.Bytes()), headers)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	return req, nil
 }

@@ -1,6 +1,6 @@
 [
     {
-        "label": "reopens the given tickets",
+        "label": "reopens the given mailgun tickets",
         "http_mocks": {
             "https://api.mailgun.net/v3/tickets.rapidpro.io/messages": [
                 {
@@ -32,6 +32,42 @@
             {
                 "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
                 "count": 2
+            }
+        ]
+    },
+    {
+        "label": "reopens the given zendesk tickets",
+        "http_mocks": {
+            "https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=21": [
+                {
+                    "status": 200,
+                    "body": "{\"job_status\":{\"id\":\"1234\",\"status\":\"queued\"}}"
+                }
+            ]
+        },
+        "method": "POST",
+        "path": "/mr/ticket/reopen",
+        "body": {
+            "org_id": 1,
+            "ticket_ids": [
+                1,
+                2
+            ]
+        },
+        "status": 200,
+        "response": {
+            "changed_ids": [
+                2
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'C'",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
+                "count": 3
             }
         ]
     }

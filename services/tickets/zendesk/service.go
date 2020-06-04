@@ -3,7 +3,6 @@ package zendesk
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -23,9 +22,12 @@ const (
 	configOAuthToken = "oauth_token"
 	configPushID     = "push_id"
 	configPushToken  = "push_token"
+	configTargetID   = "target_id"
+	configTriggerID  = "trigger_id"
 
 	statusOpen   = "open"
 	statusSolved = "solved"
+	statusClosed = "closed"
 )
 
 func init() {
@@ -37,25 +39,35 @@ type service struct {
 	pushClient     *PushClient
 	ticketer       *flows.Ticketer
 	redactor       utils.Redactor
+	secret         string
 	instancePushID string
+	targetID       string
+	triggerID      string
 }
 
 // NewService creates a new zendesk ticket service
 func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	subdomain := config[configSubdomain]
+	secret := config[configSecret]
 	oAuthToken := config[configOAuthToken]
 	instancePushID := config[configPushID]
 	pushToken := config[configPushToken]
-	if subdomain != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
+	targetID := config[configTargetID]
+	triggerID := config[configTriggerID]
+
+	if subdomain != "" && secret != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
 		return &service{
 			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
 			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
 			ticketer:       ticketer,
 			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
+			secret:         secret,
 			instancePushID: instancePushID,
+			targetID:       targetID,
+			triggerID:      triggerID,
 		}, nil
 	}
-	return nil, errors.New("missing subdomain or oauth_token or push_id or push_token in zendesk config")
+	return nil, errors.New("missing subdomain or secret or oauth_token or push_id or push_token in zendesk config")
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
@@ -64,20 +76,13 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	contactDisplay := session.Contact().Format(session.Environment())
 
 	msg := &ExternalResource{
-		ExternalID: string(ticketUUID),
+		ExternalID: string(ticketUUID), // there's no local msg so use ticket UUID instead
 		Message:    body,
 		ThreadID:   string(ticketUUID),
 		CreatedAt:  dates.Now(),
 		Author: Author{
 			ExternalID: string(session.Contact().UUID()),
 			Name:       contactDisplay,
-		},
-		DisplayInfo: []DisplayInfo{
-			{
-				// need to also include our ticket UUID in here so the Zendesk app can access it
-				Type: "temba",
-				Data: map[string]string{"uuid": string(ticketUUID)},
-			},
 		},
 		AllowChannelback: true,
 	}
@@ -102,12 +107,6 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			ExternalID: contactUUID,
 			Name:       contactDisplay,
 		},
-		DisplayInfo: []DisplayInfo{
-			{
-				Type: "temba-ticket",
-				Data: map[string]string{"uuid": string(ticket.UUID())},
-			},
-		},
 		AllowChannelback: true,
 	}
 
@@ -120,7 +119,7 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 		return nil
 	}
 
-	_, trace, err := s.restClient.UpdateManyTickets(ids, statusSolved)
+	_, trace, err := s.restClient.UpdateManyTickets(ids, statusClosed)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -140,16 +139,17 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return err
 }
 
-func (s *service) addCloseCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
-	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/ticket_callback", domain)
-
-	// TODO check for existing target with this URL
+// AddStatusCallback adds a target and trigger to callback to us when ticket status is changed
+func (s *service) AddStatusCallback(name, domain string, logHTTP flows.HTTPLogCallback) (map[string]string, error) {
+	targetURL := fmt.Sprintf("https://%s/mr/tickets/types/zendesk/target/%s", domain, s.ticketer.UUID())
 
 	target := &Target{
 		Type:        "http_target",
 		Title:       fmt.Sprintf("%s Tickets", name),
 		TargetURL:   targetURL,
 		Method:      "POST",
+		Username:    "zendesk",
+		Password:    s.secret,
 		ContentType: "application/json",
 	}
 
@@ -158,19 +158,14 @@ func (s *service) addCloseCallback(name, domain string, logHTTP flows.HTTPLogCal
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	payload := `{
-		"event": "status_changed",
-		"ticket": {
-			"id": {{ticket.id}},
-			"external_id": "{{ticket.external_id}}",
-			"status": "{{ticket.status}}",
-			"via": "{{ticket.via}}",
-			"link": "{{ticket.link}}"
-		}
-	}`
+	"event": "status_changed",
+	"id": {{ticket.id}},
+	"status": "{{ticket.status}}"
+}`
 
 	trigger := &Trigger{
 		Title: fmt.Sprintf("Notify %s on ticket status change", name),
@@ -189,16 +184,44 @@ func (s *service) addCloseCallback(name, domain string, logHTTP flows.HTTPLogCal
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]string{
+		configTargetID:  NumericIDToString(target.ID),
+		configTriggerID: NumericIDToString(trigger.ID),
+	}, nil
 }
 
-func (s *service) removeCloseCallback(name, domain string, logHTTP flows.HTTPLogCallback) error {
-	// TODO.. check if we're the last ticketer using this integration and then remove?
+func (s *service) RemoveStatusCallback(logHTTP flows.HTTPLogCallback) error {
+	if s.triggerID != "" {
+		id, _ := ParseNumericID(s.triggerID)
+		trace, err := s.restClient.DeleteTrigger(id)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if s.targetID != "" {
+		id, _ := ParseNumericID(s.targetID)
+		trace, err := s.restClient.DeleteTarget(id)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) error {
-	results, trace, err := s.pushClient.Push(s.instancePushID, "", []*ExternalResource{msg})
+	rid := NewRequestID(s.secret)
+
+	results, trace, err := s.pushClient.Push(s.instancePushID, rid.String(), []*ExternalResource{msg})
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -209,18 +232,4 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 		return errors.Wrap(err, "error pushing message to zendesk")
 	}
 	return nil
-}
-
-// parses out the zendesk ticket IDs from our external ID field
-func ticketsToZendeskIDs(tickets []*models.Ticket) ([]int64, error) {
-	ids := make([]int64, len(tickets))
-	for i := range tickets {
-		idStr := string(tickets[i].ExternalID())
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			return nil, errors.Errorf("%s is not a valid zendesk ticket id", idStr)
-		}
-		ids[i] = id
-	}
-	return ids, nil
 }

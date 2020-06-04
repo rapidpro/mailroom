@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -42,18 +43,30 @@ func (c *baseClient) put(endpoint string, payload interface{}, response interfac
 	return c.request("PUT", endpoint, payload, response)
 }
 
+func (c *baseClient) delete(endpoint string) (*httpx.Trace, error) {
+	return c.request("DELETE", endpoint, nil, nil)
+}
+
 func (c *baseClient) request(method, endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
-	data, err := jsonx.Marshal(payload)
-	if err != nil {
-		return nil, err
+	url := fmt.Sprintf("https://%s.zendesk.com/api/v2/%s", c.subdomain, endpoint)
+	headers := map[string]string{
+		"Authorization": fmt.Sprintf("Bearer %s", c.token),
+	}
+	var body io.Reader
+
+	if payload != nil {
+		data, err := jsonx.Marshal(payload)
+		if err != nil {
+			return nil, err
+		}
+		body = bytes.NewReader(data)
+		headers["Content-Type"] = "application/json"
 	}
 
-	req, err := http.NewRequest(method, fmt.Sprintf("https://%s.zendesk.com/api/v2/%s", c.subdomain, endpoint), bytes.NewReader(data))
+	req, err := httpx.NewRequest(method, url, body, headers)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 
 	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	if err != nil {
@@ -66,7 +79,10 @@ func (c *baseClient) request(method, endpoint string, payload interface{}, respo
 		return trace, errors.New(response.Description)
 	}
 
-	return trace, jsonx.Unmarshal(trace.ResponseBody, response)
+	if response != nil {
+		return trace, jsonx.Unmarshal(trace.ResponseBody, response)
+	}
+	return trace, nil
 }
 
 // RESTClient is a client for the Zendesk REST API
@@ -107,6 +123,11 @@ func (c *RESTClient) CreateTarget(target *Target) (*Target, *httpx.Trace, error)
 	}
 
 	return response.Target, trace, nil
+}
+
+// DeleteTarget see https://developer.zendesk.com/rest_api/docs/support/targets#delete-target
+func (c *RESTClient) DeleteTarget(id int64) (*httpx.Trace, error) {
+	return c.delete(fmt.Sprintf("targets/%d.json", id))
 }
 
 // Condition see https://developer.zendesk.com/rest_api/docs/support/triggers#conditions
@@ -154,9 +175,16 @@ func (c *RESTClient) CreateTrigger(trigger *Trigger) (*Trigger, *httpx.Trace, er
 	return response.Trigger, trace, nil
 }
 
+// DeleteTrigger see https://developer.zendesk.com/rest_api/docs/support/triggers#delete-trigger
+func (c *RESTClient) DeleteTrigger(id int64) (*httpx.Trace, error) {
+	return c.delete(fmt.Sprintf("triggers/%d.json", id))
+}
+
 // Ticket see https://developer.zendesk.com/rest_api/docs/support/tickets#json-format
 type Ticket struct {
-	Status string `json:"status,omitempty"`
+	ID         int64  `json:"id,omitempty"`
+	ExternalID string `json:"external_id,omitempty"`
+	Status     string `json:"status,omitempty"`
 }
 
 // JobStatus see https://developer.zendesk.com/rest_api/docs/support/job_statuses#job-statuses
