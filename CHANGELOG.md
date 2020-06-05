@@ -1,3 +1,7 @@
+v5.5.25
+----------
+ * Add endpoint to change a flow language
+
 v5.5.24
 ----------
  * Tickets fixes and improvements
