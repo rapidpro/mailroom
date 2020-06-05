@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
@@ -20,6 +21,7 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/migrate", web.RequireAuthToken(handleMigrate))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/inspect", web.RequireAuthToken(handleInspect))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/clone", web.RequireAuthToken(handleClone))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/flow/change_language", web.RequireAuthToken(handleChangeLanguage))
 }
 
 // Migrates a flow to the latest flow specification
@@ -127,4 +129,35 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 	}
 
 	return cloneJSON, http.StatusOK, nil
+}
+
+// Changes the language of a flow by replacing the text with a translation.
+//
+//   {
+//     "language": "spa",
+//     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]}
+//   }
+//
+type changeLanguageRequest struct {
+	Language envs.Language   `json:"language" validate:"required"`
+	Flow     json.RawMessage `json:"flow"     validate:"required"`
+}
+
+func handleChangeLanguage(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &changeLanguageRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	flow, err := goflow.ReadFlow(request.Flow)
+	if err != nil {
+		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
+	}
+
+	copy, err := flow.ChangeLanguage(request.Language)
+	if err != nil {
+		return errors.Wrapf(err, "unable to change flow language"), http.StatusUnprocessableEntity, nil
+	}
+
+	return copy, http.StatusOK, nil
 }
