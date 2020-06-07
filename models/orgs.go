@@ -89,6 +89,8 @@ func (o *Org) Now() time.Time { return o.env.Now() }
 // MaxValueLength returns our max value length for contact fields and run results
 func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
 
+func (o *Org) Links() []string { return o.env.Links() }
+
 // Equal return whether we are equal to the passed in environment
 func (o *Org) Equal(env envs.Environment) bool { return o.env.Equal(env) }
 
@@ -196,6 +198,7 @@ SELECT id, config, ROW_TO_JSON(o) FROM (SELECT
 	$2::int as max_value_length,
 	(SELECT iso_code FROM orgs_language WHERE id = o.primary_language_id) as default_language,
 	(SELECT ARRAY_AGG(iso_code) FROM orgs_language WHERE org_id = o.id) allowed_languages,
+	(SELECT ARRAY_AGG(concat(uuid,':',destination)) FROM links_link WHERE org_id = o.id AND is_archived = false) links,
 	COALESCE((SELECT
 		country
 	FROM

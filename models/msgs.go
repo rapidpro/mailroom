@@ -28,10 +28,6 @@ import (
 	"github.com/lib/pq/hstore"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"net/http"
-	"io/ioutil"
-	"github.com/buger/jsonparser"
-	"regexp"
 	"net/url"
 )
 
@@ -296,67 +292,8 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 	msg := &Msg{}
 
 	m := &msg.m
-
-	// splitting the text as array for analyzing and replace if it's the case
-	re := regexp.MustCompile(`https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?!&//=]*)`)
-	textSplitted := re.FindAllString(out.Text(), -1)
-	text := out.Text()
-	for i := range textSplitted {
-		d := textSplitted[i]
-
-		// checking if the text is a valid URL
-		if !isValidUrl(d) {
-			continue
-		}
-
-		// if we don't have the YoURLs credentials, should be skipped
-		if config.Mailroom.YourlsLogin == "" || config.Mailroom.YourlsPassword == "" || config.Mailroom.YourlsHost == "" {
-			continue
-		}
-
-		dest, errLink := GetLinksFromOrg(ctx, tx, orgID, d)
-
-		if errLink == nil && contactUUID != "" {
-			yourlsHost := fmt.Sprintf("%s/yourls-api.php", config.Mailroom.YourlsHost)
-			handleURL := fmt.Sprintf("https://%s/link/handler/%s", config.Mailroom.Domain, dest["uuid"])
-			longURL := fmt.Sprintf("%s?contact=%s", handleURL, contactUUID)
-
-			// creating the payload
-			payload := url.Values{}
-			payload.Add("url", longURL)
-			payload.Add("format", "json")
-			payload.Add("action", "shorturl")
-			payload.Add("username", config.Mailroom.YourlsLogin)
-			payload.Add("password", config.Mailroom.YourlsPassword)
-
-			// build our request
-			method := "GET"
-			yourlsHost = fmt.Sprintf("%s?%s", yourlsHost, payload.Encode())
-			req, errReq := http.NewRequest(method, yourlsHost, strings.NewReader(""))
-			if errReq != nil {
-				continue
-			}
-
-			req.Header.Add("Content-Type", "multipart/form-data")
-
-			resp, errHttp := http.DefaultClient.Do(req)
-			if errHttp != nil {
-				continue
-			}
-			content, errRead := ioutil.ReadAll(resp.Body)
-			if errRead != nil {
-				continue
-			}
-
-			// replacing the link for the YoURLs generated link
-			shortLink, _ := jsonparser.GetString(content, "shorturl")
-			text = strings.Replace(text, d, shortLink, -1)
-		}
-
-	}
-
 	m.UUID = out.UUID()
-	m.Text = text
+	m.Text = out.Text()
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
@@ -442,34 +379,6 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	}
 
 	return msg
-}
-
-// GetLinksFromOrg queries the trackable links from the org returning them
-func GetLinksFromOrg(ctx context.Context, tx Queryer, org OrgID, d string) (map[string]string, error) {
-	link := &TrackableLink{}
-	dest := make(map[string]string)
-
-	rows, err := tx.QueryxContext(ctx,
-		`SELECT row_to_json(r) FROM (SELECT uuid FROM links_link 
-			   WHERE org_id = $1 AND destination = $2 AND is_active = TRUE AND is_archived = FALSE 
-			   ORDER BY id DESC LIMIT 1) r`,
-		org, d,
-	)
-	if !rows.Next() {
-		return dest, errors.Errorf("no link found")
-	}
-	defer rows.Close()
-
-	err = readJSONRow(rows, link)
-	if err != nil {
-		return dest, errors.Wrapf(err, "error loading trackable link")
-	}
-
-	dest = map[string]string{
-		"uuid": link.UUID,
-	}
-
-	return dest, nil
 }
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
