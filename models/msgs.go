@@ -381,34 +381,6 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	return msg
 }
 
-// GetLinksFromOrg queries the trackable links from the org returning them
-func GetLinksFromOrg(ctx context.Context, tx Queryer, org OrgID, d string) (map[string]string, error) {
-	link := &TrackableLink{}
-	dest := make(map[string]string)
-
-	rows, err := tx.QueryxContext(ctx,
-		`SELECT row_to_json(r) FROM (SELECT uuid FROM links_link 
-			   WHERE org_id = $1 AND destination = $2 AND is_active = TRUE AND is_archived = FALSE 
-			   ORDER BY id DESC LIMIT 1) r`,
-		org, d,
-	)
-	if !rows.Next() {
-		return dest, errors.Errorf("no link found")
-	}
-	defer rows.Close()
-
-	err = readJSONRow(rows, link)
-	if err != nil {
-		return dest, errors.Wrapf(err, "error loading trackable link")
-	}
-
-	dest = map[string]string{
-		"uuid": link.UUID,
-	}
-
-	return dest, nil
-}
-
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
 func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {

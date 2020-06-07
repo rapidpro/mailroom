@@ -198,7 +198,7 @@ SELECT id, config, ROW_TO_JSON(o) FROM (SELECT
 	$2::int as max_value_length,
 	(SELECT iso_code FROM orgs_language WHERE id = o.primary_language_id) as default_language,
 	(SELECT ARRAY_AGG(iso_code) FROM orgs_language WHERE org_id = o.id) allowed_languages,
-	(SELECT ARRAY_AGG(destination) FROM links_link WHERE org_id = o.id AND is_archived = false) links,
+	(SELECT ARRAY_AGG(concat(uuid,':',destination)) FROM links_link WHERE org_id = o.id AND is_archived = false) links,
 	COALESCE((SELECT
 		country
 	FROM
