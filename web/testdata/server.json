@@ -1,0 +1,51 @@
+[
+    {
+        "label": "404 if not a valid path",
+        "method": "GET",
+        "path": "/arst",
+        "status": 404,
+        "response": {
+            "error": "not found: /arst"
+        }
+    },
+    {
+        "label": "illegal method if POST to root",
+        "method": "POST",
+        "path": "/",
+        "status": 405,
+        "response": {
+            "error": "illegal method: POST"
+        }
+    },
+    {
+        "label": "status page if GET root",
+        "method": "GET",
+        "path": "/",
+        "status": 200,
+        "response": {
+            "component": "mailroom",
+            "url": "/",
+            "version": "Dev"
+        }
+    },
+    {
+        "label": "illegal method if POST to /mr/",
+        "method": "POST",
+        "path": "/mr/",
+        "status": 405,
+        "response": {
+            "error": "illegal method: POST"
+        }
+    },
+    {
+        "label": "status page if GET /mr/",
+        "method": "GET",
+        "path": "/mr/",
+        "status": 200,
+        "response": {
+            "component": "mailroom",
+            "url": "/mr/",
+            "version": "Dev"
+        }
+    }
+]
