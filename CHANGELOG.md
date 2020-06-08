@@ -1,3 +1,7 @@
+v5.5.26
+----------
+ * Update to goflow v0.89.0
+
 v5.5.25
 ----------
  * Add endpoint to change a flow language
