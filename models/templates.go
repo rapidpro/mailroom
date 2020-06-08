@@ -41,6 +41,7 @@ type TemplateTranslation struct {
 	t struct {
 		Channel       assets.ChannelReference `json:"channel"         validate:"required"`
 		Language      envs.Language           `json:"language"        validate:"required"`
+		Country       envs.Country            `json:"country"`
 		Content       string                  `json:"content"         validate:"required"`
 		VariableCount int                     `json:"variable_count"`
 	}
@@ -54,6 +55,7 @@ func (t *TemplateTranslation) MarshalJSON() ([]byte, error) { return json.Marsha
 
 func (t *TemplateTranslation) Channel() assets.ChannelReference { return t.t.Channel }
 func (t *TemplateTranslation) Language() envs.Language          { return t.t.Language }
+func (t *TemplateTranslation) Country() envs.Country            { return t.t.Country }
 func (t *TemplateTranslation) Content() string                  { return t.t.Content }
 func (t *TemplateTranslation) VariableCount() int               { return t.t.VariableCount }
 
@@ -86,10 +88,11 @@ func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 const selectTemplatesSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.name as name, 
-	t.uuid as uuid, 
+	t.uuid as uuid,
 	(SELECT ARRAY_TO_JSON(ARRAY_AGG(ROW_TO_JSON(tr))) FROM (
 		SELECT
 			tr.language as language,
+			'' as country,
 			tr.content as content,
 			tr.variable_count as variable_count,
 			JSON_BUILD_OBJECT('uuid', c.uuid, 'name', c.name) as channel

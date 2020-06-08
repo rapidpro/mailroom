@@ -98,6 +98,9 @@ func (o *Org) Now() time.Time { return o.env.Now() }
 // MaxValueLength returns our max value length for contact fields and run results
 func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
 
+// DefaultLocale combines the default languages and countries into a locale
+func (o *Org) DefaultLocale() envs.Locale { return o.env.DefaultLocale() }
+
 // Equal return whether we are equal to the passed in environment
 func (o *Org) Equal(env envs.Environment) bool { return o.env.Equal(env) }
 

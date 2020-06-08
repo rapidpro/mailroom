@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/nyaruka/goflow/envs"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -17,6 +16,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/nyaruka/goflow/envs"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -66,6 +67,7 @@ const (
 	</Response>
 	`
 )
+
 var validLanguageCodes = map[string]bool{
 	"da-DK": true,
 	"de-DE": true,
@@ -466,7 +468,8 @@ func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait,
 		case *events.IVRCreatedEvent:
 			if len(event.Msg.Attachments()) == 0 {
 				country := envs.DeriveCountryFromTel(number.Path())
-				languageCode := event.Msg.TextLanguage.ToISO639_2(country)
+				locale := envs.NewLocale(event.Msg.TextLanguage, country)
+				languageCode := locale.ToISO639_2()
 
 				if _, valid := validLanguageCodes[languageCode]; !valid {
 					languageCode = ""

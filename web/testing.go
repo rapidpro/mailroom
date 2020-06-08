@@ -66,7 +66,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 	err = json.Unmarshal(tcJSON, &tcs)
 	require.NoError(t, err)
 
-	for _, tc := range tcs {
+	for i, tc := range tcs {
 		uuids.SetGenerator(uuids.NewSeededGenerator(123456))
 		dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
 
@@ -105,18 +105,23 @@ func RunWebTests(t *testing.T, truthFile string) {
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err, "%s: error making request", tc.Label)
 
-		assert.Equal(t, tc.Status, resp.StatusCode, "%s: unexpected status", tc.Label)
-
 		// check all http mocks were used
 		if tc.HTTPMocks != nil {
 			assert.False(t, tc.HTTPMocks.HasUnused(), "%s: unused HTTP mocks in %s", tc.Label)
 		}
+
+		// clone test case and populate with actual values
+		actual := tc
+		actual.Status = resp.StatusCode
+		actual.HTTPMocks = clonedMocks
 
 		tc.HTTPMocks = clonedMocks
 		tc.actualResponse, err = ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%s: error reading body", tc.Label)
 
 		if !test.UpdateSnapshots {
+			assert.Equal(t, tc.Status, actual.Status, "%s: unexpected status", tc.Label)
+
 			var expectedResponse []byte
 			expectedIsJSON := false
 
@@ -135,10 +140,13 @@ func RunWebTests(t *testing.T, truthFile string) {
 			} else {
 				assert.Equal(t, string(expectedResponse), string(tc.actualResponse), "%s: unexpected response", tc.Label)
 			}
-		}
 
-		for _, dba := range tc.DBAssertions {
-			testsuite.AssertQueryCount(t, db, dba.Query, nil, dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
+			for _, dba := range tc.DBAssertions {
+				testsuite.AssertQueryCount(t, db, dba.Query, nil, dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
+			}
+
+		} else {
+			tcs[i] = actual
 		}
 	}
 
