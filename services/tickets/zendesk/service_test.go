@@ -15,7 +15,6 @@ import (
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/services/tickets/zendesk"
-	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,7 +96,7 @@ func TestOpenAndForward(t *testing.T) {
 	}, ticket)
 
 	assert.Equal(t, 1, len(logger.Logs))
-	testsuite.AssertSnapshot(t, "open_ticket.dump", logger.Logs[0].Request)
+	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
 	dbTicket := models.NewTicket(ticket.UUID, models.Org1, models.CathyID, models.ZendeskID, "", "Need help", "Where are my cookies?", map[string]interface{}{
 		"contact-uuid":    string(models.CathyUUID),
@@ -109,7 +108,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
-	testsuite.AssertSnapshot(t, "forward_message.dump", logger.Logs[0].Request)
+	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
 }
 
 func TestCloseAndReopen(t *testing.T) {
@@ -157,10 +156,10 @@ func TestCloseAndReopen(t *testing.T) {
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 
 	assert.NoError(t, err)
-	testsuite.AssertSnapshot(t, "close_tickets.dump", logger.Logs[0].Request)
+	test.AssertSnapshot(t, "close_tickets", logger.Logs[0].Request)
 
 	err = svc.Reopen([]*models.Ticket{ticket2}, logger.Log)
 
 	assert.NoError(t, err)
-	testsuite.AssertSnapshot(t, "reopen_tickets.dump", logger.Logs[1].Request)
+	test.AssertSnapshot(t, "reopen_tickets", logger.Logs[1].Request)
 }
