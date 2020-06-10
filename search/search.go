@@ -309,9 +309,18 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 			} else {
 				return nil, NewError("unsupported name query comparator: %s", c.Comparator())
 			}
+		} else if key == contactql.AttributeUUID {
+			if c.Comparator() == contactql.ComparatorEqual {
+				return elastic.NewTermQuery("uuid", value), nil
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
+				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("uuid", value)), nil
+			}
+			return nil, NewError("unsupported comparator for uuid: %s", c.Comparator())
 		} else if key == contactql.AttributeID {
 			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewIdsQuery().Ids(value), nil
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
+				return elastic.NewBoolQuery().MustNot(elastic.NewIdsQuery().Ids(value)), nil
 			}
 			return nil, NewError("unsupported comparator for id: %s", c.Comparator())
 		} else if key == contactql.AttributeLanguage {
