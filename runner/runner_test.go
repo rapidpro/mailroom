@@ -110,8 +110,8 @@ func TestBatchStart(t *testing.T) {
 
 	// create a start object
 	db.MustExec(
-		`INSERT INTO flows_flowstart(is_active, created_on, modified_on, uuid, restart_participants, include_active, contact_count, status, flow_id, created_by_id, modified_by_id)
-		 VALUES(TRUE, NOW(), NOW(), $1, TRUE, TRUE, 2, 'P', $2, 1, 1)`, uuids.New(), models.SingleMessageFlowID)
+		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, start_type, created_on, modified_on, restart_participants, include_active, contact_count, status, created_by_id)
+		 VALUES($1, $2, $3, 'M', NOW(), NOW(), TRUE, TRUE, 2, 'P', 1)`, uuids.New(), models.Org1, models.SingleMessageFlowID)
 
 	// and our batch object
 	contactIDs := []models.ContactID{models.CathyID, models.BobID}
@@ -143,11 +143,10 @@ func TestBatchStart(t *testing.T) {
 	last := time.Now()
 
 	for i, tc := range tcs {
-		start := models.NewFlowStart(models.OrgID(1), models.MessagingFlow, tc.Flow, tc.Restart, tc.IncludeActive).
+		start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.MessagingFlow, tc.Flow, tc.Restart, tc.IncludeActive).
 			WithContactIDs(contactIDs).
 			WithExtra(tc.Extra)
-		batch := start.CreateBatch(contactIDs)
-		batch.SetIsLast(true)
+		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
 		sessions, err := StartFlowBatch(ctx, db, rp, batch)
 		assert.NoError(t, err)
@@ -197,7 +196,7 @@ func TestContactRuns(t *testing.T) {
 	contact, err := contacts[0].FlowContact(org)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, nil)
+	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, false, nil)
 	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)

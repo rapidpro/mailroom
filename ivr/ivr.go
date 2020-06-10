@@ -79,7 +79,7 @@ type Client interface {
 
 	HangupCall(client *http.Client, externalID string) error
 
-	WriteSessionResponse(session *models.Session, resumeURL string, req *http.Request, w http.ResponseWriter) error
+	WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
 
 	WriteErrorResponse(w http.ResponseWriter, err error) error
 
@@ -329,7 +329,7 @@ func StartIVRFlow(
 	}
 
 	// get the flow for our start
-	start, err := models.GetFlowStartAttributes(ctx, db, org.OrgID(), startID)
+	start, err := models.GetFlowStartAttributes(ctx, db, startID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
@@ -359,12 +359,12 @@ func StartIVRFlow(
 
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
-		trigger, err = triggers.NewFlowActionVoice(org.Env(), flowRef, contact, connRef, start.ParentSummary())
+		trigger, err = triggers.NewFlowActionVoice(org.Env(), flowRef, contact, connRef, start.ParentSummary(), false)
 		if err != nil {
 			return errors.Wrap(err, "unable to create flow action trigger")
 		}
 	} else {
-		trigger = triggers.NewManualVoice(org.Env(), flowRef, contact, connRef, params)
+		trigger = triggers.NewManualVoice(org.Env(), flowRef, contact, connRef, false, params)
 	}
 
 	// mark our connection as started
@@ -392,7 +392,7 @@ func StartIVRFlow(
 	}
 
 	// have our client output our session status
-	err = client.WriteSessionResponse(sessions[0], resumeURL, r, w)
+	err = client.WriteSessionResponse(sessions[0], urn, resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for start")
 	}
@@ -567,7 +567,7 @@ func ResumeIVRFlow(
 
 	// if still active, write out our response
 	if status == models.ConnectionStatusInProgress {
-		err = client.WriteSessionResponse(session, resumeURL, r, w)
+		err = client.WriteSessionResponse(session, urn, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}
@@ -598,7 +598,7 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 		}
 
 		// on errors we need to look up the flow to know how long to wait before retrying
-		start, err := models.GetFlowStartAttributes(ctx, db, org.OrgID(), conn.StartID())
+		start, err := models.GetFlowStartAttributes(ctx, db, conn.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())
 		}
@@ -608,8 +608,8 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}
 
-		retryWait := time.Minute * time.Duration(flow.IntConfigValue(models.FlowConfigIVRRetryMinutes, models.ConnectionRetryWait))
-		conn.MarkErrored(ctx, db, time.Now(), retryWait)
+		conn.MarkErrored(ctx, db, time.Now(), flow.IVRRetryWait())
+
 		if conn.Status() == models.ConnectionStatusErrored {
 			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
 		}

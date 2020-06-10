@@ -39,17 +39,17 @@ func TestInputLabelsAdded(t *testing.T) {
 				models.BobID:   msg2,
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from msgs_msg_labels WHERE msg_id = $1",
 					Args:  []interface{}{msg1.ID()},
 					Count: 2,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from msgs_msg_labels WHERE msg_id = $1",
 					Args:  []interface{}{msg2.ID()},
 					Count: 0,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from msgs_msg_labels l JOIN msgs_msg m ON l.msg_id = m.id WHERE m.contact_id = $1",
 					Args:  []interface{}{models.BobID},
 					Count: 0,
@@ -58,5 +58,5 @@ func TestInputLabelsAdded(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

@@ -43,42 +43,42 @@ func TestContactFieldChanged(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Female"}'::jsonb`,
 					Args:  []interface{}{models.CathyID, models.GenderFieldUUID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
 					Args:  []interface{}{models.CathyID, models.AgeFieldUUID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
 					Args:  []interface{}{models.GeorgeID, models.GenderFieldUUID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"40", "number": 40}'::jsonb`,
 					Args:  []interface{}{models.GeorgeID, models.AgeFieldUUID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Male"}'::jsonb`,
 					Args:  []interface{}{models.BobID, models.GenderFieldUUID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Old"}'::jsonb`,
 					Args:  []interface{}{models.BobID, models.AgeFieldUUID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
 					Args:  []interface{}{models.BobID, "unknown"},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields = '{}'`,
 					Args:  []interface{}{models.AlexandriaID},
 					Count: 1,
@@ -87,5 +87,5 @@ func TestContactFieldChanged(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

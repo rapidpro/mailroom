@@ -184,8 +184,8 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=50")
 		assert.Equal(t, 1, contacts[0].Groups().Count())
 
-		assert.Equal(t, "Sokoto", contacts[0].Fields()["state"].QueryValue())
-		assert.Equal(t, "Kilgori", contacts[0].Fields()["ward"].QueryValue())
+		assert.Equal(t, "Yobe", contacts[0].Fields()["state"].QueryValue())
+		assert.Equal(t, "Dokshi", contacts[0].Fields()["ward"].QueryValue())
 		assert.Equal(t, "F", contacts[0].Fields()["gender"].QueryValue())
 		assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
 
@@ -324,4 +324,55 @@ func TestCreateContact(t *testing.T) {
 
 	// verify she's stopped
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE AND is_active = TRUE and is_blocked = FALSE`, []interface{}{CathyID}, 1)
+}
+
+func TestUpdateContactModifiedBy(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	err := UpdateContactModifiedBy(ctx, db, []ContactID{}, UserID(0))
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(0)}, 0)
+
+	err = UpdateContactModifiedBy(ctx, db, []ContactID{CathyID}, UserID(0))
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(0)}, 0)
+
+	err = UpdateContactModifiedBy(ctx, db, []ContactID{CathyID}, UserID(1))
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(1)}, 1)
+
+}
+
+func TestUpdateContactStatus(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	err := UpdateContactStatus(ctx, db, []*ContactStatusChange{})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 0)
+
+	changes := make([]*ContactStatusChange, 0, 1)
+	changes = append(changes, &ContactStatusChange{CathyID, flows.ContactStatusBlocked})
+
+	err = UpdateContactStatus(ctx, db, changes)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 0)
+
+	changes = make([]*ContactStatusChange, 0, 1)
+	changes = append(changes, &ContactStatusChange{CathyID, flows.ContactStatusStopped})
+
+	err = UpdateContactStatus(ctx, db, changes)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 1)
+
 }

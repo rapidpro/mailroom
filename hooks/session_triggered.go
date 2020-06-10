@@ -68,12 +68,6 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		for _, e := range es {
 			event := e.(*events.SessionTriggeredEvent)
 
-			// we skip over any scene starts that involve groups if we are in a batch start
-			if len(scenes) > 1 && (len(event.Groups) > 0 || event.ContactQuery != "") {
-				logrus.WithField("session_id", s.SessionID).Error("ignoring scene trigger on group or query in batch")
-				continue
-			}
-
 			// look up our flow
 			f, err := org.Flow(event.Flow.UUID)
 			if err != nil {
@@ -97,7 +91,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			}
 
 			// create our start
-			start := models.NewFlowStart(org.OrgID(), flow.FlowType(), flow.ID(), models.DoRestartParticipants, models.DoIncludeActive).
+			start := models.NewFlowStart(org.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID(), models.DoRestartParticipants, models.DoIncludeActive).
 				WithGroupIDs(groupIDs).
 				WithContactIDs(contactIDs).
 				WithURNs(event.URNs).

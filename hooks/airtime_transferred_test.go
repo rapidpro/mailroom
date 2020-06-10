@@ -71,10 +71,10 @@ func TestAirtimeTransferred(t *testing.T) {
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://airtime-api.dtone.com/cgi-bin/shop/topup": []httpx.MockResponse{
-			httpx.NewMockResponse(200, nil, withCRLF(msisdnResponse), 1),
-			httpx.NewMockResponse(200, nil, withCRLF(reserveResponse), 1),
-			httpx.NewMockResponse(200, nil, withCRLF(topupResponse), 1),
-			httpx.NewMockResponse(200, nil, "error_code=13\r\nerror_txt=Oops\r\n", 1),
+			httpx.NewMockResponse(200, nil, withCRLF(msisdnResponse)),
+			httpx.NewMockResponse(200, nil, withCRLF(reserveResponse)),
+			httpx.NewMockResponse(200, nil, withCRLF(topupResponse)),
+			httpx.NewMockResponse(200, nil, "error_code=13\r\nerror_txt=Oops\r\n"),
 		},
 	}))
 
@@ -90,12 +90,12 @@ func TestAirtimeTransferred(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'S'`,
 					Args:  []interface{}{models.Org1, models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = FALSE AND url = 'https://airtime-api.dtone.com/cgi-bin/shop/topup'`,
 					Args:  []interface{}{models.Org1},
 					Count: 3,
@@ -109,12 +109,12 @@ func TestAirtimeTransferred(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'F'`,
 					Args:  []interface{}{models.Org1, models.GeorgeID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = TRUE AND url = 'https://airtime-api.dtone.com/cgi-bin/shop/topup'`,
 					Args:  []interface{}{models.Org1},
 					Count: 1,
@@ -123,5 +123,5 @@ func TestAirtimeTransferred(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

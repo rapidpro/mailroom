@@ -345,6 +345,7 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		flows.ContactID(c.id),
 		c.name,
 		c.language,
+		c.Status(),
 		org.Env().Timezone(),
 		c.createdOn,
 		c.urns,
@@ -406,6 +407,15 @@ func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
+
+func (c *Contact) Status() flows.ContactStatus {
+	if c.isBlocked {
+		return flows.ContactStatusBlocked
+	} else if c.isStopped {
+		return flows.ContactStatusStopped
+	}
+	return flows.ContactStatusActive
+}
 
 // fieldValueEnvelope is our utility struct for the value of a field
 type fieldValueEnvelope struct {
@@ -1262,3 +1272,85 @@ func (i *ContactID) Scan(value interface{}) error {
 func ContactLock(orgID OrgID, contactID ContactID) string {
 	return fmt.Sprintf("c:%d:%d", orgID, contactID)
 }
+
+// UpdateContactModifiedBy updates modified by the passed user id on the passed in contacts
+func UpdateContactModifiedBy(ctx context.Context, tx Queryer, contactIDs []ContactID, userID UserID) error {
+	if userID == NilUserID || len(contactIDs) == 0 {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW(), modified_by_id = $2 WHERE id = ANY($1)`, pq.Array(contactIDs), userID)
+	return err
+}
+
+// ContactStatusChange struct used for our contact status change
+type ContactStatusChange struct {
+	ContactID ContactID
+	Status    flows.ContactStatus
+}
+
+type contactStatusUpdate struct {
+	ContactID ContactID `db:"id"`
+	Blocked   bool      `db:"is_blocked"`
+	Stopped   bool      `db:"is_stopped"`
+}
+
+// UpdateContactStatus updates the contacts status as the passed changes
+func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStatusChange) error {
+
+	contactTriggersIDs := make([]interface{}, 0, len(changes))
+	statusUpdates := make([]interface{}, 0, len(changes))
+
+	for _, ch := range changes {
+		blocked := ch.Status == flows.ContactStatusBlocked
+		stopped := ch.Status == flows.ContactStatusStopped
+
+		if blocked || stopped {
+			contactTriggersIDs = append(contactTriggersIDs, ch.ContactID)
+		}
+
+		statusUpdates = append(
+			statusUpdates,
+			&contactStatusUpdate{
+				ContactID: ch.ContactID,
+				Blocked:   blocked,
+				Stopped:   stopped,
+			},
+		)
+
+	}
+
+	// remove triggers for contact we'll stop/block
+	_, err := tx.ExecContext(ctx, deleteAllContactTriggersForIDsSQL, pq.Array(contactTriggersIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error removing contact from triggers")
+	}
+
+	// do our status update
+	err = BulkSQL(ctx, "updating contact statuses", tx, updateContactStatusSQL, statusUpdates)
+	if err != nil {
+		return errors.Wrapf(err, "error updating contact statuses")
+	}
+	return err
+}
+
+const updateContactStatusSQL = `
+	UPDATE
+		contacts_contact c
+	SET
+		is_blocked = r.is_blocked::boolean,
+		is_stopped = r.is_stopped::boolean,
+		modified_on = NOW()
+	FROM (
+		VALUES(:id, :is_blocked, :is_stopped)
+	) AS
+		r(id, is_blocked, is_stopped)
+	WHERE
+		c.id = r.id::int
+`
+
+const deleteAllContactTriggersForIDsSQL = `
+DELETE FROM
+	triggers_trigger_contacts
+WHERE
+	contact_id = ANY($1)
+`

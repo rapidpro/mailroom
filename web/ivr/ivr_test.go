@@ -70,7 +70,7 @@ func TestTwilioIVR(t *testing.T) {
 	// create a flow start for cathy and george
 	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+16055741111?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
 
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(models.Org1, models.StartTypeTrigger, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
 		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
 		WithParentSummary(parentSummary)
 
@@ -374,7 +374,7 @@ func TestNexmoIVR(t *testing.T) {
 
 	// create a flow start for cathy and george
 	extra := json.RawMessage(`{"ref_id":"123"}`)
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(models.Org1, models.StartTypeTrigger, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
 		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
 		WithExtra(extra)
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})

@@ -28,7 +28,7 @@ func TestBroadcastCreated(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
@@ -51,5 +51,5 @@ func TestBroadcastCreated(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

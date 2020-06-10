@@ -18,6 +18,15 @@ type StartID null.Int
 // NilStartID is our constant for a nil start id
 var NilStartID = StartID(0)
 
+type StartType string
+
+const (
+	StartTypeManual     = StartType("M")
+	StartTypeAPI        = StartType("A")
+	StartTypeFlowAction = StartType("F")
+	StartTypeTrigger    = StartType("T")
+)
+
 // RestartParticipants is our type for the bool of restarting participatants
 type RestartParticipants bool
 
@@ -32,7 +41,7 @@ const DontIncludeActive = IncludeActive(false)
 
 // MarkStartComplete sets the status for the passed in flow start
 func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C' WHERE id = $1", startID)
+	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as complete")
 	}
@@ -41,7 +50,7 @@ func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error 
 
 // MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
 func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contactCount int) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'S', contact_count = $2 WHERE id = $1", startID, contactCount)
+	_, err := db.Exec("UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as started")
 	}
@@ -64,7 +73,8 @@ type FlowStartBatch struct {
 		RestartParticipants RestartParticipants `json:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"`
 
-		IsLast bool `json:"is_last,omitempty"`
+		IsLast        bool `json:"is_last,omitempty"`
+		TotalContacts int  `json:"total_contacts"`
 	}
 }
 
@@ -75,7 +85,7 @@ func (b *FlowStartBatch) ContactIDs() []ContactID                  { return b.b.
 func (b *FlowStartBatch) RestartParticipants() RestartParticipants { return b.b.RestartParticipants }
 func (b *FlowStartBatch) IncludeActive() IncludeActive             { return b.b.IncludeActive }
 func (b *FlowStartBatch) IsLast() bool                             { return b.b.IsLast }
-func (b *FlowStartBatch) SetIsLast(last bool)                      { b.b.IsLast = last }
+func (b *FlowStartBatch) TotalContacts() int                       { return b.b.TotalContacts }
 
 func (b *FlowStartBatch) ParentSummary() json.RawMessage { return json.RawMessage(b.b.ParentSummary) }
 func (b *FlowStartBatch) Extra() json.RawMessage         { return json.RawMessage(b.b.Extra) }
@@ -86,11 +96,12 @@ func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarsha
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
 	s struct {
-		ID       StartID    `json:"start_id"   db:"id"`
-		UUID     uuids.UUID `                  db:"uuid"`
-		OrgID    OrgID      `json:"org_id"     db:"org_id"`
-		FlowID   FlowID     `json:"flow_id"    db:"flow_id"`
-		FlowType FlowType   `json:"flow_type"`
+		ID        StartID    `json:"start_id"   db:"id"`
+		UUID      uuids.UUID `                  db:"uuid"`
+		StartType StartType  `json:"start_type" db:"start_type"`
+		OrgID     OrgID      `json:"org_id"     db:"org_id"`
+		FlowID    FlowID     `json:"flow_id"    db:"flow_id"`
+		FlowType  FlowType   `json:"flow_type"`
 
 		GroupIDs   []GroupID   `json:"group_ids,omitempty"`
 		ContactIDs []ContactID `json:"contact_ids,omitempty"`
@@ -161,7 +172,7 @@ func (s *FlowStart) MarshalJSON() ([]byte, error)    { return json.Marshal(s.s) 
 func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &s.s) }
 
 // GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and extra
-func GetFlowStartAttributes(ctx context.Context, db Queryer, orgID OrgID, startID StartID) (*FlowStart, error) {
+func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
 	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra, parent_summary FROM flows_flowstart WHERE id = $1`, startID)
 	if err != nil {
@@ -171,10 +182,11 @@ func GetFlowStartAttributes(ctx context.Context, db Queryer, orgID OrgID, startI
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
-func NewFlowStart(orgID OrgID, flowType FlowType, flowID FlowID, restartParticipants RestartParticipants, includeActive IncludeActive) *FlowStart {
+func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID, restartParticipants RestartParticipants, includeActive IncludeActive) *FlowStart {
 	s := &FlowStart{}
 	s.s.UUID = uuids.New()
 	s.s.OrgID = orgID
+	s.s.StartType = startType
 	s.s.FlowType = flowType
 	s.s.FlowID = flowID
 	s.s.RestartParticipants = restartParticipants
@@ -250,8 +262,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(created_on,  uuid,  restart_participants,  include_active,  query, status,  flow_id,  extra,  parent_summary)
-			 VALUES(NOW()     , :uuid, :restart_participants, :include_active, :query, 'P'   , :flow_id, :extra, :parent_summary)
+	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary)
+			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary)
 RETURNING
 	id
 `
@@ -269,7 +281,7 @@ INSERT INTO
 `
 
 // CreateBatch creates a batch for this start using the passed in contact ids
-func (s *FlowStart) CreateBatch(contactIDs []ContactID) *FlowStartBatch {
+func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {
 	b := &FlowStartBatch{}
 	b.b.StartID = s.ID()
 	b.b.OrgID = s.OrgID()
@@ -280,6 +292,8 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID) *FlowStartBatch {
 	b.b.IncludeActive = s.IncludeActive()
 	b.b.ParentSummary = null.JSON(s.ParentSummary())
 	b.b.Extra = null.JSON(s.Extra())
+	b.b.IsLast = last
+	b.b.TotalContacts = totalContacts
 	return b
 }
 

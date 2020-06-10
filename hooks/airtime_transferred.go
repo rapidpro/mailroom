@@ -94,7 +94,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 
 	// add a log for each HTTP call
 	for _, httpLog := range event.HTTPLogs {
-		transfer.AddLog(models.NewHTTPLog(
+		transfer.AddLog(models.NewAirtimeTransferredLog(
 			org.OrgID(),
 			httpLog.URL,
 			httpLog.Request,

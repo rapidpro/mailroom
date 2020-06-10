@@ -21,17 +21,17 @@ func TestContactLanguageChanged(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'eng'",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'spa'",
 					Args:  []interface{}{models.GeorgeID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language is NULL;",
 					Args:  []interface{}{models.BobID},
 					Count: 1,
@@ -40,5 +40,5 @@ func TestContactLanguageChanged(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

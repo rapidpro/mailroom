@@ -24,26 +24,26 @@ func TestContactNameChanged(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where name = 'Tarzan' and id = $1",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where name = 'Tarzan'",
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where name = 'Bob' and id = $1",
 					Args:  []interface{}{models.BobID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where name = 'Geoff Newman' and id = $1",
 					Args:  []interface{}{models.GeorgeID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where name = '😃2345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678' and id = $1",
 					Args:  []interface{}{models.AlexandriaID},
 					Count: 1,
@@ -52,5 +52,5 @@ func TestContactNameChanged(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }
