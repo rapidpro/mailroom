@@ -1109,6 +1109,28 @@
         "error": "comparisons with > can only be used with date and number fields"
     },
     {
+        "label": "valid uuid =",
+        "search": "uuid=bbe6dba0-818b-4c5a-be51-10432095e27a",
+        "query": {
+            "term": {
+                "uuid": "bbe6dba0-818b-4c5a-be51-10432095e27a"
+            }
+        }
+    },
+    {
+        "label": "valid uuid !=",
+        "search": "uuid!=bbe6dba0-818b-4c5a-be51-10432095e27a",
+        "query": {
+            "bool": {
+                "must_not": {
+                    "term": {
+                        "uuid": "bbe6dba0-818b-4c5a-be51-10432095e27a"
+                    }
+                }
+            }
+        }
+    },
+    {
         "label": "valid id =",
         "search": "id=123",
         "query": {
@@ -1120,9 +1142,19 @@
         }
     },
     {
-        "label": "invalid id !=",
+        "label": "valid id !=",
         "search": "id!=123",
-        "error": "unsupported comparator for id: !="
+        "query": {
+            "bool": {
+                "must_not": {
+                    "ids": {
+                        "values": [
+                            "123"
+                        ]
+                    }
+                }
+            }
+        }
     },
     {
         "label": "valid language is unset",

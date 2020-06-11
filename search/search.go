@@ -172,7 +172,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 
 			// if we are looking for unset, inverse our query
 			if c.Comparator() == contactql.ComparatorEqual {
-				query = elastic.NewBoolQuery().MustNot(query)
+				query = not(query)
 			}
 			return query, nil
 		}
@@ -187,7 +187,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 					elastic.NewTermQuery("fields.text", value),
 					elastic.NewExistsQuery("fields.text"),
 				)
-				return elastic.NewBoolQuery().MustNot(elastic.NewNestedQuery("fields", query)), nil
+				return not(elastic.NewNestedQuery("fields", query)), nil
 			} else {
 				return nil, NewError("unsupported text comparator: %s", c.Comparator())
 			}
@@ -203,7 +203,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewMatchQuery("fields.number", value)
 			} else if c.Comparator() == contactql.ComparatorNotEqual {
-				return elastic.NewBoolQuery().MustNot(
+				return not(
 					elastic.NewNestedQuery("fields",
 						elastic.NewBoolQuery().Must(
 							fieldQuery,
@@ -235,7 +235,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewRangeQuery("fields.datetime").Gte(start).Lt(end)
 			} else if c.Comparator() == contactql.ComparatorNotEqual {
-				return elastic.NewBoolQuery().MustNot(
+				return not(
 					elastic.NewNestedQuery("fields",
 						elastic.NewBoolQuery().Must(
 							fieldQuery,
@@ -264,7 +264,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 			if c.Comparator() == contactql.ComparatorEqual {
 				query = elastic.NewTermQuery(name, value)
 			} else if c.Comparator() == contactql.ComparatorNotEqual {
-				return elastic.NewBoolQuery().MustNot(
+				return not(
 					elastic.NewNestedQuery("fields",
 						elastic.NewBoolQuery().Must(
 							elastic.NewTermQuery(name, value),
@@ -289,11 +289,11 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 
 			query = elastic.NewBoolQuery().Must(
 				elastic.NewExistsQuery(key),
-				elastic.NewBoolQuery().MustNot(elastic.NewTermQuery(fmt.Sprintf("%s.keyword", key), "")),
+				not(elastic.NewTermQuery(fmt.Sprintf("%s.keyword", key), "")),
 			)
 
 			if c.Comparator() == contactql.ComparatorEqual {
-				query = elastic.NewBoolQuery().MustNot(query)
+				query = not(query)
 			}
 
 			return query, nil
@@ -305,20 +305,29 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 			} else if c.Comparator() == contactql.ComparatorContains {
 				return elastic.NewMatchQuery("name", value), nil
 			} else if c.Comparator() == contactql.ComparatorNotEqual {
-				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("name.keyword", c.Value())), nil
+				return not(elastic.NewTermQuery("name.keyword", c.Value())), nil
 			} else {
 				return nil, NewError("unsupported name query comparator: %s", c.Comparator())
 			}
+		} else if key == contactql.AttributeUUID {
+			if c.Comparator() == contactql.ComparatorEqual {
+				return elastic.NewTermQuery("uuid", value), nil
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
+				return not(elastic.NewTermQuery("uuid", value)), nil
+			}
+			return nil, NewError("unsupported comparator for uuid: %s", c.Comparator())
 		} else if key == contactql.AttributeID {
 			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewIdsQuery().Ids(value), nil
+			} else if c.Comparator() == contactql.ComparatorNotEqual {
+				return not(elastic.NewIdsQuery().Ids(value)), nil
 			}
 			return nil, NewError("unsupported comparator for id: %s", c.Comparator())
 		} else if key == contactql.AttributeLanguage {
 			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewTermQuery("language", value), nil
 			} else if c.Comparator() == contactql.ComparatorNotEqual {
-				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("language", value)), nil
+				return not(elastic.NewTermQuery("language", value)), nil
 			} else {
 				return nil, NewError("unsupported language comparator: %s", c.Comparator())
 			}
@@ -332,7 +341,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewRangeQuery("created_on").Gte(start).Lt(end), nil
 			} else if c.Comparator() == contactql.ComparatorNotEqual {
-				return elastic.NewBoolQuery().MustNot(elastic.NewRangeQuery("created_on").Gte(start).Lt(end)), nil
+				return not(elastic.NewRangeQuery("created_on").Gte(start).Lt(end)), nil
 			} else if c.Comparator() == contactql.ComparatorGreaterThan {
 				return elastic.NewRangeQuery("created_on").Gte(end), nil
 			} else if c.Comparator() == contactql.ComparatorGreaterThanOrEqual {
@@ -351,7 +360,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 			if (c.Comparator() == contactql.ComparatorEqual || c.Comparator() == contactql.ComparatorNotEqual) && value == "" {
 				query = elastic.NewNestedQuery("urns", elastic.NewExistsQuery("urns.path"))
 				if c.Comparator() == contactql.ComparatorEqual {
-					query = elastic.NewBoolQuery().MustNot(query)
+					query = not(query)
 				}
 				return query, nil
 			}
@@ -377,7 +386,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 			if c.Comparator() == contactql.ComparatorEqual {
 				return elastic.NewTermQuery("groups", group.UUID()), nil
 			} else if c.Comparator() == contactql.ComparatorNotEqual {
-				return elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("groups", group.UUID())), nil
+				return not(elastic.NewTermQuery("groups", group.UUID())), nil
 			} else {
 				return nil, NewError("unsupported group comparator: %s", c.Comparator())
 			}
@@ -395,7 +404,7 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 				elastic.NewExistsQuery("urns.path"),
 			))
 			if c.Comparator() == contactql.ComparatorEqual {
-				query = elastic.NewBoolQuery().MustNot(query)
+				query = not(query)
 			}
 			return query, nil
 		}
@@ -416,6 +425,11 @@ func conditionToElasticQuery(env envs.Environment, resolver contactql.Resolver, 
 	}
 
 	return nil, NewError("unsupported property type: %s", c.PropertyType())
+}
+
+// convenience utility to create a not boolean query
+func not(queries ...elastic.Query) *elastic.BoolQuery {
+	return elastic.NewBoolQuery().MustNot(queries...)
 }
 
 // Error is used when an error is in the parsing of a field or query format
