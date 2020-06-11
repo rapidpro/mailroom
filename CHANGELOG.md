@@ -1,3 +1,9 @@
+v5.5.27
+----------
+ * Allow searching by UUID, as well != matches on ID and UUID
+ * Update to latest goflow v0.91.1 to fix clearing fields
+ * Maybe fix intermittently failing test
+
 v5.5.26
 ----------
  * Update to goflow v0.89.0
