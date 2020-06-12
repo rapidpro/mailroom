@@ -1,3 +1,7 @@
+v5.5.28
+----------
+ * Don't do any decoration of email ticket subjects
+
 v5.5.27
 ----------
  * Allow searching by UUID, as well != matches on ID and UUID
