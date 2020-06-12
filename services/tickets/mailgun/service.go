@@ -31,8 +31,6 @@ const (
 	ticketConfigLastMessageID  = "last-message-id"
 )
 
-var subjectTemplate = newTemplate("subject", `[{{.brand}}] {{.contact}}: {{.subject}}`)
-
 // body template for new ticket being opened
 var openBodyTemplate = newTemplate("open_body", `New ticket opened
 ------------------------------------------------
@@ -115,10 +113,9 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 	from := s.ticketAddress(contactDisplay, ticketUUID)
 	context := s.templateContext(subject, body, "", string(session.Contact().UUID()), contactDisplay)
-	fullSubject := evaluateTemplate(subjectTemplate, context)
 	fullBody := evaluateTemplate(openBodyTemplate, context)
 
-	msgID, trace, err := s.client.SendMessage(from, s.toAddress, fullSubject, fullBody, nil)
+	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, fullBody, nil)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -131,20 +128,18 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
 	context := s.templateContext(ticket.Subject(), ticket.Body(), text, ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
-	subject := evaluateTemplate(subjectTemplate, context)
 	body := evaluateTemplate(forwardBodyTemplate, context)
 
-	_, err := s.sendInTicket(ticket, subject, body, logHTTP)
+	_, err := s.sendInTicket(ticket, body, logHTTP)
 	return err
 }
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, ticket := range tickets {
 		context := s.templateContext(ticket.Subject(), ticket.Body(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
-		subject := evaluateTemplate(subjectTemplate, context)
 		body := evaluateTemplate(closedBodyTemplate, context)
 
-		_, err := s.sendInTicket(ticket, subject, body, logHTTP)
+		_, err := s.sendInTicket(ticket, body, logHTTP)
 		if err != nil {
 			return err
 		}
@@ -155,10 +150,9 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, ticket := range tickets {
 		context := s.templateContext(ticket.Subject(), ticket.Body(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
-		subject := evaluateTemplate(subjectTemplate, context)
 		body := evaluateTemplate(reopenedBodyTemplate, context)
 
-		_, err := s.sendInTicket(ticket, subject, body, logHTTP)
+		_, err := s.sendInTicket(ticket, body, logHTTP)
 		if err != nil {
 			return err
 		}
@@ -167,7 +161,7 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 }
 
 // sends an email as part of the thread for the given ticket
-func (s *service) sendInTicket(ticket *models.Ticket, subject, text string, logHTTP flows.HTTPLogCallback) (string, error) {
+func (s *service) sendInTicket(ticket *models.Ticket, text string, logHTTP flows.HTTPLogCallback) (string, error) {
 	contactDisplay := ticket.Config(ticketConfigContactDisplay)
 	lastMessageID := ticket.Config(ticketConfigLastMessageID)
 	if lastMessageID == "" {
@@ -179,7 +173,7 @@ func (s *service) sendInTicket(ticket *models.Ticket, subject, text string, logH
 	}
 	from := s.ticketAddress(contactDisplay, ticket.UUID())
 
-	return s.send(from, s.toAddress, subject, text, headers, logHTTP)
+	return s.send(from, s.toAddress, ticket.Subject(), text, headers, logHTTP)
 }
 
 func (s *service) send(from, to, subject, text string, headers map[string]string, logHTTP flows.HTTPLogCallback) (string, error) {
