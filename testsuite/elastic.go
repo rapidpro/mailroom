@@ -1,4 +1,4 @@
-package search
+package testsuite
 
 import (
 	"io/ioutil"

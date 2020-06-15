@@ -10,8 +10,8 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
-	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,7 +24,7 @@ func TestStarts(t *testing.T) {
 	rc := testsuite.RC()
 	defer rc.Close()
 
-	mes := search.NewMockElasticServer()
+	mes := testsuite.NewMockElasticServer()
 	defer mes.Close()
 
 	es, err := elastic.NewClient(

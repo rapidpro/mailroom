@@ -1,17 +1,16 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/olivere/elastic"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
-
-	"fmt"
 )
 
 func TestElasticContacts(t *testing.T) {
@@ -19,7 +18,7 @@ func TestElasticContacts(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	es := search.NewMockElasticServer()
+	es := testsuite.NewMockElasticServer()
 	defer es.Close()
 
 	client, err := elastic.NewClient(

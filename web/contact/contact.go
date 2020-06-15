@@ -6,12 +6,13 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions/modifiers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/pkg/errors"
 )
 
@@ -82,27 +83,34 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	if err != nil {
 		switch cause := errors.Cause(err).(type) {
-		case *search.Error:
+		case *contactql.QueryError:
 			return cause, http.StatusBadRequest, nil
 		default:
 			return nil, http.StatusInternalServerError, err
 		}
 	}
 
-	// create our normalized query
+	// normalize and inspect the query
 	normalized := ""
+	allowAsGroup := false
+	fields := make([]string, 0)
+
 	if parsed != nil {
 		normalized = parsed.String()
+		inspection := contactql.Inspect(parsed)
+		fields = append(fields, inspection.Attributes...)
+		for _, f := range inspection.Fields {
+			fields = append(fields, f.Key)
+		}
+		allowAsGroup = inspection.AllowAsGroup
 	}
-
-	fields := search.FieldDependencies(parsed)
 
 	// build our response
 	response := &searchResponse{
 		Query:        normalized,
 		ContactIDs:   hits,
 		Fields:       fields,
-		AllowAsGroup: search.AllowAsGroup(fields),
+		AllowAsGroup: allowAsGroup,
 		Total:        total,
 		Offset:       request.Offset,
 		Sort:         request.Sort,
@@ -153,20 +161,31 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	parsed, err := search.ParseQuery(org.Env(), org.SessionAssets(), request.Query)
+	env := org.Env()
+	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
 
 	if err != nil {
 		switch cause := errors.Cause(err).(type) {
-		case *search.Error:
+		case *contactql.QueryError:
 			return cause, http.StatusBadRequest, nil
 		default:
 			return nil, http.StatusInternalServerError, err
 		}
 	}
 
+	// normalize and inspect the query
 	normalized := ""
+	allowAsGroup := false
+	fields := make([]string, 0)
+
 	if parsed != nil {
 		normalized = parsed.String()
+		inspection := contactql.Inspect(parsed)
+		fields = append(fields, inspection.Attributes...)
+		for _, f := range inspection.Fields {
+			fields = append(fields, f.Key)
+		}
+		allowAsGroup = inspection.AllowAsGroup
 	}
 
 	eq, err := models.BuildElasticQuery(org, request.GroupUUID, parsed)
@@ -178,14 +197,12 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return nil, http.StatusInternalServerError, err
 	}
 
-	fields := search.FieldDependencies(parsed)
-
 	// build our response
 	response := &parseResponse{
 		Query:        normalized,
 		Fields:       fields,
 		ElasticQuery: eqj,
-		AllowAsGroup: search.AllowAsGroup(fields),
+		AllowAsGroup: allowAsGroup,
 	}
 
 	return response, http.StatusOK, nil
