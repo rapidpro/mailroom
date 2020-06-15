@@ -45,19 +45,26 @@ type searchRequest struct {
 // {
 //   "query": "age > 10",
 //   "contact_ids": [5,10,15],
-//   "fields": ["age"],
-//   "allow_as_group": true,
 //   "total": 3,
-//   "offset": 0
+//   "offset": 0,
+//   "metadata": {
+//     "fields": [
+//       {"key": "age", "name": "Age"}
+//     ],
+//     "allow_as_group": true
+//   }
 // }
 type searchResponse struct {
-	Query        string             `json:"query"`
-	ContactIDs   []models.ContactID `json:"contact_ids"`
-	Fields       []string           `json:"fields"`
-	AllowAsGroup bool               `json:"allow_as_group"`
-	Total        int64              `json:"total"`
-	Offset       int                `json:"offset"`
-	Sort         string             `json:"sort"`
+	Query      string                `json:"query"`
+	ContactIDs []models.ContactID    `json:"contact_ids"`
+	Total      int64                 `json:"total"`
+	Offset     int                   `json:"offset"`
+	Sort       string                `json:"sort"`
+	Metadata   *contactql.Inspection `json:"metadata,omitempty"`
+
+	// deprecated
+	Fields       []string `json:"fields"`
+	AllowAsGroup bool     `json:"allow_as_group"`
 }
 
 // handles a contact search request
@@ -92,28 +99,30 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// normalize and inspect the query
 	normalized := ""
+	var metadata *contactql.Inspection
 	allowAsGroup := false
 	fields := make([]string, 0)
 
 	if parsed != nil {
 		normalized = parsed.String()
-		inspection := contactql.Inspect(parsed)
-		fields = append(fields, inspection.Attributes...)
-		for _, f := range inspection.Fields {
+		metadata = contactql.Inspect(parsed)
+		fields = append(fields, metadata.Attributes...)
+		for _, f := range metadata.Fields {
 			fields = append(fields, f.Key)
 		}
-		allowAsGroup = inspection.AllowAsGroup
+		allowAsGroup = metadata.AllowAsGroup
 	}
 
 	// build our response
 	response := &searchResponse{
 		Query:        normalized,
 		ContactIDs:   hits,
-		Fields:       fields,
-		AllowAsGroup: allowAsGroup,
 		Total:        total,
 		Offset:       request.Offset,
 		Sort:         request.Sort,
+		Metadata:     metadata,
+		Fields:       fields,
+		AllowAsGroup: allowAsGroup,
 	}
 
 	return response, http.StatusOK, nil
@@ -137,15 +146,22 @@ type parseRequest struct {
 //
 // {
 //   "query": "age > 10",
-//   "fields": ["age"],
 //   "elastic_query": { .. },
-//   "allow_as_group": true
+//   "metadata": {
+//     "fields": [
+//       {"key": "age", "name": "Age"}
+//     ],
+//     "allow_as_group": true
+//   }
 // }
 type parseResponse struct {
-	Query        string      `json:"query"`
-	Fields       []string    `json:"fields"`
-	ElasticQuery interface{} `json:"elastic_query"`
-	AllowAsGroup bool        `json:"allow_as_group"`
+	Query        string                `json:"query"`
+	ElasticQuery interface{}           `json:"elastic_query"`
+	Metadata     *contactql.Inspection `json:"metadata,omitempty"`
+
+	// deprecated
+	Fields       []string `json:"fields"`
+	AllowAsGroup bool     `json:"allow_as_group"`
 }
 
 // handles a query parsing request
@@ -175,17 +191,18 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 
 	// normalize and inspect the query
 	normalized := ""
+	var metadata *contactql.Inspection
 	allowAsGroup := false
 	fields := make([]string, 0)
 
 	if parsed != nil {
 		normalized = parsed.String()
-		inspection := contactql.Inspect(parsed)
-		fields = append(fields, inspection.Attributes...)
-		for _, f := range inspection.Fields {
+		metadata = contactql.Inspect(parsed)
+		fields = append(fields, metadata.Attributes...)
+		for _, f := range metadata.Fields {
 			fields = append(fields, f.Key)
 		}
-		allowAsGroup = inspection.AllowAsGroup
+		allowAsGroup = metadata.AllowAsGroup
 	}
 
 	eq, err := models.BuildElasticQuery(org, request.GroupUUID, parsed)
@@ -200,8 +217,9 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	// build our response
 	response := &parseResponse{
 		Query:        normalized,
-		Fields:       fields,
 		ElasticQuery: eqj,
+		Metadata:     metadata,
+		Fields:       fields,
 		AllowAsGroup: allowAsGroup,
 	}
 
