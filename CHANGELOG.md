@@ -1,3 +1,8 @@
+v5.5.29
+----------
+ * Return query inspection results as new metadata field in responses
+ * Update to latest goflow v0.92.0
+
 v5.5.28
 ----------
  * Don't do any decoration of email ticket subjects
