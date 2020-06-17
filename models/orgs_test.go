@@ -31,6 +31,8 @@ func TestOrgs(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, OrgID(1), org.ID())
+	assert.False(t, org.Suspended())
+	assert.True(t, org.UsesTopups())
 	assert.Equal(t, envs.DateFormatDayMonthYear, org.DateFormat())
 	assert.Equal(t, envs.TimeFormatHourMinute, org.TimeFormat())
 	assert.Equal(t, envs.RedactionPolicyNone, org.RedactionPolicy())
