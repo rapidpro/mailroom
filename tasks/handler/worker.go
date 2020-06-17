@@ -463,6 +463,15 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		return errors.Wrapf(err, "error loading org")
 	}
 
+	// if org is suspended, just send message to inbox
+	if oa.Org().Suspended() {
+		err := models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, models.NilTopupID)
+		if err != nil {
+			return errors.Wrapf(err, "error updating message for suspended org")
+		}
+		return nil
+	}
+
 	// find the topup for this message
 	rc := rp.Get()
 	topupID, err := models.AllocateTopups(ctx, db, rc, oa.Org(), 1)
