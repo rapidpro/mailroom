@@ -53,7 +53,10 @@ func TestTopups(t *testing.T) {
 	}
 
 	for _, tc := range tc2s {
-		topup, err := DecrementOrgCredits(ctx, tx, rc, tc.OrgID, 1)
+		org, err := loadOrg(ctx, tx, tc.OrgID)
+		assert.NoError(t, err)
+
+		topup, err := AllocateTopups(ctx, tx, rc, org, 1)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.TopupID, topup)
 		tx.MustExec(`INSERT INTO orgs_topupcredits(is_squashed, used, topup_id) VALUES(TRUE, 1, $1)`, tc.OrgID)

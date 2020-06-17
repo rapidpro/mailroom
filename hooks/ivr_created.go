@@ -22,7 +22,7 @@ type CommitIVRHook struct{}
 var commitIVRHook = &CommitIVRHook{}
 
 // Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
-func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	msgs := make([]*models.Msg, 0, len(scenes))
 	for _, s := range scenes {
 		for _, m := range s {
@@ -32,7 +32,7 @@ func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 
 	// find the topup we will assign
 	rc := rp.Get()
-	topup, err := models.DecrementOrgCredits(ctx, tx, rc, org.OrgID(), len(msgs))
+	topup, err := models.AllocateTopups(ctx, tx, rc, oa.Org(), len(msgs))
 	rc.Close()
 	if err != nil {
 		return errors.Wrapf(err, "error finding active topup")

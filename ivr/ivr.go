@@ -404,15 +404,15 @@ func StartIVRFlow(
 func ResumeIVRFlow(
 	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API,
 	resumeURL string, client Client,
-	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
+	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
-	contact, err := c.FlowContact(org)
+	contact, err := c.FlowContact(oa)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
-	session, err := models.ActiveSessionForContact(ctx, db, org, models.IVRFlow, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, oa, models.IVRFlow, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading session for contact")
 	}
@@ -494,7 +494,7 @@ func ResumeIVRFlow(
 
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(attachment.URL())
-		path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", org.OrgID()), filename[:4], filename[4:8], filename)
+		path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", oa.OrgID()), filename[:4], filename[4:8], filename)
 		if !strings.HasPrefix(path, "/") {
 			path = fmt.Sprintf("/%s", path)
 		}
@@ -518,11 +518,11 @@ func ResumeIVRFlow(
 	msgIn := flows.NewMsgIn(msgUUID, urn, channel.ChannelReference(), input, attachments)
 
 	// create an incoming message
-	msg := models.NewIncomingIVR(org.OrgID(), conn, msgIn, time.Now())
+	msg := models.NewIncomingIVR(oa.OrgID(), conn, msgIn, time.Now())
 
 	// find a topup
 	rc := rp.Get()
-	topupID, err := models.DecrementOrgCredits(ctx, db, rc, org.OrgID(), 1)
+	topupID, err := models.AllocateTopups(ctx, db, rc, oa.Org(), 1)
 	rc.Close()
 
 	// error or no topup, that's an end of call
@@ -541,7 +541,7 @@ func ResumeIVRFlow(
 	}
 
 	// create our msg resume event
-	resume := resumes.NewMsg(org.Env(), contact, msgIn)
+	resume := resumes.NewMsg(oa.Env(), contact, msgIn)
 
 	// hook to set our connection on our session before our event hooks run
 	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
@@ -560,7 +560,7 @@ func ResumeIVRFlow(
 		}
 	}
 
-	session, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}
