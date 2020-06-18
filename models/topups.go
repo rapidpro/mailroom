@@ -27,7 +27,10 @@ const (
 
 // AllocateTopups allocates topups for the given number of messages if topups are used by the org.
 // If topups are allocated it will return the ID of the topup to assign to those messages.
-func AllocateTopups(ctx context.Context, db Queryer, rc redis.Conn, org *Org, amount int) (TopupID, error) {
+func AllocateTopups(ctx context.Context, db Queryer, rp *redis.Pool, org *Org, amount int) (TopupID, error) {
+	rc := rp.Get()
+	defer rc.Close()
+
 	// if org doesn't use topups, do nothing
 	if !org.UsesTopups() {
 		return NilTopupID, nil

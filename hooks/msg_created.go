@@ -42,13 +42,13 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 
 	// for each scene gather all our messages
 	for s, args := range scenes {
-		// walk through our messages, separate by whether they have a topup
+		// walk through our messages, separate by whether they're android or not
 		courierMsgs := make([]*models.Msg, 0, len(args))
 
 		for _, m := range args {
 			msg := m.(*models.Msg)
 			channel := msg.Channel()
-			if msg.TopupID() != models.NilTopupID && channel != nil {
+			if channel != nil {
 				if channel.Type() == models.ChannelTypeAndroid {
 					androidChannels[channel] = true
 				} else {
@@ -149,12 +149,10 @@ func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 		}
 	}
 
-	// find the topup we will assign
-	rc := rp.Get()
-	topup, err := models.AllocateTopups(ctx, tx, rc, oa.Org(), len(msgs))
-	rc.Close()
+	// allocate a topup for this message if org uses topups
+	topup, err := models.AllocateTopups(ctx, tx, rp, oa.Org(), len(msgs))
 	if err != nil {
-		return errors.Wrapf(err, "error finding active topup")
+		return errors.Wrapf(err, "error allocating topup for outgoing message")
 	}
 
 	// if we have an active topup, assign it to our messages

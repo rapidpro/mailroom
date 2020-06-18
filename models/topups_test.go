@@ -11,8 +11,7 @@ import (
 func TestTopups(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	rc := testsuite.RC()
-	defer rc.Close()
+	rp := testsuite.RP()
 
 	tx, err := db.BeginTxx(ctx, nil)
 	assert.NoError(t, err)
@@ -57,7 +56,7 @@ func TestTopups(t *testing.T) {
 		org, err := loadOrg(ctx, tx, tc.OrgID)
 		assert.NoError(t, err)
 
-		topup, err := AllocateTopups(ctx, tx, rc, org, 1)
+		topup, err := AllocateTopups(ctx, tx, rp, org, 1)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.TopupID, topup)
 		tx.MustExec(`INSERT INTO orgs_topupcredits(is_squashed, used, topup_id) VALUES(TRUE, 1, $1)`, tc.OrgID)
@@ -66,7 +65,7 @@ func TestTopups(t *testing.T) {
 	// topups can be disabled for orgs
 	tx.MustExec(`UPDATE orgs_org SET uses_topups = FALSE WHERE id = $1`, Org1)
 	org, err := loadOrg(ctx, tx, Org1)
-	topup, err := AllocateTopups(ctx, tx, rc, org, 1)
+	topup, err := AllocateTopups(ctx, tx, rp, org, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, NilTopupID, topup)
 }

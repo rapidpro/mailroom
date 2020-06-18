@@ -31,11 +31,9 @@ func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	}
 
 	// find the topup we will assign
-	rc := rp.Get()
-	topup, err := models.AllocateTopups(ctx, tx, rc, oa.Org(), len(msgs))
-	rc.Close()
+	topup, err := models.AllocateTopups(ctx, tx, rp, oa.Org(), len(msgs))
 	if err != nil {
-		return errors.Wrapf(err, "error finding active topup")
+		return errors.Wrapf(err, "error allocating topup for outgoing IVR message")
 	}
 
 	// if we have an active topup, assign it to our messages
