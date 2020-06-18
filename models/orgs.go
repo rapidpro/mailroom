@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/services/airtime/dtone"
 	"github.com/nyaruka/goflow/services/email/smtp"
 	"github.com/nyaruka/goflow/utils/httpx"
+	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
@@ -60,13 +61,23 @@ const (
 
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
 type Org struct {
-	id     OrgID
-	env    envs.Environment
-	config map[string]interface{}
+	o struct {
+		ID         OrgID    `json:"id"`
+		Suspended  bool     `json:"is_suspended"`
+		UsesTopups bool     `json:"uses_topups"`
+		Config     null.Map `json:"config"`
+	}
+	env envs.Environment
 }
 
 // ID returns the id of the org
-func (o *Org) ID() OrgID { return o.id }
+func (o *Org) ID() OrgID { return o.o.ID }
+
+// Suspended returns whether the org has been suspended
+func (o *Org) Suspended() bool { return o.o.Suspended }
+
+// UsesTopups returns whether the org uses topups
+func (o *Org) UsesTopups() bool { return o.o.UsesTopups }
 
 // DateFormat returns the date format for this org
 func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
@@ -109,23 +120,23 @@ func (o *Org) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.env)
 }
 
+// UnmarshalJSON is our custom unmarshaller
+func (o *Org) UnmarshalJSON(b []byte) error {
+	err := jsonx.Unmarshal(b, &o.o)
+	if err != nil {
+		return err
+	}
+
+	o.env, err = envs.ReadEnvironment(b)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // ConfigValue returns the string value for the passed in config (or default if not found)
 func (o *Org) ConfigValue(key string, def string) string {
-	if o.config == nil {
-		return def
-	}
-
-	val, found := o.config[key]
-	if !found {
-		return def
-	}
-
-	strVal, isStr := val.(string)
-	if !isStr {
-		return def
-	}
-
-	return strVal
+	return o.o.Config.GetString(key, def)
 }
 
 // EmailService returns the email service for this org
@@ -160,8 +171,7 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	start := time.Now()
 
 	org := &Org{}
-	var orgJSON, orgConfig json.RawMessage
-	rows, err := db.Query(selectOrgEnvironment, orgID, config.Mailroom.MaxValueLength)
+	rows, err := db.Queryx(selectOrgByID, orgID, config.Mailroom.MaxValueLength)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}
@@ -170,20 +180,9 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 		return nil, errors.Errorf("no org with id: %d", orgID)
 	}
 
-	err = rows.Scan(&org.id, &orgConfig, &orgJSON)
+	err = readJSONRow(rows, org)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error scanning org: %d", orgID)
-	}
-
-	org.env, err = envs.ReadEnvironment(orgJSON)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error unmarshalling org json: %s", orgJSON)
-	}
-
-	org.config = make(map[string]interface{})
-	err = json.Unmarshal(orgConfig, &org.config)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error unmarshalling org config: %s", orgConfig)
+		return nil, errors.Wrapf(err, "error unmarshalling org")
 	}
 
 	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).Debug("loaded org environment")
@@ -191,38 +190,36 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	return org, nil
 }
 
-const selectOrgEnvironment = `
-SELECT id, config, ROW_TO_JSON(o) FROM (SELECT
+const selectOrgByID = `
+SELECT ROW_TO_JSON(o) FROM (SELECT
 	id,
-	COALESCE(o.config::json,'{}'::json) as config,
-	(SELECT CASE date_format
-		WHEN 'D' THEN 'DD-MM-YYYY'
-		WHEN 'M' THEN 'MM-DD-YYYY'
-	END) date_format,
-	'tt:mm' as time_format,
+	is_suspended,
+	uses_topups,
+	COALESCE(o.config::json,'{}'::json) AS config,
+	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' END) AS date_format, 
+	'tt:mm' AS time_format,
 	timezone,
-	(SELECT CASE is_anon
-		WHEN TRUE THEN 'urns'
-		WHEN FALSE THEN 'none'
-	END) redaction_policy,
-	$2::int as max_value_length,
-	(SELECT iso_code FROM orgs_language WHERE id = o.primary_language_id) as default_language,
-	(SELECT ARRAY_AGG(iso_code) FROM orgs_language WHERE org_id = o.id) allowed_languages,
-	COALESCE((SELECT
-		country
-	FROM
-		channels_channel c
-	WHERE
-		c.org_id = o.id AND
-		c.is_active = TRUE AND
-		c.country IS NOT NULL
-	GROUP BY
-		c.country
-	ORDER BY
-		count(c.country) desc,
-		country
-	LIMIT 1
-	), '') default_country
+	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
+	$2::int AS max_value_length,
+	(SELECT iso_code FROM orgs_language WHERE id = o.primary_language_id) AS default_language,
+	(SELECT ARRAY_AGG(iso_code) FROM orgs_language WHERE org_id = o.id) AS allowed_languages,
+	COALESCE(
+		(
+			SELECT
+				country
+			FROM
+				channels_channel c
+			WHERE
+				c.org_id = o.id AND
+				c.is_active = TRUE AND
+				c.country IS NOT NULL
+			GROUP BY
+				c.country
+			ORDER BY
+				count(c.country) desc,
+				country
+			LIMIT 1
+	), '') AS default_country
 	FROM 
 		orgs_org o
 	WHERE

@@ -217,6 +217,23 @@ func TestMsgEvents(t *testing.T) {
 
 	db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2 ORDER BY id DESC LIMIT 1`, models.Org2FredID, previous)
 	assert.Equal(t, "Hey, how are you?", text)
+
+	// restore flow
+	db.MustExec(`UPDATE flows_flow SET is_active = TRUE where id = $1`, models.Org2FavoritesFlowID)
+	models.FlushCache()
+
+	// suspend our org
+	db.MustExec(`UPDATE orgs_org SET is_suspended = TRUE WHERE id = $1`, models.Org2)
+
+	// message should be handled as an inbox message.. no new session
+	task = makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start")
+	AddHandleTask(rc, models.Org2FredID, task)
+	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
+	err = handleContactEvent(ctx, db, rp, task)
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from msgs_msg WHERE status = 'H' AND msg_type = 'I'`, nil, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1`, []interface{}{models.Org2FredID}, 7)
 }
 
 func TestChannelEvents(t *testing.T) {
