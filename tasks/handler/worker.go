@@ -36,6 +36,8 @@ import (
 	"image/jpeg"
 	"io/ioutil"
 	"database/sql"
+	"image/png"
+	"image"
 )
 
 const (
@@ -737,7 +739,7 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API
 
 		_, fileDownloaded := attachment.DownloadFile()
 		file, _ := os.Open(fileDownloaded)
-		img, _ := jpeg.Decode(file)
+		img, _, _ := image.Decode(file)
 
 		// Extracting EXIF
 		var exifJsonString string
@@ -751,15 +753,19 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API
 
 		var thumbnailURL string
 
-		generateThumbnail := stringInSlice(extension, []string{"jpg", "jpeg"})
+		generateThumbnail := stringInSlice(strings.ToLower(extension), []string{"jpg", "jpeg", "png"})
 		if generateThumbnail {
 			thumb := resize.Thumbnail(50, 50, img, resize.NearestNeighbor)
-			tmpImageName := fmt.Sprintf("/tmp/%s.jpg", flowImageUUID.String())
+			tmpImageName := fmt.Sprintf("/tmp/%s.%s", flowImageUUID.String(), extension)
 			outThumbnail, _ := os.Create(tmpImageName)
 			defer outThumbnail.Close()
 
 			// write new image to file
-			jpeg.Encode(outThumbnail, thumb, nil)
+			if strings.ToLower(extension) == "png" {
+				png.Encode(outThumbnail, thumb)
+			} else {
+				jpeg.Encode(outThumbnail, thumb, nil)
+			}
 
 			pathName := flowImageUUID.String() + path.Ext(attachment.URL())
 			s3Path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", orgID), pathName[:4], pathName[4:8], "thumbnail_"+pathName)
