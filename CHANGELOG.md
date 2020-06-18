@@ -1,3 +1,8 @@
+v5.5.30
+----------
+ * Org being suspended should stop message handling
+ * Make decrementing org credit optional
+
 v5.5.29
 ----------
  * Return query inspection results as new metadata field in responses
