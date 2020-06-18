@@ -520,10 +520,8 @@ func ResumeIVRFlow(
 	// create an incoming message
 	msg := models.NewIncomingIVR(oa.OrgID(), conn, msgIn, time.Now())
 
-	// allocate a topup for this message if org uses topups
-	rc := rp.Get()
-	topupID, err := models.AllocateTopups(ctx, db, rc, oa.Org(), 1)
-	rc.Close()
+	// allocate a topup for this message if org uses topups)
+	topupID, err := models.AllocateTopups(ctx, db, rp, oa.Org(), 1)
 	if err != nil {
 		return errors.Wrapf(err, "error allocating topup for incoming IVR message")
 	}

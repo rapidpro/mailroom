@@ -464,9 +464,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// allocate a topup for this message if org uses topups
-	rc := rp.Get()
-	topupID, err := models.AllocateTopups(ctx, db, rc, oa.Org(), 1)
-	rc.Close()
+	topupID, err := models.AllocateTopups(ctx, db, rp, oa.Org(), 1)
 	if err != nil {
 		return errors.Wrapf(err, "error allocating topup for incoming message")
 	}

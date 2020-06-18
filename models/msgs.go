@@ -914,9 +914,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 	}
 
 	// allocate a topup for these message if org uses topups
-	rc := rp.Get()
-	topup, err := AllocateTopups(ctx, db, rc, oa.Org(), len(msgs))
-	rc.Close()
+	topup, err := AllocateTopups(ctx, db, rp, oa.Org(), len(msgs))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
 	}
