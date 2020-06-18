@@ -520,18 +520,14 @@ func ResumeIVRFlow(
 	// create an incoming message
 	msg := models.NewIncomingIVR(oa.OrgID(), conn, msgIn, time.Now())
 
-	// find a topup
+	// allocate a topup for this message if org uses topups
 	rc := rp.Get()
 	topupID, err := models.AllocateTopups(ctx, db, rc, oa.Org(), 1)
 	rc.Close()
-
-	// error or no topup, that's an end of call
 	if err != nil {
-		return errors.Wrapf(err, "unable to look up topup")
+		return errors.Wrapf(err, "error allocating topup for incoming IVR message")
 	}
-	if topupID == models.NilTopupID {
-		return client.WriteEmptyResponse(w, "no topups for org, exiting call")
-	}
+
 	msg.SetTopup(topupID)
 
 	// commit it

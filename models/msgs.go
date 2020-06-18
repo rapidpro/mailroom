@@ -913,12 +913,12 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 		}
 	}
 
-	// get a topup to assign to our messages
+	// allocate a topup for these message if org uses topups
 	rc := rp.Get()
 	topup, err := AllocateTopups(ctx, db, rc, oa.Org(), len(msgs))
 	rc.Close()
 	if err != nil {
-		return nil, errors.Wrapf(err, "error finding active topup")
+		return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
 	}
 
 	// if we have an active topup, assign it to our messages

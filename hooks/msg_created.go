@@ -149,12 +149,12 @@ func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 		}
 	}
 
-	// find the topup we will assign
+	// allocate a topup for this message if org uses topups
 	rc := rp.Get()
 	topup, err := models.AllocateTopups(ctx, tx, rc, oa.Org(), len(msgs))
 	rc.Close()
 	if err != nil {
-		return errors.Wrapf(err, "error finding active topup")
+		return errors.Wrapf(err, "error allocating topup for outgoing message")
 	}
 
 	// if we have an active topup, assign it to our messages
