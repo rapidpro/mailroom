@@ -42,13 +42,13 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 
 	// for each scene gather all our messages
 	for s, args := range scenes {
-		// walk through our messages, separate by whether they have a topup
+		// walk through our messages, separate by whether they're android or not
 		courierMsgs := make([]*models.Msg, 0, len(args))
 
 		for _, m := range args {
 			msg := m.(*models.Msg)
 			channel := msg.Channel()
-			if msg.TopupID() != models.NilTopupID && channel != nil {
+			if channel != nil {
 				if channel.Type() == models.ChannelTypeAndroid {
 					androidChannels[channel] = true
 				} else {
