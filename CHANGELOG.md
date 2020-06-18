@@ -1,3 +1,8 @@
+v5.5.31
+----------
+ * Messages without topups should be queued
+ * Continue handling as normal for suspended orgs
+
 v5.5.30
 ----------
  * Org being suspended should stop message handling
