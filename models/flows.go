@@ -6,31 +6,36 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/null"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// FlowID is the type for flow IDs
 type FlowID null.Int
 
+// NilFlowID is nil value for flow IDs
+const NilFlowID = FlowID(0)
+
+// FlowType is the type for the type of a flow
 type FlowType string
 
+// flow type constants
 const (
-	GoFlowMajorVersion = 12
-
 	IVRFlow       = FlowType("V")
 	MessagingFlow = FlowType("M")
 	SurveyorFlow  = FlowType("S")
-
-	FlowConfigIVRRetryMinutes = "ivr_retry"
-
-	NilFlowID = FlowID(0)
 )
 
-var FlowTypeMapping = map[flows.FlowType]FlowType{
+const (
+	flowConfigIVRRetryMinutes = "ivr_retry"
+)
+
+var flowTypeMapping = map[flows.FlowType]FlowType{
 	flows.FlowTypeMessaging:        MessagingFlow,
 	flows.FlowTypeVoice:            IVRFlow,
 	flows.FlowTypeMessagingOffline: SurveyorFlow,
@@ -70,7 +75,7 @@ func (f *Flow) Version() string { return f.f.Version }
 
 // IVRRetryWait returns the wait before retrying a failed IVR call
 func (f *Flow) IVRRetryWait() time.Duration {
-	value := f.f.Config.Get(FlowConfigIVRRetryMinutes, nil)
+	value := f.f.Config.Get(flowConfigIVRRetryMinutes, nil)
 	fv, isFloat := value.(float64)
 	if isFloat {
 		return time.Minute * time.Duration(int(fv))
@@ -86,16 +91,16 @@ func (f *Flow) FlowReference() *assets.FlowReference {
 	return assets.NewFlowReference(f.UUID(), f.Name())
 }
 
-func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
+func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
 	// first try to look up in our assets
-	flow, _ := org.Flow(flowUUID)
+	flow, _ := oa.Flow(flowUUID)
 	if flow != nil {
 		return flow.(*Flow).ID(), nil
 	}
 
 	// flow may be inactive, try to look up the ID only
 	var flowID FlowID
-	err := tx.GetContext(ctx, &flowID, `SELECT id FROM flows_flow WHERE org_id = $1 AND uuid = $2;`, org.OrgID(), flowUUID)
+	err := tx.GetContext(ctx, &flowID, `SELECT id FROM flows_flow WHERE org_id = $1 AND uuid = $2;`, oa.OrgID(), flowUUID)
 	return flowID, err
 }
 

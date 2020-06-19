@@ -88,7 +88,7 @@ func FlushCache() {
 // org assets passed in to prevent refetching locations
 func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets, refresh Refresh) (*OrgAssets, error) {
 	// build our new assets
-	o := &OrgAssets{
+	oa := &OrgAssets{
 		db:      db,
 		builtAt: time.Now(),
 		orgID:   orgID,
@@ -96,209 +96,210 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 
 	// inherit our built at if we reusing anything
 	if prev != nil && refresh&RefreshAll > 0 {
-		o.builtAt = prev.builtAt
+		oa.builtAt = prev.builtAt
 	}
 
 	// we load everything at once except for flows which are lazily loaded
 	var err error
 
 	if prev == nil || refresh&RefreshOrg > 0 {
-		o.org, err = loadOrg(ctx, db, orgID)
+		oa.org, err = loadOrg(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading environment for org %d", orgID)
 		}
 	} else {
-		o.org = prev.org
+		oa.org = prev.org
 	}
 
 	if prev == nil || refresh&RefreshChannels > 0 {
-		o.channels, err = loadChannels(ctx, db, orgID)
+		oa.channels, err = loadChannels(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading channel assets for org %d", orgID)
 		}
-		o.channelsByID = make(map[ChannelID]*Channel)
-		o.channelsByUUID = make(map[assets.ChannelUUID]*Channel)
-		for _, c := range o.channels {
+		oa.channelsByID = make(map[ChannelID]*Channel)
+		oa.channelsByUUID = make(map[assets.ChannelUUID]*Channel)
+		for _, c := range oa.channels {
 			channel := c.(*Channel)
-			o.channelsByID[channel.ID()] = channel
-			o.channelsByUUID[channel.UUID()] = channel
+			oa.channelsByID[channel.ID()] = channel
+			oa.channelsByUUID[channel.UUID()] = channel
 		}
 	} else {
-		o.channels = prev.channels
-		o.channelsByID = prev.channelsByID
-		o.channelsByUUID = prev.channelsByUUID
+		oa.channels = prev.channels
+		oa.channelsByID = prev.channelsByID
+		oa.channelsByUUID = prev.channelsByUUID
 	}
 
 	if prev == nil || refresh&RefreshFields > 0 {
-		o.fields, err = loadFields(ctx, db, orgID)
+		oa.fields, err = loadFields(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading field assets for org %d", orgID)
 		}
-		o.fieldsByUUID = make(map[assets.FieldUUID]*Field)
-		o.fieldsByKey = make(map[string]*Field)
-		for _, f := range o.fields {
+		oa.fieldsByUUID = make(map[assets.FieldUUID]*Field)
+		oa.fieldsByKey = make(map[string]*Field)
+		for _, f := range oa.fields {
 			field := f.(*Field)
-			o.fieldsByUUID[field.UUID()] = field
-			o.fieldsByKey[field.Key()] = field
+			oa.fieldsByUUID[field.UUID()] = field
+			oa.fieldsByKey[field.Key()] = field
 		}
 	} else {
-		o.fields = prev.fields
-		o.fieldsByUUID = prev.fieldsByUUID
-		o.fieldsByKey = prev.fieldsByKey
+		oa.fields = prev.fields
+		oa.fieldsByUUID = prev.fieldsByUUID
+		oa.fieldsByKey = prev.fieldsByKey
 	}
 
 	if prev == nil || refresh&RefreshGroups > 0 {
-		o.groups, err = loadGroups(ctx, db, orgID)
+		oa.groups, err = loadGroups(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading group assets for org %d", orgID)
 		}
-		o.groupsByID = make(map[GroupID]*Group)
-		o.groupsByUUID = make(map[assets.GroupUUID]*Group)
-		for _, g := range o.groups {
+		oa.groupsByID = make(map[GroupID]*Group)
+		oa.groupsByUUID = make(map[assets.GroupUUID]*Group)
+		for _, g := range oa.groups {
 			group := g.(*Group)
-			o.groupsByID[group.ID()] = group
-			o.groupsByUUID[group.UUID()] = group
+			oa.groupsByID[group.ID()] = group
+			oa.groupsByUUID[group.UUID()] = group
 		}
 	} else {
-		o.groups = prev.groups
-		o.groupsByID = prev.groupsByID
-		o.groupsByUUID = prev.groupsByUUID
+		oa.groups = prev.groups
+		oa.groupsByID = prev.groupsByID
+		oa.groupsByUUID = prev.groupsByUUID
 	}
 
 	if prev == nil || refresh&RefreshClassifiers > 0 {
-		o.classifiers, err = loadClassifiers(ctx, db, orgID)
+		oa.classifiers, err = loadClassifiers(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading classifier assets for org %d", orgID)
 		}
-		o.classifiersByUUID = make(map[assets.ClassifierUUID]*Classifier)
-		for _, c := range o.classifiers {
-			o.classifiersByUUID[c.UUID()] = c.(*Classifier)
+		oa.classifiersByUUID = make(map[assets.ClassifierUUID]*Classifier)
+		for _, c := range oa.classifiers {
+			oa.classifiersByUUID[c.UUID()] = c.(*Classifier)
 		}
 	} else {
-		o.classifiers = prev.classifiers
-		o.classifiersByUUID = prev.classifiersByUUID
+		oa.classifiers = prev.classifiers
+		oa.classifiersByUUID = prev.classifiersByUUID
 	}
 
 	if prev == nil || refresh&RefreshLabels > 0 {
-		o.labels, err = loadLabels(ctx, db, orgID)
+		oa.labels, err = loadLabels(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading group labels for org %d", orgID)
 		}
-		o.labelsByUUID = make(map[assets.LabelUUID]*Label)
-		for _, l := range o.labels {
-			o.labelsByUUID[l.UUID()] = l.(*Label)
+		oa.labelsByUUID = make(map[assets.LabelUUID]*Label)
+		for _, l := range oa.labels {
+			oa.labelsByUUID[l.UUID()] = l.(*Label)
 		}
 	} else {
-		o.labels = prev.labels
-		o.labelsByUUID = prev.labelsByUUID
+		oa.labels = prev.labels
+		oa.labelsByUUID = prev.labelsByUUID
 	}
 
 	if prev == nil || refresh&RefreshResthooks > 0 {
-		o.resthooks, err = loadResthooks(ctx, db, orgID)
+		oa.resthooks, err = loadResthooks(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading resthooks for org %d", orgID)
 		}
 	} else {
-		o.resthooks = prev.resthooks
+		oa.resthooks = prev.resthooks
 	}
 
 	if prev == nil || refresh&RefreshCampaigns > 0 {
-		o.campaigns, err = loadCampaigns(ctx, db, orgID)
+		oa.campaigns, err = loadCampaigns(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading campaigns for org %d", orgID)
 		}
-		o.campaignEventsByField = make(map[FieldID][]*CampaignEvent)
-		o.campaignEventsByID = make(map[CampaignEventID]*CampaignEvent)
-		o.campaignsByGroup = make(map[GroupID][]*Campaign)
-		for _, c := range o.campaigns {
-			o.campaignsByGroup[c.GroupID()] = append(o.campaignsByGroup[c.GroupID()], c)
+		oa.campaignEventsByField = make(map[FieldID][]*CampaignEvent)
+		oa.campaignEventsByID = make(map[CampaignEventID]*CampaignEvent)
+		oa.campaignsByGroup = make(map[GroupID][]*Campaign)
+		for _, c := range oa.campaigns {
+			oa.campaignsByGroup[c.GroupID()] = append(oa.campaignsByGroup[c.GroupID()], c)
 			for _, e := range c.Events() {
-				o.campaignEventsByField[e.RelativeToID()] = append(o.campaignEventsByField[e.RelativeToID()], e)
-				o.campaignEventsByID[e.ID()] = e
+				oa.campaignEventsByField[e.RelativeToID()] = append(oa.campaignEventsByField[e.RelativeToID()], e)
+				oa.campaignEventsByID[e.ID()] = e
 			}
 		}
 	} else {
-		o.campaigns = prev.campaigns
-		o.campaignEventsByField = prev.campaignEventsByField
-		o.campaignEventsByID = prev.campaignEventsByID
-		o.campaignsByGroup = prev.campaignsByGroup
+		oa.campaigns = prev.campaigns
+		oa.campaignEventsByField = prev.campaignEventsByField
+		oa.campaignEventsByID = prev.campaignEventsByID
+		oa.campaignsByGroup = prev.campaignsByGroup
 	}
 
 	if prev == nil || refresh&RefreshTriggers > 0 {
-		o.triggers, err = loadTriggers(ctx, db, orgID)
+		oa.triggers, err = loadTriggers(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading triggers for org %d", orgID)
 		}
 	} else {
-		o.triggers = prev.triggers
+		oa.triggers = prev.triggers
 	}
 
 	if prev == nil || refresh&RefreshTemplates > 0 {
-		o.templates, err = loadTemplates(ctx, db, orgID)
+		oa.templates, err = loadTemplates(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading templates for org %d", orgID)
 		}
 	} else {
-		o.templates = prev.templates
+		oa.templates = prev.templates
 	}
 
 	if prev == nil || refresh&RefreshGlobals > 0 {
-		o.globals, err = loadGlobals(ctx, db, orgID)
+		oa.globals, err = loadGlobals(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading globals for org %d", orgID)
 		}
 	} else {
-		o.globals = prev.globals
+		oa.globals = prev.globals
 	}
 
 	if prev == nil || refresh&RefreshLocations > 0 {
-		o.locations, err = loadLocations(ctx, db, orgID)
-		o.locationsBuiltAt = time.Now()
+		oa.locations, err = loadLocations(ctx, db, orgID)
+		oa.locationsBuiltAt = time.Now()
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading group locations for org %d", orgID)
 		}
 	} else {
-		o.locations = prev.locations
-		o.locationsBuiltAt = prev.locationsBuiltAt
+		oa.locations = prev.locations
+		oa.locationsBuiltAt = prev.locationsBuiltAt
 	}
 
 	if prev == nil || refresh&RefreshFlows > 0 {
-		o.flowByUUID = make(map[assets.FlowUUID]assets.Flow)
-		o.flowByID = make(map[FlowID]assets.Flow)
+		oa.flowByUUID = make(map[assets.FlowUUID]assets.Flow)
+		oa.flowByID = make(map[FlowID]assets.Flow)
 	} else {
-		o.flowByUUID = prev.flowByUUID
-		o.flowByID = prev.flowByID
+		oa.flowByUUID = prev.flowByUUID
+		oa.flowByID = prev.flowByID
 	}
 
 	if prev == nil || refresh&RefreshTicketers > 0 {
-		o.ticketers, err = loadTicketers(ctx, db, orgID)
+		oa.ticketers, err = loadTicketers(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading ticketer assets for org %d", orgID)
 		}
-		o.ticketersByID = make(map[TicketerID]*Ticketer)
-		o.ticketersByUUID = make(map[assets.TicketerUUID]*Ticketer)
-		for _, t := range o.ticketers {
-			o.ticketersByID[t.(*Ticketer).ID()] = t.(*Ticketer)
-			o.ticketersByUUID[t.UUID()] = t.(*Ticketer)
+		oa.ticketersByID = make(map[TicketerID]*Ticketer)
+		oa.ticketersByUUID = make(map[assets.TicketerUUID]*Ticketer)
+		for _, t := range oa.ticketers {
+			oa.ticketersByID[t.(*Ticketer).ID()] = t.(*Ticketer)
+			oa.ticketersByUUID[t.UUID()] = t.(*Ticketer)
 		}
 	} else {
-		o.ticketers = prev.ticketers
-		o.ticketersByID = prev.ticketersByID
-		o.ticketersByUUID = prev.ticketersByUUID
+		oa.ticketers = prev.ticketers
+		oa.ticketersByID = prev.ticketersByID
+		oa.ticketersByUUID = prev.ticketersByUUID
 	}
 
 	// intialize our session assets
-	o.sessionAssets, err = engine.NewSessionAssets(o.Env(), o, goflow.MigrationConfig())
+	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", orgID)
 	}
 
-	return o, nil
+	return oa, nil
 }
 
 // Refresh is our type for the pieces of org assets we want fresh (not cached)
 type Refresh int
 
+// refresh bit masks
 const (
 	RefreshNone        = Refresh(0)
 	RefreshAll         = Refresh(^0)
