@@ -13,12 +13,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TriggerType is the type of a trigger
 type TriggerType string
 
+// MatchType is used for keyword triggers to specify how they should match
 type MatchType string
 
+// TriggerID is the type for trigger database IDs
 type TriggerID int
 
+// trigger type constants
 const (
 	CatchallTriggerType        = TriggerType("C")
 	KeywordTriggerType         = TriggerType("K")
@@ -27,12 +31,16 @@ const (
 	ReferralTriggerType        = TriggerType("R")
 	CallTriggerType            = TriggerType("V")
 	ScheduleTriggerType        = TriggerType("S")
+)
 
+// match type constants
+const (
 	MatchFirst = "F"
 	MatchOnly  = "O"
-
-	NilTriggerID = TriggerID(0)
 )
+
+// NilTriggerID is the nil value for trigger IDs
+const NilTriggerID = TriggerID(0)
 
 // Trigger represents a trigger in an organization
 type Trigger struct {
@@ -49,7 +57,9 @@ type Trigger struct {
 	}
 }
 
-func (t *Trigger) ID() TriggerID            { return t.t.ID }
+// ID returns the id of this trigger
+func (t *Trigger) ID() TriggerID { return t.t.ID }
+
 func (t *Trigger) FlowID() FlowID           { return t.t.FlowID }
 func (t *Trigger) TriggerType() TriggerType { return t.t.TriggerType }
 func (t *Trigger) Keyword() string          { return t.t.Keyword }

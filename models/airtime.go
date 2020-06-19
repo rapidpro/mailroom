@@ -11,10 +11,10 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// AirtimeTransferID is our type for airtime transfer ids
+// AirtimeTransferID is the type for airtime transfer IDs
 type AirtimeTransferID null.Int
 
-// NilAirtimeTransferID is our nil value for airtime transfer ids
+// NilAirtimeTransferID is the nil value for airtime transfer IDs
 var NilAirtimeTransferID = AirtimeTransferID(0)
 
 // AirtimeTransferStatus is the type for the status of a transfer

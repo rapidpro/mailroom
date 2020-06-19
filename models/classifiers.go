@@ -17,18 +17,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ClassifierID is our type for classifier ids
+// ClassifierID is our type for classifier IDs
 type ClassifierID null.Int
 
-const (
-	// NilClassifierID is our const for a nil classifier ID
-	NilClassifierID = ClassifierID(0)
+// NilClassifierID is nil value for classifier IDs
+const NilClassifierID = ClassifierID(0)
 
-	// Our classifier types
+// classifier type constants
+const (
 	ClassifierTypeWit    = "wit"
 	ClassifierTypeLuis   = "luis"
 	ClassifierTypeBothub = "bothub"
+)
 
+// classifier config key constants
+const (
 	// Wit.ai config options
 	WitConfigAccessToken = "access_token"
 
@@ -51,7 +54,7 @@ func init() {
 	)
 }
 
-// Classifier is our type for a Classifier
+// Classifier is our type for a classifier
 type Classifier struct {
 	c struct {
 		ID      ClassifierID          `json:"id"`
