@@ -1299,7 +1299,7 @@ type contactStatusUpdate struct {
 // UpdateContactStatus updates the contacts status as the passed changes
 func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStatusChange) error {
 
-	contactTriggersIDs := make([]interface{}, 0, len(changes))
+	archiveTriggersForContactIDs := make([]ContactID, 0, len(changes))
 	statusUpdates := make([]interface{}, 0, len(changes))
 
 	for _, ch := range changes {
@@ -1307,7 +1307,7 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 		stopped := ch.Status == flows.ContactStatusStopped
 
 		if blocked || stopped {
-			contactTriggersIDs = append(contactTriggersIDs, ch.ContactID)
+			archiveTriggersForContactIDs = append(archiveTriggersForContactIDs, ch.ContactID)
 		}
 
 		statusUpdates = append(
@@ -1321,10 +1321,9 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 
 	}
 
-	// remove triggers for contact we'll stop/block
-	_, err := tx.ExecContext(ctx, deleteAllContactTriggersForIDsSQL, pq.Array(contactTriggersIDs))
+	err := ArchiveContactTriggers(ctx, tx, archiveTriggersForContactIDs)
 	if err != nil {
-		return errors.Wrapf(err, "error removing contact from triggers")
+		return errors.Wrapf(err, "error archiving triggers for blocked or stopped contacts")
 	}
 
 	// do our status update
@@ -1332,6 +1331,7 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 	if err != nil {
 		return errors.Wrapf(err, "error updating contact statuses")
 	}
+
 	return err
 }
 
@@ -1348,11 +1348,4 @@ const updateContactStatusSQL = `
 		r(id, is_blocked, is_stopped)
 	WHERE
 		c.id = r.id::int
-`
-
-const deleteAllContactTriggersForIDsSQL = `
-DELETE FROM
-	triggers_trigger_contacts
-WHERE
-	contact_id = ANY($1)
 `
