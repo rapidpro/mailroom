@@ -74,6 +74,8 @@ func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 		changedIDs = append(changedIDs, c)
 	}
 	if len(changedIDs) > 0 {
+		logrus.WithField("contact_ids", changedIDs).Warn("updating modified_on for contacts")
+
 		_, err = tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(changedIDs))
 		if err != nil {
 			return errors.Wrapf(err, "error updating contacts modified_on")
