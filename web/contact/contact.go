@@ -356,12 +356,6 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
 	}
 
-	// apply modified_by
-	err = models.UpdateContactModifiedBy(ctx, tx, modifiedContactIDs, request.UserID)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying modified_by")
-	}
-
 	// commit our transaction
 	err = tx.Commit()
 	if err != nil {
