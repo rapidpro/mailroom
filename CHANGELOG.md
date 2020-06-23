@@ -1,3 +1,7 @@
+v5.5.32
+----------
+ * When blocking contacts archive any triggers which only apply to them
+
 v5.5.31
 ----------
  * Messages without topups should be queued
