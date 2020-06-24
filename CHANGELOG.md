@@ -1,3 +1,7 @@
+v5.5.33
+----------
+ * Update to latest goflow v0.93.0
+
 v5.5.32
 ----------
  * When blocking contacts archive any triggers which only apply to them
