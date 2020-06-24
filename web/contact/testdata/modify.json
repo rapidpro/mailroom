@@ -570,9 +570,11 @@
             ],
             "modifiers": [
                 {
-                    "type": "urn",
+                    "type": "urns",
                     "modification": "append",
-                    "urn": "tel:+255788555111"
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
                 }
             ]
         },
@@ -609,6 +611,57 @@
         ]
     },
     {
+        "label": "add URN (deprecated urn modifier)",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urn",
+                    "modification": "append",
+                    "urn": "tel:+255788555222"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111?id=20121&priority=1000",
+                        "tel:+255788555222"
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": [
+                            "tel:+255788555111?id=20121&priority=1000",
+                            "tel:+255788555222"
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
+                "count": 1
+            }
+        ]
+    },
+    {
         "label": "add existing URN",
         "method": "POST",
         "path": "/mr/contact/modify",
@@ -636,7 +689,8 @@
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "urns": [
-                        "tel:+255788555111?id=20121\u0026priority=1000"
+                        "tel:+255788555111?id=20121&priority=1000",
+                        "tel:+255788555222?id=20122&priority=999"
                     ]
                 },
                 "events": []
