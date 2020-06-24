@@ -623,7 +623,7 @@
                 {
                     "type": "urn",
                     "modification": "append",
-                    "urn": "tel:+255788555111"
+                    "urn": "tel:+255788555222"
                 }
             ]
         },
@@ -638,7 +638,8 @@
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "urns": [
-                        "tel:+255788555111"
+                        "tel:+255788555111?id=20121&priority=1000",
+                        "tel:+255788555222"
                     ]
                 },
                 "events": [
@@ -646,7 +647,8 @@
                         "type": "contact_urns_changed",
                         "created_on": "2018-07-06T12:30:00.123456789Z",
                         "urns": [
-                            "tel:+255788555111"
+                            "tel:+255788555111?id=20121&priority=1000",
+                            "tel:+255788555222"
                         ]
                     }
                 ]
@@ -654,7 +656,7 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
                 "count": 1
             }
         ]
@@ -687,7 +689,8 @@
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "urns": [
-                        "tel:+255788555111?id=20121\u0026priority=1000"
+                        "tel:+255788555111?id=20121&priority=1000",
+                        "tel:+255788555222?id=20122&priority=999"
                     ]
                 },
                 "events": []
