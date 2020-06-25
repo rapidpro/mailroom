@@ -1,3 +1,7 @@
+v5.5.34
+----------
+ * Fix detaching URNs
+
 v5.5.33
 ----------
  * Update to latest goflow v0.93.0
