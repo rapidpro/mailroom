@@ -672,9 +672,11 @@
             ],
             "modifiers": [
                 {
-                    "type": "urn",
+                    "type": "urns",
                     "modification": "append",
-                    "urn": "tel:+255788555111"
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
                 }
             ]
         },
@@ -700,6 +702,183 @@
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
                 "count": 1
+            }
+        ]
+    },
+    {
+        "label": "remove a URN",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "remove",
+                    "urns": [
+                        "tel:+255788555222"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111?id=20121&priority=1000"
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": [
+                            "tel:+255788555111?id=20121&priority=1000"
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "set URNs",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "set",
+                    "urns": [
+                        "tel:+255788555111",
+                        "tel:+255788555333"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111",
+                        "tel:+255788555333"
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": [
+                            "tel:+255788555111",
+                            "tel:+255788555333"
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(DISTINCT path) FROM contacts_contacturn WHERE path IN ('+255788555111', '+255788555222', '+255788555333')",
+                "count": 3
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555333'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "clear URNs",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "set",
+                    "urns": []
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": []
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(DISTINCT path) FROM contacts_contacturn WHERE path IN ('+255788555111', '+255788555222', '+255788555333')",
+                "count": 3
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555333'",
+                "count": 0
             }
         ]
     }
