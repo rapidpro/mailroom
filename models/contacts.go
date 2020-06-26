@@ -17,7 +17,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/olivere/elastic"
@@ -421,12 +420,12 @@ func (c *Contact) Status() flows.ContactStatus {
 
 // fieldValueEnvelope is our utility struct for the value of a field
 type fieldValueEnvelope struct {
-	Text     types.XText        `json:"text"`
-	Datetime *types.XDateTime   `json:"datetime,omitempty"`
-	Number   *types.XNumber     `json:"number,omitempty"`
-	State    utils.LocationPath `json:"state,omitempty"`
-	District utils.LocationPath `json:"district,omitempty"`
-	Ward     utils.LocationPath `json:"ward,omitempty"`
+	Text     types.XText       `json:"text"`
+	Datetime *types.XDateTime  `json:"datetime,omitempty"`
+	Number   *types.XNumber    `json:"number,omitempty"`
+	State    envs.LocationPath `json:"state,omitempty"`
+	District envs.LocationPath `json:"district,omitempty"`
+	Ward     envs.LocationPath `json:"ward,omitempty"`
 }
 
 type ContactURN struct {

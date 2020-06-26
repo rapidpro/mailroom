@@ -307,6 +307,9 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	results := make(map[models.ContactID]modifyResult)
 
+	// create an environment instance with location support
+	env := flows.NewEnvironment(org.Env(), org.SessionAssets().Locations())
+
 	// create scenes for our contacts
 	scenes := make([]*models.Scene, 0, len(contacts))
 	for _, contact := range contacts {
@@ -324,7 +327,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 		// apply our modifiers
 		for _, mod := range mods {
-			mod.Apply(org.Env(), org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+			mod.Apply(env, org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
 		}
 
 		results[contact.ID()] = result
