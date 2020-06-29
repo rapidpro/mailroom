@@ -3,8 +3,9 @@ package models
 import (
 	"testing"
 
-	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +31,7 @@ func TestLocations(t *testing.T) {
 
 	tcs := []struct {
 		Name        string
-		Level       utils.LocationLevel
+		Level       envs.LocationLevel
 		Aliases     []string
 		NumChildren int
 	}{

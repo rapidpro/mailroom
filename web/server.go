@@ -8,14 +8,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/olivere/elastic"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -126,7 +127,7 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 			}
 		}
 
-		serialized, serr := json.MarshalIndent(value, "", "  ")
+		serialized, serr := jsonx.MarshalPretty(value)
 		if serr != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error serializing handler response")
 			w.WriteHeader(http.StatusInternalServerError)
