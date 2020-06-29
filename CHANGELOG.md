@@ -1,3 +1,7 @@
+v5.5.35
+----------
+ * Update to latest goflow and add tests for field modifiers
+
 v5.5.34
 ----------
  * Fix detaching URNs
