@@ -114,7 +114,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	}
 
 	// get the contact id for this URN
-	ids, err := models.ContactIDsFromURNs(ctx, s.DB, org, []urns.URN{urn})
+	ids, err := models.ContactIDsFromURNs(ctx, s.DB, org, []urns.URN{urn}, true)
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load contact by urn"))
 	}

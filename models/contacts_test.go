@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/olivere/elastic"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestElasticContacts(t *testing.T) {
@@ -274,7 +276,7 @@ func TestContactsFromURN(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN})
+		ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN}, true)
 		assert.NoError(t, err, "%d: error getting contact ids", i)
 
 		if len(ids) != 1 {
@@ -286,6 +288,42 @@ func TestContactsFromURN(t *testing.T) {
 }
 
 func TestCreateContact(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	var maxContactID int64
+	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
+
+	tcs := []struct {
+		orgID    OrgID
+		name     string
+		language envs.Language
+		urnz     []urns.URN
+		err      string
+	}{
+		{Org1, "", "", []urns.URN{"tel:+16055700001"}, ""},
+		{Org1, "Bill", "eng", []urns.URN{"tel:+16055700002"}, ""},
+		{Org1, "Fred", "fra", []urns.URN{"tel:+16055700002"}, "URNs owned by other contacts"},
+		{Org1, "Fred", "fra", []urns.URN{"tel:+16055700004", "tel:+16055700002"}, "URNs owned by other contacts"},
+	}
+
+	org, err := GetOrgAssets(ctx, db, Org1)
+	require.NoError(t, err)
+
+	for i, tc := range tcs {
+		contact, _, err := CreateContact(ctx, db, org, UserID(1), tc.name, tc.language, tc.urnz)
+		if tc.err != "" {
+			assert.EqualError(t, err, tc.err)
+		} else {
+			assert.NoError(t, err, "%d: error creating contact", i)
+			assert.Equal(t, tc.name, contact.Name(), "%d: contact name mismatch", i)
+			assert.Equal(t, tc.language, contact.Language(), "%d: contact language mismatch", i)
+		}
+	}
+}
+
+func TestGetOrCreateContact(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 	testsuite.Reset()
@@ -309,9 +347,9 @@ func TestCreateContact(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		id, err := CreateContact(ctx, db, org, tc.URN)
+		contact, _, err := GetOrCreateContact(ctx, db, org, []urns.URN{tc.URN})
 		assert.NoError(t, err, "%d: error creating contact", i)
-		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
+		assert.Equal(t, tc.ContactID, contact.ID(), "%d: mismatch in contact id", i)
 	}
 
 	// stop kathy
@@ -345,6 +383,21 @@ func TestUpdateContactModifiedBy(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(1)}, 1)
 
+}
+
+func TestStopContact(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	// stop kathy
+	err := StopContact(ctx, db, Org1, CathyID)
+	assert.NoError(t, err)
+
+	// verify she's only in the stopped group
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, []interface{}{CathyID}, 1)
+
+	// verify she's stopped
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE AND is_active = TRUE and is_blocked = FALSE`, []interface{}{CathyID}, 1)
 }
 
 func TestUpdateContactStatus(t *testing.T) {

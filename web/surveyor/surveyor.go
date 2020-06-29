@@ -9,7 +9,6 @@ import (
 
 	"github.com/nyaruka/goflow/flows/actions/modifiers"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
@@ -99,31 +98,10 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		contactModifiers = append(contactModifiers, modifier)
 	}
 
-	// create / assign our contact
-	urn := urns.NilURN
-	if len(fs.Contact().URNs()) > 0 {
-		urn = fs.Contact().URNs()[0].URN()
-	}
-
 	// create / fetch our contact based on the highest priority URN
-	contactID, err := models.CreateContact(ctx, s.DB, org, urn)
+	_, flowContact, err := models.GetOrCreateContact(ctx, s.DB, org, fs.Contact().URNs().RawURNs())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
-	}
-
-	// load that contact to get the current groups and UUID
-	contacts, err := models.LoadContacts(ctx, s.DB, org, []models.ContactID{contactID})
-	if err == nil && len(contacts) == 0 {
-		err = errors.Errorf("no contacts loaded")
-	}
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading contact")
-	}
-
-	// load our flow contact
-	flowContact, err := contacts[0].FlowContact(org)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading flow contact")
 	}
 
 	modifierEvents := make([]flows.Event, 0, len(contactModifiers))
