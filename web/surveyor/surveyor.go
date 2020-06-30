@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 
 	"github.com/nyaruka/goflow/flows/actions/modifiers"
@@ -98,8 +99,14 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		contactModifiers = append(contactModifiers, modifier)
 	}
 
+	// create / assign our contact
+	urn := urns.NilURN
+	if len(fs.Contact().URNs()) > 0 {
+		urn = fs.Contact().URNs()[0].URN()
+	}
+
 	// create / fetch our contact based on the highest priority URN
-	_, flowContact, err := models.GetOrCreateContact(ctx, s.DB, org, fs.Contact().URNs().RawURNs())
+	_, flowContact, err := models.GetOrCreateContact(ctx, s.DB, org, urn)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 	}

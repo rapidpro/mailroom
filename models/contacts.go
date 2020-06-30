@@ -372,6 +372,17 @@ func (c *Contact) URNForID(urnID URNID) urns.URN {
 	return urns.NilURN
 }
 
+// Update updates attributes on the contact
+func (c *Contact) Update(ctx context.Context, db *sqlx.DB, name string, language envs.Language) error {
+	_, err := db.Exec(`UPDATE contacts_contact SET name = $2, language = $3 WHERE id = $1`, c.id, name, language)
+	if err != nil {
+		return errors.Wrapf(err, "error updating contact")
+	}
+	c.name = name
+	c.language = language
+	return nil
+}
+
 // Unstop sets the is_stopped attribute to false for this contact
 func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
 	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET is_stopped = FALSE, modified_on = NOW() WHERE id = $1`, c.id)
@@ -592,7 +603,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []u
 		// create the contacts that are missing
 		for _, u := range us {
 			if urnMap[u] == NilContactID {
-				contact, _, err := GetOrCreateContact(ctx, db, org, []urns.URN{u})
+				contact, _, err := CreateContact(ctx, db, org, NilUserID, "", envs.NilLanguage, []urns.URN{u})
 				if err != nil {
 					return nil, errors.Wrapf(err, "error while creating contact")
 				}
@@ -610,9 +621,10 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []u
 	return urnMap, nil
 }
 
-func ContactIDFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []urns.URN) (ContactID, error) {
+// ContactIDFromURNs gets the contact ID for the given URNs
+func ContactIDFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, urnz []urns.URN) (ContactID, error) {
 	// if this was a duplicate URN, we should be able to fetch this contact instead
-	ids, err := ContactIDsFromURNs(ctx, db, org, us, false)
+	ids, err := ContactIDsFromURNs(ctx, db, org, urnz, false)
 	if err != nil {
 		return NilContactID, err
 	}
@@ -629,30 +641,46 @@ func ContactIDFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []ur
 	return contactID, nil
 }
 
-// GetOrCreateContact creates a new contact for the passed in org with the passed in URNs or if those URNs
-// already exist, returns the existing contact who owns them
-func GetOrCreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []urns.URN) (*Contact, *flows.Contact, error) {
-	return createContact(ctx, db, org, NilUserID, "", envs.NilLanguage, us, true)
-}
-
 // CreateContact creates a new contact for the passed in org with the passed in URNs
-func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID UserID, name string, language envs.Language, us []urns.URN) (*Contact, *flows.Contact, error) {
-	return createContact(ctx, db, org, userID, name, language, us, false)
+func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID UserID, name string, language envs.Language, urnz []urns.URN) (*Contact, *flows.Contact, error) {
+	contactID, err := insertContactAndURNs(ctx, db, org, userID, name, language, urnz)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// load a full contact so that we can calculate dynamic groups
+	contacts, err := LoadContacts(ctx, db, org, []ContactID{contactID})
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error loading new contact")
+	}
+	contact := contacts[0]
+
+	flowContact, err := contact.FlowContact(org)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error creating flow contact")
+	}
+
+	err = CalculateDynamicGroups(ctx, db, org, flowContact)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error calculating dynamic groups")
+	}
+
+	return contact, flowContact, nil
 }
 
-// gets or creates a new contact for the passed in org with the passed in URNs
-func createContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID UserID, name string, language envs.Language, us []urns.URN, returnExisting bool) (*Contact, *flows.Contact, error) {
+// GetOrCreateContact creates a new contact for the passed in org with the passed in URNs
+func GetOrCreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, urn urns.URN) (*Contact, *flows.Contact, error) {
 	created := true
+	urnz := []urns.URN{}
+	if urn != urns.NilURN {
+		urnz = append(urnz, urn)
+	}
 
-	contactID, err := insertContactAndURNs(ctx, db, org, userID, name, language, us)
+	contactID, err := insertContactAndURNs(ctx, db, org, UserID(1), "", envs.NilLanguage, urnz)
 	if err != nil {
 		if isUniqueViolationError(err) {
-			if !returnExisting {
-				return nil, nil, errors.New("URNs owned by other contacts")
-			}
-
 			// if this was a duplicate URN, we should be able to fetch this contact instead
-			contactID, err = ContactIDFromURNs(ctx, db, org, us)
+			contactID, err = ContactIDFromURNs(ctx, db, org, urnz)
 			if err != nil {
 				return nil, nil, errors.Wrapf(err, "unable to load contact")
 			}
@@ -676,7 +704,7 @@ func createContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID User
 
 	// calculate dynamic groups if contact was created
 	if created {
-		err = CalculateDynamicGroups(ctx, db, org, flowContact)
+		err := CalculateDynamicGroups(ctx, db, org, flowContact)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "error calculating dynamic groups")
 		}
@@ -686,7 +714,7 @@ func createContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID User
 }
 
 // tries to create a new contact for the passed in org with the passed in URNs
-func insertContactAndURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID UserID, name string, language envs.Language, us []urns.URN) (ContactID, error) {
+func insertContactAndURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID UserID, name string, language envs.Language, urnz []urns.URN) (ContactID, error) {
 	if userID == NilUserID {
 		userID = UserID(1)
 	}
@@ -714,7 +742,7 @@ func insertContactAndURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, user
 	}
 
 	// now try to insert the URNs
-	for _, urn := range us {
+	for _, urn := range urnz {
 		_, err := tx.Exec(
 			`INSERT INTO 
 			contacts_contacturn

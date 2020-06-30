@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions/modifiers"
 	"github.com/nyaruka/goflow/utils"
@@ -226,6 +228,83 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	return response, http.StatusOK, nil
 }
 
+// Request that a set of contacts is created.
+//
+//   {
+//     "org_id": 1,
+//     "user_id": 1,
+//     "contacts": [{
+//        "name": "Joe Blow",
+//        "language": "eng",
+//        "urns": ["tel:+250788123123"],
+//        "fields": {"age": "39"},
+//        "groups": ["b0b778db-6657-430b-9272-989ad43a10db"]
+//     }, {
+//        "name": "Frank",
+//        "language": "spa",
+//        "urns": ["tel:+250788676767", "twitter:franky"],
+//        "fields": {}
+//     }]
+//   }
+//
+type createRequest struct {
+	OrgID    models.OrgID  `json:"org_id"       validate:"required"`
+	UserID   models.UserID `json:"user_id"`
+	Contacts []struct {
+		Name    string             `json:"name"`
+		Languge envs.Language      `json:"language"`
+		URNs    []urns.URN         `json:"urns"`
+		Fields  map[string]string  `json:"fields"`
+		Groups  []assets.GroupUUID `json:"groups"`
+	} `json:"contacts"       validate:"required"`
+}
+
+// Response for contact creation. Will return an array of contacts/errors the same size as that in the request.
+//
+//   [{
+//	   "contact": {
+//       "id": 123,
+//       "uuid": "559d4cf7-8ed3-43db-9bbb-2be85345f87e",
+//       "name": "Joe",
+//       "language": "eng"
+//     }
+//   },{
+//     "error": "URNs owned by other contact"
+//   }]
+//
+type createResult struct {
+	Contact *flows.Contact `json:"contact,omitempty"`
+	Error   string         `json:"error,omitempty"`
+}
+
+// handles a request to create the given contacts
+func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &createRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	results := make([]createResult, len(request.Contacts))
+
+	for i, c := range request.Contacts {
+		_, flowContact, err := models.CreateContact(ctx, s.DB, org, request.UserID, c.Name, c.Languge, c.URNs)
+		if err != nil {
+			results[i].Error = err.Error()
+			continue
+		}
+
+		results[i].Contact = flowContact
+	}
+
+	return results, http.StatusOK, nil
+}
+
 // Request that a set of contacts is modified.
 //
 //   {
@@ -270,7 +349,7 @@ type modifyResult struct {
 	Events  []flows.Event  `json:"events"`
 }
 
-// handles a request to apply the passed in actions
+// handles a request to modify the given contacts
 func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &modifyRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
