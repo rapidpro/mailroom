@@ -1125,5 +1125,95 @@
                 "count": 0
             }
         ]
+    },
+    {
+        "label": "multiple modifiers of different types",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "name",
+                    "name": "Juan"
+                },
+                {
+                    "type": "language",
+                    "language": "spa"
+                },
+                {
+                    "type": "groups",
+                    "modification": "add",
+                    "groups": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ]
+                },
+                {
+                    "type": "urns",
+                    "modification": "set",
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "name": "Juan",
+                    "language": "spa",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111"
+                    ],
+                    "groups": [
+                        {
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                            "name": "Testers"
+                        }
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_name_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "name": "Juan"
+                    },
+                    {
+                        "type": "contact_language_changed",
+                        "created_on": "2018-07-06T12:30:01.123456789Z",
+                        "language": "spa"
+                    },
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-07-06T12:30:02.123456789Z",
+                        "groups_added": [
+                            {
+                                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                "name": "Testers"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:03.123456789Z",
+                        "urns": [
+                            "tel:+255788555111"
+                        ]
+                    }
+                ]
+            }
+        }
     }
 ]

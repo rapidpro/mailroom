@@ -5,7 +5,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
@@ -66,18 +65,6 @@ func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 	err = models.RemoveContactsFromGroups(ctx, tx, removes)
 	if err != nil {
 		return errors.Wrapf(err, "error removing contacts from groups")
-	}
-
-	// build the list of all contact ids changed, we'll update modified_on for them
-	changedIDs := make([]models.ContactID, 0, len(changed))
-	for c := range changed {
-		changedIDs = append(changedIDs, c)
-	}
-	if len(changedIDs) > 0 {
-		_, err = tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(changedIDs))
-		if err != nil {
-			return errors.Wrapf(err, "error updating contacts modified_on")
-		}
 	}
 
 	return nil
