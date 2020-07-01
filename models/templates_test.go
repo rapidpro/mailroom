@@ -16,12 +16,21 @@ func TestTemplates(t *testing.T) {
 	templates, err := loadTemplates(ctx, db, 1)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 1, len(templates))
-	assert.Equal(t, "revive_issue", templates[0].Name())
-	assert.Equal(t, 1, len(templates[0].Translations()))
+	assert.Equal(t, 2, len(templates))
+	assert.Equal(t, "goodbye", templates[0].Name())
+	assert.Equal(t, "revive_issue", templates[1].Name())
 
+	assert.Equal(t, 1, len(templates[0].Translations()))
 	tt := templates[0].Translations()[0]
+	assert.Equal(t, envs.Language("fra"), tt.Language())
+	assert.Equal(t, envs.NilCountry, tt.Country())
+	assert.Equal(t, TwitterChannelUUID, tt.Channel().UUID)
+	assert.Equal(t, "Salut!", tt.Content())
+
+	assert.Equal(t, 1, len(templates[1].Translations()))
+	tt = templates[1].Translations()[0]
 	assert.Equal(t, envs.Language("eng"), tt.Language())
+	assert.Equal(t, envs.Country("US"), tt.Country())
 	assert.Equal(t, TwitterChannelUUID, tt.Channel().UUID)
 	assert.Equal(t, "Hi {{1}}, are you still experiencing problems with {{2}}?", tt.Content())
 }
