@@ -32,7 +32,7 @@
         },
         "status": 200,
         "response": {
-            "query": "age \u003e 10",
+            "query": "age > 10",
             "elastic_query": {
                 "bool": {
                     "must": [
@@ -104,7 +104,7 @@
         },
         "status": 200,
         "response": {
-            "query": "age \u003e 10",
+            "query": "age > 10",
             "elastic_query": {
                 "bool": {
                     "must": [

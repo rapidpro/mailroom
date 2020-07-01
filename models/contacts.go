@@ -17,7 +17,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/olivere/elastic"
@@ -421,12 +420,12 @@ func (c *Contact) Status() flows.ContactStatus {
 
 // fieldValueEnvelope is our utility struct for the value of a field
 type fieldValueEnvelope struct {
-	Text     types.XText        `json:"text"`
-	Datetime *types.XDateTime   `json:"datetime,omitempty"`
-	Number   *types.XNumber     `json:"number,omitempty"`
-	State    utils.LocationPath `json:"state,omitempty"`
-	District utils.LocationPath `json:"district,omitempty"`
-	Ward     utils.LocationPath `json:"ward,omitempty"`
+	Text     types.XText       `json:"text"`
+	Datetime *types.XDateTime  `json:"datetime,omitempty"`
+	Number   *types.XNumber    `json:"number,omitempty"`
+	State    envs.LocationPath `json:"state,omitempty"`
+	District envs.LocationPath `json:"district,omitempty"`
+	Ward     envs.LocationPath `json:"ward,omitempty"`
 }
 
 type ContactURN struct {
@@ -1083,14 +1082,19 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 	// keep track of all our inserts
 	inserts := make([]interface{}, 0, len(changes))
 
-	// and updates
+	// and updates to URNs
 	updates := make([]interface{}, 0, len(changes))
+
+	contactIDs := make([]ContactID, 0)
+	updatedURNIDs := make([]URNID, 0)
 
 	// identities we are inserting
 	identities := make([]string, 0, 1)
 
 	// for each of our changes (one per contact)
 	for _, change := range changes {
+		contactIDs = append(contactIDs, change.ContactID)
+
 		// priority for each contact starts at 1000
 		priority := topURNPriority
 
@@ -1100,15 +1104,17 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 			channelID := GetURNChannelID(org, urn)
 
 			// do we have an id?
-			urnID := GetURNInt(urn, "id")
+			urnID := URNID(GetURNInt(urn, "id"))
 
 			if urnID > 0 {
 				// if so, this is a URN update
 				updates = append(updates, &urnUpdate{
-					URNID:     URNID(urnID),
+					URNID:     urnID,
 					ChannelID: channelID,
 					Priority:  priority,
 				})
+
+				updatedURNIDs = append(updatedURNIDs, urnID)
 			} else {
 				// new URN, add it instead
 				inserts = append(inserts, &urnInsert{
@@ -1134,6 +1140,17 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 	err := BulkSQL(ctx, "updating contact urns", tx, updateContactURNsSQL, updates)
 	if err != nil {
 		return errors.Wrapf(err, "error updating urns")
+	}
+
+	// then detach any URNs that weren't updated (the ones we're not keeping)
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = ANY($1) AND id != ALL($2)`,
+		pq.Array(contactIDs),
+		pq.Array(updatedURNIDs),
+	)
+	if err != nil {
+		return errors.Wrapf(err, "error detaching urns")
 	}
 
 	if len(inserts) > 0 {

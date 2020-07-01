@@ -18,13 +18,26 @@ type StartID null.Int
 // NilStartID is our constant for a nil start id
 var NilStartID = StartID(0)
 
+// StartType is the type for the type of a start
 type StartType string
 
+// start type constants
 const (
 	StartTypeManual     = StartType("M")
 	StartTypeAPI        = StartType("A")
 	StartTypeFlowAction = StartType("F")
 	StartTypeTrigger    = StartType("T")
+)
+
+// StartStatus is the type for the status of a start
+type StartStatus string
+
+// start status constants
+const (
+	StartStatusPending  = StartStatus("P")
+	StartStatusStarting = StartStatus("S")
+	StartStatusComplete = StartStatus("C")
+	StartStatusFailed   = StartStatus("F")
 )
 
 // RestartParticipants is our type for the bool of restarting participatants
@@ -55,7 +68,15 @@ func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contact
 		return errors.Wrapf(err, "error setting start as started")
 	}
 	return nil
+}
 
+// MarkStartFailed sets the status for the passed in flow start to F
+func MarkStartFailed(ctx context.Context, db *sqlx.DB, startID StartID) error {
+	_, err := db.Exec("UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
+	if err != nil {
+		return errors.Wrapf(err, "error setting start as failed")
+	}
+	return nil
 }
 
 // FlowStartBatch represents a single flow batch that needs to be started

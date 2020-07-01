@@ -89,12 +89,11 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		request.GroupUUID, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
-		switch cause := errors.Cause(err).(type) {
-		case *contactql.QueryError:
-			return cause, http.StatusBadRequest, nil
-		default:
-			return nil, http.StatusInternalServerError, err
+		isQueryError, qerr := contactql.IsQueryError(err)
+		if isQueryError {
+			return qerr, http.StatusBadRequest, nil
 		}
+		return nil, http.StatusInternalServerError, err
 	}
 
 	// normalize and inspect the query
@@ -181,12 +180,11 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
 
 	if err != nil {
-		switch cause := errors.Cause(err).(type) {
-		case *contactql.QueryError:
-			return cause, http.StatusBadRequest, nil
-		default:
-			return nil, http.StatusInternalServerError, err
+		isQueryError, qerr := contactql.IsQueryError(err)
+		if isQueryError {
+			return qerr, http.StatusBadRequest, nil
 		}
+		return nil, http.StatusInternalServerError, err
 	}
 
 	// normalize and inspect the query
@@ -292,7 +290,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// build up our modifiers
 	mods := make([]flows.Modifier, len(request.Modifiers))
 	for i, m := range request.Modifiers {
-		mod, err := modifiers.ReadModifier(org.SessionAssets(), m, nil)
+		mod, err := modifiers.ReadModifier(org.SessionAssets(), m, assets.IgnoreMissing)
 		if err != nil {
 			return errors.Wrapf(err, "error in modifier: %s", string(m)), http.StatusBadRequest, nil
 		}
@@ -306,6 +304,9 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	results := make(map[models.ContactID]modifyResult)
+
+	// create an environment instance with location support
+	env := flows.NewEnvironment(org.Env(), org.SessionAssets().Locations())
 
 	// create scenes for our contacts
 	scenes := make([]*models.Scene, 0, len(contacts))
@@ -324,7 +325,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 		// apply our modifiers
 		for _, mod := range mods {
-			mod.Apply(org.Env(), org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+			mod.Apply(env, org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
 		}
 
 		results[contact.ID()] = result
