@@ -114,7 +114,8 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 		flows.NodeUUID(""),
 	))
 
-	router := routers.NewSwitch(nil, "", categories, "@contact.id", cases, defaultCategoryUUID)
+	var config routers.SwitchRouterConfig
+	router := routers.NewSwitch(nil, "", categories, "@contact.id", cases, defaultCategoryUUID, &config)
 
 	// and our entry node
 	entry := definition.NewNode(
