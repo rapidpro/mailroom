@@ -1,3 +1,9 @@
+v5.5.36
+----------
+ * Sead country from templates
+ * Ignore missing assets when reading modifiers
+ * Fail flow starts which can't be started
+
 v5.5.35
 ----------
  * Update to latest goflow and add tests for field modifiers
