@@ -89,12 +89,11 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		request.GroupUUID, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
-		switch cause := errors.Cause(err).(type) {
-		case *contactql.QueryError:
-			return cause, http.StatusBadRequest, nil
-		default:
-			return nil, http.StatusInternalServerError, err
+		isQueryError, qerr := contactql.IsQueryError(err)
+		if isQueryError {
+			return qerr, http.StatusBadRequest, nil
 		}
+		return nil, http.StatusInternalServerError, err
 	}
 
 	// normalize and inspect the query
@@ -181,12 +180,11 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
 
 	if err != nil {
-		switch cause := errors.Cause(err).(type) {
-		case *contactql.QueryError:
-			return cause, http.StatusBadRequest, nil
-		default:
-			return nil, http.StatusInternalServerError, err
+		isQueryError, qerr := contactql.IsQueryError(err)
+		if isQueryError {
+			return qerr, http.StatusBadRequest, nil
 		}
+		return nil, http.StatusInternalServerError, err
 	}
 
 	// normalize and inspect the query

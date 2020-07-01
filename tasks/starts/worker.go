@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/contactql"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -43,7 +44,18 @@ func handleFlowStart(ctx context.Context, mr *mailroom.Mailroom, task *queue.Tas
 		return errors.Wrapf(err, "error unmarshalling flow start task: %s", string(task.Task))
 	}
 
-	return CreateFlowBatches(ctx, mr.DB, mr.RP, mr.ElasticClient, startTask)
+	err = CreateFlowBatches(ctx, mr.DB, mr.RP, mr.ElasticClient, startTask)
+	if err != nil {
+		models.MarkStartFailed(ctx, mr.DB, startTask.ID())
+
+		// if error is user created query error.. don't escalate error to sentry
+		isQueryError, _ := contactql.IsQueryError(err)
+		if !isQueryError {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
