@@ -59,7 +59,7 @@
         "response": {
             "action": "forwarded",
             "ticket_uuid": "c69f103c-db64-4481-815b-1112890419ef",
-            "msg_uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
+            "msg_uuid": "692926ea-09d6-4942-bd38-d266ec8d3716"
         },
         "db_assertions": [
             {
@@ -78,7 +78,7 @@
             "https://api.mailgun.net/v3/tickets.rapidpro.io/messages": [
                 {
                     "status": 200,
-                    "body": "{\"id\": \"\u003c20200426161758.1.590432020254B2BF@tickets.rapidpro.io\u003e\", \"message\": \"Queued. Thank you.\"}"
+                    "body": "{\"id\": \"<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>\", \"message\": \"Queued. Thank you.\"}"
                 }
             ]
         },

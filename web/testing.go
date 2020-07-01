@@ -32,6 +32,8 @@ func RunWebTests(t *testing.T, truthFile string) {
 	wg := &sync.WaitGroup{}
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(123456))
+
 	defer dates.SetNowSource(dates.DefaultNowSource)
 
 	server := NewServer(context.Background(), config.Mailroom, db, rp, nil, nil, wg)
@@ -67,7 +69,6 @@ func RunWebTests(t *testing.T, truthFile string) {
 	require.NoError(t, err)
 
 	for i, tc := range tcs {
-		uuids.SetGenerator(uuids.NewSeededGenerator(123456))
 		dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
 
 		var clonedMocks *httpx.MockRequestor
