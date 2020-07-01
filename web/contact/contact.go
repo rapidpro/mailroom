@@ -290,7 +290,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// build up our modifiers
 	mods := make([]flows.Modifier, len(request.Modifiers))
 	for i, m := range request.Modifiers {
-		mod, err := modifiers.ReadModifier(org.SessionAssets(), m, nil)
+		mod, err := modifiers.ReadModifier(org.SessionAssets(), m, assets.IgnoreMissing)
 		if err != nil {
 			return errors.Wrapf(err, "error in modifier: %s", string(m)), http.StatusBadRequest, nil
 		}
