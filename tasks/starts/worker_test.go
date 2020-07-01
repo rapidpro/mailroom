@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStarts(t *testing.T) {
@@ -32,7 +35,9 @@ func TestStarts(t *testing.T) {
 		elastic.SetHealthcheck(false),
 		elastic.SetSniff(false),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
+	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: rp, ElasticClient: es}
 
 	// insert a flow run for one of our contacts
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
@@ -54,6 +59,7 @@ func TestStarts(t *testing.T) {
 		ContactCount        int
 		BatchCount          int
 		TotalCount          int
+		Status              models.StartStatus
 	}{
 		{
 			Label:        "empty flow start",
@@ -62,6 +68,7 @@ func TestStarts(t *testing.T) {
 			ContactCount: 0,
 			BatchCount:   0,
 			TotalCount:   0,
+			Status:       models.StartStatusComplete,
 		},
 		{
 			Label:        "Single group",
@@ -71,6 +78,7 @@ func TestStarts(t *testing.T) {
 			ContactCount: 121,
 			BatchCount:   2,
 			TotalCount:   121,
+			Status:       models.StartStatusComplete,
 		},
 		{
 			Label:        "Group and Contact (but all already active)",
@@ -81,6 +89,7 @@ func TestStarts(t *testing.T) {
 			ContactCount: 121,
 			BatchCount:   2,
 			TotalCount:   0,
+			Status:       models.StartStatusComplete,
 		},
 		{
 			Label:               "Contact restart",
@@ -92,6 +101,7 @@ func TestStarts(t *testing.T) {
 			ContactCount:        1,
 			BatchCount:          1,
 			TotalCount:          1,
+			Status:              models.StartStatusComplete,
 		},
 		{
 			Label:        "Previous group and one new contact",
@@ -102,6 +112,7 @@ func TestStarts(t *testing.T) {
 			ContactCount: 122,
 			BatchCount:   2,
 			TotalCount:   1,
+			Status:       models.StartStatusComplete,
 		},
 		{
 			Label:        "Single contact, no restart",
@@ -111,6 +122,7 @@ func TestStarts(t *testing.T) {
 			ContactCount: 1,
 			BatchCount:   1,
 			TotalCount:   0,
+			Status:       models.StartStatusComplete,
 		},
 		{
 			Label:         "Single contact, include active, but no restart",
@@ -121,6 +133,7 @@ func TestStarts(t *testing.T) {
 			ContactCount:  1,
 			BatchCount:    1,
 			TotalCount:    0,
+			Status:        models.StartStatusComplete,
 		},
 		{
 			Label:               "Single contact, include active and restart",
@@ -132,6 +145,7 @@ func TestStarts(t *testing.T) {
 			ContactCount:        1,
 			BatchCount:          1,
 			TotalCount:          1,
+			Status:              models.StartStatusComplete,
 		},
 		{
 			Label:  "Query start",
@@ -170,6 +184,19 @@ func TestStarts(t *testing.T) {
 			ContactCount:        1,
 			BatchCount:          1,
 			TotalCount:          1,
+			Status:              models.StartStatusComplete,
+		},
+		{
+			Label:               "Query start with invalid query",
+			FlowID:              models.SingleMessageFlowID,
+			Query:               "xyz = 45",
+			RestartParticipants: true,
+			IncludeActive:       true,
+			Queue:               queue.HandlerQueue,
+			ContactCount:        0,
+			BatchCount:          0,
+			TotalCount:          0,
+			Status:              models.StartStatusFailed,
 		},
 		{
 			Label:         "New Contact",
@@ -179,10 +206,11 @@ func TestStarts(t *testing.T) {
 			ContactCount:  1,
 			BatchCount:    1,
 			TotalCount:    1,
+			Status:        models.StartStatusComplete,
 		},
 	}
 
-	for i, tc := range tcs {
+	for _, tc := range tcs {
 		mes.NextResponse = tc.QueryResponse
 
 		// handle our start task
@@ -195,7 +223,10 @@ func TestStarts(t *testing.T) {
 		err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 		assert.NoError(t, err)
 
-		err = CreateFlowBatches(ctx, db, rp, es, start)
+		startJSON, err := json.Marshal(start)
+		require.NoError(t, err)
+
+		err = handleFlowStart(ctx, mr, &queue.Task{Type: queue.StartFlow, Task: startJSON})
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
@@ -219,14 +250,20 @@ func TestStarts(t *testing.T) {
 		}
 
 		// assert our count of batches
-		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
+		assert.Equal(t, tc.BatchCount, count, "unexpected batch count in '%s'", tc.Label)
 
 		// assert our count of total flow runs created
 		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun where flow_id = $1 AND start_id = $2 AND is_active = FALSE`,
-			[]interface{}{tc.FlowID, start.ID()}, tc.TotalCount, "%d: unexpected total run count", i)
+			[]interface{}{tc.FlowID, start.ID()}, tc.TotalCount, "unexpected total run count in '%s'", tc.Label)
 
-		// flow start should be complete
-		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart where status = 'C' AND id = $1 AND contact_count = $2`,
-			[]interface{}{start.ID(), tc.ContactCount}, 1, "%d: start status not set to complete", i)
+		// assert final status
+		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart where status = $2 AND id = $1`,
+			[]interface{}{start.ID(), tc.Status}, 1, "status mismatch in '%s'", tc.Label)
+
+		// assert final contact count
+		if tc.Status != models.StartStatusFailed {
+			testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart where contact_count = $2 AND id = $1`,
+				[]interface{}{start.ID(), tc.ContactCount}, 1, "contact count mismatch in '%s'", tc.Label)
+		}
 	}
 }
