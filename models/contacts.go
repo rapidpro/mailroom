@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/olivere/elastic"
@@ -372,17 +373,6 @@ func (c *Contact) URNForID(urnID URNID) urns.URN {
 	return urns.NilURN
 }
 
-// Update updates attributes on the contact
-func (c *Contact) Update(ctx context.Context, db *sqlx.DB, name string, language envs.Language) error {
-	_, err := db.Exec(`UPDATE contacts_contact SET name = $2, language = $3 WHERE id = $1`, c.id, name, language)
-	if err != nil {
-		return errors.Wrapf(err, "error updating contact")
-	}
-	c.name = name
-	c.language = language
-	return nil
-}
-
 // Unstop sets the is_stopped attribute to false for this contact
 func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
 	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET is_stopped = FALSE, modified_on = NOW() WHERE id = $1`, c.id)
@@ -645,6 +635,9 @@ func ContactIDFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, urnz []
 func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID UserID, name string, language envs.Language, urnz []urns.URN) (*Contact, *flows.Contact, error) {
 	contactID, err := insertContactAndURNs(ctx, db, org, userID, name, language, urnz)
 	if err != nil {
+		if isUniqueViolationError(err) {
+			return nil, nil, errors.New("URNs in use by other contacts")
+		}
 		return nil, nil, err
 	}
 
@@ -731,9 +724,9 @@ func insertContactAndURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, user
 		contacts_contact
 			(org_id, is_active, is_blocked, is_stopped, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
 		VALUES
-			($1, TRUE, FALSE, FALSE, $2, $3, $4, NOW(), NOW(), $5, $5)
+			($1, TRUE, FALSE, FALSE, $2, $3, $4, $5, $5, $6, $6)
 		RETURNING id`,
-		org.OrgID(), uuids.New(), name, string(language), userID,
+		org.OrgID(), uuids.New(), name, string(language), dates.Now(), userID,
 	)
 
 	if err != nil {
@@ -741,9 +734,23 @@ func insertContactAndURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, user
 		return NilContactID, errors.Wrapf(err, "error inserting new contact")
 	}
 
+	var urnsToAttach []URNID
+
 	// now try to insert the URNs
 	for _, urn := range urnz {
-		_, err := tx.Exec(
+		// look for a URN with this identity that already exists but doesn't have a contact so could be attached
+		var orphanURNID URNID
+		err = tx.GetContext(ctx, &orphanURNID, `SELECT id FROM contacts_contacturn WHERE org_id = $1 AND identity = $2 AND contact_id IS NULL`, org.OrgID(), urn.Identity())
+		if err != nil && err != sql.ErrNoRows {
+			return NilContactID, err
+		}
+		if orphanURNID > 0 {
+			urnsToAttach = append(urnsToAttach, orphanURNID)
+			continue
+		}
+
+		_, err := tx.ExecContext(
+			ctx,
 			`INSERT INTO 
 			contacts_contacturn
 				(org_id, identity, path, scheme, display, auth, priority, channel_id, contact_id)
@@ -755,6 +762,15 @@ func insertContactAndURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, user
 		if err != nil {
 			tx.Rollback()
 			return NilContactID, err
+		}
+	}
+
+	// attach URNs
+	if len(urnsToAttach) > 0 {
+		_, err := tx.ExecContext(ctx, `UPDATE contacts_contacturn SET contact_id = $3 WHERE org_id = $1 AND id = ANY($2)`, org.OrgID(), pq.Array(urnsToAttach), contactID)
+		if err != nil {
+			tx.Rollback()
+			return NilContactID, errors.Wrapf(err, "error attaching existing URNs to new contact")
 		}
 	}
 

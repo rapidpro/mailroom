@@ -1,0 +1,176 @@
+[
+    {
+        "label": "noop",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contacts": []
+        },
+        "status": 200,
+        "response": [],
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "create empty contacts",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contacts": [
+                {},
+                {}
+            ]
+        },
+        "status": 200,
+        "response": [
+            {
+                "contact": {
+                    "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5",
+                    "id": 30000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                }
+            },
+            {
+                "contact": {
+                    "uuid": "692926ea-09d6-4942-bd38-d266ec8d3716",
+                    "id": 30001,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:01.123457Z"
+                }
+            }
+        ],
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "count": 2
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE name = '' AND language = ''",
+                "count": 2
+            }
+        ]
+    },
+    {
+        "label": "create contacts with all properties",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contacts": [
+                {
+                    "name": "José",
+                    "language": "spa",
+                    "urns": [
+                        "tel:+16055700001"
+                    ]
+                },
+                {
+                    "name": "Jean",
+                    "language": "fra",
+                    "urns": [
+                        "tel:+16055700002"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": [
+            {
+                "contact": {
+                    "uuid": "8720f157-ca1c-432f-9c0b-2014ddc77094",
+                    "id": 30002,
+                    "name": "José",
+                    "language": "spa",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+16055700001?id=20121&priority=1000"
+                    ]
+                }
+            },
+            {
+                "contact": {
+                    "uuid": "c34b6c7d-fa06-4563-92a3-d648ab64bccb",
+                    "id": 30003,
+                    "name": "Jean",
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:01.123457Z",
+                    "urns": [
+                        "tel:+16055700002?id=20122&priority=1000"
+                    ]
+                }
+            }
+        ]
+    },
+    {
+        "label": "error if try to create contact with taken URN",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contacts": [
+                {
+                    "name": "María",
+                    "urns": [
+                        "tel:+16055700001"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": [
+            {
+                "error": "URNs in use by other contacts"
+            }
+        ]
+    },
+    {
+        "label": "though ok to take an orphaned URN",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contacts": [
+                {
+                    "name": "María",
+                    "urns": [
+                        "tel:+16055741111"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": [
+            {
+                "contact": {
+                    "uuid": "970b8069-50f5-4f6f-8f41-6b2d9f33d623",
+                    "id": 30005,
+                    "name": "María",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+16055741111?id=10000&priority=50"
+                    ]
+                }
+            }
+        ]
+    }
+]
