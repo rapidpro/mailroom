@@ -377,6 +377,11 @@
                     "key": "created_on",
                     "help": "the creation date of the result",
                     "type": "datetime"
+                },
+                {
+                    "key": "corrected",
+                    "help": "the input corrected by Bing Spell Checker",
+                    "type": "text"
                 }
             ]
         },
