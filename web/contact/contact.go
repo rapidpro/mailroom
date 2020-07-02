@@ -10,8 +10,8 @@ import (
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/actions/modifiers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
 
@@ -369,14 +369,10 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
 	}
 
-	// load our modifiers
-	mods := make([]flows.Modifier, len(request.Modifiers))
-	for i, m := range request.Modifiers {
-		mod, err := modifiers.ReadModifier(oa.SessionAssets(), m, assets.IgnoreMissing)
-		if err != nil {
-			return errors.Wrapf(err, "error in modifier: %s", string(m)), http.StatusBadRequest, nil
-		}
-		mods[i] = mod
+	// read the modifiers from the request
+	mods, err := goflow.ReadModifiers(org.SessionAssets(), request.Modifiers, false)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
 	}
 
 	// load our contacts

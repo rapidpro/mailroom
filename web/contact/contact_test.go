@@ -207,6 +207,7 @@ func TestModifyContacts(t *testing.T) {
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, models.CathyID)
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.CathyID)
 
+	// because we made changes to a group above, need to make sure we don't use stale org assets
 	models.FlushCache()
 
 	web.RunWebTests(t, "testdata/modify.json")
