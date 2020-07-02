@@ -358,21 +358,21 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	// clone it as we will modify flows
-	org, err = org.Clone(s.CTX, s.DB)
+	// clone it as we will modify flows ???
+	oa, err = oa.Clone(s.CTX, s.DB)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
 	}
 
-	// build up our modifiers
+	// load our modifiers
 	mods := make([]flows.Modifier, len(request.Modifiers))
 	for i, m := range request.Modifiers {
-		mod, err := modifiers.ReadModifier(org.SessionAssets(), m, assets.IgnoreMissing)
+		mod, err := modifiers.ReadModifier(oa.SessionAssets(), m, assets.IgnoreMissing)
 		if err != nil {
 			return errors.Wrapf(err, "error in modifier: %s", string(m)), http.StatusBadRequest, nil
 		}
@@ -380,94 +380,46 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// load our contacts
-	contacts, err := models.LoadContacts(ctx, s.DB, org, request.ContactIDs)
+	contacts, err := models.LoadContacts(ctx, s.DB, oa, request.ContactIDs)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load contact")
 	}
 
-	results := make(map[models.ContactID]modifyResult)
-
-	// create an environment instance with location support
-	env := flows.NewEnvironment(org.Env(), org.SessionAssets().Locations())
-
-	// create scenes for our contacts
-	scenes := make([]*models.Scene, 0, len(contacts))
+	// build a map of each contact to all mods (all mods are applied to all contacts)
+	contactsAndMods := make(map[*flows.Contact][]flows.Modifier, len(contacts))
 	for _, contact := range contacts {
-		flowContact, err := contact.FlowContact(org)
+		flowContact, err := contact.FlowContact(oa)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
-
-		result := modifyResult{
-			Contact: flowContact,
-			Events:  make([]flows.Event, 0, len(mods)),
-		}
-
-		scene := models.NewSceneForContact(flowContact)
-
-		// apply our modifiers
-		for _, mod := range mods {
-			mod.Apply(env, org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
-		}
-
-		results[contact.ID()] = result
-		scenes = append(scenes, scene)
+		contactsAndMods[flowContact] = mods
 	}
 
-	// ok, commit all our events
-	tx, err := s.DB.BeginTxx(ctx, nil)
+	eventsByContact, err := ModifyContacts(ctx, s.DB, s.RP, oa, contactsAndMods)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction")
+		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying contacts")
 	}
 
-	// apply our events
-	for _, scene := range scenes {
-		err := models.HandleEvents(ctx, tx, s.RP, org, scene, results[scene.ContactID()].Events)
-		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying events")
-		}
+	// convert to response format
+	response := make(map[flows.ContactID]modifyResult)
+	for contact, events := range eventsByContact {
+		response[contact.ID()] = modifyResult{Contact: contact, Events: events}
 	}
 
-	// gather all our pre commit events, group them by hook and apply them
-	err = models.ApplyEventPreCommitHooks(ctx, tx, s.RP, org, scenes)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
-	}
-
-	// commit our transaction
-	err = tx.Commit()
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
-	}
-
-	tx, err = s.DB.BeginTxx(ctx, nil)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for post commit")
-	}
-
-	// then apply our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, org, scenes)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
-	}
-
-	return results, http.StatusOK, nil
+	return response, http.StatusOK, nil
 }
 
-func modifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contacts []*flows.Contact, mods func(*flows.Contact) []flows.Modifier) error {
+// ModifyContacts modifies contacts by applying modifiers and handling the resultant events
+func ModifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contactsAndMods map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
-	// apply the modifiers to get the events for each contact
 	eventsByContact := make(map[*flows.Contact][]flows.Event)
-	for _, contact := range contacts {
+
+	// apply the modifiers to get the events for each contact
+	for contact, mods := range contactsAndMods {
 		events := make([]flows.Event, 0)
-		for _, mod := range mods(contact) {
+		for _, mod := range mods {
 			mod.Apply(env, oa.SessionAssets(), contact, func(e flows.Event) { events = append(events, e) })
 		}
 		eventsByContact[contact] = events
@@ -475,46 +427,47 @@ func modifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models
 
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error starting transaction")
+		return nil, errors.Wrapf(err, "error starting transaction")
 	}
 
-	scenes := make([]*models.Scene, len(contacts))
+	scenes := make([]*models.Scene, 0, len(contactsAndMods))
 
-	for i, contact := range contacts {
-		scenes[i] = models.NewSceneForContact(contact)
+	for contact := range contactsAndMods {
+		scene := models.NewSceneForContact(contact)
+		scenes = append(scenes, scene)
 
-		err := models.HandleEvents(ctx, tx, rp, oa, scenes[i], eventsByContact[contact])
+		err := models.HandleEvents(ctx, tx, rp, oa, scene, eventsByContact[contact])
 		if err != nil {
-			return errors.Wrapf(err, "error handling events")
+			return nil, errors.Wrapf(err, "error handling events")
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
 	err = models.ApplyEventPreCommitHooks(ctx, tx, rp, oa, scenes)
 	if err != nil {
-		return errors.Wrapf(err, "error applying pre commit hooks")
+		return nil, errors.Wrapf(err, "error applying pre commit hooks")
 	}
 
 	// commit our transaction
 	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "error committing transaction")
+		return nil, errors.Wrapf(err, "error committing transaction")
 	}
 
 	// start new transaction for post commit hooks
 	tx, err = db.BeginTxx(ctx, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error starting transaction for post commit")
+		return nil, errors.Wrapf(err, "error starting transaction for post commit")
 	}
 
 	// then apply our post commit hooks
 	err = models.ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
 	if err != nil {
-		return errors.Wrapf(err, "error applying post commit hooks")
+		return nil, errors.Wrapf(err, "error applying post commit hooks")
 	}
 
 	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "error committing post commit hooks")
+		return nil, errors.Wrapf(err, "error committing post commit hooks")
 	}
 
-	return nil
+	return eventsByContact, nil
 }
