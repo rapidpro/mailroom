@@ -7,12 +7,6 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-<<<<<<< HEAD
-
-	"github.com/nyaruka/goflow/flows/actions/modifiers"
-
-=======
->>>>>>> modifier_read_fix
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
@@ -89,7 +83,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// and our modifiers
-	mods, err := goflow.ReadModifiers(org.SessionAssets(), request.Modifiers, true)
+	mods, err := goflow.ReadModifiers(org.SessionAssets(), request.Modifiers, goflow.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

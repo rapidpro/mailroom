@@ -370,7 +370,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// read the modifiers from the request
-	mods, err := goflow.ReadModifiers(org.SessionAssets(), request.Modifiers, false)
+	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
