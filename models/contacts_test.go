@@ -274,7 +274,7 @@ func TestContactsFromURN(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN}, true)
+		ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN})
 		assert.NoError(t, err, "%d: error getting contact ids", i)
 
 		if len(ids) != 1 {
@@ -302,7 +302,6 @@ func TestGetOrCreateContact(t *testing.T) {
 		{Org1, urns.URN(CathyURN.String() + "?foo=bar"), CathyID},
 		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
 		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
-		{Org1, urns.NilURN, ContactID(maxContactID + 5)},
 	}
 
 	org, err := GetOrgAssets(ctx, db, Org1)

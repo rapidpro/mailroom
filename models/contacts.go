@@ -541,7 +541,7 @@ WHERE
 
 // ContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
 // the passed in URNs with the ids of the contacts.
-func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []urns.URN, createMissing bool) (map[urns.URN]ContactID, error) {
+func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []urns.URN) (map[urns.URN]ContactID, error) {
 	// build a map of our urns to contact id
 	urnMap := make(map[urns.URN]ContactID, len(us))
 
@@ -589,7 +589,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []u
 	}
 
 	// if we didn't find some contacts
-	if len(urnMap) < len(us) && createMissing {
+	if len(urnMap) < len(us) {
 		// create the contacts that are missing
 		for _, u := range us {
 			if urnMap[u] == NilContactID {
@@ -609,26 +609,6 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []u
 
 	// return our map of urns to ids
 	return urnMap, nil
-}
-
-// ContactIDFromURNs gets the contact ID for the given URNs
-func ContactIDFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, urnz []urns.URN) (ContactID, error) {
-	// if this was a duplicate URN, we should be able to fetch this contact instead
-	ids, err := ContactIDsFromURNs(ctx, db, org, urnz, false)
-	if err != nil {
-		return NilContactID, err
-	}
-
-	contactID := NilContactID
-	for _, id := range ids {
-		if contactID == NilContactID {
-			contactID = id
-		} else if contactID != id {
-			return NilContactID, errors.New("URNs owned by different contacts")
-		}
-	}
-
-	return contactID, nil
 }
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
@@ -664,16 +644,12 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID User
 // GetOrCreateContact creates a new contact for the passed in org with the passed in URNs
 func GetOrCreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, urn urns.URN) (*Contact, *flows.Contact, error) {
 	created := true
-	urnz := []urns.URN{}
-	if urn != urns.NilURN {
-		urnz = append(urnz, urn)
-	}
 
-	contactID, err := insertContactAndURNs(ctx, db, org, UserID(1), "", envs.NilLanguage, urnz)
+	contactID, err := insertContactAndURNs(ctx, db, org, UserID(1), "", envs.NilLanguage, []urns.URN{urn})
 	if err != nil {
 		if isUniqueViolationError(err) {
 			// if this was a duplicate URN, we should be able to fetch this contact instead
-			contactID, err = ContactIDFromURNs(ctx, db, org, urnz)
+			err := db.GetContext(ctx, &contactID, `SELECT contact_id FROM contacts_contacturn WHERE org_id = $1 AND identity = $2`, org.OrgID(), urn.Identity())
 			if err != nil {
 				return nil, nil, errors.Wrapf(err, "unable to load contact")
 			}

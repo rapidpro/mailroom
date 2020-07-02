@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/goflow"
@@ -229,53 +227,24 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	return response, http.StatusOK, nil
 }
 
-// Request that a set of contacts is created.
+// Request to create a new contact.
 //
 //   {
 //     "org_id": 1,
 //     "user_id": 1,
-//     "contacts": [{
-//        "name": "Joe Blow",
-//        "language": "eng",
-//        "urns": ["tel:+250788123123"],
-//        "fields": {"age": "39"},
-//        "groups": ["b0b778db-6657-430b-9272-989ad43a10db"]
-//     }, {
-//        "name": "Frank",
-//        "language": "spa",
-//        "urns": ["tel:+250788676767", "twitter:franky"],
-//        "fields": {}
-//     }]
+//     "contact": {
+//       "name": "Joe Blow",
+//       "language": "eng",
+//       "urns": ["tel:+250788123123"],
+//       "fields": {"age": "39"},
+//       "groups": ["b0b778db-6657-430b-9272-989ad43a10db"]
+//     }
 //   }
 //
 type createRequest struct {
-	OrgID    models.OrgID  `json:"org_id"       validate:"required"`
-	UserID   models.UserID `json:"user_id"`
-	Contacts []struct {
-		Name    string             `json:"name"`
-		Languge envs.Language      `json:"language"`
-		URNs    []urns.URN         `json:"urns"`
-		Fields  map[string]string  `json:"fields"`
-		Groups  []assets.GroupUUID `json:"groups"`
-	} `json:"contacts"       validate:"required"`
-}
-
-// Response for contact creation. Will return an array of contacts/errors the same size as that in the request.
-//
-//   [{
-//	   "contact": {
-//       "id": 123,
-//       "uuid": "559d4cf7-8ed3-43db-9bbb-2be85345f87e",
-//       "name": "Joe",
-//       "language": "eng"
-//     }
-//   },{
-//     "error": "URNs owned by other contact"
-//   }]
-//
-type createResult struct {
-	Contact *flows.Contact `json:"contact,omitempty"`
-	Error   string         `json:"error,omitempty"`
+	OrgID   models.OrgID  `json:"org_id"   validate:"required"`
+	UserID  models.UserID `json:"user_id"`
+	Contact *contactSpec  `json:"contact"  validate:"required"`
 }
 
 // handles a request to create the given contacts
@@ -286,24 +255,28 @@ func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	results := make([]createResult, len(request.Contacts))
-
-	for i, c := range request.Contacts {
-		_, flowContact, err := models.CreateContact(ctx, s.DB, org, request.UserID, c.Name, c.Languge, c.URNs)
-		if err != nil {
-			results[i].Error = err.Error()
-			continue
-		}
-
-		results[i].Contact = flowContact
+	c, err := request.Contact.validate(oa.Env(), oa.SessionAssets())
+	if err != nil {
+		return nil, http.StatusBadRequest, err
 	}
 
-	return results, http.StatusOK, nil
+	_, contact, err := models.CreateContact(ctx, s.DB, oa, request.UserID, c.name, c.language, c.urns)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.mods}
+	_, err = ModifyContacts(ctx, s.DB, s.RP, oa, modifiersByContact)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
+	}
+
+	return map[string]interface{}{"contact": contact}, http.StatusOK, nil
 }
 
 // Request that a set of contacts is modified.
@@ -382,16 +355,16 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// build a map of each contact to all mods (all mods are applied to all contacts)
-	contactsAndMods := make(map[*flows.Contact][]flows.Modifier, len(contacts))
+	modifiersByContact := make(map[*flows.Contact][]flows.Modifier, len(contacts))
 	for _, contact := range contacts {
 		flowContact, err := contact.FlowContact(oa)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
-		contactsAndMods[flowContact] = mods
+		modifiersByContact[flowContact] = mods
 	}
 
-	eventsByContact, err := ModifyContacts(ctx, s.DB, s.RP, oa, contactsAndMods)
+	eventsByContact, err := ModifyContacts(ctx, s.DB, s.RP, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying contacts")
 	}
@@ -406,14 +379,14 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 }
 
 // ModifyContacts modifies contacts by applying modifiers and handling the resultant events
-func ModifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contactsAndMods map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
+func ModifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
 	eventsByContact := make(map[*flows.Contact][]flows.Event)
 
 	// apply the modifiers to get the events for each contact
-	for contact, mods := range contactsAndMods {
+	for contact, mods := range modifiersByContact {
 		events := make([]flows.Event, 0)
 		for _, mod := range mods {
 			mod.Apply(env, oa.SessionAssets(), contact, func(e flows.Event) { events = append(events, e) })
@@ -426,9 +399,9 @@ func ModifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models
 		return nil, errors.Wrapf(err, "error starting transaction")
 	}
 
-	scenes := make([]*models.Scene, 0, len(contactsAndMods))
+	scenes := make([]*models.Scene, 0, len(modifiersByContact))
 
-	for contact := range contactsAndMods {
+	for contact := range modifiersByContact {
 		scene := models.NewSceneForContact(contact)
 		scenes = append(scenes, scene)
 
