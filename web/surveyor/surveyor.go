@@ -83,7 +83,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// and our modifiers
-	mods, err := goflow.ReadModifiers(org.SessionAssets(), request.Modifiers, true)
+	mods, err := goflow.ReadModifiers(org.SessionAssets(), request.Modifiers, goflow.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
