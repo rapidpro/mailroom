@@ -56,11 +56,14 @@ Recommended settings for error and performance monitoring:
  * `MAILROOM_PARSE_SERVER_APP_ID`: Parse Server Application ID
  * `MAILROOM_PARSE_SERVER_MASTER_KEY`: Parse Server Application Master Key
  
- For Trackable Links the follow parameter should be set up as env variable:
+ For Trackable Links the follow parameters should be set up as env variable:
  * `MAILROOM_SHORTEN_URL_PING`: This URL should be called as a fake webbhook call to have a success response with less than 10000 bytes
  * `MAILROOM_YOURLS_LOGIN`: The YoURLs API username
  * `MAILROOM_YOURLS_PASSWORD`: The YoURLs API password
  * `MAILROOM_YOURLS_HOST`: The YoURLs API host
+ 
+ For Spell Checker the follow parameter should be set up as env variable:
+ * `MAILROOM_SPELL_CHECKER_KEY`: The Bing Spell Checker API key
 
 # Development
 
