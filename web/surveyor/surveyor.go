@@ -5,11 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/nyaruka/goflow/assets"
-
-	"github.com/nyaruka/goflow/flows/actions/modifiers"
-
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
@@ -17,6 +14,7 @@ import (
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/pkg/errors"
 )
 
@@ -85,18 +83,9 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// and our modifiers
-	contactModifiers := make([]flows.Modifier, 0, len(request.Modifiers))
-	for _, m := range request.Modifiers {
-		modifier, err := modifiers.ReadModifier(org.SessionAssets(), m, assets.IgnoreMissing)
-
-		// if this modifier turned into a no-op, ignore
-		if err == modifiers.ErrNoModifier {
-			continue
-		}
-		if err != nil {
-			return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling modifier: %s", string(m))
-		}
-		contactModifiers = append(contactModifiers, modifier)
+	mods, err := goflow.ReadModifiers(org.SessionAssets(), request.Modifiers, goflow.IgnoreMissing)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
 	}
 
 	// create / assign our contact
@@ -126,13 +115,13 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading flow contact")
 	}
 
-	modifierEvents := make([]flows.Event, 0, len(contactModifiers))
+	modifierEvents := make([]flows.Event, 0, len(mods))
 	appender := func(e flows.Event) {
 		modifierEvents = append(modifierEvents, e)
 	}
 
 	// run through each contact modifier, applying it to our contact
-	for _, m := range contactModifiers {
+	for _, m := range mods {
 		m.Apply(org.Env(), org.SessionAssets(), flowContact, appender)
 	}
 
@@ -145,7 +134,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// create our sprint
-	sprint := engine.NewSprint(contactModifiers, modifierEvents)
+	sprint := engine.NewSprint(mods, modifierEvents)
 
 	// write our session out
 	tx, err := s.DB.BeginTxx(ctx, nil)
