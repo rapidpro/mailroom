@@ -1,3 +1,7 @@
+v5.5.38
+----------
+ * Varible naming consistency
+
 v5.5.37
 ----------
  * Fix reading of modifiers so always ignore modifier that becomes noop
