@@ -26,12 +26,12 @@ func TestBroadcastEvents(t *testing.T) {
 	rc := testsuite.RC()
 	defer rc.Close()
 
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
 	eng := envs.Language("eng")
 	basic := map[envs.Language]*events.BroadcastTranslation{
-		eng: &events.BroadcastTranslation{
+		eng: {
 			Text:         "hello world",
 			Attachments:  nil,
 			QuickReplies: nil,
@@ -83,7 +83,7 @@ func TestBroadcastEvents(t *testing.T) {
 	for i, tc := range tcs {
 		// handle our start task
 		event := events.NewBroadcastCreated(tc.Translations, tc.BaseLanguage, tc.Groups, tc.Contacts, tc.URNs)
-		bcast, err := models.NewBroadcastFromEvent(ctx, db, org, event)
+		bcast, err := models.NewBroadcastFromEvent(ctx, db, oa, event)
 		assert.NoError(t, err)
 
 		err = CreateBroadcastBatches(ctx, db, rp, bcast)
@@ -130,7 +130,7 @@ func TestBroadcastTask(t *testing.T) {
 	rc := testsuite.RC()
 	defer rc.Close()
 
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 	eng := envs.Language("eng")
 
@@ -142,7 +142,7 @@ func TestBroadcastTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{
-		eng: &models.BroadcastTranslation{
+		eng: {
 			Text:         "hello world",
 			Attachments:  nil,
 			QuickReplies: nil,
@@ -150,7 +150,7 @@ func TestBroadcastTask(t *testing.T) {
 	}
 
 	legacy := map[envs.Language]*models.BroadcastTranslation{
-		eng: &models.BroadcastTranslation{
+		eng: {
 			Text:         "hi @(PROPER(contact.name)) legacy URN: @contact.tel_e164 Gender: @contact.gender",
 			Attachments:  nil,
 			QuickReplies: nil,
@@ -158,7 +158,7 @@ func TestBroadcastTask(t *testing.T) {
 	}
 
 	template := map[envs.Language]*models.BroadcastTranslation{
-		eng: &models.BroadcastTranslation{
+		eng: {
 			Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
 			Attachments:  nil,
 			QuickReplies: nil,
@@ -196,7 +196,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(org.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs)
 		err = CreateBroadcastBatches(ctx, db, rp, bcast)
 		assert.NoError(t, err)
 

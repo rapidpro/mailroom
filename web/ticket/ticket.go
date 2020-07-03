@@ -46,8 +46,8 @@ func handleClose(ctx context.Context, s *web.Server, r *http.Request, l *models.
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -57,7 +57,7 @@ func handleClose(ctx context.Context, s *web.Server, r *http.Request, l *models.
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	err = models.CloseTickets(ctx, s.DB, org, tickets, true, l)
+	err = models.CloseTickets(ctx, s.DB, oa, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error closing tickets for org: %d", request.OrgID)
 	}
@@ -78,8 +78,8 @@ func handleReopen(ctx context.Context, s *web.Server, r *http.Request, l *models
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -89,7 +89,7 @@ func handleReopen(ctx context.Context, s *web.Server, r *http.Request, l *models
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	err = models.ReopenTickets(ctx, s.DB, org, tickets, true, l)
+	err = models.ReopenTickets(ctx, s.DB, oa, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
 	}

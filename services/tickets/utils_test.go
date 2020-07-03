@@ -19,22 +19,22 @@ func TestGetContactDisplay(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	require.NoError(t, err)
 
-	contact, err := models.LoadContact(ctx, db, org, models.CathyID)
+	contact, err := models.LoadContact(ctx, db, oa, models.CathyID)
 	require.NoError(t, err)
 
-	flowContact, err := contact.FlowContact(org)
+	flowContact, err := contact.FlowContact(oa)
 	require.NoError(t, err)
 
 	// name if they have one
-	assert.Equal(t, "Cathy", tickets.GetContactDisplay(org.Env(), flowContact))
+	assert.Equal(t, "Cathy", tickets.GetContactDisplay(oa.Env(), flowContact))
 
 	flowContact.SetName("")
 
 	// or primary URN
-	assert.Equal(t, "(605) 574-1111", tickets.GetContactDisplay(org.Env(), flowContact))
+	assert.Equal(t, "(605) 574-1111", tickets.GetContactDisplay(oa.Env(), flowContact))
 
 	// but not if org is anon
 	anonEnv := envs.NewBuilder().WithRedactionPolicy(envs.RedactionPolicyURNs).Build()

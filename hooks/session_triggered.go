@@ -28,7 +28,7 @@ type InsertStartHook struct{}
 var insertStartHook = &InsertStartHook{}
 
 // Apply queues up our flow starts
-func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -46,7 +46,7 @@ func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 				priority = queue.HighPriority
 			}
 
-			err := queue.AddTask(rc, taskQ, queue.StartFlow, int(org.OrgID()), start, priority)
+			err := queue.AddTask(rc, taskQ, queue.StartFlow, int(oa.OrgID()), start, priority)
 			if err != nil {
 				return errors.Wrapf(err, "error queuing flow start")
 			}
@@ -57,7 +57,7 @@ func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 }
 
 // Apply inserts our starts
-func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -69,7 +69,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			event := e.(*events.SessionTriggeredEvent)
 
 			// look up our flow
-			f, err := org.Flow(event.Flow.UUID)
+			f, err := oa.Flow(event.Flow.UUID)
 			if err != nil {
 				return errors.Wrapf(err, "unable to load flow with UUID: %s", event.Flow.UUID)
 			}
@@ -78,20 +78,20 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			// load our groups by uuid
 			groupIDs := make([]models.GroupID, 0, len(event.Groups))
 			for i := range event.Groups {
-				group := org.GroupByUUID(event.Groups[i].UUID)
+				group := oa.GroupByUUID(event.Groups[i].UUID)
 				if group != nil {
 					groupIDs = append(groupIDs, group.ID())
 				}
 			}
 
 			// load our contacts by uuid
-			contactIDs, err := models.ContactIDsFromReferences(ctx, tx, org, event.Contacts)
+			contactIDs, err := models.ContactIDsFromReferences(ctx, tx, oa, event.Contacts)
 			if err != nil {
 				return errors.Wrapf(err, "error loading contacts by reference")
 			}
 
 			// create our start
-			start := models.NewFlowStart(org.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID(), models.DoRestartParticipants, models.DoIncludeActive).
+			start := models.NewFlowStart(oa.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID(), models.DoRestartParticipants, models.DoIncludeActive).
 				WithGroupIDs(groupIDs).
 				WithContactIDs(contactIDs).
 				WithURNs(event.URNs).
@@ -116,7 +116,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 }
 
 // handleSessionTriggered queues this event for being started after our scene are committed
-func handleSessionTriggered(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleSessionTriggered(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.SessionTriggeredEvent)
 
 	logrus.WithFields(logrus.Fields{

@@ -175,10 +175,10 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
-	org, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
+	oa, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
 	assert.NoError(t, err)
 
-	org, err = org.Clone(ctx, db)
+	oa, err = oa.Clone(ctx, db)
 	assert.NoError(t, err)
 
 	// reuse id from one of our real flows
@@ -194,11 +194,11 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 		assert.NoError(t, err)
 
 		// add it to our org
-		flow := org.SetFlow(flowID, flowUUID, testFlow.Name(), flowDef)
+		flow := oa.SetFlow(flowID, flowUUID, testFlow.Name(), flowDef)
 		assert.NoError(t, err)
 
 		options := runner.NewStartOptions()
-		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, session []*models.Session) error {
+		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, session []*models.Session) error {
 			for _, s := range session {
 				msg := tc.Msgs[s.ContactID()]
 				if msg != nil {
@@ -210,12 +210,12 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 		options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
 			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewManual(org.Env(), flow.FlowReference(), contact, false, nil), nil
+				return triggers.NewManual(oa.Env(), flow.FlowReference(), contact, false, nil), nil
 			}
-			return triggers.NewMsg(org.Env(), flow.FlowReference(), contact, msg, nil), nil
+			return triggers.NewMsg(oa.Env(), flow.FlowReference(), contact, msg, nil), nil
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, org, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
+		_, err = runner.StartFlow(ctx, db, rp, oa, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
 		assert.NoError(t, err)
 
 		results := make(map[models.ContactID]modifyResult)
@@ -224,11 +224,11 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 		scenes := make([]*models.Scene, 0, len(tc.Modifiers))
 		for contactID, mods := range tc.Modifiers {
 
-			contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{contactID})
+			contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{contactID})
 			assert.NoError(t, err)
 
 			contact := contacts[0]
-			flowContact, err := contact.FlowContact(org)
+			flowContact, err := contact.FlowContact(oa)
 			assert.NoError(t, err)
 
 			result := modifyResult{
@@ -240,7 +240,7 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 
 			// apply our modifiers
 			for _, mod := range mods {
-				mod.Apply(org.Env(), org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+				mod.Apply(oa.Env(), oa.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
 			}
 
 			results[contact.ID()] = result
@@ -252,11 +252,11 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 		assert.NoError(t, err)
 
 		for _, scene := range scenes {
-			err := models.HandleEvents(ctx, tx, rp, org, scene, results[scene.ContactID()].Events)
+			err := models.HandleEvents(ctx, tx, rp, oa, scene, results[scene.ContactID()].Events)
 			assert.NoError(t, err)
 		}
 
-		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, org, scenes)
+		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -265,7 +265,7 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 		tx, err = db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, org, scenes)
+		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()

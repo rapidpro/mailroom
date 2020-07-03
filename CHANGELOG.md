@@ -1,3 +1,7 @@
+v5.5.37
+----------
+ * Fix reading of modifiers so always ignore modifier that becomes noop
+
 v5.5.36
 ----------
  * Sead country from templates

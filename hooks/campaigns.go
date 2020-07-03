@@ -18,7 +18,7 @@ type UpdateCampaignEventsHook struct{}
 var updateCampaignEventsHook = &UpdateCampaignEventsHook{}
 
 // Apply will update all the campaigns for the passed in scene, minimizing the number of queries to do so
-func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// these are all the events we need to delete unfired fires for
 	deletes := make([]*models.FireDelete, 0, 5)
 
@@ -42,7 +42,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 				delete(groupAdds, event.GroupID)
 
 			case *events.ContactFieldChangedEvent:
-				field := org.FieldByKey(event.Field.Key)
+				field := oa.FieldByKey(event.Field.Key)
 				if field == nil {
 					logrus.WithFields(logrus.Fields{
 						"field_key":  event.Field.Key,
@@ -63,7 +63,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 		// for every group that was removed, we need to remove all event fires for them
 		for g := range groupRemoves {
-			for _, c := range org.CampaignByGroupID(g) {
+			for _, c := range oa.CampaignByGroupID(g) {
 				for _, e := range c.Events() {
 					// only delete events that we qualify for or that were changed
 					if e.QualifiesByField(s.Contact()) || fieldChanges[e.RelativeToID()] {
@@ -75,7 +75,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 		// for every field that was changed, we need to also remove event fires and recalculate
 		for f := range fieldChanges {
-			fieldEvents := org.CampaignEventsByFieldID(f)
+			fieldEvents := oa.CampaignEventsByFieldID(f)
 			for _, e := range fieldEvents {
 				// only recalculate the events if this contact qualifies for this event or this group was removed
 				if e.QualifiesByGroup(s.Contact()) || groupRemoves[e.Campaign().GroupID()] {
@@ -95,7 +95,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 
 		// add in all the events we qualify for in campaigns we are now part of
 		for g := range groupAdds {
-			for _, c := range org.CampaignByGroupID(g) {
+			for _, c := range oa.CampaignByGroupID(g) {
 				for _, e := range c.Events() {
 					addEvents[e] = true
 				}
@@ -103,7 +103,7 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 		}
 
 		// ok, for all the unique events we now calculate our fire date
-		tz := org.Env().Timezone()
+		tz := oa.Env().Timezone()
 		now := time.Now()
 		for ce := range addEvents {
 			scheduled, err := ce.ScheduleForContact(tz, now, s.Contact())

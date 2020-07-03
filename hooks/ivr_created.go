@@ -53,7 +53,7 @@ func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 }
 
 // handleIVRCreated creates the db msg for the passed in event
-func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.IVRCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
@@ -72,7 +72,7 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 		return nil
 	}
 
-	msg, err := models.NewOutgoingIVR(org.OrgID(), conn, event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingIVR(oa.OrgID(), conn, event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing ivr say: %s", event.Msg.Text())
 	}

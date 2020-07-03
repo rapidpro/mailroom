@@ -54,14 +54,14 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 		return writeClientError(w, err)
 	}
 
-	// load our org
-	org, err := models.GetOrgAssets(ctx, s.DB, orgID)
+	// load our org assets
+	oa, err := models.GetOrgAssets(ctx, s.DB, orgID)
 	if err != nil {
 		return writeClientError(w, errors.Wrapf(err, "error loading org assets"))
 	}
 
 	// and our channel
-	channel := org.ChannelByUUID(channelUUID)
+	channel := oa.ChannelByUUID(channelUUID)
 	if channel == nil {
 		return writeClientError(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
 	}
@@ -114,12 +114,12 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	}
 
 	// get the contact for this URN
-	contact, _, err := models.GetOrCreateContact(ctx, s.DB, org, urn)
+	contact, _, err := models.GetOrCreateContact(ctx, s.DB, oa, urn)
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to get contact by urn"))
 	}
 
-	urn, err = models.URNForURN(ctx, s.DB, org, urn)
+	urn, err = models.URNForURN(ctx, s.DB, oa, urn)
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load urn"))
 	}
@@ -131,7 +131,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	}
 
 	// we first create an incoming call channel event and see if that matches
-	event := models.NewChannelEvent(models.MOCallEventType, org.OrgID(), channel.ID(), contact.ID(), urnID, nil, false)
+	event := models.NewChannelEvent(models.MOCallEventType, oa.OrgID(), channel.ID(), contact.ID(), urnID, nil, false)
 
 	externalID, err := client.CallIDForRequest(r)
 	if err != nil {
@@ -140,7 +140,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 
 	// create our connection
 	conn, err = models.InsertIVRConnection(
-		ctx, s.DB, org.OrgID(), channel.ID(), models.NilStartID, contact.ID(), urnID,
+		ctx, s.DB, oa.OrgID(), channel.ID(), models.NilStartID, contact.ID(), urnID,
 		models.ConnectionDirectionIn, models.ConnectionStatusInProgress, externalID,
 	)
 	if err != nil {
@@ -170,7 +170,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 
 	// no session means no trigger, create a missed call event instead
 	// we first create an incoming call channel event and see if that matches
-	event = models.NewChannelEvent(models.MOMissEventType, org.OrgID(), channel.ID(), contact.ID(), urnID, nil, false)
+	event = models.NewChannelEvent(models.MOMissEventType, oa.OrgID(), channel.ID(), contact.ID(), urnID, nil, false)
 	err = event.Insert(ctx, s.DB)
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "error inserting channel event"))
@@ -255,14 +255,14 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 		return errors.Wrapf(err, "unable to load channel connection with id: %d", request.ConnectionID)
 	}
 
-	// load our org
-	org, err := models.GetOrgAssets(ctx, s.DB, conn.OrgID())
+	// load our org assets
+	oa, err := models.GetOrgAssets(ctx, s.DB, conn.OrgID())
 	if err != nil {
 		return writeClientError(w, errors.Wrapf(err, "error loading org assets"))
 	}
 
 	// and our channel
-	channel := org.ChannelByID(conn.ChannelID())
+	channel := oa.ChannelByID(conn.ChannelID())
 	if channel == nil {
 		return writeClientError(w, errors.Errorf("no active channel with id: %d", conn.ChannelID()))
 	}
@@ -307,7 +307,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, s.DB, org, []models.ContactID{conn.ContactID()})
+	contacts, err := models.LoadContacts(ctx, s.DB, oa, []models.ContactID{conn.ContactID()})
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "no such contact"))
 	}
@@ -319,7 +319,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 	}
 
 	// load the URN for this connection
-	urn, err := models.URNForID(ctx, s.DB, org, conn.ContactURNID())
+	urn, err := models.URNForID(ctx, s.DB, oa, conn.ContactURNID())
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Errorf("unable to find connection urn: %d", conn.ContactURNID()))
 	}
@@ -342,20 +342,20 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 	case actionStart:
 		err = ivr.StartIVRFlow(
 			ctx, s.DB, s.RP, client, resumeURL,
-			org, channel, conn, contacts[0], urn, conn.StartID(),
+			oa, channel, conn, contacts[0], urn, conn.StartID(),
 			r, w,
 		)
 
 	case actionResume:
 		err = ivr.ResumeIVRFlow(
 			ctx, s.Config, s.DB, s.RP, s.S3Client, resumeURL, client,
-			org, channel, conn, contacts[0], urn,
+			oa, channel, conn, contacts[0], urn,
 			r, w,
 		)
 
 	case actionStatus:
 		err = ivr.HandleIVRStatus(
-			ctx, s.DB, s.RP, org, client, conn,
+			ctx, s.DB, s.RP, oa, client, conn,
 			r, w,
 		)
 
@@ -398,14 +398,14 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, rawW http
 		return writeClientError(w, err)
 	}
 
-	// load our org
-	org, err := models.GetOrgAssets(ctx, s.DB, orgID)
+	// load our org assets
+	oa, err := models.GetOrgAssets(ctx, s.DB, orgID)
 	if err != nil {
 		return writeClientError(w, errors.Wrapf(err, "error loading org assets"))
 	}
 
 	// and our channel
-	channel := org.ChannelByUUID(channelUUID)
+	channel := oa.ChannelByUUID(channelUUID)
 	if channel == nil {
 		return writeClientError(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
 	}
@@ -464,10 +464,7 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, rawW http
 		}
 	}()
 
-	err = ivr.HandleIVRStatus(
-		ctx, s.DB, s.RP, org, client, conn,
-		r, w,
-	)
+	err = ivr.HandleIVRStatus(ctx, s.DB, s.RP, oa, client, conn, r, w)
 
 	// had an error? mark our connection as errored and log it
 	if err != nil {

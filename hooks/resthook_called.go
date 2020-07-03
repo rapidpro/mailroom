@@ -22,7 +22,7 @@ type InsertWebhookEventHook struct{}
 var insertWebhookEventHook = &InsertWebhookEventHook{}
 
 // Apply inserts all the webook events that were created
-func (h *InsertWebhookEventHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *InsertWebhookEventHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	events := make([]*models.WebhookEvent, 0, len(scenes))
 	for _, rs := range scenes {
 		for _, r := range rs {
@@ -39,7 +39,7 @@ func (h *InsertWebhookEventHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 }
 
 // handleResthookCalled is called for each resthook call in a scene
-func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ResthookCalledEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
@@ -48,15 +48,15 @@ func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org 
 	}).Debug("resthook called")
 
 	// look up our resthook id
-	resthook := org.ResthookBySlug(event.Resthook)
+	resthook := oa.ResthookBySlug(event.Resthook)
 	if resthook == nil {
-		logrus.WithField("org_id", org.OrgID()).WithField("resthook", event.Resthook).Errorf("unable to find resthook with slug, ignoring event")
+		logrus.WithField("org_id", oa.OrgID()).WithField("resthook", event.Resthook).Errorf("unable to find resthook with slug, ignoring event")
 		return nil
 	}
 
 	// create an event for this call
 	re := models.NewWebhookEvent(
-		org.OrgID(),
+		oa.OrgID(),
 		resthook.ID(),
 		string(event.Payload),
 		event.CreatedOn(),

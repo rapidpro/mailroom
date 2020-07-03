@@ -24,7 +24,7 @@ type InsertTicketsHook struct{}
 var insertTicketsHook = &InsertTicketsHook{}
 
 // Apply inserts all the airtime transfers that were created
-func (h *InsertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *InsertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our tickets
 	tickets := make([]*models.Ticket, 0, len(scenes))
 
@@ -44,17 +44,17 @@ func (h *InsertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 }
 
 // handleTicketOpened is called for each ticket opened event
-func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.TicketOpenedEvent)
 
-	ticketer := org.TicketerByUUID(event.Ticket.Ticketer.UUID)
+	ticketer := oa.TicketerByUUID(event.Ticket.Ticketer.UUID)
 	if ticketer == nil {
 		return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticket.Ticketer.UUID)
 	}
 
 	ticket := models.NewTicket(
 		event.Ticket.UUID,
-		org.OrgID(),
+		oa.OrgID(),
 		scene.ContactID(),
 		ticketer.ID(),
 		event.Ticket.ExternalID,
@@ -62,7 +62,7 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *m
 		event.Ticket.Body,
 		map[string]interface{}{
 			"contact-uuid":    scene.Contact().UUID(),
-			"contact-display": tickets.GetContactDisplay(org.Env(), scene.Contact()),
+			"contact-display": tickets.GetContactDisplay(oa.Env(), scene.Contact()),
 		},
 	)
 

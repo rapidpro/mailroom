@@ -81,14 +81,14 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
+	// grab our org assets
+	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// Perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, org,
+	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, oa,
 		request.GroupUUID, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
@@ -173,14 +173,14 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
+	// grab our org assets
+	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	env := org.Env()
-	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
+	env := oa.Env()
+	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), oa.SessionAssets())
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
@@ -206,7 +206,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		allowAsGroup = metadata.AllowAsGroup
 	}
 
-	eq, err := models.BuildElasticQuery(org, request.GroupUUID, parsed)
+	eq, err := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -330,16 +330,10 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
+	// grab our org assets
 	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
-	}
-
-	// clone it as we will modify flows ???
-	oa, err = oa.Clone(s.CTX, s.DB)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
 	}
 
 	// read the modifiers from the request

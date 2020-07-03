@@ -23,7 +23,7 @@ type UnsubscribeResthookHook struct{}
 var unsubscribeResthookHook = &UnsubscribeResthookHook{}
 
 // Apply squashes and applies all our resthook unsubscriptions
-func (h *UnsubscribeResthookHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *UnsubscribeResthookHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
 	// gather all our unsubscribes
 	unsubs := make([]*models.ResthookUnsubscribe, 0, len(scene))
 	for _, us := range scene {
@@ -46,7 +46,7 @@ type InsertWebhookResultHook struct{}
 var insertWebhookResultHook = &InsertWebhookResultHook{}
 
 // Apply inserts all the webook results that were created
-func (h *InsertWebhookResultHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *InsertWebhookResultHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our results
 	results := make([]*models.WebhookResult, 0, len(scenes))
 	for _, rs := range scenes {
@@ -64,7 +64,7 @@ func (h *InsertWebhookResultHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 }
 
 // handleWebhookCalled is called for each webhook call in a scene
-func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.WebhookCalledEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
@@ -78,7 +78,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 	// if this was a resthook and the status was 410, that means we should remove it
 	if event.Status == flows.CallStatusSubscriberGone {
 		unsub := &models.ResthookUnsubscribe{
-			OrgID: org.OrgID(),
+			OrgID: oa.OrgID(),
 			Slug:  event.Resthook,
 			URL:   event.URL,
 		}
@@ -94,7 +94,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 
 	// create a result for this call
 	result := models.NewWebhookResult(
-		org.OrgID(), scene.ContactID(),
+		oa.OrgID(), scene.ContactID(),
 		event.URL, event.Request,
 		event.StatusCode, response,
 		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),

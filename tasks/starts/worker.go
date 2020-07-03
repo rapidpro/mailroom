@@ -66,14 +66,14 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 		contactIDs[id] = true
 	}
 
-	org, err := models.GetOrgAssets(ctx, db, start.OrgID())
+	oa, err := models.GetOrgAssets(ctx, db, start.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org assets")
 	}
 
 	// look up any contacts by URN
 	if len(start.URNs()) > 0 {
-		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, org, start.URNs())
+		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, oa, start.URNs())
 		if err != nil {
 			return errors.Wrapf(err, "error getting contact ids from urns")
 		}
@@ -84,7 +84,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// if we are meant to create a new contact, do so
 	if start.CreateContact() {
-		contact, _, err := models.CreateContact(ctx, db, org, models.NilUserID, "", envs.NilLanguage, nil)
+		contact, _, err := models.CreateContact(ctx, db, oa, models.NilUserID, "", envs.NilLanguage, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
 		}
@@ -111,7 +111,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// finally, if we have a query, add the contacts that match that as well
 	if start.Query() != "" {
-		matches, err := models.ContactIDsForQuery(ctx, ec, org, start.Query())
+		matches, err := models.ContactIDsForQuery(ctx, ec, oa, start.Query())
 		if err != nil {
 			return errors.Wrapf(err, "error performing search for start: %d", start.ID())
 		}
