@@ -17,7 +17,7 @@ func init() {
 }
 
 // goflow now sends email so this just logs the event
-func handleEmailSent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleEmailSent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.EmailSentEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),

@@ -21,7 +21,7 @@ type CommitLanguageChangesHook struct{}
 var commitLanguageChangesHook = &CommitLanguageChangesHook{}
 
 // Apply applies our contact language change before our commit
-func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and language name
 	updates := make([]interface{}, 0, len(scenes))
 	for s, e := range scenes {
@@ -35,7 +35,7 @@ func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *
 }
 
 // handleContactLanguageChanged is called when we process a contact language change
-func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactLanguageChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),

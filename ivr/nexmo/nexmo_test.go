@@ -42,10 +42,10 @@ func TestResponseForSprint(t *testing.T) {
 	config.Mailroom.AttachmentDomain = "mailroom.io"
 	defer func() { config.Mailroom.AttachmentDomain = "" }()
 
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	channel := org.ChannelByUUID(models.NexmoChannelUUID)
+	channel := oa.ChannelByUUID(models.NexmoChannelUUID)
 	assert.NotNil(t, channel)
 
 	c, err := NewClientFromChannel(channel)

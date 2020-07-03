@@ -22,7 +22,7 @@ type CommitNameChangesHook struct{}
 var commitNameChangesHook = &CommitNameChangesHook{}
 
 // Apply commits our contact name changes as a bulk update for the passed in map of scene
-func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and contact name
 	updates := make([]interface{}, 0, len(scenes))
 	for s, e := range scenes {
@@ -36,7 +36,7 @@ func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 }
 
 // handleContactNameChanged changes the name of the contact
-func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactNameChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),

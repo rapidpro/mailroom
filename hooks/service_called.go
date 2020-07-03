@@ -24,7 +24,7 @@ type InsertHTTPLogsHook struct{}
 var insertHTTPLogsHook = &InsertHTTPLogsHook{}
 
 // Apply inserts all the classifier logs that were created
-func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our logs
 	logs := make([]*models.HTTPLog, 0, len(scenes))
 	for _, ls := range scenes {
@@ -42,18 +42,18 @@ func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 }
 
 // handleServiceCalled is called for each service called event
-func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ServiceCalledEvent)
 	var classifier *models.Classifier
 	var ticketer *models.Ticketer
 
 	if event.Service == "classifier" {
-		classifier = org.ClassifierByUUID(event.Classifier.UUID)
+		classifier = oa.ClassifierByUUID(event.Classifier.UUID)
 		if classifier == nil {
 			return errors.Errorf("unable to find classifier with UUID: %s", event.Classifier.UUID)
 		}
 	} else if event.Service == "ticketer" {
-		ticketer = org.TicketerByUUID(event.Ticketer.UUID)
+		ticketer = oa.TicketerByUUID(event.Ticketer.UUID)
 		if ticketer == nil {
 			return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticketer.UUID)
 		}
@@ -73,7 +73,7 @@ func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 
 		if event.Service == "classifier" {
 			log = models.NewClassifierCalledLog(
-				org.OrgID(),
+				oa.OrgID(),
 				classifier.ID(),
 				httpLog.URL,
 				httpLog.Request,
@@ -84,7 +84,7 @@ func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 			)
 		} else if event.Service == "ticketer" {
 			log = models.NewTicketerCalledLog(
-				org.OrgID(),
+				oa.OrgID(),
 				ticketer.ID(),
 				httpLog.URL,
 				httpLog.Request,

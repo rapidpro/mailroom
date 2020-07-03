@@ -78,16 +78,16 @@ type startRequest struct {
 }
 
 // handleSimulationEvents takes care of updating our db with any events needed during simulation
-func handleSimulationEvents(ctx context.Context, db models.Queryer, org *models.OrgAssets, es []flows.Event) error {
+func handleSimulationEvents(ctx context.Context, db models.Queryer, oa *models.OrgAssets, es []flows.Event) error {
 	// nicpottier: this could be refactored into something more similar to how we handle normal events (ie hooks) if
 	// we see ourselves taking actions for more than just webhook events
 	wes := make([]*models.WebhookEvent, 0)
 	for _, e := range es {
 		if e.Type() == events.TypeResthookCalled {
 			rec := e.(*events.ResthookCalledEvent)
-			resthook := org.ResthookBySlug(rec.Resthook)
+			resthook := oa.ResthookBySlug(rec.Resthook)
 			if resthook != nil {
-				we := models.NewWebhookEvent(org.OrgID(), resthook.ID(), string(rec.Payload), rec.CreatedOn())
+				we := models.NewWebhookEvent(oa.OrgID(), resthook.ID(), string(rec.Payload), rec.CreatedOn())
 				wes = append(wes, we)
 			}
 		}
@@ -104,13 +104,13 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
 	// clone it since we will be modifying it
-	org, err = org.Clone(s.CTX, s.DB)
+	oa, err = oa.Clone(s.CTX, s.DB)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to clone org")
 	}
@@ -118,7 +118,7 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 	// for each of our passed in definitions
 	for _, flow := range request.Flows {
 		// populate our flow in our org from our request
-		err = populateFlow(org, flow.UUID, flow.Definition)
+		err = populateFlow(oa, flow.UUID, flow.Definition)
 		if err != nil {
 			return nil, http.StatusBadRequest, err
 		}
@@ -126,27 +126,27 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 
 	// populate any test channels
 	for _, channel := range request.Assets.Channels {
-		org.AddTestChannel(channel)
+		oa.AddTestChannel(channel)
 	}
 
 	// read our trigger
-	trigger, err := triggers.ReadTrigger(org.SessionAssets(), request.Trigger, assets.IgnoreMissing)
+	trigger, err := triggers.ReadTrigger(oa.SessionAssets(), request.Trigger, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
 
-	return triggerFlow(ctx, s.DB, org, trigger)
+	return triggerFlow(ctx, s.DB, oa, trigger)
 }
 
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
-func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, trigger flows.Trigger) (interface{}, int, error) {
+func triggerFlow(ctx context.Context, db *sqlx.DB, oa *models.OrgAssets, trigger flows.Trigger) (interface{}, int, error) {
 	// start our flow session
-	session, sprint, err := goflow.Simulator().NewSession(org.SessionAssets(), trigger)
+	session, sprint, err := goflow.Simulator().NewSession(oa.SessionAssets(), trigger)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
 
-	err = handleSimulationEvents(ctx, db, org, sprint.Events())
+	err = handleSimulationEvents(ctx, db, oa, sprint.Events())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
@@ -180,14 +180,14 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusBadRequest, err
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// clone it as we will modify it
-	org, err = org.Clone(s.CTX, s.DB)
+	oa, err = oa.Clone(s.CTX, s.DB)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -195,7 +195,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// for each of our passed in definitions
 	for _, flow := range request.Flows {
 		// populate our flow in our org from our request
-		err = populateFlow(org, flow.UUID, flow.Definition)
+		err = populateFlow(oa, flow.UUID, flow.Definition)
 		if err != nil {
 			return nil, http.StatusBadRequest, err
 		}
@@ -203,16 +203,16 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// populate any test channels
 	for _, channel := range request.Assets.Channels {
-		org.AddTestChannel(channel)
+		oa.AddTestChannel(channel)
 	}
 
-	session, err := goflow.Simulator().ReadSession(org.SessionAssets(), request.Session, assets.IgnoreMissing)
+	session, err := goflow.Simulator().ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// read our resume
-	resume, err := resumes.ReadResume(org.SessionAssets(), request.Resume, assets.IgnoreMissing)
+	resume, err := resumes.ReadResume(oa.SessionAssets(), request.Resume, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -220,12 +220,12 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// if this is a msg resume we want to check whether it might be caught by a trigger
 	if resume.Type() == resumes.TypeMsg {
 		msgResume := resume.(*resumes.MsgResume)
-		trigger := models.FindMatchingMsgTrigger(org, msgResume.Contact(), msgResume.Msg().Text())
+		trigger := models.FindMatchingMsgTrigger(oa, msgResume.Contact(), msgResume.Msg().Text())
 		if trigger != nil {
 			var flow *models.Flow
 			for _, r := range session.Runs() {
 				if r.Status() == flows.RunStatusWaiting {
-					f, _ := org.Flow(r.FlowReference().UUID)
+					f, _ := oa.Flow(r.FlowReference().UUID)
 					if f != nil {
 						flow = f.(*models.Flow)
 					}
@@ -235,14 +235,14 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 			// we don't have a current flow or the current flow doesn't ignore triggers
 			if flow == nil || (!flow.IgnoreTriggers() && trigger.TriggerType() == models.KeywordTriggerType) {
-				triggeredFlow, err := org.FlowByID(trigger.FlowID())
+				triggeredFlow, err := oa.FlowByID(trigger.FlowID())
 				if err != nil && err != models.ErrNotFound {
 					return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load triggered flow")
 				}
 
 				if triggeredFlow != nil {
-					trigger := triggers.NewMsg(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
-					return triggerFlow(ctx, s.DB, org, trigger)
+					trigger := triggers.NewMsg(oa.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
+					return triggerFlow(ctx, s.DB, oa, trigger)
 				}
 			}
 		}
@@ -259,7 +259,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, err
 	}
 
-	err = handleSimulationEvents(ctx, s.DB, org, sprint.Events())
+	err = handleSimulationEvents(ctx, s.DB, oa, sprint.Events())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
@@ -268,13 +268,13 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 }
 
 // populateFlow takes care of setting the definition for the flow with the passed in UUID according to the passed in definitions
-func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawMessage) error {
-	f, err := org.Flow(uuid)
+func populateFlow(oa *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawMessage) error {
+	f, err := oa.Flow(uuid)
 	if err != nil {
 		return errors.Wrapf(err, "unable to find flow with uuid: %s", uuid)
 	}
 	flow := f.(*models.Flow)
 
-	org.SetFlow(flow.ID(), flow.UUID(), flow.Name(), flowDef)
+	oa.SetFlow(flow.ID(), flow.UUID(), flow.Name(), flowDef)
 	return nil
 }

@@ -110,20 +110,20 @@ func handleImport(ctx context.Context, s *web.Server, r *http.Request) (interfac
 }
 
 func loadFlows(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flowIDs []models.FlowID) ([]flows.Flow, error) {
-	// grab our org
-	org, err := models.GetOrgAssets(ctx, db, orgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(ctx, db, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	flows := make([]flows.Flow, len(flowIDs))
 	for i, flowID := range flowIDs {
-		dbFlow, err := org.FlowByID(flowID)
+		dbFlow, err := oa.FlowByID(flowID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to load flow with ID %d", flowID)
 		}
 
-		flow, err := org.SessionAssets().Flows().Get(dbFlow.UUID())
+		flow, err := oa.SessionAssets().Flows().Get(dbFlow.UUID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to read flow with UUID %s", string(dbFlow.UUID()))
 		}

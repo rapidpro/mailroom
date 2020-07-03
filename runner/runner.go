@@ -317,7 +317,7 @@ func FireCampaignEvents(
 	// this is our pre commit callback for our sessions, we'll mark the event fires associated
 	// with the passed in sessions as complete in the same transaction
 	fired := time.Now()
-	options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+	options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
 		// build up our list of event fire ids based on the session contact ids
 		fires := make([]*models.EventFire, 0, len(sessions))
 		for _, s := range sessions {

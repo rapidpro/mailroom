@@ -30,7 +30,7 @@ type SendMessagesHook struct{}
 var sendMessagesHook = &SendMessagesHook{}
 
 // Apply sends all non-android messages to courier
-func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -172,7 +172,7 @@ func (h *CommitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 }
 
 // handleMsgCreated creates the db msg for the passed in event
-func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
 
 	// must be in a session
@@ -197,7 +197,7 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 	if scene.Session().SessionType() == models.MessagingFlow {
 		urn := event.Msg.URN()
 		if models.GetURNInt(urn, "id") == 0 {
-			urn, err := models.GetOrCreateURN(ctx, tx, org, scene.ContactID(), event.Msg.URN())
+			urn, err := models.GetOrCreateURN(ctx, tx, oa, scene.ContactID(), event.Msg.URN())
 			if err != nil {
 				return errors.Wrapf(err, "unable to get or create URN: %s", event.Msg.URN())
 			}
@@ -209,13 +209,13 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 	// get our channel
 	var channel *models.Channel
 	if event.Msg.Channel() != nil {
-		channel = org.ChannelByUUID(event.Msg.Channel().UUID)
+		channel = oa.ChannelByUUID(event.Msg.Channel().UUID)
 		if channel == nil {
 			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
 		}
 	}
 
-	msg, err := models.NewOutgoingMsg(org.OrgID(), channel, scene.ContactID(), event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingMsg(oa.OrgID(), channel, scene.ContactID(), event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
@@ -235,7 +235,7 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 }
 
 // handlePreMsgCreated clears our timeout on our session so that courier can send it when the message is sent, that will be set by courier when sent
-func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.MsgCreatedEvent)
 
 	// we only clear timeouts on messaging flows
@@ -247,7 +247,7 @@ func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *
 	var channel *models.Channel
 
 	if event.Msg.Channel() != nil {
-		channel = org.ChannelByUUID(event.Msg.Channel().UUID)
+		channel = oa.ChannelByUUID(event.Msg.Channel().UUID)
 		if channel == nil {
 			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
 		}
