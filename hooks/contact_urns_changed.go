@@ -22,14 +22,14 @@ type CommitURNChangesHook struct{}
 var commitURNChangesHook = &CommitURNChangesHook{}
 
 // Apply adds all our URNS in a batch
-func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our urn changes, we only care about the last change for each scene
 	changes := make([]*models.ContactURNsChanged, 0, len(scenes))
 	for _, sessionChanges := range scenes {
 		changes = append(changes, sessionChanges[len(sessionChanges)-1].(*models.ContactURNsChanged))
 	}
 
-	err := models.UpdateContactURNs(ctx, tx, org, changes)
+	err := models.UpdateContactURNs(ctx, tx, oa, changes)
 	if err != nil {
 		return errors.Wrapf(err, "error updating contact urns")
 	}
@@ -38,7 +38,7 @@ func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis
 }
 
 // handleContactURNsChanged is called for each contact urn changed event that is encountered
-func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactURNsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
@@ -49,7 +49,7 @@ func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	// create our URN changed event
 	change := &models.ContactURNsChanged{
 		ContactID: scene.ContactID(),
-		OrgID:     org.OrgID(),
+		OrgID:     oa.OrgID(),
 		URNs:      event.URNs,
 	}
 

@@ -22,7 +22,7 @@ type CommitGroupChangesHook struct{}
 var commitGroupChangesHook = &CommitGroupChangesHook{}
 
 // Apply squashes and adds or removes all our contact groups
-func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of all adds and removes
 	adds := make([]*models.GroupAdd, 0, len(scenes))
 	removes := make([]*models.GroupRemove, 0, len(scenes))
@@ -71,7 +71,7 @@ func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 }
 
 // handleContactGroupsChanged is called when a group is added or removed from our contact
-func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactGroupsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":   scene.ContactUUID(),
@@ -83,7 +83,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	// remove each of our groups
 	for _, g := range event.GroupsRemoved {
 		// look up our group id
-		group := org.GroupByUUID(g.UUID)
+		group := oa.GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
 				"contact_uuid": scene.ContactUUID(),
@@ -106,7 +106,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	// add each of our groups
 	for _, g := range event.GroupsAdded {
 		// look up our group id
-		group := org.GroupByUUID(g.UUID)
+		group := oa.GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
 				"contact_uuid": scene.ContactUUID(),

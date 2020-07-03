@@ -75,13 +75,13 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 	}
 
 	// load our org assets
-	org, err := models.GetOrgAssets(ctx, db, batch.OrgID())
+	oa, err := models.GetOrgAssets(ctx, db, batch.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org assets for org: %d", batch.OrgID())
 	}
 
 	// ok, we can initiate calls for the remaining contacts
-	contacts, err := models.LoadContacts(ctx, db, org, contactIDs)
+	contacts, err := models.LoadContacts(ctx, db, oa, contactIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error loading contacts")
 	}
@@ -91,7 +91,7 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 		start := time.Now()
 
 		ctx, cancel := context.WithTimeout(bg, time.Minute)
-		session, err := ivr.RequestCallStart(ctx, config, db, org, batch, contact)
+		session, err := ivr.RequestCallStart(ctx, config, db, oa, batch, contact)
 		cancel()
 		if err != nil {
 			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID())

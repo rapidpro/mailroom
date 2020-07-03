@@ -58,12 +58,12 @@ func handlePopulateDynamicGroup(ctx context.Context, mr *mailroom.Mailroom, task
 
 	log.Info("starting population of dynamic group")
 
-	org, err := models.GetOrgAssets(ctx, mr.DB, t.OrgID)
+	oa, err := models.GetOrgAssets(ctx, mr.DB, t.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org when populating group: %d", t.GroupID)
 	}
 
-	count, err := models.PopulateDynamicGroup(ctx, mr.DB, mr.ElasticClient, org, t.GroupID, t.Query)
+	count, err := models.PopulateDynamicGroup(ctx, mr.DB, mr.ElasticClient, oa, t.GroupID, t.Query)
 	if err != nil {
 		return errors.Wrapf(err, "error populating dynamic group: %d", t.GroupID)
 	}

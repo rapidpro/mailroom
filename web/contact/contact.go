@@ -78,14 +78,14 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
+	// grab our org assets
+	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// Perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, org,
+	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, oa,
 		request.GroupUUID, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
@@ -170,14 +170,14 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
+	// grab our org assets
+	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	env := org.Env()
-	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
+	env := oa.Env()
+	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), oa.SessionAssets())
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
@@ -203,7 +203,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		allowAsGroup = metadata.AllowAsGroup
 	}
 
-	eq, err := models.BuildElasticQuery(org, request.GroupUUID, parsed)
+	eq, err := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -275,26 +275,26 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// clone it as we will modify flows
-	org, err = org.Clone(s.CTX, s.DB)
+	oa, err = oa.Clone(s.CTX, s.DB)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
 	}
 
 	// read the modifiers from the request
-	mods, err := goflow.ReadModifiers(org.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
+	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// load our contacts
-	contacts, err := models.LoadContacts(ctx, s.DB, org, request.ContactIDs)
+	contacts, err := models.LoadContacts(ctx, s.DB, oa, request.ContactIDs)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load contact")
 	}
@@ -302,12 +302,12 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	results := make(map[models.ContactID]modifyResult)
 
 	// create an environment instance with location support
-	env := flows.NewEnvironment(org.Env(), org.SessionAssets().Locations())
+	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
 	// create scenes for our contacts
 	scenes := make([]*models.Scene, 0, len(contacts))
 	for _, contact := range contacts {
-		flowContact, err := contact.FlowContact(org)
+		flowContact, err := contact.FlowContact(oa)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
@@ -321,7 +321,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 		// apply our modifiers
 		for _, mod := range mods {
-			mod.Apply(env, org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+			mod.Apply(env, oa.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
 		}
 
 		results[contact.ID()] = result
@@ -336,14 +336,14 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// apply our events
 	for _, scene := range scenes {
-		err := models.HandleEvents(ctx, tx, s.RP, org, scene, results[scene.ContactID()].Events)
+		err := models.HandleEvents(ctx, tx, s.RP, oa, scene, results[scene.ContactID()].Events)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying events")
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = models.ApplyEventPreCommitHooks(ctx, tx, s.RP, org, scenes)
+	err = models.ApplyEventPreCommitHooks(ctx, tx, s.RP, oa, scenes)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
 	}
@@ -360,7 +360,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// then apply our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, org, scenes)
+	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, oa, scenes)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
 	}

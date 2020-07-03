@@ -183,21 +183,21 @@ func TestContactRuns(t *testing.T) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	flow, err := org.FlowByID(models.FavoritesFlowID)
+	flow, err := oa.FlowByID(models.FavoritesFlowID)
 	assert.NoError(t, err)
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{models.CathyID})
+	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{models.CathyID})
 	assert.NoError(t, err)
 
-	contact, err := contacts[0].FlowContact(org)
+	contact, err := contacts[0].FlowContact(oa)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManual(org.Env(), flow.FlowReference(), contact, false, nil)
-	sessions, err := StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, nil, true)
+	trigger := triggers.NewManual(oa.Env(), flow.FlowReference(), contact, false, nil)
+	sessions, err := StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
@@ -236,9 +236,9 @@ func TestContactRuns(t *testing.T) {
 		// answer our first question
 		msg := flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, tc.Message, nil)
 		msg.SetID(10)
-		resume := resumes.NewMsg(org.Env(), contact, msg)
+		resume := resumes.NewMsg(oa.Env(), contact, msg)
 
-		session, err = ResumeFlow(ctx, db, rp, org, session, resume, nil)
+		session, err = ResumeFlow(ctx, db, rp, oa, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 
