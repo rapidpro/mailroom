@@ -53,6 +53,22 @@ func TestCreateTarget(t *testing.T) {
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 180\r\n\r\n", string(trace.ResponseTrace))
 }
 
+func TestDeleteTarget(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://nyaruka.zendesk.com/api/v2/targets/123.json": {
+			httpx.NewMockResponse(200, nil, ``),
+		},
+	}))
+
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
+
+	trace, err := client.DeleteTarget(123)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "DELETE /api/v2/targets/123.json HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nAuthorization: Bearer 123456789\r\nAccept-Encoding: gzip\r\n\r\n", string(trace.RequestTrace))
+}
+
 func TestCreateTrigger(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
@@ -109,6 +125,22 @@ func TestCreateTrigger(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1234567), trigger.ID)
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 317\r\n\r\n", string(trace.ResponseTrace))
+}
+
+func TestDeleteTrigger(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://nyaruka.zendesk.com/api/v2/triggers/123.json": {
+			httpx.NewMockResponse(200, nil, ``),
+		},
+	}))
+
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
+
+	trace, err := client.DeleteTrigger(123)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "DELETE /api/v2/triggers/123.json HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nAuthorization: Bearer 123456789\r\nAccept-Encoding: gzip\r\n\r\n", string(trace.RequestTrace))
 }
 
 func TestUpdateManyTickets(t *testing.T) {

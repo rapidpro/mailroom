@@ -11,10 +11,10 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/test"
-	"github.com/sirupsen/logrus"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
