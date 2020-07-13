@@ -333,8 +333,8 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		if out.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(out.Topic())
 		}
-		m.Metadata = null.NewMap(metadata)
 	}
+	m.Metadata = null.NewMap(metadata)
 
 	// calculate msg count
 	if m.URN.Scheme() == urns.TelScheme {
