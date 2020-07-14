@@ -207,12 +207,12 @@ func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
 			}
 			return nil
 		}
-		options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
+		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewManual(oa.Env(), flow.FlowReference(), contact, false, nil), nil
+				return triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
 			}
-			return triggers.NewMsg(oa.Env(), flow.FlowReference(), contact, msg, nil), nil
+			return triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msg).Build()
 		}
 
 		_, err = runner.StartFlow(ctx, db, rp, oa, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)

@@ -241,7 +241,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 				}
 
 				if triggeredFlow != nil {
-					trigger := triggers.NewMsg(oa.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match())
+					trigger := triggers.NewBuilder(oa.Env(), triggeredFlow.FlowReference(), resume.Contact()).Msg(msgResume.Msg()).WithMatch(trigger.Match()).Build()
 					return triggerFlow(ctx, s.DB, oa, trigger)
 				}
 			}
