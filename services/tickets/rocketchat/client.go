@@ -144,7 +144,7 @@ type VisitorMsgResult struct {
 	ID string `json:"id"`
 }
 
-func (c *Client) SendVisitorMessage(msg *VisitorMsg) (*VisitorMsgResult, *httpx.Trace, error) {
+func (c *Client) SendMessage(msg *VisitorMsg) (*VisitorMsgResult, *httpx.Trace, error) {
 	response := &VisitorMsgResult{}
 
 	trace, err := c.post("visitor-message", msg, response)
