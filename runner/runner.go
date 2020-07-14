@@ -24,6 +24,12 @@ const (
 	postCommitTimeout = time.Minute
 )
 
+var startTypeToOrigin = map[models.StartType]string{
+	models.StartTypeManual:    "ui",
+	models.StartTypeAPI:       "api",
+	models.StartTypeAPIZapier: "zapier",
+}
+
 // NewStartOptions creates and returns the default start options to be used for flow starts
 func NewStartOptions() *StartOptions {
 	start := &StartOptions{
@@ -194,7 +200,7 @@ func StartFlowBatch(
 		if batchStart {
 			tb = tb.AsBatch()
 		}
-		return tb.Build()
+		return tb.WithUser(batch.CreatedBy()).WithOrigin(startTypeToOrigin[batch.StartType()]).Build()
 	}
 
 	// before committing our runs we want to set the start they are associated with
