@@ -15,6 +15,7 @@ const (
 	typeRocketChat = "rocketchat"
 
 	configDomain = "domain"
+	configAppID  = "appID"
 	configSecret = "secret"
 )
 
@@ -30,16 +31,17 @@ type service struct {
 
 func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	domain := config[configDomain]
+	appID  := config[configAppID]
 	secret := config[configSecret]
 
 	if domain != "" && secret != "" {
 		return &service{
-			client:   NewClient(httpClient, httpRetries, domain, secret),
+			client:   NewClient(httpClient, httpRetries, domain, appID, secret),
 			ticketer: ticketer,
 			redactor: utils.NewRedactor(flows.RedactionMask, secret),
 		}, nil
 	}
-	return nil, errors.New("missing domain or secret config")
+	return nil, errors.New("missing domain or app ID or secret config")
 }
 
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
@@ -104,5 +106,5 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 }
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	return errors.New("RocketChat ticketer doesn't support reopening")
+	return errors.New("RocketChat ticket type doesn't support reopening")
 }

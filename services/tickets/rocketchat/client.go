@@ -10,22 +10,22 @@ import (
 	"net/http"
 )
 
-const RCAppID = "29542a4b-5a89-4f27-872b-5f8091899f7b"
-
 // Client is a basic RocketChat app client
 type Client struct {
 	httpClient  *http.Client
 	httpRetries *httpx.RetryConfig
 	domain      string
+	appID       string
 	secret      string
 }
 
 // NewClient creates a new RocketChat app client
-func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, domain, secret string) *Client {
+func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, domain, appID, secret string) *Client {
 	return &Client{
 		httpClient:  httpClient,
 		httpRetries: httpRetries,
 		domain:      domain,
+		appID:       appID,
 		secret:      secret,
 	}
 }
@@ -36,7 +36,7 @@ type errorResponse struct {
 }
 
 func (c *Client) request(method, endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
-	url := fmt.Sprintf("https://%s/api/apps/public/%s/%s", c.domain, RCAppID, endpoint)
+	url := fmt.Sprintf("https://%s/api/apps/public/%s/%s", c.domain, c.appID, endpoint)
 	headers := map[string]string{
 		"Authorization": fmt.Sprintf("Token %s", c.secret),
 		"Content-Type":  "application/json",
