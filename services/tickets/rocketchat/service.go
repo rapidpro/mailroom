@@ -70,7 +70,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		Email: email,
 		Phone: phone,
 	}
-	room, trace, err := s.client.CreateRoom(visitor)
+	room, trace, err := s.client.CreateRoom(visitor, body)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}

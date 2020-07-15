@@ -21,7 +21,7 @@ func init() {
 }
 
 type eventCallbackRequest struct {
-	Type string `json:"type" validate:"required"`
+	Type    string `json:"type" validate:"required"`
 	Visitor struct {
 		Token string `json:"token" validate:"required"`
 	} `json:"visitor" validate:"required"`

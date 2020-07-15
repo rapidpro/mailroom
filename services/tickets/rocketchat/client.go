@@ -88,6 +88,7 @@ type VisitorToken string
 
 type Visitor struct {
 	Token        VisitorToken      `json:"token"`
+	Department   string            `json:"department"`
 	Name         string            `json:"name"`
 	Email        string            `json:"email"`
 	Phone        string            `json:"phone"`
@@ -98,10 +99,25 @@ type Room struct {
 	ID string `json:"id"`
 }
 
-func (c *Client) CreateRoom(visitor *Visitor) (*Room, *httpx.Trace, error) {
+func (c *Client) CreateRoom(visitor *Visitor, extraFields string) (*Room, *httpx.Trace, error) {
 	payload := struct {
-		Visitor *Visitor `json:"visitor"`
+		Visitor      *Visitor `json:"visitor"`
+		SessionStart string   `json:"sessionStart"`
+		Priority     string   `json:"priority"`
 	}{Visitor: visitor}
+
+	extra := &struct {
+		SessionStart string            `json:"sessionStart"`
+		Priority     string            `json:"priority"`
+		Department   string            `json:"department"`
+		CustomFields map[string]string `json:"customFields"`
+	}{}
+	if err := jsonx.Unmarshal([]byte(extraFields), extra); err == nil {
+		payload.Visitor.Department = extra.Department
+		payload.Visitor.CustomFields = extra.CustomFields
+		payload.Priority = extra.Priority
+		payload.SessionStart = extra.SessionStart
+	}
 
 	response := &Room{}
 
