@@ -1,0 +1,49 @@
+[
+    {
+        "label": "error response if missing required field",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/channelback",
+        "body": "message=We%20can%20help&recipient_id=1234&thread_id=7452108c-a52a-461b-825e-dd1e9688fcad",
+        "status": 400,
+        "response": {
+            "error": "error decoding form: Key: 'channelbackRequest.Metadata' Error:Field validation for 'Metadata' failed on the 'required' tag"
+        }
+    },
+    {
+        "label": "error response if can't find ticket with thread ID",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/channelback",
+        "body": "message=We%20can%20help&recipient_id=1234&thread_id=7452108c-a52a-461b-825e-dd1e9688fcad&metadata=%7B%22ticketer%22%3A%224ee6d4f3-f92b-439b-9718-8da90c05490c%22%2C%22secret%22%3A%22sesame%22%7D",
+        "status": 400,
+        "response": {
+            "error": "error looking up ticket 7452108c-a52a-461b-825e-dd1e9688fcad"
+        }
+    },
+    {
+        "label": "error response if passed secret is incorrect",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/channelback",
+        "body": "message=We%20can%20help&recipient_id=1234&thread_id=c69f103c-db64-4481-815b-1112890419ef&metadata=%7B%22ticketer%22%3A%224ee6d4f3-f92b-439b-9718-8da90c05490c%22%2C%22secret%22%3A%22sesxyz%22%7D",
+        "status": 401,
+        "response": {
+            "error": "ticketer secret mismatch"
+        }
+    },
+    {
+        "label": "create message and send to contact if everything correct",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/channelback",
+        "body": "message=We%20can%20help&recipient_id=1234&thread_id=c69f103c-db64-4481-815b-1112890419ef&metadata=%7B%22ticketer%22%3A%224ee6d4f3-f92b-439b-9718-8da90c05490c%22%2C%22secret%22%3A%22sesame%22%7D",
+        "status": 200,
+        "response": {
+            "external_id": "1",
+            "allow_channelback": true
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from msgs_msg where direction = 'O' and text = 'We can help'",
+                "count": 1
+            }
+        ]
+    }
+]

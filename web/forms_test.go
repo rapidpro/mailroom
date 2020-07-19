@@ -54,7 +54,7 @@ func TestDecodeAndValidateMultipartForm(t *testing.T) {
 		"bar": []string{"x"},
 	}, map[string]string{
 		"file1": "hello world\n",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	form := &TestForm{}
@@ -67,7 +67,7 @@ func TestDecodeAndValidateMultipartForm(t *testing.T) {
 	// make a request that's missing required data
 	request, err = web.MakeMultipartRequest("POST", "http://temba.io", map[string][]string{
 		"foo": []string{"a", "b"},
-	}, nil)
+	}, nil, nil)
 	require.NoError(t, err)
 
 	form = &TestForm{}

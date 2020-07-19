@@ -6,6 +6,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/services/tickets"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -61,7 +62,7 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *m
 		event.Ticket.Body,
 		map[string]interface{}{
 			"contact-uuid":    scene.Contact().UUID(),
-			"contact-display": scene.Contact().Format(org.Env()),
+			"contact-display": tickets.GetContactDisplay(org.Env(), scene.Contact()),
 		},
 	)
 
