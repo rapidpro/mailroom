@@ -1,3 +1,8 @@
+v5.7.0
+----------
+ * Set user and origin on manual triggers
+ * Switch to trigger builders
+
 v5.6.1
 ----------
  * expire runs that have no session, just warn while doing so
