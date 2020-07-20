@@ -75,21 +75,14 @@ func fireEventFires(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queu
 		return nil
 	}
 
-	// create our event for our campaign
-	event := triggers.NewCampaignEvent(
-		eventTask.EventUUID,
-		triggers.NewCampaignReference(
-			eventTask.CampaignUUID,
-			eventTask.CampaignName,
-		),
-	)
-
 	contactMap := make(map[models.ContactID]*models.EventFire)
 	for _, fire := range fires {
 		contactMap[fire.ContactID] = fire
 	}
 
-	started, err := runner.FireCampaignEvents(ctx, db, rp, eventTask.OrgID, fires, eventTask.FlowUUID, event)
+	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(eventTask.CampaignUUID), eventTask.CampaignName)
+
+	started, err := runner.FireCampaignEvents(ctx, db, rp, eventTask.OrgID, fires, eventTask.FlowUUID, campaign, triggers.CampaignEventUUID(eventTask.EventUUID))
 
 	// remove all the contacts that were started
 	for _, contactID := range started {

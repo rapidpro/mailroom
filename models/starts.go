@@ -25,6 +25,7 @@ type StartType string
 const (
 	StartTypeManual     = StartType("M")
 	StartTypeAPI        = StartType("A")
+	StartTypeAPIZapier  = StartType("Z")
 	StartTypeFlowAction = StartType("F")
 	StartTypeTrigger    = StartType("T")
 )
@@ -83,7 +84,9 @@ func MarkStartFailed(ctx context.Context, db *sqlx.DB, startID StartID) error {
 type FlowStartBatch struct {
 	b struct {
 		StartID    StartID     `json:"start_id"`
+		StartType  StartType   `json:"start_type"`
 		OrgID      OrgID       `json:"org_id"`
+		CreatedBy  string      `json:"created_by"`
 		FlowID     FlowID      `json:"flow_id"`
 		FlowType   FlowType    `json:"flow_type"`
 		ContactIDs []ContactID `json:"contact_ids"`
@@ -100,7 +103,9 @@ type FlowStartBatch struct {
 }
 
 func (b *FlowStartBatch) StartID() StartID                         { return b.b.StartID }
+func (b *FlowStartBatch) StartType() StartType                     { return b.b.StartType }
 func (b *FlowStartBatch) OrgID() OrgID                             { return b.b.OrgID }
+func (b *FlowStartBatch) CreatedBy() string                        { return b.b.CreatedBy }
 func (b *FlowStartBatch) FlowID() FlowID                           { return b.b.FlowID }
 func (b *FlowStartBatch) ContactIDs() []ContactID                  { return b.b.ContactIDs }
 func (b *FlowStartBatch) RestartParticipants() RestartParticipants { return b.b.RestartParticipants }
@@ -136,6 +141,8 @@ type FlowStart struct {
 
 		Extra         null.JSON `json:"extra,omitempty"          db:"extra"`
 		ParentSummary null.JSON `json:"parent_summary,omitempty" db:"parent_summary"`
+
+		CreatedBy string `json:"created_by"`
 	}
 }
 
@@ -305,6 +312,7 @@ INSERT INTO
 func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {
 	b := &FlowStartBatch{}
 	b.b.StartID = s.ID()
+	b.b.StartType = s.s.StartType
 	b.b.OrgID = s.OrgID()
 	b.b.FlowID = s.FlowID()
 	b.b.FlowType = s.FlowType()
@@ -315,6 +323,7 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 	b.b.Extra = null.JSON(s.Extra())
 	b.b.IsLast = last
 	b.b.TotalContacts = totalContacts
+	b.b.CreatedBy = s.s.CreatedBy
 	return b
 }
 
