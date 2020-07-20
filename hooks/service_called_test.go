@@ -14,8 +14,17 @@ func TestServiceCalled(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://api.wit.ai/message?v=20170307&q=book+me+a+flight": {
-			httpx.NewMockResponse(200, nil, `{"_text":"book me a flight","entities":{"intent":[{"confidence":0.84709152161066,"value":"book_flight"}]},"msg_id":"1M7fAcDWag76OmgDI"}`),
+		"https://api.wit.ai/message?v=20200513&q=book+me+a+flight": {
+			httpx.NewMockResponse(200, nil, `{
+				"text": "I want to book a flight to Quito",
+				"intents": [
+				  {
+					"id": "754569408690533",
+					"name": "book_flight",
+					"confidence": 0.9024
+				  }
+				]
+			}`),
 		},
 	}))
 
@@ -30,7 +39,7 @@ func TestServiceCalled(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				{
-					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND is_error = FALSE AND classifier_id = $2 AND url = 'https://api.wit.ai/message?v=20170307&q=book+me+a+flight'`,
+					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND is_error = FALSE AND classifier_id = $2 AND url = 'https://api.wit.ai/message?v=20200513&q=book+me+a+flight'`,
 					Args:  []interface{}{models.Org1, models.WitID},
 					Count: 1,
 				},
