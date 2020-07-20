@@ -10,9 +10,9 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/cron"
-	"github.com/nyaruka/mailroom/tasks/handler"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/tasks/handler"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -69,9 +69,14 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		count++
 
 		// no parent id? we can add this to our batch
-		if expiration.ParentUUID == nil {
+		if expiration.ParentUUID == nil || expiration.SessionID == nil {
 			expiredRuns = append(expiredRuns, expiration.RunID)
-			expiredSessions = append(expiredSessions, expiration.SessionID)
+
+			if expiration.SessionID != nil {
+				expiredSessions = append(expiredSessions, *expiration.SessionID)
+			} else {
+				log.WithField("run_id", expiration.RunID).WithField("org_id", expiration.OrgID).Warn("expiring active run with no session")
+			}
 
 			// batch is full? commit it
 			if len(expiredRuns) == expireBatchSize {
@@ -99,7 +104,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		}
 
 		// ok, queue this task
-		task := handler.NewExpirationTask(expiration.OrgID, expiration.ContactID, expiration.SessionID, expiration.RunID, expiration.ExpiresOn)
+		task := handler.NewExpirationTask(expiration.OrgID, expiration.ContactID, *expiration.SessionID, expiration.RunID, expiration.ExpiresOn)
 		err = handler.AddHandleTask(rc, expiration.ContactID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error adding new expiration task")
@@ -139,19 +144,18 @@ const selectExpiredRunsSQL = `
 	WHERE
 		fr.is_active = TRUE AND
 		fr.expires_on < NOW() AND
-		fr.connection_id IS NULL AND
-		fr.session_id IS NOT NULL
+		fr.connection_id IS NULL
 	ORDER BY
 		expires_on ASC
 	LIMIT 25000
 `
 
 type RunExpiration struct {
-	OrgID      models.OrgID     `db:"org_id"`
-	FlowID     models.FlowID    `db:"flow_id"`
-	ContactID  models.ContactID `db:"contact_id"`
-	RunID      models.FlowRunID `db:"run_id"`
-	ParentUUID *flows.RunUUID   `db:"parent_uuid"`
-	SessionID  models.SessionID `db:"session_id"`
-	ExpiresOn  time.Time        `db:"expires_on"`
+	OrgID      models.OrgID      `db:"org_id"`
+	FlowID     models.FlowID     `db:"flow_id"`
+	ContactID  models.ContactID  `db:"contact_id"`
+	RunID      models.FlowRunID  `db:"run_id"`
+	ParentUUID *flows.RunUUID    `db:"parent_uuid"`
+	SessionID  *models.SessionID `db:"session_id"`
+	ExpiresOn  time.Time         `db:"expires_on"`
 }

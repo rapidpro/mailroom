@@ -355,16 +355,19 @@ func StartIVRFlow(
 
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
-	connRef := flows.NewConnection(channel.ChannelReference(), urn)
 
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
-		trigger, err = triggers.NewFlowActionVoice(oa.Env(), flowRef, contact, connRef, start.ParentSummary(), false)
-		if err != nil {
-			return errors.Wrap(err, "unable to create flow action trigger")
-		}
+		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
+			FlowAction(start.ParentSummary()).
+			WithConnection(channel.ChannelReference(), urn).
+			Build()
 	} else {
-		trigger = triggers.NewManualVoice(oa.Env(), flowRef, contact, connRef, false, params)
+		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
+			Manual().
+			WithConnection(channel.ChannelReference(), urn).
+			WithParams(params).
+			Build()
 	}
 
 	// mark our connection as started

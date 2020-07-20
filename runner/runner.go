@@ -24,6 +24,12 @@ const (
 	postCommitTimeout = time.Minute
 )
 
+var startTypeToOrigin = map[models.StartType]string{
+	models.StartTypeManual:    "ui",
+	models.StartTypeAPI:       "api",
+	models.StartTypeAPIZapier: "zapier",
+}
+
 // NewStartOptions creates and returns the default start options to be used for flow starts
 func NewStartOptions() *StartOptions {
 	start := &StartOptions{
@@ -53,7 +59,7 @@ type StartOptions struct {
 }
 
 // TriggerBuilder defines the interface for building a trigger for the passed in contact
-type TriggerBuilder func(contact *flows.Contact) (flows.Trigger, error)
+type TriggerBuilder func(contact *flows.Contact) flows.Trigger
 
 // ResumeFlow resumes the passed in session using the passed in session
 func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
@@ -178,18 +184,23 @@ func StartFlowBatch(
 	batchStart := batch.TotalContacts() > 1
 
 	// this will build our trigger for each contact started
-	triggerBuilder := func(contact *flows.Contact) (flows.Trigger, error) {
+	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
 		if batch.ParentSummary() != nil {
-			trigger, err := triggers.NewFlowAction(oa.Env(), flow.FlowReference(), contact, batch.ParentSummary(), batchStart)
-			if err != nil {
-				return nil, errors.Wrap(err, "unable to create flow action trigger")
+			tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).FlowAction(batch.ParentSummary())
+			if batchStart {
+				tb = tb.AsBatch()
 			}
-			return trigger, nil
+			return tb.Build()
 		}
+
+		tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual()
 		if batch.Extra() != nil {
-			return triggers.NewManual(oa.Env(), flow.FlowReference(), contact, batchStart, params), nil
+			tb = tb.WithParams(params)
 		}
-		return triggers.NewManual(oa.Env(), flow.FlowReference(), contact, batchStart, nil), nil
+		if batchStart {
+			tb = tb.AsBatch()
+		}
+		return tb.WithUser(batch.CreatedBy()).WithOrigin(startTypeToOrigin[batch.StartType()]).Build()
 	}
 
 	// before committing our runs we want to set the start they are associated with
@@ -227,7 +238,7 @@ func StartFlowBatch(
 func FireCampaignEvents(
 	ctx context.Context, db *sqlx.DB, rp *redis.Pool,
 	orgID models.OrgID, fires []*models.EventFire, flowUUID assets.FlowUUID,
-	event *triggers.CampaignEvent) ([]models.ContactID, error) {
+	campaign *triggers.CampaignReference, eventUUID triggers.CampaignEventUUID) ([]models.ContactID, error) {
 
 	if len(fires) == 0 {
 		return nil, nil
@@ -309,9 +320,9 @@ func FireCampaignEvents(
 
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
-	options.TriggerBuilder = func(contact *flows.Contact) (flows.Trigger, error) {
+	options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 		delete(skippedContacts, models.ContactID(contact.ID()))
-		return triggers.NewCampaign(oa.Env(), flowRef, contact, event), nil
+		return triggers.NewBuilder(oa.Env(), flowRef, contact).Campaign(campaign, eventUUID).Build()
 	}
 
 	// this is our pre commit callback for our sessions, we'll mark the event fires associated
@@ -353,7 +364,7 @@ func FireCampaignEvents(
 
 	sessions, err := StartFlow(ctx, db, rp, oa, dbFlow, contactIDs, options)
 	if err != nil {
-		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %v", event)
+		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", eventUUID)
 	} else {
 		// make sure any skipped contacts are marked as fired this can occur if all fires were skipped
 		fires := make([]*models.EventFire, 0, len(sessions))
@@ -362,7 +373,7 @@ func FireCampaignEvents(
 		}
 		err = models.MarkEventsFired(ctx, db, fires, fired, models.FireResultSkipped)
 		if err != nil {
-			logrus.WithField("fire_ids", fires).WithError(err).Errorf("error marking events as skipped: %v", event)
+			logrus.WithField("fire_ids", fires).WithError(err).Errorf("error marking events as skipped: %s", eventUUID)
 		}
 	}
 
@@ -477,10 +488,7 @@ func StartFlow(
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating flow contact")
 			}
-			trigger, err := options.TriggerBuilder(contact)
-			if err != nil {
-				return nil, err
-			}
+			trigger := options.TriggerBuilder(contact)
 			triggers = append(triggers, trigger)
 		}
 

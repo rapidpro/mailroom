@@ -1,3 +1,15 @@
+v5.6.1
+----------
+ * expire runs that have no session, just warn while doing so
+
+v5.6.0
+----------
+ * 5.6.0 Release Candidate
+
+v5.5.38 
+----------
+ * Varible naming consistency
+
 v5.5.37
 ----------
  * Fix reading of modifiers so always ignore modifier that becomes noop

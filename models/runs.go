@@ -1023,10 +1023,12 @@ func ExpireRunsAndSessions(ctx context.Context, db *sqlx.DB, runIDs []FlowRunID,
 		return errors.Wrapf(err, "error expiring runs")
 	}
 
-	err = Exec(ctx, "expiring sessions", tx, expireSessionsSQL, pq.Array(sessionIDs))
-	if err != nil {
-		tx.Rollback()
-		return errors.Wrapf(err, "error expiring sessions")
+	if len(sessionIDs) > 0 {
+		err = Exec(ctx, "expiring sessions", tx, expireSessionsSQL, pq.Array(sessionIDs))
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error expiring sessions")
+		}
 	}
 
 	err = tx.Commit()
