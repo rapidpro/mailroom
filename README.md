@@ -1,4 +1,4 @@
-# mailroom [![Build Status](https://github.com/nyaruka/mailroom/workflows/CI/badge.svg)](https://github.com/nyaruka/mailroom/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/nyaruka/mailroom/branch/master/graph/badge.svg)](https://codecov.io/gh/nyaruka/mailroom)
+# mailroom [![Build Status](https://github.com/nyaruka/mailroom/workflows/CI/badge.svg)](https://github.com/nyaruka/mailroom/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/nyaruka/mailroom/branch/master/graph/badge.svg)](https://codecov.io/gh/nyaruka/mailroom) 
 
 # About 
 
