@@ -1,3 +1,70 @@
+v5.6.0
+----------
+ * 5.6.0 Release Candidate
+
+v5.5.38 
+----------
+ * Varible naming consistency
+
+v5.5.37
+----------
+ * Fix reading of modifiers so always ignore modifier that becomes noop
+
+v5.5.36
+----------
+ * Sead country from templates
+ * Ignore missing assets when reading modifiers
+ * Fail flow starts which can't be started
+
+v5.5.35
+----------
+ * Update to latest goflow and add tests for field modifiers
+
+v5.5.34
+----------
+ * Fix detaching URNs
+
+v5.5.33
+----------
+ * Update to latest goflow v0.93.0
+
+v5.5.32
+----------
+ * When blocking contacts archive any triggers which only apply to them
+
+v5.5.31
+----------
+ * Messages without topups should be queued
+ * Continue handling as normal for suspended orgs
+
+v5.5.30
+----------
+ * Org being suspended should stop message handling
+ * Make decrementing org credit optional
+
+v5.5.29
+----------
+ * Return query inspection results as new metadata field in responses
+ * Update to latest goflow v0.92.0
+
+v5.5.28
+----------
+ * Don't do any decoration of email ticket subjects
+
+v5.5.27
+----------
+ * Allow searching by UUID, as well != matches on ID and UUID
+ * Update to latest goflow v0.91.1 to fix clearing fields
+ * Maybe fix intermittently failing test
+
+v5.5.26
+----------
+ * Update to goflow v0.89.0
+
+v5.5.25
+----------
+ * Add endpoint to change a flow language
+
 v5.5.24
 ----------
  * Tickets fixes and improvements

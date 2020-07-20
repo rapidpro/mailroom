@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/contactql"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -43,7 +44,18 @@ func handleFlowStart(ctx context.Context, mr *mailroom.Mailroom, task *queue.Tas
 		return errors.Wrapf(err, "error unmarshalling flow start task: %s", string(task.Task))
 	}
 
-	return CreateFlowBatches(ctx, mr.DB, mr.RP, mr.ElasticClient, startTask)
+	err = CreateFlowBatches(ctx, mr.DB, mr.RP, mr.ElasticClient, startTask)
+	if err != nil {
+		models.MarkStartFailed(ctx, mr.DB, startTask.ID())
+
+		// if error is user created query error.. don't escalate error to sentry
+		isQueryError, _ := contactql.IsQueryError(err)
+		if !isQueryError {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
@@ -54,14 +66,14 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 		contactIDs[id] = true
 	}
 
-	org, err := models.GetOrgAssets(ctx, db, start.OrgID())
+	oa, err := models.GetOrgAssets(ctx, db, start.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org assets")
 	}
 
 	// look up any contacts by URN
 	if len(start.URNs()) > 0 {
-		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, org, start.URNs())
+		urnContactIDs, err := models.ContactIDsFromURNs(ctx, db, oa, start.URNs())
 		if err != nil {
 			return errors.Wrapf(err, "error getting contact ids from urns")
 		}
@@ -72,7 +84,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// if we are meant to create a new contact, do so
 	if start.CreateContact() {
-		newID, err := models.CreateContact(ctx, db, org, urns.NilURN)
+		newID, err := models.CreateContact(ctx, db, oa, urns.NilURN)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
 		}
@@ -99,7 +111,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// finally, if we have a query, add the contacts that match that as well
 	if start.Query() != "" {
-		matches, err := models.ContactIDsForQuery(ctx, ec, org, start.Query())
+		matches, err := models.ContactIDsForQuery(ctx, ec, oa, start.Query())
 		if err != nil {
 			return errors.Wrapf(err, "error performing search for start: %d", start.ID())
 		}

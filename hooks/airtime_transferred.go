@@ -25,7 +25,7 @@ type InsertAirtimeTransfersHook struct{}
 var insertAirtimeTransfersHook = &InsertAirtimeTransfersHook{}
 
 // Apply inserts all the airtime transfers that were created
-func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our transfers
 	transfers := make([]*models.AirtimeTransfer, 0, len(scenes))
 
@@ -62,7 +62,7 @@ func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp 
 }
 
 // handleAirtimeTransferred is called for each airtime transferred event
-func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.AirtimeTransferredEvent)
 
 	status := models.AirtimeTransferStatusSuccess
@@ -71,7 +71,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	}
 
 	transfer := models.NewAirtimeTransfer(
-		org.OrgID(),
+		oa.OrgID(),
 		status,
 		scene.ContactID(),
 		event.Sender,
@@ -95,7 +95,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	// add a log for each HTTP call
 	for _, httpLog := range event.HTTPLogs {
 		transfer.AddLog(models.NewAirtimeTransferredLog(
-			org.OrgID(),
+			oa.OrgID(),
 			httpLog.URL,
 			httpLog.Request,
 			httpLog.Response,

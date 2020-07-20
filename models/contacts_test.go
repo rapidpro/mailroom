@@ -1,17 +1,16 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/olivere/elastic"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
-
-	"fmt"
 )
 
 func TestElasticContacts(t *testing.T) {
@@ -19,7 +18,7 @@ func TestElasticContacts(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	es := search.NewMockElasticServer()
+	es := testsuite.NewMockElasticServer()
 	defer es.Close()
 
 	client, err := elastic.NewClient(
@@ -375,4 +374,73 @@ func TestUpdateContactStatus(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 0)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 1)
 
+}
+
+func TestUpdateContactURNs(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	oa, err := GetOrgAssets(ctx, db, Org1)
+	assert.NoError(t, err)
+
+	numInitialURNs := 0
+	db.Get(&numInitialURNs, `SELECT count(*) FROM contacts_contacturn`)
+
+	assertContactURNs := func(contactID ContactID, expected []string) {
+		var actual []string
+		err = db.Select(&actual, `SELECT identity FROM contacts_contacturn WHERE contact_id = $1 ORDER BY priority DESC`, contactID)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, actual, "URNs mismatch for contact %d", contactID)
+	}
+
+	assertContactURNs(CathyID, []string{"tel:+16055741111"})
+	assertContactURNs(BobID, []string{"tel:+16055742222"})
+	assertContactURNs(GeorgeID, []string{"tel:+16055743333"})
+
+	cathyURN := urns.URN(fmt.Sprintf("tel:+16055741111?id=%d", CathyURNID))
+	bobURN := urns.URN(fmt.Sprintf("tel:+16055742222?id=%d", BobURNID))
+
+	// give Cathy a new higher priority URN
+	err = UpdateContactURNs(ctx, db, oa, []*ContactURNsChanged{{CathyID, Org1, []urns.URN{"tel:+16055700001", cathyURN}}})
+	assert.NoError(t, err)
+
+	assertContactURNs(CathyID, []string{"tel:+16055700001", "tel:+16055741111"})
+
+	// give Bob a new lower priority URN
+	err = UpdateContactURNs(ctx, db, oa, []*ContactURNsChanged{{BobID, Org1, []urns.URN{bobURN, "tel:+16055700002"}}})
+	assert.NoError(t, err)
+
+	assertContactURNs(BobID, []string{"tel:+16055742222", "tel:+16055700002"})
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`, nil, 0) // shouldn't be any orphan URNs
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn`, nil, numInitialURNs+2)           // but 2 new URNs
+
+	// remove a URN from Cathy
+	err = UpdateContactURNs(ctx, db, oa, []*ContactURNsChanged{{CathyID, Org1, []urns.URN{"tel:+16055700001"}}})
+	assert.NoError(t, err)
+
+	assertContactURNs(CathyID, []string{"tel:+16055700001"})
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`, nil, 1) // now orphaned
+
+	// steal a URN from Bob
+	err = UpdateContactURNs(ctx, db, oa, []*ContactURNsChanged{{CathyID, Org1, []urns.URN{"tel:+16055700001", "tel:+16055700002"}}})
+	assert.NoError(t, err)
+
+	assertContactURNs(CathyID, []string{"tel:+16055700001", "tel:+16055700002"})
+	assertContactURNs(BobID, []string{"tel:+16055742222"})
+
+	// steal the URN back from Cathy whilst simulataneously adding new URN to Cathy and not-changing anything for George
+	err = UpdateContactURNs(ctx, db, oa, []*ContactURNsChanged{
+		{BobID, Org1, []urns.URN{"tel:+16055742222", "tel:+16055700002"}},
+		{CathyID, Org1, []urns.URN{"tel:+16055700001", "tel:+16055700003"}},
+		{GeorgeID, Org1, []urns.URN{"tel:+16055743333"}},
+	})
+	assert.NoError(t, err)
+
+	assertContactURNs(CathyID, []string{"tel:+16055700001", "tel:+16055700003"})
+	assertContactURNs(BobID, []string{"tel:+16055742222", "tel:+16055700002"})
+	assertContactURNs(GeorgeID, []string{"tel:+16055743333"})
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn`, nil, numInitialURNs+3)
 }

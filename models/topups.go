@@ -25,11 +25,19 @@ const (
 	redisCreditsRemainingKey = `org:%d:cache:credits_remaining:%d`
 )
 
-// DecrementOrgCredits decrements the credits by the passed amount for the passed in org, passing back the id
-// of the topup that should be assigned to the messages using those credits.
-func DecrementOrgCredits(ctx context.Context, db Queryer, rc redis.Conn, orgID OrgID, amount int) (TopupID, error) {
+// AllocateTopups allocates topups for the given number of messages if topups are used by the org.
+// If topups are allocated it will return the ID of the topup to assign to those messages.
+func AllocateTopups(ctx context.Context, db Queryer, rp *redis.Pool, org *Org, amount int) (TopupID, error) {
+	rc := rp.Get()
+	defer rc.Close()
+
+	// if org doesn't use topups, do nothing
+	if !org.UsesTopups() {
+		return NilTopupID, nil
+	}
+
 	// no matter what we decrement our org credit
-	topups, err := redis.Ints(decrementCreditLua.Do(rc, orgID, amount))
+	topups, err := redis.Ints(decrementCreditLua.Do(rc, org.ID(), amount))
 	if err != nil {
 		return NilTopupID, err
 	}
@@ -40,7 +48,7 @@ func DecrementOrgCredits(ctx context.Context, db Queryer, rc redis.Conn, orgID O
 	}
 
 	// no active topup found, lets calculate it
-	topup, err := calculateActiveTopup(ctx, db, orgID)
+	topup, err := calculateActiveTopup(ctx, db, org.ID())
 	if err != nil {
 		return NilTopupID, err
 	}
@@ -53,11 +61,11 @@ func DecrementOrgCredits(ctx context.Context, db Queryer, rc redis.Conn, orgID O
 	// got one? then cache it
 	expireSeconds := -int(time.Since(topup.Expiration) / time.Second)
 	if expireSeconds > 0 && topup.Remaining-amount > 0 {
-		rc.Send("SETEX", fmt.Sprintf(redisActiveTopupKey, orgID), expireSeconds, topup.ID)
-		_, err := rc.Do("SETEX", fmt.Sprintf(redisCreditsRemainingKey, orgID, topup.ID), expireSeconds, topup.Remaining-amount)
+		rc.Send("SETEX", fmt.Sprintf(redisActiveTopupKey, org.ID()), expireSeconds, topup.ID)
+		_, err := rc.Do("SETEX", fmt.Sprintf(redisCreditsRemainingKey, org.ID(), topup.ID), expireSeconds, topup.Remaining-amount)
 		if err != nil {
 			// an error here isn't the end of the world, log it and move on
-			logrus.WithError(err).Errorf("error setting active topup in redis for org: %d", orgID)
+			logrus.WithError(err).Errorf("error setting active topup in redis for org: %d", org.ID())
 		}
 	}
 

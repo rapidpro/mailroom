@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -102,7 +103,7 @@ func loadLocations(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	}
 
 	// then read it in
-	hierarchy, err := utils.ReadLocationHierarchy(locationJSON)
+	hierarchy, err := envs.ReadLocationHierarchy(locationJSON)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling hierarchy: %s", string(locationJSON))
 	}

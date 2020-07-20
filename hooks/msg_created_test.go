@@ -126,7 +126,7 @@ func TestNoTopup(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				SQLAssertion{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='No Topup' AND contact_id = $1 AND status = 'P'",
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='No Topup' AND contact_id = $1 AND status = 'Q'",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},

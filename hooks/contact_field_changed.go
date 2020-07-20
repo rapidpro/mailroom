@@ -24,7 +24,7 @@ type CommitFieldChangesHook struct{}
 var commitFieldChangesHook = &CommitFieldChangesHook{}
 
 // Apply squashes and writes all the field updates for the contacts
-func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// our list of updates
 	fieldUpdates := make([]interface{}, 0, len(scenes))
 	fieldDeletes := make(map[assets.FieldUUID][]interface{})
@@ -32,7 +32,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 		updates := make(map[assets.FieldUUID]*flows.Value, len(es))
 		for _, e := range es {
 			event := e.(*events.ContactFieldChangedEvent)
-			field := org.FieldByKey(event.Field.Key)
+			field := oa.FieldByKey(event.Field.Key)
 			if field == nil {
 				logrus.WithFields(logrus.Fields{
 					"field_key":  event.Field.Key,
@@ -90,7 +90,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 }
 
 // handleContactFieldChanged is called when a contact field changes
-func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactFieldChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),

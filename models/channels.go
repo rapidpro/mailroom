@@ -7,28 +7,34 @@ import (
 	"math"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/null"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// ChannelID is the type for channel IDs
 type ChannelID null.Int
 
+// NilChannelID is the nil value for channel IDs
+const NilChannelID = ChannelID(0)
+
+// ChannelType is the type for the type of a channel
 type ChannelType string
 
+// channel type constants
 const (
-	NilChannelID = ChannelID(0)
-
 	ChannelTypeAndroid = ChannelType("A")
+)
 
-	ChannelConfigCallbackDomain = "callback_domain"
-
+// config key constants
+const (
+	ChannelConfigCallbackDomain      = "callback_domain"
 	ChannelConfigMaxConcurrentEvents = "max_concurrent_events"
-
-	ChannelConfigFCMID = "FCM_ID"
+	ChannelConfigFCMID               = "FCM_ID"
 )
 
 // Channel is the mailroom struct that represents channels

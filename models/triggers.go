@@ -5,20 +5,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// TriggerType is the type of a trigger
 type TriggerType string
 
+// MatchType is used for keyword triggers to specify how they should match
 type MatchType string
 
+// TriggerID is the type for trigger database IDs
 type TriggerID int
 
+// trigger type constants
 const (
 	CatchallTriggerType        = TriggerType("C")
 	KeywordTriggerType         = TriggerType("K")
@@ -27,12 +33,16 @@ const (
 	ReferralTriggerType        = TriggerType("R")
 	CallTriggerType            = TriggerType("V")
 	ScheduleTriggerType        = TriggerType("S")
+)
 
+// match type constants
+const (
 	MatchFirst = "F"
 	MatchOnly  = "O"
-
-	NilTriggerID = TriggerID(0)
 )
+
+// NilTriggerID is the nil value for trigger IDs
+const NilTriggerID = TriggerID(0)
 
 // Trigger represents a trigger in an organization
 type Trigger struct {
@@ -49,7 +59,9 @@ type Trigger struct {
 	}
 }
 
-func (t *Trigger) ID() TriggerID            { return t.t.ID }
+// ID returns the id of this trigger
+func (t *Trigger) ID() TriggerID { return t.t.ID }
+
 func (t *Trigger) FlowID() FlowID           { return t.t.FlowID }
 func (t *Trigger) TriggerType() TriggerType { return t.t.TriggerType }
 func (t *Trigger) Keyword() string          { return t.t.Keyword }
@@ -295,3 +307,68 @@ GROUP BY
 	t.id
 ) r;
 `
+
+const selectTriggersByContactIDsSQL = `
+SELECT 
+	t.id AS id
+FROM
+	triggers_trigger t
+INNER JOIN 
+	triggers_trigger_contacts tc ON tc.trigger_id = t.id
+WHERE
+	tc.contact_id = ANY($1) AND
+	is_archived = FALSE
+`
+
+const deleteContactTriggersForIDsSQL = `
+DELETE FROM
+	triggers_trigger_contacts
+WHERE
+	contact_id = ANY($1)
+`
+
+const archiveEmptyTriggersSQL = `
+UPDATE 
+	triggers_trigger
+SET 
+	is_archived = TRUE
+WHERE
+	id = ANY($1) AND
+	NOT EXISTS (SELECT * FROM triggers_trigger_contacts WHERE trigger_id = triggers_trigger.id) AND
+	NOT EXISTS (SELECT * FROM triggers_trigger_groups WHERE trigger_id = triggers_trigger.id)
+`
+
+// ArchiveContactTriggers removes the given contacts from any triggers and archives any triggers
+// which reference only those contacts
+func ArchiveContactTriggers(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+	// start by getting all the active triggers that reference these contacts
+	rows, err := tx.QueryxContext(ctx, selectTriggersByContactIDsSQL, pq.Array(contactIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error finding triggers for contacts")
+	}
+	defer rows.Close()
+
+	triggerIDs := make([]TriggerID, 0)
+	for rows.Next() {
+		var triggerID TriggerID
+		err := rows.Scan(&triggerID)
+		if err != nil {
+			return errors.Wrapf(err, "error reading trigger ID")
+		}
+		triggerIDs = append(triggerIDs, triggerID)
+	}
+
+	// remove any references to these contacts in triggers
+	_, err = tx.ExecContext(ctx, deleteContactTriggersForIDsSQL, pq.Array(contactIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error removing contacts from triggers")
+	}
+
+	// archive any of the original triggers which are now not referencing any contact or group
+	_, err = tx.ExecContext(ctx, archiveEmptyTriggersSQL, pq.Array(triggerIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error archiving empty triggers")
+	}
+
+	return nil
+}

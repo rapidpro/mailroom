@@ -730,7 +730,7 @@ func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
 func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, org *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
 	broadcastURNs := bcast.URNs()
 
@@ -757,12 +757,12 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 	}
 
 	// load all our contacts
-	contacts, err := LoadContacts(ctx, db, org, contactIDs)
+	contacts, err := LoadContacts(ctx, db, oa, contactIDs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
 	}
 
-	channels := org.SessionAssets().Channels()
+	channels := oa.SessionAssets().Channels()
 
 	// for each contact, build our message
 	msgs := make([]*Msg, 0, len(contacts))
@@ -773,7 +773,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 			return nil, nil
 		}
 
-		contact, err := c.FlowContact(org)
+		contact, err := c.FlowContact(oa)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating flow contact")
 		}
@@ -790,7 +790,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 						return nil, nil
 					}
 					urn = u.URN()
-					channel = org.ChannelByUUID(c.UUID())
+					channel = oa.ChannelByUUID(c.UUID())
 					break
 				}
 			}
@@ -800,7 +800,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 				c := channels.GetForURN(u, assets.ChannelRoleSend)
 				if c != nil {
 					urn = u.URN()
-					channel = org.ChannelByUUID(c.UUID())
+					channel = oa.ChannelByUUID(c.UUID())
 					break
 				}
 			}
@@ -818,7 +818,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		lang := contact.Language()
 		if lang != envs.NilLanguage {
 			found := false
-			for _, l := range org.Env().AllowedLanguages() {
+			for _, l := range oa.Env().AllowedLanguages() {
 				if l == lang {
 					found = true
 					break
@@ -835,7 +835,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 
 		// not found? try org default language
 		if t == nil {
-			t = trans[org.Env().DefaultLanguage()]
+			t = trans[oa.Env().DefaultLanguage()]
 		}
 
 		// not found? use broadcast base language
@@ -863,12 +863,12 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		if template != "" {
 			// build up the minimum viable context for templates
 			templateCtx := types.NewXObject(map[string]types.XValue{
-				"contact": flows.Context(org.Env(), contact),
-				"fields":  flows.Context(org.Env(), contact.Fields()),
-				"globals": flows.Context(org.Env(), org.SessionAssets().Globals()),
-				"urns":    flows.ContextFunc(org.Env(), contact.URNs().MapContext),
+				"contact": flows.Context(oa.Env(), contact),
+				"fields":  flows.Context(oa.Env(), contact.Fields()),
+				"globals": flows.Context(oa.Env(), oa.SessionAssets().Globals()),
+				"urns":    flows.ContextFunc(oa.Env(), contact.URNs().MapContext),
 			})
-			text, _ = excellent.EvaluateTemplate(org.Env(), templateCtx, template, nil)
+			text, _ = excellent.EvaluateTemplate(oa.Env(), templateCtx, template, nil)
 		}
 
 		// don't do anything if we have no text or attachments
@@ -878,7 +878,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now())
+		msg, err := NewOutgoingMsg(oa.OrgID(), channel, c.ID(), out, time.Now())
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -913,12 +913,10 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		}
 	}
 
-	// get a topup to assign to our messages
-	rc := rp.Get()
-	topup, err := DecrementOrgCredits(ctx, db, rc, org.OrgID(), len(msgs))
-	rc.Close()
+	// allocate a topup for these message if org uses topups
+	topup, err := AllocateTopups(ctx, db, rp, oa.Org(), len(msgs))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error finding active topup")
+		return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
 	}
 
 	// if we have an active topup, assign it to our messages

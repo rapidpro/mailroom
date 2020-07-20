@@ -22,7 +22,7 @@ type CommitIVRHook struct{}
 var commitIVRHook = &CommitIVRHook{}
 
 // Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
-func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	msgs := make([]*models.Msg, 0, len(scenes))
 	for _, s := range scenes {
 		for _, m := range s {
@@ -31,11 +31,9 @@ func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	}
 
 	// find the topup we will assign
-	rc := rp.Get()
-	topup, err := models.DecrementOrgCredits(ctx, tx, rc, org.OrgID(), len(msgs))
-	rc.Close()
+	topup, err := models.AllocateTopups(ctx, tx, rp, oa.Org(), len(msgs))
 	if err != nil {
-		return errors.Wrapf(err, "error finding active topup")
+		return errors.Wrapf(err, "error allocating topup for outgoing IVR message")
 	}
 
 	// if we have an active topup, assign it to our messages
@@ -55,7 +53,7 @@ func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 }
 
 // handleIVRCreated creates the db msg for the passed in event
-func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.IVRCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
@@ -74,7 +72,7 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mod
 		return nil
 	}
 
-	msg, err := models.NewOutgoingIVR(org.OrgID(), conn, event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingIVR(oa.OrgID(), conn, event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing ivr say: %s", event.Msg.Text())
 	}

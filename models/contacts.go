@@ -13,12 +13,11 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
+	"github.com/nyaruka/goflow/contactql/es"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
-	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/null"
 	"github.com/olivere/elastic"
 
@@ -198,7 +197,7 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.
 
 	// and by our query if present
 	if query != nil {
-		q, err := search.ToElasticQuery(org.Env(), org.SessionAssets(), query)
+		q, err := es.ToElasticQuery(org.Env(), org.SessionAssets(), query)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
 		}
@@ -211,6 +210,7 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.
 
 // ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
 func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
+	env := org.Env()
 	start := time.Now()
 	var parsed *contactql.ContactQuery
 	var err error
@@ -220,7 +220,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 	}
 
 	if query != "" {
-		parsed, err = search.ParseQuery(org.Env(), org.SessionAssets(), query)
+		parsed, err = contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
 		if err != nil {
 			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 		}
@@ -231,7 +231,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	fieldSort, err := search.ToElasticFieldSort(org.SessionAssets(), sort)
+	fieldSort, err := es.ToElasticFieldSort(org.SessionAssets(), sort)
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
@@ -274,6 +274,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 
 // ContactIDsForQuery returns the ids of all the contacts that match the passed in query
 func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAssets, query string) ([]ContactID, error) {
+	env := org.Env()
 	start := time.Now()
 
 	if client == nil {
@@ -281,7 +282,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// turn into elastic query
-	parsed, err := search.ParseQuery(org.Env(), org.SessionAssets(), query)
+	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
@@ -419,12 +420,12 @@ func (c *Contact) Status() flows.ContactStatus {
 
 // fieldValueEnvelope is our utility struct for the value of a field
 type fieldValueEnvelope struct {
-	Text     types.XText        `json:"text"`
-	Datetime *types.XDateTime   `json:"datetime,omitempty"`
-	Number   *types.XNumber     `json:"number,omitempty"`
-	State    utils.LocationPath `json:"state,omitempty"`
-	District utils.LocationPath `json:"district,omitempty"`
-	Ward     utils.LocationPath `json:"ward,omitempty"`
+	Text     types.XText       `json:"text"`
+	Datetime *types.XDateTime  `json:"datetime,omitempty"`
+	Number   *types.XNumber    `json:"number,omitempty"`
+	State    envs.LocationPath `json:"state,omitempty"`
+	District envs.LocationPath `json:"district,omitempty"`
+	Ward     envs.LocationPath `json:"ward,omitempty"`
 }
 
 type ContactURN struct {
@@ -1081,14 +1082,19 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 	// keep track of all our inserts
 	inserts := make([]interface{}, 0, len(changes))
 
-	// and updates
+	// and updates to URNs
 	updates := make([]interface{}, 0, len(changes))
+
+	contactIDs := make([]ContactID, 0)
+	updatedURNIDs := make([]URNID, 0)
 
 	// identities we are inserting
 	identities := make([]string, 0, 1)
 
 	// for each of our changes (one per contact)
 	for _, change := range changes {
+		contactIDs = append(contactIDs, change.ContactID)
+
 		// priority for each contact starts at 1000
 		priority := topURNPriority
 
@@ -1098,15 +1104,17 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 			channelID := GetURNChannelID(org, urn)
 
 			// do we have an id?
-			urnID := GetURNInt(urn, "id")
+			urnID := URNID(GetURNInt(urn, "id"))
 
 			if urnID > 0 {
 				// if so, this is a URN update
 				updates = append(updates, &urnUpdate{
-					URNID:     URNID(urnID),
+					URNID:     urnID,
 					ChannelID: channelID,
 					Priority:  priority,
 				})
+
+				updatedURNIDs = append(updatedURNIDs, urnID)
 			} else {
 				// new URN, add it instead
 				inserts = append(inserts, &urnInsert{
@@ -1132,6 +1140,17 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 	err := BulkSQL(ctx, "updating contact urns", tx, updateContactURNsSQL, updates)
 	if err != nil {
 		return errors.Wrapf(err, "error updating urns")
+	}
+
+	// then detach any URNs that weren't updated (the ones we're not keeping)
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = ANY($1) AND id != ALL($2)`,
+		pq.Array(contactIDs),
+		pq.Array(updatedURNIDs),
+	)
+	if err != nil {
+		return errors.Wrapf(err, "error detaching urns")
 	}
 
 	if len(inserts) > 0 {
@@ -1297,7 +1316,7 @@ type contactStatusUpdate struct {
 // UpdateContactStatus updates the contacts status as the passed changes
 func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStatusChange) error {
 
-	contactTriggersIDs := make([]interface{}, 0, len(changes))
+	archiveTriggersForContactIDs := make([]ContactID, 0, len(changes))
 	statusUpdates := make([]interface{}, 0, len(changes))
 
 	for _, ch := range changes {
@@ -1305,7 +1324,7 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 		stopped := ch.Status == flows.ContactStatusStopped
 
 		if blocked || stopped {
-			contactTriggersIDs = append(contactTriggersIDs, ch.ContactID)
+			archiveTriggersForContactIDs = append(archiveTriggersForContactIDs, ch.ContactID)
 		}
 
 		statusUpdates = append(
@@ -1319,10 +1338,9 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 
 	}
 
-	// remove triggers for contact we'll stop/block
-	_, err := tx.ExecContext(ctx, deleteAllContactTriggersForIDsSQL, pq.Array(contactTriggersIDs))
+	err := ArchiveContactTriggers(ctx, tx, archiveTriggersForContactIDs)
 	if err != nil {
-		return errors.Wrapf(err, "error removing contact from triggers")
+		return errors.Wrapf(err, "error archiving triggers for blocked or stopped contacts")
 	}
 
 	// do our status update
@@ -1330,6 +1348,7 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 	if err != nil {
 		return errors.Wrapf(err, "error updating contact statuses")
 	}
+
 	return err
 }
 
@@ -1346,11 +1365,4 @@ const updateContactStatusSQL = `
 		r(id, is_blocked, is_stopped)
 	WHERE
 		c.id = r.id::int
-`
-
-const deleteAllContactTriggersForIDsSQL = `
-DELETE FROM
-	triggers_trigger_contacts
-WHERE
-	contact_id = ANY($1)
 `

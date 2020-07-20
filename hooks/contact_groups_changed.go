@@ -5,7 +5,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
@@ -23,7 +22,7 @@ type CommitGroupChangesHook struct{}
 var commitGroupChangesHook = &CommitGroupChangesHook{}
 
 // Apply squashes and adds or removes all our contact groups
-func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of all adds and removes
 	adds := make([]*models.GroupAdd, 0, len(scenes))
 	removes := make([]*models.GroupRemove, 0, len(scenes))
@@ -68,23 +67,11 @@ func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 		return errors.Wrapf(err, "error removing contacts from groups")
 	}
 
-	// build the list of all contact ids changed, we'll update modified_on for them
-	changedIDs := make([]models.ContactID, 0, len(changed))
-	for c := range changed {
-		changedIDs = append(changedIDs, c)
-	}
-	if len(changedIDs) > 0 {
-		_, err = tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(changedIDs))
-		if err != nil {
-			return errors.Wrapf(err, "error updating contacts modified_on")
-		}
-	}
-
 	return nil
 }
 
 // handleContactGroupsChanged is called when a group is added or removed from our contact
-func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactGroupsChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":   scene.ContactUUID(),
@@ -96,7 +83,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	// remove each of our groups
 	for _, g := range event.GroupsRemoved {
 		// look up our group id
-		group := org.GroupByUUID(g.UUID)
+		group := oa.GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
 				"contact_uuid": scene.ContactUUID(),
@@ -119,7 +106,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	// add each of our groups
 	for _, g := range event.GroupsAdded {
 		// look up our group id
-		group := org.GroupByUUID(g.UUID)
+		group := oa.GroupByUUID(g.UUID)
 		if group == nil {
 			logrus.WithFields(logrus.Fields{
 				"contact_uuid": scene.ContactUUID(),

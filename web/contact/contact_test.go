@@ -15,9 +15,9 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +29,7 @@ func TestSearch(t *testing.T) {
 	rp := testsuite.RP()
 	wg := &sync.WaitGroup{}
 
-	es := search.NewMockElasticServer()
+	es := testsuite.NewMockElasticServer()
 	defer es.Close()
 
 	client, err := elastic.NewClient(
@@ -194,5 +194,10 @@ func TestModifyContacts(t *testing.T) {
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, models.CathyID)
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.CathyID)
 
-	web.RunWebTests(t, "testdata/modify_contacts.json")
+	// because we made changes to a group above, need to make sure we don't use stale org assets
+	models.FlushCache()
+
+	web.RunWebTests(t, "testdata/modify.json")
+
+	models.FlushCache()
 }

@@ -105,14 +105,14 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 	// no matter what mark our call as failed
 	defer conn.MarkFailed(ctx, db, time.Now())
 
-	// load our org
-	org, err := models.GetOrgAssets(ctx, db, conn.OrgID())
+	// load our org assets
+	oa, err := models.GetOrgAssets(ctx, db, conn.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org")
 	}
 
 	// and our channel
-	channel := org.ChannelByID(conn.ChannelID())
+	channel := oa.ChannelByID(conn.ChannelID())
 	if channel == nil {
 		return errors.Wrapf(err, "unable to load channel")
 	}
@@ -159,7 +159,7 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 }
 
 // RequestCallStart creates a new ChannelSession for the passed in flow start and contact, returning the created session
-func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, org *models.OrgAssets, start *models.FlowStartBatch, contact *models.Contact) (*models.ChannelConnection, error) {
+func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, oa *models.OrgAssets, start *models.FlowStartBatch, contact *models.Contact) (*models.ChannelConnection, error) {
 	// find a tel URL for the contact
 	telURN := urns.NilURN
 	for _, u := range contact.URNs() {
@@ -179,7 +179,7 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 	}
 
 	// build our channel assets, we need these to calculate the preferred channel for a call
-	channels, err := org.Channels()
+	channels, err := oa.Channels()
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load channels for org")
 	}
@@ -207,7 +207,7 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 
 	// create our channel connection
 	conn, err := models.InsertIVRConnection(
-		ctx, db, org.OrgID(), channel.ID(), start.StartID(), contact.ID(), models.URNID(urnID),
+		ctx, db, oa.OrgID(), channel.ID(), start.StartID(), contact.ID(), models.URNID(urnID),
 		models.ConnectionDirectionOut, models.ConnectionStatusPending, "",
 	)
 	if err != nil {
@@ -319,7 +319,7 @@ func WriteErrorResponse(ctx context.Context, db *sqlx.DB, client Client, conn *m
 
 // StartIVRFlow takes care of starting the flow in the passed in start for the passed in contact and URN
 func StartIVRFlow(
-	ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, resumeURL string, org *models.OrgAssets,
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, resumeURL string, oa *models.OrgAssets,
 	channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN, startID models.StartID,
 	r *http.Request, w http.ResponseWriter) error {
 
@@ -334,13 +334,13 @@ func StartIVRFlow(
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
 
-	flow, err := org.FlowByID(start.FlowID())
+	flow, err := oa.FlowByID(start.FlowID())
 	if err != nil {
 		return errors.Wrapf(err, "unable to load flow: %d", startID)
 	}
 
 	// our flow contact
-	contact, err := c.FlowContact(org)
+	contact, err := c.FlowContact(oa)
 	if err != nil {
 		return errors.Wrapf(err, "error loading flow contact")
 	}
@@ -359,12 +359,12 @@ func StartIVRFlow(
 
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
-		trigger, err = triggers.NewFlowActionVoice(org.Env(), flowRef, contact, connRef, start.ParentSummary(), false)
+		trigger, err = triggers.NewFlowActionVoice(oa.Env(), flowRef, contact, connRef, start.ParentSummary(), false)
 		if err != nil {
 			return errors.Wrap(err, "unable to create flow action trigger")
 		}
 	} else {
-		trigger = triggers.NewManualVoice(org.Env(), flowRef, contact, connRef, false, params)
+		trigger = triggers.NewManualVoice(oa.Env(), flowRef, contact, connRef, false, params)
 	}
 
 	// mark our connection as started
@@ -374,7 +374,7 @@ func StartIVRFlow(
 	}
 
 	// we set the connection on the session before our event hooks fire so that IVR messages can be created with the right connection reference
-	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
 		for _, session := range sessions {
 			session.SetChannelConnection(conn)
 		}
@@ -382,7 +382,7 @@ func StartIVRFlow(
 	}
 
 	// start our flow
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, org, flow, []flows.Trigger{trigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, hook, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow")
 	}
@@ -404,15 +404,15 @@ func StartIVRFlow(
 func ResumeIVRFlow(
 	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API,
 	resumeURL string, client Client,
-	org *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
+	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
-	contact, err := c.FlowContact(org)
+	contact, err := c.FlowContact(oa)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
-	session, err := models.ActiveSessionForContact(ctx, db, org, models.IVRFlow, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, oa, models.IVRFlow, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading session for contact")
 	}
@@ -494,7 +494,7 @@ func ResumeIVRFlow(
 
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(attachment.URL())
-		path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", org.OrgID()), filename[:4], filename[4:8], filename)
+		path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", oa.OrgID()), filename[:4], filename[4:8], filename)
 		if !strings.HasPrefix(path, "/") {
 			path = fmt.Sprintf("/%s", path)
 		}
@@ -518,20 +518,14 @@ func ResumeIVRFlow(
 	msgIn := flows.NewMsgIn(msgUUID, urn, channel.ChannelReference(), input, attachments)
 
 	// create an incoming message
-	msg := models.NewIncomingIVR(org.OrgID(), conn, msgIn, time.Now())
+	msg := models.NewIncomingIVR(oa.OrgID(), conn, msgIn, time.Now())
 
-	// find a topup
-	rc := rp.Get()
-	topupID, err := models.DecrementOrgCredits(ctx, db, rc, org.OrgID(), 1)
-	rc.Close()
-
-	// error or no topup, that's an end of call
+	// allocate a topup for this message if org uses topups)
+	topupID, err := models.AllocateTopups(ctx, db, rp, oa.Org(), 1)
 	if err != nil {
-		return errors.Wrapf(err, "unable to look up topup")
+		return errors.Wrapf(err, "error allocating topup for incoming IVR message")
 	}
-	if topupID == models.NilTopupID {
-		return client.WriteEmptyResponse(w, "no topups for org, exiting call")
-	}
+
 	msg.SetTopup(topupID)
 
 	// commit it
@@ -541,10 +535,10 @@ func ResumeIVRFlow(
 	}
 
 	// create our msg resume event
-	resume := resumes.NewMsg(org.Env(), contact, msgIn)
+	resume := resumes.NewMsg(oa.Env(), contact, msgIn)
 
 	// hook to set our connection on our session before our event hooks run
-	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, sessions []*models.Session) error {
+	hook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
 		for _, session := range sessions {
 			session.SetChannelConnection(conn)
 		}
@@ -560,7 +554,7 @@ func ResumeIVRFlow(
 		}
 	}
 
-	session, err = runner.ResumeFlow(ctx, db, rp, org, session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}
@@ -585,7 +579,7 @@ func ResumeIVRFlow(
 
 // HandleIVRStatus is called on status callbacks for an IVR call. We let the client decide whether the call has
 // ended for some reason and update the state of the call and session if so
-func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
+func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
 	status, duration := client.StatusForRequest(r)
 
@@ -603,7 +597,7 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *mode
 			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())
 		}
 
-		flow, err := org.FlowByID(start.FlowID())
+		flow, err := oa.FlowByID(start.FlowID())
 		if err != nil {
 			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}

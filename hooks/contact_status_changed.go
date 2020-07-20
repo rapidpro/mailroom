@@ -22,7 +22,7 @@ type CommitStatusChangesHook struct{}
 var commitStatusChangesHook = &CommitStatusChangesHook{}
 
 // Apply commits our contact status change
-func (h *CommitStatusChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *CommitStatusChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 
 	statusChanges := make([]*models.ContactStatusChange, 0, len(scenes))
 	for scene, es := range scenes {
@@ -39,7 +39,7 @@ func (h *CommitStatusChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 }
 
 // handleContactStatusChanged updates contact status
-func handleContactStatusChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleContactStatusChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ContactStatusChangedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),

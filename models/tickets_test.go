@@ -15,6 +15,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestTicketers(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	// can load directly by UUID
+	ticketer, err := models.LookupTicketerByUUID(ctx, db, models.ZendeskUUID)
+	assert.NoError(t, err)
+	assert.Equal(t, models.ZendeskID, ticketer.ID())
+	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	assert.Equal(t, "Zendesk (Nyaruka)", ticketer.Name())
+	assert.Equal(t, "1234-abcd", ticketer.Config("push_id"))
+	assert.Equal(t, "523562", ticketer.Config("push_token"))
+
+	// org through org assets
+	org1, err := models.GetOrgAssets(ctx, db, models.Org1)
+	assert.NoError(t, err)
+
+	ticketer = org1.TicketerByID(models.ZendeskID)
+	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	assert.Equal(t, "Zendesk (Nyaruka)", ticketer.Name())
+	assert.Equal(t, "1234-abcd", ticketer.Config("push_id"))
+
+	ticketer = org1.TicketerByUUID(models.ZendeskUUID)
+	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	assert.Equal(t, "Zendesk (Nyaruka)", ticketer.Name())
+	assert.Equal(t, "1234-abcd", ticketer.Config("push_id"))
+
+	ticketer.UpdateConfig(ctx, db, map[string]string{"new-key": "foo"}, map[string]bool{"push_id": true})
+	models.FlushCache()
+
+	org1, _ = models.GetOrgAssets(ctx, db, models.Org1)
+	ticketer = org1.TicketerByID(models.ZendeskID)
+
+	assert.Equal(t, "foo", ticketer.Config("new-key"))       // new config value added
+	assert.Equal(t, "", ticketer.Config("push_id"))          // existing config value removed
+	assert.Equal(t, "523562", ticketer.Config("push_token")) // other value unchanged
+}
+
 func TestTickets(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()

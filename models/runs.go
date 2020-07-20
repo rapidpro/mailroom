@@ -301,7 +301,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	}
 
 	// figure out our type
-	sessionType, found := FlowTypeMapping[fs.Type()]
+	sessionType, found := flowTypeMapping[fs.Type()]
 	if !found {
 		return nil, errors.Errorf("unknown flow type: %s", fs.Type())
 	}

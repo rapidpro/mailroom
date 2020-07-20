@@ -75,14 +75,14 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 		}
 
 		// load the org for this connection
-		org, err := models.GetOrgAssets(ctx, db, conn.OrgID())
+		oa, err := models.GetOrgAssets(ctx, db, conn.OrgID())
 		if err != nil {
 			log.WithError(err).WithField("org_id", conn.OrgID()).Error("error loading org")
 			continue
 		}
 
 		// and the associated channel
-		channel := org.ChannelByID(conn.ChannelID())
+		channel := oa.ChannelByID(conn.ChannelID())
 		if channel == nil {
 			// fail this call, channel is no longer active
 			err = models.UpdateChannelConnectionStatuses(ctx, db, []models.ConnectionID{conn.ID()}, models.ConnectionStatusFailed)
@@ -93,7 +93,7 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 		}
 
 		// finally load the full URN
-		urn, err := models.URNForID(ctx, db, org, conn.ContactURNID())
+		urn, err := models.URNForID(ctx, db, oa, conn.ContactURNID())
 		if err != nil {
 			log.WithError(err).WithField("urn_id", conn.ContactURNID()).Error("unable to load contact urn")
 			continue

@@ -1,0 +1,1219 @@
+[
+    {
+        "label": "noop",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": []
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "name": "Cathy",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": []
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name = 'Cathy'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "set name",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "name",
+                    "name": "Kathy"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "name": "Kathy",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_name_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "name": "Kathy"
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name = 'Kathy'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "set name",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "name",
+                    "name": "Nate"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "name": "Nate",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_name_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "name": "Nate"
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name = 'Nate'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "clear name",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "name",
+                    "name": ""
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_name_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "name": ""
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name = ''",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "set text field with valid value",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "field",
+                    "field": {
+                        "key": "gender",
+                        "name": "Gender"
+                    },
+                    "value": "M"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "fields": {
+                        "gender": {
+                            "text": "M"
+                        }
+                    }
+                },
+                "events": [
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-07-06T12:30:01.123456789Z",
+                        "field": {
+                            "key": "gender",
+                            "name": "Gender"
+                        },
+                        "value": {
+                            "text": "M"
+                        }
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND fields = '{\"3a5891e4-756e-4dc9-8e12-b7a766168824\": {\"text\": \"M\"}}'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "set numeric field with valid value",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "field",
+                    "field": {
+                        "key": "age",
+                        "name": "Age"
+                    },
+                    "value": "24"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ],
+                    "fields": {
+                        "age": {
+                            "text": "24",
+                            "number": 24
+                        },
+                        "gender": {
+                            "text": "M"
+                        }
+                    }
+                },
+                "events": [
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-07-06T12:30:01.123456789Z",
+                        "field": {
+                            "key": "age",
+                            "name": "Age"
+                        },
+                        "value": {
+                            "text": "24",
+                            "number": 24
+                        }
+                    },
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-07-06T12:30:02.123456789Z",
+                        "groups_added": [
+                            {
+                                "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                                "name": "Doctors"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND fields = '{\"3a5891e4-756e-4dc9-8e12-b7a766168824\": {\"text\": \"M\"}, \"903f51da-2717-47c7-a0d3-f2f32877013d\": {\"text\": \"24\", \"number\": 24}}'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM campaigns_eventfire WHERE contact_id = 10000",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "set date field with valid value",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "field",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "value": "26/06/2020"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ],
+                    "fields": {
+                        "age": {
+                            "text": "24",
+                            "number": 24
+                        },
+                        "gender": {
+                            "text": "M"
+                        },
+                        "joined": {
+                            "text": "26/06/2020",
+                            "datetime": "2020-06-26T05:30:01.123456-07:00"
+                        }
+                    }
+                },
+                "events": [
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-07-06T12:30:02.123456789Z",
+                        "field": {
+                            "key": "joined",
+                            "name": "Joined"
+                        },
+                        "value": {
+                            "text": "26/06/2020",
+                            "datetime": "2020-06-26T05:30:01.123456-07:00"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "label": "set state field with valid value",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "field",
+                    "field": {
+                        "key": "state",
+                        "name": "State"
+                    },
+                    "value": "BORNO"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ],
+                    "fields": {
+                        "age": {
+                            "text": "24",
+                            "number": 24
+                        },
+                        "gender": {
+                            "text": "M"
+                        },
+                        "joined": {
+                            "text": "26/06/2020",
+                            "datetime": "2020-06-26T05:30:01.123456-07:00"
+                        },
+                        "state": {
+                            "text": "BORNO",
+                            "state": "Nigeria > Borno"
+                        }
+                    }
+                },
+                "events": [
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-07-06T12:30:01.123456789Z",
+                        "field": {
+                            "key": "state",
+                            "name": "State"
+                        },
+                        "value": {
+                            "text": "BORNO",
+                            "state": "Nigeria > Borno"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "label": "clear fields",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "field",
+                    "field": {
+                        "key": "gender",
+                        "name": "Gender"
+                    },
+                    "value": ""
+                },
+                {
+                    "type": "field",
+                    "field": {
+                        "key": "age",
+                        "name": "Age"
+                    },
+                    "value": ""
+                },
+                {
+                    "type": "field",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "value": ""
+                },
+                {
+                    "type": "field",
+                    "field": {
+                        "key": "state",
+                        "name": "State"
+                    },
+                    "value": ""
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "field": {
+                            "key": "gender",
+                            "name": "Gender"
+                        },
+                        "value": null
+                    },
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-07-06T12:30:01.123456789Z",
+                        "field": {
+                            "key": "age",
+                            "name": "Age"
+                        },
+                        "value": null
+                    },
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-07-06T12:30:02.123456789Z",
+                        "groups_removed": [
+                            {
+                                "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                                "name": "Doctors"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-07-06T12:30:03.123456789Z",
+                        "field": {
+                            "key": "joined",
+                            "name": "Joined"
+                        },
+                        "value": null
+                    },
+                    {
+                        "type": "contact_field_changed",
+                        "created_on": "2018-07-06T12:30:04.123456789Z",
+                        "field": {
+                            "key": "state",
+                            "name": "State"
+                        },
+                        "value": null
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND fields = '{}'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM campaigns_eventfire WHERE contact_id = 10000",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "add group",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "groups",
+                    "modification": "add",
+                    "groups": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "groups": [
+                        {
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                            "name": "Testers"
+                        }
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "groups_added": [
+                            {
+                                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                "name": "Testers"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "add group contact already in",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "groups",
+                    "modification": "add",
+                    "groups": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "groups": [
+                        {
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                            "name": "Testers"
+                        }
+                    ]
+                },
+                "events": []
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "remove group",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "groups",
+                    "modification": "remove",
+                    "groups": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "groups_removed": [
+                            {
+                                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                "name": "Testers"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "remove group contact isn't part of",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "groups",
+                    "modification": "remove",
+                    "groups": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": []
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "set contact language",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "language",
+                    "language": "fra"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_language_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "language": "fra"
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE language = 'fra' and id = 10000",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "add URN",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "append",
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": [
+                            "tel:+255788555111"
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "add URN (deprecated urn modifier)",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urn",
+                    "modification": "append",
+                    "urn": "tel:+255788555222"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111?id=20121&priority=1000",
+                        "tel:+255788555222"
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": [
+                            "tel:+255788555111?id=20121&priority=1000",
+                            "tel:+255788555222"
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "add existing URN",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "append",
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111?id=20121&priority=1000",
+                        "tel:+255788555222?id=20122&priority=999"
+                    ]
+                },
+                "events": []
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "remove a URN",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "remove",
+                    "urns": [
+                        "tel:+255788555222"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111?id=20121&priority=1000"
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": [
+                            "tel:+255788555111?id=20121&priority=1000"
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "set URNs",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "set",
+                    "urns": [
+                        "tel:+255788555111",
+                        "tel:+255788555333"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111",
+                        "tel:+255788555333"
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": [
+                            "tel:+255788555111",
+                            "tel:+255788555333"
+                        ]
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(DISTINCT path) FROM contacts_contacturn WHERE path IN ('+255788555111', '+255788555222', '+255788555333')",
+                "count": 3
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555333'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "clear URNs",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "set",
+                    "urns": []
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "urns": []
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(DISTINCT path) FROM contacts_contacturn WHERE path IN ('+255788555111', '+255788555222', '+255788555333')",
+                "count": 3
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555333'",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "multiple modifiers of different types",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "name",
+                    "name": "Juan"
+                },
+                {
+                    "type": "language",
+                    "language": "spa"
+                },
+                {
+                    "type": "groups",
+                    "modification": "add",
+                    "groups": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ]
+                },
+                {
+                    "type": "urns",
+                    "modification": "set",
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "name": "Juan",
+                    "language": "spa",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111"
+                    ],
+                    "groups": [
+                        {
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                            "name": "Testers"
+                        }
+                    ]
+                },
+                "events": [
+                    {
+                        "type": "contact_name_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "name": "Juan"
+                    },
+                    {
+                        "type": "contact_language_changed",
+                        "created_on": "2018-07-06T12:30:01.123456789Z",
+                        "language": "spa"
+                    },
+                    {
+                        "type": "contact_groups_changed",
+                        "created_on": "2018-07-06T12:30:02.123456789Z",
+                        "groups_added": [
+                            {
+                                "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                "name": "Testers"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "contact_urns_changed",
+                        "created_on": "2018-07-06T12:30:03.123456789Z",
+                        "urns": [
+                            "tel:+255788555111"
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+]

@@ -6,12 +6,13 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/actions/modifiers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/pkg/errors"
 )
 
@@ -44,19 +45,26 @@ type searchRequest struct {
 // {
 //   "query": "age > 10",
 //   "contact_ids": [5,10,15],
-//   "fields": ["age"],
-//   "allow_as_group": true,
 //   "total": 3,
-//   "offset": 0
+//   "offset": 0,
+//   "metadata": {
+//     "fields": [
+//       {"key": "age", "name": "Age"}
+//     ],
+//     "allow_as_group": true
+//   }
 // }
 type searchResponse struct {
-	Query        string             `json:"query"`
-	ContactIDs   []models.ContactID `json:"contact_ids"`
-	Fields       []string           `json:"fields"`
-	AllowAsGroup bool               `json:"allow_as_group"`
-	Total        int64              `json:"total"`
-	Offset       int                `json:"offset"`
-	Sort         string             `json:"sort"`
+	Query      string                `json:"query"`
+	ContactIDs []models.ContactID    `json:"contact_ids"`
+	Total      int64                 `json:"total"`
+	Offset     int                   `json:"offset"`
+	Sort       string                `json:"sort"`
+	Metadata   *contactql.Inspection `json:"metadata,omitempty"`
+
+	// deprecated
+	Fields       []string `json:"fields"`
+	AllowAsGroup bool     `json:"allow_as_group"`
 }
 
 // handles a contact search request
@@ -70,42 +78,50 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
+	// grab our org assets
+	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// Perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, org,
+	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, oa,
 		request.GroupUUID, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
-		switch cause := errors.Cause(err).(type) {
-		case *search.Error:
-			return cause, http.StatusBadRequest, nil
-		default:
-			return nil, http.StatusInternalServerError, err
+		isQueryError, qerr := contactql.IsQueryError(err)
+		if isQueryError {
+			return qerr, http.StatusBadRequest, nil
 		}
+		return nil, http.StatusInternalServerError, err
 	}
 
-	// create our normalized query
+	// normalize and inspect the query
 	normalized := ""
+	var metadata *contactql.Inspection
+	allowAsGroup := false
+	fields := make([]string, 0)
+
 	if parsed != nil {
 		normalized = parsed.String()
+		metadata = contactql.Inspect(parsed)
+		fields = append(fields, metadata.Attributes...)
+		for _, f := range metadata.Fields {
+			fields = append(fields, f.Key)
+		}
+		allowAsGroup = metadata.AllowAsGroup
 	}
-
-	fields := search.FieldDependencies(parsed)
 
 	// build our response
 	response := &searchResponse{
 		Query:        normalized,
 		ContactIDs:   hits,
-		Fields:       fields,
-		AllowAsGroup: search.AllowAsGroup(fields),
 		Total:        total,
 		Offset:       request.Offset,
 		Sort:         request.Sort,
+		Metadata:     metadata,
+		Fields:       fields,
+		AllowAsGroup: allowAsGroup,
 	}
 
 	return response, http.StatusOK, nil
@@ -129,15 +145,22 @@ type parseRequest struct {
 //
 // {
 //   "query": "age > 10",
-//   "fields": ["age"],
 //   "elastic_query": { .. },
-//   "allow_as_group": true
+//   "metadata": {
+//     "fields": [
+//       {"key": "age", "name": "Age"}
+//     ],
+//     "allow_as_group": true
+//   }
 // }
 type parseResponse struct {
-	Query        string      `json:"query"`
-	Fields       []string    `json:"fields"`
-	ElasticQuery interface{} `json:"elastic_query"`
-	AllowAsGroup bool        `json:"allow_as_group"`
+	Query        string                `json:"query"`
+	ElasticQuery interface{}           `json:"elastic_query"`
+	Metadata     *contactql.Inspection `json:"metadata,omitempty"`
+
+	// deprecated
+	Fields       []string `json:"fields"`
+	AllowAsGroup bool     `json:"allow_as_group"`
 }
 
 // handles a query parsing request
@@ -147,29 +170,40 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
+	// grab our org assets
+	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	parsed, err := search.ParseQuery(org.Env(), org.SessionAssets(), request.Query)
+	env := oa.Env()
+	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), oa.SessionAssets())
 
 	if err != nil {
-		switch cause := errors.Cause(err).(type) {
-		case *search.Error:
-			return cause, http.StatusBadRequest, nil
-		default:
-			return nil, http.StatusInternalServerError, err
+		isQueryError, qerr := contactql.IsQueryError(err)
+		if isQueryError {
+			return qerr, http.StatusBadRequest, nil
 		}
+		return nil, http.StatusInternalServerError, err
 	}
 
+	// normalize and inspect the query
 	normalized := ""
+	var metadata *contactql.Inspection
+	allowAsGroup := false
+	fields := make([]string, 0)
+
 	if parsed != nil {
 		normalized = parsed.String()
+		metadata = contactql.Inspect(parsed)
+		fields = append(fields, metadata.Attributes...)
+		for _, f := range metadata.Fields {
+			fields = append(fields, f.Key)
+		}
+		allowAsGroup = metadata.AllowAsGroup
 	}
 
-	eq, err := models.BuildElasticQuery(org, request.GroupUUID, parsed)
+	eq, err := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -178,14 +212,13 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		return nil, http.StatusInternalServerError, err
 	}
 
-	fields := search.FieldDependencies(parsed)
-
 	// build our response
 	response := &parseResponse{
 		Query:        normalized,
-		Fields:       fields,
 		ElasticQuery: eqj,
-		AllowAsGroup: search.AllowAsGroup(fields),
+		Metadata:     metadata,
+		Fields:       fields,
+		AllowAsGroup: allowAsGroup,
 	}
 
 	return response, http.StatusOK, nil
@@ -242,40 +275,39 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// clone it as we will modify flows
-	org, err = org.Clone(s.CTX, s.DB)
+	oa, err = oa.Clone(s.CTX, s.DB)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
 	}
 
-	// build up our modifiers
-	mods := make([]flows.Modifier, len(request.Modifiers))
-	for i, m := range request.Modifiers {
-		mod, err := modifiers.ReadModifier(org.SessionAssets(), m, nil)
-		if err != nil {
-			return errors.Wrapf(err, "error in modifier: %s", string(m)), http.StatusBadRequest, nil
-		}
-		mods[i] = mod
+	// read the modifiers from the request
+	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
 	}
 
 	// load our contacts
-	contacts, err := models.LoadContacts(ctx, s.DB, org, request.ContactIDs)
+	contacts, err := models.LoadContacts(ctx, s.DB, oa, request.ContactIDs)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load contact")
 	}
 
 	results := make(map[models.ContactID]modifyResult)
 
+	// create an environment instance with location support
+	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
+
 	// create scenes for our contacts
 	scenes := make([]*models.Scene, 0, len(contacts))
 	for _, contact := range contacts {
-		flowContact, err := contact.FlowContact(org)
+		flowContact, err := contact.FlowContact(oa)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
@@ -289,7 +321,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 		// apply our modifiers
 		for _, mod := range mods {
-			mod.Apply(org.Env(), org.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+			mod.Apply(env, oa.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
 		}
 
 		results[contact.ID()] = result
@@ -302,29 +334,18 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction")
 	}
 
-	modifiedContactIDs := make([]models.ContactID, 0, len(contacts))
-
 	// apply our events
 	for _, scene := range scenes {
-		err := models.HandleEvents(ctx, tx, s.RP, org, scene, results[scene.ContactID()].Events)
+		err := models.HandleEvents(ctx, tx, s.RP, oa, scene, results[scene.ContactID()].Events)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying events")
-		}
-		if len(results[scene.ContactID()].Events) > 0 {
-			modifiedContactIDs = append(modifiedContactIDs, scene.ContactID())
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = models.ApplyEventPreCommitHooks(ctx, tx, s.RP, org, scenes)
+	err = models.ApplyEventPreCommitHooks(ctx, tx, s.RP, oa, scenes)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
-	}
-
-	// apply modified_by
-	err = models.UpdateContactModifiedBy(ctx, tx, modifiedContactIDs, request.UserID)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying modified_by")
 	}
 
 	// commit our transaction
@@ -339,7 +360,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// then apply our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, org, scenes)
+	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, oa, scenes)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
 	}

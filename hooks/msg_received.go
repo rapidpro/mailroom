@@ -16,7 +16,7 @@ func init() {
 }
 
 // handleMsgReceived takes care of creating the incoming message for surveyor flows, it is a noop for all other flows
-func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.MsgReceivedEvent)
 
 	// we only care about msg received events when dealing with surveyor flows
@@ -31,7 +31,7 @@ func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *mo
 		"urn":          event.Msg.URN(),
 	}).Debug("msg received event")
 
-	msg := models.NewIncomingMsg(org.OrgID(), nil, scene.ContactID(), &event.Msg, event.CreatedOn())
+	msg := models.NewIncomingMsg(oa.OrgID(), nil, scene.ContactID(), &event.Msg, event.CreatedOn())
 
 	// we'll commit this message with all the others
 	scene.AppendToEventPreCommitHook(commitMessagesHook, msg)
