@@ -84,10 +84,9 @@ func (c *Client) post(endpoint string, payload interface{}, response interface{}
 	return c.request("POST", endpoint, payload, response)
 }
 
-type VisitorToken string
-
 type Visitor struct {
-	Token        VisitorToken      `json:"token"`
+	Token        string            `json:"token"       validate:"required"`
+	ContactUUID  string            `json:"contactUuid"`
 	Department   string            `json:"department"`
 	Name         string            `json:"name"`
 	Email        string            `json:"email"`
@@ -96,51 +95,32 @@ type Visitor struct {
 }
 
 type Room struct {
-	ID string `json:"id"`
+	Visitor      Visitor `json:"visitor"     validate:"required"`
+	TicketID     string  `json:"ticketId"    validate:"required"`
+	Priority     string  `json:"priority"`
+	SessionStart string  `json:"sessionStart"`
 }
 
-func (c *Client) CreateRoom(visitor *Visitor, extraFields string) (*Room, *httpx.Trace, error) {
+// CreateRoom creates a new room and returns the ID
+func (c *Client) CreateRoom(room *Room) (string, *httpx.Trace, error) {
+	response := &struct {
+		ID string `json:"id"`
+	}{}
+
+	trace, err := c.get("room", room, response)
+	if err != nil {
+		return "", trace, err
+	}
+
+	return response.ID, trace, nil
+}
+
+func (c *Client) CloseRoom(visitor *Visitor) (*httpx.Trace, error) {
 	payload := struct {
-		Visitor      *Visitor `json:"visitor"`
-		SessionStart string   `json:"sessionStart"`
-		Priority     string   `json:"priority"`
+		Visitor *Visitor `json:"visitor"`
 	}{Visitor: visitor}
 
-	extra := &struct {
-		SessionStart string            `json:"sessionStart"`
-		Priority     string            `json:"priority"`
-		Department   string            `json:"department"`
-		CustomFields map[string]string `json:"customFields"`
-	}{}
-	if err := jsonx.Unmarshal([]byte(extraFields), extra); err == nil {
-		payload.Visitor.Department = extra.Department
-		payload.Visitor.CustomFields = extra.CustomFields
-		payload.Priority = extra.Priority
-		payload.SessionStart = extra.SessionStart
-	}
-
-	response := &Room{}
-
-	trace, err := c.get("room", payload, response)
-	if err != nil {
-		return nil, trace, err
-	}
-
-	return response, trace, nil
-}
-
-func (c *Client) CloseRoom(token VisitorToken, comment string) (*httpx.Trace, error) {
-	payload := struct {
-		Visitor struct {
-			Token VisitorToken `json:"token"`
-		} `json:"visitor"`
-		Comment string `json:"comment"`
-	}{Comment: comment}
-
-	payload.Visitor.Token = token
-	response := &Room{}
-
-	trace, err := c.get("room.close", payload, response)
+	trace, err := c.get("room.close", payload, nil)
 	if err != nil {
 		return trace, err
 	}
@@ -149,24 +129,20 @@ func (c *Client) CloseRoom(token VisitorToken, comment string) (*httpx.Trace, er
 }
 
 type VisitorMsg struct {
-	Visitor struct {
-		Token VisitorToken `json:"token"`
-	} `json:"visitor"`
+	Visitor     Visitor  `json:"visitor"    validate:"required"`
 	Text        string   `json:"text"`
 	Attachments []string `json:"attachments"`
 }
 
-type VisitorMsgResult struct {
-	ID string `json:"id"`
-}
-
-func (c *Client) SendMessage(msg *VisitorMsg) (*VisitorMsgResult, *httpx.Trace, error) {
-	response := &VisitorMsgResult{}
+func (c *Client) SendMessage(msg *VisitorMsg) (string, *httpx.Trace, error) {
+	response := &struct {
+		ID string `json:"id"`
+	}{}
 
 	trace, err := c.post("visitor-message", msg, response)
 	if err != nil {
-		return nil, trace, err
+		return "", trace, err
 	}
 
-	return response, trace, nil
+	return response.ID, trace, nil
 }

@@ -21,14 +21,12 @@ func init() {
 }
 
 type eventCallbackRequest struct {
-	Type    string `json:"type" validate:"required"`
-	Visitor struct {
-		Token string `json:"token" validate:"required"`
-	} `json:"visitor" validate:"required"`
-	Data json.RawMessage `json:"data" validate:"required"`
+	Type     string          `json:"type"     validate:"required"`
+	TicketID string          `json:"ticketId" validate:"required"`
+	Data     json.RawMessage `json:"data"`
 }
 
-type agentMessageData struct {
+type agentMessage struct {
 	Text        string   `json:"text"`
 	Attachments []string `json:"attachments"`
 }
@@ -36,11 +34,13 @@ type agentMessageData struct {
 func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 
+	// look up ticketer
 	ticketer, _, err := tickets.FromTicketerUUID(ctx, s.DB, ticketerUUID, typeRocketChat)
 	if err != nil {
 		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
 
+	// check secret
 	secret := r.Header.Get("Authorization")
 	if ticketer.Config(configSecret) != secret {
 		return map[string]string{"status": "unauthorized"}, http.StatusUnauthorized, nil
@@ -51,15 +51,17 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 		return err, http.StatusBadRequest, nil
 	}
 
-	ticket, _, _, err := tickets.FromTicketUUID(ctx, s.DB, flows.TicketUUID(request.Visitor.Token), typeRocketChat)
+	// look up ticket
+	ticket, _, _, err := tickets.FromTicketUUID(ctx, s.DB, flows.TicketUUID(request.TicketID), typeRocketChat)
 	if err != nil {
-		return errors.Errorf("no such ticket %s", request.Visitor.Token), http.StatusNotFound, nil
+		return errors.Errorf("no such ticket %s", request.TicketID), http.StatusNotFound, nil
 	}
 
+	// handle event callback
 	switch request.Type {
 
 	case "agent-message":
-		data := &agentMessageData{}
+		data := &agentMessage{}
 		if err := utils.UnmarshalAndValidate(request.Data, data); err != nil {
 			return err, http.StatusBadRequest, nil
 		}
