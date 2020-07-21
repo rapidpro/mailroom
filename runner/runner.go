@@ -186,7 +186,7 @@ func StartFlowBatch(
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
 		if batch.ParentSummary() != nil {
-			tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).FlowAction(batch.ParentSummary())
+			tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).FlowAction(batch.SessionHistory(), batch.ParentSummary())
 			if batchStart {
 				tb = tb.AsBatch()
 			}

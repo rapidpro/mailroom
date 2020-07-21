@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -91,8 +92,9 @@ type FlowStartBatch struct {
 		FlowType   FlowType    `json:"flow_type"`
 		ContactIDs []ContactID `json:"contact_ids"`
 
-		ParentSummary null.JSON `json:"parent_summary,omitempty"`
-		Extra         null.JSON `json:"extra,omitempty"`
+		ParentSummary  null.JSON             `json:"parent_summary,omitempty"`
+		SessionHistory *flows.SessionHistory `json:"session_history,omitempty"`
+		Extra          null.JSON             `json:"extra,omitempty"`
 
 		RestartParticipants RestartParticipants `json:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"`
@@ -113,8 +115,9 @@ func (b *FlowStartBatch) IncludeActive() IncludeActive             { return b.b.
 func (b *FlowStartBatch) IsLast() bool                             { return b.b.IsLast }
 func (b *FlowStartBatch) TotalContacts() int                       { return b.b.TotalContacts }
 
-func (b *FlowStartBatch) ParentSummary() json.RawMessage { return json.RawMessage(b.b.ParentSummary) }
-func (b *FlowStartBatch) Extra() json.RawMessage         { return json.RawMessage(b.b.Extra) }
+func (b *FlowStartBatch) ParentSummary() json.RawMessage        { return json.RawMessage(b.b.ParentSummary) }
+func (b *FlowStartBatch) SessionHistory() *flows.SessionHistory { return b.b.SessionHistory }
+func (b *FlowStartBatch) Extra() json.RawMessage                { return json.RawMessage(b.b.Extra) }
 
 func (b *FlowStartBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -139,8 +142,9 @@ type FlowStart struct {
 		RestartParticipants RestartParticipants `json:"restart_participants" db:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"       db:"include_active"`
 
-		Extra         null.JSON `json:"extra,omitempty"          db:"extra"`
-		ParentSummary null.JSON `json:"parent_summary,omitempty" db:"parent_summary"`
+		Extra          null.JSON             `json:"extra,omitempty"          db:"extra"`
+		ParentSummary  null.JSON             `json:"parent_summary,omitempty" db:"parent_summary"`
+		SessionHistory *flows.SessionHistory `json:"session_history,omitempty"`
 
 		CreatedBy string `json:"created_by"`
 	}
@@ -190,6 +194,12 @@ func (s *FlowStart) WithParentSummary(sum json.RawMessage) *FlowStart {
 	return s
 }
 
+func (s *FlowStart) SessionHistory() *flows.SessionHistory { return s.s.SessionHistory }
+func (s *FlowStart) WithSessionHistory(history *flows.SessionHistory) *FlowStart {
+	s.s.SessionHistory = history
+	return s
+}
+
 func (s *FlowStart) Extra() json.RawMessage { return json.RawMessage(s.s.Extra) }
 func (s *FlowStart) WithExtra(extra json.RawMessage) *FlowStart {
 	s.s.Extra = null.JSON(extra)
@@ -202,7 +212,7 @@ func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and extra
 func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
-	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra, parent_summary FROM flows_flowstart WHERE id = $1`, startID)
+	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra, parent_summary, session_history FROM flows_flowstart WHERE id = $1`, startID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load start attributes for id: %d", startID)
 	}
@@ -320,6 +330,7 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 	b.b.RestartParticipants = s.RestartParticipants()
 	b.b.IncludeActive = s.IncludeActive()
 	b.b.ParentSummary = null.JSON(s.ParentSummary())
+	b.b.SessionHistory = s.SessionHistory()
 	b.b.Extra = null.JSON(s.Extra())
 	b.b.IsLast = last
 	b.b.TotalContacts = totalContacts

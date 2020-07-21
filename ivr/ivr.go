@@ -359,7 +359,7 @@ func StartIVRFlow(
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
-			FlowAction(start.ParentSummary()).
+			FlowAction(start.SessionHistory(), start.ParentSummary()).
 			WithConnection(channel.ChannelReference(), urn).
 			Build()
 	} else {

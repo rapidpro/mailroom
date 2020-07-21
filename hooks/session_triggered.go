@@ -97,7 +97,8 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 				WithURNs(event.URNs).
 				WithQuery(event.ContactQuery).
 				WithCreateContact(event.CreateContact).
-				WithParentSummary(event.RunSummary)
+				WithParentSummary(event.RunSummary).
+				WithSessionHistory(event.History)
 
 			starts = append(starts, start)
 
