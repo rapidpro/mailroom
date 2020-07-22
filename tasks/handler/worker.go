@@ -405,12 +405,17 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	switch eventType {
 
 	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
-		channelEvent := triggers.NewChannelEvent(triggers.ChannelEventType(eventType), channel.ChannelReference())
-		flowTrigger = triggers.NewChannel(oa.Env(), flow.FlowReference(), contact, channelEvent, params)
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
+			WithParams(params).
+			Build()
 
 	case models.MOCallEventType:
 		urn := contacts[0].URNForID(event.URNID())
-		flowTrigger = triggers.NewIncomingCall(oa.Env(), flow.FlowReference(), contact, urn, channel.ChannelReference())
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
+			WithConnection(urn).
+			Build()
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
@@ -607,7 +612,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 			}
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewMsg(oa.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
+			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
 			_, err = runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")

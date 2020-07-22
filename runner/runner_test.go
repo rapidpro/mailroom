@@ -22,13 +22,7 @@ func TestCampaignStarts(t *testing.T) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
-	event := triggers.NewCampaignEvent(
-		"e68f4c70-9db1-44c8-8498-602d6857235e",
-		triggers.NewCampaignReference(
-			string(models.DoctorRemindersCampaignUUID),
-			"Doctor Reminders",
-		),
-	)
+	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(models.DoctorRemindersCampaignUUID), "Doctor Reminders")
 
 	// create our event fires
 	now := time.Now()
@@ -45,26 +39,26 @@ func TestCampaignStarts(t *testing.T) {
 
 	contacts := []models.ContactID{models.CathyID, models.BobID}
 	fires := []*models.EventFire{
-		&models.EventFire{
+		{
 			FireID:    1,
 			EventID:   models.RemindersEvent2ID,
 			ContactID: models.CathyID,
 			Scheduled: now,
 		},
-		&models.EventFire{
+		{
 			FireID:    2,
 			EventID:   models.RemindersEvent2ID,
 			ContactID: models.BobID,
 			Scheduled: now,
 		},
-		&models.EventFire{
+		{
 			FireID:    3,
 			EventID:   models.RemindersEvent2ID,
 			ContactID: models.AlexandriaID,
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, models.Org1, fires, models.CampaignFlowUUID, event)
+	sessions, err := FireCampaignEvents(ctx, db, rp, models.Org1, fires, models.CampaignFlowUUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
 
@@ -196,7 +190,7 @@ func TestContactRuns(t *testing.T) {
 	contact, err := contacts[0].FlowContact(oa)
 	assert.NoError(t, err)
 
-	trigger := triggers.NewManual(oa.Env(), flow.FlowReference(), contact, false, nil)
+	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
 	sessions, err := StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
