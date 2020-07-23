@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/locker"
@@ -180,13 +181,21 @@ func StartFlowBatch(
 		}
 	}
 
+	var history *flows.SessionHistory
+	if len(batch.SessionHistory()) > 0 {
+		err := jsonx.Unmarshal(batch.SessionHistory(), history)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to read JSON from flow start history")
+		}
+	}
+
 	// whether engine allows some functions is based on whether there is more than one contact being started
 	batchStart := batch.TotalContacts() > 1
 
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
 		if batch.ParentSummary() != nil {
-			tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).FlowAction(batch.SessionHistory(), batch.ParentSummary())
+			tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).FlowAction(history, batch.ParentSummary())
 			if batchStart {
 				tb = tb.AsBatch()
 			}

@@ -7,7 +7,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -92,9 +91,9 @@ type FlowStartBatch struct {
 		FlowType   FlowType    `json:"flow_type"`
 		ContactIDs []ContactID `json:"contact_ids"`
 
-		ParentSummary  null.JSON             `json:"parent_summary,omitempty"`
-		SessionHistory *flows.SessionHistory `json:"session_history,omitempty"`
-		Extra          null.JSON             `json:"extra,omitempty"`
+		ParentSummary  null.JSON `json:"parent_summary,omitempty"`
+		SessionHistory null.JSON `json:"session_history,omitempty"`
+		Extra          null.JSON `json:"extra,omitempty"`
 
 		RestartParticipants RestartParticipants `json:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"`
@@ -115,9 +114,9 @@ func (b *FlowStartBatch) IncludeActive() IncludeActive             { return b.b.
 func (b *FlowStartBatch) IsLast() bool                             { return b.b.IsLast }
 func (b *FlowStartBatch) TotalContacts() int                       { return b.b.TotalContacts }
 
-func (b *FlowStartBatch) ParentSummary() json.RawMessage        { return json.RawMessage(b.b.ParentSummary) }
-func (b *FlowStartBatch) SessionHistory() *flows.SessionHistory { return b.b.SessionHistory }
-func (b *FlowStartBatch) Extra() json.RawMessage                { return json.RawMessage(b.b.Extra) }
+func (b *FlowStartBatch) ParentSummary() json.RawMessage  { return json.RawMessage(b.b.ParentSummary) }
+func (b *FlowStartBatch) SessionHistory() json.RawMessage { return json.RawMessage(b.b.SessionHistory) }
+func (b *FlowStartBatch) Extra() json.RawMessage          { return json.RawMessage(b.b.Extra) }
 
 func (b *FlowStartBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -142,9 +141,9 @@ type FlowStart struct {
 		RestartParticipants RestartParticipants `json:"restart_participants" db:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"       db:"include_active"`
 
-		Extra          null.JSON             `json:"extra,omitempty"          db:"extra"`
-		ParentSummary  null.JSON             `json:"parent_summary,omitempty" db:"parent_summary"`
-		SessionHistory *flows.SessionHistory `json:"session_history,omitempty"`
+		Extra          null.JSON `json:"extra,omitempty"           db:"extra"`
+		ParentSummary  null.JSON `json:"parent_summary,omitempty"  db:"parent_summary"`
+		SessionHistory null.JSON `json:"session_history,omitempty" db:"session_history"`
 
 		CreatedBy string `json:"created_by"`
 	}
@@ -194,9 +193,9 @@ func (s *FlowStart) WithParentSummary(sum json.RawMessage) *FlowStart {
 	return s
 }
 
-func (s *FlowStart) SessionHistory() *flows.SessionHistory { return s.s.SessionHistory }
-func (s *FlowStart) WithSessionHistory(history *flows.SessionHistory) *FlowStart {
-	s.s.SessionHistory = history
+func (s *FlowStart) SessionHistory() json.RawMessage { return json.RawMessage(s.s.SessionHistory) }
+func (s *FlowStart) WithSessionHistory(history json.RawMessage) *FlowStart {
+	s.s.SessionHistory = null.JSON(history)
 	return s
 }
 
@@ -330,7 +329,7 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 	b.b.RestartParticipants = s.RestartParticipants()
 	b.b.IncludeActive = s.IncludeActive()
 	b.b.ParentSummary = null.JSON(s.ParentSummary())
-	b.b.SessionHistory = s.SessionHistory()
+	b.b.SessionHistory = null.JSON(s.SessionHistory())
 	b.b.Extra = null.JSON(s.Extra())
 	b.b.IsLast = last
 	b.b.TotalContacts = totalContacts

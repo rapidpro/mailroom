@@ -19,6 +19,7 @@ import (
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/httputils"
@@ -353,13 +354,21 @@ func StartIVRFlow(
 		}
 	}
 
+	var history *flows.SessionHistory
+	if len(start.SessionHistory()) > 0 {
+		err := jsonx.Unmarshal(start.SessionHistory(), history)
+		if err != nil {
+			return errors.Wrap(err, "unable to read JSON from flow start history")
+		}
+	}
+
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
-			FlowAction(start.SessionHistory(), start.ParentSummary()).
+			FlowAction(history, start.ParentSummary()).
 			WithConnection(channel.ChannelReference(), urn).
 			Build()
 	} else {
