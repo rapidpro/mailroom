@@ -93,7 +93,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 			historyJSON, err := jsonx.Marshal(event.History)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "error marshaling session history")
 			}
 
 			// create our start
