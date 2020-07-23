@@ -10,7 +10,6 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/mailroom/locker"
@@ -183,7 +182,7 @@ func StartFlowBatch(
 
 	var history *flows.SessionHistory
 	if len(batch.SessionHistory()) > 0 {
-		err := jsonx.Unmarshal(batch.SessionHistory(), history)
+		history, err = models.ReadSessionHistory(batch.SessionHistory())
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to read JSON from flow start history")
 		}

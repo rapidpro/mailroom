@@ -7,6 +7,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -299,8 +301,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary)
-			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary)
+	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary,  session_history)
+			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary, :session_history)
 RETURNING
 	id
 `
@@ -355,4 +357,10 @@ func (i StartID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *StartID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
+}
+
+// ReadSessionHistory reads a session history from the given JSON
+func ReadSessionHistory(data []byte) (*flows.SessionHistory, error) {
+	h := &flows.SessionHistory{}
+	return h, jsonx.Unmarshal(data, h)
 }

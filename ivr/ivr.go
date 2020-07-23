@@ -19,7 +19,6 @@ import (
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/httputils"
@@ -356,7 +355,7 @@ func StartIVRFlow(
 
 	var history *flows.SessionHistory
 	if len(start.SessionHistory()) > 0 {
-		err := jsonx.Unmarshal(start.SessionHistory(), history)
+		history, err = models.ReadSessionHistory(start.SessionHistory())
 		if err != nil {
 			return errors.Wrap(err, "unable to read JSON from flow start history")
 		}
