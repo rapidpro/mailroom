@@ -313,9 +313,14 @@ func TestCreateContact(t *testing.T) {
 		assert.NoError(t, err, "%d: error creating contact", i)
 		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
 	}
+}
+
+func TestStopContact(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
 
 	// stop kathy
-	err = StopContact(ctx, db, Org1, CathyID)
+	err := StopContact(ctx, db, Org1, CathyID)
 	assert.NoError(t, err)
 
 	// verify she's only in the stopped group
