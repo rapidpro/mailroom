@@ -1,3 +1,8 @@
+v5.7.1
+----------
+ * Update to latest goflow v0.96.0
+ * Add loop protection by passing session history to new flow action triggers
+
 v5.7.0
 ----------
  * Set user and origin on manual triggers
