@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,6 +22,8 @@ func TestStarts(t *testing.T) {
 		"query": null,
 		"restart_participants": true,
 		"include_active": true,
+		"parent_summary": {"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"},
+		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1},
 		"extra": {"foo": "bar"}
 	}`)
 
@@ -35,6 +38,9 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, "", start.Query())
 	assert.Equal(t, models.DoRestartParticipants, start.RestartParticipants())
 	assert.Equal(t, models.DoIncludeActive, start.IncludeActive())
+
+	assert.Equal(t, json.RawMessage(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), start.ParentSummary())
+	assert.Equal(t, json.RawMessage(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory())
 	assert.Equal(t, json.RawMessage(`{"foo": "bar"}`), start.Extra())
 
 	batch := start.CreateBatch([]models.ContactID{4567, 5678}, false, 3)
@@ -47,4 +53,15 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, "rowan@nyaruka.com", batch.CreatedBy())
 	assert.False(t, batch.IsLast())
 	assert.Equal(t, 3, batch.TotalContacts())
+
+	assert.Equal(t, json.RawMessage(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), batch.ParentSummary())
+	assert.Equal(t, json.RawMessage(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), batch.SessionHistory())
+	assert.Equal(t, json.RawMessage(`{"foo": "bar"}`), batch.Extra())
+
+	history, err := models.ReadSessionHistory(batch.SessionHistory())
+	assert.NoError(t, err)
+	assert.Equal(t, flows.SessionUUID("532a3899-492f-4ffe-aed7-e75ad524efab"), history.ParentUUID)
+
+	history, err = models.ReadSessionHistory([]byte(`{`))
+	assert.EqualError(t, err, "unexpected end of JSON input")
 }

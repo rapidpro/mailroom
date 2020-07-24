@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/pkg/errors"
@@ -90,6 +91,11 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 				return errors.Wrapf(err, "error loading contacts by reference")
 			}
 
+			historyJSON, err := jsonx.Marshal(event.History)
+			if err != nil {
+				return errors.Wrapf(err, "error marshaling session history")
+			}
+
 			// create our start
 			start := models.NewFlowStart(oa.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID(), models.DoRestartParticipants, models.DoIncludeActive).
 				WithGroupIDs(groupIDs).
@@ -97,7 +103,8 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 				WithURNs(event.URNs).
 				WithQuery(event.ContactQuery).
 				WithCreateContact(event.CreateContact).
-				WithParentSummary(event.RunSummary)
+				WithParentSummary(event.RunSummary).
+				WithSessionHistory(historyJSON)
 
 			starts = append(starts, start)
 
