@@ -353,13 +353,21 @@ func StartIVRFlow(
 		}
 	}
 
+	var history *flows.SessionHistory
+	if len(start.SessionHistory()) > 0 {
+		history, err = models.ReadSessionHistory(start.SessionHistory())
+		if err != nil {
+			return errors.Wrap(err, "unable to read JSON from flow start history")
+		}
+	}
+
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
-			FlowAction(start.ParentSummary()).
+			FlowAction(history, start.ParentSummary()).
 			WithConnection(channel.ChannelReference(), urn).
 			Build()
 	} else {
