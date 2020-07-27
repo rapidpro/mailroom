@@ -131,7 +131,8 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 		if serr != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error serializing handler response")
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error": "error serializing handler response"}`))
+			serialized, _ := json.Marshal(errors.New("error serializing handler response"))
+			w.Write(serialized)
 			return
 		}
 
@@ -219,14 +220,4 @@ type Server struct {
 	wg *sync.WaitGroup
 
 	httpServer *http.Server
-}
-
-// ErrorResponse is the type for our error responses, it just contains a single error field
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
-// NewErrorResponse creates a new error response from the passed in errro
-func NewErrorResponse(err error) *ErrorResponse {
-	return &ErrorResponse{err.Error()}
 }
