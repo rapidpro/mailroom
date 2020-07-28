@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/contactql"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/mailroom/web"
 
@@ -12,6 +13,7 @@ import (
 )
 
 func TestErrorResponse(t *testing.T) {
+	// create a simple error
 	er1 := web.NewErrorResponse(errors.New("I'm an error!"))
 	assert.Equal(t, "I'm an error!", er1.Error)
 
@@ -19,11 +21,14 @@ func TestErrorResponse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(t, `{"error": "I'm an error!"}`, string(er1JSON))
 
-	er2 := web.NewErrorResponse(contactql.NewQueryError("I'm a rich error!", "foo_code", map[string]string{"foo": "123"}))
-	assert.Equal(t, "I'm a rich error!", er2.Error)
-	assert.Equal(t, "foo_code", er2.Code)
+	// create a rich error
+	_, err = contactql.ParseQuery(envs.NewBuilder().Build(), "$$", nil)
+
+	er2 := web.NewErrorResponse(err)
+	assert.Equal(t, "mismatched input '$' expecting {'(', TEXT, STRING}", er2.Error)
+	assert.Equal(t, "unexpected_token", er2.Code)
 
 	er2JSON, err := jsonx.Marshal(er2)
 	assert.NoError(t, err)
-	assert.JSONEq(t, `{"error": "I'm a rich error!", "code": "foo_code", "extra": {"foo": "123"}}`, string(er2JSON))
+	assert.JSONEq(t, `{"error": "mismatched input '$' expecting {'(', TEXT, STRING}", "code": "unexpected_token", "extra": {"token": "$"}}`, string(er2JSON))
 }

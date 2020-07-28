@@ -131,8 +131,7 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 		if serr != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error serializing handler response")
 			w.WriteHeader(http.StatusInternalServerError)
-			serialized, _ := json.Marshal(errors.New("error serializing handler response"))
-			w.Write(serialized)
+			w.Write([]byte(`{"error": "error serializing handler response"}`))
 			return
 		}
 

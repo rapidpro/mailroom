@@ -20,7 +20,7 @@
         "status": 400,
         "response": {
             "error": "mismatched input '$' expecting {'(', TEXT, STRING}",
-            "code": "query_unexpected_token",
+            "code": "unexpected_token",
             "extra": {
                 "token": "$"
             }
@@ -36,7 +36,11 @@
         },
         "status": 400,
         "response": {
-            "error": "can't resolve 'birthday' to attribute, scheme or field"
+            "error": "can't resolve 'birthday' to attribute, scheme or field",
+            "code": "unknown_property",
+            "extra": {
+                "property": "birthday"
+            }
         }
     },
     {
