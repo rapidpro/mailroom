@@ -177,7 +177,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	}
 
 	env := oa.Env()
-	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), oa.SessionAssets())
+	parsed, err := contactql.ParseQuery(env, request.Query, oa.SessionAssets())
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)

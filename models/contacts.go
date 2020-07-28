@@ -220,7 +220,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 	}
 
 	if query != "" {
-		parsed, err = contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
+		parsed, err = contactql.ParseQuery(env, query, org.SessionAssets())
 		if err != nil {
 			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 		}
@@ -282,7 +282,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// turn into elastic query
-	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
+	parsed, err := contactql.ParseQuery(env, query, org.SessionAssets())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
