@@ -1,3 +1,8 @@
+v5.7.2
+----------
+ * Update to latest goflow v0.98.0
+ * Render rich errors with code and extra field
+
 v5.7.1
 ----------
  * Update to latest goflow v0.96.0
