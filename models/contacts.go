@@ -183,7 +183,7 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 }
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.ContactQuery) (elastic.Query, error) {
+func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.ContactQuery) elastic.Query {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
@@ -197,15 +197,11 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.
 
 	// and by our query if present
 	if query != nil {
-		q, err := es.ToElasticQuery(org.Env(), org.SessionAssets(), query)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
-		}
-
+		q := es.ToElasticQuery(org.Env(), query)
 		eq = eq.Must(q)
 	}
 
-	return eq, nil
+	return eq
 }
 
 // ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
@@ -226,12 +222,9 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		}
 	}
 
-	eq, err := BuildElasticQuery(org, group, parsed)
-	if err != nil {
-		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
-	}
+	eq := BuildElasticQuery(org, group, parsed)
 
-	fieldSort, err := es.ToElasticFieldSort(org.SessionAssets(), sort)
+	fieldSort, err := es.ToElasticFieldSort(sort, org.SessionAssets())
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
@@ -287,10 +280,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq, err := BuildElasticQuery(org, "", parsed)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
-	}
+	eq := BuildElasticQuery(org, "", parsed)
 
 	// only include unblocked and unstopped contacts
 	eq = elastic.NewBoolQuery().Must(

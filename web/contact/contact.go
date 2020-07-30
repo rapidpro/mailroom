@@ -203,10 +203,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		allowAsGroup = metadata.AllowAsGroup
 	}
 
-	eq, err := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
+	eq := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
 	eqj, err := eq.Source()
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
