@@ -52,8 +52,8 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 	}
 
 	for _, msg := range msgs {
-		// no channel, continue
-		if msg.ChannelUUID() == "" {
+		// ignore any message without a channel or already marked as failed (maybe org is suspended)
+		if msg.ChannelUUID() == "" || msg.Status() == models.MsgStatusFailed {
 			continue
 		}
 
