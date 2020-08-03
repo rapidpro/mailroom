@@ -36,6 +36,7 @@ type modifyResult struct {
 }
 
 type HookTestCase struct {
+	FlowType      flows.FlowType
 	Actions       ContactActionMap
 	Msgs          ContactMsgMap
 	Modifiers     ContactModifierMap
@@ -134,12 +135,17 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	nodes := []flows.Node{entry}
 	nodes = append(nodes, exitNodes...)
 
+	flowType := tc.FlowType
+	if flowType == "" {
+		flowType = flows.FlowTypeMessaging
+	}
+
 	// we have our nodes, lets create our flow
 	flow, err := definition.NewFlow(
 		uuid,
 		"Test Flow",
 		envs.Language("eng"),
-		flows.FlowTypeMessaging,
+		flowType,
 		1,
 		300,
 		definition.NewLocalization(),
