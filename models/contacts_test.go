@@ -12,6 +12,7 @@ import (
 	"github.com/olivere/elastic"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestElasticContacts(t *testing.T) {
@@ -336,9 +337,12 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	db := testsuite.DB()
 	testsuite.Reset()
 
+	oa, err := GetOrgAssets(ctx, db, Org1)
+	require.NoError(t, err)
+
 	t0 := time.Now()
 
-	err := UpdateContactModifiedOn(ctx, db, []ContactID{CathyID})
+	err = UpdateContactModifiedOn(ctx, db, []ContactID{CathyID})
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, []interface{}{t0}, 1)
@@ -349,6 +353,19 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on > $1`, []interface{}{t1}, 1)
+
+	cathy, err := LoadContact(ctx, db, oa, CathyID)
+	require.NoError(t, err)
+	assert.NotNil(t, cathy.LastSeenOn())
+
+	t2 := *cathy.LastSeenOn()
+
+	err = cathy.UpdateLastSeenOn(ctx, db)
+	require.NoError(t, err)
+
+	t3 := *cathy.LastSeenOn()
+
+	assert.True(t, t3.After(t2))
 }
 
 func TestUpdateContactModifiedBy(t *testing.T) {
