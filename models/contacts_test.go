@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
@@ -330,6 +331,26 @@ func TestStopContact(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE AND is_active = TRUE and is_blocked = FALSE`, []interface{}{CathyID}, 1)
 }
 
+func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	t0 := time.Now()
+
+	err := UpdateContactModifiedOn(ctx, db, []ContactID{CathyID})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, []interface{}{t0}, 1)
+
+	t1 := time.Now()
+
+	err = UpdateContactLastSeenOn(ctx, db, []ContactID{CathyID})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on > $1`, []interface{}{t1}, 1)
+}
+
 func TestUpdateContactModifiedBy(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
@@ -349,7 +370,6 @@ func TestUpdateContactModifiedBy(t *testing.T) {
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(1)}, 1)
-
 }
 
 func TestUpdateContactStatus(t *testing.T) {

@@ -1067,6 +1067,12 @@ func UpdateContactModifiedOn(ctx context.Context, tx Queryer, contactIDs []Conta
 	return err
 }
 
+// UpdateContactLastSeenOn updates last seen on (and modified on) on the passed in contact
+func UpdateContactLastSeenOn(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = NOW(), modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
+	return err
+}
+
 // UpdateContactURNs updates the contact urns in our database to match the passed in changes
 func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes []*ContactURNsChanged) error {
 	// keep track of all our inserts

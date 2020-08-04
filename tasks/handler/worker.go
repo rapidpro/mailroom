@@ -631,10 +631,25 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		return nil
 	}
 
-	err = models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topupID)
+	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
+	err = handleAsInbox(ctx, db, modelContact.ID(), event.MsgID, topupID)
+	if err != nil {
+		return errors.Wrapf(err, "error handling inbox message")
+	}
+	return nil
+}
+
+func handleAsInbox(ctx context.Context, db *sqlx.DB, contactID models.ContactID, msgID flows.MsgID, topupID models.TopupID) error {
+	err := models.UpdateMessage(ctx, db, msgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
+
+	err = models.UpdateContactLastSeenOn(ctx, db, []models.ContactID{contactID})
+	if err != nil {
+		return errors.Wrapf(err, "error updating contact last_seen_on and modified_on")
+	}
+
 	return nil
 }
 
