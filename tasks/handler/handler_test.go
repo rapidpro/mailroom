@@ -270,9 +270,9 @@ func TestChannelEvents(t *testing.T) {
 
 	models.FlushCache()
 
-	last := time.Now()
 	for i, tc := range tcs {
 		start := time.Now()
+
 		event := models.NewChannelEvent(tc.EventType, tc.OrgID, tc.ChannelID, tc.ContactID, tc.URNID, tc.Extra, false)
 		eventJSON, err := json.Marshal(event)
 		assert.NoError(t, err)
@@ -295,18 +295,16 @@ func TestChannelEvents(t *testing.T) {
 		// if we are meant to have a response
 		if tc.Response != "" {
 			var text string
-			err = db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, last)
+			err = db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.Response, text, "%d: response: '%s' is not '%s'", i, text, tc.Response)
 		}
-
-		last = time.Now()
 
 		if tc.UpdateLastSeen {
 			var lastSeen time.Time
 			err = db.Get(&lastSeen, `SELECT last_seen_on FROM contacts_contact WHERE id = $1`, tc.ContactID)
 			assert.NoError(t, err)
-			assert.True(t, lastSeen.After(start))
+			assert.True(t, lastSeen.Equal(start) || lastSeen.After(start), "%d: expected last seen to be updated", i)
 		}
 	}
 }
