@@ -1080,7 +1080,7 @@ func UpdateContactModifiedOn(ctx context.Context, tx Queryer, contactIDs []Conta
 
 // UpdateContactLastSeenOn updates last seen on (and modified on) on the passed in contact
 func UpdateContactLastSeenOn(ctx context.Context, tx Queryer, contactID ContactID, lastSeenOn time.Time) error {
-	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = $2, modified_on = NOW() WHERE id = $1`, contactID, lastSeenOn)
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = $2, modified_on = NOW() WHERE id = $1 AND last_seen_on IS NULL OR last_seen_on < $2`, contactID, lastSeenOn)
 	return err
 }
 
