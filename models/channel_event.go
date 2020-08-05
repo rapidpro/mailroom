@@ -12,13 +12,26 @@ import (
 type ChannelEventType string
 type ChannelEventID int64
 
+// channel event types
 const (
 	NewConversationEventType = ChannelEventType("new_conversation")
-	WelcomeMessateEventType  = ChannelEventType("welcome_message")
+	WelcomeMessageEventType  = ChannelEventType("welcome_message")
 	ReferralEventType        = ChannelEventType("referral")
+	MTMissEventType          = ChannelEventType("mt_miss")
+	MTCallEventType          = ChannelEventType("mt_call")
 	MOMissEventType          = ChannelEventType("mo_miss")
 	MOCallEventType          = ChannelEventType("mo_call")
+	StopContactEventType     = ChannelEventType("stop_contact")
 )
+
+// ContactSeenEvents are those which count as the contact having been seen
+var ContactSeenEvents = map[ChannelEventType]bool{
+	NewConversationEventType: true,
+	ReferralEventType:        true,
+	MOMissEventType:          true,
+	MOCallEventType:          true,
+	StopContactEventType:     true,
+}
 
 // ChannelEvent represents an event that occurred associated with a channel, such as a referral, missed call, etc..
 type ChannelEvent struct {

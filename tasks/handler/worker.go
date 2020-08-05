@@ -307,6 +307,13 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		return nil, nil
 	}
 
+	if models.ContactSeenEvents[eventType] {
+		err = models.UpdateContactLastSeenOn(ctx, db, []models.ContactID{event.ContactID()})
+		if err != nil {
+			return nil, errors.Wrap(err, "error updating contact last_seen_on")
+		}
+	}
+
 	// load our contact
 	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{event.ContactID()})
 	if err != nil {
@@ -322,6 +329,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	// do we have associated trigger?
 	var trigger *models.Trigger
+
 	switch eventType {
 
 	case models.NewConversationEventType:
@@ -336,7 +344,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	case models.MOCallEventType:
 		trigger = models.FindMatchingMOCallTrigger(oa, modelContact)
 
-	case models.WelcomeMessateEventType:
+	case models.WelcomeMessageEventType:
 		trigger = nil
 
 	default:

@@ -78,8 +78,9 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 			language:   e.Language,
 			isStopped:  e.IsStopped,
 			isBlocked:  e.IsBlocked,
-			modifiedOn: e.ModifiedOn,
 			createdOn:  e.CreatedOn,
+			modifiedOn: e.ModifiedOn,
+			lastSeenOn: e.LastSeenOn,
 		}
 
 		// load our real groups
@@ -383,8 +384,9 @@ type Contact struct {
 	fields     map[string]*flows.Value
 	groups     []*Group
 	urns       []urns.URN
-	modifiedOn time.Time
 	createdOn  time.Time
+	modifiedOn time.Time
+	lastSeenOn *time.Time
 }
 
 func (c *Contact) ID() ContactID                   { return c.id }
@@ -396,8 +398,9 @@ func (c *Contact) IsBlocked() bool                 { return c.isBlocked }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
 func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
-func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
+func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
+func (c *Contact) LastSeenOn() *time.Time          { return c.lastSeenOn }
 
 func (c *Contact) Status() flows.ContactStatus {
 	if c.isBlocked {
@@ -468,8 +471,9 @@ type contactEnvelope struct {
 	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
 	GroupIDs   []GroupID                                `json:"group_ids"`
 	URNs       []ContactURN                             `json:"urns"`
-	ModifiedOn time.Time                                `json:"modified_on"`
 	CreatedOn  time.Time                                `json:"created_on"`
+	ModifiedOn time.Time                                `json:"modified_on"`
+	LastSeenOn *time.Time                               `json:"last_seen_on"`
 }
 
 const selectContactSQL = `
@@ -484,6 +488,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	is_active,
 	created_on,
 	modified_on,
+	last_seen_on,
 	fields,
 	g.groups AS group_ids,
 	u.urns AS urns
