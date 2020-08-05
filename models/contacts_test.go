@@ -357,15 +357,6 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	cathy, err := LoadContact(ctx, db, oa, CathyID)
 	require.NoError(t, err)
 	assert.NotNil(t, cathy.LastSeenOn())
-
-	t2 := *cathy.LastSeenOn()
-
-	err = cathy.UpdateLastSeenOn(ctx, db)
-	require.NoError(t, err)
-
-	t3 := *cathy.LastSeenOn()
-
-	assert.True(t, t3.After(t2))
 }
 
 func TestUpdateContactModifiedBy(t *testing.T) {

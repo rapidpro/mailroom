@@ -17,7 +17,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/olivere/elastic"
@@ -926,14 +925,6 @@ SET
 WHERE 
 	id = $1
 `
-
-// UpdateLastSeenOn updates the last seen on for the contact
-func (c *Contact) UpdateLastSeenOn(ctx context.Context, tx Queryer) error {
-	t := dates.Now()
-	c.lastSeenOn = &t
-	c.modifiedOn = t
-	return UpdateContactLastSeenOn(ctx, tx, []ContactID{c.id})
-}
 
 // UpdatePreferredURN updates the URNs for the contact (if needbe) to have the passed in URN as top priority
 // with the passed in channel as the preferred channel

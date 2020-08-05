@@ -307,6 +307,13 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		return nil, nil
 	}
 
+	if models.ContactSeenEvents[eventType] {
+		err = models.UpdateContactLastSeenOn(ctx, db, []models.ContactID{event.ContactID()})
+		if err != nil {
+			return nil, errors.Wrap(err, "error updating contact last_seen_on")
+		}
+	}
+
 	// load our contact
 	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{event.ContactID()})
 	if err != nil {
@@ -320,40 +327,28 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	modelContact := contacts[0]
 
-	// do we have associated trigger and should this event count as contact being seen?
+	// do we have associated trigger?
 	var trigger *models.Trigger
-	updateLastSeen := false
 
 	switch eventType {
 
 	case models.NewConversationEventType:
 		trigger = models.FindMatchingNewConversationTrigger(oa, channel)
-		updateLastSeen = true
 
 	case models.ReferralEventType:
 		trigger = models.FindMatchingReferralTrigger(oa, channel, event.ExtraValue("referrer_id"))
-		updateLastSeen = true
 
 	case models.MOMissEventType:
 		trigger = models.FindMatchingMissedCallTrigger(oa)
-		updateLastSeen = true
 
 	case models.MOCallEventType:
 		trigger = models.FindMatchingMOCallTrigger(oa, modelContact)
-		updateLastSeen = true
 
 	case models.WelcomeMessageEventType:
 		trigger = nil
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
-	}
-
-	if updateLastSeen {
-		err = modelContact.UpdateLastSeenOn(ctx, db)
-		if err != nil {
-			return nil, errors.Wrap(err, "error updating contact last_seen_on")
-		}
 	}
 
 	// make sure this URN is our highest priority (this is usually a noop)
