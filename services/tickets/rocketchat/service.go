@@ -11,14 +11,14 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 const (
 	typeRocketChat = "rocketchat"
 
-	configDomain = "domain"
-	configAppID  = "appID"
-	configSecret = "secret"
+	configURLBase = "url_base"
+	configSecret  = "secret"
 )
 
 func init() {
@@ -33,21 +33,20 @@ type service struct {
 
 // NewService creates a new RocketChat ticket service
 func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
-	domain := config[configDomain]
-	appID := config[configAppID]
+	baseURL := config[configURLBase]
 	secret := config[configSecret]
 
-	if domain != "" && secret != "" {
+	if baseURL != "" && secret != "" {
 		return &service{
-			client:   NewClient(httpClient, httpRetries, domain, appID, secret),
+			client:   NewClient(httpClient, httpRetries, baseURL, secret),
 			ticketer: ticketer,
 			redactor: utils.NewRedactor(flows.RedactionMask, secret),
 		}, nil
 	}
-	return nil, errors.New("missing domain or app ID or secret config")
+	return nil, errors.New("missing url_base or secret config")
 }
 
-// VisitorToken ticket user ID, RocketChat allows one room/ticket per user only
+// VisitorToken ticket user ID, RocketChat allows one room/ticket per user/contact
 type VisitorToken models.ContactID
 
 // Open opens a ticket which for RocketChat means open a room associated to a visitor user
@@ -80,6 +79,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		},
 		TicketID: string(ticketUUID),
 	}
+	room.SessionStart = session.Runs()[0].CreatedOn().Format(time.RFC3339)
 
 	// to fully support the RocketChat ticketer, look up extra fields from ticket body for now
 	extra := &struct {
@@ -92,7 +92,6 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		room.Visitor.Department = extra.Department
 		room.Visitor.CustomFields = extra.CustomFields
 		room.Priority = extra.Priority
-		room.SessionStart = extra.SessionStart
 	}
 
 	roomID, trace, err := s.client.CreateRoom(room)
@@ -100,7 +99,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error calling RocketChat")
 	}
 
 	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, roomID), nil
@@ -119,7 +118,10 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
-	return err
+	if err != nil {
+		return errors.Wrap(err, "error calling RocketChat")
+	}
+	return nil
 }
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
@@ -131,7 +133,7 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error calling RocketChat")
 		}
 	}
 	return nil

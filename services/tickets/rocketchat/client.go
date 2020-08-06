@@ -2,10 +2,10 @@ package rocketchat
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/jsonx"
+	"github.com/pkg/errors"
 	"io"
 	"net/http"
 )
@@ -14,29 +14,26 @@ import (
 type Client struct {
 	httpClient  *http.Client
 	httpRetries *httpx.RetryConfig
-	domain      string
-	appID       string
+	URLBase     string
 	secret      string
 }
 
 // NewClient creates a new RocketChat app client
-func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, domain, appID, secret string) *Client {
+func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, URLBase, secret string) *Client {
 	return &Client{
 		httpClient:  httpClient,
 		httpRetries: httpRetries,
-		domain:      domain,
-		appID:       appID,
+		URLBase:     URLBase,
 		secret:      secret,
 	}
 }
 
 type errorResponse struct {
-	Title       string `json:"error"`
-	Description string `json:"details"`
+	Error string `json:"error"`
 }
 
 func (c *Client) request(method, endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
-	url := fmt.Sprintf("https://%s/api/apps/public/%s/%s", c.domain, c.appID, endpoint)
+	url := fmt.Sprintf("%s/%s", c.URLBase, endpoint)
 	headers := map[string]string{
 		"Authorization": fmt.Sprintf("Token %s", c.secret),
 		"Content-Type":  "application/json",
@@ -67,7 +64,7 @@ func (c *Client) request(method, endpoint string, payload interface{}, response 
 		if err != nil {
 			return trace, err
 		}
-		return trace, errors.New(response.Description)
+		return trace, errors.New(response.Error)
 	}
 
 	if response != nil {
@@ -85,20 +82,20 @@ func (c *Client) post(endpoint string, payload interface{}, response interface{}
 }
 
 type Visitor struct {
-	Token        string            `json:"token"       validate:"required"`
-	ContactUUID  string            `json:"contactUuid"`
-	Department   string            `json:"department"`
-	Name         string            `json:"name"`
-	Email        string            `json:"email"`
-	Phone        string            `json:"phone"`
-	CustomFields map[string]string `json:"customFields"`
+	Token        string            `json:"token"`
+	ContactUUID  string            `json:"contactUUID,omitempty"`
+	Department   string            `json:"department,omitempty"`
+	Name         string            `json:"name,omitempty"`
+	Email        string            `json:"email,omitempty"`
+	Phone        string            `json:"phone,omitempty"`
+	CustomFields map[string]string `json:"customFields,omitempty"`
 }
 
 type Room struct {
-	Visitor      Visitor `json:"visitor"     validate:"required"`
-	TicketID     string  `json:"ticketId"    validate:"required"`
-	Priority     string  `json:"priority"`
-	SessionStart string  `json:"sessionStart"`
+	Visitor      Visitor `json:"visitor"`
+	TicketID     string  `json:"ticketID"`
+	Priority     string  `json:"priority,omitempty"`
+	SessionStart string  `json:"sessionStart,omitempty"`
 }
 
 // CreateRoom creates a new room and returns the ID
@@ -129,9 +126,8 @@ func (c *Client) CloseRoom(visitor *Visitor) (*httpx.Trace, error) {
 }
 
 type VisitorMsg struct {
-	Visitor     Visitor  `json:"visitor"    validate:"required"`
+	Visitor     Visitor  `json:"visitor"`
 	Text        string   `json:"text"`
-	Attachments []string `json:"attachments"`
 }
 
 func (c *Client) SendMessage(msg *VisitorMsg) (string, *httpx.Trace, error) {
