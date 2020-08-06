@@ -80,7 +80,7 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
+	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -172,13 +172,13 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields)
+	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	env := oa.Env()
-	parsed, err := contactql.ParseQuery(request.Query, env.RedactionPolicy(), env.DefaultCountry(), oa.SessionAssets())
+	parsed, err := contactql.ParseQuery(env, request.Query, oa.SessionAssets())
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
@@ -204,10 +204,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		allowAsGroup = metadata.AllowAsGroup
 	}
 
-	eq, err := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
+	eq := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
 	eqj, err := eq.Source()
 	if err != nil {
 		return nil, http.StatusInternalServerError, err

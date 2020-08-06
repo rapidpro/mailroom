@@ -55,7 +55,7 @@ func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 
 	// add our callback
 	scene.AppendToEventPreCommitHook(commitURNChangesHook, change)
-	scene.AppendToEventPreCommitHook(contactModifiedHook, scene.Contact().ID())
+	scene.AppendToEventPreCommitHook(contactModifiedHook, scene.ContactID())
 
 	return nil
 }

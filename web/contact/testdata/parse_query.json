@@ -10,7 +10,24 @@
         }
     },
     {
-        "label": "invalid body",
+        "label": "query that is syntactically invalid",
+        "method": "POST",
+        "path": "/mr/contact/parse_query",
+        "body": {
+            "org_id": 1,
+            "query": "$"
+        },
+        "status": 400,
+        "response": {
+            "error": "mismatched input '$' expecting {'(', TEXT, STRING}",
+            "code": "unexpected_token",
+            "extra": {
+                "token": "$"
+            }
+        }
+    },
+    {
+        "label": "query with invalid property",
         "method": "POST",
         "path": "/mr/contact/parse_query",
         "body": {
@@ -19,7 +36,11 @@
         },
         "status": 400,
         "response": {
-            "error": "can't resolve 'birthday' to attribute, scheme or field"
+            "error": "can't resolve 'birthday' to attribute, scheme or field",
+            "code": "unknown_property",
+            "extra": {
+                "property": "birthday"
+            }
         }
     },
     {

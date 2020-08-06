@@ -1,3 +1,17 @@
+v5.7.4
+----------
+ * Fail outgoing messages for suspended orgs
+ * Refresh groups as well as fields for contact query parsing
+
+v5.7.3
+----------
+ * Update to goflow v0.99.0
+
+v5.7.2
+----------
+ * Update to latest goflow v0.98.0
+ * Render rich errors with code and extra field
+
 v5.7.1
 ----------
  * Update to latest goflow v0.96.0

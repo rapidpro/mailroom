@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
@@ -11,6 +12,7 @@ import (
 	"github.com/olivere/elastic"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestElasticContacts(t *testing.T) {
@@ -329,6 +331,58 @@ func TestStopContact(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE AND is_active = TRUE and is_blocked = FALSE`, []interface{}{CathyID}, 1)
 }
 
+func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	oa, err := GetOrgAssets(ctx, db, Org1)
+	require.NoError(t, err)
+
+	t0 := time.Now()
+
+	err = UpdateContactModifiedOn(ctx, db, []ContactID{CathyID})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, []interface{}{t0}, 1)
+
+	t1 := time.Now().Truncate(time.Millisecond)
+	time.Sleep(time.Millisecond * 5)
+
+	err = UpdateContactLastSeenOn(ctx, db, CathyID, t1)
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on = $1`, []interface{}{t1}, 1)
+
+	cathy, err := LoadContact(ctx, db, oa, CathyID)
+	require.NoError(t, err)
+	assert.NotNil(t, cathy.LastSeenOn())
+	assert.True(t, t1.Equal(*cathy.LastSeenOn()))
+	assert.True(t, cathy.ModifiedOn().After(t1))
+
+	t2 := time.Now().Truncate(time.Millisecond)
+	time.Sleep(time.Millisecond * 5)
+
+	// can update directly from the contact object
+	err = cathy.UpdateLastSeenOn(ctx, db, t2)
+	require.NoError(t, err)
+	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
+
+	// and that also updates the database
+	cathy, err = LoadContact(ctx, db, oa, CathyID)
+	require.NoError(t, err)
+	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
+	assert.True(t, cathy.ModifiedOn().After(t2))
+
+	// can't accidently overwrite a newer date
+	err = cathy.UpdateLastSeenOn(ctx, db, time.Date(2010, 1, 1, 12, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+
+	cathy, err = LoadContact(ctx, db, oa, CathyID)
+	require.NoError(t, err)
+	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
+}
+
 func TestUpdateContactModifiedBy(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
@@ -348,7 +402,6 @@ func TestUpdateContactModifiedBy(t *testing.T) {
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(1)}, 1)
-
 }
 
 func TestUpdateContactStatus(t *testing.T) {

@@ -79,8 +79,9 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 			language:   e.Language,
 			isStopped:  e.IsStopped,
 			isBlocked:  e.IsBlocked,
-			modifiedOn: e.ModifiedOn,
 			createdOn:  e.CreatedOn,
+			modifiedOn: e.ModifiedOn,
+			lastSeenOn: e.LastSeenOn,
 		}
 
 		// load our real groups
@@ -184,7 +185,7 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 }
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.ContactQuery) (elastic.Query, error) {
+func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.ContactQuery) elastic.Query {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
@@ -198,15 +199,11 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.
 
 	// and by our query if present
 	if query != nil {
-		q, err := es.ToElasticQuery(org.Env(), org.SessionAssets(), query)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
-		}
-
+		q := es.ToElasticQuery(org.Env(), query)
 		eq = eq.Must(q)
 	}
 
-	return eq, nil
+	return eq
 }
 
 // ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
@@ -221,18 +218,15 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 	}
 
 	if query != "" {
-		parsed, err = contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
+		parsed, err = contactql.ParseQuery(env, query, org.SessionAssets())
 		if err != nil {
 			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 		}
 	}
 
-	eq, err := BuildElasticQuery(org, group, parsed)
-	if err != nil {
-		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
-	}
+	eq := BuildElasticQuery(org, group, parsed)
 
-	fieldSort, err := es.ToElasticFieldSort(org.SessionAssets(), sort)
+	fieldSort, err := es.ToElasticFieldSort(sort, org.SessionAssets())
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
@@ -283,15 +277,12 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 	}
 
 	// turn into elastic query
-	parsed, err := contactql.ParseQuery(query, env.RedactionPolicy(), env.DefaultCountry(), org.SessionAssets())
+	parsed, err := contactql.ParseQuery(env, query, org.SessionAssets())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq, err := BuildElasticQuery(org, "", parsed)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
-	}
+	eq := BuildElasticQuery(org, "", parsed)
 
 	// only include unblocked and unstopped contacts
 	eq = elastic.NewBoolQuery().Must(
@@ -394,8 +385,9 @@ type Contact struct {
 	fields     map[string]*flows.Value
 	groups     []*Group
 	urns       []urns.URN
-	modifiedOn time.Time
 	createdOn  time.Time
+	modifiedOn time.Time
+	lastSeenOn *time.Time
 }
 
 func (c *Contact) ID() ContactID                   { return c.id }
@@ -407,8 +399,9 @@ func (c *Contact) IsBlocked() bool                 { return c.isBlocked }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
 func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
-func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
+func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
+func (c *Contact) LastSeenOn() *time.Time          { return c.lastSeenOn }
 
 func (c *Contact) Status() flows.ContactStatus {
 	if c.isBlocked {
@@ -479,8 +472,9 @@ type contactEnvelope struct {
 	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
 	GroupIDs   []GroupID                                `json:"group_ids"`
 	URNs       []ContactURN                             `json:"urns"`
-	ModifiedOn time.Time                                `json:"modified_on"`
 	CreatedOn  time.Time                                `json:"created_on"`
+	ModifiedOn time.Time                                `json:"modified_on"`
+	LastSeenOn *time.Time                               `json:"last_seen_on"`
 }
 
 const selectContactSQL = `
@@ -495,6 +489,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	is_active,
 	created_on,
 	modified_on,
+	last_seen_on,
 	fields,
 	g.groups AS group_ids,
 	u.urns AS urns
@@ -993,6 +988,12 @@ WHERE
 	id = $1
 `
 
+// UpdateLastSeenOn updates last seen on (and modified on)
+func (c *Contact) UpdateLastSeenOn(ctx context.Context, tx Queryer, lastSeenOn time.Time) error {
+	c.lastSeenOn = &lastSeenOn
+	return UpdateContactLastSeenOn(ctx, tx, c.id, lastSeenOn)
+}
+
 // UpdatePreferredURN updates the URNs for the contact (if needbe) to have the passed in URN as top priority
 // with the passed in channel as the preferred channel
 func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID, channel *Channel) error {
@@ -1136,6 +1137,12 @@ func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urn
 // UpdateContactModifiedOn updates modified on on the passed in contact
 func UpdateContactModifiedOn(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
 	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
+	return err
+}
+
+// UpdateContactLastSeenOn updates last seen on (and modified on) on the passed in contact
+func UpdateContactLastSeenOn(ctx context.Context, tx Queryer, contactID ContactID, lastSeenOn time.Time) error {
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = $2, modified_on = NOW() WHERE id = $1 AND last_seen_on IS NULL OR last_seen_on < $2`, contactID, lastSeenOn)
 	return err
 }
 

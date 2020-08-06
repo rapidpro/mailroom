@@ -220,13 +220,3 @@ type Server struct {
 
 	httpServer *http.Server
 }
-
-// ErrorResponse is the type for our error responses, it just contains a single error field
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
-// NewErrorResponse creates a new error response from the passed in errro
-func NewErrorResponse(err error) *ErrorResponse {
-	return &ErrorResponse{err.Error()}
-}
