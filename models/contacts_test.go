@@ -374,14 +374,6 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
 	assert.True(t, cathy.ModifiedOn().After(t2))
-
-	// can't accidently overwrite a newer date
-	err = cathy.UpdateLastSeenOn(ctx, db, time.Date(2010, 1, 1, 12, 0, 0, 0, time.UTC))
-	require.NoError(t, err)
-
-	cathy, err = LoadContact(ctx, db, oa, CathyID)
-	require.NoError(t, err)
-	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
 }
 
 func TestUpdateContactModifiedBy(t *testing.T) {
