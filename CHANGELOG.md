@@ -1,3 +1,8 @@
+v5.7.5
+----------
+ * Update last_seen_on when handling certain channel events
+ * Update last_seen_on when we receive a message from a contact
+
 v5.7.4
 ----------
  * Fail outgoing messages for suspended orgs
