@@ -272,6 +272,7 @@ func TestChannelEvents(t *testing.T) {
 
 	for i, tc := range tcs {
 		start := time.Now()
+		time.Sleep(time.Millisecond * 5)
 
 		event := models.NewChannelEvent(tc.EventType, tc.OrgID, tc.ChannelID, tc.ContactID, tc.URNID, tc.Extra, false)
 		eventJSON, err := json.Marshal(event)
