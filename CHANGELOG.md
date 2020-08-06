@@ -1,3 +1,7 @@
+v5.7.6
+----------
+ * Remove protection for overwriting last_seen_on with older values
+
 v5.7.5
 ----------
  * Update last_seen_on when handling certain channel events
