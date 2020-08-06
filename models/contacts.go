@@ -926,6 +926,12 @@ WHERE
 	id = $1
 `
 
+// UpdateLastSeenOn updates last seen on (and modified on)
+func (c *Contact) UpdateLastSeenOn(ctx context.Context, tx Queryer, lastSeenOn time.Time) error {
+	c.lastSeenOn = &lastSeenOn
+	return UpdateContactLastSeenOn(ctx, tx, c.id, lastSeenOn)
+}
+
 // UpdatePreferredURN updates the URNs for the contact (if needbe) to have the passed in URN as top priority
 // with the passed in channel as the preferred channel
 func (c *Contact) UpdatePreferredURN(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID, channel *Channel) error {
@@ -1073,8 +1079,8 @@ func UpdateContactModifiedOn(ctx context.Context, tx Queryer, contactIDs []Conta
 }
 
 // UpdateContactLastSeenOn updates last seen on (and modified on) on the passed in contact
-func UpdateContactLastSeenOn(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
-	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = NOW(), modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
+func UpdateContactLastSeenOn(ctx context.Context, tx Queryer, contactID ContactID, lastSeenOn time.Time) error {
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = $2, modified_on = NOW() WHERE id = $1 AND last_seen_on IS NULL OR last_seen_on < $2`, contactID, lastSeenOn)
 	return err
 }
 

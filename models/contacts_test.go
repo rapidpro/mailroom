@@ -347,16 +347,41 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, []interface{}{t0}, 1)
 
-	t1 := time.Now()
+	t1 := time.Now().Truncate(time.Millisecond)
+	time.Sleep(time.Millisecond * 5)
 
-	err = UpdateContactLastSeenOn(ctx, db, []ContactID{CathyID})
+	err = UpdateContactLastSeenOn(ctx, db, CathyID, t1)
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on > $1`, []interface{}{t1}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on = $1`, []interface{}{t1}, 1)
 
 	cathy, err := LoadContact(ctx, db, oa, CathyID)
 	require.NoError(t, err)
 	assert.NotNil(t, cathy.LastSeenOn())
+	assert.True(t, t1.Equal(*cathy.LastSeenOn()))
+	assert.True(t, cathy.ModifiedOn().After(t1))
+
+	t2 := time.Now().Truncate(time.Millisecond)
+	time.Sleep(time.Millisecond * 5)
+
+	// can update directly from the contact object
+	err = cathy.UpdateLastSeenOn(ctx, db, t2)
+	require.NoError(t, err)
+	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
+
+	// and that also updates the database
+	cathy, err = LoadContact(ctx, db, oa, CathyID)
+	require.NoError(t, err)
+	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
+	assert.True(t, cathy.ModifiedOn().After(t2))
+
+	// can't accidently overwrite a newer date
+	err = cathy.UpdateLastSeenOn(ctx, db, time.Date(2010, 1, 1, 12, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+
+	cathy, err = LoadContact(ctx, db, oa, CathyID)
+	require.NoError(t, err)
+	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
 }
 
 func TestUpdateContactModifiedBy(t *testing.T) {
