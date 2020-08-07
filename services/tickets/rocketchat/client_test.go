@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	URLBase = "https://my.rocket.chat/api/apps/public/684202ed-1461-4983-9ea7-fde74b15026c"
+	baseURL = "https://my.rocket.chat/api/apps/public/684202ed-1461-4983-9ea7-fde74b15026c"
 	secret  = "123456789"
 )
 
@@ -17,14 +17,14 @@ func TestCreateRoom(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		URLBase + "/room": {
+		baseURL + "/room": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a department for name: kitchen" }`),
 			httpx.NewMockResponse(201, nil, `{ "id": "uiF7ybjsv7PSJGSw6" }`),
 		},
 	}))
 
-	client := rocketchat.NewClient(http.DefaultClient, nil, URLBase, secret)
+	client := rocketchat.NewClient(http.DefaultClient, nil, baseURL, secret)
 	room := &rocketchat.Room{
 		Visitor: rocketchat.Visitor{
 			Token:       "1234",
@@ -58,14 +58,14 @@ func TestCloseRoom(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		URLBase + "/room.close": {
+		baseURL + "/room.close": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a room for visitor token: 1234" }`),
 			httpx.NewMockResponse(204, nil, ``),
 		},
 	}))
 
-	client := rocketchat.NewClient(http.DefaultClient, nil, URLBase, secret)
+	client := rocketchat.NewClient(http.DefaultClient, nil, baseURL, secret)
 	visitor := &rocketchat.Visitor{ Token: "1234" }
 
 	_, err := client.CloseRoom(visitor)
@@ -83,14 +83,14 @@ func TestSendMessage(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		URLBase + "/visitor-message": {
+		baseURL + "/visitor-message": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a room for visitor token: 1234" }`),
 			httpx.NewMockResponse(201, nil, `{ "id": "tyLrD97j8TFZmT3Y6" }`),
 		},
 	}))
 
-	client := rocketchat.NewClient(http.DefaultClient, nil, URLBase, secret)
+	client := rocketchat.NewClient(http.DefaultClient, nil, baseURL, secret)
 	msg := &rocketchat.VisitorMsg{
 		Visitor: rocketchat.Visitor{ Token: "1234" },
 		Text: "Can you help me?",

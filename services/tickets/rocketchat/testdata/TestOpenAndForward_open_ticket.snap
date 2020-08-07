@@ -6,4 +6,4 @@ Authorization: Token ****************
 Content-Type: application/json
 Accept-Encoding: gzip
 
-{"visitor":{"token":"1234567","contactUUID":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis","email":"foo@bar.com","phone":"+12024561111"},"ticketID":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","sessionStart":"2019-10-07T15:21:30Z"}
+{"visitor":{"token":"1234567","contactUUID":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis","email":"foo@bar.com","phone":"+12024561111"},"ticketID":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","sessionStart":"2019-10-07T15:21:20Z"}

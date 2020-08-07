@@ -17,7 +17,7 @@ import (
 const (
 	typeRocketChat = "rocketchat"
 
-	configURLBase = "url_base"
+	configBaseURL = "base_url"
 	configSecret  = "secret"
 )
 
@@ -33,7 +33,7 @@ type service struct {
 
 // NewService creates a new RocketChat ticket service
 func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
-	baseURL := config[configURLBase]
+	baseURL := config[configBaseURL]
 	secret := config[configSecret]
 
 	if baseURL != "" && secret != "" {
@@ -43,7 +43,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 			redactor: utils.NewRedactor(flows.RedactionMask, secret),
 		}, nil
 	}
-	return nil, errors.New("missing url_base or secret config")
+	return nil, errors.New("missing base_url or secret config")
 }
 
 // VisitorToken ticket user ID, RocketChat allows one room/ticket per user/contact
@@ -79,7 +79,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		},
 		TicketID: string(ticketUUID),
 	}
-	room.SessionStart = session.Runs()[0].CreatedOn().Format(time.RFC3339)
+	room.SessionStart = session.Runs()[0].CreatedOn().Add(-10*time.Second).Format(time.RFC3339)
 
 	// to fully support the RocketChat ticketer, look up extra fields from ticket body for now
 	extra := &struct {

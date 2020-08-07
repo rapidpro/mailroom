@@ -3,6 +3,7 @@ package rocketchat
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/go-chi/chi"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -17,18 +18,17 @@ import (
 func init() {
 	base := "/mr/tickets/types/rocketchat"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
+	web.RegisterJSONRoute(http.MethodPost, base+"/{ticketer:[a-f0-9\\-]+}/eventCallback", web.WithHTTPLogs(handleEventCallback))
 }
 
 type eventCallbackRequest struct {
 	Type     string          `json:"type"     validate:"required"`
-	TicketID string          `json:"ticketId" validate:"required"`
+	TicketID string          `json:"ticketID" validate:"required"`
 	Data     json.RawMessage `json:"data"`
 }
 
 type agentMessage struct {
-	Text        string   `json:"text"`
-	Attachments []string `json:"attachments"`
+	Text string `json:"text"`
 }
 
 func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
@@ -42,7 +42,7 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 
 	// check secret
 	secret := r.Header.Get("Authorization")
-	if ticketer.Config(configSecret) != secret {
+	if fmt.Sprintf("Token %s", ticketer.Config(configSecret)) != secret {
 		return map[string]string{"status": "unauthorized"}, http.StatusUnauthorized, nil
 	}
 

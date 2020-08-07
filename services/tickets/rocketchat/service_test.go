@@ -30,11 +30,11 @@ func TestOpenAndForward(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		URLBase + "/room": {
+		baseURL + "/room": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, `{ "id": "uiF7ybjsv7PSJGSw6" }`),
 		},
-		URLBase + "/visitor-message": {
+		baseURL + "/visitor-message": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, `{ "id": "tyLrD97j8TFZmT3Y6" }`),
 		},
@@ -48,14 +48,14 @@ func TestOpenAndForward(t *testing.T) {
 		ticketer,
 		map[string]string{},
 	)
-	assert.EqualError(t, err, "missing url_base or secret config")
+	assert.EqualError(t, err, "missing base_url or secret config")
 
 	svc, err := rocketchat.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
 		map[string]string{
-			"url_base": URLBase,
+			"base_url": baseURL,
 			"secret":   secret,
 		},
 	)
@@ -100,7 +100,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		URLBase + "/room.close": {
+		baseURL + "/room.close": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(204, nil, ``),
 			httpx.NewMockResponse(204, nil, ``),
@@ -113,7 +113,7 @@ func TestCloseAndReopen(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"url_base": URLBase,
+			"base_url": baseURL,
 			"secret":   secret,
 		},
 	)

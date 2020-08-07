@@ -14,16 +14,16 @@ import (
 type Client struct {
 	httpClient  *http.Client
 	httpRetries *httpx.RetryConfig
-	URLBase     string
+	baseURL     string
 	secret      string
 }
 
 // NewClient creates a new RocketChat app client
-func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, URLBase, secret string) *Client {
+func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, baseURL, secret string) *Client {
 	return &Client{
 		httpClient:  httpClient,
 		httpRetries: httpRetries,
-		URLBase:     URLBase,
+		baseURL:     baseURL,
 		secret:      secret,
 	}
 }
@@ -33,7 +33,7 @@ type errorResponse struct {
 }
 
 func (c *Client) request(method, endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
-	url := fmt.Sprintf("%s/%s", c.URLBase, endpoint)
+	url := fmt.Sprintf("%s/%s", c.baseURL, endpoint)
 	headers := map[string]string{
 		"Authorization": fmt.Sprintf("Token %s", c.secret),
 		"Content-Type":  "application/json",

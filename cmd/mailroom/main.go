@@ -39,6 +39,7 @@ import (
 
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
+	_ "github.com/nyaruka/mailroom/services/tickets/rocketchat"
 
 	_ "github.com/nyaruka/mailroom/ivr/nexmo"
 	_ "github.com/nyaruka/mailroom/ivr/twiml"
