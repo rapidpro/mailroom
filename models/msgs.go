@@ -130,6 +130,8 @@ type Msg struct {
 		SessionID            SessionID  `json:"session_id,omitempty"`
 		SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
 		SessionTimeout       int        `json:"session_timeout,omitempty"`
+
+		SessionAwaitsResponse bool 		`json:"session_wants_response,omitempty"`
 	}
 
 	channel *Channel
@@ -319,11 +321,9 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		}
 	}
 
-
-	metadata := make(map[string]interface{})
-	metadata["wants_response"] = out.WantsResponse // Pass it along...
+	// populate metadata if we have any
 	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic {
-
+		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
 		}
@@ -333,8 +333,8 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		if out.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(out.Topic())
 		}
+		m.Metadata = null.NewMap(metadata)
 	}
-	m.Metadata = null.NewMap(metadata)
 
 	// calculate msg count
 	if m.URN.Scheme() == urns.TelScheme {
@@ -402,6 +402,10 @@ func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
 	m.m.SessionID = id
 	m.m.SessionWaitStartedOn = &start
 	m.m.SessionTimeout = int(timeout / time.Second)
+}
+
+func (m *Msg) SetWantsResponse (wantsResponse bool) {
+	m.m.SessionAwaitsResponse = wantsResponse
 }
 
 // InsertMessages inserts the passed in messages in a single query
@@ -879,7 +883,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic,false)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
 		msg, err := NewOutgoingMsg(oa.OrgID(), channel, c.ID(), out, time.Now())
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {

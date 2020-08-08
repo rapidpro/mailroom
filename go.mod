@@ -1,7 +1,5 @@
 module github.com/nyaruka/mailroom
 
-replace github.com/nyaruka/goflow => github.com/dsmagicug/goflow v0.95.2
-
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/apex/log v1.1.4

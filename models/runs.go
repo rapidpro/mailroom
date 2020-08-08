@@ -210,6 +210,24 @@ func (s *Session) ChannelConnection() *ChannelConnection {
 	return s.channelConnection
 }
 
+func (s *Session) WantsResponse() bool {
+	if s.runs == nil || len(s.runs) == 0 {
+		return false
+	}
+	r := s.runs[0]
+	n := r.CurrentNode()
+
+	var hasExits = false
+
+	for _, e := range n.Exits() {
+		if len(e.DestinationUUID()) != 0 {
+			hasExits = true
+			break
+		}
+	}
+	return  hasExits
+}
+
 // MarshalJSON is our custom marshaller so that our inner struct get output
 func (s *Session) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.s)
@@ -268,6 +286,16 @@ func (r *FlowRun) MarshalJSON() ([]byte, error) {
 	return json.Marshal(r.r)
 }
 
+func (r *FlowRun) CurrentNode() flows.Node {
+	flow := r.run.Flow()
+	path := r.run.Path()
+	if path != nil {
+		last := path[len(path)-1]
+		nid := last.NodeUUID()
+		return flow.GetNode(nid)
+	}
+	return nil
+}
 // UnmarshalJSON is our custom marshaller so that our inner struct get output
 func (r *FlowRun) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, &r.r)
