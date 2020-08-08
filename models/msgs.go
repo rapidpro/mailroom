@@ -130,8 +130,6 @@ type Msg struct {
 		SessionID            SessionID  `json:"session_id,omitempty"`
 		SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
 		SessionTimeout       int        `json:"session_timeout,omitempty"`
-
-		SessionAwaitsResponse bool 		`json:"session_wants_response,omitempty"`
 	}
 
 	channel *Channel
@@ -405,7 +403,13 @@ func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
 }
 
 func (m *Msg) SetWantsResponse (wantsResponse bool) {
-	m.m.SessionAwaitsResponse = wantsResponse
+	// Put it in the meta data
+
+	if m.m.Metadata.Map() == nil {
+		metadata := make(map[string]interface{})
+		m.m.Metadata = null.NewMap(metadata)
+	}
+	m.Metadata()["wants_response"] = wantsResponse
 }
 
 // InsertMessages inserts the passed in messages in a single query
