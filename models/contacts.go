@@ -340,6 +340,7 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		c.Status(),
 		org.Env().Timezone(),
 		c.createdOn,
+		c.lastSeenOn,
 		c.urns,
 		groups,
 		c.fields,
