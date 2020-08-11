@@ -1,3 +1,7 @@
+v5.7.7
+----------
+ * Update to latest goflow v0.100.0
+
 v5.7.6
 ----------
  * Remove protection for overwriting last_seen_on with older values
