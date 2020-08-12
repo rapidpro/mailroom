@@ -36,7 +36,8 @@ func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mod
 	}
 
 	// update the contact's last seen date
-	scene.AppendToEventPreCommitHook(contactLastSeenHook, event.CreatedOn())
+	scene.AppendToEventPreCommitHook(contactLastSeenHook, event)
+	scene.AppendToEventPreCommitHook(updateCampaignEventsHook, event)
 
 	return nil
 }
