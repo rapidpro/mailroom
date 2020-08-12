@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
@@ -648,22 +649,26 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
-	err = handleAsInbox(ctx, db, modelContact.ID(), event.MsgID, topupID, event.CreatedOn)
+	err = handleAsInbox(ctx, db, rp, oa, contact, msgIn, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
 	}
 	return nil
 }
 
-func handleAsInbox(ctx context.Context, db *sqlx.DB, contactID models.ContactID, msgID flows.MsgID, topupID models.TopupID, createdOn time.Time) error {
-	err := models.UpdateMessage(ctx, db, msgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topupID)
+func handleAsInbox(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID) error {
+	msgEvent := events.NewMsgReceived(msg)
+	contact.SetLastSeenOn(msgEvent.CreatedOn())
+	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
+
+	err := models.HandleAndCommitEvents(ctx, db, rp, oa, contactEvents)
 	if err != nil {
-		return errors.Wrapf(err, "error marking message as handled")
+		return errors.Wrap(err, "error handling inbox message events")
 	}
 
-	err = models.UpdateContactLastSeenOn(ctx, db, contactID, createdOn)
+	err = models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topupID)
 	if err != nil {
-		return errors.Wrapf(err, "error updating contact last_seen_on")
+		return errors.Wrapf(err, "error marking message as handled")
 	}
 
 	return nil

@@ -301,8 +301,9 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
-	// create scenes for our contacts
-	scenes := make([]*models.Scene, 0, len(contacts))
+	// gather up events for our contacts
+	contactEvents := make(map[*flows.Contact][]flows.Event, len(contacts))
+
 	for _, contact := range contacts {
 		flowContact, err := contact.FlowContact(oa)
 		if err != nil {
@@ -314,57 +315,18 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 			Events:  make([]flows.Event, 0, len(mods)),
 		}
 
-		scene := models.NewSceneForContact(flowContact)
-
 		// apply our modifiers
 		for _, mod := range mods {
 			mod.Apply(env, oa.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
 		}
 
 		results[contact.ID()] = result
-		scenes = append(scenes, scene)
+		contactEvents[flowContact] = result.Events
 	}
 
-	// ok, commit all our events
-	tx, err := s.DB.BeginTxx(ctx, nil)
+	err = models.HandleAndCommitEvents(ctx, s.DB, s.RP, oa, contactEvents)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction")
-	}
-
-	// apply our events
-	for _, scene := range scenes {
-		err := models.HandleEvents(ctx, tx, s.RP, oa, scene, results[scene.ContactID()].Events)
-		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying events")
-		}
-	}
-
-	// gather all our pre commit events, group them by hook and apply them
-	err = models.ApplyEventPreCommitHooks(ctx, tx, s.RP, oa, scenes)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
-	}
-
-	// commit our transaction
-	err = tx.Commit()
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
-	}
-
-	tx, err = s.DB.BeginTxx(ctx, nil)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for post commit")
-	}
-
-	// then apply our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, oa, scenes)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying pre commit hooks")
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing pre commit hooks")
+		return nil, http.StatusInternalServerError, err
 	}
 
 	return results, http.StatusOK, nil
