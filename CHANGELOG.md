@@ -1,3 +1,8 @@
+v5.7.9
+----------
+ * Update to goflow v0.101.2
+ * Bundle localized goflow docs in release
+
 v5.7.8
 ----------
  * Recalculate event fires for campaign events based on last_seen_on
