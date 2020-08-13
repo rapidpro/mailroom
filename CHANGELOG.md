@@ -1,3 +1,7 @@
+v5.7.10
+----------
+ * Tweak goreleaser config to include subdirectories inside docs folder
+
 v5.7.9
 ----------
  * Update to goflow v0.101.2
