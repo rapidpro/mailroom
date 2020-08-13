@@ -1,3 +1,7 @@
+v5.7.8
+----------
+ * Recalculate event fires for campaign events based on last_seen_on
+
 v5.7.7
 ----------
  * Update to latest goflow v0.100.0
