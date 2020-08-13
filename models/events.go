@@ -191,13 +191,13 @@ func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa 
 		scenes = append(scenes, scene)
 	}
 
-	// ok, commit all our events
+	// begin the transaction for handling and pre-commit hooks
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error beginning transaction")
 	}
 
-	// apply our events
+	// handle the events to create the hooks on each scene
 	for _, scene := range scenes {
 		err := HandleEvents(ctx, tx, rp, oa, scene, contactEvents[scene.Contact()])
 		if err != nil {
@@ -211,25 +211,25 @@ func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa 
 		return errors.Wrapf(err, "error applying pre commit hooks")
 	}
 
-	// commit our transaction
-	err = tx.Commit()
-	if err != nil {
+	// commit the transaction
+	if err := tx.Commit(); err != nil {
 		return errors.Wrapf(err, "error committing pre commit hooks")
 	}
 
+	// begin the transaction for post-commit hooks
 	tx, err = db.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error beginning transaction for post commit")
 	}
 
-	// then apply our post commit hooks
+	// apply the post commit hooks
 	err = ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
 	if err != nil {
 		return errors.Wrapf(err, "error applying post commit hooks")
 	}
 
-	err = tx.Commit()
-	if err != nil {
+	// commit the transaction
+	if err := tx.Commit(); err != nil {
 		return errors.Wrapf(err, "error committing post commit hooks")
 	}
 	return nil
