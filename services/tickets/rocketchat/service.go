@@ -83,15 +83,10 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 
 	// to fully support the RocketChat ticketer, look up extra fields from ticket body for now
 	extra := &struct {
-		SessionStart string            `json:"sessionStart"`
-		Priority     string            `json:"priority"`
 		Department   string            `json:"department"`
-		CustomFields map[string]string `json:"customFields"`
 	}{}
 	if err := jsonx.Unmarshal([]byte(body), extra); err == nil {
 		room.Visitor.Department = extra.Department
-		room.Visitor.CustomFields = extra.CustomFields
-		room.Priority = extra.Priority
 	}
 
 	roomID, trace, err := s.client.CreateRoom(room)

@@ -18,7 +18,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/rocketchat"
 
-	web.RegisterJSONRoute(http.MethodPost, base+"/{ticketer:[a-f0-9\\-]+}/eventCallback", web.WithHTTPLogs(handleEventCallback))
+	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback/{ticketer:[a-f0-9\\-]+}", web.WithHTTPLogs(handleEventCallback))
 }
 
 type eventCallbackRequest struct {
@@ -27,7 +27,7 @@ type eventCallbackRequest struct {
 	Data     json.RawMessage `json:"data"`
 }
 
-type agentMessage struct {
+type agentMessageData struct {
 	Text string `json:"text"`
 }
 
@@ -61,7 +61,7 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 	switch request.Type {
 
 	case "agent-message":
-		data := &agentMessage{}
+		data := &agentMessageData{}
 		if err := utils.UnmarshalAndValidate(request.Data, data); err != nil {
 			return err, http.StatusBadRequest, nil
 		}
@@ -70,6 +70,9 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 
 	case "close-room":
 		err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)
+
+	default:
+		err = errors.New("invalid event type")
 
 	}
 	if err != nil {

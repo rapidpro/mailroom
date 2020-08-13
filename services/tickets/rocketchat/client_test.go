@@ -33,12 +33,8 @@ func TestCreateRoom(t *testing.T) {
 			Name:        "Bob",
 			Email:       "bob@acme.com",
 			Phone:       "+16055741111",
-			CustomFields: map[string]string{
-				"flavor": "chocolate",
-			},
 		},
 		TicketID:     "88ff1e41-c1f8-4637-af8e-d56acbde9171",
-		Priority:     "high",
 		SessionStart: "2020-08-03T13:42:53.388037-04:00",
 	}
 
