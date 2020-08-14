@@ -88,6 +88,7 @@ type Visitor struct {
 	Name         string            `json:"name,omitempty"`
 	Email        string            `json:"email,omitempty"`
 	Phone        string            `json:"phone,omitempty"`
+	CustomFields map[string]string `json:"customFields,omitempty"`
 }
 
 type Room struct {
