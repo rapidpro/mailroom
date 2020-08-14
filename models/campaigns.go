@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -312,7 +313,6 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		WHERE 
 			e.campaign_id = c.id AND
 			e.is_active = TRUE AND
-			e.is_archived = FALSE AND
 			f.is_active = TRUE
 		ORDER BY
 			e.relative_to_id,
@@ -597,7 +597,7 @@ func CalculateCampaignEventFires(ctx context.Context, db *sqlx.DB, orgID OrgID, 
 		return nil
 	}
 
-	oa, err := GetOrgAssets(ctx, db, orgID)
+	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshCampaigns)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org: %d", orgID)
 	}
@@ -673,7 +673,7 @@ FROM
 INNER JOIN
     contacts_contactgroup_contacts gc ON gc.contact_id = c.id
 WHERE
-    gc.contactgroup_id = $1 AND c.is_active = TRUE AND c.fields->$2->>'datetime' IS NOT NULL
+    gc.contactgroup_id = $1 AND c.is_active = TRUE AND ARRAY[$2]::text[] <@ (extract_jsonb_keys("contacts_contact"."fields")) IS NOT NULL
 `
 
 func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID GroupID, field *Field) ([]*eligibleContact, error) {
@@ -693,7 +693,7 @@ func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID Gro
 	}
 
 	rows, err := db.QueryxContext(ctx, query, params...)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrapf(err, "error querying for eligible contacts")
 	}
 	defer rows.Close()
