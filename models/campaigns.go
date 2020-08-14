@@ -312,6 +312,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		WHERE 
 			e.campaign_id = c.id AND
 			e.is_active = TRUE AND
+			e.is_archived = FALSE AND
 			f.is_active = TRUE
 		ORDER BY
 			e.relative_to_id,
@@ -585,4 +586,130 @@ func AddCampaignEventsForGroupAddition(ctx context.Context, tx Queryer, org *Org
 
 	// add all our new event fires
 	return AddEventFires(ctx, tx, fas)
+}
+
+// CalculateCampaignEventFires calculates event fires for a new campaign event
+func CalculateCampaignEventFires(ctx context.Context, db *sqlx.DB, orgID OrgID, eventID CampaignEventID) error {
+	// NOOP if fires already exist for this event
+	var fireID FireID
+	db.Get(&fireID, "SELECT id FROM campaigns_eventfire WHERE event_id = $1", eventID)
+	if fireID != 0 {
+		return nil
+	}
+
+	oa, err := GetOrgAssets(ctx, db, orgID)
+	if err != nil {
+		return errors.Wrapf(err, "unable to load org: %d", orgID)
+	}
+
+	event := oa.CampaignEventByID(eventID)
+	if event == nil {
+		return errors.Errorf("can't find campaign event with id %d", eventID)
+	}
+
+	field := oa.FieldByKey(event.RelativeToKey())
+	if field == nil {
+		return errors.Errorf("can't find field with key %s", event.RelativeToKey())
+	}
+
+	eligible, err := campaignEventEligibleContacts(ctx, db, event.campaign.GroupID(), field)
+	if err != nil {
+		return errors.Wrapf(err, "unable to calculate eligible contacts for event %d", eventID)
+	}
+
+	fas := make([]*FireAdd, 0, len(eligible))
+
+	for _, el := range eligible {
+		// calculate next fire for this contact
+		scheduled, err := event.ScheduleForTime(oa.Env().Timezone(), time.Now(), el.Value)
+		if err != nil {
+			return errors.Wrapf(err, "error calculating offset for start: %s and event: %d", el.Value, eventID)
+		}
+
+		if scheduled != nil {
+			fas = append(fas, &FireAdd{ContactID: el.ContactID, EventID: eventID, Scheduled: *scheduled})
+		}
+	}
+
+	// add all our new event fires
+	return AddEventFires(ctx, db, fas)
+}
+
+type eligibleContact struct {
+	ContactID ContactID `db:"contact_id"`
+	Value     time.Time `db:"value"`
+}
+
+const eligibleContactsForCreatedOnSQL = `
+SELECT 
+	c.id AS contact_id,
+	c.created_on AS value
+FROM 
+	contacts_contact c
+INNER JOIN
+    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+WHERE
+    gc.contactgroup_id = $1 AND c.is_active = TRUE
+`
+
+const eligibleContactsForLastSeenOnSQL = `
+SELECT 
+	c.id AS contact_id, 
+	c.last_seen_on AS value
+FROM 
+	contacts_contact c
+INNER JOIN
+    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+WHERE
+    gc.contactgroup_id = $1 AND c.is_active = TRUE AND c.last_seen_on IS NOT NULL
+`
+
+const eligibleContactsForFieldSQL = `
+SELECT 
+	c.id AS contact_id, 
+	c.fields->$2->>'datetime' AS value
+FROM 
+	contacts_contact c
+INNER JOIN
+    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+WHERE
+    gc.contactgroup_id = $1 AND c.is_active = TRUE AND c.fields->$2->>'datetime' IS NOT NULL
+`
+
+func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID GroupID, field *Field) ([]*eligibleContact, error) {
+	var query string
+	var params []interface{}
+
+	switch field.Key() {
+	case CreatedOnKey:
+		query = eligibleContactsForCreatedOnSQL
+		params = []interface{}{groupID}
+	case LastSeenOnKey:
+		query = eligibleContactsForLastSeenOnSQL
+		params = []interface{}{groupID}
+	default:
+		query = eligibleContactsForFieldSQL
+		params = []interface{}{groupID, pq.Array([]interface{}{field.UUID()})}
+	}
+
+	rows, err := db.QueryxContext(ctx, query, params...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying for eligible contacts")
+	}
+	defer rows.Close()
+
+	contacts := make([]*eligibleContact, 0, 100)
+
+	for rows.Next() {
+		contact := &eligibleContact{}
+
+		err := rows.Scan(&contact)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning eligible contact result")
+		}
+
+		contacts = append(contacts, contact)
+	}
+
+	return contacts, nil
 }

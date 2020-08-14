@@ -6,24 +6,65 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.AddTaskFunction(queue.FireCampaignEvent, HandleCampaignEvent)
+	mailroom.AddTaskFunction(queue.CalcCampaignEventFires, HandleCalcCampaignEventFires)
+	mailroom.AddTaskFunction(queue.FireCampaignEvent, HandleFireCampaignEvent)
 }
 
-// HandleCampaignEvent is called by mailroom when a campaign event task is ready to be processed.
-func HandleCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+// RecalculateTask is our definition of our event recalculation task
+type RecalculateTask struct {
+	OrgID           models.OrgID           `json:"org_id"`
+	CampaignEventID models.CampaignEventID `json:"campaign_event_id"`
+}
+
+const calcLockKey string = "calc_campaign_event_fires_%d"
+
+// HandleCalcCampaignEventFires is called by RapidPro when a campaign event has been created or updated
+func HandleCalcCampaignEventFires(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Hour)
+	defer cancel()
+
+	// decode our task body
+	if task.Type != queue.CalcCampaignEventFires {
+		return errors.Errorf("unknown event type passed to calc campaign event fires worker: %s", task.Type)
+	}
+	t := &RecalculateTask{}
+	err := json.Unmarshal(task.Task, t)
+	if err != nil {
+		return errors.Wrapf(err, "error unmarshalling task: %s", string(task.Task))
+	}
+
+	lockKey := fmt.Sprintf(calcLockKey, t.CampaignEventID)
+	lock, err := locker.GrabLock(mr.RP, lockKey, time.Hour, time.Minute*5)
+	if err != nil {
+		return errors.Wrapf(err, "error grabbing lock to calculate fires for event: %d", t.CampaignEventID)
+	}
+	defer locker.ReleaseLock(mr.RP, lockKey, lock)
+
+	err = models.CalculateCampaignEventFires(ctx, mr.DB, t.OrgID, t.CampaignEventID)
+	if err != nil {
+		return errors.Wrapf(err, "error calculating fires for event: %d", t.CampaignEventID)
+	}
+
+	return nil
+}
+
+// HandleFireCampaignEvent is called by mailroom when a campaign event task is ready to be processed.
+func HandleFireCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
