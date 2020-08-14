@@ -47,8 +47,8 @@ const (
 	// SendBroadcastBatch is our type for sending a broadcast batch
 	SendBroadcastBatch = "send_broadcast_batch"
 
-	// CalcCampaignEventFires is our type for firing a campaign event
-	CalcCampaignEventFires = "calc_campaign_event_fires"
+	// ScheduleCampaignEvent is our type for scheduling a campaign event
+	ScheduleCampaignEvent = "schedule_campaign_event"
 
 	// FireCampaignEvent is our type for firing a campaign event
 	FireCampaignEvent = "fire_campaign_event"

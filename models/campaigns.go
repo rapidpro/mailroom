@@ -588,8 +588,8 @@ func AddCampaignEventsForGroupAddition(ctx context.Context, tx Queryer, org *Org
 	return AddEventFires(ctx, tx, fas)
 }
 
-// CalculateCampaignEventFires calculates event fires for a new campaign event
-func CalculateCampaignEventFires(ctx context.Context, db *sqlx.DB, orgID OrgID, eventID CampaignEventID) error {
+// ScheduleCampaignEvent calculates event fires for a new campaign event
+func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, eventID CampaignEventID) error {
 	// NOOP if fires already exist for this event
 	var fireID FireID
 	db.Get(&fireID, "SELECT id FROM campaigns_eventfire WHERE event_id = $1", eventID)

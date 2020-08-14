@@ -21,43 +21,43 @@ import (
 )
 
 func init() {
-	mailroom.AddTaskFunction(queue.CalcCampaignEventFires, HandleCalcCampaignEventFires)
+	mailroom.AddTaskFunction(queue.ScheduleCampaignEvent, HandleScheduleCampaignEvent)
 	mailroom.AddTaskFunction(queue.FireCampaignEvent, HandleFireCampaignEvent)
 }
 
-// RecalculateTask is our definition of our event recalculation task
-type RecalculateTask struct {
+// scheduleTask is our definition of our event recalculation task
+type scheduleTask struct {
 	OrgID           models.OrgID           `json:"org_id"`
 	CampaignEventID models.CampaignEventID `json:"campaign_event_id"`
 }
 
-const calcLockKey string = "calc_campaign_event_fires_%d"
+const scheduleLockKey string = "schedule_campaign_event_%d"
 
-// HandleCalcCampaignEventFires is called by RapidPro when a campaign event has been created or updated
-func HandleCalcCampaignEventFires(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+// HandleScheduleCampaignEvent is called by RapidPro when a campaign event has been created or updated
+func HandleScheduleCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Hour)
 	defer cancel()
 
 	// decode our task body
-	if task.Type != queue.CalcCampaignEventFires {
-		return errors.Errorf("unknown event type passed to calc campaign event fires worker: %s", task.Type)
+	if task.Type != queue.ScheduleCampaignEvent {
+		return errors.Errorf("unknown event type passed to calc schedule campaign event worker: %s", task.Type)
 	}
-	t := &RecalculateTask{}
+	t := &scheduleTask{}
 	err := json.Unmarshal(task.Task, t)
 	if err != nil {
 		return errors.Wrapf(err, "error unmarshalling task: %s", string(task.Task))
 	}
 
-	lockKey := fmt.Sprintf(calcLockKey, t.CampaignEventID)
+	lockKey := fmt.Sprintf(scheduleLockKey, t.CampaignEventID)
 	lock, err := locker.GrabLock(mr.RP, lockKey, time.Hour, time.Minute*5)
 	if err != nil {
-		return errors.Wrapf(err, "error grabbing lock to calculate fires for event: %d", t.CampaignEventID)
+		return errors.Wrapf(err, "error grabbing lock to schedule campaign event %d", t.CampaignEventID)
 	}
 	defer locker.ReleaseLock(mr.RP, lockKey, lock)
 
-	err = models.CalculateCampaignEventFires(ctx, mr.DB, t.OrgID, t.CampaignEventID)
+	err = models.ScheduleCampaignEvent(ctx, mr.DB, t.OrgID, t.CampaignEventID)
 	if err != nil {
-		return errors.Wrapf(err, "error calculating fires for event: %d", t.CampaignEventID)
+		return errors.Wrapf(err, "error scheduling campaign event %d", t.CampaignEventID)
 	}
 
 	return nil
