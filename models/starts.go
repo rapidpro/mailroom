@@ -7,6 +7,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -25,6 +27,7 @@ type StartType string
 const (
 	StartTypeManual     = StartType("M")
 	StartTypeAPI        = StartType("A")
+	StartTypeAPIZapier  = StartType("Z")
 	StartTypeFlowAction = StartType("F")
 	StartTypeTrigger    = StartType("T")
 )
@@ -83,13 +86,16 @@ func MarkStartFailed(ctx context.Context, db *sqlx.DB, startID StartID) error {
 type FlowStartBatch struct {
 	b struct {
 		StartID    StartID     `json:"start_id"`
+		StartType  StartType   `json:"start_type"`
 		OrgID      OrgID       `json:"org_id"`
+		CreatedBy  string      `json:"created_by"`
 		FlowID     FlowID      `json:"flow_id"`
 		FlowType   FlowType    `json:"flow_type"`
 		ContactIDs []ContactID `json:"contact_ids"`
 
-		ParentSummary null.JSON `json:"parent_summary,omitempty"`
-		Extra         null.JSON `json:"extra,omitempty"`
+		ParentSummary  null.JSON `json:"parent_summary,omitempty"`
+		SessionHistory null.JSON `json:"session_history,omitempty"`
+		Extra          null.JSON `json:"extra,omitempty"`
 
 		RestartParticipants RestartParticipants `json:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"`
@@ -100,7 +106,9 @@ type FlowStartBatch struct {
 }
 
 func (b *FlowStartBatch) StartID() StartID                         { return b.b.StartID }
+func (b *FlowStartBatch) StartType() StartType                     { return b.b.StartType }
 func (b *FlowStartBatch) OrgID() OrgID                             { return b.b.OrgID }
+func (b *FlowStartBatch) CreatedBy() string                        { return b.b.CreatedBy }
 func (b *FlowStartBatch) FlowID() FlowID                           { return b.b.FlowID }
 func (b *FlowStartBatch) ContactIDs() []ContactID                  { return b.b.ContactIDs }
 func (b *FlowStartBatch) RestartParticipants() RestartParticipants { return b.b.RestartParticipants }
@@ -108,8 +116,9 @@ func (b *FlowStartBatch) IncludeActive() IncludeActive             { return b.b.
 func (b *FlowStartBatch) IsLast() bool                             { return b.b.IsLast }
 func (b *FlowStartBatch) TotalContacts() int                       { return b.b.TotalContacts }
 
-func (b *FlowStartBatch) ParentSummary() json.RawMessage { return json.RawMessage(b.b.ParentSummary) }
-func (b *FlowStartBatch) Extra() json.RawMessage         { return json.RawMessage(b.b.Extra) }
+func (b *FlowStartBatch) ParentSummary() json.RawMessage  { return json.RawMessage(b.b.ParentSummary) }
+func (b *FlowStartBatch) SessionHistory() json.RawMessage { return json.RawMessage(b.b.SessionHistory) }
+func (b *FlowStartBatch) Extra() json.RawMessage          { return json.RawMessage(b.b.Extra) }
 
 func (b *FlowStartBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -134,8 +143,11 @@ type FlowStart struct {
 		RestartParticipants RestartParticipants `json:"restart_participants" db:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"       db:"include_active"`
 
-		Extra         null.JSON `json:"extra,omitempty"          db:"extra"`
-		ParentSummary null.JSON `json:"parent_summary,omitempty" db:"parent_summary"`
+		Extra          null.JSON `json:"extra,omitempty"           db:"extra"`
+		ParentSummary  null.JSON `json:"parent_summary,omitempty"  db:"parent_summary"`
+		SessionHistory null.JSON `json:"session_history,omitempty" db:"session_history"`
+
+		CreatedBy string `json:"created_by"`
 	}
 }
 
@@ -183,6 +195,12 @@ func (s *FlowStart) WithParentSummary(sum json.RawMessage) *FlowStart {
 	return s
 }
 
+func (s *FlowStart) SessionHistory() json.RawMessage { return json.RawMessage(s.s.SessionHistory) }
+func (s *FlowStart) WithSessionHistory(history json.RawMessage) *FlowStart {
+	s.s.SessionHistory = null.JSON(history)
+	return s
+}
+
 func (s *FlowStart) Extra() json.RawMessage { return json.RawMessage(s.s.Extra) }
 func (s *FlowStart) WithExtra(extra json.RawMessage) *FlowStart {
 	s.s.Extra = null.JSON(extra)
@@ -195,7 +213,7 @@ func (s *FlowStart) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // GetFlowStartAttributes gets the basic attributes for the passed in start id, this includes ONLY its id, uuid, flow_id and extra
 func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*FlowStart, error) {
 	start := &FlowStart{}
-	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra, parent_summary FROM flows_flowstart WHERE id = $1`, startID)
+	err := db.GetContext(ctx, &start.s, `SELECT id, uuid, flow_id, extra, parent_summary, session_history FROM flows_flowstart WHERE id = $1`, startID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load start attributes for id: %d", startID)
 	}
@@ -283,8 +301,8 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 
 const insertStartSQL = `
 INSERT INTO
-	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary)
-			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary)
+	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary,  session_history)
+			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary, :session_history)
 RETURNING
 	id
 `
@@ -305,6 +323,7 @@ INSERT INTO
 func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {
 	b := &FlowStartBatch{}
 	b.b.StartID = s.ID()
+	b.b.StartType = s.s.StartType
 	b.b.OrgID = s.OrgID()
 	b.b.FlowID = s.FlowID()
 	b.b.FlowType = s.FlowType()
@@ -312,9 +331,11 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 	b.b.RestartParticipants = s.RestartParticipants()
 	b.b.IncludeActive = s.IncludeActive()
 	b.b.ParentSummary = null.JSON(s.ParentSummary())
+	b.b.SessionHistory = null.JSON(s.SessionHistory())
 	b.b.Extra = null.JSON(s.Extra())
 	b.b.IsLast = last
 	b.b.TotalContacts = totalContacts
+	b.b.CreatedBy = s.s.CreatedBy
 	return b
 }
 
@@ -336,4 +357,10 @@ func (i StartID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *StartID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
+}
+
+// ReadSessionHistory reads a session history from the given JSON
+func ReadSessionHistory(data []byte) (*flows.SessionHistory, error) {
+	h := &flows.SessionHistory{}
+	return h, jsonx.Unmarshal(data, h)
 }

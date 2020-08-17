@@ -8,7 +8,6 @@ require (
 	github.com/certifi/gocertifi v0.0.0-20200211180108-c7c1fbc02894 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/edganiukov/fcm v0.4.0
-	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-chi/chi v3.3.3+incompatible
 	github.com/golang/protobuf v1.4.0
@@ -20,7 +19,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.2.0
-	github.com/nyaruka/goflow v0.94.2
+	github.com/nyaruka/goflow v0.101.2
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0

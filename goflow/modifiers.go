@@ -5,7 +5,7 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/actions/modifiers"
+	"github.com/nyaruka/goflow/flows/modifiers"
 
 	"github.com/pkg/errors"
 )

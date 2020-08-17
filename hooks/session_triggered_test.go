@@ -4,14 +4,16 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,6 +38,9 @@ func TestSessionTriggered(t *testing.T) {
 		UUID: models.TestersGroupUUID,
 	}
 
+	uuids.SetGenerator(uuids.NewSeededGenerator(1234567))
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+
 	tcs := []HookTestCase{
 		{
 			Actions: ContactActionMap{
@@ -50,7 +55,7 @@ func TestSessionTriggered(t *testing.T) {
 					Count: 1,
 				},
 				{
-					SQL:   "select count(*) from flows_flowstart where org_id = 1 AND start_type = 'F' AND flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL;",
+					SQL:   "select count(*) from flows_flowstart where org_id = 1 AND start_type = 'F' AND flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL AND session_history IS NOT NULL;",
 					Args:  []interface{}{models.SingleMessageFlowID},
 					Count: 1,
 				},
@@ -73,10 +78,11 @@ func TestSessionTriggered(t *testing.T) {
 					start := models.FlowStart{}
 					err = json.Unmarshal(task.Task, &start)
 					assert.NoError(t, err)
-					assert.Equal(t, start.CreateContact(), true)
+					assert.True(t, start.CreateContact())
 					assert.Equal(t, []models.ContactID{models.GeorgeID}, start.ContactIDs())
 					assert.Equal(t, []models.GroupID{models.TestersGroupID}, start.GroupIDs())
-					assert.Equal(t, start.FlowID(), simpleFlow.ID())
+					assert.Equal(t, simpleFlow.ID(), start.FlowID())
+					assert.JSONEq(t, `{"parent_uuid":"36284611-ea19-4f1f-8611-9bc48e206654", "ancestors":1, "ancestors_since_input":1}`, string(start.SessionHistory()))
 					return nil
 				},
 			},

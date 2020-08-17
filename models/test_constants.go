@@ -88,13 +88,14 @@ var AllContactsGroupUUID = assets.GroupUUID("bc268217-9ffa-49e0-883e-e4e09c252a5
 var TestersGroupID = GroupID(10001)
 var TestersGroupUUID = assets.GroupUUID("5e9d8fab-5e7e-4f51-b533-261af5dea70d")
 
+var CreatedOnFieldID = FieldID(3)
+var LastSeenOnFieldID = FieldID(5)
+
 var AgeFieldUUID = assets.FieldUUID("903f51da-2717-47c7-a0d3-f2f32877013d")
 var GenderFieldUUID = assets.FieldUUID("3a5891e4-756e-4dc9-8e12-b7a766168824")
 
-var JoinedFieldID = FieldID(7)
+var JoinedFieldID = FieldID(8)
 var JoinedFieldUUID = assets.FieldUUID("d83aae24-4bbf-49d0-ab85-6bfd201eac6d")
-
-var CreatedOnFieldID = FieldID(3)
 
 var ReportingLabelID = LabelID(10000)
 var ReportingLabelUUID = assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698")

@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
@@ -320,8 +321,16 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	modelContact := contacts[0]
 
+	if models.ContactSeenEvents[eventType] {
+		err = modelContact.UpdateLastSeenOn(ctx, db, event.OccurredOn())
+		if err != nil {
+			return nil, errors.Wrap(err, "error updating contact last_seen_on")
+		}
+	}
+
 	// do we have associated trigger?
 	var trigger *models.Trigger
+
 	switch eventType {
 
 	case models.NewConversationEventType:
@@ -336,7 +345,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	case models.MOCallEventType:
 		trigger = models.FindMatchingMOCallTrigger(oa, modelContact)
 
-	case models.WelcomeMessateEventType:
+	case models.WelcomeMessageEventType:
 		trigger = nil
 
 	default:
@@ -405,12 +414,17 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	switch eventType {
 
 	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
-		channelEvent := triggers.NewChannelEvent(triggers.ChannelEventType(eventType), channel.ChannelReference())
-		flowTrigger = triggers.NewChannel(oa.Env(), flow.FlowReference(), contact, channelEvent, params)
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
+			WithParams(params).
+			Build()
 
 	case models.MOCallEventType:
 		urn := contacts[0].URNForID(event.URNID())
-		flowTrigger = triggers.NewIncomingCall(oa.Env(), flow.FlowReference(), contact, urn, channel.ChannelReference())
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
+			WithConnection(urn).
+			Build()
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
@@ -444,11 +458,19 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction for stopping contact")
 	}
+
 	err = models.StopContact(ctx, tx, event.OrgID, event.ContactID)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
+
+	err = models.UpdateContactLastSeenOn(ctx, tx, event.ContactID, event.OccurredOn)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	err = tx.Commit()
 	if err != nil {
 		return errors.Wrapf(err, "unable to commit for contact stop")
@@ -607,7 +629,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 			}
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewMsg(oa.Env(), flow.FlowReference(), contact, msgIn, trigger.Match())
+			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
 			_, err = runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
@@ -626,10 +648,29 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		return nil
 	}
 
-	err = models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topupID)
+	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
+	err = handleAsInbox(ctx, db, rp, oa, contact, msgIn, topupID)
+	if err != nil {
+		return errors.Wrapf(err, "error handling inbox message")
+	}
+	return nil
+}
+
+func handleAsInbox(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID) error {
+	msgEvent := events.NewMsgReceived(msg)
+	contact.SetLastSeenOn(msgEvent.CreatedOn())
+	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
+
+	err := models.HandleAndCommitEvents(ctx, db, rp, oa, contactEvents)
+	if err != nil {
+		return errors.Wrap(err, "error handling inbox message events")
+	}
+
+	err = models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
+
 	return nil
 }
 
@@ -657,11 +698,13 @@ type MsgEvent struct {
 	Text          string             `json:"text"`
 	Attachments   []utils.Attachment `json:"attachments"`
 	NewContact    bool               `json:"new_contact"`
+	CreatedOn     time.Time          `json:"created_on"`
 }
 
 type StopEvent struct {
-	ContactID models.ContactID `json:"contact_id"`
-	OrgID     models.OrgID     `json:"org_id"`
+	ContactID  models.ContactID `json:"contact_id"`
+	OrgID      models.OrgID     `json:"org_id"`
+	OccurredOn time.Time        `json:"occurred_on"`
 }
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event

@@ -55,9 +55,6 @@ func (s *Scene) ContactUUID() flows.ContactUUID { return s.contact.UUID() }
 
 // Session returns the session for this scene if any
 func (s *Scene) Session() *Session {
-	if s.session == nil {
-		panic("attempt to retrieve session on scene without one")
-	}
 	return s.session
 }
 
@@ -182,5 +179,58 @@ func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 		}
 	}
 
+	return nil
+}
+
+// HandleAndCommitEvents takes a set of contacts and events, handles the events and applies any hooks, and commits everything
+func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *OrgAssets, contactEvents map[*flows.Contact][]flows.Event) error {
+	// create scenes for each contact
+	scenes := make([]*Scene, 0, len(contactEvents))
+	for contact := range contactEvents {
+		scene := NewSceneForContact(contact)
+		scenes = append(scenes, scene)
+	}
+
+	// begin the transaction for handling and pre-commit hooks
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return errors.Wrapf(err, "error beginning transaction")
+	}
+
+	// handle the events to create the hooks on each scene
+	for _, scene := range scenes {
+		err := HandleEvents(ctx, tx, rp, oa, scene, contactEvents[scene.Contact()])
+		if err != nil {
+			return errors.Wrapf(err, "error applying events")
+		}
+	}
+
+	// gather all our pre commit events, group them by hook and apply them
+	err = ApplyEventPreCommitHooks(ctx, tx, rp, oa, scenes)
+	if err != nil {
+		return errors.Wrapf(err, "error applying pre commit hooks")
+	}
+
+	// commit the transaction
+	if err := tx.Commit(); err != nil {
+		return errors.Wrapf(err, "error committing pre commit hooks")
+	}
+
+	// begin the transaction for post-commit hooks
+	tx, err = db.BeginTxx(ctx, nil)
+	if err != nil {
+		return errors.Wrapf(err, "error beginning transaction for post commit")
+	}
+
+	// apply the post commit hooks
+	err = ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
+	if err != nil {
+		return errors.Wrapf(err, "error applying post commit hooks")
+	}
+
+	// commit the transaction
+	if err := tx.Commit(); err != nil {
+		return errors.Wrapf(err, "error committing post commit hooks")
+	}
 	return nil
 }

@@ -100,7 +100,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		// add our add event
 		scene.AppendToEventPreCommitHook(commitGroupChangesHook, hookEvent)
 		scene.AppendToEventPreCommitHook(updateCampaignEventsHook, hookEvent)
-		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.Contact().ID())
+		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.ContactID())
 	}
 
 	// add each of our groups
@@ -123,7 +123,7 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 
 		scene.AppendToEventPreCommitHook(commitGroupChangesHook, hookEvent)
 		scene.AppendToEventPreCommitHook(updateCampaignEventsHook, hookEvent)
-		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.Contact().ID())
+		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.ContactID())
 	}
 
 	return nil

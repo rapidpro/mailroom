@@ -11,4 +11,4 @@ archives:
   - files:
     - LICENSE
     - README.md
-    - docs/*
+    - docs/**/*
