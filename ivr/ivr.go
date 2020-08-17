@@ -19,9 +19,9 @@ import (
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/httputils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/s3utils"
@@ -56,7 +56,7 @@ var CallEndedError = fmt.Errorf("call ended")
 var constructors = make(map[models.ChannelType]ClientConstructor)
 
 // ClientConstructor defines our signature for creating a new IVR client from a channel
-type ClientConstructor func(c *models.Channel) (Client, error)
+type ClientConstructor func(*http.Client, *models.Channel) (Client, error)
 
 // RegisterClientType registers the passed in channel type with the passed in constructor
 func RegisterClientType(channelType models.ChannelType, constructor ClientConstructor) {
@@ -70,14 +70,14 @@ func GetClient(channel *models.Channel) (Client, error) {
 		return nil, errors.Errorf("no ivr client for channel type: %s", channel.Type())
 	}
 
-	return constructor(channel)
+	return constructor(http.DefaultClient, channel)
 }
 
 // Client defines the interface IVR clients must satisfy
 type Client interface {
-	RequestCall(client *http.Client, number urns.URN, handleURL string, statusURL string) (CallID, error)
+	RequestCall(number urns.URN, handleURL string, statusURL string) (CallID, *httpx.Trace, error)
 
-	HangupCall(client *http.Client, externalID string) error
+	HangupCall(externalID string) (*httpx.Trace, error)
 
 	WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
 
@@ -123,27 +123,19 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 		return errors.Wrapf(err, "unable to create ivr client")
 	}
 
-	// we create our own HTTP client with our own transport so we can log the request and set our user agent
-	logger := httputils.NewLoggingTransport(http.DefaultTransport)
-	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
-
 	// try to request our call hangup
-	err = c.HangupCall(client, conn.ExternalID())
+	trace, err := c.HangupCall(conn.ExternalID())
 
-	// insert any logged requests
-	for _, rt := range logger.RoundTrips {
+	// insert an channel log if we have an HTTP trace
+	if trace != nil {
 		desc := "Hangup Requested"
 		isError := false
-		if rt.Status/100 != 2 {
+		if trace.Response == nil || trace.Response.StatusCode/100 != 2 {
 			desc = "Error Hanging up Call"
 			isError = true
 		}
-		_, err := models.InsertChannelLog(
-			ctx, db, desc, isError,
-			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody,
-			rt.StartedOn, rt.Elapsed,
-			channel, conn,
-		)
+		log := models.NewChannelLog(trace, isError, desc, channel, conn)
+		err := models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log})
 
 		// log any error inserting our channel log, but try to continue
 		if err != nil {
@@ -262,27 +254,19 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 		return errors.Wrapf(err, "unable to create ivr client")
 	}
 
-	// we create our own HTTP client with our own transport so we can log the request and set our user agent
-	logger := httputils.NewLoggingTransport(http.DefaultTransport)
-	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
-
 	// try to request our call start
-	callID, err := c.RequestCall(client, telURN, resumeURL, statusURL)
+	callID, trace, err := c.RequestCall(telURN, resumeURL, statusURL)
 
-	// insert any logged requests
-	for _, rt := range logger.RoundTrips {
+	/// insert an channel log if we have an HTTP trace
+	if trace != nil {
 		desc := "Call Requested"
 		isError := false
-		if rt.Status/100 != 2 {
+		if trace.Response == nil || trace.Response.StatusCode/100 != 2 {
 			desc = "Error Requesting Call"
 			isError = true
 		}
-		_, err := models.InsertChannelLog(
-			ctx, db, desc, isError,
-			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody,
-			rt.StartedOn, rt.Elapsed,
-			channel, conn,
-		)
+		log := models.NewChannelLog(trace, isError, desc, channel, conn)
+		err := models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log})
 
 		// log any error inserting our channel log, but try to continue
 		if err != nil {
