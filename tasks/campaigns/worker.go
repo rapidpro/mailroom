@@ -25,8 +25,8 @@ func init() {
 	mailroom.AddTaskFunction(queue.FireCampaignEvent, HandleFireCampaignEvent)
 }
 
-// scheduleTask is our definition of our event recalculation task
-type scheduleTask struct {
+// ScheduleTask is our definition of our event recalculation task
+type ScheduleTask struct {
 	OrgID           models.OrgID           `json:"org_id"`
 	CampaignEventID models.CampaignEventID `json:"campaign_event_id"`
 }
@@ -42,20 +42,25 @@ func HandleScheduleCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, tas
 	if task.Type != queue.ScheduleCampaignEvent {
 		return errors.Errorf("unknown event type passed to calc schedule campaign event worker: %s", task.Type)
 	}
-	t := &scheduleTask{}
+	t := &ScheduleTask{}
 	err := json.Unmarshal(task.Task, t)
 	if err != nil {
 		return errors.Wrapf(err, "error unmarshalling task: %s", string(task.Task))
 	}
 
+	return ScheduleCampaignEvent(ctx, mr.DB, mr.RP, t)
+}
+
+// ScheduleCampaignEvent creates the actual event fires to schedule the given campaign event
+func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, t *ScheduleTask) error {
 	lockKey := fmt.Sprintf(scheduleLockKey, t.CampaignEventID)
-	lock, err := locker.GrabLock(mr.RP, lockKey, time.Hour, time.Minute*5)
+	lock, err := locker.GrabLock(rp, lockKey, time.Hour, time.Minute*5)
 	if err != nil {
 		return errors.Wrapf(err, "error grabbing lock to schedule campaign event %d", t.CampaignEventID)
 	}
-	defer locker.ReleaseLock(mr.RP, lockKey, lock)
+	defer locker.ReleaseLock(rp, lockKey, lock)
 
-	err = models.ScheduleCampaignEvent(ctx, mr.DB, t.OrgID, t.CampaignEventID)
+	err = models.ScheduleCampaignEvent(ctx, db, t.OrgID, t.CampaignEventID)
 	if err != nil {
 		return errors.Wrapf(err, "error scheduling campaign event %d", t.CampaignEventID)
 	}

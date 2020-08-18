@@ -618,16 +618,21 @@ func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, eventI
 	}
 
 	fas := make([]*FireAdd, 0, len(eligible))
+	tz := oa.Env().Timezone()
 
 	for _, el := range eligible {
-		// calculate next fire for this contact
-		scheduled, err := event.ScheduleForTime(oa.Env().Timezone(), time.Now(), el.Value)
-		if err != nil {
-			return errors.Wrapf(err, "error calculating offset for start: %s and event: %d", el.Value, eventID)
-		}
+		if el.RelToValue != nil {
+			start := *el.RelToValue
 
-		if scheduled != nil {
-			fas = append(fas, &FireAdd{ContactID: el.ContactID, EventID: eventID, Scheduled: *scheduled})
+			// calculate next fire for this contact
+			scheduled, err := event.ScheduleForTime(tz, time.Now(), start)
+			if err != nil {
+				return errors.Wrapf(err, "error calculating offset for start: %s and event: %d", start, eventID)
+			}
+
+			if scheduled != nil {
+				fas = append(fas, &FireAdd{ContactID: el.ContactID, EventID: eventID, Scheduled: *scheduled})
+			}
 		}
 	}
 
@@ -636,14 +641,14 @@ func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, eventI
 }
 
 type eligibleContact struct {
-	ContactID ContactID `db:"contact_id"`
-	Value     time.Time `db:"value"`
+	ContactID  ContactID  `db:"contact_id"`
+	RelToValue *time.Time `db:"rel_to_value"`
 }
 
 const eligibleContactsForCreatedOnSQL = `
 SELECT 
 	c.id AS contact_id,
-	c.created_on AS value
+	c.created_on AS rel_to_value
 FROM 
 	contacts_contact c
 INNER JOIN
@@ -655,7 +660,7 @@ WHERE
 const eligibleContactsForLastSeenOnSQL = `
 SELECT 
 	c.id AS contact_id, 
-	c.last_seen_on AS value
+	c.last_seen_on AS rel_to_value
 FROM 
 	contacts_contact c
 INNER JOIN
@@ -667,13 +672,13 @@ WHERE
 const eligibleContactsForFieldSQL = `
 SELECT 
 	c.id AS contact_id, 
-	c.fields->$2->>'datetime' AS value
+	(c.fields->$2->>'datetime')::timestamptz AS rel_to_value
 FROM 
 	contacts_contact c
 INNER JOIN
     contacts_contactgroup_contacts gc ON gc.contact_id = c.id
 WHERE
-    gc.contactgroup_id = $1 AND c.is_active = TRUE AND ARRAY[$2]::text[] <@ (extract_jsonb_keys("contacts_contact"."fields")) IS NOT NULL
+    gc.contactgroup_id = $1 AND c.is_active = TRUE AND ARRAY[$2]::text[] <@ (extract_jsonb_keys(c.fields)) IS NOT NULL
 `
 
 func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID GroupID, field *Field) ([]*eligibleContact, error) {
@@ -689,7 +694,7 @@ func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID Gro
 		params = []interface{}{groupID}
 	default:
 		query = eligibleContactsForFieldSQL
-		params = []interface{}{groupID, pq.Array([]interface{}{field.UUID()})}
+		params = []interface{}{groupID, field.UUID()}
 	}
 
 	rows, err := db.QueryxContext(ctx, query, params...)
@@ -703,7 +708,7 @@ func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID Gro
 	for rows.Next() {
 		contact := &eligibleContact{}
 
-		err := rows.Scan(&contact)
+		err := rows.StructScan(&contact)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error scanning eligible contact result")
 		}
