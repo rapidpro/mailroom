@@ -17,7 +17,7 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/gorilla/schema v1.0.2
-	github.com/greatnonprofits-nfp/goflow v0.50.3-0.20200717222429-634f7d8dee6f
+	github.com/greatnonprofits-nfp/goflow v0.50.3-0.20200818231342-5598cee6dcf2
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect

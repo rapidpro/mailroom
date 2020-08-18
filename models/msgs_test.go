@@ -91,7 +91,7 @@ func TestMsgs(t *testing.T) {
 		tx, err := db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic)
+		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, "")
 		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now, "", ctx, tx)
 
 		if err == nil {
