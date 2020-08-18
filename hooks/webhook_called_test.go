@@ -6,9 +6,9 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
-	"github.com/nyaruka/goflow/utils/httpx"
 )
 
 func TestWebhookCalled(t *testing.T) {

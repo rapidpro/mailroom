@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"

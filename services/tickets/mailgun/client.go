@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/httpx"
-	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/pkg/errors"
 )

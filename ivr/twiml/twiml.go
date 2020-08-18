@@ -9,19 +9,15 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/nyaruka/goflow/envs"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/routers/waits"
@@ -29,6 +25,9 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -100,6 +99,7 @@ var validLanguageCodes = map[string]bool{
 var indentMarshal = true
 
 type client struct {
+	httpClient   *http.Client
 	channel      *models.Channel
 	baseURL      string
 	accountSID   string
@@ -114,7 +114,7 @@ func init() {
 }
 
 // NewClientFromChannel creates a new Twilio IVR client for the passed in account and and auth token
-func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
+func NewClientFromChannel(httpClient *http.Client, channel *models.Channel) (ivr.Client, error) {
 	accountSID := channel.ConfigValue(accountSIDConfig, "")
 	authToken := channel.ConfigValue(authTokenConfig, "")
 	if accountSID == "" || authToken == "" {
@@ -123,6 +123,7 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 	baseURL := channel.ConfigValue(baseURLConfig, channel.ConfigValue(sendURLConfig, BaseURL))
 
 	return &client{
+		httpClient:   httpClient,
 		channel:      channel,
 		baseURL:      baseURL,
 		accountSID:   accountSID,
@@ -132,8 +133,9 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 }
 
 // NewClient creates a new Twilio IVR client for the passed in account and and auth token
-func NewClient(accountSID string, authToken string) ivr.Client {
+func NewClient(httpClient *http.Client, accountSID string, authToken string) ivr.Client {
 	return &client{
+		httpClient: httpClient,
 		baseURL:    BaseURL,
 		accountSID: accountSID,
 		authToken:  authToken,
@@ -173,7 +175,7 @@ type CallResponse struct {
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL string, statusURL string) (ivr.CallID, error) {
+func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
 	form := url.Values{}
 	form.Set("To", number.Path())
 	form.Set("From", c.channel.Address())
@@ -182,57 +184,47 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 
 	sendURL := c.baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
 
-	resp, err := c.postRequest(client, sendURL, form)
+	trace, err := c.postRequest(sendURL, form)
 	if err != nil {
-		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 201 {
-		io.Copy(ioutil.Discard, resp.Body)
-		return ivr.NilCallID, errors.Errorf("received non 201 status for call start: %d", resp.StatusCode)
+		return ivr.NilCallID, trace, errors.Wrapf(err, "error trying to start call")
 	}
 
-	// read our body
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return ivr.NilCallID, errors.Wrapf(err, "error reading response body")
+	if trace.Response.StatusCode != 201 {
+		return ivr.NilCallID, trace, errors.Errorf("received non 201 status for call start: %d", trace.Response.StatusCode)
 	}
 
 	// parse out our call sid
 	call := &CallResponse{}
-	err = json.Unmarshal(body, call)
+	err = json.Unmarshal(trace.ResponseBody, call)
 	if err != nil || call.SID == "" {
-		return ivr.NilCallID, errors.Errorf("unable to read call id")
+		return ivr.NilCallID, trace, errors.Errorf("unable to read call id")
 	}
 
 	if call.Status == statusFailed {
-		return ivr.NilCallID, errors.Errorf("call status returned as failed")
+		return ivr.NilCallID, trace, errors.Errorf("call status returned as failed")
 	}
 
-	return ivr.CallID(call.SID), nil
+	return ivr.CallID(call.SID), trace, nil
 }
 
 // HangupCall asks Twilio to hang up the call that is passed in
-func (c *client) HangupCall(client *http.Client, callID string) error {
+func (c *client) HangupCall(callID string) (*httpx.Trace, error) {
 	form := url.Values{}
 	form.Set("Status", "completed")
 
 	sendURL := c.baseURL + strings.Replace(hangupPath, "{AccountSID}", c.accountSID, -1)
 	sendURL = strings.Replace(sendURL, "{SID}", callID, -1)
 
-	resp, err := c.postRequest(client, sendURL, form)
+	trace, err := c.postRequest(sendURL, form)
 	if err != nil {
-		return errors.Wrapf(err, "error trying to hangup call")
-	}
-	defer resp.Body.Close()
-	io.Copy(ioutil.Discard, resp.Body)
-
-	if resp.StatusCode != 200 {
-		return errors.Errorf("received non 204 trying to hang up call: %d", resp.StatusCode)
+		return trace, errors.Wrapf(err, "error trying to hangup call")
 	}
 
-	return nil
+	if trace.Response.StatusCode != 200 {
+		return trace, errors.Errorf("received non 204 trying to hang up call: %d", trace.Response.StatusCode)
+	}
+
+	return trace, nil
 }
 
 // InputForRequest returns the input for the passed in request, if any
@@ -376,13 +368,13 @@ func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
 	return err
 }
 
-func (c *client) postRequest(client *http.Client, sendURL string, form url.Values) (*http.Response, error) {
+func (c *client) postRequest(sendURL string, form url.Values) (*httpx.Trace, error) {
 	req, _ := http.NewRequest(http.MethodPost, sendURL, strings.NewReader(form.Encode()))
 	req.SetBasicAuth(c.accountSID, c.authToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	return client.Do(req)
+	return httpx.DoTrace(c.httpClient, req, nil, nil, -1)
 }
 
 // see https://www.twilio.com/docs/api/security
