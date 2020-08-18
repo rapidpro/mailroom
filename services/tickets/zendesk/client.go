@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nyaruka/goflow/utils/httpx"
-	"github.com/nyaruka/goflow/utils/jsonx"
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 )
 
 type baseClient struct {

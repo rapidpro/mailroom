@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/utils/httpx"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/pkg/errors"
 )
 

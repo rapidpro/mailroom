@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/nyaruka/goflow/utils/httpx"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/services/tickets/mailgun"
 
