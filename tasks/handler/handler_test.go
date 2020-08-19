@@ -347,7 +347,7 @@ func TestStopEvent(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, models.GeorgeID}, 1)
 
 	// that cathy is stopped
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{models.CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S' AND is_stopped = TRUE`, []interface{}{models.CathyID}, 1)
 
 	// and has no upcoming events
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{models.CathyID}, 0)
