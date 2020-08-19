@@ -7,7 +7,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/actions/modifiers"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/models"
 
 	"github.com/gomodule/redigo/redis"
@@ -86,7 +86,7 @@ func ModifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
-	eventsByContact := make(map[*flows.Contact][]flows.Event)
+	eventsByContact := make(map[*flows.Contact][]flows.Event, len(modifiersByContact))
 
 	// apply the modifiers to get the events for each contact
 	for contact, mods := range modifiersByContact {
@@ -97,48 +97,9 @@ func ModifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models
 		eventsByContact[contact] = events
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	err := models.HandleAndCommitEvents(ctx, db, rp, oa, eventsByContact)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error starting transaction")
-	}
-
-	scenes := make([]*models.Scene, 0, len(modifiersByContact))
-
-	for contact := range modifiersByContact {
-		scene := models.NewSceneForContact(contact)
-		scenes = append(scenes, scene)
-
-		err := models.HandleEvents(ctx, tx, rp, oa, scene, eventsByContact[contact])
-		if err != nil {
-			return nil, errors.Wrapf(err, "error handling events")
-		}
-	}
-
-	// gather all our pre commit events, group them by hook and apply them
-	err = models.ApplyEventPreCommitHooks(ctx, tx, rp, oa, scenes)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error applying pre commit hooks")
-	}
-
-	// commit our transaction
-	if err := tx.Commit(); err != nil {
-		return nil, errors.Wrapf(err, "error committing transaction")
-	}
-
-	// start new transaction for post commit hooks
-	tx, err = db.BeginTxx(ctx, nil)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error starting transaction for post commit")
-	}
-
-	// then apply our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error applying post commit hooks")
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, errors.Wrapf(err, "error committing post commit hooks")
+		return nil, errors.Wrap(err, "error commiting events")
 	}
 
 	return eventsByContact, nil

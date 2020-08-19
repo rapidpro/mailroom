@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
@@ -17,13 +18,12 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/dates"
 	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
-	"github.com/olivere/elastic"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -341,6 +341,7 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		c.Status(),
 		org.Env().Timezone(),
 		c.createdOn,
+		c.lastSeenOn,
 		c.urns,
 		groups,
 		c.fields,
@@ -1142,7 +1143,7 @@ func UpdateContactModifiedOn(ctx context.Context, tx Queryer, contactIDs []Conta
 
 // UpdateContactLastSeenOn updates last seen on (and modified on) on the passed in contact
 func UpdateContactLastSeenOn(ctx context.Context, tx Queryer, contactID ContactID, lastSeenOn time.Time) error {
-	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = $2, modified_on = NOW() WHERE id = $1 AND last_seen_on IS NULL OR last_seen_on < $2`, contactID, lastSeenOn)
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = $2, modified_on = NOW() WHERE id = $1`, contactID, lastSeenOn)
 	return err
 }
 

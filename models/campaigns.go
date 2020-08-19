@@ -37,8 +37,11 @@ type OffsetUnit string
 type StartMode string
 
 const (
-	// CreatedOnKey
+	// CreatedOnKey is key of created on system field
 	CreatedOnKey = "created_on"
+
+	// LastSeenOnKey is key of last seen on system field
+	LastSeenOnKey = "last_seen_on"
 
 	// OffsetMinute means our offset is in minutes
 	OffsetMinute = OffsetUnit("M")
@@ -126,12 +129,15 @@ func (e *CampaignEvent) QualifiesByGroup(contact *flows.Contact) bool {
 
 // QualifiesByField returns whether the passed in contact qualifies for this event by group membership
 func (e *CampaignEvent) QualifiesByField(contact *flows.Contact) bool {
-	if e.RelativeToKey() == CreatedOnKey {
+	switch e.RelativeToKey() {
+	case CreatedOnKey:
 		return true
+	case LastSeenOnKey:
+		return contact.LastSeenOn() != nil
+	default:
+		value := contact.Fields()[e.RelativeToKey()]
+		return value != nil
 	}
-
-	value := contact.Fields()[e.RelativeToKey()]
-	return value != nil
 }
 
 // ScheduleForContact calculates the next fire ( if any) for the passed in contact
@@ -143,10 +149,16 @@ func (e *CampaignEvent) ScheduleForContact(tz *time.Location, now time.Time, con
 
 	var start time.Time
 
-	// created on is a special case
-	if e.RelativeToKey() == CreatedOnKey {
+	switch e.RelativeToKey() {
+	case CreatedOnKey:
 		start = contact.CreatedOn()
-	} else {
+	case LastSeenOnKey:
+		value := contact.LastSeenOn()
+		if value == nil {
+			return nil, nil
+		}
+		start = *value
+	default:
 		// everything else is just a normal field
 		value := contact.Fields()[e.RelativeToKey()]
 

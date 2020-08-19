@@ -3,8 +3,8 @@ package models_test
 import (
 	"testing"
 
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/models"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"

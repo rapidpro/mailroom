@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nyaruka/goflow/utils/dates"
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/mailroom/models"
 
 	"github.com/pkg/errors"

@@ -57,11 +57,11 @@ jobs:
       uses: actions/checkout@v1
 
     - name: Fetch GoFlow docs
-      # for now just grab en_US/ docs and bundle as docs/
+      # for backward compatibility, English docs are copied to root of docs directory
       run: |
-        GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2)
-        curl https://codeload.github.com/nyaruka/goflow/tar.gz/$GOFLOW_VERSION | tar --wildcards --strip=2 -zx "*/docs/en_US/*"
-        mv en_US docs  
+        GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2 | cut -c2-)
+        curl https://codeload.github.com/nyaruka/goflow/tar.gz/v$GOFLOW_VERSION | tar --wildcards --strip=1 -zx "goflow-${GOFLOW_VERSION}/docs/*"
+        cp ./docs/en-us/*.* docs/
 
     - name: Install Go
       uses: actions/setup-go@v1

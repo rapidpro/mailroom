@@ -1,3 +1,29 @@
+v5.7.10
+----------
+ * Tweak goreleaser config to include subdirectories inside docs folder
+
+v5.7.9
+----------
+ * Update to goflow v0.101.2
+ * Bundle localized goflow docs in release
+
+v5.7.8
+----------
+ * Recalculate event fires for campaign events based on last_seen_on
+
+v5.7.7
+----------
+ * Update to latest goflow v0.100.0
+
+v5.7.6
+----------
+ * Remove protection for overwriting last_seen_on with older values
+
+v5.7.5
+----------
+ * Update last_seen_on when handling certain channel events
+ * Update last_seen_on when we receive a message from a contact
+
 v5.7.4
 ----------
  * Fail outgoing messages for suspended orgs

@@ -17,12 +17,19 @@ func TestCampaigns(t *testing.T) {
 	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
 	joined := assets.NewFieldReference("joined", "Joined")
 
-	// insert an event on our campaign that is based on created on
+	// insert an event on our campaign that is based on created_on
 	testsuite.DB().MustExec(
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
 		uuids.New(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID)
+
+	// insert an event on our campaign that is based on last_seen_on
+	testsuite.DB().MustExec(
+		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
+											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
+									   VALUES(TRUE, NOW(), NOW(), $1, 2, 'D', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
+		uuids.New(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.LastSeenOnFieldID)
 
 	// init their values
 	testsuite.DB().MustExec(
@@ -35,7 +42,10 @@ func TestCampaigns(t *testing.T) {
 		WHERE id = $1`, models.BobID)
 
 	tcs := []HookTestCase{
-		HookTestCase{
+		{
+			Msgs: ContactMsgMap{
+				models.CathyID: flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, "Hi there", nil),
+			},
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
 					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
@@ -58,7 +68,7 @@ func TestCampaigns(t *testing.T) {
 				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{models.CathyID},
-					Count: 1,
+					Count: 2,
 				},
 				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,

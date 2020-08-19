@@ -1,6 +1,7 @@
 package nexmo
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
@@ -48,7 +49,7 @@ func TestResponseForSprint(t *testing.T) {
 	channel := oa.ChannelByUUID(models.NexmoChannelUUID)
 	assert.NotNil(t, channel)
 
-	c, err := NewClientFromChannel(channel)
+	c, err := NewClientFromChannel(http.DefaultClient, channel)
 	assert.NoError(t, err)
 
 	client := c.(*client)

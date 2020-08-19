@@ -21,7 +21,7 @@ func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mod
 	event := e.(*events.MsgReceivedEvent)
 
 	// for surveyor sessions we need to actually create the message
-	if scene.Session().SessionType() == models.SurveyorFlow {
+	if scene.Session() != nil && scene.Session().SessionType() == models.SurveyorFlow {
 		logrus.WithFields(logrus.Fields{
 			"contact_uuid": scene.ContactUUID(),
 			"session_id":   scene.SessionID(),
@@ -36,7 +36,8 @@ func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mod
 	}
 
 	// update the contact's last seen date
-	scene.AppendToEventPreCommitHook(contactLastSeenHook, event.CreatedOn())
+	scene.AppendToEventPreCommitHook(contactLastSeenHook, event)
+	scene.AppendToEventPreCommitHook(updateCampaignEventsHook, event)
 
 	return nil
 }

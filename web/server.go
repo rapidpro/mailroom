@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nyaruka/goflow/utils/jsonx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/config"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"

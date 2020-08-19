@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -19,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -65,6 +65,7 @@ const (
 var indentMarshal = true
 
 type client struct {
+	httpClient *http.Client
 	channel    *models.Channel
 	baseURL    string
 	appID      string
@@ -76,7 +77,7 @@ func init() {
 }
 
 // NewClientFromChannel creates a new Twilio IVR client for the passed in account and and auth token
-func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
+func NewClientFromChannel(httpClient *http.Client, channel *models.Channel) (ivr.Client, error) {
 	appID := channel.ConfigValue(appIDConfig, "")
 	key := channel.ConfigValue(privateKeyConfig, "")
 	if appID == "" || key == "" {
@@ -89,6 +90,7 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 	}
 
 	return &client{
+		httpClient: httpClient,
 		channel:    channel,
 		baseURL:    BaseURL,
 		appID:      appID,
@@ -280,7 +282,7 @@ type CallResponse struct {
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL string, statusURL string) (ivr.CallID, error) {
+func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
 	callR := &CallRequest{
 		AnswerURL:    []string{resumeURL + "&sig=" + url.QueryEscape(c.calculateSignature(resumeURL))},
 		AnswerMethod: http.MethodPost,
@@ -290,64 +292,54 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, resumeURL str
 	}
 	rawTo, err := strconv.Atoi(number.Path())
 	if err != nil {
-		return ivr.NilCallID, errors.Wrapf(err, "unable to turn urn path into number: %s", number.Path())
+		return ivr.NilCallID, nil, errors.Wrapf(err, "unable to turn urn path into number: %s", number.Path())
 	}
 	callR.To = append(callR.To, Phone{Type: "phone", Number: rawTo})
 
 	rawFrom, err := strconv.Atoi(c.channel.Address())
 	if err != nil {
-		return ivr.NilCallID, errors.Wrapf(err, "unable to turn urn path into number: %s", number.Path())
+		return ivr.NilCallID, nil, errors.Wrapf(err, "unable to turn urn path into number: %s", number.Path())
 	}
 	callR.From = Phone{Type: "phone", Number: rawFrom}
 
-	resp, err := c.makeRequest(client, http.MethodPost, BaseURL, callR)
+	trace, err := c.makeRequest(http.MethodPost, BaseURL, callR)
 	if err != nil {
-		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		io.Copy(ioutil.Discard, resp.Body)
-		return ivr.NilCallID, errors.Errorf("received non 200 status for call start: %d", resp.StatusCode)
+		return ivr.NilCallID, trace, errors.Wrapf(err, "error trying to start call")
 	}
 
-	// read our body
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return ivr.NilCallID, errors.Wrapf(err, "error reading response body")
+	if trace.Response.StatusCode != http.StatusCreated {
+		return ivr.NilCallID, trace, errors.Errorf("received non 200 status for call start: %d", trace.Response.StatusCode)
 	}
 
 	// parse out our call sid
 	call := &CallResponse{}
-	err = json.Unmarshal(body, call)
+	err = json.Unmarshal(trace.ResponseBody, call)
 	if err != nil || call.UUID == "" {
-		return ivr.NilCallID, errors.Errorf("unable to read call uuid")
+		return ivr.NilCallID, trace, errors.Errorf("unable to read call uuid")
 	}
 
 	if call.Status == statusFailed {
-		return ivr.NilCallID, errors.Errorf("call status returned as failed")
+		return ivr.NilCallID, trace, errors.Errorf("call status returned as failed")
 	}
 
-	logrus.WithField("body", string(body)).WithField("status", resp.StatusCode).Debug("requested call")
+	logrus.WithField("body", string(trace.ResponseBody)).WithField("status", trace.Response.StatusCode).Debug("requested call")
 
-	return ivr.CallID(call.UUID), nil
+	return ivr.CallID(call.UUID), trace, nil
 }
 
 // HangupCall asks Nexmo to hang up the call that is passed in
-func (c *client) HangupCall(client *http.Client, callID string) error {
+func (c *client) HangupCall(callID string) (*httpx.Trace, error) {
 	hangupBody := map[string]string{"action": "hangup"}
 	url := BaseURL + "/" + callID
-	resp, err := c.makeRequest(client, http.MethodPut, url, hangupBody)
+	trace, err := c.makeRequest(http.MethodPut, url, hangupBody)
 	if err != nil {
-		return errors.Wrapf(err, "error trying to hangup call")
+		return trace, errors.Wrapf(err, "error trying to hangup call")
 	}
-	defer resp.Body.Close()
-	io.Copy(ioutil.Discard, resp.Body)
 
-	if resp.StatusCode != 204 {
-		return errors.Errorf("received non 204 status for call hangup: %d", resp.StatusCode)
+	if trace.Response.StatusCode != 204 {
+		return trace, errors.Errorf("received non 204 status for call hangup: %d", trace.Response.StatusCode)
 	}
-	return nil
+	return trace, nil
 }
 
 type NCCOInput struct {
@@ -533,7 +525,7 @@ func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
 	return err
 }
 
-func (c *client) makeRequest(client *http.Client, method string, sendURL string, body interface{}) (*http.Response, error) {
+func (c *client) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
 	bb, err := json.Marshal(body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error json encoding request")
@@ -549,7 +541,7 @@ func (c *client) makeRequest(client *http.Client, method string, sendURL string,
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
-	return client.Do(req)
+	return httpx.DoTrace(c.httpClient, req, nil, nil, -1)
 }
 
 // calculateSignature calculates a signature for the passed in URL

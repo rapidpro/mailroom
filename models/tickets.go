@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/dates"
-	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
 
