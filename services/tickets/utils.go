@@ -6,6 +6,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
 
@@ -69,17 +70,24 @@ func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
-func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.Ticket, text string) (*models.Msg, error) {
+func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.Ticket, text string, fileURLs []string) (*models.Msg, error) {
 	// look up our assets
 	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
 
+	// fetch and files and prepare as attachments
+	attachments := make([]utils.Attachment, len(fileURLs))
+	//for i := range fileURLs {
+	//	// TODO
+	//
+	//attachments[i] =
+	//}
+
 	// build a simple translation
-	translations := map[envs.Language]*models.BroadcastTranslation{
-		envs.Language("base"): {Text: text},
-	}
+	base := &models.BroadcastTranslation{Text: text, Attachments: attachments}
+	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("base"): base}
 
 	// we'll use a broadcast to send this message
 	bcast := models.NewBroadcast(assets.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil)
