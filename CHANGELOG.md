@@ -1,3 +1,8 @@
+v5.7.11
+----------
+ * Always write contact.status when writing is_blocked or is_stopped
+ * Convert IVR code to use goflow's httpx package
+
 v5.7.10
 ----------
  * Tweak goreleaser config to include subdirectories inside docs folder
