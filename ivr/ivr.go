@@ -7,9 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -24,9 +22,8 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
-	"github.com/nyaruka/mailroom/s3utils"
+	"github.com/nyaruka/mailroom/storage"
 
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -45,9 +42,6 @@ const (
 	// ErrorMessage that is spoken to an IVR user if an error occurs
 	ErrorMessage = "An error has occurred, please try again later."
 )
-
-// WriteAttachments controls whether we write attachments, used during unit testing
-var WriteAttachments = true
 
 // CallEndedError is our constant error for when a call has ended
 var CallEndedError = fmt.Errorf("call ended")
@@ -397,7 +391,7 @@ func StartIVRFlow(
 
 // ResumeIVRFlow takes care of resuming the flow in the passed in start for the passed in contact and URN
 func ResumeIVRFlow(
-	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API,
+	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage,
 	resumeURL string, client Client,
 	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
@@ -484,24 +478,12 @@ func ResumeIVRFlow(
 		}
 		resp.Body.Close()
 
-		// check our content type
-		contentType := http.DetectContentType(body)
-
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(attachment.URL())
-		path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", oa.OrgID()), filename[:4], filename[4:8], filename)
-		if !strings.HasPrefix(path, "/") {
-			path = fmt.Sprintf("/%s", path)
-		}
 
-		if WriteAttachments {
-			// write to S3
-			logrus.WithField("path", path).Info("** uploading s3 file")
-			url, err := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, contentType, body)
-			if err != nil {
-				return errors.Wrapf(err, "unable to write attachment to s3")
-			}
-			attachment = utils.Attachment(contentType + ":" + url)
+		attachment, err = storage.StoreAttachment(store, config.S3MediaPrefix, int(oa.OrgID()), filename, body)
+		if err != nil {
+			return errors.Wrapf(err, "unable to store IVR attachment")
 		}
 	}
 
