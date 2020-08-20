@@ -3,7 +3,7 @@ package storage
 import (
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 )
 
 type fsStorage struct {
@@ -24,10 +24,10 @@ func (s *fsStorage) Test() error {
 	return nil
 }
 
-func (s *fsStorage) Put(p string, contentType string, contents []byte) (string, error) {
-	fullPath := path.Join(s.directory, p)
+func (s *fsStorage) Put(path string, contentType string, contents []byte) (string, error) {
+	fullPath := filepath.Join(s.directory, path)
 
-	err := os.MkdirAll(path.Dir(fullPath), s.perms)
+	err := os.MkdirAll(filepath.Dir(fullPath), s.perms)
 	if err != nil {
 		return "", err
 	}
