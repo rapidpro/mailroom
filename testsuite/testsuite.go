@@ -9,9 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nyaruka/mailroom/utils/storage"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/mailroom/storage"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )

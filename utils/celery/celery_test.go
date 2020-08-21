@@ -1,11 +1,13 @@
-package celery
+package celery_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/utils/celery"
+
+	"github.com/gomodule/redigo/redis"
 )
 
 func TestQueue(t *testing.T) {
@@ -15,7 +17,7 @@ func TestQueue(t *testing.T) {
 
 	// queue to our handler queue
 	rc.Send("multi")
-	err := QueueTask(rc, "handler", "handle_event_task", []int64{})
+	err := celery.QueueTask(rc, "handler", "handle_event_task", []int64{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -31,7 +33,7 @@ func TestQueue(t *testing.T) {
 	}
 
 	// make sure our task is valid json
-	task := Task{}
+	task := celery.Task{}
 	err = json.Unmarshal([]byte(taskJSON), &task)
 	if err != nil {
 		t.Errorf("should be JSON: %s", err)

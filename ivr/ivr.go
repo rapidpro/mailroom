@@ -22,7 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
-	"github.com/nyaruka/mailroom/storage"
+	"github.com/nyaruka/mailroom/utils/storage"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"

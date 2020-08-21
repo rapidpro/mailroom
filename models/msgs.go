@@ -19,7 +19,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/gsm7"
+	"github.com/nyaruka/mailroom/utils/gsm7"
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"

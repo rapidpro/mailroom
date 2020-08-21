@@ -1,7 +1,9 @@
-package gsm7
+package gsm7_test
 
 import (
 	"testing"
+
+	"github.com/nyaruka/mailroom/utils/gsm7"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -33,6 +35,6 @@ func TestSegments(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assert.Equal(t, tc.Segments, Segments(tc.Text), "unexpected num of segments for: %s", tc.Text)
+		assert.Equal(t, tc.Segments, gsm7.Segments(tc.Text), "unexpected num of segments for: %s", tc.Text)
 	}
 }

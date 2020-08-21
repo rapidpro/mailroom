@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nyaruka/mailroom/storage"
+	"github.com/nyaruka/mailroom/utils/storage"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
