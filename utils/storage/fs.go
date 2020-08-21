@@ -21,6 +21,12 @@ func (s *fsStorage) Name() string {
 }
 
 func (s *fsStorage) Test() error {
+	path, err := s.Put("test.txt", "text/plain", []byte(`test`))
+	if err != nil {
+		return err
+	}
+
+	os.Remove(path)
 	return nil
 }
 
