@@ -87,7 +87,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *model
 	if request.Sender != configuredAddress {
 		body := fmt.Sprintf("The address %s is not allowed to reply to this ticket\n", request.Sender)
 
-		mailgun.send(mailgun.noReplyAddress(), request.From, "Ticket reply rejected", body, nil, l.Ticketer(ticketer))
+		mailgun.send(mailgun.noReplyAddress(), request.From, "Ticket reply rejected", body, nil, nil, l.Ticketer(ticketer))
 
 		return &receiveResponse{Action: "rejected", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}

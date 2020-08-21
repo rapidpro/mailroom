@@ -3,6 +3,7 @@ package zendesk
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
@@ -94,9 +95,14 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, ""), nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
 	contactUUID := ticket.Config("contact-uuid")
 	contactDisplay := ticket.Config("contact-display")
+
+	fileURLs, err := s.convertAttachments(attachments)
+	if err != nil {
+		return errors.Wrap(err, "error converting attachments")
+	}
 
 	msg := &ExternalResource{
 		ExternalID: string(msgUUID),
@@ -107,6 +113,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			ExternalID: contactUUID,
 			Name:       contactDisplay,
 		},
+		FileURLs:         fileURLs,
 		AllowChannelback: true,
 	}
 
@@ -232,4 +239,19 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 		return errors.Wrap(err, "error pushing message to zendesk")
 	}
 	return nil
+}
+
+// convert attachments to URLs which Zendesk can POST to
+func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
+	fileURLs := make([]string, len(attachments))
+	for i, a := range attachments {
+		u, err := url.Parse(a.URL())
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO generate URL of current instance??
+		fileURLs[i] = "https://temba.ngrok.io/mr/tickets/types/zendesk/file?path=" + url.QueryEscape(u.Path)
+	}
+	return fileURLs, nil
 }

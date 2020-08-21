@@ -26,7 +26,8 @@ func init() {
 
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
 	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodPost, base+"/target/{ticketer:[a-f0-9\\-]+}", web.WithHTTPLogs(handleTicketerTarget))
+	web.RegisterJSONRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerTarget))
+	web.RegisterRoute(http.MethodPost, base+`/file`, handleFileCallback)
 }
 
 type integrationMetadata struct {
@@ -277,4 +278,20 @@ func handleTicketerTarget(ctx context.Context, s *web.Server, r *http.Request, l
 	}
 
 	return map[string]string{"status": "handled"}, http.StatusOK, nil
+}
+
+func handleFileCallback(ctx context.Context, s *web.Server, r *http.Request, w http.ResponseWriter) error {
+	path := r.URL.Query().Get("path")
+
+	fmt.Printf("callback for file URL '%s'\n", path)
+
+	data, err := s.Storage.Get(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return nil
+	}
+
+	w.WriteHeader(200)
+	w.Write(data)
+	return nil
 }

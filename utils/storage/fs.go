@@ -45,3 +45,9 @@ func (s *fsStorage) Put(path string, contentType string, contents []byte) (strin
 
 	return fullPath, nil
 }
+
+func (s *fsStorage) Get(path string) ([]byte, error) {
+	fullPath := filepath.Join(s.directory, path)
+
+	return ioutil.ReadFile(fullPath)
+}

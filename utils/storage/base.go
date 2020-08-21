@@ -9,6 +9,7 @@ type Storage interface {
 	Name() string
 	Test() error
 	Put(path string, contentType string, contents []byte) (string, error)
+	Get(path string) ([]byte, error)
 }
 
 // New creates a new storage service

@@ -69,5 +69,13 @@ func (s *s3Storage) Put(path string, contentType string, contents []byte) (strin
 		return "", err
 	}
 
-	return fmt.Sprintf(s3BucketURL, s.bucket, path), nil
+	return s.url(path), nil
+}
+
+func (s *s3Storage) Get(path string) ([]byte, error) {
+	return nil, nil // TODO
+}
+
+func (s *s3Storage) url(path string) string {
+	return fmt.Sprintf(s3BucketURL, s.bucket, path)
 }
