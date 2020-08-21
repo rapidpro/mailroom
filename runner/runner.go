@@ -12,9 +12,9 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

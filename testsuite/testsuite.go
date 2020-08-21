@@ -9,11 +9,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nyaruka/mailroom/utils/storage"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
+
+const storageDir = "_test_storage"
 
 // Reset clears out both our database and redis DB
 func Reset() (context.Context, *sqlx.DB, *redis.Pool) {
@@ -95,6 +99,18 @@ func RC() redis.Conn {
 // CTX returns our background testing context
 func CTX() context.Context {
 	return context.Background()
+}
+
+// Storage returns our storage for tests
+func Storage() storage.Storage {
+	return storage.NewFS(storageDir)
+}
+
+// ResetStorage clears our storage for tests
+func ResetStorage() {
+	if err := os.RemoveAll(storageDir); err != nil {
+		panic(err)
+	}
 }
 
 // utility function for running a command panicking if there is any error

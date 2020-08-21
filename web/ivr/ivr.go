@@ -348,7 +348,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 
 	case actionResume:
 		err = ivr.ResumeIVRFlow(
-			ctx, s.Config, s.DB, s.RP, s.S3Client, resumeURL, client,
+			ctx, s.Config, s.DB, s.RP, s.Storage, resumeURL, client,
 			oa, channel, conn, contacts[0], urn,
 			r, w,
 		)
