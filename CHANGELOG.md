@@ -1,3 +1,7 @@
+v5.7.12
+----------
+ * Fix inserting channel logs and add test
+
 v5.7.11
 ----------
  * Always write contact.status when writing is_blocked or is_stopped
