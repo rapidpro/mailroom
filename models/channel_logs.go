@@ -72,7 +72,7 @@ func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Chann
 func InsertChannelLogs(ctx context.Context, db *sqlx.DB, logs []*ChannelLog) error {
 	ls := make([]interface{}, len(logs))
 	for i := range logs {
-		ls[i] = logs[i].l
+		ls[i] = &logs[i].l
 	}
 
 	err := BulkSQL(ctx, "insert channel log", db, insertChannelLogSQL, ls)

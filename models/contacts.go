@@ -41,6 +41,23 @@ const (
 	NilContactID = ContactID(0)
 )
 
+// ContactStatus is the type for contact statuses
+type ContactStatus string
+
+// possible contact statuses
+const (
+	ContactStatusActive   = "A"
+	ContactStatusBlocked  = "B"
+	ContactStatusStopped  = "S"
+	ContactStatusArchived = "V"
+)
+
+var contactStatusMap = map[flows.ContactStatus]ContactStatus{
+	flows.ContactStatusActive:  ContactStatusActive,
+	flows.ContactStatusBlocked: ContactStatusBlocked,
+	flows.ContactStatusStopped: ContactStatusStopped,
+}
+
 // LoadContact loads a contact from the passed in id
 func LoadContact(ctx context.Context, db Queryer, org *OrgAssets, id ContactID) (*Contact, error) {
 	contacts, err := LoadContacts(ctx, db, org, []ContactID{id})
@@ -366,7 +383,7 @@ func (c *Contact) URNForID(urnID URNID) urns.URN {
 
 // Unstop sets the is_stopped attribute to false for this contact
 func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
-	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET is_stopped = FALSE, modified_on = NOW() WHERE id = $1`, c.id)
+	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET status = 'A', is_stopped = FALSE, modified_on = NOW() WHERE id = $1`, c.id)
 	if err != nil {
 		return errors.Wrapf(err, "error unstopping contact")
 	}
@@ -619,9 +636,9 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, urn urns.UR
 	err = tx.GetContext(ctx, &contactID,
 		`INSERT INTO 
 		contacts_contact
-			(org_id, is_active, is_blocked, is_stopped, uuid, created_on, modified_on, created_by_id, modified_by_id, name) 
+			(org_id, is_active, status, is_blocked, is_stopped, uuid, created_on, modified_on, created_by_id, modified_by_id, name) 
 		VALUES
-			($1, TRUE, FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
+			($1, TRUE, 'A', FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
 		RETURNING id`,
 		org.OrgID(), uuids.New(),
 	)
@@ -922,6 +939,7 @@ UPDATE
 	contacts_contact
 SET
 	is_stopped = TRUE,
+	status = 'S',
 	modified_on = NOW()
 WHERE 
 	id = $1
@@ -1316,9 +1334,10 @@ type ContactStatusChange struct {
 }
 
 type contactStatusUpdate struct {
-	ContactID ContactID `db:"id"`
-	Blocked   bool      `db:"is_blocked"`
-	Stopped   bool      `db:"is_stopped"`
+	ContactID ContactID     `db:"id"`
+	Status    ContactStatus `db:"status"`
+	Blocked   bool          `db:"is_blocked"`
+	Stopped   bool          `db:"is_stopped"`
 }
 
 // UpdateContactStatus updates the contacts status as the passed changes
@@ -1330,6 +1349,7 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 	for _, ch := range changes {
 		blocked := ch.Status == flows.ContactStatusBlocked
 		stopped := ch.Status == flows.ContactStatusStopped
+		status := contactStatusMap[ch.Status]
 
 		if blocked || stopped {
 			archiveTriggersForContactIDs = append(archiveTriggersForContactIDs, ch.ContactID)
@@ -1339,6 +1359,7 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 			statusUpdates,
 			&contactStatusUpdate{
 				ContactID: ch.ContactID,
+				Status:    status,
 				Blocked:   blocked,
 				Stopped:   stopped,
 			},
@@ -1364,13 +1385,14 @@ const updateContactStatusSQL = `
 	UPDATE
 		contacts_contact c
 	SET
+		status = r.status,
 		is_blocked = r.is_blocked::boolean,
 		is_stopped = r.is_stopped::boolean,
 		modified_on = NOW()
 	FROM (
-		VALUES(:id, :is_blocked, :is_stopped)
+		VALUES(:id, :status, :is_blocked, :is_stopped)
 	) AS
-		r(id, is_blocked, is_stopped)
+		r(id, status, is_blocked, is_stopped)
 	WHERE
 		c.id = r.id::int
 `

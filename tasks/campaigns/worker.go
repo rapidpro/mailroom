@@ -8,11 +8,11 @@ import (
 
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/locker"
-	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/nyaruka/mailroom/utils/locker"
+	"github.com/nyaruka/mailroom/utils/marker"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"

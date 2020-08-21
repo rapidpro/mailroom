@@ -6,7 +6,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
-	"github.com/nyaruka/mailroom/locker"
+	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/sirupsen/logrus"
 )
 
