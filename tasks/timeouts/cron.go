@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/tasks/handler"
+	"github.com/nyaruka/mailroom/utils/cron"
+	"github.com/nyaruka/mailroom/utils/marker"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/cron"
-	"github.com/nyaruka/mailroom/tasks/handler"
-	"github.com/nyaruka/mailroom/marker"
-	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

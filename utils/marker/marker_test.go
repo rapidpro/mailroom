@@ -1,9 +1,11 @@
-package marker
+package marker_test
 
 import (
 	"testing"
 
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/utils/marker"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,18 +32,18 @@ func TestMarker(t *testing.T) {
 
 	for i, tc := range tcs {
 		if tc.Action == "absent" {
-			present, err := HasTask(rc, tc.Group, tc.TaskID)
+			present, err := marker.HasTask(rc, tc.Group, tc.TaskID)
 			assert.NoError(t, err)
 			assert.False(t, present, "%d: %s:%s should be absent", i, tc.Group, tc.TaskID)
 		} else if tc.Action == "present" {
-			present, err := HasTask(rc, tc.Group, tc.TaskID)
+			present, err := marker.HasTask(rc, tc.Group, tc.TaskID)
 			assert.NoError(t, err)
 			assert.True(t, present, "%d: %s:%s should be present", i, tc.Group, tc.TaskID)
 		} else if tc.Action == "add" {
-			err := AddTask(rc, tc.Group, tc.TaskID)
+			err := marker.AddTask(rc, tc.Group, tc.TaskID)
 			assert.NoError(t, err)
 		} else if tc.Action == "remove" {
-			err := RemoveTask(rc, tc.Group, tc.TaskID)
+			err := marker.RemoveTask(rc, tc.Group, tc.TaskID)
 			assert.NoError(t, err)
 		}
 	}
