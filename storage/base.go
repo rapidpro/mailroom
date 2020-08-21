@@ -1,12 +1,6 @@
 package storage
 
 import (
-	"fmt"
-	"net/http"
-	"path/filepath"
-	"strings"
-
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 )
 
@@ -23,42 +17,4 @@ func New(cfg *config.Config) (Storage, error) {
 		return NewS3(cfg)
 	}
 	return NewFS("_storage"), nil
-}
-
-// StoreAttachment saves an attachment to storage
-func StoreAttachment(s Storage, prefix string, ownerID int, filename string, content []byte) (utils.Attachment, error) {
-	contentType := http.DetectContentType(content)
-
-	path := attachmentPath(prefix, ownerID, filename)
-
-	url, err := s.Put(path, contentType, content)
-	if err != nil {
-		return "", err
-	}
-
-	return utils.Attachment(contentType + ":" + url), nil
-}
-
-func attachmentPath(prefix string, ownerID int, filename string) string {
-	parts := []string{prefix, fmt.Sprintf("%d", ownerID)}
-
-	// not all filesystems like having a directory with a huge number of files, so if filename is long enough,
-	// use parts of it to create intermediate subdirectories
-	if len(filename) > 4 {
-		parts = append(parts, filename[:4])
-
-		if len(filename) > 8 {
-			parts = append(parts, filename[4:8])
-		}
-	}
-	parts = append(parts, filename)
-
-	path := filepath.Join(parts...)
-
-	// ensure path begins with /
-	if !strings.HasPrefix(path, "/") {
-		path = fmt.Sprintf("/%s", path)
-	}
-
-	return path
 }

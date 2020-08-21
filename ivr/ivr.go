@@ -481,7 +481,7 @@ func ResumeIVRFlow(
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(attachment.URL())
 
-		attachment, err = storage.StoreAttachment(store, config.S3MediaPrefix, int(oa.OrgID()), filename, body)
+		attachment, err = oa.Org().StoreAttachment(store, config.S3MediaPrefix, filename, body)
 		if err != nil {
 			return errors.Wrapf(err, "unable to store IVR attachment")
 		}
