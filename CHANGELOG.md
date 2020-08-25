@@ -1,3 +1,7 @@
+v5.7.14
+----------
+ * Stop writing is_blocked and is_stopped
+
 v5.7.13
 ----------
  * Read from contact.status intead of is_stopped/is_blocked
