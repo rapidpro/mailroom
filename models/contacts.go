@@ -388,9 +388,9 @@ func (c *Contact) URNForID(urnID URNID) urns.URN {
 	return urns.NilURN
 }
 
-// Unstop sets the is_stopped attribute to false for this contact
+// Unstop sets the status to stopped for this contact
 func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
-	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET status = 'A', is_stopped = FALSE, modified_on = NOW() WHERE id = $1`, c.id)
+	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET status = 'A', modified_on = NOW() WHERE id = $1`, c.id)
 	if err != nil {
 		return errors.Wrapf(err, "error unstopping contact")
 	}
@@ -630,9 +630,9 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, urn urns.UR
 	err = tx.GetContext(ctx, &contactID,
 		`INSERT INTO 
 		contacts_contact
-			(org_id, is_active, status, is_blocked, is_stopped, uuid, created_on, modified_on, created_by_id, modified_by_id, name) 
+			(org_id, is_active, status, uuid, created_on, modified_on, created_by_id, modified_by_id, name) 
 		VALUES
-			($1, TRUE, 'A', FALSE, FALSE, $2, NOW(), NOW(), 1, 1, '')
+			($1, TRUE, 'A', $2, NOW(), NOW(), 1, 1, '')
 		RETURNING id`,
 		org.OrgID(), uuids.New(),
 	)
@@ -932,7 +932,6 @@ const markContactStoppedSQL = `
 UPDATE
 	contacts_contact
 SET
-	is_stopped = TRUE,
 	status = 'S',
 	modified_on = NOW()
 WHERE 
@@ -1330,8 +1329,6 @@ type ContactStatusChange struct {
 type contactStatusUpdate struct {
 	ContactID ContactID     `db:"id"`
 	Status    ContactStatus `db:"status"`
-	Blocked   bool          `db:"is_blocked"`
-	Stopped   bool          `db:"is_stopped"`
 }
 
 // UpdateContactStatus updates the contacts status as the passed changes
@@ -1354,8 +1351,6 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 			&contactStatusUpdate{
 				ContactID: ch.ContactID,
 				Status:    status,
-				Blocked:   blocked,
-				Stopped:   stopped,
 			},
 		)
 
@@ -1380,13 +1375,11 @@ const updateContactStatusSQL = `
 		contacts_contact c
 	SET
 		status = r.status,
-		is_blocked = r.is_blocked::boolean,
-		is_stopped = r.is_stopped::boolean,
 		modified_on = NOW()
 	FROM (
-		VALUES(:id, :status, :is_blocked, :is_stopped)
+		VALUES(:id, :status)
 	) AS
-		r(id, status, is_blocked, is_stopped)
+		r(id, status)
 	WHERE
 		c.id = r.id::int
 `
