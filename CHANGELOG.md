@@ -1,3 +1,9 @@
+v5.7.13
+----------
+ * Read from contact.status intead of is_stopped/is_blocked
+ * Implement saving of zendesk ticket files as attachments
+ * Abstract S3 code so tests and dev envs can use file storage
+
 v5.7.12
 ----------
  * Fix inserting channel logs and add test
