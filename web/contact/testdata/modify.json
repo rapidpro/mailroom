@@ -161,6 +161,135 @@
         ]
     },
     {
+        "label": "set status to blocked",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "status",
+                    "status": "blocked"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "blocked",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_status_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "status": "blocked"
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND status = 'B'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "set status to archived",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "status",
+                    "status": "archived"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "archived",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_status_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "status": "archived"
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND status = 'V'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "set status to active",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "status",
+                    "status": "active"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z"
+                },
+                "events": [
+                    {
+                        "type": "contact_status_changed",
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "status": "active"
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND status = 'A'",
+                "count": 1
+            }
+        ]
+    },
+    {
         "label": "set text field with valid value",
         "method": "POST",
         "path": "/mr/contact/modify",

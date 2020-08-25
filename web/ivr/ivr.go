@@ -316,10 +316,10 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "no such contact"))
 	}
 	if len(contacts) == 0 {
-		return client.WriteErrorResponse(w, errors.Errorf("no contact width id: %d", conn.ContactID()))
+		return client.WriteErrorResponse(w, errors.Errorf("no contact with id: %d", conn.ContactID()))
 	}
-	if contacts[0].IsStopped() || contacts[0].IsBlocked() {
-		return client.WriteErrorResponse(w, errors.Errorf("no contact width id: %d", conn.ContactID()))
+	if contacts[0].Status() != models.ContactStatusActive {
+		return client.WriteErrorResponse(w, errors.Errorf("no contact with id: %d", conn.ContactID()))
 	}
 
 	// load the URN for this connection

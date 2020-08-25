@@ -218,8 +218,8 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return errors.Wrapf(err, "error loading contact")
 	}
 
-	// contact has been deleted or is blocked, ignore this event
-	if len(contacts) == 0 || contacts[0].IsBlocked() {
+	// contact has been deleted or is blocked/stopped/archived, ignore this event
+	if len(contacts) == 0 || contacts[0].Status() != models.ContactStatusActive {
 		return nil
 	}
 
@@ -315,7 +315,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// contact has been deleted or is blocked, ignore this event
-	if len(contacts) == 0 || contacts[0].IsBlocked() {
+	if len(contacts) == 0 || contacts[0].Status() == models.ContactStatusBlocked {
 		return nil, nil
 	}
 
@@ -526,7 +526,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
-	if channel == nil || modelContact.IsBlocked() {
+	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
 		err := models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.TypeInbox, topupID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking blocked or nil channel message as handled")
@@ -536,7 +536,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 	// stopped contact? they are unstopped if they send us an incoming message
 	newContact := event.NewContact
-	if modelContact.IsStopped() {
+	if modelContact.Status() == models.ContactStatusStopped {
 		err := modelContact.Unstop(ctx, db)
 		if err != nil {
 			return errors.Wrapf(err, "error unstopping contact")

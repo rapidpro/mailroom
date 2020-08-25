@@ -774,7 +774,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 
 	// utility method to build up our message
 	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
-		if c.IsStopped() || c.IsBlocked() {
+		if c.Status() != ContactStatusActive {
 			return nil, nil
 		}
 

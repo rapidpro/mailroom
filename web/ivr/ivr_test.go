@@ -344,7 +344,7 @@ func TestNexmoIVR(t *testing.T) {
 		} else {
 			type CallForm struct {
 				To []struct {
-					Number int64 `json:"number`
+					Number int64 `json:"number"`
 				} `json:"to"`
 			}
 			body, _ := ioutil.ReadAll(r.Body)
