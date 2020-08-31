@@ -5,16 +5,16 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/contactql"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -84,11 +84,11 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// if we are meant to create a new contact, do so
 	if start.CreateContact() {
-		newID, err := models.CreateContact(ctx, db, oa, urns.NilURN)
+		contact, _, err := models.CreateContact(ctx, db, oa, models.NilUserID, "", envs.NilLanguage, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
 		}
-		contactIDs[newID] = true
+		contactIDs[contact.ID()] = true
 	}
 
 	// now add all the ids for our groups

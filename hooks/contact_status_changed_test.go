@@ -14,7 +14,7 @@ func TestContactStatusChanged(t *testing.T) {
 	db := testsuite.DB()
 
 	// make sure cathyID contact is active
-	db.Exec(`UPDATE contacts_contact SET status = 'A', is_blocked = FALSE, is_stopped = FALSE WHERE id = $1`, models.CathyID)
+	db.Exec(`UPDATE contacts_contact SET status = 'A' WHERE id = $1`, models.CathyID)
 
 	tcs := []HookTestCase{
 		{
@@ -23,7 +23,7 @@ func TestContactStatusChanged(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				{
-					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'B' AND is_blocked = TRUE`,
+					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'B'`,
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
@@ -35,7 +35,7 @@ func TestContactStatusChanged(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				{
-					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'S' AND is_stopped = TRUE`,
+					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'S'`,
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
@@ -47,12 +47,12 @@ func TestContactStatusChanged(t *testing.T) {
 			},
 			SQLAssertions: []SQLAssertion{
 				{
-					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'A' AND is_stopped = FALSE`,
+					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'A'`,
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
 				{
-					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'A' AND is_blocked = FALSE`,
+					SQL:   `select count(*) from contacts_contact where id = $1 AND status = 'A'`,
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
