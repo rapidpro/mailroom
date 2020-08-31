@@ -287,7 +287,7 @@ func TestContactsFromURN(t *testing.T) {
 	}
 }
 
-func TestCreateContact(t *testing.T) {
+func TestGetOrCreateContact(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 	testsuite.Reset()
@@ -304,16 +304,15 @@ func TestCreateContact(t *testing.T) {
 		{Org1, urns.URN(CathyURN.String() + "?foo=bar"), CathyID},
 		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
 		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
-		{Org1, urns.NilURN, ContactID(maxContactID + 5)},
 	}
 
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		id, err := CreateContact(ctx, db, org, tc.URN)
+		contact, _, err := GetOrCreateContact(ctx, db, org, tc.URN)
 		assert.NoError(t, err, "%d: error creating contact", i)
-		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
+		assert.Equal(t, tc.ContactID, contact.ID(), "%d: mismatch in contact id", i)
 	}
 }
 

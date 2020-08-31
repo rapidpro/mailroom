@@ -19,6 +19,7 @@ import (
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(handleParseQuery))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(handleCreate))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
 }
 
@@ -221,6 +222,58 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	return response, http.StatusOK, nil
 }
 
+// Request to create a new contact.
+//
+//   {
+//     "org_id": 1,
+//     "user_id": 1,
+//     "contact": {
+//       "name": "Joe Blow",
+//       "language": "eng",
+//       "urns": ["tel:+250788123123"],
+//       "fields": {"age": "39"},
+//       "groups": ["b0b778db-6657-430b-9272-989ad43a10db"]
+//     }
+//   }
+//
+type createRequest struct {
+	OrgID   models.OrgID  `json:"org_id"   validate:"required"`
+	UserID  models.UserID `json:"user_id"`
+	Contact *Spec         `json:"contact"  validate:"required"`
+}
+
+// handles a request to create the given contacts
+func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &createRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	c, err := request.Contact.Validate(oa.Env(), oa.SessionAssets())
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	_, contact, err := models.CreateContact(ctx, s.DB, oa, request.UserID, c.Name, c.Language, c.URNs)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
+	_, err = ModifyContacts(ctx, s.DB, s.RP, oa, modifiersByContact)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
+	}
+
+	return map[string]interface{}{"contact": contact}, http.StatusOK, nil
+}
+
 // Request that a set of contacts is modified.
 //
 //   {
@@ -293,40 +346,32 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// load our contacts
 	contacts, err := models.LoadContacts(ctx, s.DB, oa, request.ContactIDs)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load contact")
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load contact")
 	}
 
-	results := make(map[models.ContactID]modifyResult)
-
-	// create an environment instance with location support
-	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
-
-	// gather up events for our contacts
-	contactEvents := make(map[*flows.Contact][]flows.Event, len(contacts))
-
+	// convert to map of flow contacts to modifiers
+	modifiersByContact := make(map[*flows.Contact][]flows.Modifier, len(contacts))
 	for _, contact := range contacts {
 		flowContact, err := contact.FlowContact(oa)
 		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
+			return nil, http.StatusBadRequest, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
 
-		result := modifyResult{
-			Contact: flowContact,
-			Events:  make([]flows.Event, 0, len(mods)),
-		}
-
-		// apply our modifiers
-		for _, mod := range mods {
-			mod.Apply(env, oa.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
-		}
-
-		results[contact.ID()] = result
-		contactEvents[flowContact] = result.Events
+		modifiersByContact[flowContact] = mods
 	}
 
-	err = models.HandleAndCommitEvents(ctx, s.DB, s.RP, oa, contactEvents)
+	eventsByContact, err := ModifyContacts(ctx, s.DB, s.RP, oa, modifiersByContact)
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusBadRequest, err
+	}
+
+	// create our results
+	results := make(map[flows.ContactID]modifyResult, len(contacts))
+	for flowContact := range modifiersByContact {
+		results[flowContact.ID()] = modifyResult{
+			Contact: flowContact,
+			Events:  eventsByContact[flowContact],
+		}
 	}
 
 	return results, http.StatusOK, nil

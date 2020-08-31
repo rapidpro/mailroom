@@ -113,14 +113,10 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to find URN in request"))
 	}
 
-	// get the contact id for this URN
-	ids, err := models.ContactIDsFromURNs(ctx, s.DB, oa, []urns.URN{urn})
+	// get the contact for this URN
+	contact, _, err := models.GetOrCreateContact(ctx, s.DB, oa, urn)
 	if err != nil {
-		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load contact by urn"))
-	}
-	contactID, found := ids[urn]
-	if !found {
-		return client.WriteErrorResponse(w, errors.Errorf("no contact for urn: %s", urn))
+		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to get contact by urn"))
 	}
 
 	urn, err = models.URNForURN(ctx, s.DB, oa, urn)
@@ -135,7 +131,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	}
 
 	// we first create an incoming call channel event and see if that matches
-	event := models.NewChannelEvent(models.MOCallEventType, oa.OrgID(), channel.ID(), contactID, urnID, nil, false)
+	event := models.NewChannelEvent(models.MOCallEventType, oa.OrgID(), channel.ID(), contact.ID(), urnID, nil, false)
 
 	externalID, err := client.CallIDForRequest(r)
 	if err != nil {
@@ -144,7 +140,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 
 	// create our connection
 	conn, err = models.InsertIVRConnection(
-		ctx, s.DB, oa.OrgID(), channel.ID(), models.NilStartID, contactID, urnID,
+		ctx, s.DB, oa.OrgID(), channel.ID(), models.NilStartID, contact.ID(), urnID,
 		models.ConnectionDirectionIn, models.ConnectionStatusInProgress, externalID,
 	)
 	if err != nil {
@@ -174,7 +170,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 
 	// no session means no trigger, create a missed call event instead
 	// we first create an incoming call channel event and see if that matches
-	event = models.NewChannelEvent(models.MOMissEventType, oa.OrgID(), channel.ID(), contactID, urnID, nil, false)
+	event = models.NewChannelEvent(models.MOMissEventType, oa.OrgID(), channel.ID(), contact.ID(), urnID, nil, false)
 	err = event.Insert(ctx, s.DB)
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "error inserting channel event"))
