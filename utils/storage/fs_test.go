@@ -1,7 +1,6 @@
 package storage_test
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -26,7 +25,7 @@ func TestFS(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "_testing/foo/bar.txt", url)
 
-	data, err := ioutil.ReadFile(url)
+	data, err := s.Get("/foo/bar.txt")
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(`hello world`), data)
 

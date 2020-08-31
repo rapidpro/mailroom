@@ -30,6 +30,12 @@ func (s *fsStorage) Test() error {
 	return nil
 }
 
+func (s *fsStorage) Get(path string) ([]byte, error) {
+	fullPath := filepath.Join(s.directory, path)
+
+	return ioutil.ReadFile(fullPath)
+}
+
 func (s *fsStorage) Put(path string, contentType string, contents []byte) (string, error) {
 	fullPath := filepath.Join(s.directory, path)
 
