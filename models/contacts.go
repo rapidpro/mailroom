@@ -53,10 +53,18 @@ const (
 	ContactStatusArchived = "V"
 )
 
-var contactStatusMap = map[flows.ContactStatus]ContactStatus{
-	flows.ContactStatusActive:  ContactStatusActive,
-	flows.ContactStatusBlocked: ContactStatusBlocked,
-	flows.ContactStatusStopped: ContactStatusStopped,
+var contactToModelStatus = map[flows.ContactStatus]ContactStatus{
+	flows.ContactStatusActive:   ContactStatusActive,
+	flows.ContactStatusBlocked:  ContactStatusBlocked,
+	flows.ContactStatusStopped:  ContactStatusStopped,
+	flows.ContactStatusArchived: ContactStatusArchived,
+}
+
+var contactToFlowStatus = map[ContactStatus]flows.ContactStatus{
+	ContactStatusActive:   flows.ContactStatusActive,
+	ContactStatusBlocked:  flows.ContactStatusBlocked,
+	ContactStatusStopped:  flows.ContactStatusStopped,
+	ContactStatusArchived: flows.ContactStatusArchived,
 }
 
 // LoadContact loads a contact from the passed in id
@@ -94,8 +102,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 			uuid:       e.UUID,
 			name:       e.Name,
 			language:   e.Language,
-			isStopped:  e.IsStopped,
-			isBlocked:  e.IsBlocked,
+			status:     e.Status,
 			createdOn:  e.CreatedOn,
 			modifiedOn: e.ModifiedOn,
 			lastSeenOn: e.LastSeenOn,
@@ -355,7 +362,7 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		flows.ContactID(c.id),
 		c.name,
 		c.language,
-		c.Status(),
+		contactToFlowStatus[c.Status()],
 		org.Env().Timezone(),
 		c.createdOn,
 		c.lastSeenOn,
@@ -382,13 +389,13 @@ func (c *Contact) URNForID(urnID URNID) urns.URN {
 	return urns.NilURN
 }
 
-// Unstop sets the is_stopped attribute to false for this contact
+// Unstop sets the status to stopped for this contact
 func (c *Contact) Unstop(ctx context.Context, db *sqlx.DB) error {
-	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET status = 'A', is_stopped = FALSE, modified_on = NOW() WHERE id = $1`, c.id)
+	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET status = 'A', modified_on = NOW() WHERE id = $1`, c.id)
 	if err != nil {
 		return errors.Wrapf(err, "error unstopping contact")
 	}
-	c.isStopped = false
+	c.status = ContactStatusActive
 	return nil
 }
 
@@ -398,8 +405,7 @@ type Contact struct {
 	uuid       flows.ContactUUID
 	name       string
 	language   envs.Language
-	isStopped  bool
-	isBlocked  bool
+	status     ContactStatus
 	fields     map[string]*flows.Value
 	groups     []*Group
 	urns       []urns.URN
@@ -412,23 +418,13 @@ func (c *Contact) ID() ContactID                   { return c.id }
 func (c *Contact) UUID() flows.ContactUUID         { return c.uuid }
 func (c *Contact) Name() string                    { return c.name }
 func (c *Contact) Language() envs.Language         { return c.language }
-func (c *Contact) IsStopped() bool                 { return c.isStopped }
-func (c *Contact) IsBlocked() bool                 { return c.isBlocked }
+func (c *Contact) Status() ContactStatus           { return c.status }
 func (c *Contact) Fields() map[string]*flows.Value { return c.fields }
 func (c *Contact) Groups() []*Group                { return c.groups }
 func (c *Contact) URNs() []urns.URN                { return c.urns }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) LastSeenOn() *time.Time          { return c.lastSeenOn }
-
-func (c *Contact) Status() flows.ContactStatus {
-	if c.isBlocked {
-		return flows.ContactStatusBlocked
-	} else if c.isStopped {
-		return flows.ContactStatusStopped
-	}
-	return flows.ContactStatusActive
-}
 
 // fieldValueEnvelope is our utility struct for the value of a field
 type fieldValueEnvelope struct {
@@ -485,8 +481,7 @@ type contactEnvelope struct {
 	UUID       flows.ContactUUID                        `json:"uuid"`
 	Name       string                                   `json:"name"`
 	Language   envs.Language                            `json:"language"`
-	IsStopped  bool                                     `json:"is_stopped"`
-	IsBlocked  bool                                     `json:"is_blocked"`
+	Status     ContactStatus                            `json:"status"`
 	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
 	GroupIDs   []GroupID                                `json:"group_ids"`
 	URNs       []ContactURN                             `json:"urns"`
@@ -502,8 +497,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	uuid,
 	name,
 	language,
-	is_stopped,
-	is_blocked,
+	status,
 	is_active,
 	created_on,
 	modified_on,
@@ -710,9 +704,9 @@ func insertContactAndURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, user
 	var contactID ContactID
 	err = tx.GetContext(ctx, &contactID,
 		`INSERT INTO contacts_contact
-			(org_id, is_active, status, is_blocked, is_stopped, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
+			(org_id, is_active, status, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
 		VALUES
-			($1, TRUE, A', FALSE, FALSE, $2, $3, $4, $5, $5, $6, $6)
+			($1, TRUE, 'A', $2, $3, $4, $5, $5, $6, $6)
 		RETURNING id`,
 		org.OrgID(), uuids.New(), name, string(language), dates.Now(), userID,
 	)
@@ -999,7 +993,6 @@ const markContactStoppedSQL = `
 UPDATE
 	contacts_contact
 SET
-	is_stopped = TRUE,
 	status = 'S',
 	modified_on = NOW()
 WHERE 
@@ -1397,8 +1390,6 @@ type ContactStatusChange struct {
 type contactStatusUpdate struct {
 	ContactID ContactID     `db:"id"`
 	Status    ContactStatus `db:"status"`
-	Blocked   bool          `db:"is_blocked"`
-	Stopped   bool          `db:"is_stopped"`
 }
 
 // UpdateContactStatus updates the contacts status as the passed changes
@@ -1410,7 +1401,7 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 	for _, ch := range changes {
 		blocked := ch.Status == flows.ContactStatusBlocked
 		stopped := ch.Status == flows.ContactStatusStopped
-		status := contactStatusMap[ch.Status]
+		status := contactToModelStatus[ch.Status]
 
 		if blocked || stopped {
 			archiveTriggersForContactIDs = append(archiveTriggersForContactIDs, ch.ContactID)
@@ -1421,8 +1412,6 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 			&contactStatusUpdate{
 				ContactID: ch.ContactID,
 				Status:    status,
-				Blocked:   blocked,
-				Stopped:   stopped,
 			},
 		)
 
@@ -1447,13 +1436,11 @@ const updateContactStatusSQL = `
 		contacts_contact c
 	SET
 		status = r.status,
-		is_blocked = r.is_blocked::boolean,
-		is_stopped = r.is_stopped::boolean,
 		modified_on = NOW()
 	FROM (
-		VALUES(:id, :status, :is_blocked, :is_stopped)
+		VALUES(:id, :status)
 	) AS
-		r(id, status, is_blocked, is_stopped)
+		r(id, status)
 	WHERE
 		c.id = r.id::int
 `

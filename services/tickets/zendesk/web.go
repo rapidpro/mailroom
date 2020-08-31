@@ -76,7 +76,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusBadRequest, nil
 	}
 
-	msg, err := tickets.SendReply(ctx, s.DB, s.RP, ticket, request.Message)
+	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, s.Config.S3MediaPrefix, ticket, request.Message, request.FileURLs)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

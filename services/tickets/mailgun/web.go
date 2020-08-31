@@ -112,7 +112,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *model
 		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 	}
 
-	msg, err := tickets.SendReply(ctx, s.DB, s.RP, ticket, request.StrippedText)
+	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, s.Config.S3MediaPrefix, ticket, request.StrippedText, nil)
 	if err != nil {
 		return err, http.StatusInternalServerError, nil
 	}

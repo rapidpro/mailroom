@@ -2,12 +2,19 @@ package tickets
 
 import (
 	"context"
+	"net/http"
+	"path/filepath"
+	"time"
 
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/utils/storage"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -69,22 +76,37 @@ func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
-func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.Ticket, text string) (*models.Msg, error) {
+func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, mediaPrefix string, ticket *models.Ticket, text string, fileURLs []string) (*models.Msg, error) {
 	// look up our assets
-	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
+	oa, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
 
-	// build a simple translation
-	translations := map[envs.Language]*models.BroadcastTranslation{
-		envs.Language("base"): {Text: text},
+	// fetch and files and prepare as attachments
+	attachments := make([]utils.Attachment, len(fileURLs))
+	for i, fileURL := range fileURLs {
+		fileBody, err := fetchFile(fileURL)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error fetching file %s for ticket reply", fileURL)
+		}
+
+		filename := string(uuids.New()) + filepath.Ext(fileURL)
+
+		attachments[i], err = oa.Org().StoreAttachment(store, mediaPrefix, filename, fileBody)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error storing attachment %s for ticket reply", fileURL)
+		}
 	}
 
+	// build a simple translation
+	base := &models.BroadcastTranslation{Text: text, Attachments: attachments}
+	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("base"): base}
+
 	// we'll use a broadcast to send this message
-	bcast := models.NewBroadcast(assets.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil)
+	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil)
 	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
-	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, assets, batch)
+	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, oa, batch)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
@@ -100,4 +122,18 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ticket *models.
 		return msg, errors.Wrapf(err, "error queuing ticket reply")
 	}
 	return msg, nil
+}
+
+func fetchFile(url string) ([]byte, error) {
+	req, _ := httpx.NewRequest("GET", url, nil, nil)
+
+	trace, err := httpx.DoTrace(http.DefaultClient, req, httpx.NewFixedRetries(time.Second*5, time.Second*10), nil, 10*1024*1024)
+	if err != nil {
+		return nil, err
+	}
+	if trace.Response.StatusCode/100 != 2 {
+		return nil, errors.New("fetch returned non-200 response")
+	}
+
+	return trace.ResponseBody, nil
 }
