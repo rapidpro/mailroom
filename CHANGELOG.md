@@ -1,3 +1,8 @@
+v5.7.15
+----------
+ * Add create contact endpoint which uses modifiers to add fields and groups to contacts
+ * Rework contact creation functions to support creation with multiple URNs
+
 v5.7.14
 ----------
  * Stop writing is_blocked and is_stopped
