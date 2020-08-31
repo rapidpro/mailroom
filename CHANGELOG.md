@@ -1,3 +1,18 @@
+v5.7.15
+----------
+ * Add create contact endpoint which uses modifiers to add fields and groups to contacts
+ * Rework contact creation functions to support creation with multiple URNs
+
+v5.7.14
+----------
+ * Stop writing is_blocked and is_stopped
+
+v5.7.13
+----------
+ * Read from contact.status intead of is_stopped/is_blocked
+ * Implement saving of zendesk ticket files as attachments
+ * Abstract S3 code so tests and dev envs can use file storage
+
 v5.7.12
 ----------
  * Fix inserting channel logs and add test

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/go-playground/validator.v9"
@@ -163,4 +164,11 @@ func BulkSQL(ctx context.Context, label string, tx Queryer, sql string, vs []int
 	logrus.WithField("elapsed", time.Since(start)).WithField("rows", len(vs)).Infof("%s bulk sql complete", label)
 
 	return nil
+}
+
+func isUniqueViolationError(err error) bool {
+	if pqErr, ok := err.(*pq.Error); ok {
+		return pqErr.Code.Name() == "unique_violation"
+	}
+	return false
 }
