@@ -209,7 +209,7 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 }
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.ContactQuery) elastic.Query {
+func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
@@ -219,6 +219,15 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.
 	// our group if present
 	if group != "" {
 		eq = eq.Must(elastic.NewTermQuery("groups", group))
+	}
+
+	// exclude ids if present
+	if len(excludeIDs) > 0 {
+		ids := make([]string, len(excludeIDs))
+		for i := range excludeIDs {
+			ids[i] = fmt.Sprintf("%d", excludeIDs[i])
+		}
+		eq = eq.MustNot(elastic.NewIdsQuery("_doc").Ids(ids...))
 	}
 
 	// and by our query if present
@@ -231,7 +240,7 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.
 }
 
 // ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
-func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
+func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, excludeIDs []ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
 	env := org.Env()
 	start := time.Now()
 	var parsed *contactql.ContactQuery
@@ -248,7 +257,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		}
 	}
 
-	eq := BuildElasticQuery(org, group, parsed)
+	eq := BuildElasticQuery(org, group, excludeIDs, parsed)
 
 	fieldSort, err := es.ToElasticFieldSort(sort, org.SessionAssets())
 	if err != nil {
@@ -306,7 +315,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq := BuildElasticQuery(org, "", parsed)
+	eq := BuildElasticQuery(org, "", nil, parsed)
 
 	// only include unblocked and unstopped contacts
 	eq = elastic.NewBoolQuery().Must(

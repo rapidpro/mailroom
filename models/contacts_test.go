@@ -7,6 +7,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/olivere/elastic"
@@ -15,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestElasticContacts(t *testing.T) {
+func TestContactIDsForQuery(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
@@ -34,15 +35,15 @@ func TestElasticContacts(t *testing.T) {
 	assert.NoError(t, err)
 
 	tcs := []struct {
-		Query    string
-		Request  string
-		Response string
-		Contacts []ContactID
-		Error    bool
+		Query             string
+		ExpectedESRequest string
+		MockedESResponse  string
+		ExpectedContacts  []ContactID
+		ExpectedError     string
 	}{
 		{
 			Query: "george",
-			Request: `{
+			ExpectedESRequest: `{
 				"_source":false,
 				"query":{
 					"bool":{
@@ -65,7 +66,7 @@ func TestElasticContacts(t *testing.T) {
 				},
 				"sort":["_doc"]
 			}`,
-			Response: fmt.Sprintf(`{
+			MockedESResponse: fmt.Sprintf(`{
 				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
 				"took": 2,
 				"timed_out": false,
@@ -92,10 +93,10 @@ func TestElasticContacts(t *testing.T) {
 				  ]
 				}
 			}`, GeorgeID),
-			Contacts: []ContactID{GeorgeID},
+			ExpectedContacts: []ContactID{GeorgeID},
 		}, {
 			Query: "nobody",
-			Request: `{
+			ExpectedESRequest: `{
 				"_source":false,
 				"query":{
 					"bool":{
@@ -114,7 +115,7 @@ func TestElasticContacts(t *testing.T) {
 				},
 				"sort":["_doc"]
 			}`,
-			Response: `{
+			MockedESResponse: `{
 				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
 				"took": 2,
 				"timed_out": false,
@@ -130,24 +131,24 @@ func TestElasticContacts(t *testing.T) {
 				  "hits": []
 				}
 			}`,
-			Contacts: []ContactID{},
+			ExpectedContacts: []ContactID{},
 		}, {
-			Query: "goats > 2", // no such contact field
-			Error: true,
+			Query:         "goats > 2", // no such contact field
+			ExpectedError: "error parsing query: goats > 2: can't resolve 'goats' to attribute, scheme or field",
 		},
 	}
 
 	for i, tc := range tcs {
-		es.NextResponse = tc.Response
+		es.NextResponse = tc.MockedESResponse
 
 		ids, err := ContactIDsForQuery(ctx, client, org, tc.Query)
 
-		if tc.Error {
-			assert.Error(t, err)
+		if tc.ExpectedError != "" {
+			assert.EqualError(t, err, tc.ExpectedError)
 		} else {
 			assert.NoError(t, err, "%d: error encountered performing query", i)
-			assert.JSONEq(t, tc.Request, es.LastBody, "%d: request mismatch, got: %s", i, es.LastBody)
-			assert.Equal(t, tc.Contacts, ids, "%d: ids mismatch", i)
+			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: request mismatch, got: %s", i, es.LastBody)
+			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
 		}
 	}
 }

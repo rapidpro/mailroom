@@ -28,12 +28,13 @@ func init() {
 //   }
 //
 type searchRequest struct {
-	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
-	GroupUUID assets.GroupUUID `json:"group_uuid" validate:"required"`
-	Query     string           `json:"query"`
-	PageSize  int              `json:"page_size"`
-	Offset    int              `json:"offset"`
-	Sort      string           `json:"sort"`
+	OrgID      models.OrgID       `json:"org_id"     validate:"required"`
+	GroupUUID  assets.GroupUUID   `json:"group_uuid" validate:"required"`
+	Query      string             `json:"query"`
+	PageSize   int                `json:"page_size"`
+	Offset     int                `json:"offset"`
+	Sort       string             `json:"sort"`
+	ExcludeIDs []models.ContactID `json:"exclude_ids"`
 }
 
 // Response for a contact search
@@ -80,9 +81,9 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	// Perform our search
+	// perform our search
 	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, oa,
-		request.GroupUUID, request.Query, request.Sort, request.Offset, request.PageSize)
+		request.GroupUUID, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
@@ -199,7 +200,7 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 		allowAsGroup = metadata.AllowAsGroup
 	}
 
-	eq := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
+	eq := models.BuildElasticQuery(oa, request.GroupUUID, nil, parsed)
 	eqj, err := eq.Source()
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
