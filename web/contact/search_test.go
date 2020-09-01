@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
@@ -75,58 +76,124 @@ func TestSearch(t *testing.T) {
 	}`, models.CathyID)
 
 	tcs := []struct {
-		URL        string
-		Method     string
-		Body       string
-		Status     int
-		Error      string
-		Hits       []models.ContactID
-		Query      string
-		Fields     []string
-		ESResponse string
+		URL               string
+		Method            string
+		Body              string
+		ESResponse        string
+		ExpectedStatus    int
+		ExpectedError     string
+		ExpectedHits      []models.ContactID
+		ExpectedQuery     string
+		ExpectedFields    []string
+		ExpectedESRequest string
 	}{
-		{"/mr/contact/search", "GET", "", 405, "illegal method: GET", nil, "", nil, ""},
 		{
-			"/mr/contact/search", "POST",
-			fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
-			400, "can't resolve 'birthday' to attribute, scheme or field",
-			nil, "", nil, "",
+			Method:         "GET",
+			URL:            "/mr/contact/search",
+			ExpectedStatus: 405,
+			ExpectedError:  "illegal method: GET",
 		},
 		{
-			"/mr/contact/search", "POST",
-			fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
-			400, "can't convert 'tomorrow' to a number",
-			nil, "", nil, "",
+			Method:         "POST",
+			URL:            "/mr/contact/search",
+			Body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			ExpectedStatus: 400,
+			ExpectedError:  "can't resolve 'birthday' to attribute, scheme or field",
 		},
 		{
-			"/mr/contact/search", "POST",
-			fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
-			200,
-			"",
-			[]models.ContactID{models.CathyID},
-			`name ~ "Cathy"`,
-			[]string{"name"},
-			singleESResponse,
+			Method:         "POST",
+			URL:            "/mr/contact/search",
+			Body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			ExpectedStatus: 400,
+			ExpectedError:  "can't convert 'tomorrow' to a number",
 		},
 		{
-			"/mr/contact/search", "POST",
-			fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
-			200,
-			"",
-			[]models.ContactID{models.CathyID},
-			`age = 10 AND gender = "M"`,
-			[]string{"age", "gender"},
-			singleESResponse,
+			Method:         "POST",
+			URL:            "/mr/contact/search",
+			Body:           fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			ESResponse:     singleESResponse,
+			ExpectedStatus: 200,
+			ExpectedHits:   []models.ContactID{models.CathyID},
+			ExpectedQuery:  `name ~ "Cathy"`,
+			ExpectedFields: []string{"name"},
 		},
 		{
-			"/mr/contact/search", "POST",
-			fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
-			200,
-			"",
-			[]models.ContactID{models.CathyID},
-			``,
-			[]string{},
-			singleESResponse,
+			Method:         "POST",
+			URL:            "/mr/contact/search",
+			Body:           fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s", "exclude_ids": [%d, %d]}`, models.AllContactsGroupUUID, models.BobID, models.GeorgeID),
+			ESResponse:     singleESResponse,
+			ExpectedStatus: 200,
+			ExpectedHits:   []models.ContactID{models.CathyID},
+			ExpectedQuery:  `name ~ "Cathy"`,
+			ExpectedFields: []string{"name"},
+			ExpectedESRequest: `{
+				"_source": false,
+				"from": 0,
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"term": {
+									"org_id": 1
+								}
+							},
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"groups": "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"
+								}
+							},
+							{
+								"match": {
+									"name": {
+										"query": "cathy"
+									}
+								}
+							}
+						],
+						"must_not": {
+							"ids": {
+								"type": "_doc",
+								"values": [
+									"10001", "10002"
+								]
+							}
+						}
+					}
+				},
+				"size": 50,
+				"sort": [
+					{
+						"id": {
+							"order": "desc"
+						}
+					}
+				]
+			}`,
+		},
+		{
+			Method:         "POST",
+			URL:            "/mr/contact/search",
+			Body:           fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			ESResponse:     singleESResponse,
+			ExpectedStatus: 200,
+			ExpectedHits:   []models.ContactID{models.CathyID},
+			ExpectedQuery:  `age = 10 AND gender = "M"`,
+			ExpectedFields: []string{"age", "gender"},
+		},
+		{
+			Method:         "POST",
+			URL:            "/mr/contact/search",
+			Body:           fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, models.AllContactsGroupUUID),
+			ESResponse:     singleESResponse,
+			ExpectedStatus: 200,
+			ExpectedHits:   []models.ContactID{models.CathyID},
+			ExpectedQuery:  ``,
+			ExpectedFields: []string{},
 		},
 	}
 
@@ -144,7 +211,7 @@ func TestSearch(t *testing.T) {
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err, "%d: error making request", i)
 
-		assert.Equal(t, tc.Status, resp.StatusCode, "%d: unexpected status", i)
+		assert.Equal(t, tc.ExpectedStatus, resp.StatusCode, "%d: unexpected status", i)
 
 		content, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
@@ -154,14 +221,18 @@ func TestSearch(t *testing.T) {
 			r := &searchResponse{}
 			err = json.Unmarshal(content, r)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.Hits, r.ContactIDs)
-			assert.Equal(t, tc.Query, r.Query)
-			assert.Equal(t, tc.Fields, r.Fields)
+			assert.Equal(t, tc.ExpectedHits, r.ContactIDs)
+			assert.Equal(t, tc.ExpectedQuery, r.Query)
+			assert.Equal(t, tc.ExpectedFields, r.Fields)
+
+			if tc.ExpectedESRequest != "" {
+				test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "elastic request mismatch")
+			}
 		} else {
 			r := &web.ErrorResponse{}
 			err = json.Unmarshal(content, r)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.Error, r.Error)
+			assert.Equal(t, tc.ExpectedError, r.Error)
 		}
 	}
 }
