@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 
 	"github.com/pkg/errors"
@@ -241,17 +243,28 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 	return nil
 }
 
-// convert attachments to URLs which Zendesk can POST to
+// convert attachments to URLs which Zendesk can POST to.
+//
+// For example https://mybucket.s3.amazonaws.com/attachments/1/01c1/1aa4/01c11aa4-770a-4783.jpg
+// is sent to Zendesk as file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
+// which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
+//
 func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
+	prefix := config.Mailroom.S3MediaPrefix
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+
 	fileURLs := make([]string, len(attachments))
 	for i, a := range attachments {
 		u, err := url.Parse(a.URL())
 		if err != nil {
 			return nil, err
 		}
+		path := strings.TrimPrefix(u.Path, prefix)
+		path = strings.TrimPrefix(path, "/")
 
-		// TODO generate URL of current instance??
-		fileURLs[i] = "https://temba.ngrok.io/mr/tickets/types/zendesk/file?path=" + url.QueryEscape(u.Path)
+		fileURLs[i] = "file/" + path
 	}
 	return fileURLs, nil
 }
