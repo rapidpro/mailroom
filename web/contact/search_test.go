@@ -144,7 +144,7 @@ func TestSearch(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "bc268217-9ffa-49e0-883e-e4e09c252a5a"
+									"groups": "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"
 								}
 							},
 							{

@@ -30,11 +30,11 @@ func init() {
 type searchRequest struct {
 	OrgID      models.OrgID       `json:"org_id"     validate:"required"`
 	GroupUUID  assets.GroupUUID   `json:"group_uuid" validate:"required"`
+	ExcludeIDs []models.ContactID `json:"exclude_ids"`
 	Query      string             `json:"query"`
 	PageSize   int                `json:"page_size"`
 	Offset     int                `json:"offset"`
 	Sort       string             `json:"sort"`
-	ExcludeIDs []models.ContactID `json:"exclude_ids"`
 }
 
 // Response for a contact search
