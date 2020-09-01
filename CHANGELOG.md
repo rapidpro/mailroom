@@ -1,3 +1,8 @@
+v5.7.16
+----------
+ * Add support for excluding contacts from searches by ids
+ * Rework utils/storage to be generic and moveable to gocommon
+
 v5.7.15
 ----------
  * Add create contact endpoint which uses modifiers to add fields and groups to contacts
