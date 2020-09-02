@@ -282,22 +282,31 @@ func TestContactIDsForQuery(t *testing.T) {
 			Query: "george",
 			ExpectedESRequest: `{
 				"_source":false,
-				"query":{
-					"bool":{
-						"must":[
-							{ "bool":{
-								"must":[
-									{"term":{"org_id":1}},
-									{"term":{"is_active":true}},
-									{"match":{"name":{"query":"george"}}}
-								]
-							}},
-							{ "term":{
-								"is_blocked":false
-							}},
-							{"term":
-								{"is_stopped":false
-							}}
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"term": {
+									"org_id": 1
+								}
+							},
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"status": "A"
+								}
+							},
+							{
+								"match": {
+									"name": {
+										"query": "george"
+									}
+								}
+							}
 						]
 					}
 				},
@@ -335,18 +344,31 @@ func TestContactIDsForQuery(t *testing.T) {
 			Query: "nobody",
 			ExpectedESRequest: `{
 				"_source":false,
-				"query":{
-					"bool":{
-						"must":[
-							{"bool":
-								{"must":[
-									{"term":{"org_id":1}},
-									{"term":{"is_active":true}},
-									{"match":{"name":{"query":"nobody"}}}
-								]}
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"term": {
+									"org_id": 1
+								}
 							},
-							{"term":{"is_blocked":false}},
-							{"term":{"is_stopped":false}}
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"status": "A"
+								}
+							},
+							{
+								"match": {
+									"name": {
+										"query": "nobody"
+									}
+								}
+							}
 						]
 					}
 				},
@@ -387,7 +409,7 @@ func TestContactIDsForQuery(t *testing.T) {
 			assert.NoError(t, err, "%d: error encountered performing query", i)
 			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
 
-			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: request mismatch, got: %s", i, es.LastBody)
+			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: request mismatch", i)
 		}
 	}
 }
