@@ -209,7 +209,7 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 }
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
+func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, activeOnly bool, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
@@ -219,6 +219,10 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, excludeIDs []Cont
 	// our group if present
 	if group != "" {
 		eq = eq.Must(elastic.NewTermQuery("groups", group))
+	}
+
+	if activeOnly {
+		eq = eq.Must(elastic.NewTermQuery("status", "A"))
 	}
 
 	// exclude ids if present
@@ -257,7 +261,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		}
 	}
 
-	eq := BuildElasticQuery(org, group, excludeIDs, parsed)
+	eq := BuildElasticQuery(org, group, false, excludeIDs, parsed)
 
 	fieldSort, err := es.ToElasticFieldSort(sort, org.SessionAssets())
 	if err != nil {
@@ -315,14 +319,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq := BuildElasticQuery(org, "", nil, parsed)
-
-	// only include unblocked and unstopped contacts
-	eq = elastic.NewBoolQuery().Must(
-		eq,
-		elastic.NewTermQuery("is_blocked", false),
-		elastic.NewTermQuery("is_stopped", false),
-	)
+	eq := BuildElasticQuery(org, "", true, nil, parsed)
 
 	ids := make([]ContactID, 0, 100)
 
