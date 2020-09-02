@@ -1,3 +1,7 @@
+v5.7.17
+----------
+ * Use status for elastic queries that need to filter out non-active contacts
+
 v5.7.16
 ----------
  * Add support for excluding contacts from searches by ids
