@@ -409,7 +409,7 @@ func TestContactIDsForQuery(t *testing.T) {
 			assert.NoError(t, err, "%d: error encountered performing query", i)
 			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
 
-			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: request mismatch, got: %s", i, es.LastBody)
+			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: request mismatch", i)
 		}
 	}
 }

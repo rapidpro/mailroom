@@ -45,6 +45,9 @@ const (
 // ContactStatus is the type for contact statuses
 type ContactStatus string
 
+// NilContactStatus is an unset contact status
+const NilContactStatus ContactStatus = ""
+
 // possible contact statuses
 const (
 	ContactStatusActive   = "A"
@@ -209,7 +212,7 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 }
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, activeOnly bool, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
+func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, status ContactStatus, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", org.OrgID()),
@@ -221,8 +224,9 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, activeOnly bool, 
 		eq = eq.Must(elastic.NewTermQuery("groups", group))
 	}
 
-	if activeOnly {
-		eq = eq.Must(elastic.NewTermQuery("status", "A"))
+	// our status is present
+	if status != NilContactStatus {
+		eq = eq.Must(elastic.NewTermQuery("status", status))
 	}
 
 	// exclude ids if present
@@ -261,7 +265,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		}
 	}
 
-	eq := BuildElasticQuery(org, group, false, excludeIDs, parsed)
+	eq := BuildElasticQuery(org, group, NilContactStatus, excludeIDs, parsed)
 
 	fieldSort, err := es.ToElasticFieldSort(sort, org.SessionAssets())
 	if err != nil {
@@ -319,7 +323,7 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq := BuildElasticQuery(org, "", true, nil, parsed)
+	eq := BuildElasticQuery(org, "", ContactStatusActive, nil, parsed)
 
 	ids := make([]ContactID, 0, 100)
 
