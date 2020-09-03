@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -14,7 +15,6 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/utils/storage"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"

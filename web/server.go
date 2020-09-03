@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/utils/storage"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
