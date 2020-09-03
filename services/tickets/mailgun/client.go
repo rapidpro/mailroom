@@ -9,8 +9,8 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/pkg/errors"
 )
 
@@ -43,14 +43,24 @@ type messageResponse struct {
 	ID string `json:"id"`
 }
 
+type File struct {
+	Filename string
+	Data     []byte
+}
+
 // SendMessage sends a new email message and returns the ID
 // see https://documentation.mailgun.com/en/latest/api-sending.html
-func (c *Client) SendMessage(from, to, subject, text string, headers map[string]string) (string, *httpx.Trace, error) {
+func (c *Client) SendMessage(from, to, subject, text string, attachments []File, headers map[string]string) (string, *httpx.Trace, error) {
 	writeBody := func(w *multipart.Writer) {
 		w.WriteField("from", from)
 		w.WriteField("to", to)
 		w.WriteField("subject", subject)
 		w.WriteField("text", text)
+
+		for _, attachment := range attachments {
+			fw, _ := w.CreateFormFile("attachment", attachment.Filename)
+			fw.Write(attachment.Data)
+		}
 
 		// for the sake of tests, we want to output headers in consistent order
 		headerKeys := make([]string, 0, len(headers))

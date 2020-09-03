@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/gocommon/uuids"
 
 	"github.com/gomodule/redigo/redis"
 )

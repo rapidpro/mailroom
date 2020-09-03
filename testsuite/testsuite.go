@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nyaruka/mailroom/utils/storage"
+	"github.com/nyaruka/gocommon/storage"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"

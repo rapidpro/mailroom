@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/storage"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/courier"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/utils/storage"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -76,7 +76,7 @@ func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
-func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, mediaPrefix string, ticket *models.Ticket, text string, fileURLs []string) (*models.Msg, error) {
+func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, ticket *models.Ticket, text string, fileURLs []string) (*models.Msg, error) {
 	// look up our assets
 	oa, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
 	if err != nil {
@@ -93,7 +93,7 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 
 		filename := string(uuids.New()) + filepath.Ext(fileURL)
 
-		attachments[i], err = oa.Org().StoreAttachment(store, mediaPrefix, filename, fileBody)
+		attachments[i], err = oa.Org().StoreAttachment(store, filename, fileBody)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error storing attachment %s for ticket reply", fileURL)
 		}

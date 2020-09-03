@@ -70,7 +70,7 @@ func TestStoreAttachment(t *testing.T) {
 	org, err := loadOrg(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	attachment, err := org.StoreAttachment(store, "media", "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", image)
+	attachment, err := org.StoreAttachment(store, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", image)
 	require.NoError(t, err)
 
 	assert.Equal(t, utils.Attachment("image/jpeg:_test_storage/media/1/6683/83ba/668383ba-387c-49bc-b164-1213ac0ea7aa.jpg"), attachment)

@@ -11,18 +11,18 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
-	"github.com/nyaruka/mailroom/utils/storage"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -481,7 +481,7 @@ func ResumeIVRFlow(
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(attachment.URL())
 
-		attachment, err = oa.Org().StoreAttachment(store, config.S3MediaPrefix, filename, body)
+		attachment, err = oa.Org().StoreAttachment(store, filename, body)
 		if err != nil {
 			return errors.Wrapf(err, "unable to store IVR attachment")
 		}

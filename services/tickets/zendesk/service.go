@@ -3,12 +3,15 @@ package zendesk
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 
 	"github.com/pkg/errors"
@@ -94,9 +97,14 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, ""), nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
 	contactUUID := ticket.Config("contact-uuid")
 	contactDisplay := ticket.Config("contact-display")
+
+	fileURLs, err := s.convertAttachments(attachments)
+	if err != nil {
+		return errors.Wrap(err, "error converting attachments")
+	}
 
 	msg := &ExternalResource{
 		ExternalID: string(msgUUID),
@@ -107,6 +115,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			ExternalID: contactUUID,
 			Name:       contactDisplay,
 		},
+		FileURLs:         fileURLs,
 		AllowChannelback: true,
 	}
 
@@ -232,4 +241,30 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 		return errors.Wrap(err, "error pushing message to zendesk")
 	}
 	return nil
+}
+
+// convert attachments to URLs which Zendesk can POST to.
+//
+// For example https://mybucket.s3.amazonaws.com/attachments/1/01c1/1aa4/01c11aa4-770a-4783.jpg
+// is sent to Zendesk as file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
+// which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
+//
+func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
+	prefix := config.Mailroom.S3MediaPrefix
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+
+	fileURLs := make([]string, len(attachments))
+	for i, a := range attachments {
+		u, err := url.Parse(a.URL())
+		if err != nil {
+			return nil, err
+		}
+		path := strings.TrimPrefix(u.Path, prefix)
+		path = strings.TrimPrefix(path, "/")
+
+		fileURLs[i] = "file/" + path
+	}
+	return fileURLs, nil
 }

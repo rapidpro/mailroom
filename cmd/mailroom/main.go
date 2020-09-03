@@ -6,15 +6,17 @@ import (
 	"runtime"
 	"syscall"
 
-	_ "github.com/lib/pq"
 	"github.com/nyaruka/ezconf"
-	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/logrus_sentry"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/sirupsen/logrus"
 
 	_ "github.com/nyaruka/mailroom/hooks"
+	_ "github.com/nyaruka/mailroom/ivr/nexmo"
+	_ "github.com/nyaruka/mailroom/ivr/twiml"
+	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
+	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	_ "github.com/nyaruka/mailroom/tasks/broadcasts"
 	_ "github.com/nyaruka/mailroom/tasks/campaigns"
 	_ "github.com/nyaruka/mailroom/tasks/expirations"
@@ -25,7 +27,6 @@ import (
 	_ "github.com/nyaruka/mailroom/tasks/starts"
 	_ "github.com/nyaruka/mailroom/tasks/stats"
 	_ "github.com/nyaruka/mailroom/tasks/timeouts"
-
 	_ "github.com/nyaruka/mailroom/web/contact"
 	_ "github.com/nyaruka/mailroom/web/docs"
 	_ "github.com/nyaruka/mailroom/web/expression"
@@ -37,11 +38,8 @@ import (
 	_ "github.com/nyaruka/mailroom/web/surveyor"
 	_ "github.com/nyaruka/mailroom/web/ticket"
 
-	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
-	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
-
-	_ "github.com/nyaruka/mailroom/ivr/nexmo"
-	_ "github.com/nyaruka/mailroom/ivr/twiml"
+	_ "github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 )
 
 var version = "Dev"

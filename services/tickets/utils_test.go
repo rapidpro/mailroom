@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/services/tickets"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
@@ -146,7 +146,7 @@ func TestSendReply(t *testing.T) {
 	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
 	require.NoError(t, err)
 
-	msg, err := tickets.SendReply(ctx, db, rp, testsuite.Storage(), "media", ticket, "I'll get back to you", []string{"http://coolfilesfortickets.com/a.jpg"})
+	msg, err := tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []string{"http://coolfilesfortickets.com/a.jpg"})
 	require.NoError(t, err)
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
@@ -155,6 +155,6 @@ func TestSendReply(t *testing.T) {
 	assert.FileExists(t, "_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg")
 
 	// try with file that can't be fetched
-	_, err = tickets.SendReply(ctx, db, rp, testsuite.Storage(), "media", ticket, "I'll get back to you", []string{"http://badfiles.com/b.jpg"})
+	_, err = tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []string{"http://badfiles.com/b.jpg"})
 	assert.EqualError(t, err, "error fetching file http://badfiles.com/b.jpg for ticket reply: fetch returned non-200 response")
 }
