@@ -94,7 +94,7 @@ func TestOpenAndForward(t *testing.T) {
 	})
 
 	logger = &flows.HTTPLogger{}
-	err = svc.Forward(dbTicket, flows.MsgUUID("ca5607f0-cba8-4c94-9cd5-c4fbc24aa767"), "It's urgent", logger.Log)
+	err = svc.Forward(dbTicket, flows.MsgUUID("ca5607f0-cba8-4c94-9cd5-c4fbc24aa767"), "It's urgent", nil, logger.Log)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))

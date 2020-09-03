@@ -170,7 +170,9 @@ func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryCo
 }
 
 // StoreAttachment saves an attachment to storage
-func (o *Org) StoreAttachment(s storage.Storage, prefix string, filename string, content []byte) (utils.Attachment, error) {
+func (o *Org) StoreAttachment(s storage.Storage, filename string, content []byte) (utils.Attachment, error) {
+	prefix := config.Mailroom.S3MediaPrefix
+
 	contentType := http.DetectContentType(content)
 
 	path := o.attachmentPath(prefix, filename)

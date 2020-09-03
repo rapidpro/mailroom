@@ -98,7 +98,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 	}
 
 	logger := &HTTPLogger{}
-	err = service.Forward(t, msgUUID, text, logger.Ticketer(ticketer))
+	err = service.Forward(t, msgUUID, text, attachments, logger.Ticketer(ticketer))
 
 	return logger.Insert(ctx, db)
 }
@@ -477,7 +477,7 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db *sqlx.DB, add map[string
 type TicketService interface {
 	flows.TicketService
 
-	Forward(*Ticket, flows.MsgUUID, string, flows.HTTPLogCallback) error
+	Forward(*Ticket, flows.MsgUUID, string, []utils.Attachment, flows.HTTPLogCallback) error
 	Close([]*Ticket, flows.HTTPLogCallback) error
 	Reopen([]*Ticket, flows.HTTPLogCallback) error
 }

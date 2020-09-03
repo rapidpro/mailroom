@@ -76,7 +76,7 @@ func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
-func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, mediaPrefix string, ticket *models.Ticket, text string, fileURLs []string) (*models.Msg, error) {
+func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, ticket *models.Ticket, text string, fileURLs []string) (*models.Msg, error) {
 	// look up our assets
 	oa, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
 	if err != nil {
@@ -93,7 +93,7 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 
 		filename := string(uuids.New()) + filepath.Ext(fileURL)
 
-		attachments[i], err = oa.Org().StoreAttachment(store, mediaPrefix, filename, fileBody)
+		attachments[i], err = oa.Org().StoreAttachment(store, filename, fileBody)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error storing attachment %s for ticket reply", fileURL)
 		}
