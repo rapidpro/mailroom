@@ -69,8 +69,8 @@ func (s *Spec) Validate(env envs.Environment, sa flows.SessionAssets) (*Creation
 			if group == nil {
 				return nil, errors.Errorf("unknown contact group '%s'", uuid)
 			}
-			if group.IsDynamic() {
-				return nil, errors.Errorf("can't add contact to dynamic group '%s'", uuid)
+			if group.UsesQuery() {
+				return nil, errors.Errorf("can't add contact to query based group '%s'", uuid)
 			}
 			groups[i] = group
 		}

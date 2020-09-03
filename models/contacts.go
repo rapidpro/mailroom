@@ -12,13 +12,13 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/contactql/es"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -865,7 +865,7 @@ func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urn
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
 // campaigns as necessary based on those group changes.
 func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, contact *flows.Contact) error {
-	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env())
+	added, removed, errs := contact.ReevaluateQueryBasedGroups(org.Env())
 	if len(errs) > 0 {
 		return errors.Wrapf(errs[0], "error calculating dynamic groups")
 	}

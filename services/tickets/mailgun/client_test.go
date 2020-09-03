@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/services/tickets/mailgun"
 
 	"github.com/stretchr/testify/assert"
