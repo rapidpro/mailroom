@@ -1,3 +1,8 @@
+v5.7.18
+----------
+ * Update to latest goflow
+ * Add support for incoming attachments on ticketing services
+
 v5.7.17
 ----------
  * Use status for elastic queries that need to filter out non-active contacts
