@@ -11,6 +11,7 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/services/airtime/dtone"
@@ -18,7 +19,6 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/utils/storage"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
