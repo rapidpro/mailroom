@@ -140,7 +140,7 @@
                 "timezone": "America/Los_Angeles",
                 "created_on": "2018-07-06T12:30:00.123457Z",
                 "urns": [
-                    "tel:+16055741111?id=10000&priority=50"
+                    "tel:+16055741111?id=10000&priority=1000"
                 ]
             }
         }
