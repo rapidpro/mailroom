@@ -718,7 +718,7 @@ func insertContactAndURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, user
 		VALUES
 			($1, TRUE, 'A', $2, $3, $4, $5, $5, $6, $6)
 		RETURNING id`,
-		org.OrgID(), uuids.New(), name, string(language), dates.Now(), userID,
+		org.OrgID(), uuids.New(), null.String(name), null.String(string(language)), dates.Now(), userID,
 	)
 
 	if err != nil {
