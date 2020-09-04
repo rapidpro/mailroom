@@ -155,7 +155,7 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name = ''",
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name IS NULL",
                 "count": 1
             }
         ]

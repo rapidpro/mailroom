@@ -424,7 +424,7 @@ func TestContacts(t *testing.T) {
 
 	db.MustExec(
 		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-		                          VALUES(1, $1, 'whatsapp', '250788373373', 'whatsapp:250788373373', 100)`, BobID)
+		                          VALUES(1, $1, 'whatsapp', '250788373373', 'whatsapp:250788373373', 999)`, BobID)
 
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, GeorgeID)
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, GeorgeID)
@@ -444,7 +444,7 @@ func TestContacts(t *testing.T) {
 	if len(contacts) == 3 {
 		assert.Equal(t, "Cathy", contacts[0].Name())
 		assert.Equal(t, len(contacts[0].URNs()), 1)
-		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=50")
+		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
 		assert.Equal(t, 1, contacts[0].Groups().Count())
 
 		assert.Equal(t, "Yobe", contacts[0].Fields()["state"].QueryValue())
@@ -455,8 +455,8 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, "Bob", contacts[1].Name())
 		assert.NotNil(t, contacts[1].Fields()["joined"].QueryValue())
 		assert.Equal(t, 2, len(contacts[1].URNs()))
-		assert.Equal(t, contacts[1].URNs()[0].String(), "whatsapp:250788373373?id=20121&priority=100")
-		assert.Equal(t, contacts[1].URNs()[1].String(), "tel:+16055742222?id=10001&priority=50")
+		assert.Equal(t, contacts[1].URNs()[0].String(), "tel:+16055742222?id=10001&priority=1000")
+		assert.Equal(t, contacts[1].URNs()[1].String(), "whatsapp:250788373373?id=20121&priority=999")
 		assert.Equal(t, 0, contacts[1].Groups().Count())
 
 		assert.Equal(t, "George", contacts[2].Name())
