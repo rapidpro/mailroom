@@ -1,6 +1,7 @@
 package web
 
 import (
+	"compress/flate"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -75,7 +76,7 @@ func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redi
 	router := chi.NewRouter()
 
 	//  set up our middlewares
-	router.Use(middleware.DefaultCompress)
+	router.Use(middleware.Compress(flate.DefaultCompression))
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(panicRecovery)
