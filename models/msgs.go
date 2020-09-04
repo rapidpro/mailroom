@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -19,7 +20,6 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/utils/gsm7"
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
