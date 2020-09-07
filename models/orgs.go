@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -174,6 +175,7 @@ func (o *Org) StoreAttachment(s storage.Storage, filename string, content []byte
 	prefix := config.Mailroom.S3MediaPrefix
 
 	contentType := http.DetectContentType(content)
+	contentType, _, _ = mime.ParseMediaType(contentType)
 
 	path := o.attachmentPath(prefix, filename)
 
