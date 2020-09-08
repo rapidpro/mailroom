@@ -36,7 +36,7 @@ type integrationMetadata struct {
 
 type channelbackRequest struct {
 	Message     string   `form:"message"      validate:"required"`
-	FileURLs    []string `form:"file_urls"`
+	FileURLs    []string `form:"file_urls[]"`
 	ParentID    string   `form:"parent_id"`
 	ThreadID    string   `form:"thread_id"    validate:"required"`
 	RecipientID string   `form:"recipient_id" validate:"required"`

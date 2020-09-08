@@ -1,3 +1,7 @@
+v5.7.20
+----------
+ * Fix incoming attachments from Zendesk
+
 v5.7.19
 ----------
  * Update to latest goflow
