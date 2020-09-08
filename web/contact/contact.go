@@ -54,12 +54,12 @@ func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	c, err := request.Contact.Validate(oa.Env(), oa.SessionAssets())
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return err, http.StatusBadRequest, nil
 	}
 
 	_, contact, err := models.CreateContact(ctx, s.DB, oa, request.UserID, c.Name, c.Language, c.URNs)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return err, http.StatusBadRequest, nil
 	}
 
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
