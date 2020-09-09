@@ -493,6 +493,18 @@ func DeleteUnfiredContactEvents(ctx context.Context, tx Queryer, contactID Conta
 	return nil
 }
 
+const insertEventFiresSQL = `
+INSERT INTO campaigns_eventfire(contact_id,  event_id,  scheduled)
+                         VALUES(:contact_id, :event_id, :scheduled)
+ON CONFLICT DO NOTHING
+`
+
+type FireAdd struct {
+	ContactID ContactID       `db:"contact_id"`
+	EventID   CampaignEventID `db:"event_id"`
+	Scheduled time.Time       `db:"scheduled"`
+}
+
 // AddEventFires adds the passed in event fires to our db
 func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 	if len(adds) == 0 {
@@ -505,19 +517,6 @@ func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 		is[i] = adds[i]
 	}
 	return BulkQueryBatches(ctx, "adding campaign event fires", tx, insertEventFiresSQL, 1000, is)
-}
-
-const insertEventFiresSQL = `
-	INSERT INTO 
-		campaigns_eventfire
-		(contact_id, event_id, scheduled)
-	VALUES(:contact_id, :event_id, :scheduled)
-`
-
-type FireAdd struct {
-	ContactID ContactID       `db:"contact_id"`
-	EventID   CampaignEventID `db:"event_id"`
-	Scheduled time.Time       `db:"scheduled"`
 }
 
 // DeleteUnfiredEventsForGroupRemoval deletes any unfired events for all campaigns that are
