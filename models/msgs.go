@@ -414,7 +414,7 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 		is[i] = &msgs[i].m
 	}
 
-	return BulkSQL(ctx, "insert messages", tx, insertMsgSQL, is)
+	return BulkQuery(ctx, "insert messages", tx, insertMsgSQL, is)
 }
 
 const insertMsgSQL = `
@@ -472,7 +472,7 @@ func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status M
 		is[i] = m
 	}
 
-	return BulkSQL(ctx, "updating message status", tx, updateMsgStatusSQL, is)
+	return BulkQuery(ctx, "updating message status", tx, updateMsgStatusSQL, is)
 }
 
 const updateMsgStatusSQL = `
@@ -566,7 +566,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our broadcast
-	err := BulkSQL(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
+	err := BulkQuery(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.BroadcastID())
 	}
@@ -581,7 +581,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our contacts
-	err = BulkSQL(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
+	err = BulkQuery(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting contacts for broadcast")
 	}
@@ -596,7 +596,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our groups
-	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
+	err = BulkQuery(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting groups for broadcast")
 	}
@@ -615,7 +615,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our urns
-	err = BulkSQL(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
+	err = BulkQuery(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting URNs for broadcast")
 	}

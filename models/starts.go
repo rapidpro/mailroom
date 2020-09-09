@@ -257,7 +257,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our starts
-	err := BulkSQL(ctx, "inserting flow start", db, insertStartSQL, is)
+	err := BulkQuery(ctx, "inserting flow start", db, insertStartSQL, is)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow starts")
 	}
@@ -274,7 +274,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our contacts
-	err = BulkSQL(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
+	err = BulkQuery(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow start contacts for flow")
 	}
@@ -291,7 +291,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our groups
-	err = BulkSQL(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
+	err = BulkQuery(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow start groups for flow")
 	}

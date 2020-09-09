@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -266,7 +268,7 @@ func loadCampaigns(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Campai
 	campaigns := make([]*Campaign, 0, 2)
 	for rows.Next() {
 		campaign := &Campaign{}
-		err := readJSONRow(rows, &campaign.c)
+		err := dbutil.ReadJSONRow(rows, &campaign.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling campaign")
 		}
@@ -337,7 +339,7 @@ func MarkEventsFired(ctx context.Context, tx Queryer, fires []*EventFire, fired 
 		updates = append(updates, f)
 	}
 
-	return BulkSQL(ctx, "mark events fired", tx, markEventsFired, updates)
+	return BulkQuery(ctx, "mark events fired", tx, markEventsFired, updates)
 }
 
 const markEventsFired = `
@@ -455,7 +457,7 @@ func DeleteUnfiredEventFires(ctx context.Context, tx Queryer, removes []*FireDel
 	for i := range removes {
 		is[i] = removes[i]
 	}
-	return BulkSQL(ctx, "removing campaign event fires", tx, removeUnfiredFiresSQL, is)
+	return BulkQuery(ctx, "removing campaign event fires", tx, removeUnfiredFiresSQL, is)
 }
 
 const removeUnfiredFiresSQL = `
@@ -501,7 +503,7 @@ func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 	for i := range adds {
 		is[i] = adds[i]
 	}
-	return BulkSQL(ctx, "adding campaign event fires", tx, insertEventFiresSQL, is)
+	return BulkQuery(ctx, "adding campaign event fires", tx, insertEventFiresSQL, is)
 }
 
 const insertEventFiresSQL = `
