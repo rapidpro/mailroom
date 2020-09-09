@@ -155,7 +155,7 @@ func (o *Org) EmailService(httpClient *http.Client) (flows.EmailService, error) 
 	if connectionURL == "" {
 		return nil, errors.New("missing SMTP configuration")
 	}
-	return smtp.NewServiceFromURL(connectionURL)
+	return smtp.NewService(connectionURL)
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
