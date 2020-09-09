@@ -36,7 +36,9 @@ func RunWebTests(t *testing.T, truthFile string) {
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 
-	server := NewServer(context.Background(), config.Mailroom, db, rp, nil, nil, wg)
+	defer testsuite.ResetStorage()
+
+	server := NewServer(context.Background(), config.Mailroom, db, rp, testsuite.Storage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 

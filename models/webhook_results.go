@@ -52,7 +52,7 @@ func InsertWebhookResults(ctx context.Context, db Queryer, results []*WebhookRes
 		is[i] = &results[i].r
 	}
 
-	return BulkSQL(ctx, "inserting webhook results", db, insertWebhookResultsSQL, is)
+	return BulkQuery(ctx, "inserting webhook results", db, insertWebhookResultsSQL, is)
 }
 
 const insertWebhookResultsSQL = `

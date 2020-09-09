@@ -98,6 +98,23 @@
         }
     },
     {
+        "label": "error if try to create contact with invalid language",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact": {
+                "name": "María",
+                "language": "xyz"
+            }
+        },
+        "status": 400,
+        "response": {
+            "error": "invalid language: unrecognized language code: xyz"
+        }
+    },
+    {
         "label": "error if try to create contact with taken URN",
         "method": "POST",
         "path": "/mr/contact/create",
@@ -111,7 +128,7 @@
                 ]
             }
         },
-        "status": 500,
+        "status": 400,
         "response": {
             "error": "URNs in use by other contacts"
         }

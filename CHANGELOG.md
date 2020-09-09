@@ -1,3 +1,13 @@
+v5.7.21
+----------
+ * Simplify test-smtp cmd using smtpx package
+ * Create new dbutil package with generic DB stuff
+ * Add task to calculate fires for new campaign event
+
+v5.7.20
+----------
+ * Fix incoming attachments from Zendesk
+
 v5.7.19
 ----------
  * Update to latest goflow

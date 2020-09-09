@@ -9,6 +9,7 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -132,7 +133,7 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 	channels := make([]assets.Channel, 0, 2)
 	for rows.Next() {
 		channel := &Channel{}
-		err := readJSONRow(rows, &channel.c)
+		err := dbutil.ReadJSONRow(rows, &channel.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling channel")
 		}
