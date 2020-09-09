@@ -33,7 +33,7 @@ func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// do our update
-	return models.BulkSQL(ctx, "updating contact name", tx, updateContactNameSQL, updates)
+	return models.BulkQuery(ctx, "updating contact name", tx, updateContactNameSQL, updates)
 }
 
 // handleContactNameChanged changes the name of the contact

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -283,7 +285,7 @@ func GetUnfiredSchedules(ctx context.Context, db *sqlx.DB) ([]*Schedule, error) 
 	unfired := make([]*Schedule, 0, 10)
 	for rows.Next() {
 		s := &Schedule{}
-		err := readJSONRow(rows, &s.s)
+		err := dbutil.ReadJSONRow(rows, &s.s)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading schedule")
 		}

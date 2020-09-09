@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -155,7 +156,7 @@ func (o *Org) EmailService(httpClient *http.Client) (flows.EmailService, error) 
 	if connectionURL == "" {
 		return nil, errors.New("missing SMTP configuration")
 	}
-	return smtp.NewServiceFromURL(connectionURL)
+	return smtp.NewService(connectionURL)
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
@@ -230,7 +231,7 @@ func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 		return nil, errors.Errorf("no org with id: %d", orgID)
 	}
 
-	err = readJSONRow(rows, org)
+	err = dbutil.ReadJSONRow(rows, org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling org")
 	}

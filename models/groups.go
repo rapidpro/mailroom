@@ -4,10 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/utils/dbutil"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -60,7 +62,7 @@ func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Gro
 	groups := make([]assets.Group, 0, 10)
 	for rows.Next() {
 		group := &Group{}
-		err = readJSONRow(rows, &group.g)
+		err = dbutil.ReadJSONRow(rows, &group.g)
 		if err != nil {
 			return nil, errors.Wrap(err, "error reading group row")
 		}
@@ -101,7 +103,7 @@ func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*Group
 	for i := range removals {
 		is[i] = removals[i]
 	}
-	return BulkSQL(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, is)
+	return BulkQuery(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, is)
 }
 
 // GroupRemove is our struct to track group removals
@@ -137,7 +139,7 @@ func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) erro
 	for i := range adds {
 		is[i] = adds[i]
 	}
-	return BulkSQL(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, is)
+	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, is)
 }
 
 // GroupAdd is our struct to track a final group additions
