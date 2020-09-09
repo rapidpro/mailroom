@@ -51,3 +51,33 @@ func BulkQuery(ctx context.Context, label string, tx Queryer, sql string, struct
 
 	return nil
 }
+
+// BulkQueryBatches runs the given query as a bulk operation, in batches of the given size
+func BulkQueryBatches(ctx context.Context, label string, tx Queryer, sql string, batchSize int, structs []interface{}) error {
+	start := time.Now()
+
+	batches := chunkSlice(structs, batchSize)
+	for i, batch := range batches {
+		err := dbutil.BulkQuery(ctx, tx, sql, batch)
+		if err != nil {
+			return errors.Wrap(err, "error making bulk batch query")
+		}
+
+		logrus.WithField("elapsed", time.Since(start)).WithField("rows", len(batch)).WithField("batch", i+1).Infof("%s bulk sql batch complete", label)
+	}
+
+	return nil
+}
+
+func chunkSlice(slice []interface{}, size int) [][]interface{} {
+	chunks := make([][]interface{}, 0, len(slice)/size+1)
+
+	for i := 0; i < len(slice); i += size {
+		end := i + size
+		if end > len(slice) {
+			end = len(slice)
+		}
+		chunks = append(chunks, slice[i:end])
+	}
+	return chunks
+}

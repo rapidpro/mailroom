@@ -504,7 +504,7 @@ func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 	for i := range adds {
 		is[i] = adds[i]
 	}
-	return BulkQuery(ctx, "adding campaign event fires", tx, insertEventFiresSQL, is)
+	return BulkQueryBatches(ctx, "adding campaign event fires", tx, insertEventFiresSQL, 1000, is)
 }
 
 const insertEventFiresSQL = `
