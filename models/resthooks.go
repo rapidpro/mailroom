@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/utils/dbutil"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -44,7 +46,7 @@ func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	resthooks := make([]assets.Resthook, 0, 10)
 	for rows.Next() {
 		resthook := &Resthook{}
-		err = readJSONRow(rows, &resthook.r)
+		err = dbutil.ReadJSONRow(rows, &resthook.r)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning resthook row")
 		}
@@ -89,7 +91,7 @@ func UnsubscribeResthooks(ctx context.Context, tx *sqlx.Tx, unsubs []*ResthookUn
 		is[i] = unsubs[i]
 	}
 
-	err := BulkSQL(ctx, "unsubscribing resthooks", tx, unsubscribeResthooksSQL, is)
+	err := BulkQuery(ctx, "unsubscribing resthooks", tx, unsubscribeResthooksSQL, is)
 	if err != nil {
 		return errors.Wrapf(err, "error unsubscribing from resthooks")
 	}

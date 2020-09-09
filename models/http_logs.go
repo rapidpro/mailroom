@@ -101,7 +101,7 @@ func InsertHTTPLogs(ctx context.Context, tx Queryer, logs []*HTTPLog) error {
 		ls[i] = &logs[i].h
 	}
 
-	return BulkSQL(ctx, "inserted http logs", tx, insertHTTPLogsSQL, ls)
+	return BulkQuery(ctx, "inserted http logs", tx, insertHTTPLogsSQL, ls)
 }
 
 // MarshalJSON marshals into JSON. 0 values will become null
