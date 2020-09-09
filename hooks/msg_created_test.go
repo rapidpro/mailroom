@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
-	"github.com/nyaruka/goflow/utils/uuids"
 )
 
 func TestMsgCreated(t *testing.T) {

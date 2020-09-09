@@ -12,10 +12,10 @@ func TestFields(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	fields, err := loadFields(ctx, db, 1)
+	userFields, systemFields, err := loadFields(ctx, db, 1)
 	assert.NoError(t, err)
 
-	tcs := []struct {
+	expectedUserFields := []struct {
 		Key       string
 		Name      string
 		ValueType assets.FieldType
@@ -28,10 +28,29 @@ func TestFields(t *testing.T) {
 		{"ward", "Ward", assets.FieldTypeWard},
 	}
 
-	assert.Equal(t, 6, len(fields))
-	for i, tc := range tcs {
-		assert.Equal(t, tc.Key, fields[i].Key())
-		assert.Equal(t, tc.Name, fields[i].Name())
-		assert.Equal(t, tc.ValueType, fields[i].Type())
+	assert.Equal(t, len(expectedUserFields), len(userFields))
+	for i, tc := range expectedUserFields {
+		assert.Equal(t, tc.Key, userFields[i].Key())
+		assert.Equal(t, tc.Name, userFields[i].Name())
+		assert.Equal(t, tc.ValueType, userFields[i].Type())
+	}
+
+	expectedSystemFields := []struct {
+		Key       string
+		Name      string
+		ValueType assets.FieldType
+	}{
+		{"created_on", "Created On", assets.FieldTypeDatetime},
+		{"id", "ID", assets.FieldTypeNumber},
+		{"language", "Language", assets.FieldTypeText},
+		{"last_seen_on", "Last Seen On", assets.FieldTypeDatetime},
+		{"name", "Name", assets.FieldTypeText},
+	}
+
+	assert.Equal(t, len(expectedSystemFields), len(systemFields))
+	for i, tc := range expectedSystemFields {
+		assert.Equal(t, tc.Key, systemFields[i].Key())
+		assert.Equal(t, tc.Name, systemFields[i].Name())
+		assert.Equal(t, tc.ValueType, systemFields[i].Type())
 	}
 }

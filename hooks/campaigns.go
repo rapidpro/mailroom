@@ -52,6 +52,10 @@ func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *r
 					continue
 				}
 				fieldChanges[field.ID()] = true
+
+			case *events.MsgReceivedEvent:
+				field := oa.FieldByKey(models.LastSeenOnKey)
+				fieldChanges[field.ID()] = true
 			}
 		}
 

@@ -21,6 +21,7 @@ type Field struct {
 		Key       string           `json:"key"`
 		Name      string           `json:"name"`
 		FieldType assets.FieldType `json:"field_type"`
+		System    bool             `json:"is_system"`
 	}
 }
 
@@ -39,29 +40,39 @@ func (f *Field) Name() string { return f.f.Name }
 // Type returns the value type for this field
 func (f *Field) Type() assets.FieldType { return f.f.FieldType }
 
+// System returns whether this is a system field
+func (f *Field) System() bool { return f.f.System }
+
 // loadFields loads the assets for the passed in db
-func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Field, error) {
+func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Field, []assets.Field, error) {
 	start := time.Now()
 
 	rows, err := db.Queryx(selectFieldsSQL, orgID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error querying fields for org: %d", orgID)
+		return nil, nil, errors.Wrapf(err, "error querying fields for org: %d", orgID)
 	}
 	defer rows.Close()
 
-	fields := make([]assets.Field, 0, 10)
+	userFields := make([]assets.Field, 0, 10)
+	systemFields := make([]assets.Field, 0, 10)
+
 	for rows.Next() {
 		field := &Field{}
 		err = readJSONRow(rows, &field.f)
 		if err != nil {
-			return nil, errors.Wrap(err, "error reading field")
+			return nil, nil, errors.Wrap(err, "error reading field")
 		}
-		fields = append(fields, field)
+
+		if field.System() {
+			systemFields = append(systemFields, field)
+		} else {
+			userFields = append(userFields, field)
+		}
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(fields)).Debug("loaded contact fields")
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(userFields)).Debug("loaded contact fields")
 
-	return fields, nil
+	return userFields, systemFields, nil
 }
 
 const selectFieldsSQL = `
@@ -77,13 +88,13 @@ SELECT ROW_TO_JSON(f) FROM (SELECT
 		WHEN 'S' THEN 'state'
 		WHEN 'I' THEN 'district'
 		WHEN 'W' THEN 'ward'
-	END) as field_type
-FROM 
+	END) as field_type,
+	field_type = 'S' as is_system
+FROM
 	contacts_contactfield 
 WHERE 
 	org_id = $1 AND 
-	is_active = TRUE AND
-	field_type = 'U'
+	is_active = TRUE
 ORDER BY
 	key ASC
 ) f;

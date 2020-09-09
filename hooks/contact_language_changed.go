@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/null"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,7 +28,7 @@ func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *
 	for s, e := range scenes {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactLanguageChangedEvent)
-		updates = append(updates, &languageUpdate{s.ContactID(), event.Language})
+		updates = append(updates, &languageUpdate{s.ContactID(), null.String(event.Language)})
 	}
 
 	// do our update
@@ -50,7 +51,7 @@ func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 // struct used for our bulk update
 type languageUpdate struct {
 	ContactID models.ContactID `db:"id"`
-	Language  string           `db:"language"`
+	Language  null.String      `db:"language"`
 }
 
 const updateContactLanguageSQL = `

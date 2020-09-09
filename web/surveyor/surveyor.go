@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
@@ -88,31 +88,22 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusBadRequest, err
 	}
 
-	// create / assign our contact
-	urn := urns.NilURN
+	// get the current version of this contact from the database
+	var flowContact *flows.Contact
+
 	if len(fs.Contact().URNs()) > 0 {
-		urn = fs.Contact().URNs()[0].URN()
-	}
+		// create / fetch our contact based on the highest priority URN
+		urn := fs.Contact().URNs()[0].URN()
 
-	// create / fetch our contact based on the highest priority URN
-	contactID, err := models.CreateContact(ctx, s.DB, oa, urn)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
-	}
-
-	// load that contact to get the current groups and UUID
-	contacts, err := models.LoadContacts(ctx, s.DB, oa, []models.ContactID{contactID})
-	if err == nil && len(contacts) == 0 {
-		err = errors.Errorf("no contacts loaded")
-	}
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading contact")
-	}
-
-	// load our flow contact
-	flowContact, err := contacts[0].FlowContact(oa)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading flow contact")
+		_, flowContact, err = models.GetOrCreateContact(ctx, s.DB, oa, urn)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
+		}
+	} else {
+		_, flowContact, err = models.CreateContact(ctx, s.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to create contact")
+		}
 	}
 
 	modifierEvents := make([]flows.Event, 0, len(mods))

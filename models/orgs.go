@@ -3,15 +3,21 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"mime"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/services/airtime/dtone"
 	"github.com/nyaruka/goflow/services/email/smtp"
-	"github.com/nyaruka/goflow/utils/httpx"
-	"github.com/nyaruka/goflow/utils/jsonx"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/goflow"
 	"github.com/nyaruka/null"
@@ -162,6 +168,47 @@ func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryCo
 		return nil, errors.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneLogin, configDTOneToken, o.ID())
 	}
 	return dtone.NewService(httpClient, httpRetries, login, token, currency), nil
+}
+
+// StoreAttachment saves an attachment to storage
+func (o *Org) StoreAttachment(s storage.Storage, filename string, content []byte) (utils.Attachment, error) {
+	prefix := config.Mailroom.S3MediaPrefix
+
+	contentType := http.DetectContentType(content)
+	contentType, _, _ = mime.ParseMediaType(contentType)
+
+	path := o.attachmentPath(prefix, filename)
+
+	url, err := s.Put(path, contentType, content)
+	if err != nil {
+		return "", err
+	}
+
+	return utils.Attachment(contentType + ":" + url), nil
+}
+
+func (o *Org) attachmentPath(prefix string, filename string) string {
+	parts := []string{prefix, fmt.Sprintf("%d", o.ID())}
+
+	// not all filesystems like having a directory with a huge number of files, so if filename is long enough,
+	// use parts of it to create intermediate subdirectories
+	if len(filename) > 4 {
+		parts = append(parts, filename[:4])
+
+		if len(filename) > 8 {
+			parts = append(parts, filename[4:8])
+		}
+	}
+	parts = append(parts, filename)
+
+	path := filepath.Join(parts...)
+
+	// ensure path begins with /
+	if !strings.HasPrefix(path, "/") {
+		path = fmt.Sprintf("/%s", path)
+	}
+
+	return path
 }
 
 // gets the underlying org for the given engine session

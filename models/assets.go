@@ -130,13 +130,19 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	}
 
 	if prev == nil || refresh&RefreshFields > 0 {
-		oa.fields, err = loadFields(ctx, db, orgID)
+		userFields, systemFields, err := loadFields(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading field assets for org %d", orgID)
 		}
-		oa.fieldsByUUID = make(map[assets.FieldUUID]*Field)
-		oa.fieldsByKey = make(map[string]*Field)
-		for _, f := range oa.fields {
+		oa.fields = userFields
+		oa.fieldsByUUID = make(map[assets.FieldUUID]*Field, len(userFields)+len(systemFields))
+		oa.fieldsByKey = make(map[string]*Field, len(userFields)+len(systemFields))
+		for _, f := range userFields {
+			field := f.(*Field)
+			oa.fieldsByUUID[field.UUID()] = field
+			oa.fieldsByKey[field.Key()] = field
+		}
+		for _, f := range systemFields {
 			field := f.(*Field)
 			oa.fieldsByUUID[field.UUID()] = field
 			oa.fieldsByKey[field.Key()] = field

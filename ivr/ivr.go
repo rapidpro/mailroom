@@ -7,26 +7,23 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/httputils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
-	"github.com/nyaruka/mailroom/s3utils"
 
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -46,9 +43,6 @@ const (
 	ErrorMessage = "An error has occurred, please try again later."
 )
 
-// WriteAttachments controls whether we write attachments, used during unit testing
-var WriteAttachments = true
-
 // CallEndedError is our constant error for when a call has ended
 var CallEndedError = fmt.Errorf("call ended")
 
@@ -56,7 +50,7 @@ var CallEndedError = fmt.Errorf("call ended")
 var constructors = make(map[models.ChannelType]ClientConstructor)
 
 // ClientConstructor defines our signature for creating a new IVR client from a channel
-type ClientConstructor func(c *models.Channel) (Client, error)
+type ClientConstructor func(*http.Client, *models.Channel) (Client, error)
 
 // RegisterClientType registers the passed in channel type with the passed in constructor
 func RegisterClientType(channelType models.ChannelType, constructor ClientConstructor) {
@@ -70,14 +64,14 @@ func GetClient(channel *models.Channel) (Client, error) {
 		return nil, errors.Errorf("no ivr client for channel type: %s", channel.Type())
 	}
 
-	return constructor(channel)
+	return constructor(http.DefaultClient, channel)
 }
 
 // Client defines the interface IVR clients must satisfy
 type Client interface {
-	RequestCall(client *http.Client, number urns.URN, handleURL string, statusURL string) (CallID, error)
+	RequestCall(number urns.URN, handleURL string, statusURL string) (CallID, *httpx.Trace, error)
 
-	HangupCall(client *http.Client, externalID string) error
+	HangupCall(externalID string) (*httpx.Trace, error)
 
 	WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
 
@@ -123,27 +117,19 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 		return errors.Wrapf(err, "unable to create ivr client")
 	}
 
-	// we create our own HTTP client with our own transport so we can log the request and set our user agent
-	logger := httputils.NewLoggingTransport(http.DefaultTransport)
-	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
-
 	// try to request our call hangup
-	err = c.HangupCall(client, conn.ExternalID())
+	trace, err := c.HangupCall(conn.ExternalID())
 
-	// insert any logged requests
-	for _, rt := range logger.RoundTrips {
+	// insert an channel log if we have an HTTP trace
+	if trace != nil {
 		desc := "Hangup Requested"
 		isError := false
-		if rt.Status/100 != 2 {
+		if trace.Response == nil || trace.Response.StatusCode/100 != 2 {
 			desc = "Error Hanging up Call"
 			isError = true
 		}
-		_, err := models.InsertChannelLog(
-			ctx, db, desc, isError,
-			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody,
-			rt.StartedOn, rt.Elapsed,
-			channel, conn,
-		)
+		log := models.NewChannelLog(trace, isError, desc, channel, conn)
+		err := models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log})
 
 		// log any error inserting our channel log, but try to continue
 		if err != nil {
@@ -262,27 +248,19 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 		return errors.Wrapf(err, "unable to create ivr client")
 	}
 
-	// we create our own HTTP client with our own transport so we can log the request and set our user agent
-	logger := httputils.NewLoggingTransport(http.DefaultTransport)
-	client := &http.Client{Transport: httputils.NewUserAgentTransport(logger, userAgent+config.Version)}
-
 	// try to request our call start
-	callID, err := c.RequestCall(client, telURN, resumeURL, statusURL)
+	callID, trace, err := c.RequestCall(telURN, resumeURL, statusURL)
 
-	// insert any logged requests
-	for _, rt := range logger.RoundTrips {
+	/// insert an channel log if we have an HTTP trace
+	if trace != nil {
 		desc := "Call Requested"
 		isError := false
-		if rt.Status/100 != 2 {
+		if trace.Response == nil || trace.Response.StatusCode/100 != 2 {
 			desc = "Error Requesting Call"
 			isError = true
 		}
-		_, err := models.InsertChannelLog(
-			ctx, db, desc, isError,
-			rt.Method, rt.URL, rt.RequestBody, rt.Status, rt.ResponseBody,
-			rt.StartedOn, rt.Elapsed,
-			channel, conn,
-		)
+		log := models.NewChannelLog(trace, isError, desc, channel, conn)
+		err := models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log})
 
 		// log any error inserting our channel log, but try to continue
 		if err != nil {
@@ -353,18 +331,29 @@ func StartIVRFlow(
 		}
 	}
 
+	var history *flows.SessionHistory
+	if len(start.SessionHistory()) > 0 {
+		history, err = models.ReadSessionHistory(start.SessionHistory())
+		if err != nil {
+			return errors.Wrap(err, "unable to read JSON from flow start history")
+		}
+	}
+
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
-	connRef := flows.NewConnection(channel.ChannelReference(), urn)
 
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
-		trigger, err = triggers.NewFlowActionVoice(oa.Env(), flowRef, contact, connRef, start.ParentSummary(), false)
-		if err != nil {
-			return errors.Wrap(err, "unable to create flow action trigger")
-		}
+		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
+			FlowAction(history, start.ParentSummary()).
+			WithConnection(channel.ChannelReference(), urn).
+			Build()
 	} else {
-		trigger = triggers.NewManualVoice(oa.Env(), flowRef, contact, connRef, false, params)
+		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
+			Manual().
+			WithConnection(channel.ChannelReference(), urn).
+			WithParams(params).
+			Build()
 	}
 
 	// mark our connection as started
@@ -402,7 +391,7 @@ func StartIVRFlow(
 
 // ResumeIVRFlow takes care of resuming the flow in the passed in start for the passed in contact and URN
 func ResumeIVRFlow(
-	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API,
+	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage,
 	resumeURL string, client Client,
 	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
@@ -489,24 +478,12 @@ func ResumeIVRFlow(
 		}
 		resp.Body.Close()
 
-		// check our content type
-		contentType := http.DetectContentType(body)
-
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(attachment.URL())
-		path := filepath.Join(config.S3MediaPrefix, fmt.Sprintf("%d", oa.OrgID()), filename[:4], filename[4:8], filename)
-		if !strings.HasPrefix(path, "/") {
-			path = fmt.Sprintf("/%s", path)
-		}
 
-		if WriteAttachments {
-			// write to S3
-			logrus.WithField("path", path).Info("** uploading s3 file")
-			url, err := s3utils.PutS3File(s3Client, config.S3MediaBucket, path, contentType, body)
-			if err != nil {
-				return errors.Wrapf(err, "unable to write attachment to s3")
-			}
-			attachment = utils.Attachment(contentType + ":" + url)
+		attachment, err = oa.Org().StoreAttachment(store, filename, body)
+		if err != nil {
+			return errors.Wrapf(err, "unable to store IVR attachment")
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/pkg/errors"
 )
 
@@ -35,16 +36,51 @@ func (l *ChannelLog) ID() ChannelLogID { return l.l.ID }
 
 const insertChannelLogSQL = `
 INSERT INTO
-	channels_channellog(
-		description, is_error, url, method, request, response, response_status,
-		created_on, request_time, channel_id, connection_id)
-	VALUES(
-		:description, :is_error, :url, :method, :request, :response, :response_status,
-		:created_on, :request_time, :channel_id, :connection_id)
-
+	channels_channellog( description, is_error,  url,  method,  request,  response,  response_status,  created_on,  request_time,  channel_id,  connection_id)
+	             VALUES(:description, :is_error, :url, :method, :request, :response, :response_status, :created_on, :request_time, :channel_id, :connection_id)
 RETURNING 
 	id as id
 `
+
+// NewChannelLog creates a new channel log
+func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Channel, conn *ChannelConnection) *ChannelLog {
+	log := &ChannelLog{}
+	l := &log.l
+
+	statusCode := 0
+	if trace.Response != nil {
+		statusCode = trace.Response.StatusCode
+	}
+
+	l.Description = desc
+	l.IsError = isError
+	l.URL = trace.Request.URL.String()
+	l.Method = trace.Request.Method
+	l.Request = string(trace.RequestTrace)
+	l.Response = trace.ResponseTraceUTF8("...")
+	l.Status = statusCode
+	l.CreatedOn = trace.StartTime
+	l.RequestTime = int((trace.EndTime.Sub(trace.StartTime)) / time.Millisecond)
+	l.ChannelID = channel.ID()
+	if conn != nil {
+		l.ConnectionID = conn.ID()
+	}
+	return log
+}
+
+// InsertChannelLogs writes the given channel logs to the db
+func InsertChannelLogs(ctx context.Context, db *sqlx.DB, logs []*ChannelLog) error {
+	ls := make([]interface{}, len(logs))
+	for i := range logs {
+		ls[i] = &logs[i].l
+	}
+
+	err := BulkSQL(ctx, "insert channel log", db, insertChannelLogSQL, ls)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting channel log")
+	}
+	return nil
+}
 
 // InsertChannelLog writes a channel log to the db returning the inserted log
 func InsertChannelLog(ctx context.Context, db *sqlx.DB,

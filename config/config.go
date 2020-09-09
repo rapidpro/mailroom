@@ -94,8 +94,8 @@ func NewMailroomConfig() *Config {
 		S3MediaPrefix:      "/media/",
 		S3DisableSSL:       false,
 		S3ForcePathStyle:   false,
-		AWSAccessKeyID:     "missing_aws_access_key_id",
-		AWSSecretAccessKey: "missing_aws_secret_access_key",
+		AWSAccessKeyID:     "",
+		AWSSecretAccessKey: "",
 
 		RetryPendingMessages: true,
 

@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

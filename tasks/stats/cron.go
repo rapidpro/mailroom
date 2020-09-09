@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/cron"
 	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/sirupsen/logrus"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 )
 
 const (

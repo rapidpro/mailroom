@@ -26,7 +26,7 @@ func init() {
 
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
 	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
-	web.RegisterJSONRoute(http.MethodPost, base+"/target/{ticketer:[a-f0-9\\-]+}", web.WithHTTPLogs(handleTicketerTarget))
+	web.RegisterJSONRoute(http.MethodPost, base+`/target/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerTarget))
 }
 
 type integrationMetadata struct {
@@ -36,7 +36,7 @@ type integrationMetadata struct {
 
 type channelbackRequest struct {
 	Message     string   `form:"message"      validate:"required"`
-	FileURLs    []string `form:"file_urls"`
+	FileURLs    []string `form:"file_urls[]"`
 	ParentID    string   `form:"parent_id"`
 	ThreadID    string   `form:"thread_id"    validate:"required"`
 	RecipientID string   `form:"recipient_id" validate:"required"`
@@ -76,7 +76,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusBadRequest, nil
 	}
 
-	msg, err := tickets.SendReply(ctx, s.DB, s.RP, ticket, request.Message)
+	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, request.Message, request.FileURLs)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

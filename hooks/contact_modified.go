@@ -3,9 +3,10 @@ package hooks
 import (
 	"context"
 
+	"github.com/nyaruka/mailroom/models"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 )
 
@@ -16,8 +17,9 @@ var contactModifiedHook = &ContactModifiedHook{}
 
 // Apply squashes and updates modified_on on all the contacts passed in
 func (h *ContactModifiedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
-	// our list of contact ids
+	// our lists of contact ids
 	contactIDs := make([]models.ContactID, 0, len(scenes))
+
 	for scene := range scenes {
 		contactIDs = append(contactIDs, scene.ContactID())
 	}

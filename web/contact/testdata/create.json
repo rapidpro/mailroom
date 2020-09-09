@@ -1,0 +1,165 @@
+[
+    {
+        "label": "error if contact not provided",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1
+        },
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'contact' is required"
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "create empty contact",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact": {}
+        },
+        "status": 200,
+        "response": {
+            "contact": {
+                "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5",
+                "id": 30000,
+                "status": "active",
+                "timezone": "America/Los_Angeles",
+                "created_on": "2018-07-06T12:30:00.123457Z"
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE name IS NULL AND language IS NULL AND created_by_id != 2",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "create contact with all properties",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact": {
+                "name": "José",
+                "language": "spa",
+                "urns": [
+                    "tel:+16055700001"
+                ],
+                "fields": {
+                    "gender": "M",
+                    "age": "39"
+                },
+                "groups": [
+                    "c153e265-f7c9-4539-9dbc-9b358714b638"
+                ]
+            }
+        },
+        "status": 200,
+        "response": {
+            "contact": {
+                "uuid": "692926ea-09d6-4942-bd38-d266ec8d3716",
+                "id": 30001,
+                "name": "José",
+                "language": "spa",
+                "status": "active",
+                "timezone": "America/Los_Angeles",
+                "created_on": "2018-07-06T12:30:00.123457Z",
+                "urns": [
+                    "tel:+16055700001?id=20121&priority=1000"
+                ],
+                "groups": [
+                    {
+                        "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                        "name": "Doctors"
+                    }
+                ],
+                "fields": {
+                    "age": {
+                        "text": "39",
+                        "number": 39
+                    },
+                    "gender": {
+                        "text": "M"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "label": "error if try to create contact with invalid language",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact": {
+                "name": "María",
+                "language": "xyz"
+            }
+        },
+        "status": 400,
+        "response": {
+            "error": "invalid language: unrecognized language code: xyz"
+        }
+    },
+    {
+        "label": "error if try to create contact with taken URN",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact": {
+                "name": "María",
+                "urns": [
+                    "tel:+16055700001"
+                ]
+            }
+        },
+        "status": 400,
+        "response": {
+            "error": "URNs in use by other contacts"
+        }
+    },
+    {
+        "label": "though ok to take an orphaned URN",
+        "method": "POST",
+        "path": "/mr/contact/create",
+        "body": {
+            "org_id": 1,
+            "user_id": 1,
+            "contact": {
+                "name": "María",
+                "urns": [
+                    "tel:+16055741111"
+                ]
+            }
+        },
+        "status": 200,
+        "response": {
+            "contact": {
+                "uuid": "c34b6c7d-fa06-4563-92a3-d648ab64bccb",
+                "id": 30003,
+                "name": "María",
+                "status": "active",
+                "timezone": "America/Los_Angeles",
+                "created_on": "2018-07-06T12:30:00.123457Z",
+                "urns": [
+                    "tel:+16055741111?id=10000&priority=1000"
+                ]
+            }
+        }
+    }
+]

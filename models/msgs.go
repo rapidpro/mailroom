@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -19,7 +20,6 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
@@ -281,21 +281,26 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 	return msg, nil
 }
 
-// NewOutgoingMsg creates an outgoing message for the passed in flow message. Note that this message is created in a queued state!
-func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+// NewOutgoingMsg creates an outgoing message for the passed in flow message.
+func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	msg := &Msg{}
-
 	m := &msg.m
+
+	// we fail messages for suspended orgs right away
+	status := MsgStatusQueued
+	if org.Suspended() {
+		status = MsgStatusFailed
+	}
 
 	m.UUID = out.UUID()
 	m.Text = out.Text()
 	m.HighPriority = false
 	m.Direction = DirectionOut
-	m.Status = MsgStatusQueued
+	m.Status = status
 	m.Visibility = VisibilityVisible
 	m.MsgType = TypeFlow
 	m.ContactID = contactID
-	m.OrgID = orgID
+	m.OrgID = org.ID()
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
@@ -779,7 +784,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 
 	// utility method to build up our message
 	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
-		if c.IsStopped() || c.IsBlocked() {
+		if c.Status() != ContactStatusActive {
 			return nil, nil
 		}
 
@@ -888,7 +893,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingMsg(oa.OrgID(), channel, c.ID(), out, time.Now())
+		msg, err := NewOutgoingMsg(oa.Org(), channel, c.ID(), out, time.Now())
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
