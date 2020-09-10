@@ -29,8 +29,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumCAMpl/TFQ4/5kLM=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
-github.com/dsmagicug/goflow v0.95.2 h1:Z6GvqkDR2Uk6M8aQ8CnzM1y7xF2I0ej+9u2DOTEKhNg=
-github.com/dsmagicug/goflow v0.95.2/go.mod h1:PDah2hr5WzODnUFK4VWWQkg7SqnYclf7P9Ik5u/VOG0=
 github.com/edganiukov/fcm v0.4.0 h1:PAZamwbiW2AegM5hGqYNv+djE1xxLyH7zMN6MwWpvoQ=
 github.com/edganiukov/fcm v0.4.0/go.mod h1:3gL1BLvC3w05anUsF2Wbd1Sz+ZdCu8qsNCa1LyRfwFo=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=

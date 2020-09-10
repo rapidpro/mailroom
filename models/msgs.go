@@ -407,14 +407,14 @@ func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
 	m.m.SessionTimeout = int(timeout / time.Second)
 }
 
-func (m *Msg) SetWantsResponse (wantsResponse bool) {
+func (m *Msg) SetSessionStatus (status SessionStatus) {
 	// Put it in the meta data
 
 	if m.m.Metadata.Map() == nil {
 		metadata := make(map[string]interface{})
 		m.m.Metadata = null.NewMap(metadata)
 	}
-	m.Metadata()["wants_response"] = wantsResponse
+	m.Metadata()["session_status"] = status
 }
 
 // InsertMessages inserts the passed in messages in a single query
