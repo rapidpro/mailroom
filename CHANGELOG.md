@@ -1,3 +1,7 @@
+v5.7.22
+----------
+ * Update to latest goflow v0.104.1
+
 v5.7.21
 ----------
  * Simplify test-smtp cmd using smtpx package
