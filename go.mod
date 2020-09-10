@@ -31,6 +31,7 @@ require (
 	github.com/sirupsen/logrus v1.5.0
 	github.com/stretchr/testify v1.5.1
 	gopkg.in/go-playground/validator.v9 v9.31.0
+	gopkg.in/mail.v2 v2.3.1
 )
 
 go 1.14

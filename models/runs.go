@@ -210,9 +210,6 @@ func (s *Session) ChannelConnection() *ChannelConnection {
 	return s.channelConnection
 }
 
-func (s *Session) WantsResponse() bool {
-	return s.Status() == SessionStatusWaiting
-}
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
 func (s *Session) MarshalJSON() ([]byte, error) {
