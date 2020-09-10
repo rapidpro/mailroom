@@ -17,8 +17,8 @@ require (
 	github.com/lib/pq v1.4.0
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
-	github.com/nyaruka/gocommon v1.5.0
-	github.com/nyaruka/goflow v0.104.0
+	github.com/nyaruka/gocommon v1.5.1
+	github.com/nyaruka/goflow v0.104.1
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0
@@ -31,7 +31,6 @@ require (
 	github.com/sirupsen/logrus v1.5.0
 	github.com/stretchr/testify v1.5.1
 	gopkg.in/go-playground/validator.v9 v9.31.0
-	gopkg.in/mail.v2 v2.3.1
 )
 
 go 1.14
