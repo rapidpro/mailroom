@@ -210,7 +210,6 @@ func (s *Session) ChannelConnection() *ChannelConnection {
 	return s.channelConnection
 }
 
-
 // MarshalJSON is our custom marshaller so that our inner struct get output
 func (s *Session) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.s)
