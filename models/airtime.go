@@ -86,7 +86,7 @@ func InsertAirtimeTransfers(ctx context.Context, tx Queryer, transfers []*Airtim
 		ts[i] = &transfers[i].t
 	}
 
-	return BulkSQL(ctx, "inserted airtime transfers", tx, insertAirtimeTransfersSQL, ts)
+	return BulkQuery(ctx, "inserted airtime transfers", tx, insertAirtimeTransfersSQL, ts)
 }
 
 // MarshalJSON marshals into JSON. 0 values will become null

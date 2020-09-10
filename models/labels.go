@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/utils/dbutil"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -43,7 +45,7 @@ func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Lab
 	labels := make([]assets.Label, 0, 10)
 	for rows.Next() {
 		label := &Label{}
-		err = readJSONRow(rows, &label.l)
+		err = dbutil.ReadJSONRow(rows, &label.l)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning label row")
 		}
@@ -78,7 +80,7 @@ func AddMsgLabels(ctx context.Context, tx *sqlx.Tx, adds []*MsgLabelAdd) error {
 		is[i] = adds[i]
 	}
 
-	err := BulkSQL(ctx, "inserting msg labels", tx, insertMsgLabelsSQL, is)
+	err := BulkQuery(ctx, "inserting msg labels", tx, insertMsgLabelsSQL, is)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting new msg labels")
 	}

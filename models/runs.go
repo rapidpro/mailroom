@@ -571,14 +571,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// update all modified runs at once
-	err = BulkSQL(ctx, "update runs", tx, updateRunSQL, updatedRuns)
+	err = BulkQuery(ctx, "update runs", tx, updateRunSQL, updatedRuns)
 	if err != nil {
 		logrus.WithError(err).WithField("session", string(output)).Error("error while updating runs for session")
 		return errors.Wrapf(err, "error updating runs")
 	}
 
 	// insert all new runs at once
-	err = BulkSQL(ctx, "insert runs", tx, insertRunSQL, newRuns)
+	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, newRuns)
 	if err != nil {
 		return errors.Wrapf(err, "error writing runs")
 	}
@@ -686,7 +686,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// insert our complete sessions first
-	err := BulkSQL(ctx, "insert completed sessions", tx, insertCompleteSessionSQL, completeSessionsI)
+	err := BulkQuery(ctx, "insert completed sessions", tx, insertCompleteSessionSQL, completeSessionsI)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting completed sessions")
 	}
@@ -698,7 +698,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// insert incomplete sessions
-	err = BulkSQL(ctx, "insert incomplete sessions", tx, insertIncompleteSessionSQL, incompleteSessionsI)
+	err = BulkQuery(ctx, "insert incomplete sessions", tx, insertIncompleteSessionSQL, incompleteSessionsI)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting incomplete sessions")
 	}
@@ -715,7 +715,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// insert all runs
-	err = BulkSQL(ctx, "insert runs", tx, insertRunSQL, runs)
+	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, runs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error writing runs")
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -270,7 +271,7 @@ func InsertTickets(ctx context.Context, tx Queryer, tickets []*Ticket) error {
 		ts[i] = &tickets[i].t
 	}
 
-	return BulkSQL(ctx, "inserted tickets", tx, insertTicketSQL, ts)
+	return BulkQuery(ctx, "inserted tickets", tx, insertTicketSQL, ts)
 }
 
 const updateTicketExternalIDSQL = `
@@ -521,7 +522,7 @@ func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerU
 	}
 
 	ticketer := &Ticketer{}
-	err = readJSONRow(rows, &ticketer.t)
+	err = dbutil.ReadJSONRow(rows, &ticketer.t)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling ticketer")
 	}
@@ -560,7 +561,7 @@ func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	ticketers := make([]assets.Ticketer, 0, 2)
 	for rows.Next() {
 		ticketer := &Ticketer{}
-		err := readJSONRow(rows, &ticketer.t)
+		err := dbutil.ReadJSONRow(rows, &ticketer.t)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling ticketer")
 		}

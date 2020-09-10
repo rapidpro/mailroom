@@ -6,24 +6,70 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/mailroom/utils/marker"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.AddTaskFunction(queue.FireCampaignEvent, HandleCampaignEvent)
+	mailroom.AddTaskFunction(queue.ScheduleCampaignEvent, HandleScheduleCampaignEvent)
+	mailroom.AddTaskFunction(queue.FireCampaignEvent, HandleFireCampaignEvent)
 }
 
-// HandleCampaignEvent is called by mailroom when a campaign event task is ready to be processed.
-func HandleCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+// ScheduleTask is our definition of our event recalculation task
+type ScheduleTask struct {
+	OrgID           models.OrgID           `json:"org_id"`
+	CampaignEventID models.CampaignEventID `json:"campaign_event_id"`
+}
+
+const scheduleLockKey string = "schedule_campaign_event_%d"
+
+// HandleScheduleCampaignEvent is called by RapidPro when a campaign event has been created or updated
+func HandleScheduleCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Hour)
+	defer cancel()
+
+	// decode our task body
+	if task.Type != queue.ScheduleCampaignEvent {
+		return errors.Errorf("unknown event type passed to calc schedule campaign event worker: %s", task.Type)
+	}
+	t := &ScheduleTask{}
+	err := json.Unmarshal(task.Task, t)
+	if err != nil {
+		return errors.Wrapf(err, "error unmarshalling task: %s", string(task.Task))
+	}
+
+	return ScheduleCampaignEvent(ctx, mr.DB, mr.RP, t)
+}
+
+// ScheduleCampaignEvent creates the actual event fires to schedule the given campaign event
+func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, t *ScheduleTask) error {
+	lockKey := fmt.Sprintf(scheduleLockKey, t.CampaignEventID)
+	lock, err := locker.GrabLock(rp, lockKey, time.Hour, time.Minute*5)
+	if err != nil {
+		return errors.Wrapf(err, "error grabbing lock to schedule campaign event %d", t.CampaignEventID)
+	}
+	defer locker.ReleaseLock(rp, lockKey, lock)
+
+	err = models.ScheduleCampaignEvent(ctx, db, t.OrgID, t.CampaignEventID)
+	if err != nil {
+		return errors.Wrapf(err, "error scheduling campaign event %d", t.CampaignEventID)
+	}
+
+	return nil
+}
+
+// HandleFireCampaignEvent is called by mailroom when a campaign event task is ready to be processed.
+func HandleFireCampaignEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 

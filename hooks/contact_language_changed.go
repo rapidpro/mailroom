@@ -32,7 +32,7 @@ func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *
 	}
 
 	// do our update
-	return models.BulkSQL(ctx, "updating contact language", tx, updateContactLanguageSQL, updates)
+	return models.BulkQuery(ctx, "updating contact language", tx, updateContactLanguageSQL, updates)
 }
 
 // handleContactLanguageChanged is called when we process a contact language change

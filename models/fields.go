@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/utils/dbutil"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -58,7 +60,7 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 
 	for rows.Next() {
 		field := &Field{}
-		err = readJSONRow(rows, &field.f)
+		err = dbutil.ReadJSONRow(rows, &field.f)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "error reading field")
 		}

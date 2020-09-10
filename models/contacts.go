@@ -19,6 +19,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -95,7 +96,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 	contacts := make([]*Contact, 0, len(ids))
 	for rows.Next() {
 		e := &contactEnvelope{}
-		err := readJSONRow(rows, e)
+		err := dbutil.ReadJSONRow(rows, e)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning contact json")
 		}
@@ -632,7 +633,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []u
 func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, userID UserID, name string, language envs.Language, urnz []urns.URN) (*Contact, *flows.Contact, error) {
 	contactID, err := insertContactAndURNs(ctx, db, org, userID, name, language, urnz)
 	if err != nil {
-		if isUniqueViolationError(err) {
+		if dbutil.IsUniqueViolation(err) {
 			return nil, nil, errors.New("URNs in use by other contacts")
 		}
 		return nil, nil, err
@@ -664,7 +665,7 @@ func GetOrCreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, urn ur
 
 	contactID, err := insertContactAndURNs(ctx, db, org, UserID(1), "", envs.NilLanguage, []urns.URN{urn})
 	if err != nil {
-		if isUniqueViolationError(err) {
+		if dbutil.IsUniqueViolation(err) {
 			// if this was a duplicate URN, we should be able to fetch this contact instead
 			err := db.GetContext(ctx, &contactID, `SELECT contact_id FROM contacts_contacturn WHERE org_id = $1 AND identity = $2`, org.OrgID(), urn.Identity())
 			if err != nil {
@@ -793,7 +794,7 @@ func URNForURN(ctx context.Context, tx Queryer, org *OrgAssets, u urns.URN) (urn
 		return urns.NilURN, errors.Errorf("no urn with identity: %s", u.Identity())
 	}
 
-	err = readJSONRow(rows, urn)
+	err = dbutil.ReadJSONRow(rows, urn)
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "error loading contact urn")
 	}
@@ -854,7 +855,7 @@ func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urn
 		return urns.NilURN, errors.Errorf("no urn with id: %d", urnID)
 	}
 
-	err = readJSONRow(rows, urn)
+	err = dbutil.ReadJSONRow(rows, urn)
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "error loading contact urn")
 	}
@@ -1227,7 +1228,7 @@ func UpdateContactURNs(ctx context.Context, tx Queryer, org *OrgAssets, changes 
 	}
 
 	// first update existing URNs
-	err := BulkSQL(ctx, "updating contact urns", tx, updateContactURNsSQL, updates)
+	err := BulkQuery(ctx, "updating contact urns", tx, updateContactURNsSQL, updates)
 	if err != nil {
 		return errors.Wrapf(err, "error updating urns")
 	}
@@ -1433,7 +1434,7 @@ func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStat
 	}
 
 	// do our status update
-	err = BulkSQL(ctx, "updating contact statuses", tx, updateContactStatusSQL, statusUpdates)
+	err = BulkQuery(ctx, "updating contact statuses", tx, updateContactStatusSQL, statusUpdates)
 	if err != nil {
 		return errors.Wrapf(err, "error updating contact statuses")
 	}

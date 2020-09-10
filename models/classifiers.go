@@ -5,14 +5,16 @@ import (
 	"database/sql/driver"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/services/classification/bothub"
 	"github.com/nyaruka/goflow/services/classification/luis"
 	"github.com/nyaruka/goflow/services/classification/wit"
 	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
+
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -133,7 +135,7 @@ func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]asset
 	classifiers := make([]assets.Classifier, 0, 2)
 	for rows.Next() {
 		classifier := &Classifier{}
-		err := readJSONRow(rows, &classifier.c)
+		err := dbutil.ReadJSONRow(rows, &classifier.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling classifier")
 		}

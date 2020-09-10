@@ -75,7 +75,7 @@ func InsertChannelLogs(ctx context.Context, db *sqlx.DB, logs []*ChannelLog) err
 		ls[i] = &logs[i].l
 	}
 
-	err := BulkSQL(ctx, "insert channel log", db, insertChannelLogSQL, ls)
+	err := BulkQuery(ctx, "insert channel log", db, insertChannelLogSQL, ls)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting channel log")
 	}
@@ -105,7 +105,7 @@ func InsertChannelLog(ctx context.Context, db *sqlx.DB,
 		l.ConnectionID = conn.ID()
 	}
 
-	err := BulkSQL(ctx, "insert channel log", db, insertChannelLogSQL, []interface{}{l})
+	err := BulkQuery(ctx, "insert channel log", db, insertChannelLogSQL, []interface{}{l})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting channel log")
 	}
