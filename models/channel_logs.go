@@ -2,6 +2,8 @@ package models
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -52,9 +54,12 @@ func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Chann
 		statusCode = trace.Response.StatusCode
 	}
 
+	// if URL was rewritten (by nginx for example), we want to log the original request
+	url := originalURL(trace.Request)
+
 	l.Description = desc
 	l.IsError = isError
-	l.URL = trace.Request.URL.String()
+	l.URL = url
 	l.Method = trace.Request.Method
 	l.Request = string(trace.RequestTrace)
 	l.Response = trace.ResponseTraceUTF8("...")
@@ -66,6 +71,14 @@ func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Chann
 		l.ConnectionID = conn.ID()
 	}
 	return log
+}
+
+func originalURL(r *http.Request) string {
+	proxyPath := r.Header.Get("X-Forwarded-Path")
+	if proxyPath != "" {
+		return fmt.Sprintf("https://%s%s", r.Host, proxyPath)
+	}
+	return r.URL.String()
 }
 
 // InsertChannelLogs writes the given channel logs to the db
