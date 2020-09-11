@@ -19,7 +19,7 @@ func RegisterType(name string, initFunc func() Task) {
 
 	mailroom.AddTaskFunction(name, func(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
 		// decode our task body
-		typedTask, err := readTask(task.Type, task.Task)
+		typedTask, err := ReadTask(task.Type, task.Task)
 		if err != nil {
 			return errors.Wrapf(err, "error reading task of type %s", task.Type)
 		}
@@ -38,8 +38,8 @@ type Task interface {
 // JSON Encoding / Decoding
 //------------------------------------------------------------------------------------------
 
-// reads an action from the given JSON
-func readTask(typeName string, data json.RawMessage) (Task, error) {
+// ReadTask reads an action from the given JSON
+func ReadTask(typeName string, data json.RawMessage) (Task, error) {
 	f := registeredTypes[typeName]
 	if f == nil {
 		return nil, errors.Errorf("unknown task type: '%s'", typeName)

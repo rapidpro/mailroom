@@ -64,9 +64,6 @@ const (
 
 	// StartIVRFlowBatch is our task for starting an ivr batch
 	StartIVRFlowBatch = "start_ivr_flow_batch"
-
-	// PopulateDynamicGroup is our task to populate the contacts for a dynamic group
-	PopulateDynamicGroup = "populate_dynamic_group"
 )
 
 // Size returns the number of tasks for the passed in queue
