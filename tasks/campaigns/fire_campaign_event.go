@@ -1,0 +1,106 @@
+package campaigns
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/runner"
+	"github.com/nyaruka/mailroom/tasks"
+	"github.com/nyaruka/mailroom/utils/marker"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+)
+
+// TypeFireCampaignEvent is the type of the fire event task
+const TypeFireCampaignEvent = "fire_campaign_event"
+
+func init() {
+	tasks.RegisterType(TypeFireCampaignEvent, func() tasks.Task { return &FireCampaignEventTask{} })
+}
+
+// FireCampaignEventTask is the task to handle firing campaign events
+type FireCampaignEventTask struct {
+	FireIDs      []int64         `json:"fire_ids"`
+	EventID      int64           `json:"event_id"`
+	EventUUID    string          `json:"event_uuid"`
+	FlowUUID     assets.FlowUUID `json:"flow_uuid"`
+	CampaignUUID string          `json:"campaign_uuid"`
+	CampaignName string          `json:"campaign_name"`
+	OrgID        models.OrgID    `json:"org_id"`
+}
+
+// Timeout is the maximum amount of time the task can run for
+func (t *FireCampaignEventTask) Timeout() time.Duration {
+	return time.Minute * 5
+}
+
+// Perform handles firing campaign events
+//   - loads the org assets for that event
+//   - locks on the contact
+//   - loads the contact for that event
+//   - creates the trigger for that event
+//   - runs the flow that is to be started through our engine
+//   - saves the flow run and session resulting from our run
+func (t *FireCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
+	db := mr.DB
+	rp := mr.RP
+	log := logrus.WithField("comp", "campaign_worker").WithField("event_id", t.EventID)
+
+	// grab all the fires for this event
+	fires, err := models.LoadEventFires(ctx, db, t.FireIDs)
+	if err != nil {
+		// unmark all these fires as fires so they can retry
+		rc := rp.Get()
+		for _, id := range t.FireIDs {
+			rerr := marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", id))
+			if rerr != nil {
+				log.WithError(rerr).WithField("fire_id", id).Error("error unmarking campaign fire")
+			}
+		}
+		rc.Close()
+
+		// if we had an error, return that
+		return errors.Wrapf(err, "error loading event fire from db: %v", t.FireIDs)
+	}
+
+	// no fires returned
+	if len(fires) == 0 {
+		log.Info("events already fired, ignoring")
+		return nil
+	}
+
+	contactMap := make(map[models.ContactID]*models.EventFire)
+	for _, fire := range fires {
+		contactMap[fire.ContactID] = fire
+	}
+
+	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(t.CampaignUUID), t.CampaignName)
+
+	started, err := runner.FireCampaignEvents(ctx, db, rp, t.OrgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
+
+	// remove all the contacts that were started
+	for _, contactID := range started {
+		delete(contactMap, contactID)
+	}
+
+	// what remains in our contact map are fires that failed for some reason, umark these
+	if len(contactMap) > 0 {
+		rc := rp.Get()
+		for _, failed := range contactMap {
+			marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", failed.FireID))
+		}
+		rc.Close()
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error firing campaign events: %d", t.FireIDs)
+	}
+
+	return nil
+}

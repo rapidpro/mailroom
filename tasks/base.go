@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom"
@@ -24,12 +25,18 @@ func RegisterType(name string, initFunc func() Task) {
 			return errors.Wrapf(err, "error reading task of type %s", task.Type)
 		}
 
+		ctx, cancel := context.WithTimeout(ctx, typedTask.Timeout())
+		defer cancel()
+
 		return typedTask.Perform(ctx, mr)
 	})
 }
 
 // Task is the common interface for all task types
 type Task interface {
+	// Timeout is the maximum amount of time the task can run for
+	Timeout() time.Duration
+
 	// Perform performs the task
 	Perform(ctx context.Context, mr *mailroom.Mailroom) error
 }
