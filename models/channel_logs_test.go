@@ -21,6 +21,7 @@ func TestChannelLogs(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"http://rapidpro.io":     {httpx.NewMockResponse(200, nil, "OK")},
 		"http://rapidpro.io/bad": {httpx.NewMockResponse(400, nil, "Oops")},
+		"http://rapidpro.io/new": {httpx.NewMockResponse(200, nil, "OK")},
 	}))
 
 	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
@@ -36,10 +37,15 @@ func TestChannelLogs(t *testing.T) {
 	trace2, err := httpx.DoTrace(http.DefaultClient, req2, nil, nil, -1)
 	log2 := models.NewChannelLog(trace2, true, "test request", channel, nil)
 
-	err = models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log1, log2})
+	req3, _ := httpx.NewRequest("GET", "http://rapidpro.io/new", nil, map[string]string{"X-Forwarded-Path": "/old"})
+	trace3, err := httpx.DoTrace(http.DefaultClient, req3, nil, nil, -1)
+	log3 := models.NewChannelLog(trace3, false, "test request", channel, nil)
+
+	err = models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log1, log2, log3})
 	require.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM channels_channellog`, nil, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM channels_channellog`, nil, 3)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io' AND is_error = FALSE AND channel_id = $1`, []interface{}{channel.ID()}, 1)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io/bad' AND is_error = TRUE AND channel_id = $1`, []interface{}{channel.ID()}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'https://rapidpro.io/old' AND is_error = FALSE AND channel_id = $1`, []interface{}{channel.ID()}, 1)
 }
