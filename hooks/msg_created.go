@@ -220,6 +220,9 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mode
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
 
+	// Pass along the session status to courier
+	 msg.SetSessionStatus(scene.Session().Status())
+
 	// set our reply to as well (will be noop in cases when there is no incoming message)
 	msg.SetResponseTo(scene.Session().IncomingMsgID(), scene.Session().IncomingMsgExternalID())
 

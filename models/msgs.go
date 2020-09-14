@@ -130,6 +130,8 @@ type Msg struct {
 		SessionID            SessionID  `json:"session_id,omitempty"`
 		SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
 		SessionTimeout       int        `json:"session_timeout,omitempty"`
+		// Transmit sessionstatus onwards
+		SessionStatus		SessionStatus `json:"session_status,omitempty""`
 	}
 
 	channel *Channel
@@ -405,6 +407,10 @@ func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
 	m.m.SessionID = id
 	m.m.SessionWaitStartedOn = &start
 	m.m.SessionTimeout = int(timeout / time.Second)
+}
+
+func (m *Msg) SetSessionStatus (status SessionStatus) {
+	m.m.SessionStatus = status
 }
 
 // InsertMessages inserts the passed in messages in a single query
