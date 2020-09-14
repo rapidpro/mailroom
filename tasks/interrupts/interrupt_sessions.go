@@ -58,10 +58,12 @@ WHERE
 	fs.current_flow_id = ANY($1);
 `
 
-func (t *InterruptSessionsTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*60)
-	defer cancel()
+// Timeout is the maximum amount of time the task can run for
+func (t *InterruptSessionsTask) Timeout() time.Duration {
+	return time.Hour
+}
 
+func (t *InterruptSessionsTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
 	db := mr.DB
 
 	sessionIDs := make(map[models.SessionID]bool)

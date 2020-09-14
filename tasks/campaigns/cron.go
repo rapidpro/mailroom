@@ -61,7 +61,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 	defer rc.Close()
 
 	queued := 0
-	queueTask := func(task *eventFireTask) error {
+	queueTask := func(task *FireCampaignEventTask) error {
 		if task.EventID == 0 {
 			return nil
 		}
@@ -75,7 +75,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 			task.FireIDs = fireIDs[:batchSize]
 			fireIDs = fireIDs[batchSize:]
 
-			err = queue.AddTask(rc, queue.BatchQueue, queue.FireCampaignEvent, int(task.OrgID), task, queue.DefaultPriority)
+			err = queue.AddTask(rc, queue.BatchQueue, TypeFireCampaignEvent, int(task.OrgID), task, queue.DefaultPriority)
 			if err != nil {
 				return errors.Wrap(err, "error queuing task")
 			}
@@ -95,7 +95,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 	}
 
 	// while we have rows
-	task := &eventFireTask{}
+	task := &FireCampaignEventTask{}
 	for rows.Next() {
 		row := &eventFireRow{}
 		err := rows.StructScan(row)
@@ -128,7 +128,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 		}
 
 		// and create a new one based on this row
-		task = &eventFireTask{
+		task = &FireCampaignEventTask{
 			FireIDs:      []int64{row.FireID},
 			EventID:      row.EventID,
 			EventUUID:    row.EventUUID,
@@ -149,16 +149,6 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 	librato.Gauge("mr.campaign_event_cron_count", float64(queued))
 	log.WithField("elapsed", time.Since(start)).WithField("queued", queued).Info("campaign event fire queuing complete")
 	return nil
-}
-
-type eventFireTask struct {
-	FireIDs      []int64         `json:"fire_ids"`
-	EventID      int64           `json:"event_id"`
-	EventUUID    string          `json:"event_uuid"`
-	FlowUUID     assets.FlowUUID `json:"flow_uuid"`
-	CampaignUUID string          `json:"campaign_uuid"`
-	CampaignName string          `json:"campaign_name"`
-	OrgID        models.OrgID    `json:"org_id"`
 }
 
 type eventFireRow struct {

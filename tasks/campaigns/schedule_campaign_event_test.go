@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/tasks/campaigns"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -17,6 +19,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
+	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: nil}
 
 	models.FlushCache()
 
@@ -39,8 +42,9 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	//  2. +10 Minutes send message
 
 	// schedule first event...
-	err := campaigns.ScheduleCampaignEvent(ctx, db, testsuite.RP(), &campaigns.ScheduleTask{OrgID: models.Org1, CampaignEventID: models.RemindersEvent1ID})
-	assert.NoError(t, err)
+	task := &campaigns.ScheduleCampaignEventTask{OrgID: models.Org1, CampaignEventID: models.RemindersEvent1ID}
+	err := task.Perform(ctx, mr)
+	require.NoError(t, err)
 
 	// cathy has no value for joined and alexandia has a value too far in past, but bob and george will have values...
 	assertContactFires(t, models.RemindersEvent1ID, map[models.ContactID]time.Time{
@@ -49,8 +53,9 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	})
 
 	// schedule second event...
-	err = campaigns.ScheduleCampaignEvent(ctx, db, testsuite.RP(), &campaigns.ScheduleTask{OrgID: models.Org1, CampaignEventID: models.RemindersEvent2ID})
-	assert.NoError(t, err)
+	task = &campaigns.ScheduleCampaignEventTask{OrgID: models.Org1, CampaignEventID: models.RemindersEvent2ID}
+	err = task.Perform(ctx, mr)
+	require.NoError(t, err)
 
 	assertContactFires(t, models.RemindersEvent2ID, map[models.ContactID]time.Time{
 		models.BobID:    time.Date(2030, 1, 1, 0, 10, 0, 0, time.UTC),
@@ -72,8 +77,9 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	// create new campaign event based on created_on + 5 minutes
 	event3 := insertCampaignEvent(t, models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID, 5, "M")
 
-	err = campaigns.ScheduleCampaignEvent(ctx, db, testsuite.RP(), &campaigns.ScheduleTask{OrgID: models.Org1, CampaignEventID: event3})
-	assert.NoError(t, err)
+	task = &campaigns.ScheduleCampaignEventTask{OrgID: models.Org1, CampaignEventID: event3}
+	err = task.Perform(ctx, mr)
+	require.NoError(t, err)
 
 	// only cathy is in the group and new enough to have a fire
 	assertContactFires(t, event3, map[models.ContactID]time.Time{
@@ -86,8 +92,9 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	// bump last_seen_on for bob
 	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, models.BobID)
 
-	err = campaigns.ScheduleCampaignEvent(ctx, db, testsuite.RP(), &campaigns.ScheduleTask{OrgID: models.Org1, CampaignEventID: event4})
-	assert.NoError(t, err)
+	task = &campaigns.ScheduleCampaignEventTask{OrgID: models.Org1, CampaignEventID: event4}
+	err = task.Perform(ctx, mr)
+	require.NoError(t, err)
 
 	assertContactFires(t, event4, map[models.ContactID]time.Time{
 		models.BobID: time.Date(2040, 1, 2, 0, 0, 0, 0, time.UTC),

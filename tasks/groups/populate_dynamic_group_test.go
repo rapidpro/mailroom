@@ -66,7 +66,7 @@ func TestPopulateTask(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	task := &groups.PopulateTask{
+	task := &groups.PopulateDynamicGroupTask{
 		OrgID:   models.Org1,
 		GroupID: groupID,
 		Query:   "gender = F",

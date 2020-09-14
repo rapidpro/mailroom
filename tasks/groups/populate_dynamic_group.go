@@ -20,21 +20,23 @@ const TypePopulateDynamicGroup = "populate_dynamic_group"
 const populateLockKey string = "pop_dyn_group_%d"
 
 func init() {
-	tasks.RegisterType(TypePopulateDynamicGroup, func() tasks.Task { return &PopulateTask{} })
+	tasks.RegisterType(TypePopulateDynamicGroup, func() tasks.Task { return &PopulateDynamicGroupTask{} })
 }
 
-// PopulateTask is our task to populate the contacts for a dynamic group
-type PopulateTask struct {
+// PopulateDynamicGroupTask is our task to populate the contacts for a dynamic group
+type PopulateDynamicGroupTask struct {
 	OrgID   models.OrgID   `json:"org_id"`
 	GroupID models.GroupID `json:"group_id"`
 	Query   string         `json:"query"`
 }
 
-// Perform figures out the membership for a query based group then repopulates it
-func (t *PopulateTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Hour)
-	defer cancel()
+// Timeout is the maximum amount of time the task can run for
+func (t *PopulateDynamicGroupTask) Timeout() time.Duration {
+	return time.Hour
+}
 
+// Perform figures out the membership for a query based group then repopulates it
+func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
 	lockKey := fmt.Sprintf(populateLockKey, t.GroupID)
 	lock, err := locker.GrabLock(mr.RP, lockKey, time.Hour, time.Minute*5)
 	if err != nil {
