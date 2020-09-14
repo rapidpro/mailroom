@@ -1,3 +1,13 @@
+v5.7.23
+----------
+ * Make defining new task types easier and drier
+ * Better locking when handling
+ * Fix and simplify creation of channel logs in IVR handlers
+
+v5.7.22
+----------
+ * Update to latest goflow v0.104.1
+
 v5.7.21
 ----------
  * Simplify test-smtp cmd using smtpx package

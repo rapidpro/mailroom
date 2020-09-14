@@ -46,6 +46,21 @@ func AddHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task) 
 	return addHandleTask(rc, contactID, task, false)
 }
 
+// addContactTask pushes a single contact task on our queue. Note this does not push the actual content of the task
+// only that a task exists for the contact, addHandleTask should be used if the task has already been pushed
+// off the contact specific queue.
+func addContactTask(rc redis.Conn, orgID models.OrgID, contactID models.ContactID) error {
+	// create our contact event
+	contactTask := &HandleEventTask{ContactID: contactID}
+
+	// then add a handle task for that contact on our global handler queue
+	err := queue.AddTask(rc, queue.HandlerQueue, queue.HandleContactEvent, int(orgID), contactTask, queue.DefaultPriority)
+	if err != nil {
+		return errors.Wrapf(err, "error adding handle event task")
+	}
+	return nil
+}
+
 // addHandleTask adds a single task for the passed in contact. `front` specifies whether the task
 // should be inserted in front of all other tasks for that contact
 func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, front bool) error {
@@ -67,15 +82,7 @@ func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, 
 		return errors.Wrapf(err, "error adding contact event")
 	}
 
-	// create our contact event
-	contactTask := &HandleEventTask{ContactID: contactID}
-
-	// then add a handle task for that contact
-	err = queue.AddTask(rc, queue.HandlerQueue, queue.HandleContactEvent, task.OrgID, contactTask, queue.DefaultPriority)
-	if err != nil {
-		return errors.Wrapf(err, "error adding handle event task")
-	}
-	return nil
+	return addContactTask(rc, models.OrgID(task.OrgID), contactID)
 }
 
 func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
@@ -96,12 +103,24 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 
 	// acquire the lock for this contact
 	lockID := models.ContactLock(models.OrgID(task.OrgID), eventTask.ContactID)
-	lock, err := locker.GrabLock(rp, lockID, time.Minute*5, time.Minute*5)
+	lock, err := locker.GrabLock(rp, lockID, time.Minute*5, time.Second*10)
 	if err != nil {
 		return errors.Wrapf(err, "error acquiring lock for contact %d", eventTask.ContactID)
 	}
+
+	// we didn't get the lock within our timeout, skip and requeue for later
 	if lock == "" {
-		return errors.Errorf("unable to acquire lock for contact %d in timeout period, skipping", eventTask.ContactID)
+		rc := rp.Get()
+		defer rc.Close()
+		err = addContactTask(rc, models.OrgID(task.OrgID), eventTask.ContactID)
+		if err != nil {
+			return errors.Wrapf(err, "error re-adding contact task after failing to get lock")
+		}
+		logrus.WithFields(logrus.Fields{
+			"org_id":     task.OrgID,
+			"contact_id": eventTask.ContactID,
+		}).Info("failed to get lock for contact, requeued and skipping")
+		return nil
 	}
 	defer locker.ReleaseLock(rp, lockID, lock)
 
