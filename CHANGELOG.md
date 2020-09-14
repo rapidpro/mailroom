@@ -1,3 +1,7 @@
+v5.7.24
+----------
+ * Add SessionStatus to messages queued to courier
+
 v5.7.23
 ----------
  * Make defining new task types easier and drier
