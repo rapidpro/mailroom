@@ -129,7 +129,6 @@ FROM
 	LEFT OUTER JOIN orgs_topupcredits tc ON (t.id = tc.topup_id) 
 WHERE 
 	t.org_id = $1 AND
-	t.expires_on >= NOW() AND
 	t.is_active = TRUE AND
 	t.credits > 0
 GROUP BY 
