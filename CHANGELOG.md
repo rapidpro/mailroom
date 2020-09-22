@@ -1,3 +1,7 @@
+v5.7.25
+----------
+ * Pass org from the base task to task structs to remove need for duplicating it in the task body
+
 v5.7.24
 ----------
  * Add SessionStatus to messages queued to courier
