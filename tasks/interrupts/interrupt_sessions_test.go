@@ -105,7 +105,7 @@ func TestInterrupts(t *testing.T) {
 		}
 
 		// execute it
-		err := task.Perform(ctx, mr)
+		err := task.Perform(ctx, mr, models.Org1)
 		assert.NoError(t, err)
 
 		// check session statuses are as expected

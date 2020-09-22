@@ -42,8 +42,8 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	//  2. +10 Minutes send message
 
 	// schedule first event...
-	task := &campaigns.ScheduleCampaignEventTask{OrgID: models.Org1, CampaignEventID: models.RemindersEvent1ID}
-	err := task.Perform(ctx, mr)
+	task := &campaigns.ScheduleCampaignEventTask{CampaignEventID: models.RemindersEvent1ID}
+	err := task.Perform(ctx, mr, models.Org1)
 	require.NoError(t, err)
 
 	// cathy has no value for joined and alexandia has a value too far in past, but bob and george will have values...
@@ -53,8 +53,8 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	})
 
 	// schedule second event...
-	task = &campaigns.ScheduleCampaignEventTask{OrgID: models.Org1, CampaignEventID: models.RemindersEvent2ID}
-	err = task.Perform(ctx, mr)
+	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: models.RemindersEvent2ID}
+	err = task.Perform(ctx, mr, models.Org1)
 	require.NoError(t, err)
 
 	assertContactFires(t, models.RemindersEvent2ID, map[models.ContactID]time.Time{
@@ -77,8 +77,8 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	// create new campaign event based on created_on + 5 minutes
 	event3 := insertCampaignEvent(t, models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID, 5, "M")
 
-	task = &campaigns.ScheduleCampaignEventTask{OrgID: models.Org1, CampaignEventID: event3}
-	err = task.Perform(ctx, mr)
+	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event3}
+	err = task.Perform(ctx, mr, models.Org1)
 	require.NoError(t, err)
 
 	// only cathy is in the group and new enough to have a fire
@@ -92,8 +92,8 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	// bump last_seen_on for bob
 	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, models.BobID)
 
-	task = &campaigns.ScheduleCampaignEventTask{OrgID: models.Org1, CampaignEventID: event4}
-	err = task.Perform(ctx, mr)
+	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event4}
+	err = task.Perform(ctx, mr, models.Org1)
 	require.NoError(t, err)
 
 	assertContactFires(t, event4, map[models.ContactID]time.Time{

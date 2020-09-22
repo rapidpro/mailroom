@@ -7,6 +7,7 @@ import (
 
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 
 	"github.com/pkg/errors"
@@ -28,7 +29,7 @@ func RegisterType(name string, initFunc func() Task) {
 		ctx, cancel := context.WithTimeout(ctx, typedTask.Timeout())
 		defer cancel()
 
-		return typedTask.Perform(ctx, mr)
+		return typedTask.Perform(ctx, mr, models.OrgID(task.OrgID))
 	})
 }
 
@@ -38,7 +39,7 @@ type Task interface {
 	Timeout() time.Duration
 
 	// Perform performs the task
-	Perform(ctx context.Context, mr *mailroom.Mailroom) error
+	Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error
 }
 
 //------------------------------------------------------------------------------------------

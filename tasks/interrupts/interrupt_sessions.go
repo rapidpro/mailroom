@@ -63,7 +63,7 @@ func (t *InterruptSessionsTask) Timeout() time.Duration {
 	return time.Hour
 }
 
-func (t *InterruptSessionsTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
+func (t *InterruptSessionsTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
 	db := mr.DB
 
 	sessionIDs := make(map[models.SessionID]bool)
