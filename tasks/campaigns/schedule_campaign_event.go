@@ -24,7 +24,6 @@ func init() {
 
 // ScheduleCampaignEventTask is our definition of our event recalculation task
 type ScheduleCampaignEventTask struct {
-	OrgID           models.OrgID           `json:"org_id"`
 	CampaignEventID models.CampaignEventID `json:"campaign_event_id"`
 }
 
@@ -34,7 +33,7 @@ func (t *ScheduleCampaignEventTask) Timeout() time.Duration {
 }
 
 // Perform creates the actual event fires to schedule the given campaign event
-func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
+func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
 	db := mr.DB
 	rp := mr.RP
 	lockKey := fmt.Sprintf(scheduleLockKey, t.CampaignEventID)
@@ -45,7 +44,7 @@ func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Ma
 	}
 	defer locker.ReleaseLock(rp, lockKey, lock)
 
-	err = models.ScheduleCampaignEvent(ctx, db, t.OrgID, t.CampaignEventID)
+	err = models.ScheduleCampaignEvent(ctx, db, orgID, t.CampaignEventID)
 	if err != nil {
 		return errors.Wrapf(err, "error scheduling campaign event %d", t.CampaignEventID)
 	}

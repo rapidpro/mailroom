@@ -32,7 +32,6 @@ type FireCampaignEventTask struct {
 	FlowUUID     assets.FlowUUID `json:"flow_uuid"`
 	CampaignUUID string          `json:"campaign_uuid"`
 	CampaignName string          `json:"campaign_name"`
-	OrgID        models.OrgID    `json:"org_id"`
 }
 
 // Timeout is the maximum amount of time the task can run for
@@ -47,7 +46,7 @@ func (t *FireCampaignEventTask) Timeout() time.Duration {
 //   - creates the trigger for that event
 //   - runs the flow that is to be started through our engine
 //   - saves the flow run and session resulting from our run
-func (t *FireCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
+func (t *FireCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
 	db := mr.DB
 	rp := mr.RP
 	log := logrus.WithField("comp", "campaign_worker").WithField("event_id", t.EventID)
@@ -82,7 +81,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailro
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(t.CampaignUUID), t.CampaignName)
 
-	started, err := runner.FireCampaignEvents(ctx, db, rp, t.OrgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
+	started, err := runner.FireCampaignEvents(ctx, db, rp, orgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
 
 	// remove all the contacts that were started
 	for _, contactID := range started {

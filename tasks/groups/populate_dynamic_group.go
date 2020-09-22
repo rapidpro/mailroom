@@ -25,7 +25,6 @@ func init() {
 
 // PopulateDynamicGroupTask is our task to populate the contacts for a dynamic group
 type PopulateDynamicGroupTask struct {
-	OrgID   models.OrgID   `json:"org_id"`
 	GroupID models.GroupID `json:"group_id"`
 	Query   string         `json:"query"`
 }
@@ -36,7 +35,7 @@ func (t *PopulateDynamicGroupTask) Timeout() time.Duration {
 }
 
 // Perform figures out the membership for a query based group then repopulates it
-func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
+func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
 	lockKey := fmt.Sprintf(populateLockKey, t.GroupID)
 	lock, err := locker.GrabLock(mr.RP, lockKey, time.Hour, time.Minute*5)
 	if err != nil {
@@ -47,13 +46,13 @@ func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, mr *mailroom.Mai
 	start := time.Now()
 	log := logrus.WithFields(logrus.Fields{
 		"group_id": t.GroupID,
-		"org_id":   t.OrgID,
+		"org_id":   orgID,
 		"query":    t.Query,
 	})
 
 	log.Info("starting population of dynamic group")
 
-	oa, err := models.GetOrgAssets(ctx, mr.DB, t.OrgID)
+	oa, err := models.GetOrgAssets(ctx, mr.DB, orgID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org when populating group: %d", t.GroupID)
 	}

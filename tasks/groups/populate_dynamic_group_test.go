@@ -67,11 +67,10 @@ func TestPopulateTask(t *testing.T) {
 	require.NoError(t, err)
 
 	task := &groups.PopulateDynamicGroupTask{
-		OrgID:   models.Org1,
 		GroupID: groupID,
 		Query:   "gender = F",
 	}
-	err = task.Perform(ctx, mr)
+	err = task.Perform(ctx, mr, models.Org1)
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, []interface{}{groupID}, 1)

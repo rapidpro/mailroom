@@ -61,7 +61,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 	defer rc.Close()
 
 	queued := 0
-	queueTask := func(task *FireCampaignEventTask) error {
+	queueTask := func(orgID models.OrgID, task *FireCampaignEventTask) error {
 		if task.EventID == 0 {
 			return nil
 		}
@@ -75,7 +75,7 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 			task.FireIDs = fireIDs[:batchSize]
 			fireIDs = fireIDs[batchSize:]
 
-			err = queue.AddTask(rc, queue.BatchQueue, TypeFireCampaignEvent, int(task.OrgID), task, queue.DefaultPriority)
+			err = queue.AddTask(rc, queue.BatchQueue, TypeFireCampaignEvent, int(orgID), task, queue.DefaultPriority)
 			if err != nil {
 				return errors.Wrap(err, "error queuing task")
 			}
@@ -95,7 +95,9 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 	}
 
 	// while we have rows
+	orgID := models.NilOrgID
 	task := &FireCampaignEventTask{}
+
 	for rows.Next() {
 		row := &eventFireRow{}
 		err := rows.StructScan(row)
@@ -122,12 +124,13 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 		}
 
 		// different task, queue up our current task
-		err = queueTask(task)
+		err = queueTask(orgID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error queueing task")
 		}
 
 		// and create a new one based on this row
+		orgID = row.OrgID
 		task = &FireCampaignEventTask{
 			FireIDs:      []int64{row.FireID},
 			EventID:      row.EventID,
@@ -135,12 +138,11 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 			FlowUUID:     row.FlowUUID,
 			CampaignUUID: row.CampaignUUID,
 			CampaignName: row.CampaignName,
-			OrgID:        row.OrgID,
 		}
 	}
 
 	// queue our last task
-	err = queueTask(task)
+	err = queueTask(orgID, task)
 	if err != nil {
 		return errors.Wrapf(err, "error queueing task")
 	}

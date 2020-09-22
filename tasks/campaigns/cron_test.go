@@ -44,7 +44,7 @@ func TestCampaigns(t *testing.T) {
 	require.NoError(t, err)
 
 	// work on that task
-	err = typedTask.Perform(ctx, mr)
+	err = typedTask.Perform(ctx, mr, models.OrgID(task.OrgID))
 	assert.NoError(t, err)
 
 	// should now have a flow run for that contact and flow
@@ -81,7 +81,7 @@ func TestIVRCampaigns(t *testing.T) {
 	require.NoError(t, err)
 
 	// work on that task
-	err = typedTask.Perform(ctx, mr)
+	err = typedTask.Perform(ctx, mr, models.OrgID(task.OrgID))
 	assert.NoError(t, err)
 
 	// should now have a flow start created
