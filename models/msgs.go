@@ -324,8 +324,19 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		}
 	}
 
+	hasActiveSocialMedia := CustomAny([]bool{
+		out.SharingConfig().Email,
+		out.SharingConfig().Facebook,
+		out.SharingConfig().WhatsApp,
+		out.SharingConfig().Pinterest,
+		out.SharingConfig().Download,
+		out.SharingConfig().Twitter,
+		out.SharingConfig().Telegram,
+		out.SharingConfig().Line,
+	})
+
 	// populate metadata if we have any
-	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.ReceiveAttachment() != "" {
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.ReceiveAttachment() != "" || hasActiveSocialMedia {
 		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
@@ -339,6 +350,21 @@ func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flo
 		if out.ReceiveAttachment() != "" {
 			metadata["receive_attachment"] = out.ReceiveAttachment()
 		}
+		if hasActiveSocialMedia {
+			sharingConfig := make(map[string]interface{})
+			sharingConfig["text"] = out.SharingConfig().Text
+			sharingConfig["hashtags"] = out.SharingConfig().Hashtags
+			sharingConfig["email"] = out.SharingConfig().Email
+			sharingConfig["facebook"] = out.SharingConfig().Facebook
+			sharingConfig["whatsapp"] = out.SharingConfig().WhatsApp
+			sharingConfig["pinterest"] = out.SharingConfig().Pinterest
+			sharingConfig["download"] = out.SharingConfig().Download
+			sharingConfig["twitter"] = out.SharingConfig().Twitter
+			sharingConfig["telegram"] = out.SharingConfig().Telegram
+			sharingConfig["line"] = out.SharingConfig().Line
+			metadata["sharing_config"] = sharingConfig
+		}
+
 		m.Metadata = null.NewMap(metadata)
 	}
 
@@ -885,7 +911,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, or
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, "")
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{})
 		msg, err := NewOutgoingMsg(org.OrgID(), channel, c.ID(), out, time.Now(), c.uuid, ctx, db)
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
@@ -1009,4 +1035,13 @@ func isValidUrl(toTest string) bool {
 	} else {
 		return true
 	}
+}
+
+func CustomAny(list []bool) bool {
+	for _, item := range list {
+		if item == true {
+			return item
+		}
+	}
+	return false
 }
