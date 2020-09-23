@@ -19,6 +19,7 @@ import (
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	_ "github.com/nyaruka/mailroom/tasks/broadcasts"
 	_ "github.com/nyaruka/mailroom/tasks/campaigns"
+	_ "github.com/nyaruka/mailroom/tasks/contacts"
 	_ "github.com/nyaruka/mailroom/tasks/expirations"
 	_ "github.com/nyaruka/mailroom/tasks/groups"
 	_ "github.com/nyaruka/mailroom/tasks/interrupts"

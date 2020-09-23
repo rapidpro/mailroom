@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
@@ -23,23 +22,18 @@ type Creation struct {
 	Mods     []flows.Modifier
 }
 
-// Spec describes a contact to be created
-type Spec struct {
-	Name     string             `json:"name"`
-	Language string             `json:"language"`
-	URNs     []urns.URN         `json:"urns"`
-	Fields   map[string]string  `json:"fields"`
-	Groups   []assets.GroupUUID `json:"groups"`
-}
-
-// Validate validates that the spec is valid for the given assets
-func (s *Spec) Validate(env envs.Environment, sa flows.SessionAssets) (*Creation, error) {
+// SpecToCreation validates that the spec is valid for the given assets
+func SpecToCreation(s *models.ContactSpec, env envs.Environment, sa flows.SessionAssets) (*Creation, error) {
 	country := string(env.DefaultCountry())
 	var err error
-	validated := &Creation{Name: s.Name}
+	validated := &Creation{}
 
-	if s.Language != "" {
-		validated.Language, err = envs.ParseLanguage(s.Language)
+	if s.Name != nil {
+		validated.Name = *s.Name
+	}
+
+	if s.Language != nil && *s.Language != "" {
+		validated.Language, err = envs.ParseLanguage(*s.Language)
 		if err != nil {
 			return nil, errors.Wrap(err, "invalid language")
 		}

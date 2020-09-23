@@ -34,9 +34,9 @@ func init() {
 //   }
 //
 type createRequest struct {
-	OrgID   models.OrgID  `json:"org_id"   validate:"required"`
-	UserID  models.UserID `json:"user_id"`
-	Contact *Spec         `json:"contact"  validate:"required"`
+	OrgID   models.OrgID        `json:"org_id"   validate:"required"`
+	UserID  models.UserID       `json:"user_id"`
+	Contact *models.ContactSpec `json:"contact"  validate:"required"`
 }
 
 // handles a request to create the given contacts
@@ -52,7 +52,7 @@ func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	c, err := request.Contact.Validate(oa.Env(), oa.SessionAssets())
+	c, err := SpecToCreation(request.Contact, oa.Env(), oa.SessionAssets())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
