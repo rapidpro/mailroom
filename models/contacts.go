@@ -162,6 +162,15 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 	return contacts, nil
 }
 
+// LoadContactsByUUID loads a set of contacts for the passed in UUIDs
+func LoadContactsByUUID(ctx context.Context, db Queryer, oa *OrgAssets, uuids []flows.ContactUUID) ([]*Contact, error) {
+	ids, err := ContactIDsFromUUIDs(ctx, db, oa.OrgID(), uuids)
+	if err != nil {
+		return nil, err
+	}
+	return LoadContacts(ctx, db, oa, ids)
+}
+
 // GetNewestContactModifiedOn returns the newest modified_on for a contact in the passed in org
 func GetNewestContactModifiedOn(ctx context.Context, db *sqlx.DB, org *OrgAssets) (*time.Time, error) {
 	rows, err := db.QueryxContext(ctx, "SELECT modified_on FROM contacts_contact WHERE org_id = $1 ORDER BY modified_on DESC LIMIT 1", org.OrgID())
@@ -184,20 +193,22 @@ func GetNewestContactModifiedOn(ctx context.Context, db *sqlx.DB, org *OrgAssets
 }
 
 // ContactIDsFromReferences queries the contacts for the passed in org, returning the contact ids for the references
-func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, refs []*flows.ContactReference) ([]ContactID, error) {
+func ContactIDsFromReferences(ctx context.Context, tx Queryer, orgID OrgID, refs []*flows.ContactReference) ([]ContactID, error) {
 	// build our list of UUIDs
-	uuids := make([]interface{}, len(refs))
+	uuids := make([]flows.ContactUUID, len(refs))
 	for i := range refs {
 		uuids[i] = refs[i].UUID
 	}
 
-	ids := make([]ContactID, 0, len(refs))
-	rows, err := tx.QueryxContext(ctx,
-		`SELECT id FROM contacts_contact WHERE org_id = $1 AND uuid = ANY($2) AND is_active = TRUE`,
-		org.OrgID(), pq.Array(uuids),
-	)
+	return ContactIDsFromUUIDs(ctx, tx, orgID, uuids)
+}
+
+// ContactIDsFromUUIDs queries the contacts for the passed in org, returning the contact ids for the UUIDs
+func ContactIDsFromUUIDs(ctx context.Context, tx Queryer, orgID OrgID, uuids []flows.ContactUUID) ([]ContactID, error) {
+	ids := make([]ContactID, 0, len(uuids))
+	rows, err := tx.QueryxContext(ctx, `SELECT id FROM contacts_contact WHERE org_id = $1 AND uuid = ANY($2) AND is_active = TRUE`, orgID, pq.Array(uuids))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error selecting contact ids by uuid")
+		return nil, errors.Wrapf(err, "error selecting contact ids by UUID")
 	}
 	defer rows.Close()
 

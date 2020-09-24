@@ -3,13 +3,16 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/pkg/errors"
 
 	"github.com/jmoiron/sqlx"
@@ -52,36 +55,178 @@ type ContactImportBatch struct {
 }
 
 // Import does the actual import of this batch
-func (b *ContactImportBatch) Import(ctx context.Context, db *sqlx.DB) error {
+func (b *ContactImportBatch) Import(ctx context.Context, db *sqlx.DB, orgID OrgID) error {
 	// if any error occurs this batch should be marked as failed
-	if err := b.tryImport(ctx, db); err != nil {
+	if err := b.tryImport(ctx, db, orgID); err != nil {
 		b.markFailed(ctx, db)
 		return err
 	}
 	return nil
 }
 
-func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB) error {
+// holds work data for import of a single contact
+type importContact struct {
+	record      int
+	spec        *ContactSpec
+	contact     *Contact
+	created     bool
+	flowContact *flows.Contact
+	mods        []flows.Modifier
+	errors      []string
+}
+
+func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID OrgID) error {
 	if err := b.markProcessing(ctx, db); err != nil {
-		return errors.Wrap(err, "unable to mark as processing")
+		return errors.Wrap(err, "error marking as processing")
+	}
+
+	// grab our org assets
+	oa, err := GetOrgAssets(ctx, db, orgID)
+	if err != nil {
+		return errors.Wrap(err, "error loading org assets")
 	}
 
 	// unmarshal this batch's specs
 	var specs []*ContactSpec
 	if err := jsonx.Unmarshal(b.Specs, &specs); err != nil {
-		return errors.New("unable to unmarsal specs")
+		return errors.Wrap(err, "error unmarsaling specs")
 	}
 
-	result, err := importContactSpecs(ctx, db, specs)
+	// create our work data for each contact being created or updated
+	imports := make([]*importContact, len(specs))
+	for i := range imports {
+		// ensure all URNs are normalized
+		for j, urn := range specs[i].URNs {
+			specs[i].URNs[j] = urn.Normalize(string(oa.Env().DefaultCountry()))
+		}
+
+		imports[i] = &importContact{record: b.RecordStart + i, spec: specs[i]}
+	}
+
+	if err := b.getOrCreateContacts(ctx, db, oa, imports); err != nil {
+		return errors.Wrap(err, "error getting and creating contacts")
+	}
+
+	// gather up contacts and modifiers
+	modifiersByContact := make(map[*flows.Contact][]flows.Modifier, len(imports))
+	for _, imp := range imports {
+		// ignore errored imports which couldn't get/create a contact
+		if imp.contact != nil {
+			modifiersByContact[imp.flowContact] = imp.mods
+		}
+	}
+
+	// and apply in bulk
+	_, err = ApplyModifiers(ctx, db, nil, oa, modifiersByContact)
 	if err != nil {
-		return errors.Wrap(err, "unable to import specs")
+		return errors.Wrap(err, "error applying modifiers")
 	}
 
-	if err := b.markComplete(ctx, db, result); err != nil {
+	if err := b.markComplete(ctx, db, imports); err != nil {
 		return errors.Wrap(err, "unable to mark as complete")
 	}
 
 	return nil
+}
+
+// for each import, fetches or creates the contact, creates the modifiers needed to set fields etc
+func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db *sqlx.DB, oa *OrgAssets, imports []*importContact) error {
+	sa := oa.SessionAssets()
+
+	// build map of UUIDs to contacts
+	contactsByUUID, err := b.loadContactsByUUID(ctx, db, oa, imports)
+	if err != nil {
+		return errors.Wrap(err, "error loading contacts by UUID")
+	}
+
+	for _, imp := range imports {
+		addModifier := func(m flows.Modifier) { imp.mods = append(imp.mods, m) }
+		addError := func(s string, args ...interface{}) { imp.errors = append(imp.errors, fmt.Sprintf(s, args...)) }
+		spec := imp.spec
+
+		uuid := spec.UUID
+		if uuid != "" {
+			imp.contact = contactsByUUID[uuid]
+			if imp.contact == nil {
+				addError("Unable to find contact with UUID '%s'", uuid)
+				continue
+			}
+
+			imp.flowContact, err = imp.contact.FlowContact(oa)
+			if err != nil {
+				return errors.Wrapf(err, "error creating flow contact for %d", imp.contact.ID())
+			}
+
+			addModifier(modifiers.NewURNs(spec.URNs, modifiers.URNsAppend))
+
+		} else {
+			// TODO get or create by multiple URNs
+
+			imp.contact, imp.flowContact, err = GetOrCreateContact(ctx, db, oa, spec.URNs[0])
+			if err != nil {
+				addError("Unable to get or create contact with URN '%s'", spec.URNs[0])
+				continue
+			}
+		}
+
+		if spec.Name != nil {
+			addModifier(modifiers.NewName(*spec.Name))
+		}
+		if spec.Language != nil {
+			lang, err := envs.ParseLanguage(*spec.Language)
+			if err != nil {
+				addError("'%s' is not a valid language code", *spec.Language)
+			} else {
+				addModifier(modifiers.NewLanguage(lang))
+			}
+		}
+
+		for key, value := range spec.Fields {
+			field := sa.Fields().Get(key)
+			if field == nil {
+				addError("'%s' is not a valid contact field key", key)
+			} else {
+				addModifier(modifiers.NewField(field, value))
+			}
+		}
+
+		if len(spec.Groups) > 0 {
+			groups := make([]*flows.Group, 0, len(spec.Groups))
+			for _, uuid := range spec.Groups {
+				group := sa.Groups().Get(uuid)
+				if group == nil {
+					addError("'%s' is not a valid contact group UUID", uuid)
+				} else {
+					groups = append(groups, group)
+				}
+			}
+			addModifier(modifiers.NewGroups(groups, modifiers.GroupsAdd))
+		}
+	}
+
+	return nil
+}
+
+// loads any import contacts for which we have UUIDs
+func (b *ContactImportBatch) loadContactsByUUID(ctx context.Context, db *sqlx.DB, oa *OrgAssets, imports []*importContact) (map[flows.ContactUUID]*Contact, error) {
+	uuids := make([]flows.ContactUUID, 0, 50)
+	for _, imp := range imports {
+		if imp.spec.UUID != "" {
+			uuids = append(uuids, imp.spec.UUID)
+		}
+	}
+
+	// build map of UUIDs to contacts
+	contacts, err := LoadContactsByUUID(ctx, db, oa, uuids)
+	if err != nil {
+		return nil, err
+	}
+
+	contactsByUUID := make(map[flows.ContactUUID]*Contact, len(contacts))
+	for _, c := range contacts {
+		contactsByUUID[c.UUID()] = c
+	}
+	return contactsByUUID, nil
 }
 
 func (b *ContactImportBatch) markProcessing(ctx context.Context, db *sqlx.DB) error {
@@ -90,17 +235,34 @@ func (b *ContactImportBatch) markProcessing(ctx context.Context, db *sqlx.DB) er
 	return err
 }
 
-func (b *ContactImportBatch) markComplete(ctx context.Context, db *sqlx.DB, r importResult) error {
-	errorsJSON, err := jsonx.Marshal(r.errors)
+func (b *ContactImportBatch) markComplete(ctx context.Context, db *sqlx.DB, imports []*importContact) error {
+	numCreated := 0
+	numUpdated := 0
+	numErrored := 0
+	importErrors := make([]importError, 0, 10)
+	for _, imp := range imports {
+		if imp.contact == nil {
+			numErrored++
+		} else if imp.created {
+			numCreated++
+		} else {
+			numUpdated++
+		}
+		for _, e := range imp.errors {
+			importErrors = append(importErrors, importError{Record: imp.record, Message: e})
+		}
+	}
+
+	errorsJSON, err := jsonx.Marshal(importErrors)
 	if err != nil {
 		return errors.Wrap(err, "error marshaling errors")
 	}
 
 	now := dates.Now()
 	b.Status = ContactImportStatusComplete
-	b.NumCreated = r.numCreated
-	b.NumUpdated = r.numUpdated
-	b.NumErrored = r.numErrored
+	b.NumCreated = numCreated
+	b.NumUpdated = numUpdated
+	b.NumErrored = numErrored
 	b.Errors = errorsJSON
 	b.FinishedOn = &now
 	_, err = db.ExecContext(ctx,
@@ -155,22 +317,4 @@ type ContactSpec struct {
 type importError struct {
 	Record  int    `json:"record"`
 	Message string `json:"message"`
-}
-
-// holds the result of importing a set of contact specs
-type importResult struct {
-	numCreated int
-	numUpdated int
-	numErrored int
-	errors     []importError
-}
-
-func importContactSpecs(ctx context.Context, db *sqlx.DB, specs []*ContactSpec) (importResult, error) {
-	res := importResult{
-		errors: make([]importError, 0),
-	}
-
-	// TODO
-
-	return res, nil
 }

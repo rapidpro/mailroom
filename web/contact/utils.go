@@ -1,16 +1,12 @@
 package contact
 
 import (
-	"context"
-
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/models"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -73,28 +69,4 @@ func SpecToCreation(s *models.ContactSpec, env envs.Environment, sa flows.Sessio
 	}
 
 	return validated, nil
-}
-
-// ModifyContacts modifies contacts by applying modifiers and handling the resultant events
-func ModifyContacts(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
-	// create an environment instance with location support
-	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
-
-	eventsByContact := make(map[*flows.Contact][]flows.Event, len(modifiersByContact))
-
-	// apply the modifiers to get the events for each contact
-	for contact, mods := range modifiersByContact {
-		events := make([]flows.Event, 0)
-		for _, mod := range mods {
-			mod.Apply(env, oa.SessionAssets(), contact, func(e flows.Event) { events = append(events, e) })
-		}
-		eventsByContact[contact] = events
-	}
-
-	err := models.HandleAndCommitEvents(ctx, db, rp, oa, eventsByContact)
-	if err != nil {
-		return nil, errors.Wrap(err, "error commiting events")
-	}
-
-	return eventsByContact, nil
 }

@@ -235,3 +235,27 @@ func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa 
 	}
 	return nil
 }
+
+// ApplyModifiers modifies contacts by applying modifiers and handling the resultant events
+func ApplyModifiers(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
+	// create an environment instance with location support
+	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
+
+	eventsByContact := make(map[*flows.Contact][]flows.Event, len(modifiersByContact))
+
+	// apply the modifiers to get the events for each contact
+	for contact, mods := range modifiersByContact {
+		events := make([]flows.Event, 0)
+		for _, mod := range mods {
+			mod.Apply(env, oa.SessionAssets(), contact, func(e flows.Event) { events = append(events, e) })
+		}
+		eventsByContact[contact] = events
+	}
+
+	err := HandleAndCommitEvents(ctx, db, rp, oa, eventsByContact)
+	if err != nil {
+		return nil, errors.Wrap(err, "error commiting events")
+	}
+
+	return eventsByContact, nil
+}

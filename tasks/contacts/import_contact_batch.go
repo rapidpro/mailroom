@@ -34,7 +34,7 @@ func (t *ImportContactBatchTask) Perform(ctx context.Context, mr *mailroom.Mailr
 		return errors.Wrapf(err, "unable to load contact import batch with id %d", t.ContactImportBatchID)
 	}
 
-	if err := batch.Import(ctx, mr.DB); err != nil {
+	if err := batch.Import(ctx, mr.DB, orgID); err != nil {
 		return errors.Wrapf(err, "unable to import contact import batch %d", t.ContactImportBatchID)
 	}
 

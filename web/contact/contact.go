@@ -63,7 +63,7 @@ func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
-	_, err = ModifyContacts(ctx, s.DB, s.RP, oa, modifiersByContact)
+	_, err = models.ApplyModifiers(ctx, s.DB, s.RP, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
 	}
@@ -157,7 +157,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		modifiersByContact[flowContact] = mods
 	}
 
-	eventsByContact, err := ModifyContacts(ctx, s.DB, s.RP, oa, modifiersByContact)
+	eventsByContact, err := models.ApplyModifiers(ctx, s.DB, s.RP, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

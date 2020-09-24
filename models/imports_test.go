@@ -1,13 +1,13 @@
 package models_test
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -21,18 +21,21 @@ func TestContactImportBatch(t *testing.T) {
 	db := testsuite.DB()
 
 	importID := testdata.InsertContactImport(t, db, models.Org1)
-	batchID := testdata.InsertContactImportBatch(t, db, importID, `[{"name": "Bob"},{"name": "Jim"}]`)
+	batchID := testdata.InsertContactImportBatch(t, db, importID, `[
+		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
+		{"name": "Leah", "urns": ["tel:+16055740002"]}
+	]`)
 
 	batch, err := models.LoadContactImportBatch(ctx, db, batchID)
 	require.NoError(t, err)
 
 	assert.Equal(t, importID, batch.ImportID)
 	assert.Equal(t, models.ContactImportStatus("P"), batch.Status)
-	assert.Equal(t, json.RawMessage(`[{"name": "Bob"}, {"name": "Jim"}]`), batch.Specs)
+	assert.NotNil(t, batch.Specs)
 	assert.Equal(t, 10, batch.RecordStart)
 	assert.Equal(t, 12, batch.RecordEnd)
 
-	err = batch.Import(ctx, db)
+	err = batch.Import(ctx, db, models.Org1)
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`, []interface{}{}, 1)
