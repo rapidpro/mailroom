@@ -515,7 +515,7 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=998", bob.URNs()[2].String())
 }
 
-func TestContactsFromURN(t *testing.T) {
+func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 	testsuite.Reset()
@@ -538,7 +538,7 @@ func TestContactsFromURN(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN})
+		ids, err := GetOrCreateContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN})
 		assert.NoError(t, err, "%d: error getting contact ids", i)
 
 		if len(ids) != 1 {
@@ -559,20 +559,22 @@ func TestGetOrCreateContact(t *testing.T) {
 
 	tcs := []struct {
 		OrgID     OrgID
-		URN       urns.URN
+		URNs      []urns.URN
 		ContactID ContactID
 	}{
-		{Org1, CathyURN, CathyID},
-		{Org1, urns.URN(CathyURN.String() + "?foo=bar"), CathyID},
-		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
-		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
+		{Org1, []urns.URN{CathyURN}, CathyID},
+		{Org1, []urns.URN{urns.URN(CathyURN.String() + "?foo=bar")}, CathyID},                                     // only URN identity is considered
+		{Org1, []urns.URN{urns.URN("telegram:100001")}, ContactID(maxContactID + 3)},                              // creates new contact
+		{Org1, []urns.URN{urns.URN("telegram:100001")}, ContactID(maxContactID + 3)},                              // returns the same created contact
+		{Org1, []urns.URN{urns.URN("telegram:100001"), urns.URN("telegram:100002")}, ContactID(maxContactID + 3)}, // same again as other URNs don't exist
+		{Org1, []urns.URN{urns.URN("telegram:100002"), urns.URN("telegram:100001")}, ContactID(maxContactID + 3)}, // same again as other URNs don't exist
 	}
 
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		contact, _, err := GetOrCreateContact(ctx, db, org, tc.URN)
+		contact, _, err := GetOrCreateContact(ctx, db, org, tc.URNs)
 		assert.NoError(t, err, "%d: error creating contact", i)
 		assert.Equal(t, tc.ContactID, contact.ID(), "%d: mismatch in contact id", i)
 	}

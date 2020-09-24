@@ -160,9 +160,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db *sqlx.D
 			addModifier(modifiers.NewURNs(spec.URNs, modifiers.URNsAppend))
 
 		} else {
-			// TODO get or create by multiple URNs
-
-			imp.contact, imp.flowContact, err = GetOrCreateContact(ctx, db, oa, spec.URNs[0])
+			imp.contact, imp.flowContact, err = GetOrCreateContact(ctx, db, oa, spec.URNs)
 			if err != nil {
 				addError("Unable to get or create contact with URN '%s'", spec.URNs[0])
 				continue
