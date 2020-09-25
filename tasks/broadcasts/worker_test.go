@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -45,9 +46,7 @@ func TestBroadcastEvents(t *testing.T) {
 	cathyOnly := []*flows.ContactReference{cathy}
 
 	// add an extra URN fo cathy
-	db.MustExec(
-		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 1001)`, models.CathyID)
+	testdata.InsertContactURN(t, db, models.Org1, models.CathyID, urns.URN("tel:+12065551212"), 1001)
 
 	// change george's URN to an invalid twitter URN so it can't be sent
 	db.MustExec(
@@ -169,9 +168,7 @@ func TestBroadcastTask(t *testing.T) {
 	cathyOnly := []models.ContactID{models.CathyID}
 
 	// add an extra URN fo cathy
-	db.MustExec(
-		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 1001)`, models.CathyID)
+	testdata.InsertContactURN(t, db, models.Org1, models.CathyID, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
 		BroadcastID   models.BroadcastID
