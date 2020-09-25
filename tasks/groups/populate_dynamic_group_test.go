@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/tasks/groups"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/require"
@@ -58,13 +58,7 @@ func TestPopulateTask(t *testing.T) {
 		}
 	}`, models.CathyID)
 
-	var groupID models.GroupID
-	err = db.Get(&groupID,
-		`INSERT INTO contacts_contactgroup(uuid, org_id, group_type, name, query, status, is_active, created_by_id, created_on, modified_by_id, modified_on) 
- 						            VALUES($1,   $2,     'U',        $3,   $4,    'R',    TRUE, 1, NOW(), 1, NOW()) RETURNING id`,
-		uuids.New(), models.Org1, "Women", "gender = F",
-	)
-	require.NoError(t, err)
+	groupID := testdata.InsertContactGroup(t, db, models.Org1, "Women", "gender = F")
 
 	task := &groups.PopulateDynamicGroupTask{
 		GroupID: groupID,

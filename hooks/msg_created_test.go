@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMsgCreated(t *testing.T) {
@@ -24,10 +26,7 @@ func TestMsgCreated(t *testing.T) {
 	defer func() { config.Mailroom.AttachmentDomain = "" }()
 
 	// add a URN for cathy so we can test all urn sends
-	db.MustExec(
-		`INSERT INTO contacts_contacturn(identity, path, scheme, priority, contact_id, org_id) 
-		                          VALUES('tel:12065551212', '12065551212', 'tel', 10, $1, 1)`,
-		models.CathyID)
+	testdata.InsertContactURN(t, db, models.Org1, models.CathyID, urns.URN("tel:+12065551212"), 10)
 
 	// delete all URNs for bob
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, models.BobID)
@@ -41,12 +40,12 @@ func TestMsgCreated(t *testing.T) {
 	templateAction := actions.NewSendMsg(newActionUUID(), "Template time", nil, nil, false)
 	templateAction.Templating = &actions.Templating{
 		UUID:      uuids.UUID("db297d56-ec8c-4231-bbe8-030369777ae1"),
-		Template:  &assets.TemplateReference{assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), "revive_issue"},
+		Template:  &assets.TemplateReference{UUID: assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), Name: "revive_issue"},
 		Variables: []string{"@contact.name", "tooth"},
 	}
 
 	tcs := []HookTestCase{
-		HookTestCase{
+		{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
 					actions.NewSendMsg(newActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
@@ -118,14 +117,14 @@ func TestNoTopup(t *testing.T) {
 	db.MustExec(`UPDATE orgs_topup SET credits = 0 WHERE org_id = $1`, models.Org1)
 
 	tcs := []HookTestCase{
-		HookTestCase{
+		{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
 					actions.NewSendMsg(newActionUUID(), "No Topup", nil, nil, false),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='No Topup' AND contact_id = $1 AND status = 'Q'",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
@@ -150,13 +149,10 @@ func TestNewURN(t *testing.T) {
 	)
 
 	// give George a URN that Bob will steal
-	db.MustExec(
-		`INSERT INTO contacts_contacturn(identity, path, scheme, priority, contact_id, org_id) 
-		                          VALUES('telegram:67890', '67890', 'telegram', 10, $1, 1)`,
-		models.GeorgeID)
+	testdata.InsertContactURN(t, db, models.Org1, models.GeorgeID, urns.URN("telegram:67890"), 1)
 
 	tcs := []HookTestCase{
-		HookTestCase{
+		{
 			Actions: ContactActionMap{
 				// brand new URN on Cathy
 				models.CathyID: []flows.Action{
@@ -173,7 +169,7 @@ func TestNewURN(t *testing.T) {
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL: `
 					SELECT 
 					  COUNT(*) 
@@ -190,7 +186,7 @@ func TestNewURN(t *testing.T) {
 					Args:  []interface{}{models.CathyID, "telegram:12345", telegramID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL: `
 					SELECT 
 					  COUNT(*) 
