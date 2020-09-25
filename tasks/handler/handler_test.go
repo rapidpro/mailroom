@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
@@ -245,11 +246,7 @@ func TestChannelEvents(t *testing.T) {
 		models.PickNumberFlowID, models.NexmoChannelID)
 
 	// add a URN for cathy so we can test twitter URNs
-	var cathyTwitterURN models.URNID
-	db.Get(&cathyTwitterURN,
-		`INSERT INTO contacts_contacturn(identity, path, scheme, priority, contact_id, org_id) 
-		                          VALUES('twitterid:123456', '123456', 'twitterid', 10, $1, 1) RETURNING id`,
-		models.CathyID)
+	testdata.InsertContactURN(t, db, models.Org1, models.BobID, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
 		EventType      models.ChannelEventType
