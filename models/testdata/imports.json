@@ -1,0 +1,394 @@
+[
+    {
+        "description": "2 new contacts with name and phone",
+        "specs": [
+            {
+                "name": "Ann",
+                "urns": [
+                    "tel:+16055700001"
+                ]
+            },
+            {
+                "name": "Bob",
+                "urns": [
+                    "tel:+16055700002"
+                ]
+            }
+        ],
+        "num_created": 0,
+        "num_updated": 2,
+        "num_errored": 0,
+        "errors": [],
+        "contacts": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Ann",
+                "language": "",
+                "urns": [
+                    "tel:+16055700001?id=1000&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "name": "Bob",
+                "language": "",
+                "urns": [
+                    "tel:+16055700002?id=1001&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
+            }
+        ]
+    },
+    {
+        "description": "1 new contact with all fields",
+        "specs": [
+            {
+                "name": "Cat",
+                "language": "spa",
+                "urns": [
+                    "tel:+16055700003",
+                    "tel:+593979000001"
+                ],
+                "fields": {
+                    "age": "39"
+                },
+                "groups": [
+                    "c153e265-f7c9-4539-9dbc-9b358714b638",
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                ]
+            }
+        ],
+        "num_created": 0,
+        "num_updated": 1,
+        "num_errored": 0,
+        "errors": [],
+        "contacts": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Ann",
+                "language": "",
+                "urns": [
+                    "tel:+16055700001?id=1000&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "name": "Bob",
+                "language": "",
+                "urns": [
+                    "tel:+16055700002?id=1001&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+                "name": "Cat",
+                "language": "spa",
+                "urns": [
+                    "tel:+16055700003?id=1002&priority=1000",
+                    "tel:+593979000001?id=1003&priority=999"
+                ],
+                "fields": {
+                    "age": "39"
+                },
+                "groups": [
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "c153e265-f7c9-4539-9dbc-9b358714b638"
+                ]
+            }
+        ]
+    },
+    {
+        "description": "updating contacts with single URN",
+        "specs": [
+            {
+                "name": "Bob",
+                "urns": [
+                    "tel:+16055700002",
+                    "tel:+593979000002"
+                ],
+                "fields": {
+                    "age": "28"
+                }
+            },
+            {
+                "name": "Cat",
+                "urns": [
+                    "tel:+16055700003"
+                ],
+                "fields": {
+                    "age": "43"
+                }
+            }
+        ],
+        "num_created": 0,
+        "num_updated": 2,
+        "num_errored": 0,
+        "errors": [],
+        "contacts": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Ann",
+                "language": "",
+                "urns": [
+                    "tel:+16055700001?id=1000&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "name": "Bob",
+                "language": "",
+                "urns": [
+                    "tel:+16055700002?id=1001&priority=1000",
+                    "tel:+593979000002?id=1004&priority=999"
+                ],
+                "fields": {
+                    "age": "28"
+                },
+                "groups": []
+            },
+            {
+                "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+                "name": "Cat",
+                "language": "spa",
+                "urns": [
+                    "tel:+16055700003?id=1002&priority=1000",
+                    "tel:+593979000001?id=1003&priority=999"
+                ],
+                "fields": {
+                    "age": "43"
+                },
+                "groups": [
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "c153e265-f7c9-4539-9dbc-9b358714b638"
+                ]
+            }
+        ]
+    },
+    {
+        "description": "updating contacts with multiple URNs (first contact has URNs from 2 different contacts so errors)",
+        "specs": [
+            {
+                "name": "Ann",
+                "urns": [
+                    "tel:+16055700001",
+                    "tel:+593979000001"
+                ],
+                "fields": {
+                    "joined": "2020-01-01T10:45:30Z"
+                }
+            },
+            {
+                "name": "Bob",
+                "urns": [
+                    "tel:+16055700002",
+                    "tel:+593979000002"
+                ],
+                "fields": {
+                    "joined": "2020-01-01T10:45:30Z"
+                }
+            },
+            {
+                "name": "Cat",
+                "urns": [
+                    "tel:+593979000001",
+                    "tel:+16055700003"
+                ],
+                "fields": {
+                    "joined": "2020-02-01T17:15:30Z"
+                }
+            }
+        ],
+        "num_created": 0,
+        "num_updated": 2,
+        "num_errored": 1,
+        "errors": [
+            {
+                "record": 0,
+                "message": "Unable to find or create contact with URNs tel:+16055700001, tel:+593979000001"
+            }
+        ],
+        "contacts": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Ann",
+                "language": "",
+                "urns": [
+                    "tel:+16055700001?id=1000&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "name": "Bob",
+                "language": "",
+                "urns": [
+                    "tel:+16055700002?id=1001&priority=1000",
+                    "tel:+593979000002?id=1004&priority=999"
+                ],
+                "fields": {
+                    "age": "28",
+                    "joined": "2020-01-01T10:45:30.000000Z"
+                },
+                "groups": []
+            },
+            {
+                "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+                "name": "Cat",
+                "language": "spa",
+                "urns": [
+                    "tel:+16055700003?id=1002&priority=1000",
+                    "tel:+593979000001?id=1003&priority=999"
+                ],
+                "fields": {
+                    "age": "43",
+                    "joined": "2020-02-01T17:15:30.000000Z"
+                },
+                "groups": [
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "c153e265-f7c9-4539-9dbc-9b358714b638"
+                ]
+            }
+        ]
+    },
+    {
+        "description": "updating contacts by UUID (last UUID doesn't exist)",
+        "specs": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Anne"
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "language": "kin",
+                "urns": [
+                    "tel:+16055700002"
+                ]
+            },
+            {
+                "uuid": "68dc10e7-19ce-4052-b202-7c1b49e69ba0",
+                "name": "Jim"
+            }
+        ],
+        "num_created": 0,
+        "num_updated": 2,
+        "num_errored": 1,
+        "errors": [
+            {
+                "record": 2,
+                "message": "Unable to find contact with UUID '68dc10e7-19ce-4052-b202-7c1b49e69ba0'"
+            }
+        ],
+        "contacts": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Anne",
+                "language": "",
+                "urns": [
+                    "tel:+16055700001?id=1000&priority=1000"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "name": "Bob",
+                "language": "kin",
+                "urns": [
+                    "tel:+16055700002?id=1001&priority=1000",
+                    "tel:+593979000002?id=1004&priority=999"
+                ],
+                "fields": {
+                    "age": "28",
+                    "joined": "2020-01-01T10:45:30.000000Z"
+                },
+                "groups": []
+            },
+            {
+                "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+                "name": "Cat",
+                "language": "spa",
+                "urns": [
+                    "tel:+16055700003?id=1002&priority=1000",
+                    "tel:+593979000001?id=1003&priority=999"
+                ],
+                "fields": {
+                    "age": "43",
+                    "joined": "2020-02-01T17:15:30.000000Z"
+                },
+                "groups": [
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "c153e265-f7c9-4539-9dbc-9b358714b638"
+                ]
+            }
+        ]
+    },
+    {
+        "description": "stealing URNs permitted with UUIDs",
+        "specs": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Anne",
+                "urns": [
+                    "tel:+16055700002"
+                ]
+            }
+        ],
+        "num_created": 0,
+        "num_updated": 1,
+        "num_errored": 0,
+        "errors": [],
+        "contacts": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Anne",
+                "language": "",
+                "urns": [
+                    "tel:+16055700001?id=1000&priority=1000",
+                    "tel:+16055700002?id=1001&priority=999"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "name": "Bob",
+                "language": "kin",
+                "urns": [
+                    "tel:+593979000002?id=1004&priority=999"
+                ],
+                "fields": {
+                    "age": "28",
+                    "joined": "2020-01-01T10:45:30.000000Z"
+                },
+                "groups": []
+            },
+            {
+                "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+                "name": "Cat",
+                "language": "spa",
+                "urns": [
+                    "tel:+16055700003?id=1002&priority=1000",
+                    "tel:+593979000001?id=1003&priority=999"
+                ],
+                "fields": {
+                    "age": "43",
+                    "joined": "2020-02-01T17:15:30.000000Z"
+                },
+                "groups": [
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "c153e265-f7c9-4539-9dbc-9b358714b638"
+                ]
+            }
+        ]
+    }
+]

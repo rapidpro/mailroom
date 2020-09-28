@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
@@ -157,15 +158,20 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db *sqlx.D
 				return errors.Wrapf(err, "error creating flow contact for %d", imp.contact.ID())
 			}
 
-			addModifier(modifiers.NewURNs(spec.URNs, modifiers.URNsAppend))
-
 		} else {
 			imp.contact, imp.flowContact, err = GetOrCreateContact(ctx, db, oa, spec.URNs)
 			if err != nil {
-				addError("Unable to get or create contact with URN '%s'", spec.URNs[0])
+				urnStrs := make([]string, len(spec.URNs))
+				for i := range spec.URNs {
+					urnStrs[i] = string(spec.URNs[i].Identity())
+				}
+
+				addError("Unable to find or create contact with URNs %s", strings.Join(urnStrs, ", "))
 				continue
 			}
 		}
+
+		addModifier(modifiers.NewURNs(spec.URNs, modifiers.URNsAppend))
 
 		if spec.Name != nil {
 			addModifier(modifiers.NewName(*spec.Name))

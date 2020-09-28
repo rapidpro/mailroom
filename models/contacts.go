@@ -578,74 +578,55 @@ WHERE
 
 // GetOrCreateContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
 // the passed in URNs with the ids of the contacts.
-func GetOrCreateContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []urns.URN) (map[urns.URN]ContactID, error) {
-	// build a map of our urns to contact id
-	urnMap := make(map[urns.URN]ContactID, len(us))
-
-	// and another map from URN identity to the passed in URN
-	urnIdentities := make(map[urns.URN]urns.URN, len(us))
-	for _, u := range us {
-		urnIdentities[u.Identity()] = u
-	}
-
-	// try to select our contact ids
-	identities := make([]string, len(us))
-	for i := range us {
-		if us[i] == urns.NilURN {
-			return nil, errors.Errorf("cannot look up contact without URN")
-		}
-
-		identities[i] = us[i].Identity().String()
-	}
-
-	rows, err := db.QueryxContext(ctx,
-		`SELECT contact_id, identity FROM contacts_contacturn WHERE org_id = $1 AND identity = ANY($2) AND contact_id IS NOT NULL`,
-		org.OrgID(), pq.Array(identities),
-	)
-
+func GetOrCreateContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, urnz []urns.URN) (map[urns.URN]ContactID, error) {
+	// find current owners of these URNs
+	owners, err := contactIDsFromURNs(ctx, db, org.OrgID(), urnz)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error querying contact urns")
+		return nil, errors.Wrapf(err, "error looking up contacts for URNs")
+	}
+
+	// create any contacts that are missing
+	for urn, contactID := range owners {
+		if contactID == NilContactID {
+			contact, _, err := CreateContact(ctx, db, org, NilUserID, "", envs.NilLanguage, []urns.URN{urn})
+			if err != nil {
+				return nil, errors.Wrapf(err, "error creating contact")
+			}
+			owners[urn] = contact.ID()
+		}
+	}
+	return owners, nil
+}
+
+// looks up the contacts who own the given urns (which should be normalized by the caller) and returns that information as a map
+func contactIDsFromURNs(ctx context.Context, db *sqlx.DB, orgID OrgID, urnz []urns.URN) (map[urns.URN]ContactID, error) {
+	identityToOriginal := make(map[urns.URN]urns.URN, len(urnz))
+	identities := make([]urns.URN, len(urnz))
+	owners := make(map[urns.URN]ContactID, len(urnz))
+
+	for i, urn := range urnz {
+		identity := urn.Identity()
+		identityToOriginal[identity] = urn
+		identities[i] = identity
+		owners[urn] = NilContactID
+	}
+
+	rows, err := db.QueryxContext(ctx, `SELECT contact_id, identity FROM contacts_contacturn WHERE org_id = $1 AND identity = ANY($2)`, orgID, pq.Array(identities))
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrapf(err, "error querying contact URNs")
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var urn urns.URN
 		var id ContactID
-
-		err := rows.Scan(&id, &urn)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error scanning urn result")
+		if err := rows.Scan(&id, &urn); err != nil {
+			return nil, errors.Wrapf(err, "error scanning URN result")
 		}
-
-		original, found := urnIdentities[urn]
-		if !found {
-			return nil, errors.Wrapf(err, "unable to find original URN from identity")
-		}
-
-		urnMap[original] = id
+		owners[identityToOriginal[urn]] = id
 	}
 
-	// if we didn't find some contacts
-	if len(urnMap) < len(us) {
-		// create the contacts that are missing
-		for _, u := range us {
-			if urnMap[u] == NilContactID {
-				contact, _, err := CreateContact(ctx, db, org, NilUserID, "", envs.NilLanguage, []urns.URN{u})
-				if err != nil {
-					return nil, errors.Wrapf(err, "error while creating contact")
-				}
-
-				original, found := urnIdentities[u]
-				if !found {
-					return nil, errors.Wrapf(err, "unable to find original URN from identity")
-				}
-				urnMap[original] = contact.ID()
-			}
-		}
-	}
-
-	// return our map of urns to ids
-	return urnMap, nil
+	return owners, nil
 }
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
@@ -678,35 +659,17 @@ func CreateContact(ctx context.Context, db *sqlx.DB, oa *OrgAssets, userID UserI
 	return contact, flowContact, nil
 }
 
-// GetOrCreateContact fetches or creates a new contact for the passed in org with the passed in URNs
+// GetOrCreateContact fetches or creates a new contact for the passed in org with the passed in URNs.
+//
+// * If none of the URNs exist, it creates a new contact with those URNs.
+// * If URNs exist but are orphaned it creates a new contact and assigns those URNs to them.
+// * If URNs exists and belongs to a single contact it returns that contact (other URNs are not assigned to the contact).
+// * If URNs exists and belongs to multiple contacts it will return an error.
+//
 func GetOrCreateContact(ctx context.Context, db *sqlx.DB, oa *OrgAssets, urnz []urns.URN) (*Contact, *flows.Contact, error) {
-	created := true
-
-	contactID, err := tryInsertContactAndURNs(ctx, db, oa.OrgID(), UserID(1), "", envs.NilLanguage, urnz)
+	contactID, created, err := getOrCreateContact(ctx, db, oa.OrgID(), urnz)
 	if err != nil {
-		if dbutil.IsUniqueViolation(err) {
-			// if we blew up because URNs are already taken by other contacts, find who owns them
-			identities := make([]string, len(urnz))
-			for i := range urnz {
-				identities[i] = string(urnz[i].Identity())
-			}
-
-			contactIDs, err := queryContactIDs(ctx, db, `SELECT DISTINCT contact_id FROM contacts_contacturn WHERE org_id = $1 AND identity = ANY($2) AND contact_id IS NOT NULL`, oa.OrgID(), pq.Array(identities))
-			if err != nil {
-				return nil, nil, errors.Wrapf(err, "error querying contacts with URNs")
-			}
-
-			// if we have a single contact, we can return that
-			if len(contactIDs) == 1 {
-				contactID = contactIDs[0]
-			} else {
-				return nil, nil, errors.New("error because URNs belong to different contacts")
-			}
-
-			created = false
-		} else {
-			return nil, nil, err
-		}
+		return nil, nil, err
 	}
 
 	// load a full contact so that we can calculate dynamic groups
@@ -732,12 +695,61 @@ func GetOrCreateContact(ctx context.Context, db *sqlx.DB, oa *OrgAssets, urnz []
 	return contact, flowContact, nil
 }
 
-// tries to create a new contact for the passed in org with the passed in URNs
-func tryInsertContactAndURNs(ctx context.Context, db *sqlx.DB, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN) (ContactID, error) {
-	if userID == NilUserID {
-		userID = UserID(1)
+func getOrCreateContact(ctx context.Context, db *sqlx.DB, orgID OrgID, urnz []urns.URN) (ContactID, bool, error) {
+	// find current owners of these URNs
+	owners, err := contactIDsFromURNs(ctx, db, orgID, urnz)
+	if err != nil {
+		return NilContactID, false, errors.Wrapf(err, "error looking up contacts for URNs")
 	}
 
+	uniqueOwners := uniqueContactIDs(owners)
+	if len(uniqueOwners) > 1 {
+		return NilContactID, false, errors.New("error because URNs belong to different contacts")
+	} else if len(uniqueOwners) == 1 {
+		return uniqueOwners[0], false, nil
+	}
+
+	contactID, err := tryInsertContactAndURNs(ctx, db, orgID, UserID(1), "", envs.NilLanguage, urnz)
+	if err == nil {
+		return contactID, true, nil
+	}
+
+	if dbutil.IsUniqueViolation(err) {
+		// another thread must have created contacts with these URNs in the time between us looking them up and trying to
+		// create them ourselves, so let's try to fetch that contact
+		owners, err := contactIDsFromURNs(ctx, db, orgID, urnz)
+		if err != nil {
+			return NilContactID, false, errors.Wrapf(err, "error looking up contacts for URNs")
+		}
+
+		uniqueOwners := uniqueContactIDs(owners)
+		if len(uniqueOwners) > 1 {
+			return NilContactID, false, errors.New("error because URNs belong to different contacts")
+		} else if len(uniqueOwners) == 1 {
+			return uniqueOwners[0], false, nil
+		} else {
+			return NilContactID, false, errors.New("lookup of URNs after failed insert returned zero contacts")
+		}
+	}
+
+	return NilContactID, false, err
+}
+
+// utility to extract non-nil unique contact IDs from the given URN map
+func uniqueContactIDs(urnMap map[urns.URN]ContactID) []ContactID {
+	unique := make([]ContactID, 0, len(urnMap))
+	seen := make(map[ContactID]bool)
+	for _, id := range urnMap {
+		if id != NilContactID && !seen[id] {
+			unique = append(unique, id)
+			seen[id] = true
+		}
+	}
+	return unique
+}
+
+// tries to create a new contact for the passed in org with the passed in URNs
+func tryInsertContactAndURNs(ctx context.Context, db *sqlx.DB, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN) (ContactID, error) {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return NilContactID, errors.Wrapf(err, "error beginning transaction")
@@ -759,6 +771,10 @@ func tryInsertContactAndURNs(ctx context.Context, db *sqlx.DB, orgID OrgID, user
 }
 
 func insertContactAndURNs(ctx context.Context, tx *sqlx.Tx, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN) (ContactID, error) {
+	if userID == NilUserID {
+		userID = UserID(1)
+	}
+
 	// first insert our contact
 	var contactID ContactID
 	err := tx.GetContext(ctx, &contactID,
@@ -774,7 +790,10 @@ func insertContactAndURNs(ctx context.Context, tx *sqlx.Tx, orgID OrgID, userID 
 		return NilContactID, errors.Wrapf(err, "error inserting new contact")
 	}
 
+	// TODO bulk attach orphaned URNs here ?
+
 	var urnsToAttach []URNID
+	priority := topURNPriority
 
 	// now try to insert the URNs
 	for _, urn := range urnz {
@@ -796,8 +815,10 @@ func insertContactAndURNs(ctx context.Context, tx *sqlx.Tx, orgID OrgID, userID 
 				(org_id, identity, path, scheme, display, auth, priority, channel_id, contact_id)
 			VALUES
 				($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			orgID, urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), GetURNAuth(urn), topURNPriority, nil, contactID,
+			orgID, urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), GetURNAuth(urn), priority, nil, contactID,
 		)
+
+		priority--
 
 		if err != nil {
 			return NilContactID, err

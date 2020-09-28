@@ -1,9 +1,11 @@
 package testdata
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/models"
 
 	"github.com/jmoiron/sqlx"
@@ -20,10 +22,14 @@ func InsertContactImport(t *testing.T, db *sqlx.DB, orgID models.OrgID) models.C
 }
 
 // InsertContactImportBatch inserts a contact import batch
-func InsertContactImportBatch(t *testing.T, db *sqlx.DB, importID models.ContactImportID, specs string) models.ContactImportBatchID {
+func InsertContactImportBatch(t *testing.T, db *sqlx.DB, importID models.ContactImportID, specs json.RawMessage) models.ContactImportBatchID {
+	var splitSpecs []json.RawMessage
+	err := jsonx.Unmarshal(specs, &splitSpecs)
+	require.NoError(t, err)
+
 	var batchID models.ContactImportBatchID
-	err := db.Get(&batchID, `INSERT INTO contacts_contactimportbatch(contact_import_id, status, specs, record_start, record_end, num_created, num_updated, num_errored, errors, finished_on)
-					         VALUES($1, 'P', $2, 10, 12, 0, 0, 0, '[]', NULL) RETURNING id`, importID, specs)
+	err = db.Get(&batchID, `INSERT INTO contacts_contactimportbatch(contact_import_id, status, specs, record_start, record_end, num_created, num_updated, num_errored, errors, finished_on)
+					         VALUES($1, 'P', $2, 0, $3, 0, 0, 0, '[]', NULL) RETURNING id`, importID, specs, len(splitSpecs))
 	require.NoError(t, err)
 	return batchID
 }
