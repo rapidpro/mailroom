@@ -778,24 +778,17 @@ func insertContactAndURNs(ctx context.Context, tx *sqlx.Tx, orgID OrgID, userID 
 	// first insert our contact
 	var contactID ContactID
 	err := tx.GetContext(ctx, &contactID,
-		`INSERT INTO contacts_contact
-			(org_id, is_active, status, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
-		VALUES
-			($1, TRUE, 'A', $2, $3, $4, $5, $5, $6, $6)
+		`INSERT INTO contacts_contact (org_id, is_active, status, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
+		VALUES($1, TRUE, 'A', $2, $3, $4, $5, $5, $6, $6)
 		RETURNING id`,
 		orgID, uuids.New(), null.String(name), null.String(string(language)), dates.Now(), userID,
 	)
-
 	if err != nil {
 		return NilContactID, errors.Wrapf(err, "error inserting new contact")
 	}
 
-	// TODO bulk attach orphaned URNs here ?
-
-	var urnsToAttach []URNID
 	priority := topURNPriority
 
-	// now try to insert the URNs
 	for _, urn := range urnz {
 		// look for a URN with this identity that already exists but doesn't have a contact so could be attached
 		var orphanURNID URNID
@@ -803,34 +796,24 @@ func insertContactAndURNs(ctx context.Context, tx *sqlx.Tx, orgID OrgID, userID 
 		if err != nil && err != sql.ErrNoRows {
 			return NilContactID, err
 		}
-		if orphanURNID > 0 {
-			urnsToAttach = append(urnsToAttach, orphanURNID)
-			continue
+		if orphanURNID != NilURNID {
+			_, err := tx.ExecContext(ctx, `UPDATE contacts_contacturn SET contact_id = $2, priority = $3 WHERE id = $1`, orphanURNID, contactID, priority)
+			if err != nil {
+				return NilContactID, errors.Wrapf(err, "error attaching existing URN to new contact")
+			}
+		} else {
+			_, err := tx.ExecContext(
+				ctx,
+				`INSERT INTO contacts_contacturn(org_id, identity, path, scheme, display, auth, priority, channel_id, contact_id)
+			     VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+				orgID, urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), GetURNAuth(urn), priority, nil, contactID,
+			)
+			if err != nil {
+				return NilContactID, err
+			}
 		}
-
-		_, err := tx.ExecContext(
-			ctx,
-			`INSERT INTO 
-			contacts_contacturn
-				(org_id, identity, path, scheme, display, auth, priority, channel_id, contact_id)
-			VALUES
-				($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			orgID, urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), GetURNAuth(urn), priority, nil, contactID,
-		)
 
 		priority--
-
-		if err != nil {
-			return NilContactID, err
-		}
-	}
-
-	// attach URNs
-	if len(urnsToAttach) > 0 {
-		_, err := tx.ExecContext(ctx, `UPDATE contacts_contacturn SET contact_id = $3 WHERE org_id = $1 AND id = ANY($2)`, orgID, pq.Array(urnsToAttach), contactID)
-		if err != nil {
-			return NilContactID, errors.Wrapf(err, "error attaching existing URNs to new contact")
-		}
 	}
 
 	return contactID, nil

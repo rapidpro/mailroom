@@ -31,13 +31,8 @@ func TestContactImports(t *testing.T) {
 	testsuite.Reset()
 	defer testsuite.Reset()
 
-	// clear out the existing contacts
-	db.MustExec(`DELETE FROM contacts_contacturn`)
-	db.MustExec(`DELETE FROM contacts_contactgroup_contacts`)
-	db.MustExec(`DELETE FROM contacts_contact`)
-
-	// reset new URN ids back to a known number
-	db.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 1000`)
+	testdata.DeleteContactsAndURNs(t, db)
+	testdata.InsertContact(t, db, models.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa")
 
 	testJSON, err := ioutil.ReadFile("testdata/imports.json")
 	require.NoError(t, err)

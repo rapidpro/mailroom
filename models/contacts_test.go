@@ -576,8 +576,9 @@ func TestGetOrCreateContact(t *testing.T) {
 	db := testsuite.DB()
 	testsuite.Reset()
 
-	// add an orphaned URN
+	// add some orphaned URNs
 	testdata.InsertContactURN(t, db, models.Org1, models.NilContactID, urns.URN("telegram:200001"), 100)
+	testdata.InsertContactURN(t, db, models.Org1, models.NilContactID, urns.URN("telegram:200002"), 100)
 
 	var maxContactID models.ContactID
 	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
@@ -588,24 +589,73 @@ func TestGetOrCreateContact(t *testing.T) {
 	assert.NoError(t, err)
 
 	tcs := []struct {
-		OrgID     models.OrgID
-		URNs      []urns.URN
-		ContactID models.ContactID
+		OrgID       models.OrgID
+		URNs        []urns.URN
+		ContactID   models.ContactID
+		ContactURNs []urns.URN
 	}{
-		{models.Org1, []urns.URN{models.CathyURN}, models.CathyID},
-		{models.Org1, []urns.URN{urns.URN(models.CathyURN.String() + "?foo=bar")}, models.CathyID},         // only URN identity is considered
-		{models.Org1, []urns.URN{urns.URN("telegram:100001")}, newContact()},                               // creates new contact
-		{models.Org1, []urns.URN{urns.URN("telegram:100001")}, prevContact()},                              // returns the same created contact
-		{models.Org1, []urns.URN{urns.URN("telegram:100001"), urns.URN("telegram:100002")}, prevContact()}, // same again as other URNs don't exist
-		{models.Org1, []urns.URN{urns.URN("telegram:100002"), urns.URN("telegram:100001")}, prevContact()}, // same again as other URNs don't exist
-		{models.Org1, []urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:100001")}, prevContact()}, // same again as other URNs are orphaned
-		{models.Org1, []urns.URN{urns.URN("telegram:100003")}, newContact()},                               // creates new contact
+		{
+			models.Org1,
+			[]urns.URN{models.CathyURN},
+			models.CathyID,
+			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN(models.CathyURN.String() + "?foo=bar")},
+			models.CathyID, // only URN identity is considered
+			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100001")},
+			newContact(), // creates new contact
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100001")},
+			prevContact(), // returns the same created contact
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100001"), urns.URN("telegram:100002")},
+			prevContact(), // same again as other URNs don't exist
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100002"), urns.URN("telegram:100001")},
+			prevContact(), // same again as other URNs don't exist
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:100001")},
+			prevContact(), // same again as other URNs are orphaned
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100003"), urns.URN("telegram:100004")}, // 2 new URNs
+			newContact(),
+			[]urns.URN{"telegram:100003?id=20124&priority=1000", "telegram:100004?id=20125&priority=999"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100005"), urns.URN("telegram:200002")}, // 1 new, 1 orphaned
+			newContact(),
+			[]urns.URN{"telegram:100005?id=20126&priority=1000", "telegram:200002?id=20122&priority=999"},
+		},
 	}
 
 	for i, tc := range tcs {
-		contact, _, err := models.GetOrCreateContact(ctx, db, org, tc.URNs)
+		contact, flowContact, err := models.GetOrCreateContact(ctx, db, org, tc.URNs)
 		assert.NoError(t, err, "%d: error creating contact", i)
-		assert.Equal(t, tc.ContactID, contact.ID(), "%d: mismatch in contact id", i)
+
+		assert.Equal(t, tc.ContactID, contact.ID(), "%d: contact id mismatch", i)
+		assert.Equal(t, tc.ContactURNs, flowContact.URNs().RawURNs(), "%d: URNs mismatch", i)
 	}
 }
 
