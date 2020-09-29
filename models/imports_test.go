@@ -31,8 +31,15 @@ func TestContactImports(t *testing.T) {
 	testsuite.Reset()
 	defer testsuite.Reset()
 
+	models.FlushCache()
+
 	testdata.DeleteContactsAndURNs(t, db)
+
+	// add contact in other org to make sure we can't update it
 	testdata.InsertContact(t, db, models.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa")
+
+	// add dynamic group to test imported contacts are added to it
+	testdata.InsertContactGroup(t, db, models.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
 
 	testJSON, err := ioutil.ReadFile("testdata/imports.json")
 	require.NoError(t, err)
