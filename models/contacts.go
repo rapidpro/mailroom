@@ -585,9 +585,14 @@ WHERE
 
 // GetOrCreateContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
 // the passed in URNs with the ids of the contacts.
-func GetOrCreateContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, urnz []urns.URN) (map[urns.URN]ContactID, error) {
+func GetOrCreateContactIDsFromURNs(ctx context.Context, db *sqlx.DB, oa *OrgAssets, urnz []urns.URN) (map[urns.URN]ContactID, error) {
+	// ensure all URNs are normalized
+	for i, urn := range urnz {
+		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
+	}
+
 	// find current owners of these URNs
-	owners, err := contactIDsFromURNs(ctx, db, org.OrgID(), urnz)
+	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error looking up contacts for URNs")
 	}
@@ -595,7 +600,7 @@ func GetOrCreateContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAss
 	// create any contacts that are missing
 	for urn, contactID := range owners {
 		if contactID == NilContactID {
-			contact, _, err := CreateContact(ctx, db, org, NilUserID, "", envs.NilLanguage, []urns.URN{urn})
+			contact, _, err := CreateContact(ctx, db, oa, NilUserID, "", envs.NilLanguage, []urns.URN{urn})
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating contact")
 			}
@@ -638,6 +643,11 @@ func contactIDsFromURNs(ctx context.Context, db *sqlx.DB, orgID OrgID, urnz []ur
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
 func CreateContact(ctx context.Context, db *sqlx.DB, oa *OrgAssets, userID UserID, name string, language envs.Language, urnz []urns.URN) (*Contact, *flows.Contact, error) {
+	// ensure all URNs are normalized
+	for i, urn := range urnz {
+		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
+	}
+
 	// find current owners of these URNs
 	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
 	if err != nil {
@@ -685,6 +695,11 @@ func CreateContact(ctx context.Context, db *sqlx.DB, oa *OrgAssets, userID UserI
 // * If URNs exists and belongs to multiple contacts it will return an error.
 //
 func GetOrCreateContact(ctx context.Context, db *sqlx.DB, oa *OrgAssets, urnz []urns.URN) (*Contact, *flows.Contact, error) {
+	// ensure all URNs are normalized
+	for i, urn := range urnz {
+		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
+	}
+
 	contactID, created, err := getOrCreateContact(ctx, db, oa.OrgID(), urnz)
 	if err != nil {
 		return nil, nil, err

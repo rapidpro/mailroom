@@ -96,11 +96,6 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID O
 	// create our work data for each contact being created or updated
 	imports := make([]*importContact, len(specs))
 	for i := range imports {
-		// ensure all URNs are normalized
-		for j, urn := range specs[i].URNs {
-			specs[i].URNs[j] = urn.Normalize(string(oa.Env().DefaultCountry()))
-		}
-
 		imports[i] = &importContact{record: b.RecordStart + i, spec: specs[i]}
 	}
 
