@@ -1,38 +1,50 @@
-package models
+package models_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/lib/pq"
 	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestGroups(t *testing.T) {
+func TestLoadGroups(t *testing.T) {
 	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	db := testsuite.NewMockDB(testsuite.DB(), func(funcName string, call int) error {
+		// fail first query for groups
+		if funcName == "QueryxContext" && call == 0 {
+			return errors.New("boom")
+		}
+		return nil
+	})
 
-	groups, err := loadGroups(ctx, db, 1)
-	assert.NoError(t, err)
+	groups, err := models.LoadGroups(ctx, db, 1)
+	require.EqualError(t, err, "error querying groups for org: 1: boom")
+
+	groups, err = models.LoadGroups(ctx, db, 1)
+	require.NoError(t, err)
 
 	tcs := []struct {
-		ID    GroupID
+		ID    models.GroupID
 		UUID  assets.GroupUUID
 		Name  string
 		Query string
 	}{
-		{DoctorsGroupID, DoctorsGroupUUID, "Doctors", ""},
-		{TestersGroupID, TestersGroupUUID, "Testers", ""},
+		{models.DoctorsGroupID, models.DoctorsGroupUUID, "Doctors", ""},
+		{models.TestersGroupID, models.TestersGroupUUID, "Testers", ""},
 	}
 
 	assert.Equal(t, 2, len(groups))
 	for i, tc := range tcs {
-		group := groups[i].(*Group)
+		group := groups[i].(*models.Group)
 		assert.Equal(t, tc.UUID, group.UUID())
 		assert.Equal(t, tc.ID, group.ID())
 		assert.Equal(t, tc.Name, group.Name())
@@ -45,27 +57,27 @@ func TestDynamicGroups(t *testing.T) {
 	db := testsuite.DB()
 
 	// insert an event on our campaign
-	var eventID CampaignEventID
+	var eventID models.CampaignEventID
 	testsuite.DB().Get(&eventID,
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I') RETURNING id`,
-		uuids.New(), DoctorRemindersCampaignID, FavoritesFlowID, JoinedFieldID)
+		uuids.New(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.JoinedFieldID)
 
 	// clear Cathy's value
 	testsuite.DB().MustExec(
 		`update contacts_contact set fields = fields - $2
-		WHERE id = $1`, CathyID, JoinedFieldUUID)
+		WHERE id = $1`, models.CathyID, models.JoinedFieldUUID)
 
 	// and populate Bob's
 	testsuite.DB().MustExec(
 		fmt.Sprintf(`update contacts_contact set fields = fields ||
 		'{"%s": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
-		WHERE id = $1`, JoinedFieldUUID), BobID)
+		WHERE id = $1`, models.JoinedFieldUUID), models.BobID)
 
 	// clear our org cache so we reload org campaigns and events
-	FlushCache()
-	org, err := GetOrgAssets(ctx, db, Org1)
+	models.FlushCache()
+	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
 	esServer := testsuite.NewMockElasticServer()
@@ -106,52 +118,52 @@ func TestDynamicGroups(t *testing.T) {
 		}
 	}`
 
-	cathyHit := fmt.Sprintf(contactHit, CathyID)
-	bobHit := fmt.Sprintf(contactHit, BobID)
+	cathyHit := fmt.Sprintf(contactHit, models.CathyID)
+	bobHit := fmt.Sprintf(contactHit, models.BobID)
 
 	tcs := []struct {
 		Query           string
 		ESResponse      string
-		ContactIDs      []ContactID
-		EventContactIDs []ContactID
+		ContactIDs      []models.ContactID
+		EventContactIDs []models.ContactID
 	}{
 		{
 			"cathy",
 			cathyHit,
-			[]ContactID{CathyID},
-			[]ContactID{},
+			[]models.ContactID{models.CathyID},
+			[]models.ContactID{},
 		},
 		{
 			"bob",
 			bobHit,
-			[]ContactID{BobID},
-			[]ContactID{BobID},
+			[]models.ContactID{models.BobID},
+			[]models.ContactID{models.BobID},
 		},
 		{
 			"unchanged",
 			bobHit,
-			[]ContactID{BobID},
-			[]ContactID{BobID},
+			[]models.ContactID{models.BobID},
+			[]models.ContactID{models.BobID},
 		},
 	}
 
 	for _, tc := range tcs {
-		err := UpdateGroupStatus(ctx, db, DoctorsGroupID, GroupStatusInitializing)
+		err := models.UpdateGroupStatus(ctx, db, models.DoctorsGroupID, models.GroupStatusInitializing)
 		assert.NoError(t, err)
 
 		esServer.NextResponse = tc.ESResponse
-		count, err := PopulateDynamicGroup(ctx, db, es, org, DoctorsGroupID, tc.Query)
+		count, err := models.PopulateDynamicGroup(ctx, db, es, org, models.DoctorsGroupID, tc.Query)
 		assert.NoError(t, err, "error populating dynamic group for: %s", tc.Query)
 
 		assert.Equal(t, count, len(tc.ContactIDs))
 
 		// assert the current group membership
-		contactIDs, err := ContactIDsForGroupIDs(ctx, db, []GroupID{DoctorsGroupID})
+		contactIDs, err := models.ContactIDsForGroupIDs(ctx, db, []models.GroupID{models.DoctorsGroupID})
 		assert.Equal(t, tc.ContactIDs, contactIDs)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) from contacts_contactgroup WHERE id = $1 AND status = 'R'`,
-			[]interface{}{DoctorsGroupID}, 1, "wrong number of contacts in group for query: %s", tc.Query)
+			[]interface{}{models.DoctorsGroupID}, 1, "wrong number of contacts in group for query: %s", tc.Query)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) from campaigns_eventfire WHERE event_id = $1`,

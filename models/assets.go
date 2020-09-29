@@ -154,7 +154,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	}
 
 	if prev == nil || refresh&RefreshGroups > 0 {
-		oa.groups, err = loadGroups(ctx, db, orgID)
+		oa.groups, err = LoadGroups(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading group assets for org %d", orgID)
 		}
