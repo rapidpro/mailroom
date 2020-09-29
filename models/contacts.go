@@ -35,10 +35,14 @@ type URNID null.Int
 // ContactID is our type for contact ids, which can be null
 type ContactID null.Int
 
+// URN priority constants
 const (
 	topURNPriority     = 1000
 	defaultURNPriority = 0
+)
 
+// nil versions of ID types
+const (
 	NilURNID     = URNID(0)
 	NilContactID = ContactID(0)
 )
@@ -83,7 +87,8 @@ func LoadContact(ctx context.Context, db Queryer, org *OrgAssets, id ContactID) 
 	return contacts[0], nil
 }
 
-// LoadContacts loads a set of contacts for the passed in ids
+// LoadContacts loads a set of contacts for the passed in ids. Note that the order of the returned contacts
+// won't necessarily match the order of the ids.
 func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []ContactID) ([]*Contact, error) {
 	start := time.Now()
 
@@ -164,7 +169,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 
 // LoadContactsByUUID loads a set of contacts for the passed in UUIDs
 func LoadContactsByUUID(ctx context.Context, db Queryer, oa *OrgAssets, uuids []flows.ContactUUID) ([]*Contact, error) {
-	ids, err := ContactIDsFromUUIDs(ctx, db, oa.OrgID(), uuids)
+	ids, err := getContactIDsFromUUIDs(ctx, db, oa.OrgID(), uuids)
 	if err != nil {
 		return nil, err
 	}
@@ -192,19 +197,20 @@ func GetNewestContactModifiedOn(ctx context.Context, db *sqlx.DB, org *OrgAssets
 	return nil, nil
 }
 
-// ContactIDsFromReferences queries the contacts for the passed in org, returning the contact ids for the references
-func ContactIDsFromReferences(ctx context.Context, tx Queryer, orgID OrgID, refs []*flows.ContactReference) ([]ContactID, error) {
+// GetContactIDsFromReferences gets the contact ids for the given org and set of references. Note that the order of the returned contacts
+// won't necessarily match the order of the references.
+func GetContactIDsFromReferences(ctx context.Context, tx Queryer, orgID OrgID, refs []*flows.ContactReference) ([]ContactID, error) {
 	// build our list of UUIDs
 	uuids := make([]flows.ContactUUID, len(refs))
 	for i := range refs {
 		uuids[i] = refs[i].UUID
 	}
 
-	return ContactIDsFromUUIDs(ctx, tx, orgID, uuids)
+	return getContactIDsFromUUIDs(ctx, tx, orgID, uuids)
 }
 
-// ContactIDsFromUUIDs queries the contacts for the passed in org, returning the contact ids for the UUIDs
-func ContactIDsFromUUIDs(ctx context.Context, tx Queryer, orgID OrgID, uuids []flows.ContactUUID) ([]ContactID, error) {
+// gets the contact IDs for the passed in org and set of UUIDs
+func getContactIDsFromUUIDs(ctx context.Context, tx Queryer, orgID OrgID, uuids []flows.ContactUUID) ([]ContactID, error) {
 	ids, err := queryContactIDs(ctx, tx, `SELECT id FROM contacts_contact WHERE org_id = $1 AND uuid = ANY($2) AND is_active = TRUE`, orgID, pq.Array(uuids))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting contact ids by UUID")
@@ -212,6 +218,7 @@ func ContactIDsFromUUIDs(ctx context.Context, tx Queryer, orgID OrgID, uuids []f
 	return ids, nil
 }
 
+// utility to query contact IDs
 func queryContactIDs(ctx context.Context, tx Queryer, query string, args ...interface{}) ([]ContactID, error) {
 	ids := make([]ContactID, 0, 10)
 	rows, err := tx.QueryxContext(ctx, query, args...)
@@ -631,8 +638,19 @@ func contactIDsFromURNs(ctx context.Context, db *sqlx.DB, orgID OrgID, urnz []ur
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
 func CreateContact(ctx context.Context, db *sqlx.DB, oa *OrgAssets, userID UserID, name string, language envs.Language, urnz []urns.URN) (*Contact, *flows.Contact, error) {
+	// find current owners of these URNs
+	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error looking up contacts for URNs")
+	}
+
+	if len(uniqueContactIDs(owners)) > 0 {
+		return nil, nil, errors.New("URNs in use by other contacts")
+	}
+
 	contactID, err := tryInsertContactAndURNs(ctx, db, oa.OrgID(), userID, name, language, urnz)
 	if err != nil {
+		// always possible that another thread created a contact with these URNs after we checked above
 		if dbutil.IsUniqueViolation(err) {
 			return nil, nil, errors.New("URNs in use by other contacts")
 		}
@@ -748,7 +766,8 @@ func uniqueContactIDs(urnMap map[urns.URN]ContactID) []ContactID {
 	return unique
 }
 
-// tries to create a new contact for the passed in org with the passed in URNs
+// Tries to create a new contact for the passed in org with the passed in URNs. Returned error can be tested with `dbutil.IsUniqueViolation` to
+// determine if problem was one or more of the URNs already exist and are assigned to other contacts.
 func tryInsertContactAndURNs(ctx context.Context, db *sqlx.DB, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN) (ContactID, error) {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {

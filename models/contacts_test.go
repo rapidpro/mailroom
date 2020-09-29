@@ -659,6 +659,18 @@ func TestGetOrCreateContact(t *testing.T) {
 	}
 }
 
+func TestGetContactIDsFromReferences(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	ids, err := models.GetContactIDsFromReferences(ctx, db, models.Org1, []*flows.ContactReference{
+		flows.NewContactReference(models.CathyUUID, "Cathy"),
+		flows.NewContactReference(models.BobUUID, "Bob"),
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []models.ContactID{models.CathyID, models.BobID}, ids)
+}
+
 func TestStopContact(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
