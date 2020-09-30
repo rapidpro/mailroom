@@ -1,3 +1,9 @@
+v5.7.26
+----------
+ * Add mockable DB to enable testing database errors
+ * CreateContact also should do lookup before trying to create new contact with URNs
+ * Imports 2.0
+
 v5.7.25
 ----------
  * Pass org from the base task to task structs to remove need for duplicating it in the task body
