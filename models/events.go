@@ -184,7 +184,7 @@ func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 }
 
 // HandleAndCommitEvents takes a set of contacts and events, handles the events and applies any hooks, and commits everything
-func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *OrgAssets, contactEvents map[*flows.Contact][]flows.Event) error {
+func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool, oa *OrgAssets, contactEvents map[*flows.Contact][]flows.Event) error {
 	// create scenes for each contact
 	scenes := make([]*Scene, 0, len(contactEvents))
 	for contact := range contactEvents {
@@ -237,7 +237,7 @@ func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa 
 }
 
 // ApplyModifiers modifies contacts by applying modifiers and handling the resultant events
-func ApplyModifiers(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
+func ApplyModifiers(ctx context.Context, db QueryerWithTx, rp *redis.Pool, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 

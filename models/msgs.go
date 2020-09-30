@@ -947,7 +947,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 }
 
 // MarkBroadcastSent marks the passed in broadcast as sent
-func MarkBroadcastSent(ctx context.Context, db *sqlx.DB, id BroadcastID) error {
+func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
 	// noop if it is a nil id
 	if id == NilBroadcastID {
 		return nil

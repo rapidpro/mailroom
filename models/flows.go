@@ -105,20 +105,20 @@ func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID ass
 	return flowID, err
 }
 
-func loadFlowByUUID(ctx context.Context, db *sqlx.DB, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
+func loadFlowByUUID(ctx context.Context, db Queryer, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
 	return loadFlow(ctx, db, selectFlowByUUIDSQL, orgID, flowUUID)
 }
 
-func loadFlowByID(ctx context.Context, db *sqlx.DB, orgID OrgID, flowID FlowID) (*Flow, error) {
+func loadFlowByID(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID) (*Flow, error) {
 	return loadFlow(ctx, db, selectFlowByIDSQL, orgID, flowID)
 }
 
 // loads the flow with the passed in UUID
-func loadFlow(ctx context.Context, db *sqlx.DB, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
+func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg interface{}) (*Flow, error) {
 	start := time.Now()
 	flow := &Flow{}
 
-	rows, err := db.Queryx(sql, orgID, arg)
+	rows, err := db.QueryxContext(ctx, sql, orgID, arg)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying flow by: %s", arg)
 	}

@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -275,7 +274,7 @@ ORDER BY
 `
 
 // GetUnfiredSchedules returns all unfired schedules
-func GetUnfiredSchedules(ctx context.Context, db *sqlx.DB) ([]*Schedule, error) {
+func GetUnfiredSchedules(ctx context.Context, db Queryer) ([]*Schedule, error) {
 	rows, err := db.QueryxContext(ctx, selectUnfiredSchedules)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting unfired schedules")

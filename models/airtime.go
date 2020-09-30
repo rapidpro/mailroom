@@ -76,7 +76,7 @@ RETURNING id
 `
 
 // InsertAirtimeTransfers inserts the passed in airtime transfers returning any errors encountered
-func InsertAirtimeTransfers(ctx context.Context, tx Queryer, transfers []*AirtimeTransfer) error {
+func InsertAirtimeTransfers(ctx context.Context, db Queryer, transfers []*AirtimeTransfer) error {
 	if len(transfers) == 0 {
 		return nil
 	}
@@ -86,7 +86,7 @@ func InsertAirtimeTransfers(ctx context.Context, tx Queryer, transfers []*Airtim
 		ts[i] = &transfers[i].t
 	}
 
-	return BulkQuery(ctx, "inserted airtime transfers", tx, insertAirtimeTransfersSQL, ts)
+	return BulkQuery(ctx, "inserted airtime transfers", db, insertAirtimeTransfersSQL, ts)
 }
 
 // MarshalJSON marshals into JSON. 0 values will become null

@@ -331,7 +331,7 @@ WHERE
 `
 
 // MarkEventsFired updates the passed in event fires with the fired time and result
-func MarkEventsFired(ctx context.Context, tx Queryer, fires []*EventFire, fired time.Time, result EventFireResult) error {
+func MarkEventsFired(ctx context.Context, db Queryer, fires []*EventFire, fired time.Time, result EventFireResult) error {
 	// set fired on all our values
 	updates := make([]interface{}, 0, len(fires))
 	for _, f := range fires {
@@ -340,7 +340,7 @@ func MarkEventsFired(ctx context.Context, tx Queryer, fires []*EventFire, fired 
 		updates = append(updates, f)
 	}
 
-	return BulkQuery(ctx, "mark events fired", tx, markEventsFired, updates)
+	return BulkQuery(ctx, "mark events fired", db, markEventsFired, updates)
 }
 
 const markEventsFired = `
@@ -358,7 +358,7 @@ WHERE
 `
 
 // DeleteEventFires deletes all event fires passed in (used when an event has been marked as inactive)
-func DeleteEventFires(ctx context.Context, db *sqlx.DB, fires []*EventFire) error {
+func DeleteEventFires(ctx context.Context, db Queryer, fires []*EventFire) error {
 	// build our list of ids
 	ids := make([]FireID, 0, len(fires))
 	for _, f := range fires {
@@ -403,7 +403,7 @@ type EventFire struct {
 }
 
 // LoadEventFires loads all the event fires with the passed in ids
-func LoadEventFires(ctx context.Context, db *sqlx.DB, ids []int64) ([]*EventFire, error) {
+func LoadEventFires(ctx context.Context, db Queryer, ids []int64) ([]*EventFire, error) {
 	start := time.Now()
 
 	q, vs, err := sqlx.In(loadEventFireSQL, ids)
@@ -675,7 +675,7 @@ WHERE
     gc.contactgroup_id = $1 AND c.is_active = TRUE AND ARRAY[$2]::text[] <@ (extract_jsonb_keys(c.fields)) IS NOT NULL
 `
 
-func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID GroupID, field *Field) ([]*eligibleContact, error) {
+func campaignEventEligibleContacts(ctx context.Context, db Queryer, groupID GroupID, field *Field) ([]*eligibleContact, error) {
 	var query string
 	var params []interface{}
 

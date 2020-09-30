@@ -87,7 +87,7 @@ func (t *Ticket) Config(key string) string {
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
-func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
+func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
 	ticketer := org.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
@@ -457,7 +457,7 @@ WHERE
 `
 
 // UpdateConfig updates the configuration of this ticketer with the given values
-func (t *Ticketer) UpdateConfig(ctx context.Context, db *sqlx.DB, add map[string]string, remove map[string]bool) error {
+func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]string, remove map[string]bool) error {
 	for key, value := range add {
 		t.t.Config[key] = value
 	}

@@ -5,12 +5,12 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/null"
+
 	"github.com/pkg/errors"
 )
 
@@ -56,8 +56,8 @@ const DoIncludeActive = IncludeActive(true)
 const DontIncludeActive = IncludeActive(false)
 
 // MarkStartComplete sets the status for the passed in flow start
-func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
+func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as complete")
 	}
@@ -65,8 +65,8 @@ func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error 
 }
 
 // MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
-func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contactCount int) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
+func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as started")
 	}
@@ -74,8 +74,8 @@ func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contact
 }
 
 // MarkStartFailed sets the status for the passed in flow start to F
-func MarkStartFailed(ctx context.Context, db *sqlx.DB, startID StartID) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
+func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as failed")
 	}

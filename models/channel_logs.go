@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/pkg/errors"
 )
@@ -82,7 +81,7 @@ func originalURL(r *http.Request) string {
 }
 
 // InsertChannelLogs writes the given channel logs to the db
-func InsertChannelLogs(ctx context.Context, db *sqlx.DB, logs []*ChannelLog) error {
+func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) error {
 	ls := make([]interface{}, len(logs))
 	for i := range logs {
 		ls[i] = &logs[i].l
@@ -96,7 +95,7 @@ func InsertChannelLogs(ctx context.Context, db *sqlx.DB, logs []*ChannelLog) err
 }
 
 // InsertChannelLog writes a channel log to the db returning the inserted log
-func InsertChannelLog(ctx context.Context, db *sqlx.DB,
+func InsertChannelLog(ctx context.Context, db Queryer,
 	desc string, isError bool, method string, url string, request []byte, status int, response []byte,
 	createdOn time.Time, elapsed time.Duration, channel *Channel, conn *ChannelConnection) (*ChannelLog, error) {
 

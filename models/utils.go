@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Queryer contains functionality common to sqlx.Tx and sqlx.DB so we can write code that works with either
 type Queryer interface {
 	dbutil.Queryer
 
@@ -20,6 +21,7 @@ type Queryer interface {
 	GetContext(ctx context.Context, value interface{}, query string, args ...interface{}) error
 }
 
+// QueryerWithTx adds support for beginning transactions
 type QueryerWithTx interface {
 	Queryer
 

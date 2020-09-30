@@ -146,9 +146,9 @@ func (h *HTTPLogger) Ticketer(t *Ticketer) flows.HTTPLogCallback {
 }
 
 // Insert this logger's logs into the database
-func (h *HTTPLogger) Insert(ctx context.Context, tx Queryer) error {
+func (h *HTTPLogger) Insert(ctx context.Context, db Queryer) error {
 	if len(h.logs) > 0 {
-		return InsertHTTPLogs(ctx, tx, h.logs)
+		return InsertHTTPLogs(ctx, db, h.logs)
 	}
 	return nil
 }
