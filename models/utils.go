@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -17,6 +18,12 @@ type Queryer interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
 	GetContext(ctx context.Context, value interface{}, query string, args ...interface{}) error
+}
+
+type QueryerWithTx interface {
+	Queryer
+
+	BeginTxx(ctx context.Context, opts *sql.TxOptions) (*sqlx.Tx, error)
 }
 
 // Exec calls ExecContext on the passed in Queryer, logging time taken if any rows were affected

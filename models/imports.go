@@ -264,9 +264,19 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db *sqlx.DB, impo
 	b.NumErrored = numErrored
 	b.Errors = errorsJSON
 	b.FinishedOn = &now
-	_, err = db.ExecContext(ctx,
-		`UPDATE contacts_contactimportbatch SET status = $2, num_created = $3, num_updated = $4, num_errored = $5, errors = $6, finished_on = $7 WHERE id = $1`,
-		b.ID, b.Status, b.NumCreated, b.NumUpdated, b.NumErrored, b.Errors, b.FinishedOn,
+	_, err = db.NamedExecContext(ctx,
+		`UPDATE 
+			contacts_contactimportbatch
+		SET 
+			status = :status, 
+			num_created = :num_created, 
+			num_updated = :num_updated, 
+			num_errored = :num_errored, 
+			errors = :errors, 
+			finished_on = :finished_on 
+		WHERE 
+			id = :id`,
+		b,
 	)
 	return err
 }

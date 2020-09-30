@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -585,7 +586,7 @@ func TestGetOrCreateContact(t *testing.T) {
 	newContact := func() models.ContactID { maxContactID++; return maxContactID }
 	prevContact := func() models.ContactID { return maxContactID }
 
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
 	tcs := []struct {
@@ -651,12 +652,49 @@ func TestGetOrCreateContact(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		contact, flowContact, err := models.GetOrCreateContact(ctx, db, org, tc.URNs)
+		contact, flowContact, err := models.GetOrCreateContact(ctx, db, oa, tc.URNs)
 		assert.NoError(t, err, "%d: error creating contact", i)
 
 		assert.Equal(t, tc.ContactID, contact.ID(), "%d: contact id mismatch", i)
 		assert.Equal(t, tc.ContactURNs, flowContact.URNs().RawURNs(), "%d: URNs mismatch", i)
 	}
+}
+
+func TestGetOrCreateContactRace(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	assert.NoError(t, err)
+
+	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
+		// Make beginning a transaction take a while to create race condition. All threads will fetch
+		// URN owners and decide nobody owns the URN, so all threads will try to create a new contact.
+		if funcName == "BeginTxx" {
+			time.Sleep(100 * time.Millisecond)
+		}
+		return nil
+	})
+
+	var contacts [2]*models.Contact
+	var errs [2]error
+	wg := &sync.WaitGroup{}
+
+	getOrCreate := func(i int) {
+		defer wg.Done()
+		contacts[i], _, errs[i] = models.GetOrCreateContact(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
+	}
+
+	wg.Add(2)
+	go getOrCreate(0)
+	go getOrCreate(1)
+
+	// let both finish
+	wg.Wait()
+
+	require.NoError(t, errs[0])
+	require.NoError(t, errs[1])
+	assert.Equal(t, contacts[0].ID(), contacts[1].ID())
 }
 
 func TestGetContactIDsFromReferences(t *testing.T) {

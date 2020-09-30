@@ -58,3 +58,10 @@ func (d *MockDB) GetContext(ctx context.Context, value interface{}, query string
 	}
 	return d.real.GetContext(ctx, value, query, args...)
 }
+
+func (d *MockDB) BeginTxx(ctx context.Context, opts *sql.TxOptions) (*sqlx.Tx, error) {
+	if err := d.check("BeginTxx"); err != nil {
+		return nil, err
+	}
+	return d.real.BeginTxx(ctx, opts)
+}
