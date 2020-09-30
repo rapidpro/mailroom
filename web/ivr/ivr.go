@@ -102,7 +102,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, w h
 	}
 
 	// get the contact for this URN
-	contact, _, err := models.GetOrCreateContact(ctx, s.DB, oa, urn)
+	contact, _, err := models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{urn})
 	if err != nil {
 		return channel, nil, client.WriteErrorResponse(w, errors.Wrapf(err, "unable to get contact by urn"))
 	}

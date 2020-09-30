@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -513,37 +514,61 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=998", bob.URNs()[2].String())
 }
 
-func TestContactsFromURN(t *testing.T) {
+func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 	testsuite.Reset()
 
-	var maxContactID int64
-	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
+	// add an orphaned URN
+	testdata.InsertContactURN(t, db, models.Org1, models.NilContactID, urns.URN("telegram:200001"), 100)
 
-	tcs := []struct {
-		OrgID     models.OrgID
-		URN       urns.URN
-		ContactID models.ContactID
-	}{
-		{models.Org1, models.CathyURN, models.CathyID},
-		{models.Org1, urns.URN(models.CathyURN.String() + "?foo=bar"), models.CathyID},
-		{models.Org1, urns.URN("telegram:12345678"), models.ContactID(maxContactID + 1)},
-		{models.Org1, urns.URN("telegram:12345678"), models.ContactID(maxContactID + 1)},
-	}
+	var maxContactID models.ContactID
+	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
+	newContact := func() models.ContactID { maxContactID++; return maxContactID }
+	prevContact := func() models.ContactID { return maxContactID }
 
 	org, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	for i, tc := range tcs {
-		ids, err := models.ContactIDsFromURNs(ctx, db, org, []urns.URN{tc.URN})
-		assert.NoError(t, err, "%d: error getting contact ids", i)
+	tcs := []struct {
+		OrgID      models.OrgID
+		URNs       []urns.URN
+		ContactIDs map[urns.URN]models.ContactID
+	}{
+		{
+			models.Org1,
+			[]urns.URN{models.CathyURN},
+			map[urns.URN]models.ContactID{models.CathyURN: models.CathyID},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN(models.CathyURN.String() + "?foo=bar")},
+			map[urns.URN]models.ContactID{urns.URN(models.CathyURN.String() + "?foo=bar"): models.CathyID},
+		},
+		{
+			models.Org1,
+			[]urns.URN{models.CathyURN, urns.URN("telegram:100001")},
+			map[urns.URN]models.ContactID{
+				models.CathyURN:             models.CathyID,
+				urns.URN("telegram:100001"): newContact(),
+			},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100001")},
+			map[urns.URN]models.ContactID{urns.URN("telegram:100001"): prevContact()},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:200001")},
+			map[urns.URN]models.ContactID{urns.URN("telegram:200001"): newContact()}, // new contact assigned orphaned URN
+		},
+	}
 
-		if len(ids) != 1 {
-			assert.Fail(t, "%d: unexpected number of ids returned", i)
-			continue
-		}
-		assert.Equal(t, tc.ContactID, ids[tc.URN], "%d: mismatch in contact ids", i)
+	for i, tc := range tcs {
+		ids, err := models.GetOrCreateContactIDsFromURNs(ctx, db, org, tc.URNs)
+		assert.NoError(t, err, "%d: error getting contact ids", i)
+		assert.Equal(t, tc.ContactIDs, ids, "%d: mismatch in contact ids", i)
 	}
 }
 
@@ -552,28 +577,136 @@ func TestGetOrCreateContact(t *testing.T) {
 	db := testsuite.DB()
 	testsuite.Reset()
 
-	var maxContactID int64
+	// add some orphaned URNs
+	testdata.InsertContactURN(t, db, models.Org1, models.NilContactID, urns.URN("telegram:200001"), 100)
+	testdata.InsertContactURN(t, db, models.Org1, models.NilContactID, urns.URN("telegram:200002"), 100)
+
+	var maxContactID models.ContactID
 	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
+	newContact := func() models.ContactID { maxContactID++; return maxContactID }
+	prevContact := func() models.ContactID { return maxContactID }
 
-	tcs := []struct {
-		OrgID     models.OrgID
-		URN       urns.URN
-		ContactID models.ContactID
-	}{
-		{models.Org1, models.CathyURN, models.CathyID},
-		{models.Org1, urns.URN(models.CathyURN.String() + "?foo=bar"), models.CathyID},
-		{models.Org1, urns.URN("telegram:12345678"), models.ContactID(maxContactID + 3)},
-		{models.Org1, urns.URN("telegram:12345678"), models.ContactID(maxContactID + 3)},
-	}
-
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	assert.NoError(t, err)
 
-	for i, tc := range tcs {
-		contact, _, err := models.GetOrCreateContact(ctx, db, org, tc.URN)
-		assert.NoError(t, err, "%d: error creating contact", i)
-		assert.Equal(t, tc.ContactID, contact.ID(), "%d: mismatch in contact id", i)
+	tcs := []struct {
+		OrgID       models.OrgID
+		URNs        []urns.URN
+		ContactID   models.ContactID
+		ContactURNs []urns.URN
+	}{
+		{
+			models.Org1,
+			[]urns.URN{models.CathyURN},
+			models.CathyID,
+			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN(models.CathyURN.String() + "?foo=bar")},
+			models.CathyID, // only URN identity is considered
+			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100001")},
+			newContact(), // creates new contact
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100001")},
+			prevContact(), // returns the same created contact
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100001"), urns.URN("telegram:100002")},
+			prevContact(), // same again as other URNs don't exist
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100002"), urns.URN("telegram:100001")},
+			prevContact(), // same again as other URNs don't exist
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:100001")},
+			prevContact(), // same again as other URNs are orphaned
+			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100003"), urns.URN("telegram:100004")}, // 2 new URNs
+			newContact(),
+			[]urns.URN{"telegram:100003?id=20124&priority=1000", "telegram:100004?id=20125&priority=999"},
+		},
+		{
+			models.Org1,
+			[]urns.URN{urns.URN("telegram:100005"), urns.URN("telegram:200002")}, // 1 new, 1 orphaned
+			newContact(),
+			[]urns.URN{"telegram:100005?id=20126&priority=1000", "telegram:200002?id=20122&priority=999"},
+		},
 	}
+
+	for i, tc := range tcs {
+		contact, flowContact, err := models.GetOrCreateContact(ctx, db, oa, tc.URNs)
+		assert.NoError(t, err, "%d: error creating contact", i)
+
+		assert.Equal(t, tc.ContactID, contact.ID(), "%d: contact id mismatch", i)
+		assert.Equal(t, tc.ContactURNs, flowContact.URNs().RawURNs(), "%d: URNs mismatch", i)
+	}
+}
+
+func TestGetOrCreateContactRace(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	assert.NoError(t, err)
+
+	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
+		// Make beginning a transaction take a while to create race condition. All threads will fetch
+		// URN owners and decide nobody owns the URN, so all threads will try to create a new contact.
+		if funcName == "BeginTxx" {
+			time.Sleep(100 * time.Millisecond)
+		}
+		return nil
+	})
+
+	var contacts [2]*models.Contact
+	var errs [2]error
+	wg := &sync.WaitGroup{}
+
+	getOrCreate := func(i int) {
+		defer wg.Done()
+		contacts[i], _, errs[i] = models.GetOrCreateContact(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
+	}
+
+	wg.Add(2)
+	go getOrCreate(0)
+	go getOrCreate(1)
+
+	// let both finish
+	wg.Wait()
+
+	require.NoError(t, errs[0])
+	require.NoError(t, errs[1])
+	assert.Equal(t, contacts[0].ID(), contacts[1].ID())
+}
+
+func TestGetContactIDsFromReferences(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	ids, err := models.GetContactIDsFromReferences(ctx, db, models.Org1, []*flows.ContactReference{
+		flows.NewContactReference(models.CathyUUID, "Cathy"),
+		flows.NewContactReference(models.BobUUID, "Bob"),
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []models.ContactID{models.CathyID, models.BobID}, ids)
 }
 
 func TestStopContact(t *testing.T) {

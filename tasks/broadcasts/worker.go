@@ -62,7 +62,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 	}
 
 	// get the contact ids for our URNs
-	urnMap, err := models.ContactIDsFromURNs(ctx, db, oa, bcast.URNs())
+	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, db, oa, bcast.URNs())
 	if err != nil {
 		return errors.Wrapf(err, "error getting contact ids for urns")
 	}

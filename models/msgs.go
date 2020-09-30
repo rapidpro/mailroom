@@ -683,7 +683,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 	}
 
 	// resolve our contact references
-	contactIDs, err := ContactIDsFromReferences(ctx, tx, org, event.Contacts)
+	contactIDs, err := GetContactIDsFromReferences(ctx, tx, org.OrgID(), event.Contacts)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error resolving contact references")
 	}

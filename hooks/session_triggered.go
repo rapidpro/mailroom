@@ -86,7 +86,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			}
 
 			// load our contacts by uuid
-			contactIDs, err := models.ContactIDsFromReferences(ctx, tx, oa, event.Contacts)
+			contactIDs, err := models.GetContactIDsFromReferences(ctx, tx, oa.OrgID(), event.Contacts)
 			if err != nil {
 				return errors.Wrapf(err, "error loading contacts by reference")
 			}
