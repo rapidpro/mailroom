@@ -49,11 +49,11 @@ func (g *Group) Name() string { return g.g.Name }
 // Query returns the query string (if any) for this group
 func (g *Group) Query() string { return g.g.Query }
 
-// loads the groups for the passed in org
-func loadGroups(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Group, error) {
+// LoadGroups loads the groups for the passed in org
+func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectGroupsSQL, orgID)
+	rows, err := db.QueryxContext(ctx, selectGroupsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying groups for org: %d", orgID)
 	}
