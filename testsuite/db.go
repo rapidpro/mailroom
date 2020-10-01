@@ -3,27 +3,37 @@ package testsuite
 import (
 	"context"
 	"database/sql"
+	"sync"
 
 	"github.com/jmoiron/sqlx"
 )
 
+// MockDB is a mockable proxy to a real sqlx.DB that implements models.Queryer
 type MockDB struct {
-	real       *sqlx.DB
-	callCounts map[string]int
-	shouldErr  func(funcName string, call int) error
+	real            *sqlx.DB
+	callCounts      map[string]int
+	callCountsMutex *sync.Mutex
+
+	// invoked before each queryer method call giving tests a chance to define an error return, sleep etc
+	shouldErr func(funcName string, call int) error
 }
 
+// NewMockDB creates a new mock over the given database connection
 func NewMockDB(db *sqlx.DB, shouldErr func(funcName string, call int) error) *MockDB {
 	return &MockDB{
-		real:       db,
-		callCounts: make(map[string]int),
-		shouldErr:  shouldErr,
+		real:            db,
+		callCounts:      make(map[string]int),
+		callCountsMutex: &sync.Mutex{},
+		shouldErr:       shouldErr,
 	}
 }
 
 func (d *MockDB) check(funcName string) error {
+	d.callCountsMutex.Lock()
 	call := d.callCounts[funcName]
 	d.callCounts[funcName]++
+	d.callCountsMutex.Unlock()
+
 	return d.shouldErr(funcName, call)
 }
 
