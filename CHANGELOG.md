@@ -1,3 +1,7 @@
+v5.7.27
+----------
+ * If a flow start task creates new contacts, save those back to the start
+
 v5.7.26
 ----------
  * Add mockable DB to enable testing database errors
