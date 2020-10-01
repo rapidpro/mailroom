@@ -65,10 +65,28 @@ func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
 }
 
 // MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
-func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int) error {
+func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int, createdContactIDs []ContactID) error {
 	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as started")
+	}
+
+	// if we created contacts, add them to the start for logging
+	if len(createdContactIDs) > 0 {
+		type startContact struct {
+			StartID   StartID   `db:"flowstart_id"`
+			ContactID ContactID `db:"contact_id"`
+		}
+
+		args := make([]interface{}, len(createdContactIDs))
+		for i, id := range createdContactIDs {
+			args[i] = &startContact{StartID: startID, ContactID: id}
+		}
+		return BulkQuery(
+			ctx, "adding created contacts to flow start", db,
+			`INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES(:flowstart_id, :contact_id) ON CONFLICT DO NOTHING`,
+			args,
+		)
 	}
 	return nil
 }

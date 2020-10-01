@@ -60,8 +60,10 @@ func handleFlowStart(ctx context.Context, mr *mailroom.Mailroom, task *queue.Tas
 
 // CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
 func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *elastic.Client, start *models.FlowStart) error {
-	// we are building a set of contact ids, start with the explicit ones
 	contactIDs := make(map[models.ContactID]bool)
+	createdContactIDs := make([]models.ContactID, 0)
+
+	// we are building a set of contact ids, start with the explicit ones
 	for _, id := range start.ContactIDs() {
 		contactIDs[id] = true
 	}
@@ -78,6 +80,9 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 			return errors.Wrapf(err, "error getting contact ids from urns")
 		}
 		for _, id := range urnContactIDs {
+			if !contactIDs[id] {
+				createdContactIDs = append(createdContactIDs, id)
+			}
 			contactIDs[id] = true
 		}
 	}
@@ -89,6 +94,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 			return errors.Wrapf(err, "error creating new contact")
 		}
 		contactIDs[contact.ID()] = true
+		createdContactIDs = append(createdContactIDs, contact.ID())
 	}
 
 	// now add all the ids for our groups
@@ -125,7 +131,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 	defer rc.Close()
 
 	// mark our start as starting, last task will mark as complete
-	err = models.MarkStartStarted(ctx, db, start.ID(), len(contactIDs))
+	err = models.MarkStartStarted(ctx, db, start.ID(), len(contactIDs), createdContactIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error marking start as started")
 	}
