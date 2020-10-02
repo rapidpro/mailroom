@@ -202,5 +202,20 @@ func handleResolve(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error getting or creating contact")
 	}
 
-	return map[string]interface{}{"contact": contact}, http.StatusOK, nil
+	// find the URN on the contact
+	urn := request.URN.Normalize(string(oa.Env().DefaultCountry()))
+	for _, u := range contact.URNs() {
+		if urn.Identity() == u.URN().Identity() {
+			urn = u.URN()
+			break
+		}
+	}
+
+	return map[string]interface{}{
+		"contact": contact,
+		"urn": map[string]interface{}{
+			"id":       models.GetURNInt(urn, "id"),
+			"identity": urn.Identity(),
+		},
+	}, http.StatusOK, nil
 }
