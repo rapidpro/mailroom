@@ -194,65 +194,75 @@ func TestGetOrCreateContact(t *testing.T) {
 		URNs        []urns.URN
 		ContactID   models.ContactID
 		ContactURNs []urns.URN
+		ChannelID   models.ChannelID
 	}{
 		{
 			models.Org1,
 			[]urns.URN{models.CathyURN},
 			models.CathyID,
 			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
+			models.NilChannelID,
 		},
 		{
 			models.Org1,
 			[]urns.URN{urns.URN(models.CathyURN.String() + "?foo=bar")},
 			models.CathyID, // only URN identity is considered
 			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
+			models.NilChannelID,
 		},
 		{
 			models.Org1,
 			[]urns.URN{urns.URN("telegram:100001")},
 			newContact(), // creates new contact
-			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			models.TwilioChannelID,
 		},
 		{
 			models.Org1,
 			[]urns.URN{urns.URN("telegram:100001")},
 			prevContact(), // returns the same created contact
-			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			models.NilChannelID,
 		},
 		{
 			models.Org1,
 			[]urns.URN{urns.URN("telegram:100001"), urns.URN("telegram:100002")},
 			prevContact(), // same again as other URNs don't exist
-			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			models.NilChannelID,
 		},
 		{
 			models.Org1,
 			[]urns.URN{urns.URN("telegram:100002"), urns.URN("telegram:100001")},
 			prevContact(), // same again as other URNs don't exist
-			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			models.NilChannelID,
 		},
 		{
 			models.Org1,
 			[]urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:100001")},
 			prevContact(), // same again as other URNs are orphaned
-			[]urns.URN{"telegram:100001?id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			models.NilChannelID,
 		},
 		{
 			models.Org1,
 			[]urns.URN{urns.URN("telegram:100003"), urns.URN("telegram:100004")}, // 2 new URNs
 			newContact(),
 			[]urns.URN{"telegram:100003?id=20124&priority=1000", "telegram:100004?id=20125&priority=999"},
+			models.NilChannelID,
 		},
 		{
 			models.Org1,
 			[]urns.URN{urns.URN("telegram:100005"), urns.URN("telegram:200002")}, // 1 new, 1 orphaned
 			newContact(),
 			[]urns.URN{"telegram:100005?id=20126&priority=1000", "telegram:200002?id=20122&priority=999"},
+			models.NilChannelID,
 		},
 	}
 
 	for i, tc := range tcs {
-		contact, flowContact, err := models.GetOrCreateContact(ctx, db, oa, tc.URNs)
+		contact, flowContact, err := models.GetOrCreateContact(ctx, db, oa, tc.URNs, tc.ChannelID)
 		assert.NoError(t, err, "%d: error creating contact", i)
 
 		assert.Equal(t, tc.ContactID, contact.ID(), "%d: contact id mismatch", i)
@@ -282,7 +292,7 @@ func TestGetOrCreateContactRace(t *testing.T) {
 
 	getOrCreate := func(i int) {
 		defer wg.Done()
-		contacts[i], _, errs[i] = models.GetOrCreateContact(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
+		contacts[i], _, errs[i] = models.GetOrCreateContact(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")}, models.NilChannelID)
 	}
 
 	wg.Add(2)

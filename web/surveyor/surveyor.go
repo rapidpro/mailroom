@@ -96,7 +96,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		// create / fetch our contact based on the highest priority URN
 		urn := fs.Contact().URNs()[0].URN()
 
-		_, flowContact, err = models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{urn})
+		_, flowContact, err = models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{urn}, models.NilChannelID)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 		}

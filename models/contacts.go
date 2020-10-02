@@ -579,7 +579,7 @@ func CreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, userID 
 		return nil, nil, errors.New("URNs in use by other contacts")
 	}
 
-	contactID, err := tryInsertContactAndURNs(ctx, db, oa.OrgID(), userID, name, language, urnz)
+	contactID, err := tryInsertContactAndURNs(ctx, db, oa.OrgID(), userID, name, language, urnz, NilChannelID)
 	if err != nil {
 		// always possible that another thread created a contact with these URNs after we checked above
 		if dbutil.IsUniqueViolation(err) {
@@ -615,13 +615,13 @@ func CreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, userID 
 // * If URNs exists and belongs to a single contact it returns that contact (other URNs are not assigned to the contact).
 // * If URNs exists and belongs to multiple contacts it will return an error.
 //
-func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN) (*Contact, *flows.Contact, error) {
+func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN, channelID ChannelID) (*Contact, *flows.Contact, error) {
 	// ensure all URNs are normalized
 	for i, urn := range urnz {
 		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
 	}
 
-	contactID, created, err := getOrCreateContact(ctx, db, oa.OrgID(), urnz)
+	contactID, created, err := getOrCreateContact(ctx, db, oa.OrgID(), urnz, channelID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -649,7 +649,7 @@ func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, ur
 	return contact, flowContact, nil
 }
 
-func getOrCreateContact(ctx context.Context, db QueryerWithTx, orgID OrgID, urnz []urns.URN) (ContactID, bool, error) {
+func getOrCreateContact(ctx context.Context, db QueryerWithTx, orgID OrgID, urnz []urns.URN, channelID ChannelID) (ContactID, bool, error) {
 	// find current owners of these URNs
 	owners, err := contactIDsFromURNs(ctx, db, orgID, urnz)
 	if err != nil {
@@ -663,7 +663,7 @@ func getOrCreateContact(ctx context.Context, db QueryerWithTx, orgID OrgID, urnz
 		return uniqueOwners[0], false, nil
 	}
 
-	contactID, err := tryInsertContactAndURNs(ctx, db, orgID, UserID(1), "", envs.NilLanguage, urnz)
+	contactID, err := tryInsertContactAndURNs(ctx, db, orgID, UserID(1), "", envs.NilLanguage, urnz, channelID)
 	if err == nil {
 		return contactID, true, nil
 	}
@@ -704,13 +704,13 @@ func uniqueContactIDs(urnMap map[urns.URN]ContactID) []ContactID {
 
 // Tries to create a new contact for the passed in org with the passed in URNs. Returned error can be tested with `dbutil.IsUniqueViolation` to
 // determine if problem was one or more of the URNs already exist and are assigned to other contacts.
-func tryInsertContactAndURNs(ctx context.Context, db QueryerWithTx, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN) (ContactID, error) {
+func tryInsertContactAndURNs(ctx context.Context, db QueryerWithTx, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN, channelID ChannelID) (ContactID, error) {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return NilContactID, errors.Wrapf(err, "error beginning transaction")
 	}
 
-	contactID, err := insertContactAndURNs(ctx, tx, orgID, userID, name, language, urnz)
+	contactID, err := insertContactAndURNs(ctx, tx, orgID, userID, name, language, urnz, channelID)
 	if err != nil {
 		tx.Rollback()
 		return NilContactID, err
@@ -725,7 +725,7 @@ func tryInsertContactAndURNs(ctx context.Context, db QueryerWithTx, orgID OrgID,
 	return contactID, nil
 }
 
-func insertContactAndURNs(ctx context.Context, db Queryer, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN) (ContactID, error) {
+func insertContactAndURNs(ctx context.Context, db Queryer, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN, channelID ChannelID) (ContactID, error) {
 	if userID == NilUserID {
 		userID = UserID(1)
 	}
@@ -757,11 +757,10 @@ func insertContactAndURNs(ctx context.Context, db Queryer, orgID OrgID, userID U
 				return NilContactID, errors.Wrapf(err, "error attaching existing URN to new contact")
 			}
 		} else {
-			_, err := db.ExecContext(
-				ctx,
+			_, err := db.ExecContext(ctx,
 				`INSERT INTO contacts_contacturn(org_id, identity, path, scheme, display, auth, priority, channel_id, contact_id)
 			     VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-				orgID, urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), GetURNAuth(urn), priority, nil, contactID,
+				orgID, urn.Identity(), urn.Path(), urn.Scheme(), urn.Display(), GetURNAuth(urn), priority, channelID, contactID,
 			)
 			if err != nil {
 				return NilContactID, err

@@ -192,7 +192,7 @@ func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool
 		scenes = append(scenes, scene)
 	}
 
-	// begin the transaction for handling and pre-commit hooks
+	// begin the transaction for pre-commit hooks
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error beginning transaction")

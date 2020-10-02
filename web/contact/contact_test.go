@@ -52,3 +52,15 @@ func TestModifyContacts(t *testing.T) {
 
 	models.FlushCache()
 }
+
+func TestResolveContacts(t *testing.T) {
+	testsuite.Reset()
+	db := testsuite.DB()
+
+	// detach Cathy's tel URN
+	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.CathyID)
+
+	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
+
+	web.RunWebTests(t, "testdata/resolve.json")
+}

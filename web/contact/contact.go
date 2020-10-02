@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/goflow"
@@ -17,6 +18,7 @@ import (
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(handleCreate))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(handleResolve))
 }
 
 // Request to create a new contact.
@@ -39,7 +41,7 @@ type createRequest struct {
 	Contact *models.ContactSpec `json:"contact"  validate:"required"`
 }
 
-// handles a request to create the given contacts
+// handles a request to create the given contact
 func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &createRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
@@ -128,12 +130,6 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	// clone it as we will modify flows
-	oa, err = oa.Clone(s.CTX, s.DB)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
-	}
-
 	// read the modifiers from the request
 	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
 	if err != nil {
@@ -172,4 +168,54 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	return results, http.StatusOK, nil
+}
+
+// Request to resolve a contact based on a channel and URN
+//
+//   {
+//     "org_id": 1,
+//     "channel_id": 234,
+//     "urn": "tel:+250788123123"
+//   }
+//
+type resolveRequest struct {
+	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
+	ChannelID models.ChannelID `json:"channel_id" validate:"required"`
+	URN       urns.URN         `json:"urn"        validate:"required"`
+}
+
+// handles a request to resolve a contact
+func handleResolve(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &resolveRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	_, contact, err := models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{request.URN}, request.ChannelID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error getting or creating contact")
+	}
+
+	// find the URN on the contact
+	urn := request.URN.Normalize(string(oa.Env().DefaultCountry()))
+	for _, u := range contact.URNs() {
+		if urn.Identity() == u.URN().Identity() {
+			urn = u.URN()
+			break
+		}
+	}
+
+	return map[string]interface{}{
+		"contact": contact,
+		"urn": map[string]interface{}{
+			"id":       models.GetURNInt(urn, "id"),
+			"identity": urn.Identity(),
+		},
+	}, http.StatusOK, nil
 }
