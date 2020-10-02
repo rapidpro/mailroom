@@ -1,3 +1,7 @@
+v5.7.28
+----------
+ * Add contact/resolve endpoint to assist with channel events still handled in RP
+
 v5.7.27
 ----------
  * If a flow start task creates new contacts, save those back to the start
