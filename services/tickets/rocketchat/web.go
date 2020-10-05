@@ -66,7 +66,7 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 			return err, http.StatusBadRequest, nil
 		}
 
-		_, err = tickets.SendReply(ctx, s.DB, s.RP, ticket, data.Text)
+		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, nil)
 
 	case "close-room":
 		err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)

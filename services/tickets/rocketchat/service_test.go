@@ -1,14 +1,14 @@
 package rocketchat_test
 
 import (
+	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/goflow/utils/dates"
-	"github.com/nyaruka/goflow/utils/httpx"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	"github.com/stretchr/testify/assert"
@@ -85,11 +85,11 @@ func TestOpenAndForward(t *testing.T) {
 		"contact-display": "Cathy",
 	})
 	logger = &flows.HTTPLogger{}
-	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", logger.Log)
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, logger.Log)
 	assert.EqualError(t, err, "error calling RocketChat: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
-	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", logger.Log)
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, logger.Log)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
 }

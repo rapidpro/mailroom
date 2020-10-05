@@ -3,8 +3,8 @@ package rocketchat
 import (
 	"bytes"
 	"fmt"
-	"github.com/nyaruka/goflow/utils/httpx"
-	"github.com/nyaruka/goflow/utils/jsonx"
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/pkg/errors"
 	"io"
 	"net/http"
@@ -125,8 +125,8 @@ func (c *Client) CloseRoom(visitor *Visitor) (*httpx.Trace, error) {
 }
 
 type VisitorMsg struct {
-	Visitor     Visitor  `json:"visitor"`
-	Text        string   `json:"text"`
+	Visitor Visitor `json:"visitor"`
+	Text    string  `json:"text"`
 }
 
 func (c *Client) SendMessage(msg *VisitorMsg) (string, *httpx.Trace, error) {

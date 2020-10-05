@@ -1,7 +1,7 @@
 package rocketchat_test
 
 import (
-	"github.com/nyaruka/goflow/utils/httpx"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -62,7 +62,7 @@ func TestCloseRoom(t *testing.T) {
 	}))
 
 	client := rocketchat.NewClient(http.DefaultClient, nil, baseURL, secret)
-	visitor := &rocketchat.Visitor{ Token: "1234" }
+	visitor := &rocketchat.Visitor{Token: "1234"}
 
 	_, err := client.CloseRoom(visitor)
 	assert.EqualError(t, err, "unable to connect to server")
@@ -88,8 +88,8 @@ func TestSendMessage(t *testing.T) {
 
 	client := rocketchat.NewClient(http.DefaultClient, nil, baseURL, secret)
 	msg := &rocketchat.VisitorMsg{
-		Visitor: rocketchat.Visitor{ Token: "1234" },
-		Text: "Can you help me?",
+		Visitor: rocketchat.Visitor{Token: "1234"},
+		Text:    "Can you help me?",
 	}
 
 	_, _, err := client.SendMessage(msg)
@@ -97,7 +97,6 @@ func TestSendMessage(t *testing.T) {
 
 	_, _, err = client.SendMessage(msg)
 	assert.EqualError(t, err, "Could not find a room for visitor token: 1234")
-
 
 	id, trace, err := client.SendMessage(msg)
 	assert.NoError(t, err)
