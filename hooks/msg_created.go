@@ -63,7 +63,7 @@ func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 		if len(courierMsgs) > 0 {
 			// if our scene has a timeout, set it on our last message
 			if s.Session().Timeout() != nil && s.Session().WaitStartedOn() != nil {
-				courierMsgs[len(courierMsgs)-1].SetTimeout(s.SessionID(), *s.Session().WaitStartedOn(), *s.Session().Timeout())
+				courierMsgs[len(courierMsgs)-1].SetTimeout(*s.Session().WaitStartedOn(), *s.Session().Timeout())
 			}
 
 			log := log.WithField("messages", courierMsgs).WithField("scene", s.SessionID)
@@ -219,6 +219,9 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mode
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
+
+	// include some information about the session
+	msg.SetSession(scene.Session().ID(), scene.Session().Status())
 
 	// set our reply to as well (will be noop in cases when there is no incoming message)
 	msg.SetResponseTo(scene.Session().IncomingMsgID(), scene.Session().IncomingMsgExternalID())

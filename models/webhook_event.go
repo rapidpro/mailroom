@@ -50,5 +50,5 @@ func InsertWebhookEvents(ctx context.Context, db Queryer, events []*WebhookEvent
 		is[i] = &events[i].e
 	}
 
-	return BulkSQL(ctx, "inserted webhook events", db, insertWebhookEventsSQL, is)
+	return BulkQuery(ctx, "inserted webhook events", db, insertWebhookEventsSQL, is)
 }

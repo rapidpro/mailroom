@@ -9,6 +9,7 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -132,7 +133,7 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 	channels := make([]assets.Channel, 0, 2)
 	for rows.Next() {
 		channel := &Channel{}
-		err := readJSONRow(rows, &channel.c)
+		err := dbutil.ReadJSONRow(rows, &channel.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling channel")
 		}
@@ -180,7 +181,7 @@ ORDER BY
 `
 
 // OrgIDForChannelUUID returns the org id for the passed in channel UUID if any
-func OrgIDForChannelUUID(ctx context.Context, db *sqlx.DB, channelUUID assets.ChannelUUID) (OrgID, error) {
+func OrgIDForChannelUUID(ctx context.Context, db Queryer, channelUUID assets.ChannelUUID) (OrgID, error) {
 	var orgID OrgID
 	err := db.GetContext(ctx, &orgID, `SELECT org_id FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
 	if err != nil {

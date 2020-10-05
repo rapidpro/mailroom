@@ -10,7 +10,7 @@ import (
 
 func TestContactNameChanged(t *testing.T) {
 	tcs := []HookTestCase{
-		HookTestCase{
+		{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
 					actions.NewSetContactName(newActionUUID(), "Fred"),
@@ -18,6 +18,9 @@ func TestContactNameChanged(t *testing.T) {
 				},
 				models.GeorgeID: []flows.Action{
 					actions.NewSetContactName(newActionUUID(), "Geoff Newman"),
+				},
+				models.BobID: []flows.Action{
+					actions.NewSetContactName(newActionUUID(), ""),
 				},
 				models.AlexandriaID: []flows.Action{
 					actions.NewSetContactName(newActionUUID(), "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
@@ -34,7 +37,7 @@ func TestContactNameChanged(t *testing.T) {
 					Count: 1,
 				},
 				{
-					SQL:   "select count(*) from contacts_contact where name = 'Bob' and id = $1",
+					SQL:   "select count(*) from contacts_contact where name IS NULL and id = $1",
 					Args:  []interface{}{models.BobID},
 					Count: 1,
 				},

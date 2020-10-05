@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
+
 	"github.com/pkg/errors"
 )
 
@@ -273,7 +274,7 @@ ORDER BY
 `
 
 // GetUnfiredSchedules returns all unfired schedules
-func GetUnfiredSchedules(ctx context.Context, db *sqlx.DB) ([]*Schedule, error) {
+func GetUnfiredSchedules(ctx context.Context, db Queryer) ([]*Schedule, error) {
 	rows, err := db.QueryxContext(ctx, selectUnfiredSchedules)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting unfired schedules")
@@ -283,7 +284,7 @@ func GetUnfiredSchedules(ctx context.Context, db *sqlx.DB) ([]*Schedule, error) 
 	unfired := make([]*Schedule, 0, 10)
 	for rows.Next() {
 		s := &Schedule{}
-		err := readJSONRow(rows, &s.s)
+		err := dbutil.ReadJSONRow(rows, &s.s)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading schedule")
 		}

@@ -4,18 +4,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestAddContactURN(t *testing.T) {
-	// add a URN to george that cathy will steal
 	db := testsuite.DB()
-	db.MustExec(
-		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 100)`, models.GeorgeID)
+
+	// add a URN to george that cathy will steal
+	testdata.InsertContactURN(t, db, models.Org1, models.GeorgeID, urns.URN("tel:+12065551212"), 100)
 
 	now := time.Now()
 

@@ -2,7 +2,6 @@ package zendesk
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nyaruka/goflow/utils/httpx"
-	"github.com/nyaruka/goflow/utils/jsonx"
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 )
 
 type baseClient struct {
@@ -224,13 +223,19 @@ func NewPushClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subd
 	return &PushClient{baseClient: newBaseClient(httpClient, httpRetries, subdomain, token)}
 }
 
+// FieldValue is a value for the named field
+type FieldValue struct {
+	ID    string `json:"id"`
+	Value string `json:"value"`
+}
+
 // Author see https://developer.zendesk.com/rest_api/docs/support/channel_framework#author-object
 type Author struct {
-	ExternalID string          `json:"external_id"`
-	Name       string          `json:"name,omitempty"`
-	ImageURL   string          `json:"image_url,omitempty"`
-	Locale     string          `json:"locale,omitempty"`
-	Fields     json.RawMessage `json:"fields,omitempty"`
+	ExternalID string       `json:"external_id"`
+	Name       string       `json:"name,omitempty"`
+	ImageURL   string       `json:"image_url,omitempty"`
+	Locale     string       `json:"locale,omitempty"`
+	Fields     []FieldValue `json:"fields,omitempty"`
 }
 
 // DisplayInfo see https://developer.zendesk.com/rest_api/docs/support/channel_framework#display_info-object
@@ -250,6 +255,8 @@ type ExternalResource struct {
 	Author           Author        `json:"author"`
 	DisplayInfo      []DisplayInfo `json:"display_info,omitempty"`
 	AllowChannelback bool          `json:"allow_channelback"`
+	Fields           []FieldValue  `json:"fields,omitempty"`
+	FileURLs         []string      `json:"file_urls,omitempty"`
 }
 
 // Status see https://developer.zendesk.com/rest_api/docs/support/channel_framework#status-object

@@ -5,10 +5,9 @@ import (
 	"database/sql/driver"
 	"time"
 
-	"github.com/nyaruka/null"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 )
 
@@ -319,7 +318,7 @@ func LoadChannelConnectionsToRetry(ctx context.Context, db Queryer, limit int) (
 }
 
 // UpdateExternalID updates the external id on the passed in channel session
-func (c *ChannelConnection) UpdateExternalID(ctx context.Context, db *sqlx.DB, id string) error {
+func (c *ChannelConnection) UpdateExternalID(ctx context.Context, db Queryer, id string) error {
 	c.c.ExternalID = id
 	c.c.Status = ConnectionStatusWired
 

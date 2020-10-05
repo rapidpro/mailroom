@@ -1,16 +1,17 @@
 package nexmo
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -48,7 +49,7 @@ func TestResponseForSprint(t *testing.T) {
 	channel := oa.ChannelByUUID(models.NexmoChannelUUID)
 	assert.NotNil(t, channel)
 
-	c, err := NewClientFromChannel(channel)
+	c, err := NewClientFromChannel(http.DefaultClient, channel)
 	assert.NoError(t, err)
 
 	client := c.(*client)

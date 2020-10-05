@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/null"
 )
 
@@ -89,8 +88,8 @@ RETURNING
 
 // Insert inserts this channel event to our DB. The ID of the channel event will be
 // set if no error is returned
-func (e *ChannelEvent) Insert(ctx context.Context, db *sqlx.DB) error {
-	return BulkSQL(ctx, "insert channel event", db, insertChannelEventSQL, []interface{}{&e.e})
+func (e *ChannelEvent) Insert(ctx context.Context, db Queryer) error {
+	return BulkQuery(ctx, "insert channel event", db, insertChannelEventSQL, []interface{}{&e.e})
 }
 
 // NewChannelEvent creates a new channel event for the passed in parameters, returning it

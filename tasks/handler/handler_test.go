@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
@@ -245,11 +246,7 @@ func TestChannelEvents(t *testing.T) {
 		models.PickNumberFlowID, models.NexmoChannelID)
 
 	// add a URN for cathy so we can test twitter URNs
-	var cathyTwitterURN models.URNID
-	db.Get(&cathyTwitterURN,
-		`INSERT INTO contacts_contacturn(identity, path, scheme, priority, contact_id, org_id) 
-		                          VALUES('twitterid:123456', '123456', 'twitterid', 10, $1, 1) RETURNING id`,
-		models.CathyID)
+	testdata.InsertContactURN(t, db, models.Org1, models.BobID, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
 		EventType      models.ChannelEventType
@@ -347,7 +344,7 @@ func TestStopEvent(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, models.GeorgeID}, 1)
 
 	// that cathy is stopped
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{models.CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{models.CathyID}, 1)
 
 	// and has no upcoming events
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{models.CathyID}, 0)

@@ -3,9 +3,10 @@ package models
 import (
 	"context"
 
+	"github.com/nyaruka/goflow/flows"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/pkg/errors"
 )
 
@@ -183,7 +184,7 @@ func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 }
 
 // HandleAndCommitEvents takes a set of contacts and events, handles the events and applies any hooks, and commits everything
-func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *OrgAssets, contactEvents map[*flows.Contact][]flows.Event) error {
+func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool, oa *OrgAssets, contactEvents map[*flows.Contact][]flows.Event) error {
 	// create scenes for each contact
 	scenes := make([]*Scene, 0, len(contactEvents))
 	for contact := range contactEvents {
@@ -191,7 +192,7 @@ func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa 
 		scenes = append(scenes, scene)
 	}
 
-	// begin the transaction for handling and pre-commit hooks
+	// begin the transaction for pre-commit hooks
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error beginning transaction")
@@ -233,4 +234,28 @@ func HandleAndCommitEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa 
 		return errors.Wrapf(err, "error committing post commit hooks")
 	}
 	return nil
+}
+
+// ApplyModifiers modifies contacts by applying modifiers and handling the resultant events
+func ApplyModifiers(ctx context.Context, db QueryerWithTx, rp *redis.Pool, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
+	// create an environment instance with location support
+	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
+
+	eventsByContact := make(map[*flows.Contact][]flows.Event, len(modifiersByContact))
+
+	// apply the modifiers to get the events for each contact
+	for contact, mods := range modifiersByContact {
+		events := make([]flows.Event, 0)
+		for _, mod := range mods {
+			mod.Apply(env, oa.SessionAssets(), contact, func(e flows.Event) { events = append(events, e) })
+		}
+		eventsByContact[contact] = events
+	}
+
+	err := HandleAndCommitEvents(ctx, db, rp, oa, eventsByContact)
+	if err != nil {
+		return nil, errors.Wrap(err, "error commiting events")
+	}
+
+	return eventsByContact, nil
 }

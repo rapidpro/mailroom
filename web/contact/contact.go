@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/contactql"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/goflow"
@@ -17,208 +16,61 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(handleSearch))
-	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/parse_query", web.RequireAuthToken(handleParseQuery))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(handleCreate))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(handleResolve))
 }
 
-// Searches the contacts for an org
+// Request to create a new contact.
 //
 //   {
 //     "org_id": 1,
-//     "group_uuid": "985a83fe-2e9f-478d-a3ec-fa602d5e7ddd",
-//     "query": "age > 10",
-//     "sort": "-age"
+//     "user_id": 1,
+//     "contact": {
+//       "name": "Joe Blow",
+//       "language": "eng",
+//       "urns": ["tel:+250788123123"],
+//       "fields": {"age": "39"},
+//       "groups": ["b0b778db-6657-430b-9272-989ad43a10db"]
+//     }
 //   }
 //
-type searchRequest struct {
-	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
-	GroupUUID assets.GroupUUID `json:"group_uuid" validate:"required"`
-	Query     string           `json:"query"`
-	PageSize  int              `json:"page_size"`
-	Offset    int              `json:"offset"`
-	Sort      string           `json:"sort"`
+type createRequest struct {
+	OrgID   models.OrgID        `json:"org_id"   validate:"required"`
+	UserID  models.UserID       `json:"user_id"`
+	Contact *models.ContactSpec `json:"contact"  validate:"required"`
 }
 
-// Response for a contact search
-//
-// {
-//   "query": "age > 10",
-//   "contact_ids": [5,10,15],
-//   "total": 3,
-//   "offset": 0,
-//   "metadata": {
-//     "fields": [
-//       {"key": "age", "name": "Age"}
-//     ],
-//     "allow_as_group": true
-//   }
-// }
-type searchResponse struct {
-	Query      string                `json:"query"`
-	ContactIDs []models.ContactID    `json:"contact_ids"`
-	Total      int64                 `json:"total"`
-	Offset     int                   `json:"offset"`
-	Sort       string                `json:"sort"`
-	Metadata   *contactql.Inspection `json:"metadata,omitempty"`
-
-	// deprecated
-	Fields       []string `json:"fields"`
-	AllowAsGroup bool     `json:"allow_as_group"`
-}
-
-// handles a contact search request
-func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	request := &searchRequest{
-		Offset:   0,
-		PageSize: 50,
-		Sort:     "-id",
-	}
+// handles a request to create the given contact
+func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &createRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
+	// grab our org
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	// Perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, oa,
-		request.GroupUUID, request.Query, request.Sort, request.Offset, request.PageSize)
-
+	c, err := SpecToCreation(request.Contact, oa.Env(), oa.SessionAssets())
 	if err != nil {
-		isQueryError, qerr := contactql.IsQueryError(err)
-		if isQueryError {
-			return qerr, http.StatusBadRequest, nil
-		}
-		return nil, http.StatusInternalServerError, err
+		return err, http.StatusBadRequest, nil
 	}
 
-	// normalize and inspect the query
-	normalized := ""
-	var metadata *contactql.Inspection
-	allowAsGroup := false
-	fields := make([]string, 0)
-
-	if parsed != nil {
-		normalized = parsed.String()
-		metadata = contactql.Inspect(parsed)
-		fields = append(fields, metadata.Attributes...)
-		for _, f := range metadata.Fields {
-			fields = append(fields, f.Key)
-		}
-		allowAsGroup = metadata.AllowAsGroup
-	}
-
-	// build our response
-	response := &searchResponse{
-		Query:        normalized,
-		ContactIDs:   hits,
-		Total:        total,
-		Offset:       request.Offset,
-		Sort:         request.Sort,
-		Metadata:     metadata,
-		Fields:       fields,
-		AllowAsGroup: allowAsGroup,
-	}
-
-	return response, http.StatusOK, nil
-}
-
-// Request to parse the passed in query
-//
-//   {
-//     "org_id": 1,
-//     "query": "age > 10",
-//     "group_uuid": "123123-123-123-"
-//   }
-//
-type parseRequest struct {
-	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
-	Query     string           `json:"query"      validate:"required"`
-	GroupUUID assets.GroupUUID `json:"group_uuid"`
-}
-
-// Response for a parse query request
-//
-// {
-//   "query": "age > 10",
-//   "elastic_query": { .. },
-//   "metadata": {
-//     "fields": [
-//       {"key": "age", "name": "Age"}
-//     ],
-//     "allow_as_group": true
-//   }
-// }
-type parseResponse struct {
-	Query        string                `json:"query"`
-	ElasticQuery interface{}           `json:"elastic_query"`
-	Metadata     *contactql.Inspection `json:"metadata,omitempty"`
-
-	// deprecated
-	Fields       []string `json:"fields"`
-	AllowAsGroup bool     `json:"allow_as_group"`
-}
-
-// handles a query parsing request
-func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
-	request := &parseRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
-		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
-	}
-
-	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
+	_, contact, err := models.CreateContact(ctx, s.DB, oa, request.UserID, c.Name, c.Language, c.URNs)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+		return err, http.StatusBadRequest, nil
 	}
 
-	env := oa.Env()
-	parsed, err := contactql.ParseQuery(env, request.Query, oa.SessionAssets())
-
+	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
+	_, err = models.ApplyModifiers(ctx, s.DB, s.RP, oa, modifiersByContact)
 	if err != nil {
-		isQueryError, qerr := contactql.IsQueryError(err)
-		if isQueryError {
-			return qerr, http.StatusBadRequest, nil
-		}
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
 	}
 
-	// normalize and inspect the query
-	normalized := ""
-	var metadata *contactql.Inspection
-	allowAsGroup := false
-	fields := make([]string, 0)
-
-	if parsed != nil {
-		normalized = parsed.String()
-		metadata = contactql.Inspect(parsed)
-		fields = append(fields, metadata.Attributes...)
-		for _, f := range metadata.Fields {
-			fields = append(fields, f.Key)
-		}
-		allowAsGroup = metadata.AllowAsGroup
-	}
-
-	eq := models.BuildElasticQuery(oa, request.GroupUUID, parsed)
-	eqj, err := eq.Source()
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-
-	// build our response
-	response := &parseResponse{
-		Query:        normalized,
-		ElasticQuery: eqj,
-		Metadata:     metadata,
-		Fields:       fields,
-		AllowAsGroup: allowAsGroup,
-	}
-
-	return response, http.StatusOK, nil
+	return map[string]interface{}{"contact": contact}, http.StatusOK, nil
 }
 
 // Request that a set of contacts is modified.
@@ -278,12 +130,6 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	// clone it as we will modify flows
-	oa, err = oa.Clone(s.CTX, s.DB)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
-	}
-
 	// read the modifiers from the request
 	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
 	if err != nil {
@@ -293,41 +139,83 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// load our contacts
 	contacts, err := models.LoadContacts(ctx, s.DB, oa, request.ContactIDs)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load contact")
+		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load contact")
 	}
 
-	results := make(map[models.ContactID]modifyResult)
-
-	// create an environment instance with location support
-	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
-
-	// gather up events for our contacts
-	contactEvents := make(map[*flows.Contact][]flows.Event, len(contacts))
-
+	// convert to map of flow contacts to modifiers
+	modifiersByContact := make(map[*flows.Contact][]flows.Modifier, len(contacts))
 	for _, contact := range contacts {
 		flowContact, err := contact.FlowContact(oa)
 		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
+			return nil, http.StatusBadRequest, errors.Wrapf(err, "error creating flow contact for contact: %d", contact.ID())
 		}
 
-		result := modifyResult{
-			Contact: flowContact,
-			Events:  make([]flows.Event, 0, len(mods)),
-		}
-
-		// apply our modifiers
-		for _, mod := range mods {
-			mod.Apply(env, oa.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
-		}
-
-		results[contact.ID()] = result
-		contactEvents[flowContact] = result.Events
+		modifiersByContact[flowContact] = mods
 	}
 
-	err = models.HandleAndCommitEvents(ctx, s.DB, s.RP, oa, contactEvents)
+	eventsByContact, err := models.ApplyModifiers(ctx, s.DB, s.RP, oa, modifiersByContact)
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusBadRequest, err
+	}
+
+	// create our results
+	results := make(map[flows.ContactID]modifyResult, len(contacts))
+	for flowContact := range modifiersByContact {
+		results[flowContact.ID()] = modifyResult{
+			Contact: flowContact,
+			Events:  eventsByContact[flowContact],
+		}
 	}
 
 	return results, http.StatusOK, nil
+}
+
+// Request to resolve a contact based on a channel and URN
+//
+//   {
+//     "org_id": 1,
+//     "channel_id": 234,
+//     "urn": "tel:+250788123123"
+//   }
+//
+type resolveRequest struct {
+	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
+	ChannelID models.ChannelID `json:"channel_id" validate:"required"`
+	URN       urns.URN         `json:"urn"        validate:"required"`
+}
+
+// handles a request to resolve a contact
+func handleResolve(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &resolveRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	_, contact, err := models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{request.URN}, request.ChannelID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error getting or creating contact")
+	}
+
+	// find the URN on the contact
+	urn := request.URN.Normalize(string(oa.Env().DefaultCountry()))
+	for _, u := range contact.URNs() {
+		if urn.Identity() == u.URN().Identity() {
+			urn = u.URN()
+			break
+		}
+	}
+
+	return map[string]interface{}{
+		"contact": contact,
+		"urn": map[string]interface{}{
+			"id":       models.GetURNInt(urn, "id"),
+			"identity": urn.Identity(),
+		},
+	}, http.StatusOK, nil
 }

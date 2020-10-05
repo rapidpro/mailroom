@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/nyaruka/mailroom/hooks"
-	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/ivr/nexmo"
 	"github.com/nyaruka/mailroom/ivr/twiml"
 	ivr_tasks "github.com/nyaruka/mailroom/tasks/ivr"
@@ -33,6 +32,7 @@ func TestTwilioIVR(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
+	defer testsuite.ResetStorage()
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +60,7 @@ func TestTwilioIVR(t *testing.T) {
 	twiml.IgnoreSignatures = true
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.Storage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -327,6 +327,7 @@ func TestNexmoIVR(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
+	defer testsuite.ResetStorage()
 	models.FlushCache()
 
 	// deactivate our twilio channel
@@ -343,7 +344,7 @@ func TestNexmoIVR(t *testing.T) {
 		} else {
 			type CallForm struct {
 				To []struct {
-					Number int64 `json:"number`
+					Number int64 `json:"number"`
 				} `json:"to"`
 			}
 			body, _ := ioutil.ReadAll(r.Body)
@@ -364,11 +365,10 @@ func TestNexmoIVR(t *testing.T) {
 	defer ts.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.Storage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 
-	ivr.WriteAttachments = false
 	nexmo.BaseURL = ts.URL
 	nexmo.IgnoreSignatures = true
 

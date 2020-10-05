@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/null"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,11 +29,11 @@ func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for s, e := range scenes {
 		// we only care about the last name change
 		event := e[len(e)-1].(*events.ContactNameChangedEvent)
-		updates = append(updates, &nameUpdate{s.ContactID(), fmt.Sprintf("%.128s", event.Name)})
+		updates = append(updates, &nameUpdate{s.ContactID(), null.String(fmt.Sprintf("%.128s", event.Name))})
 	}
 
 	// do our update
-	return models.BulkSQL(ctx, "updating contact name", tx, updateContactNameSQL, updates)
+	return models.BulkQuery(ctx, "updating contact name", tx, updateContactNameSQL, updates)
 }
 
 // handleContactNameChanged changes the name of the contact
@@ -51,7 +52,7 @@ func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 // struct used for our bulk insert
 type nameUpdate struct {
 	ContactID models.ContactID `db:"id"`
-	Name      string           `db:"name"`
+	Name      null.String      `db:"name"`
 }
 
 const updateContactNameSQL = `

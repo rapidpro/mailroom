@@ -45,5 +45,30 @@
                 "count": 1
             }
         ]
+    },
+    {
+        "label": "create message with attachments",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/channelback",
+        "body": "file_urls%5B%5D=https%3A%2F%2Fd3v-nyaruka.zendesk.com%2Fattachments%2Ftoken%2FEWTWEGWE%2F%3Fname%3DIhCY7aKs_400x400.jpg&message=Like%20this&recipient_id=1234&thread_id=c69f103c-db64-4481-815b-1112890419ef&metadata=%7B%22ticketer%22%3A%224ee6d4f3-f92b-439b-9718-8da90c05490c%22%2C%22secret%22%3A%22sesame%22%7D",
+        "http_mocks": {
+            "https://d3v-nyaruka.zendesk.com/attachments/token/EWTWEGWE/?name=IhCY7aKs_400x400.jpg": [
+                {
+                    "status": 200,
+                    "body": "IMAGE"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "external_id": "2",
+            "allow_channelback": true
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from msgs_msg where direction = 'O' and text = 'Like this' and attachments = '{text/plain:https:///_test_storage/media/1/6929/26ea/692926ea-09d6-4942-bd38-d266ec8d3716.jpg}'",
+                "count": 1
+            }
+        ]
     }
 ]

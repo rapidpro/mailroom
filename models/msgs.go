@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -19,7 +20,6 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
@@ -124,10 +124,12 @@ type Msg struct {
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"`
 
-		// These three fields are set on the last outgoing message in a session's sprint. In the case
+		SessionID     SessionID     `json:"session_id,omitempty"`
+		SessionStatus SessionStatus `json:"session_status,omitempty"`
+
+		// These fields are set on the last outgoing message in a session's sprint. In the case
 		// of the session being at a wait with a timeout then the timeout will be set. It is up to
 		// Courier to update the session's timeout appropriately after sending the message.
-		SessionID            SessionID  `json:"session_id,omitempty"`
 		SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
 		SessionTimeout       int        `json:"session_timeout,omitempty"`
 	}
@@ -400,9 +402,13 @@ func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
 }
 
-// SetTimeout sets the timeout for this message
-func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
+func (m *Msg) SetSession(id SessionID, status SessionStatus) {
 	m.m.SessionID = id
+	m.m.SessionStatus = status
+}
+
+// SetTimeout sets the timeout for this message
+func (m *Msg) SetTimeout(start time.Time, timeout time.Duration) {
 	m.m.SessionWaitStartedOn = &start
 	m.m.SessionTimeout = int(timeout / time.Second)
 }
@@ -414,7 +420,7 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 		is[i] = &msgs[i].m
 	}
 
-	return BulkSQL(ctx, "insert messages", tx, insertMsgSQL, is)
+	return BulkQuery(ctx, "insert messages", tx, insertMsgSQL, is)
 }
 
 const insertMsgSQL = `
@@ -472,7 +478,7 @@ func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status M
 		is[i] = m
 	}
 
-	return BulkSQL(ctx, "updating message status", tx, updateMsgStatusSQL, is)
+	return BulkQuery(ctx, "updating message status", tx, updateMsgStatusSQL, is)
 }
 
 const updateMsgStatusSQL = `
@@ -566,7 +572,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our broadcast
-	err := BulkSQL(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
+	err := BulkQuery(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.BroadcastID())
 	}
@@ -581,7 +587,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our contacts
-	err = BulkSQL(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
+	err = BulkQuery(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting contacts for broadcast")
 	}
@@ -596,7 +602,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our groups
-	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
+	err = BulkQuery(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting groups for broadcast")
 	}
@@ -615,7 +621,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our urns
-	err = BulkSQL(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
+	err = BulkQuery(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting URNs for broadcast")
 	}
@@ -677,7 +683,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 	}
 
 	// resolve our contact references
-	contactIDs, err := ContactIDsFromReferences(ctx, tx, org, event.Contacts)
+	contactIDs, err := GetContactIDsFromReferences(ctx, tx, org.OrgID(), event.Contacts)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error resolving contact references")
 	}
@@ -774,7 +780,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 
 	// utility method to build up our message
 	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
-		if c.IsStopped() || c.IsBlocked() {
+		if c.Status() != ContactStatusActive {
 			return nil, nil
 		}
 
@@ -941,7 +947,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 }
 
 // MarkBroadcastSent marks the passed in broadcast as sent
-func MarkBroadcastSent(ctx context.Context, db *sqlx.DB, id BroadcastID) error {
+func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
 	// noop if it is a nil id
 	if id == NilBroadcastID {
 		return nil

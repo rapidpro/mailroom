@@ -47,9 +47,6 @@ const (
 	// SendBroadcastBatch is our type for sending a broadcast batch
 	SendBroadcastBatch = "send_broadcast_batch"
 
-	// FireCampaignEvent is our type for firing a campaign event
-	FireCampaignEvent = "fire_campaign_event"
-
 	// HandleContactEvent is our task for event handling
 	HandleContactEvent = "handle_contact_event"
 
@@ -61,12 +58,6 @@ const (
 
 	// StartIVRFlowBatch is our task for starting an ivr batch
 	StartIVRFlowBatch = "start_ivr_flow_batch"
-
-	// InterruptSessions is our task type to interrupt a set of sessions
-	InterruptSessions = "interrupt_sessions"
-
-	// PopulateDynamicGroup is our task to populate the contacts for a dynamic group
-	PopulateDynamicGroup = "populate_dynamic_group"
 )
 
 // Size returns the number of tasks for the passed in queue

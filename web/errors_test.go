@@ -3,9 +3,9 @@ package web_test
 import (
 	"testing"
 
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/utils/jsonx"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"

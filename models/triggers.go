@@ -8,8 +8,8 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -89,10 +89,10 @@ func (t *Trigger) Match() *triggers.KeywordMatch {
 }
 
 // loadTriggers loads all non-schedule triggers for the passed in org
-func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, error) {
+func loadTriggers(ctx context.Context, db Queryer, orgID OrgID) ([]*Trigger, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectTriggersSQL, orgID)
+	rows, err := db.QueryxContext(ctx, selectTriggersSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying triggers for org: %d", orgID)
 	}
@@ -101,7 +101,7 @@ func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, er
 	triggers := make([]*Trigger, 0, 10)
 	for rows.Next() {
 		trigger := &Trigger{}
-		err = readJSONRow(rows, &trigger.t)
+		err = dbutil.ReadJSONRow(rows, &trigger.t)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning label row")
 		}

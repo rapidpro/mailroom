@@ -1,15 +1,20 @@
 package tickets_test
 
 import (
+	"io/ioutil"
 	"testing"
 
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/services/tickets"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,11 +55,8 @@ func TestFromTicketUUID(t *testing.T) {
 	ticket2UUID := flows.TicketUUID("44b7d9b5-6ddd-4a6a-a1c0-8b70ecd06339")
 
 	// create some tickets
-	db.MustExec(`INSERT INTO tickets_ticket(id, uuid,  org_id, contact_id, ticketer_id, status, subject, body, opened_on, modified_on)
-	VALUES(1, $1, $2, $3, $4, 'O', 'Need help', 'Have you seen my cookies?', NOW(), NOW())`, ticket1UUID, models.Org1, models.CathyID, models.MailgunID)
-
-	db.MustExec(`INSERT INTO tickets_ticket(id, uuid,  org_id, contact_id, ticketer_id, status, subject, body, opened_on, modified_on)
-	VALUES(2, $1, $2, $3, $4, 'O', 'Need help', 'Have you seen my shoes?', NOW(), NOW())`, ticket2UUID, models.Org1, models.CathyID, models.ZendeskID)
+	testdata.InsertOpenTicket(t, db, models.Org1, models.CathyID, models.MailgunID, ticket1UUID, "Need help", "Have you seen my cookies?", "")
+	testdata.InsertOpenTicket(t, db, models.Org1, models.CathyID, models.ZendeskID, ticket2UUID, "Need help", "Have you seen my shoes?", "")
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, models.MailgunID)
@@ -118,19 +120,38 @@ func TestSendReply(t *testing.T) {
 	testsuite.ResetDB()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
+	rp := testsuite.RP()
+	defer testsuite.ResetStorage()
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	image, err := ioutil.ReadFile("../../models/testdata/test.jpg")
+	require.NoError(t, err)
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"http://coolfilesfortickets.com/a.jpg": {httpx.MockResponse{Status: 200, Body: image}},
+		"http://badfiles.com/b.jpg":            {httpx.MockResponse{Status: 400, Body: nil}},
+	}))
 
 	ticketUUID := flows.TicketUUID("f7358870-c3dd-450d-b5ae-db2eb50216ba")
 
 	// create a ticket
-	db.MustExec(`INSERT INTO tickets_ticket(id, uuid,  org_id, contact_id, ticketer_id, status, subject, body, opened_on, modified_on)
-	VALUES(1, $1, $2, $3, $4, 'O', 'Need help', 'Have you seen my cookies?', NOW(), NOW())`, ticketUUID, models.Org1, models.CathyID, models.MailgunID)
+	testdata.InsertOpenTicket(t, db, models.Org1, models.CathyID, models.MailgunID, ticketUUID, "Need help", "Have you seen my cookies?", "")
 
 	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
 	require.NoError(t, err)
 
-	msg, err := tickets.SendReply(ctx, db, testsuite.RP(), ticket, "I'll get back to you")
+	msg, err := tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []string{"http://coolfilesfortickets.com/a.jpg"})
 	require.NoError(t, err)
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
 	assert.Equal(t, models.CathyID, msg.ContactID())
+	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg"}, msg.Attachments())
+	assert.FileExists(t, "_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg")
+
+	// try with file that can't be fetched
+	_, err = tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []string{"http://badfiles.com/b.jpg"})
+	assert.EqualError(t, err, "error fetching file http://badfiles.com/b.jpg for ticket reply: fetch returned non-200 response")
 }

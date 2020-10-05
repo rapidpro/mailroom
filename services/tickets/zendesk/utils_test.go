@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/utils/dates"
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/mailroom/services/tickets/zendesk"
 
 	"github.com/stretchr/testify/assert"

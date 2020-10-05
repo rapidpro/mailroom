@@ -5,14 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/goflow/utils/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -103,9 +105,7 @@ func TestBatchStart(t *testing.T) {
 	rp := testsuite.RP()
 
 	// create a start object
-	db.MustExec(
-		`INSERT INTO flows_flowstart(uuid, org_id, flow_id, start_type, created_on, modified_on, restart_participants, include_active, contact_count, status, created_by_id)
-		 VALUES($1, $2, $3, 'M', NOW(), NOW(), TRUE, TRUE, 2, 'P', 1)`, uuids.New(), models.Org1, models.SingleMessageFlowID)
+	testdata.InsertFlowStart(t, db, models.Org1, models.SingleMessageFlowID, nil)
 
 	// and our batch object
 	contactIDs := []models.ContactID{models.CathyID, models.BobID}

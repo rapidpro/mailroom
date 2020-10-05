@@ -2,9 +2,9 @@ package models
 
 import (
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/uuids"
 )
 
 // Constants used in tests, these are tied to the DB created by the
@@ -83,7 +83,10 @@ var DoctorsGroupID = GroupID(10000)
 var DoctorsGroupUUID = assets.GroupUUID("c153e265-f7c9-4539-9dbc-9b358714b638")
 
 var AllContactsGroupID = GroupID(1)
-var AllContactsGroupUUID = assets.GroupUUID("bc268217-9ffa-49e0-883e-e4e09c252a5a")
+var AllContactsGroupUUID = assets.GroupUUID("d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008")
+
+var BlockedContactsGroupID = GroupID(2)
+var BlockedContactsGroupUUID = assets.GroupUUID("9295ebab-5c2d-4eb1-86f9-7c15ed2f3219")
 
 var TestersGroupID = GroupID(10001)
 var TestersGroupUUID = assets.GroupUUID("5e9d8fab-5e7e-4f51-b533-261af5dea70d")

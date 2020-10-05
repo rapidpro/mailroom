@@ -5,12 +5,12 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/jsonx"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/null"
+
 	"github.com/pkg/errors"
 )
 
@@ -56,8 +56,8 @@ const DoIncludeActive = IncludeActive(true)
 const DontIncludeActive = IncludeActive(false)
 
 // MarkStartComplete sets the status for the passed in flow start
-func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
+func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'C', modified_on = NOW() WHERE id = $1", startID)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as complete")
 	}
@@ -65,17 +65,35 @@ func MarkStartComplete(ctx context.Context, db *sqlx.DB, startID StartID) error 
 }
 
 // MarkStartStarted sets the status for the passed in flow start to S and updates the contact count on it
-func MarkStartStarted(ctx context.Context, db *sqlx.DB, startID StartID, contactCount int) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
+func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactCount int, createdContactIDs []ContactID) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'S', contact_count = $2, modified_on = NOW() WHERE id = $1", startID, contactCount)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as started")
+	}
+
+	// if we created contacts, add them to the start for logging
+	if len(createdContactIDs) > 0 {
+		type startContact struct {
+			StartID   StartID   `db:"flowstart_id"`
+			ContactID ContactID `db:"contact_id"`
+		}
+
+		args := make([]interface{}, len(createdContactIDs))
+		for i, id := range createdContactIDs {
+			args[i] = &startContact{StartID: startID, ContactID: id}
+		}
+		return BulkQuery(
+			ctx, "adding created contacts to flow start", db,
+			`INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES(:flowstart_id, :contact_id) ON CONFLICT DO NOTHING`,
+			args,
+		)
 	}
 	return nil
 }
 
 // MarkStartFailed sets the status for the passed in flow start to F
-func MarkStartFailed(ctx context.Context, db *sqlx.DB, startID StartID) error {
-	_, err := db.Exec("UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
+func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
+	_, err := db.ExecContext(ctx, "UPDATE flows_flowstart SET status = 'F', modified_on = NOW() WHERE id = $1", startID)
 	if err != nil {
 		return errors.Wrapf(err, "error setting start as failed")
 	}
@@ -257,7 +275,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our starts
-	err := BulkSQL(ctx, "inserting flow start", db, insertStartSQL, is)
+	err := BulkQuery(ctx, "inserting flow start", db, insertStartSQL, is)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow starts")
 	}
@@ -274,7 +292,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our contacts
-	err = BulkSQL(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
+	err = BulkQuery(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow start contacts for flow")
 	}
@@ -291,7 +309,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our groups
-	err = BulkSQL(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
+	err = BulkQuery(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow start groups for flow")
 	}

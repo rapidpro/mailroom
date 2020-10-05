@@ -10,7 +10,7 @@ import (
 
 func TestContactLanguageChanged(t *testing.T) {
 	tcs := []HookTestCase{
-		HookTestCase{
+		{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
 					actions.NewSetContactLanguage(newActionUUID(), "fra"),
@@ -18,6 +18,9 @@ func TestContactLanguageChanged(t *testing.T) {
 				},
 				models.GeorgeID: []flows.Action{
 					actions.NewSetContactLanguage(newActionUUID(), "spa"),
+				},
+				models.AlexandriaID: []flows.Action{
+					actions.NewSetContactLanguage(newActionUUID(), ""),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
@@ -34,6 +37,11 @@ func TestContactLanguageChanged(t *testing.T) {
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language is NULL;",
 					Args:  []interface{}{models.BobID},
+					Count: 1,
+				},
+				{
+					SQL:   "select count(*) from contacts_contact where id = $1 and language is NULL;",
+					Args:  []interface{}{models.AlexandriaID},
 					Count: 1,
 				},
 			},

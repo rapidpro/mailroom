@@ -36,44 +36,45 @@ func TestMetrics(t *testing.T) {
 		URL      string
 		Username string
 		Password string
+		Response string
 		Contains []string
 	}{
 		{
 			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
 			Username: "",
 			Password: "",
-			Contains: []string{`{"error": "invalid authentication"}`},
+			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
 			Username: "metrics",
 			Password: "invalid",
-			Contains: []string{`{"error": "invalid authentication"}`},
+			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
 			Username: "invalid",
 			Password: promToken,
-			Contains: []string{`{"error": "invalid authentication"}`},
+			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org2UUID),
 			Username: "metrics",
 			Password: promToken,
-			Contains: []string{`{"error": "invalid authentication"}`},
+			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
 			Username: "metrics",
 			Password: adminToken,
-			Contains: []string{`{"error": "invalid authentication"}`},
+			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
 			Username: "metrics",
 			Password: promToken,
 			Contains: []string{
-				`rapidpro_group_contact_count{group_name="All Contacts",group_uuid="d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008",group_type="system",org="UNICEF"} 124`,
+				`rapidpro_group_contact_count{group_name="Active",group_uuid="d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008",group_type="system",org="UNICEF"} 124`,
 				`rapidpro_group_contact_count{group_name="Doctors",group_uuid="c153e265-f7c9-4539-9dbc-9b358714b638",group_type="user",org="UNICEF"} 121`,
 				`rapidpro_channel_msg_count{channel_name="Nexmo",channel_uuid="19012bfd-3ce3-4cae-9bb9-76cf92c73d49",channel_type="NX",msg_direction="out",msg_type="message",org="UNICEF"} 0`,
 			},
@@ -88,6 +89,9 @@ func TestMetrics(t *testing.T) {
 
 		body, _ := ioutil.ReadAll(resp.Body)
 
+		if tc.Response != "" {
+			assert.Equal(t, string(body), tc.Response, "%d: response mismatch", i)
+		}
 		for _, contains := range tc.Contains {
 			assert.Contains(t, string(body), contains, "%d does not contain: %s", i, contains)
 		}
