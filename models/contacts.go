@@ -521,7 +521,7 @@ func GetOrCreateContactIDsFromURNs(ctx context.Context, db QueryerWithTx, oa *Or
 	// create any contacts that are missing
 	for urn, contactID := range owners {
 		if contactID == NilContactID {
-			contact, _, err := CreateContact(ctx, db, oa, NilUserID, "", envs.NilLanguage, []urns.URN{urn})
+			contact, _, err := GetOrCreateContact(ctx, db, oa, []urns.URN{urn}, NilChannelID)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating contact")
 			}

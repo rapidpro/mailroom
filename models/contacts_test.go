@@ -172,6 +172,45 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	}
 }
 
+func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	assert.NoError(t, err)
+
+	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
+		// Make beginning a transaction take a while to create race condition. All threads will fetch
+		// URN owners and decide nobody owns the URN, so all threads will try to create a new contact.
+		if funcName == "BeginTxx" {
+			time.Sleep(100 * time.Millisecond)
+		}
+		return nil
+	})
+
+	var contacts [2]models.ContactID
+	var errs [2]error
+	wg := &sync.WaitGroup{}
+
+	getOrCreate := func(i int) {
+		defer wg.Done()
+		var cmap map[urns.URN]models.ContactID
+		cmap, errs[i] = models.GetOrCreateContactIDsFromURNs(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
+		contacts[i] = cmap[urns.URN("telegram:100007")]
+	}
+
+	wg.Add(2)
+	go getOrCreate(0)
+	go getOrCreate(1)
+
+	// let both finish
+	wg.Wait()
+
+	require.NoError(t, errs[0])
+	require.NoError(t, errs[1])
+	assert.Equal(t, contacts[0], contacts[1])
+}
+
 func TestGetOrCreateContact(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
