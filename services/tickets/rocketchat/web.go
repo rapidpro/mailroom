@@ -28,7 +28,8 @@ type eventCallbackRequest struct {
 }
 
 type agentMessageData struct {
-	Text string `json:"text"`
+	Text        string   `json:"text"`
+	Attachments []string `json:"attachments"`
 }
 
 func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
@@ -66,7 +67,9 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 			return err, http.StatusBadRequest, nil
 		}
 
-		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, nil)
+		fmt.Println(data)
+
+		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, data.Attachments)
 
 	case "close-room":
 		err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)

@@ -110,6 +110,10 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Visitor: visitor,
 		Text:    text,
 	}
+	for _, attachment := range attachments {
+		mimeType, url := attachment.ToParts()
+		msg.Attachments = append(msg.Attachments, Attachment{MimeType: mimeType, URL: url})
+	}
 
 	_, trace, err := s.client.SendMessage(msg)
 	if trace != nil {

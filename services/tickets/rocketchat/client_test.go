@@ -90,6 +90,11 @@ func TestSendMessage(t *testing.T) {
 	msg := &rocketchat.VisitorMsg{
 		Visitor: rocketchat.Visitor{Token: "1234"},
 		Text:    "Can you help me?",
+		Attachments: []rocketchat.Attachment{
+			{MimeType: "image/jpg", URL: "https://link.to/image.jpg"},
+			{MimeType: "video/mp4", URL: "https://link.to/video.mp4"},
+			{MimeType: "audio/ogg", URL: "https://link.to/audio.ogg"},
+		},
 	}
 
 	_, _, err := client.SendMessage(msg)

@@ -124,9 +124,15 @@ func (c *Client) CloseRoom(visitor *Visitor) (*httpx.Trace, error) {
 	return trace, nil
 }
 
+type Attachment struct {
+	MimeType string `json:"mimeType"`
+	URL      string `json:"url"`
+}
+
 type VisitorMsg struct {
-	Visitor Visitor `json:"visitor"`
-	Text    string  `json:"text"`
+	Visitor     Visitor      `json:"visitor"`
+	Text        string       `json:"text,omitempty"`
+	Attachments []Attachment `json:"attachments,omitempty"`
 }
 
 func (c *Client) SendMessage(msg *VisitorMsg) (string, *httpx.Trace, error) {
