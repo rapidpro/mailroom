@@ -190,21 +190,12 @@ func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
 
 	var contacts [2]models.ContactID
 	var errs [2]error
-	wg := &sync.WaitGroup{}
 
-	getOrCreate := func(i int) {
-		defer wg.Done()
+	runConcurrently(2, func(i int) {
 		var cmap map[urns.URN]models.ContactID
 		cmap, errs[i] = models.GetOrCreateContactIDsFromURNs(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")})
 		contacts[i] = cmap[urns.URN("telegram:100007")]
-	}
-
-	wg.Add(2)
-	go getOrCreate(0)
-	go getOrCreate(1)
-
-	// let both finish
-	wg.Wait()
+	})
 
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
@@ -327,19 +318,10 @@ func TestGetOrCreateContactRace(t *testing.T) {
 
 	var contacts [2]*models.Contact
 	var errs [2]error
-	wg := &sync.WaitGroup{}
 
-	getOrCreate := func(i int) {
-		defer wg.Done()
+	runConcurrently(2, func(i int) {
 		contacts[i], _, errs[i] = models.GetOrCreateContact(ctx, mdb, oa, []urns.URN{urns.URN("telegram:100007")}, models.NilChannelID)
-	}
-
-	wg.Add(2)
-	go getOrCreate(0)
-	go getOrCreate(1)
-
-	// let both finish
-	wg.Wait()
+	})
 
 	require.NoError(t, errs[0])
 	require.NoError(t, errs[1])
@@ -534,4 +516,14 @@ func TestUpdateContactURNs(t *testing.T) {
 	assertContactURNs(models.GeorgeID, []string{"tel:+16055743333"})
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn`, nil, numInitialURNs+3)
+}
+
+// util to run a function multiple times and return when all calls complete
+func runConcurrently(times int, fn func(int)) {
+	wg := &sync.WaitGroup{}
+	for i := 0; i < times; i++ {
+		wg.Add(1)
+		go func(t int) { defer wg.Done(); fn(t) }(i)
+	}
+	wg.Wait()
 }
