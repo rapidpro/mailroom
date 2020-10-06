@@ -25,12 +25,12 @@ func init() {
 }
 
 // SendMessagesHook is our hook for sending scene messages
-type SendMessagesHook struct{}
+var SendMessagesHook models.EventCommitHook = &sendMessagesHook{}
 
-var sendMessagesHook = &SendMessagesHook{}
+type sendMessagesHook struct{}
 
 // Apply sends all non-android messages to courier
-func (h *SendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *sendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -231,7 +231,7 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mode
 
 	// don't send messages for surveyor flows
 	if scene.Session().SessionType() != models.SurveyorFlow {
-		scene.AppendToEventPostCommitHook(sendMessagesHook, msg)
+		scene.AppendToEventPostCommitHook(SendMessagesHook, msg)
 	}
 
 	return nil

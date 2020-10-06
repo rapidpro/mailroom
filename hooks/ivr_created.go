@@ -17,12 +17,12 @@ func init() {
 }
 
 // CommitIVRHook is our hook for comitting scene messages / say commands
-type CommitIVRHook struct{}
+var CommitIVRHook models.EventCommitHook = &commitIVRHook{}
 
-var commitIVRHook = &CommitIVRHook{}
+type commitIVRHook struct{}
 
 // Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
-func (h *CommitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	msgs := make([]*models.Msg, 0, len(scenes))
 	for _, s := range scenes {
 		for _, m := range s {
@@ -78,7 +78,7 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mode
 	}
 
 	// register to have this message committed
-	scene.AppendToEventPreCommitHook(commitIVRHook, msg)
+	scene.AppendToEventPreCommitHook(CommitIVRHook, msg)
 
 	return nil
 }

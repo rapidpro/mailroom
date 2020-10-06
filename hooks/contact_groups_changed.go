@@ -17,12 +17,12 @@ func init() {
 }
 
 // CommitGroupChangesHook is our hook for all group changes
-type CommitGroupChangesHook struct{}
+var CommitGroupChangesHook models.EventCommitHook = &commitGroupChangesHook{}
 
-var commitGroupChangesHook = &CommitGroupChangesHook{}
+type commitGroupChangesHook struct{}
 
 // Apply squashes and adds or removes all our contact groups
-func (h *CommitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of all adds and removes
 	adds := make([]*models.GroupAdd, 0, len(scenes))
 	removes := make([]*models.GroupRemove, 0, len(scenes))
@@ -98,9 +98,9 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		}
 
 		// add our add event
-		scene.AppendToEventPreCommitHook(commitGroupChangesHook, hookEvent)
-		scene.AppendToEventPreCommitHook(updateCampaignEventsHook, hookEvent)
-		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.ContactID())
+		scene.AppendToEventPreCommitHook(CommitGroupChangesHook, hookEvent)
+		scene.AppendToEventPreCommitHook(UpdateCampaignEventsHook, hookEvent)
+		scene.AppendToEventPreCommitHook(ContactModifiedHook, scene.ContactID())
 	}
 
 	// add each of our groups
@@ -121,9 +121,9 @@ func handleContactGroupsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			GroupID:   group.ID(),
 		}
 
-		scene.AppendToEventPreCommitHook(commitGroupChangesHook, hookEvent)
-		scene.AppendToEventPreCommitHook(updateCampaignEventsHook, hookEvent)
-		scene.AppendToEventPreCommitHook(contactModifiedHook, scene.ContactID())
+		scene.AppendToEventPreCommitHook(CommitGroupChangesHook, hookEvent)
+		scene.AppendToEventPreCommitHook(UpdateCampaignEventsHook, hookEvent)
+		scene.AppendToEventPreCommitHook(ContactModifiedHook, scene.ContactID())
 	}
 
 	return nil

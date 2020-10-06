@@ -17,12 +17,12 @@ func init() {
 }
 
 // CommitLanguageChangesHook is our hook for language changes
-type CommitLanguageChangesHook struct{}
+var CommitLanguageChangesHook models.EventCommitHook = &commitLanguageChangesHook{}
 
-var commitLanguageChangesHook = &CommitLanguageChangesHook{}
+type commitLanguageChangesHook struct{}
 
 // Apply applies our contact language change before our commit
-func (h *CommitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and language name
 	updates := make([]interface{}, 0, len(scenes))
 	for s, e := range scenes {
@@ -44,7 +44,7 @@ func handleContactLanguageChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 		"language":     event.Language,
 	}).Debug("changing contact language")
 
-	scene.AppendToEventPreCommitHook(commitLanguageChangesHook, event)
+	scene.AppendToEventPreCommitHook(CommitLanguageChangesHook, event)
 	return nil
 }
 

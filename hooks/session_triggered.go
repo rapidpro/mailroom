@@ -19,17 +19,17 @@ func init() {
 }
 
 // StartStartHook is our hook to fire our scene starts
-type StartStartHook struct{}
+var StartStartHook models.EventCommitHook = &startStartHook{}
 
-var startStartHook = &StartStartHook{}
+type startStartHook struct{}
 
 // InsertStartHook is our hook to fire insert our starts
-type InsertStartHook struct{}
+var InsertStartHook models.EventCommitHook = &insertStartHook{}
 
-var insertStartHook = &InsertStartHook{}
+type insertStartHook struct{}
 
 // Apply queues up our flow starts
-func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *startStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -58,7 +58,7 @@ func (h *StartStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 }
 
 // Apply inserts our starts
-func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -109,7 +109,7 @@ func (h *InsertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 			starts = append(starts, start)
 
 			// this will add our task for our start after we commit
-			s.AppendToEventPostCommitHook(startStartHook, start)
+			s.AppendToEventPostCommitHook(StartStartHook, start)
 		}
 	}
 
@@ -133,7 +133,7 @@ func handleSessionTriggered(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa
 		"flow_uuid":    event.Flow.UUID,
 	}).Debug("scene triggered")
 
-	scene.AppendToEventPreCommitHook(insertStartHook, event)
+	scene.AppendToEventPreCommitHook(InsertStartHook, event)
 
 	return nil
 }

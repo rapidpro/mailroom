@@ -17,12 +17,12 @@ func init() {
 }
 
 // InsertWebhookEventHook is our hook for when a resthook needs to be inserted
-type InsertWebhookEventHook struct{}
+var InsertWebhookEventHook models.EventCommitHook = &insertWebhookEventHook{}
 
-var insertWebhookEventHook = &InsertWebhookEventHook{}
+type insertWebhookEventHook struct{}
 
 // Apply inserts all the webook events that were created
-func (h *InsertWebhookEventHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertWebhookEventHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	events := make([]*models.WebhookEvent, 0, len(scenes))
 	for _, rs := range scenes {
 		for _, r := range rs {
@@ -61,7 +61,7 @@ func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *
 		string(event.Payload),
 		event.CreatedOn(),
 	)
-	scene.AppendToEventPreCommitHook(insertWebhookEventHook, re)
+	scene.AppendToEventPreCommitHook(InsertWebhookEventHook, re)
 
 	return nil
 }

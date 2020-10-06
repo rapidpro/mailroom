@@ -17,12 +17,12 @@ func init() {
 }
 
 // CommitURNChangesHook is our hook for when a URN is added to a contact
-type CommitURNChangesHook struct{}
+var CommitURNChangesHook models.EventCommitHook = &commitURNChangesHook{}
 
-var commitURNChangesHook = &CommitURNChangesHook{}
+type commitURNChangesHook struct{}
 
 // Apply adds all our URNS in a batch
-func (h *CommitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitURNChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our urn changes, we only care about the last change for each scene
 	changes := make([]*models.ContactURNsChanged, 0, len(scenes))
 	for _, sessionChanges := range scenes {
@@ -54,8 +54,8 @@ func handleContactURNsChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 	}
 
 	// add our callback
-	scene.AppendToEventPreCommitHook(commitURNChangesHook, change)
-	scene.AppendToEventPreCommitHook(contactModifiedHook, scene.ContactID())
+	scene.AppendToEventPreCommitHook(CommitURNChangesHook, change)
+	scene.AppendToEventPreCommitHook(ContactModifiedHook, scene.ContactID())
 
 	return nil
 }

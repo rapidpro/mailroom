@@ -12,12 +12,12 @@ import (
 )
 
 // ContactLastSeenHook is our hook for contact changes that require an update to last_seen_on
-type ContactLastSeenHook struct{}
+var ContactLastSeenHook models.EventCommitHook = &contactLastSeenHook{}
 
-var contactLastSeenHook = &ContactLastSeenHook{}
+type contactLastSeenHook struct{}
 
 // Apply squashes and updates modified_on on all the contacts passed in
-func (h *ContactLastSeenHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *contactLastSeenHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 
 	for scene, evts := range scenes {
 		lastEvent := evts[len(evts)-1].(flows.Event)

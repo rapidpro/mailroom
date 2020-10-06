@@ -19,12 +19,12 @@ func init() {
 }
 
 // InsertHTTPLogsHook is our hook for inserting classifier logs
-type InsertHTTPLogsHook struct{}
+var InsertHTTPLogsHook models.EventCommitHook = &insertHTTPLogsHook{}
 
-var insertHTTPLogsHook = &InsertHTTPLogsHook{}
+type insertHTTPLogsHook struct{}
 
 // Apply inserts all the classifier logs that were created
-func (h *InsertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our logs
 	logs := make([]*models.HTTPLog, 0, len(scenes))
 	for _, ls := range scenes {
@@ -95,7 +95,7 @@ func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 			)
 		}
 
-		scene.AppendToEventPreCommitHook(insertHTTPLogsHook, log)
+		scene.AppendToEventPreCommitHook(InsertHTTPLogsHook, log)
 	}
 
 	return nil

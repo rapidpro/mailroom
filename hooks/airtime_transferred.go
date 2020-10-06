@@ -20,12 +20,12 @@ func init() {
 }
 
 // InsertAirtimeTransfersHook is our hook for inserting airtime transfers
-type InsertAirtimeTransfersHook struct{}
+var InsertAirtimeTransfersHook models.EventCommitHook = &insertAirtimeTransfersHook{}
 
-var insertAirtimeTransfersHook = &InsertAirtimeTransfersHook{}
+type insertAirtimeTransfersHook struct{}
 
 // Apply inserts all the airtime transfers that were created
-func (h *InsertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertAirtimeTransfersHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our transfers
 	transfers := make([]*models.AirtimeTransfer, 0, len(scenes))
 
@@ -105,7 +105,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 		))
 	}
 
-	scene.AppendToEventPreCommitHook(insertAirtimeTransfersHook, transfer)
+	scene.AppendToEventPreCommitHook(InsertAirtimeTransfersHook, transfer)
 
 	return nil
 }

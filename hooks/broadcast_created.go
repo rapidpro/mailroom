@@ -17,13 +17,13 @@ func init() {
 	models.RegisterEventHandler(events.TypeBroadcastCreated, handleBroadcastCreated)
 }
 
-// StartBroadcastsHook is our hook for starting the broadcasts created in these scene
-type StartBroadcastsHook struct{}
+// StartBroadcastsHook is our hook for starting broadcasts
+var StartBroadcastsHook models.EventCommitHook = &startBroadcastsHook{}
 
-var startBroadcastsHook = &StartBroadcastsHook{}
+type startBroadcastsHook struct{}
 
 // Apply queues up our broadcasts for sending
-func (h *StartBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *startBroadcastsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -66,7 +66,7 @@ func handleBroadcastCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa
 	}).Debug("broadcast created")
 
 	// schedule this for being started after our scene are committed
-	scene.AppendToEventPostCommitHook(startBroadcastsHook, event)
+	scene.AppendToEventPostCommitHook(StartBroadcastsHook, event)
 
 	return nil
 }

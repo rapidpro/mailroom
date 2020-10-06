@@ -18,12 +18,12 @@ func init() {
 }
 
 // UnsubscribeResthookHook is our hook for when a webhook is called
-type UnsubscribeResthookHook struct{}
+var UnsubscribeResthookHook models.EventCommitHook = &unsubscribeResthookHook{}
 
-var unsubscribeResthookHook = &UnsubscribeResthookHook{}
+type unsubscribeResthookHook struct{}
 
 // Apply squashes and applies all our resthook unsubscriptions
-func (h *UnsubscribeResthookHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
+func (h *unsubscribeResthookHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene map[*models.Scene][]interface{}) error {
 	// gather all our unsubscribes
 	unsubs := make([]*models.ResthookUnsubscribe, 0, len(scene))
 	for _, us := range scene {
@@ -41,12 +41,12 @@ func (h *UnsubscribeResthookHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *re
 }
 
 // InsertWebhookResultHook is our hook for inserting webhook results
-type InsertWebhookResultHook struct{}
+var InsertWebhookResultHook models.EventCommitHook = &insertWebhookResultHook{}
 
-var insertWebhookResultHook = &InsertWebhookResultHook{}
+type insertWebhookResultHook struct{}
 
 // Apply inserts all the webook results that were created
-func (h *InsertWebhookResultHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertWebhookResultHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our results
 	results := make([]*models.WebhookResult, 0, len(scenes))
 	for _, rs := range scenes {
@@ -83,7 +83,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 			URL:   event.URL,
 		}
 
-		scene.AppendToEventPreCommitHook(unsubscribeResthookHook, unsub)
+		scene.AppendToEventPreCommitHook(UnsubscribeResthookHook, unsub)
 	}
 
 	// if this is a connection error, use that as our response
@@ -99,7 +99,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 		event.StatusCode, response,
 		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),
 	)
-	scene.AppendToEventPreCommitHook(insertWebhookResultHook, result)
+	scene.AppendToEventPreCommitHook(InsertWebhookResultHook, result)
 
 	return nil
 }

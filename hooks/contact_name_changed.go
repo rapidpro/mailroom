@@ -18,12 +18,12 @@ func init() {
 }
 
 // CommitNameChangesHook is our hook for name changes
-type CommitNameChangesHook struct{}
+var CommitNameChangesHook models.EventCommitHook = &commitNameChangesHook{}
 
-var commitNameChangesHook = &CommitNameChangesHook{}
+type commitNameChangesHook struct{}
 
 // Apply commits our contact name changes as a bulk update for the passed in map of scene
-func (h *CommitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and contact name
 	updates := make([]interface{}, 0, len(scenes))
 	for s, e := range scenes {
@@ -45,7 +45,7 @@ func handleContactNameChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 		"name":         event.Name,
 	}).Debug("changing contact name")
 
-	scene.AppendToEventPreCommitHook(commitNameChangesHook, event)
+	scene.AppendToEventPreCommitHook(CommitNameChangesHook, event)
 	return nil
 }
 

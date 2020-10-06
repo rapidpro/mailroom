@@ -19,12 +19,12 @@ func init() {
 }
 
 // CommitFieldChangesHook is our hook for contact field changes
-type CommitFieldChangesHook struct{}
+var CommitFieldChangesHook models.EventCommitHook = &commitFieldChangesHook{}
 
-var commitFieldChangesHook = &CommitFieldChangesHook{}
+type commitFieldChangesHook struct{}
 
 // Apply squashes and writes all the field updates for the contacts
-func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// our list of updates
 	fieldUpdates := make([]interface{}, 0, len(scenes))
 	fieldDeletes := make(map[assets.FieldUUID][]interface{})
@@ -100,8 +100,8 @@ func handleContactFieldChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 	}).Debug("contact field changed")
 
 	// add our callback
-	scene.AppendToEventPreCommitHook(commitFieldChangesHook, event)
-	scene.AppendToEventPreCommitHook(updateCampaignEventsHook, event)
+	scene.AppendToEventPreCommitHook(CommitFieldChangesHook, event)
+	scene.AppendToEventPreCommitHook(UpdateCampaignEventsHook, event)
 
 	return nil
 }

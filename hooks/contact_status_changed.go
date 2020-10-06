@@ -17,12 +17,12 @@ func init() {
 }
 
 // CommitStatusChangesHook is our hook for status changes
-type CommitStatusChangesHook struct{}
+var CommitStatusChangesHook models.EventCommitHook = &commitStatusChangesHook{}
 
-var commitStatusChangesHook = &CommitStatusChangesHook{}
+type commitStatusChangesHook struct{}
 
 // Apply commits our contact status change
-func (h *CommitStatusChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitStatusChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 
 	statusChanges := make([]*models.ContactStatusChange, 0, len(scenes))
 	for scene, es := range scenes {
@@ -47,6 +47,6 @@ func handleContactStatusChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 		"status":       event.Status,
 	}).Debug("updating contact status")
 
-	scene.AppendToEventPreCommitHook(commitStatusChangesHook, event)
+	scene.AppendToEventPreCommitHook(CommitStatusChangesHook, event)
 	return nil
 }

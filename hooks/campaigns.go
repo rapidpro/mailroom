@@ -13,12 +13,12 @@ import (
 )
 
 // UpdateCampaignEventsHook is our hook to update any campaign events
-type UpdateCampaignEventsHook struct{}
+var UpdateCampaignEventsHook models.EventCommitHook = &updateCampaignEventsHook{}
 
-var updateCampaignEventsHook = &UpdateCampaignEventsHook{}
+type updateCampaignEventsHook struct{}
 
 // Apply will update all the campaigns for the passed in scene, minimizing the number of queries to do so
-func (h *UpdateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *updateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// these are all the events we need to delete unfired fires for
 	deletes := make([]*models.FireDelete, 0, 5)
 
