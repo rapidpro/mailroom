@@ -1,4 +1,4 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
@@ -48,17 +49,17 @@ func TestTicketOpened(t *testing.T) {
 	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyTicket})
 	require.NoError(t, err)
 
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewOpenTicket(newActionUUID(), assets.NewTicketerReference(models.MailgunUUID, "Mailgun (IT Support)"), "Need help", "Where are my cookies?", "Email Ticket"),
+					actions.NewOpenTicket(hooks.NewActionUUID(), assets.NewTicketerReference(models.MailgunUUID, "Mailgun (IT Support)"), "Need help", "Where are my cookies?", "Email Ticket"),
 				},
 				models.BobID: []flows.Action{
-					actions.NewOpenTicket(newActionUUID(), assets.NewTicketerReference(models.ZendeskUUID, "Zendesk (Nyaruka)"), "Interesting", "I've found some cookies", "Zen Ticket"),
+					actions.NewOpenTicket(hooks.NewActionUUID(), assets.NewTicketerReference(models.ZendeskUUID, "Zendesk (Nyaruka)"), "Interesting", "I've found some cookies", "Zen Ticket"),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{ // cathy's old ticket will still be open and cathy's new ticket will have been created
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
 					Args:  []interface{}{models.CathyID, models.MailgunID},
@@ -93,5 +94,5 @@ func TestTicketOpened(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

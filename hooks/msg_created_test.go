@@ -1,4 +1,4 @@
-package hooks
+package hooks_test
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -35,35 +36,35 @@ func TestMsgCreated(t *testing.T) {
 	db.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:12345', path='12345', scheme='twitter' WHERE contact_id = $1`, models.AlexandriaID)
 	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, models.AlexandriaID)
 
-	msg1 := createIncomingMsg(db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start")
+	msg1 := testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start")
 
-	templateAction := actions.NewSendMsg(newActionUUID(), "Template time", nil, nil, false)
+	templateAction := actions.NewSendMsg(hooks.NewActionUUID(), "Template time", nil, nil, false)
 	templateAction.Templating = &actions.Templating{
 		UUID:      uuids.UUID("db297d56-ec8c-4231-bbe8-030369777ae1"),
 		Template:  &assets.TemplateReference{UUID: assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), Name: "revive_issue"},
 		Variables: []string{"@contact.name", "tooth"},
 	}
 
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendMsg(newActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
+					actions.NewSendMsg(hooks.NewActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSendMsg(newActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
+					actions.NewSendMsg(hooks.NewActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
 				},
 				models.BobID: []flows.Action{
-					actions.NewSendMsg(newActionUUID(), "No URNs", nil, nil, false),
+					actions.NewSendMsg(hooks.NewActionUUID(), "No URNs", nil, nil, false),
 				},
 				models.AlexandriaID: []flows.Action{
 					templateAction,
 				},
 			},
-			Msgs: ContactMsgMap{
+			Msgs: hooks.ContactMsgMap{
 				models.CathyID: msg1,
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND metadata = $2 AND response_to_id = $3 AND high_priority = TRUE",
 					Args:  []interface{}{models.CathyID, `{"quick_replies":["yes","no"]}`, msg1.ID()},
@@ -93,7 +94,7 @@ func TestMsgCreated(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 
 	rc := testsuite.RP().Get()
 	defer rc.Close()
@@ -116,14 +117,14 @@ func TestNoTopup(t *testing.T) {
 	// no more credits
 	db.MustExec(`UPDATE orgs_topup SET credits = 0 WHERE org_id = $1`, models.Org1)
 
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendMsg(newActionUUID(), "No Topup", nil, nil, false),
+					actions.NewSendMsg(hooks.NewActionUUID(), "No Topup", nil, nil, false),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='No Topup' AND contact_id = $1 AND status = 'Q'",
 					Args:  []interface{}{models.CathyID},
@@ -133,7 +134,7 @@ func TestNoTopup(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }
 
 func TestNewURN(t *testing.T) {
@@ -151,24 +152,24 @@ func TestNewURN(t *testing.T) {
 	// give George a URN that Bob will steal
 	testdata.InsertContactURN(t, db, models.Org1, models.GeorgeID, urns.URN("telegram:67890"), 1)
 
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				// brand new URN on Cathy
 				models.CathyID: []flows.Action{
-					actions.NewAddContactURN(newActionUUID(), "telegram", "12345"),
-					actions.NewSetContactChannel(newActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
-					actions.NewSendMsg(newActionUUID(), "Cathy Message", nil, nil, false),
+					actions.NewAddContactURN(hooks.NewActionUUID(), "telegram", "12345"),
+					actions.NewSetContactChannel(hooks.NewActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
+					actions.NewSendMsg(hooks.NewActionUUID(), "Cathy Message", nil, nil, false),
 				},
 
 				// Bob is stealing a URN previously assigned to George
 				models.BobID: []flows.Action{
-					actions.NewAddContactURN(newActionUUID(), "telegram", "67890"),
-					actions.NewSetContactChannel(newActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
-					actions.NewSendMsg(newActionUUID(), "Bob Message", nil, nil, false),
+					actions.NewAddContactURN(hooks.NewActionUUID(), "telegram", "67890"),
+					actions.NewSetContactChannel(hooks.NewActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
+					actions.NewSendMsg(hooks.NewActionUUID(), "Bob Message", nil, nil, false),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL: `
 					SELECT 
@@ -207,5 +208,5 @@ func TestNewURN(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

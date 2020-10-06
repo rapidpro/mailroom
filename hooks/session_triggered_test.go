@@ -1,4 +1,4 @@
-package hooks
+package hooks_test
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -41,14 +42,14 @@ func TestSessionTriggered(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(1234567))
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewStartSession(newActionUUID(), simpleFlow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
+					actions.NewStartSession(hooks.NewActionUUID(), simpleFlow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
 					Args:  []interface{}{models.CathyID},
@@ -70,7 +71,7 @@ func TestSessionTriggered(t *testing.T) {
 					Count: 1,
 				},
 			},
-			Assertions: []Assertion{
+			Assertions: []hooks.Assertion{
 				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
 					task, err := queue.PopNextTask(rc, queue.BatchQueue)
 					assert.NoError(t, err)
@@ -89,7 +90,7 @@ func TestSessionTriggered(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }
 
 func TestQuerySessionTriggered(t *testing.T) {
@@ -105,22 +106,22 @@ func TestQuerySessionTriggered(t *testing.T) {
 	favoriteFlow, err := oa.FlowByID(models.FavoritesFlowID)
 	assert.NoError(t, err)
 
-	sessionAction := actions.NewStartSession(newActionUUID(), favoriteFlow.FlowReference(), nil, nil, nil, nil, true)
+	sessionAction := actions.NewStartSession(hooks.NewActionUUID(), favoriteFlow.FlowReference(), nil, nil, nil, nil, true)
 	sessionAction.ContactQuery = "name ~ @contact.name"
 
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{sessionAction},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   `select count(*) from flows_flowstart where flow_id = $1 AND start_type = 'F' AND status = 'P' AND query = 'name ~ "Cathy"' AND parent_summary IS NOT NULL;`,
 					Args:  []interface{}{models.FavoritesFlowID},
 					Count: 1,
 				},
 			},
-			Assertions: []Assertion{
+			Assertions: []hooks.Assertion{
 				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
 					task, err := queue.PopNextTask(rc, queue.BatchQueue)
 					assert.NoError(t, err)
@@ -139,5 +140,5 @@ func TestQuerySessionTriggered(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

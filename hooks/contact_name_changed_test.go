@@ -1,32 +1,33 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 )
 
 func TestContactNameChanged(t *testing.T) {
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSetContactName(newActionUUID(), "Fred"),
-					actions.NewSetContactName(newActionUUID(), "Tarzan"),
+					actions.NewSetContactName(hooks.NewActionUUID(), "Fred"),
+					actions.NewSetContactName(hooks.NewActionUUID(), "Tarzan"),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSetContactName(newActionUUID(), "Geoff Newman"),
+					actions.NewSetContactName(hooks.NewActionUUID(), "Geoff Newman"),
 				},
 				models.BobID: []flows.Action{
-					actions.NewSetContactName(newActionUUID(), ""),
+					actions.NewSetContactName(hooks.NewActionUUID(), ""),
 				},
 				models.AlexandriaID: []flows.Action{
-					actions.NewSetContactName(newActionUUID(), "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
+					actions.NewSetContactName(hooks.NewActionUUID(), "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contact where name = 'Tarzan' and id = $1",
 					Args:  []interface{}{models.CathyID},
@@ -55,5 +56,5 @@ func TestContactNameChanged(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

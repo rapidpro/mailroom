@@ -1,4 +1,4 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
@@ -8,8 +8,10 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestMsgReceived(t *testing.T) {
@@ -18,20 +20,20 @@ func TestMsgReceived(t *testing.T) {
 
 	now := time.Now()
 
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendMsg(newActionUUID(), "Hello World", nil, nil, false),
+					actions.NewSendMsg(hooks.NewActionUUID(), "Hello World", nil, nil, false),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSendMsg(newActionUUID(), "Hello world", nil, nil, false),
+					actions.NewSendMsg(hooks.NewActionUUID(), "Hello world", nil, nil, false),
 				},
 			},
-			Msgs: ContactMsgMap{
-				models.CathyID: createIncomingMsg(db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start"),
+			Msgs: hooks.ContactMsgMap{
+				models.CathyID: testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start"),
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "SELECT COUNT(*) FROM contacts_contact WHERE id = $1 AND last_seen_on > $2",
 					Args:  []interface{}{models.CathyID, now},
@@ -46,15 +48,15 @@ func TestMsgReceived(t *testing.T) {
 		},
 		{
 			FlowType: flows.FlowTypeMessagingOffline,
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.BobID: []flows.Action{
-					actions.NewSendMsg(newActionUUID(), "Hello World", nil, nil, false),
+					actions.NewSendMsg(hooks.NewActionUUID(), "Hello World", nil, nil, false),
 				},
 			},
-			Msgs: ContactMsgMap{
+			Msgs: hooks.ContactMsgMap{
 				models.BobID: flows.NewMsgIn(flows.MsgUUID(uuids.New()), urns.NilURN, nil, "Hi offline", nil),
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'I'",
 					Args:  []interface{}{models.BobID},
@@ -64,5 +66,5 @@ func TestMsgReceived(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

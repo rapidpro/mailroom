@@ -1,4 +1,4 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 )
@@ -41,30 +42,30 @@ func TestCampaigns(t *testing.T) {
 		'{"8c1c1256-78d6-4a5b-9f1c-1761d5728251": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
 		WHERE id = $1`, models.BobID)
 
-	tcs := []HookTestCase{
+	tcs := []hooks.TestCase{
 		{
-			Msgs: ContactMsgMap{
+			Msgs: hooks.ContactMsgMap{
 				models.CathyID: flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, "Hi there", nil),
 			},
-			Actions: ContactActionMap{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewSetContactField(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
-					actions.NewSetContactField(newActionUUID(), joined, ""),
+					actions.NewRemoveContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewSetContactField(hooks.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewSetContactField(hooks.NewActionUUID(), joined, ""),
 				},
 				models.BobID: []flows.Action{
-					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewSetContactField(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
-					actions.NewSetContactField(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewAddContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewSetContactField(hooks.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewSetContactField(hooks.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewSetContactField(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
-					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewSetContactField(hooks.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewRemoveContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}, false),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{models.CathyID},
@@ -84,5 +85,5 @@ func TestCampaigns(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

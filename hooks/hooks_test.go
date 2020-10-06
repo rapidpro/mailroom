@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -35,7 +34,7 @@ type modifyResult struct {
 	Events  []flows.Event  `json:"events"`
 }
 
-type HookTestCase struct {
+type TestCase struct {
 	FlowType      flows.FlowType
 	Actions       ContactActionMap
 	Msgs          ContactMsgMap
@@ -52,7 +51,7 @@ type SQLAssertion struct {
 	Count int
 }
 
-func newActionUUID() flows.ActionUUID {
+func NewActionUUID() flows.ActionUUID {
 	return flows.ActionUUID(uuids.New())
 }
 
@@ -66,7 +65,7 @@ func TestMain(m *testing.M) {
 // test case are present.
 //
 // It returns the completed flow.
-func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.Flow {
+func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow {
 	categoryUUIDs := make([]flows.CategoryUUID, len(tc.Actions))
 	exitUUIDs := make([]flows.ExitUUID, len(tc.Actions))
 	i := 0
@@ -157,24 +156,7 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	return flow
 }
 
-func createIncomingMsg(db *sqlx.DB, orgID models.OrgID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *flows.MsgIn {
-	msgUUID := flows.MsgUUID(uuids.New())
-	var msgID flows.MsgID
-
-	err := db.Get(&msgID,
-		`INSERT INTO msgs_msg(uuid, text, created_on, direction, status, visibility, msg_count, error_count, next_attempt, contact_id, contact_urn_id, org_id)
-	  						  VALUES($1, $2, NOW(), 'I', 'P', 'V', 1, 0, NOW(), $3, $4, $5) RETURNING id`,
-		msgUUID, text, contactID, urnID, orgID)
-	if err != nil {
-		panic(err)
-	}
-
-	msg := flows.NewMsgIn(msgUUID, urn, nil, text, nil)
-	msg.SetID(msgID)
-	return msg
-}
-
-func RunHookTestCases(t *testing.T, tcs []HookTestCase) {
+func RunTestCases(t *testing.T, tcs []TestCase) {
 	models.FlushCache()
 
 	db := testsuite.DB()

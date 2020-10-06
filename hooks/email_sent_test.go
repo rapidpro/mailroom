@@ -1,10 +1,11 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 )
@@ -14,15 +15,15 @@ func TestEmailSent(t *testing.T) {
 	db := testsuite.DB()
 	db.MustExec(`UPDATE orgs_org SET config = '{"smtp_server": "smtp://24f335c64dbc28:d7966a553e76f6@smtp.mailtrap.io:2525/?from=mailroom@foo.bar"}' WHERE id = 1;`)
 
-	tcs := []HookTestCase{
-		HookTestCase{
-			Actions: ContactActionMap{
+	tcs := []hooks.TestCase{
+		{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendEmail(newActionUUID(), []string{"cathy@foo.bar", "bob@foo.bar"}, "Test Email", "This is your test email"),
+					actions.NewSendEmail(hooks.NewActionUUID(), []string{"cathy@foo.bar", "bob@foo.bar"}, "Test Email", "This is your test email"),
 				},
 			},
-			SQLAssertions: []SQLAssertion{},
+			SQLAssertions: []hooks.SQLAssertion{},
 		},
 	}
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

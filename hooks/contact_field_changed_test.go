@@ -1,4 +1,4 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 )
@@ -19,30 +20,30 @@ func TestContactFieldChanged(t *testing.T) {
 	// populate some field values on alexandria
 	db.Exec(`UPDATE contacts_contact SET fields = '{"903f51da-2717-47c7-a0d3-f2f32877013d": {"text":"34"}, "3a5891e4-756e-4dc9-8e12-b7a766168824": {"text":"female"}}' WHERE id = $1`, models.AlexandriaID)
 
-	tcs := []HookTestCase{
-		HookTestCase{
-			Actions: ContactActionMap{
+	tcs := []hooks.TestCase{
+		{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSetContactField(newActionUUID(), gender, "Male"),
-					actions.NewSetContactField(newActionUUID(), gender, "Female"),
-					actions.NewSetContactField(newActionUUID(), age, ""),
+					actions.NewSetContactField(hooks.NewActionUUID(), gender, "Male"),
+					actions.NewSetContactField(hooks.NewActionUUID(), gender, "Female"),
+					actions.NewSetContactField(hooks.NewActionUUID(), age, ""),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewSetContactField(newActionUUID(), gender, "Male"),
-					actions.NewSetContactField(newActionUUID(), gender, ""),
-					actions.NewSetContactField(newActionUUID(), age, "40"),
+					actions.NewSetContactField(hooks.NewActionUUID(), gender, "Male"),
+					actions.NewSetContactField(hooks.NewActionUUID(), gender, ""),
+					actions.NewSetContactField(hooks.NewActionUUID(), age, "40"),
 				},
 				models.BobID: []flows.Action{
-					actions.NewSetContactField(newActionUUID(), gender, ""),
-					actions.NewSetContactField(newActionUUID(), gender, "Male"),
-					actions.NewSetContactField(newActionUUID(), age, "Old"),
+					actions.NewSetContactField(hooks.NewActionUUID(), gender, ""),
+					actions.NewSetContactField(hooks.NewActionUUID(), gender, "Male"),
+					actions.NewSetContactField(hooks.NewActionUUID(), age, "Old"),
 				},
 				models.AlexandriaID: []flows.Action{
-					actions.NewSetContactField(newActionUUID(), age, ""),
-					actions.NewSetContactField(newActionUUID(), gender, ""),
+					actions.NewSetContactField(hooks.NewActionUUID(), age, ""),
+					actions.NewSetContactField(hooks.NewActionUUID(), gender, ""),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Female"}'::jsonb`,
 					Args:  []interface{}{models.CathyID, models.GenderFieldUUID},
@@ -87,5 +88,5 @@ func TestContactFieldChanged(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

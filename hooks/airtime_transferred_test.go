@@ -1,4 +1,4 @@
-package hooks
+package hooks_test
 
 import (
 	"strings"
@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
@@ -70,7 +71,7 @@ func TestAirtimeTransferred(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://airtime-api.dtone.com/cgi-bin/shop/topup": []httpx.MockResponse{
+		"https://airtime-api.dtone.com/cgi-bin/shop/topup": {
 			httpx.NewMockResponse(200, nil, withCRLF(msisdnResponse)),
 			httpx.NewMockResponse(200, nil, withCRLF(reserveResponse)),
 			httpx.NewMockResponse(200, nil, withCRLF(topupResponse)),
@@ -82,14 +83,14 @@ func TestAirtimeTransferred(t *testing.T) {
 		`UPDATE orgs_org SET config = '{"TRANSFERTO_ACCOUNT_LOGIN": "nyaruka", "TRANSFERTO_AIRTIME_API_TOKEN": "123456789"}'::jsonb
 		WHERE id = $1`, models.Org1)
 
-	tcs := []HookTestCase{
-		HookTestCase{
-			Actions: ContactActionMap{
+	tcs := []hooks.TestCase{
+		{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewTransferAirtime(newActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.20`)}, "Transfer"),
+					actions.NewTransferAirtime(hooks.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.20`)}, "Transfer"),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'S'`,
 					Args:  []interface{}{models.Org1, models.CathyID},
@@ -102,13 +103,13 @@ func TestAirtimeTransferred(t *testing.T) {
 				},
 			},
 		},
-		HookTestCase{
-			Actions: ContactActionMap{
+		{
+			Actions: hooks.ContactActionMap{
 				models.GeorgeID: []flows.Action{
-					actions.NewTransferAirtime(newActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.20`)}, "Transfer"),
+					actions.NewTransferAirtime(hooks.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.20`)}, "Transfer"),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'F'`,
 					Args:  []interface{}{models.Org1, models.GeorgeID},
@@ -123,5 +124,5 @@ func TestAirtimeTransferred(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

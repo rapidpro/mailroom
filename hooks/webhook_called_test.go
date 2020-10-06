@@ -1,8 +1,9 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
 
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
@@ -17,11 +18,11 @@ func TestWebhookCalled(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://rapidpro.io/": []httpx.MockResponse{
+		"http://rapidpro.io/": {
 			httpx.NewMockResponse(200, nil, "OK"),
 			httpx.NewMockResponse(200, nil, "OK"),
 		},
-		"http://rapidpro.io/?unsub=1": []httpx.MockResponse{
+		"http://rapidpro.io/?unsub=1": {
 			httpx.NewMockResponse(410, nil, "Gone"),
 			httpx.NewMockResponse(410, nil, "Gone"),
 			httpx.NewMockResponse(410, nil, "Gone"),
@@ -37,18 +38,18 @@ func TestWebhookCalled(t *testing.T) {
 	testsuite.DB().MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/?unsub=1', 1, 1, 2);`)
 	testsuite.DB().MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id) VALUES(TRUE, NOW(), NOW(), 'http://rapidpro.io/?unsub=1', 1, 1, 1);`)
 
-	tcs := []HookTestCase{
-		HookTestCase{
-			Actions: ContactActionMap{
+	tcs := []hooks.TestCase{
+		{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewCallResthook(newActionUUID(), "foo", "foo"),
+					actions.NewCallResthook(hooks.NewActionUUID(), "foo", "foo"),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewCallResthook(newActionUUID(), "foo", "foo"),
-					actions.NewCallWebhook(newActionUUID(), "GET", "http://rapidpro.io/?unsub=1", nil, "", ""),
+					actions.NewCallResthook(hooks.NewActionUUID(), "foo", "foo"),
+					actions.NewCallWebhook(hooks.NewActionUUID(), "GET", "http://rapidpro.io/?unsub=1", nil, "", ""),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "select count(*) from api_resthooksubscriber where is_active = FALSE",
 					Args:  nil,
@@ -88,5 +89,5 @@ func TestWebhookCalled(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

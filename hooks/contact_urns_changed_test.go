@@ -1,4 +1,4 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -20,18 +21,18 @@ func TestAddContactURN(t *testing.T) {
 
 	now := time.Now()
 
-	tcs := []HookTestCase{
-		HookTestCase{
-			Actions: ContactActionMap{
+	tcs := []hooks.TestCase{
+		{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewAddContactURN(newActionUUID(), "tel", "12065551212"),
-					actions.NewAddContactURN(newActionUUID(), "tel", "12065551212"),
-					actions.NewAddContactURN(newActionUUID(), "telegram", "11551"),
-					actions.NewAddContactURN(newActionUUID(), "tel", "+16055741111"),
+					actions.NewAddContactURN(hooks.NewActionUUID(), "tel", "12065551212"),
+					actions.NewAddContactURN(hooks.NewActionUUID(), "tel", "12065551212"),
+					actions.NewAddContactURN(hooks.NewActionUUID(), "telegram", "11551"),
+					actions.NewAddContactURN(hooks.NewActionUUID(), "tel", "+16055741111"),
 				},
 				models.GeorgeID: []flows.Action{},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'telegram' and path = '11551' and priority = 998",
 					Args:  []interface{}{models.CathyID},
@@ -63,5 +64,5 @@ func TestAddContactURN(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }

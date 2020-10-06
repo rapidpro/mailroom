@@ -1,12 +1,12 @@
-package hooks
+package hooks_test
 
 import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
-
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 )
 
@@ -14,21 +14,21 @@ func TestContactGroupsChanged(t *testing.T) {
 	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
 	testers := assets.NewGroupReference(models.TestersGroupUUID, "Testers")
 
-	tcs := []HookTestCase{
-		HookTestCase{
-			Actions: ContactActionMap{
+	tcs := []hooks.TestCase{
+		{
+			Actions: hooks.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{testers}),
+					actions.NewAddContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewAddContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewRemoveContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{testers}),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{testers}),
+					actions.NewRemoveContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(hooks.NewActionUUID(), []*assets.GroupReference{testers}),
 				},
 			},
-			SQLAssertions: []SQLAssertion{
+			SQLAssertions: []hooks.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.CathyID, models.DoctorsGroupID},
@@ -53,5 +53,5 @@ func TestContactGroupsChanged(t *testing.T) {
 		},
 	}
 
-	RunHookTestCases(t, tcs)
+	hooks.RunTestCases(t, tcs)
 }
