@@ -5,7 +5,7 @@ import (
 
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"

@@ -13,8 +13,8 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/courier"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/courier"
+	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"

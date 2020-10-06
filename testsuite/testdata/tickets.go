@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"

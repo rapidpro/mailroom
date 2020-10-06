@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/goflow/flows/translation"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/i18n"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/go-chi/chi/middleware"

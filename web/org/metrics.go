@@ -8,7 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 	dto "github.com/prometheus/client_model/go"
