@@ -45,7 +45,7 @@ jobs:
       uses: codecov/codecov-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        # fail_ci_if_error: true  # ideally this should be enabled but codecov uploads fail a lot
+        fail_ci_if_error: true
   
   release:
     name: Release
