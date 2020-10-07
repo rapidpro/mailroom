@@ -1,3 +1,7 @@
+v5.7.30
+----------
+ * Reorganization of core packages
+
 v5.7.29
 ----------
  * Fix race condition when bulk getting/creating contacts
