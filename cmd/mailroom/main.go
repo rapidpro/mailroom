@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
 
+	_ "github.com/nyaruka/mailroom/core/handlers"
 	_ "github.com/nyaruka/mailroom/core/hooks"
 	_ "github.com/nyaruka/mailroom/core/ivr/nexmo"
 	_ "github.com/nyaruka/mailroom/core/ivr/twiml"

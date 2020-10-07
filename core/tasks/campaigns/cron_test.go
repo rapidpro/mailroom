@@ -6,7 +6,7 @@ import (
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
-	_ "github.com/nyaruka/mailroom/core/hooks"
+	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks"

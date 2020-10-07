@@ -17,7 +17,7 @@ import (
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/buger/jsonparser"
-	_ "github.com/nyaruka/mailroom/core/hooks"
+	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/stretchr/testify/assert"
 )
 

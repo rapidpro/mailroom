@@ -22,7 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 
-	_ "github.com/nyaruka/mailroom/core/hooks"
+	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/ivr/nexmo"
 	"github.com/nyaruka/mailroom/core/ivr/twiml"
 	ivr_tasks "github.com/nyaruka/mailroom/core/tasks/ivr"
