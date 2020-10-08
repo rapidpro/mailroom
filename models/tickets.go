@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/goflow/utils/dates"
-	"github.com/nyaruka/goflow/utils/httpx"
 	"github.com/nyaruka/mailroom/goflow"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -98,7 +99,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db *sqlx.DB, org *OrgAsset
 	}
 
 	logger := &HTTPLogger{}
-	err = service.Forward(t, msgUUID, text, logger.Ticketer(ticketer))
+	err = service.Forward(t, msgUUID, text, attachments, logger.Ticketer(ticketer))
 
 	return logger.Insert(ctx, db)
 }
@@ -270,7 +271,7 @@ func InsertTickets(ctx context.Context, tx Queryer, tickets []*Ticket) error {
 		ts[i] = &tickets[i].t
 	}
 
-	return BulkSQL(ctx, "inserted tickets", tx, insertTicketSQL, ts)
+	return BulkQuery(ctx, "inserted tickets", tx, insertTicketSQL, ts)
 }
 
 const updateTicketExternalIDSQL = `
@@ -477,7 +478,7 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db *sqlx.DB, add map[string
 type TicketService interface {
 	flows.TicketService
 
-	Forward(*Ticket, flows.MsgUUID, string, flows.HTTPLogCallback) error
+	Forward(*Ticket, flows.MsgUUID, string, []utils.Attachment, flows.HTTPLogCallback) error
 	Close([]*Ticket, flows.HTTPLogCallback) error
 	Reopen([]*Ticket, flows.HTTPLogCallback) error
 }
@@ -521,7 +522,7 @@ func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerU
 	}
 
 	ticketer := &Ticketer{}
-	err = readJSONRow(rows, &ticketer.t)
+	err = dbutil.ReadJSONRow(rows, &ticketer.t)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling ticketer")
 	}
@@ -560,7 +561,7 @@ func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	ticketers := make([]assets.Ticketer, 0, 2)
 	for rows.Next() {
 		ticketer := &Ticketer{}
-		err := readJSONRow(rows, &ticketer.t)
+		err := dbutil.ReadJSONRow(rows, &ticketer.t)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling ticketer")
 		}

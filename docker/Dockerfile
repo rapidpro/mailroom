@@ -11,8 +11,8 @@ RUN addgroup -S golang \
 
 COPY . .
 
-RUN curl https://codeload.github.com/nyaruka/goflow/tar.gz/$(grep goflow go.mod | cut -d" " -f2) | tar --wildcards --strip=1 -zx "*/docs/*"
-RUN cp docs/en_US/completion.json docs/completion.json && cp docs/en_US/functions.json docs/functions.json
+RUN export GOFLOW_VERSION=$(grep goflow go.mod | cut -d" " -f2 | cut -c2-) && curl https://codeload.github.com/nyaruka/goflow/tar.gz/v$GOFLOW_VERSION | tar --wildcards --strip=1 -zx "goflow-${GOFLOW_VERSION}/docs/*"
+RUN cp ./docs/en-us/*.* docs/
 
 RUN go install -v ./cmd/...
 

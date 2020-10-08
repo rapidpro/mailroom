@@ -2,9 +2,9 @@ package models
 
 import (
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/uuids"
 )
 
 // Constants used in tests, these are tied to the DB created by the
@@ -83,18 +83,22 @@ var DoctorsGroupID = GroupID(10000)
 var DoctorsGroupUUID = assets.GroupUUID("c153e265-f7c9-4539-9dbc-9b358714b638")
 
 var AllContactsGroupID = GroupID(1)
-var AllContactsGroupUUID = assets.GroupUUID("bc268217-9ffa-49e0-883e-e4e09c252a5a")
+var AllContactsGroupUUID = assets.GroupUUID("d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008")
+
+var BlockedContactsGroupID = GroupID(2)
+var BlockedContactsGroupUUID = assets.GroupUUID("9295ebab-5c2d-4eb1-86f9-7c15ed2f3219")
 
 var TestersGroupID = GroupID(10001)
 var TestersGroupUUID = assets.GroupUUID("5e9d8fab-5e7e-4f51-b533-261af5dea70d")
 
+var CreatedOnFieldID = FieldID(3)
+var LastSeenOnFieldID = FieldID(5)
+
 var AgeFieldUUID = assets.FieldUUID("903f51da-2717-47c7-a0d3-f2f32877013d")
 var GenderFieldUUID = assets.FieldUUID("3a5891e4-756e-4dc9-8e12-b7a766168824")
 
-var JoinedFieldID = FieldID(7)
+var JoinedFieldID = FieldID(8)
 var JoinedFieldUUID = assets.FieldUUID("d83aae24-4bbf-49d0-ab85-6bfd201eac6d")
-
-var CreatedOnFieldID = FieldID(3)
 
 var ReportingLabelID = LabelID(10000)
 var ReportingLabelUUID = assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698")

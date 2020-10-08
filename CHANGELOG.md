@@ -1,3 +1,116 @@
+v5.7.24
+----------
+ * Add SessionStatus to messages queued to courier
+
+v5.7.23
+----------
+ * Make defining new task types easier and drier
+ * Better locking when handling
+ * Fix and simplify creation of channel logs in IVR handlers
+
+v5.7.22
+----------
+ * Update to latest goflow v0.104.1
+
+v5.7.21
+----------
+ * Simplify test-smtp cmd using smtpx package
+ * Create new dbutil package with generic DB stuff
+ * Add task to calculate fires for new campaign event
+
+v5.7.20
+----------
+ * Fix incoming attachments from Zendesk
+
+v5.7.19
+----------
+ * Update to latest goflow
+ * Empty contact names and languages should be saved as NULL
+ * Delete no longer used utils/celery package
+
+v5.7.18
+----------
+ * Update to latest goflow
+ * Add support for incoming attachments on ticketing services
+
+v5.7.17
+----------
+ * Use status for elastic queries that need to filter out non-active contacts
+
+v5.7.16
+----------
+ * Add support for excluding contacts from searches by ids
+ * Rework utils/storage to be generic and moveable to gocommon
+
+v5.7.15
+----------
+ * Add create contact endpoint which uses modifiers to add fields and groups to contacts
+ * Rework contact creation functions to support creation with multiple URNs
+
+v5.7.14
+----------
+ * Stop writing is_blocked and is_stopped
+
+v5.7.13
+----------
+ * Read from contact.status intead of is_stopped/is_blocked
+ * Implement saving of zendesk ticket files as attachments
+ * Abstract S3 code so tests and dev envs can use file storage
+
+v5.7.12
+----------
+ * Fix inserting channel logs and add test
+
+v5.7.11
+----------
+ * Always write contact.status when writing is_blocked or is_stopped
+ * Convert IVR code to use goflow's httpx package
+
+v5.7.10
+----------
+ * Tweak goreleaser config to include subdirectories inside docs folder
+
+v5.7.9
+----------
+ * Update to goflow v0.101.2
+ * Bundle localized goflow docs in release
+
+v5.7.8
+----------
+ * Recalculate event fires for campaign events based on last_seen_on
+
+v5.7.7
+----------
+ * Update to latest goflow v0.100.0
+
+v5.7.6
+----------
+ * Remove protection for overwriting last_seen_on with older values
+
+v5.7.5
+----------
+ * Update last_seen_on when handling certain channel events
+ * Update last_seen_on when we receive a message from a contact
+
+v5.7.4
+----------
+ * Fail outgoing messages for suspended orgs
+ * Refresh groups as well as fields for contact query parsing
+
+v5.7.3
+----------
+ * Update to goflow v0.99.0
+
+v5.7.2
+----------
+ * Update to latest goflow v0.98.0
+ * Render rich errors with code and extra field
+
+v5.7.1
+----------
+ * Update to latest goflow v0.96.0
+ * Add loop protection by passing session history to new flow action triggers
+
 v5.7.0
 ----------
  * Set user and origin on manual triggers

@@ -3,17 +3,21 @@ package models
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/olivere/elastic"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestElasticContacts(t *testing.T) {
+func TestContactIDsForQueryPage(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
@@ -26,44 +30,66 @@ func TestElasticContacts(t *testing.T) {
 		elastic.SetHealthcheck(false),
 		elastic.SetSniff(false),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	org, err := GetOrgAssets(ctx, db, 1)
-	assert.NoError(t, err)
+	oa, err := GetOrgAssets(ctx, db, 1)
+	require.NoError(t, err)
 
 	tcs := []struct {
-		Query    string
-		Request  string
-		Response string
-		Contacts []ContactID
-		Error    bool
+		Group             assets.GroupUUID
+		ExcludeIDs        []ContactID
+		Query             string
+		Sort              string
+		ExpectedESRequest string
+		MockedESResponse  string
+		ExpectedContacts  []ContactID
+		ExpectedTotal     int64
+		ExpectedError     string
 	}{
 		{
+			Group: AllContactsGroupUUID,
 			Query: "george",
-			Request: `{
-				"_source":false,
-				"query":{
-					"bool":{
-						"must":[
-							{ "bool":{
-								"must":[
-									{"term":{"org_id":1}},
-									{"term":{"is_active":true}},
-									{"match":{"name":{"query":"george"}}}
-								]
-							}},
-							{ "term":{
-								"is_blocked":false
-							}},
-							{"term":
-								{"is_stopped":false
-							}}
+			ExpectedESRequest: `{
+				"_source": false,
+				"from": 0,
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"term": {
+									"org_id": 1
+								}
+							},
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"groups": "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"
+								}
+							},
+							{
+								"match": {
+									"name": {
+										"query": "george"
+									}
+								}
+							}
 						]
 					}
 				},
-				"sort":["_doc"]
+				"size": 50,
+				"sort": [
+					{
+						"id": {
+							"order": "desc"
+						}
+					}
+				]
 			}`,
-			Response: fmt.Sprintf(`{
+			MockedESResponse: fmt.Sprintf(`{
 				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
 				"took": 2,
 				"timed_out": false,
@@ -90,29 +116,265 @@ func TestElasticContacts(t *testing.T) {
 				  ]
 				}
 			}`, GeorgeID),
-			Contacts: []ContactID{GeorgeID},
-		}, {
-			Query: "nobody",
-			Request: `{
-				"_source":false,
-				"query":{
-					"bool":{
-						"must":[
-							{"bool":
-								{"must":[
-									{"term":{"org_id":1}},
-									{"term":{"is_active":true}},
-									{"match":{"name":{"query":"nobody"}}}
-								]}
+			ExpectedContacts: []ContactID{GeorgeID},
+			ExpectedTotal:    1,
+		},
+		{
+			Group:      BlockedContactsGroupUUID,
+			ExcludeIDs: []ContactID{BobID, CathyID},
+			Query:      "age > 32",
+			Sort:       "-age",
+			ExpectedESRequest: `{
+				"_source": false,
+				"from": 0,
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"term": {
+									"org_id": 1
+								}
 							},
-							{"term":{"is_blocked":false}},
-							{"term":{"is_stopped":false}}
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"groups": "9295ebab-5c2d-4eb1-86f9-7c15ed2f3219"
+								}
+							},
+							{
+								"nested": {
+									"path": "fields",
+									"query": {
+										"bool": {
+											"must": [
+												{
+													"term": {
+														"fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
+													}
+												},
+												{
+													"range": {
+														"fields.number": {
+															"from": 32,
+															"include_lower": false,
+															"include_upper": true,
+															"to": null
+														}
+													}
+												}
+											]
+										}
+									}
+								}
+							}
+						],
+						"must_not": {
+							"ids": {
+								"type": "_doc",
+								"values": [
+									"10001",
+									"10000"
+								]
+							}
+						}
+					}
+				},
+				"size": 50,
+				"sort": [
+					{
+						"fields.number": {
+							"nested": {
+								"filter": {
+									"term": {
+										"fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
+									}
+								},
+								"path": "fields"
+							},
+							"order": "desc"
+						}
+					}
+				]
+			}`,
+			MockedESResponse: fmt.Sprintf(`{
+				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
+				"took": 2,
+				"timed_out": false,
+				"_shards": {
+				  "total": 1,
+				  "successful": 1,
+				  "skipped": 0,
+				  "failed": 0
+				},
+				"hits": {
+				  "total": 1,
+				  "max_score": null,
+				  "hits": [
+					{
+					  "_index": "contacts",
+					  "_type": "_doc",
+					  "_id": "%d",
+					  "_score": null,
+					  "_routing": "1",
+					  "sort": [
+						15124352
+					  ]
+					}
+				  ]
+				}
+			}`, GeorgeID),
+			ExpectedContacts: []ContactID{GeorgeID},
+			ExpectedTotal:    1,
+		},
+		{
+			Query:         "goats > 2", // no such contact field
+			ExpectedError: "error parsing query: goats > 2: can't resolve 'goats' to attribute, scheme or field",
+		},
+	}
+
+	for i, tc := range tcs {
+		es.NextResponse = tc.MockedESResponse
+
+		_, ids, total, err := ContactIDsForQueryPage(ctx, client, oa, tc.Group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
+
+		if tc.ExpectedError != "" {
+			assert.EqualError(t, err, tc.ExpectedError)
+		} else {
+			assert.NoError(t, err, "%d: error encountered performing query", i)
+			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
+			assert.Equal(t, tc.ExpectedTotal, total, "%d: total mismatch", i)
+
+			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: ES request mismatch", i)
+		}
+	}
+}
+
+func TestContactIDsForQuery(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	es := testsuite.NewMockElasticServer()
+	defer es.Close()
+
+	client, err := elastic.NewClient(
+		elastic.SetURL(es.URL()),
+		elastic.SetHealthcheck(false),
+		elastic.SetSniff(false),
+	)
+	require.NoError(t, err)
+
+	oa, err := GetOrgAssets(ctx, db, 1)
+	require.NoError(t, err)
+
+	tcs := []struct {
+		Query             string
+		ExpectedESRequest string
+		MockedESResponse  string
+		ExpectedContacts  []ContactID
+		ExpectedError     string
+	}{
+		{
+			Query: "george",
+			ExpectedESRequest: `{
+				"_source":false,
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"term": {
+									"org_id": 1
+								}
+							},
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"status": "A"
+								}
+							},
+							{
+								"match": {
+									"name": {
+										"query": "george"
+									}
+								}
+							}
 						]
 					}
 				},
 				"sort":["_doc"]
 			}`,
-			Response: `{
+			MockedESResponse: fmt.Sprintf(`{
+				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
+				"took": 2,
+				"timed_out": false,
+				"_shards": {
+				  "total": 1,
+				  "successful": 1,
+				  "skipped": 0,
+				  "failed": 0
+				},
+				"hits": {
+				  "total": 1,
+				  "max_score": null,
+				  "hits": [
+					{
+					  "_index": "contacts",
+					  "_type": "_doc",
+					  "_id": "%d",
+					  "_score": null,
+					  "_routing": "1",
+					  "sort": [
+						15124352
+					  ]
+					}
+				  ]
+				}
+			}`, GeorgeID),
+			ExpectedContacts: []ContactID{GeorgeID},
+		}, {
+			Query: "nobody",
+			ExpectedESRequest: `{
+				"_source":false,
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"term": {
+									"org_id": 1
+								}
+							},
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"status": "A"
+								}
+							},
+							{
+								"match": {
+									"name": {
+										"query": "nobody"
+									}
+								}
+							}
+						]
+					}
+				},
+				"sort":["_doc"]
+			}`,
+			MockedESResponse: `{
 				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
 				"took": 2,
 				"timed_out": false,
@@ -128,24 +390,26 @@ func TestElasticContacts(t *testing.T) {
 				  "hits": []
 				}
 			}`,
-			Contacts: []ContactID{},
-		}, {
-			Query: "goats > 2", // no such contact field
-			Error: true,
+			ExpectedContacts: []ContactID{},
+		},
+		{
+			Query:         "goats > 2", // no such contact field
+			ExpectedError: "error parsing query: goats > 2: can't resolve 'goats' to attribute, scheme or field",
 		},
 	}
 
 	for i, tc := range tcs {
-		es.NextResponse = tc.Response
+		es.NextResponse = tc.MockedESResponse
 
-		ids, err := ContactIDsForQuery(ctx, client, org, tc.Query)
+		ids, err := ContactIDsForQuery(ctx, client, oa, tc.Query)
 
-		if tc.Error {
-			assert.Error(t, err)
+		if tc.ExpectedError != "" {
+			assert.EqualError(t, err, tc.ExpectedError)
 		} else {
 			assert.NoError(t, err, "%d: error encountered performing query", i)
-			assert.JSONEq(t, tc.Request, es.LastBody, "%d: request mismatch, got: %s", i, es.LastBody)
-			assert.Equal(t, tc.Contacts, ids, "%d: ids mismatch", i)
+			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
+
+			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: request mismatch", i)
 		}
 	}
 }
@@ -160,7 +424,7 @@ func TestContacts(t *testing.T) {
 
 	db.MustExec(
 		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-		                          VALUES(1, $1, 'whatsapp', '250788373373', 'whatsapp:250788373373', 100)`, BobID)
+		                          VALUES(1, $1, 'whatsapp', '250788373373', 'whatsapp:250788373373', 999)`, BobID)
 
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, GeorgeID)
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, GeorgeID)
@@ -180,7 +444,7 @@ func TestContacts(t *testing.T) {
 	if len(contacts) == 3 {
 		assert.Equal(t, "Cathy", contacts[0].Name())
 		assert.Equal(t, len(contacts[0].URNs()), 1)
-		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=50")
+		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
 		assert.Equal(t, 1, contacts[0].Groups().Count())
 
 		assert.Equal(t, "Yobe", contacts[0].Fields()["state"].QueryValue())
@@ -191,8 +455,8 @@ func TestContacts(t *testing.T) {
 		assert.Equal(t, "Bob", contacts[1].Name())
 		assert.NotNil(t, contacts[1].Fields()["joined"].QueryValue())
 		assert.Equal(t, 2, len(contacts[1].URNs()))
-		assert.Equal(t, contacts[1].URNs()[0].String(), "whatsapp:250788373373?id=20121&priority=100")
-		assert.Equal(t, contacts[1].URNs()[1].String(), "tel:+16055742222?id=10001&priority=50")
+		assert.Equal(t, contacts[1].URNs()[0].String(), "tel:+16055742222?id=10001&priority=1000")
+		assert.Equal(t, contacts[1].URNs()[1].String(), "whatsapp:250788373373?id=20121&priority=999")
 		assert.Equal(t, 0, contacts[1].Groups().Count())
 
 		assert.Equal(t, "George", contacts[2].Name())
@@ -285,7 +549,7 @@ func TestContactsFromURN(t *testing.T) {
 	}
 }
 
-func TestCreateContact(t *testing.T) {
+func TestGetOrCreateContact(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 	testsuite.Reset()
@@ -302,27 +566,75 @@ func TestCreateContact(t *testing.T) {
 		{Org1, urns.URN(CathyURN.String() + "?foo=bar"), CathyID},
 		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
 		{Org1, urns.URN("telegram:12345678"), ContactID(maxContactID + 3)},
-		{Org1, urns.NilURN, ContactID(maxContactID + 5)},
 	}
 
 	org, err := GetOrgAssets(ctx, db, Org1)
 	assert.NoError(t, err)
 
 	for i, tc := range tcs {
-		id, err := CreateContact(ctx, db, org, tc.URN)
+		contact, _, err := GetOrCreateContact(ctx, db, org, tc.URN)
 		assert.NoError(t, err, "%d: error creating contact", i)
-		assert.Equal(t, tc.ContactID, id, "%d: mismatch in contact id", i)
+		assert.Equal(t, tc.ContactID, contact.ID(), "%d: mismatch in contact id", i)
 	}
+}
+
+func TestStopContact(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
 
 	// stop kathy
-	err = StopContact(ctx, db, Org1, CathyID)
+	err := StopContact(ctx, db, Org1, CathyID)
 	assert.NoError(t, err)
 
 	// verify she's only in the stopped group
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, []interface{}{CathyID}, 1)
 
 	// verify she's stopped
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE AND is_active = TRUE and is_blocked = FALSE`, []interface{}{CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S' AND is_active = TRUE`, []interface{}{CathyID}, 1)
+}
+
+func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	testsuite.Reset()
+
+	oa, err := GetOrgAssets(ctx, db, Org1)
+	require.NoError(t, err)
+
+	t0 := time.Now()
+
+	err = UpdateContactModifiedOn(ctx, db, []ContactID{CathyID})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, []interface{}{t0}, 1)
+
+	t1 := time.Now().Truncate(time.Millisecond)
+	time.Sleep(time.Millisecond * 5)
+
+	err = UpdateContactLastSeenOn(ctx, db, CathyID, t1)
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on = $1`, []interface{}{t1}, 1)
+
+	cathy, err := LoadContact(ctx, db, oa, CathyID)
+	require.NoError(t, err)
+	assert.NotNil(t, cathy.LastSeenOn())
+	assert.True(t, t1.Equal(*cathy.LastSeenOn()))
+	assert.True(t, cathy.ModifiedOn().After(t1))
+
+	t2 := time.Now().Truncate(time.Millisecond)
+	time.Sleep(time.Millisecond * 5)
+
+	// can update directly from the contact object
+	err = cathy.UpdateLastSeenOn(ctx, db, t2)
+	require.NoError(t, err)
+	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
+
+	// and that also updates the database
+	cathy, err = LoadContact(ctx, db, oa, CathyID)
+	require.NoError(t, err)
+	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
+	assert.True(t, cathy.ModifiedOn().After(t2))
 }
 
 func TestUpdateContactModifiedBy(t *testing.T) {
@@ -344,7 +656,6 @@ func TestUpdateContactModifiedBy(t *testing.T) {
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{CathyID, UserID(1)}, 1)
-
 }
 
 func TestUpdateContactStatus(t *testing.T) {
@@ -355,24 +666,24 @@ func TestUpdateContactStatus(t *testing.T) {
 	err := UpdateContactStatus(ctx, db, []*ContactStatusChange{})
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{CathyID}, 0)
 
 	changes := make([]*ContactStatusChange, 0, 1)
 	changes = append(changes, &ContactStatusChange{CathyID, flows.ContactStatusBlocked})
 
 	err = UpdateContactStatus(ctx, db, changes)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{CathyID}, 0)
 
 	changes = make([]*ContactStatusChange, 0, 1)
 	changes = append(changes, &ContactStatusChange{CathyID, flows.ContactStatusStopped})
 
 	err = UpdateContactStatus(ctx, db, changes)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_blocked = TRUE`, []interface{}{CathyID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{CathyID}, 1)
 
 }
 

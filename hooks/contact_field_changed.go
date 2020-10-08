@@ -72,7 +72,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 	// first apply our deletes
 	// in pg9.6 we need to do this as one query per field type, in pg10 we can rewrite this to be a single query
 	for _, fds := range fieldDeletes {
-		err := models.BulkSQL(ctx, "deleting contact field values", tx, deleteContactFieldsSQL, fds)
+		err := models.BulkQuery(ctx, "deleting contact field values", tx, deleteContactFieldsSQL, fds)
 		if err != nil {
 			return errors.Wrapf(err, "error deleting contact fields")
 		}
@@ -80,7 +80,7 @@ func (h *CommitFieldChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *red
 
 	// then our updates
 	if len(fieldUpdates) > 0 {
-		err := models.BulkSQL(ctx, "updating contact field values", tx, updateContactFieldsSQL, fieldUpdates)
+		err := models.BulkQuery(ctx, "updating contact field values", tx, updateContactFieldsSQL, fieldUpdates)
 		if err != nil {
 			return errors.Wrapf(err, "error updating contact fields")
 		}

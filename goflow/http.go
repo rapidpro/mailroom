@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nyaruka/goflow/utils/httpx"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/mailroom/config"
 )
 

@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -101,7 +102,7 @@ func loadTriggers(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]*Trigger, er
 	triggers := make([]*Trigger, 0, 10)
 	for rows.Next() {
 		trigger := &Trigger{}
-		err = readJSONRow(rows, &trigger.t)
+		err = dbutil.ReadJSONRow(rows, &trigger.t)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning label row")
 		}

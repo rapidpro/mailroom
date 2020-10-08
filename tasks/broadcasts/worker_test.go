@@ -47,7 +47,7 @@ func TestBroadcastEvents(t *testing.T) {
 	// add an extra URN fo cathy
 	db.MustExec(
 		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 100)`, models.CathyID)
+								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 1001)`, models.CathyID)
 
 	// change george's URN to an invalid twitter URN so it can't be sent
 	db.MustExec(
@@ -171,7 +171,7 @@ func TestBroadcastTask(t *testing.T) {
 	// add an extra URN fo cathy
 	db.MustExec(
 		`INSERT INTO contacts_contacturn(org_id, contact_id, scheme, path, identity, priority) 
-								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 100)`, models.CathyID)
+								  VALUES(1, $1, 'tel', '+12065551212', 'tel:+12065551212', 1001)`, models.CathyID)
 
 	tcs := []struct {
 		BroadcastID   models.BroadcastID

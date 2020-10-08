@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/gocommon/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
-	"github.com/nyaruka/mailroom/marker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/utils/marker"
+
 	"github.com/stretchr/testify/assert"
 )
 

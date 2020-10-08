@@ -3,7 +3,9 @@ package interrupts
 import (
 	"testing"
 
-	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -15,6 +17,8 @@ func TestInterrupts(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
+
+	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: nil}
 
 	insertConnection := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urnID models.URNID) models.ConnectionID {
 		var connectionID models.ConnectionID
@@ -101,7 +105,7 @@ func TestInterrupts(t *testing.T) {
 		}
 
 		// execute it
-		err := interruptSessions(ctx, db, task)
+		err := task.Perform(ctx, mr)
 		assert.NoError(t, err)
 
 		// check session statuses are as expected

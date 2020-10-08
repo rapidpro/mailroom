@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
 	"github.com/nyaruka/goflow/flows/routers"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/goflow/utils/uuids"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/runner"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -36,6 +36,7 @@ type modifyResult struct {
 }
 
 type HookTestCase struct {
+	FlowType      flows.FlowType
 	Actions       ContactActionMap
 	Msgs          ContactMsgMap
 	Modifiers     ContactModifierMap
@@ -134,12 +135,17 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc HookTestCase) flows.F
 	nodes := []flows.Node{entry}
 	nodes = append(nodes, exitNodes...)
 
+	flowType := tc.FlowType
+	if flowType == "" {
+		flowType = flows.FlowTypeMessaging
+	}
+
 	// we have our nodes, lets create our flow
 	flow, err := definition.NewFlow(
 		uuid,
 		"Test Flow",
 		envs.Language("eng"),
-		flows.FlowTypeMessaging,
+		flowType,
 		1,
 		300,
 		definition.NewLocalization(),

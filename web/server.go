@@ -1,6 +1,7 @@
 package web
 
 import (
+	"compress/flate"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nyaruka/goflow/utils/jsonx"
+	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
 
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/gomodule/redigo/redis"
@@ -60,12 +61,12 @@ func RegisterRoute(method string, pattern string, handler Handler) {
 }
 
 // NewServer creates a new web server, it will need to be started after being created
-func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, s3Client s3iface.S3API, elasticClient *elastic.Client, wg *sync.WaitGroup) *Server {
+func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage, elasticClient *elastic.Client, wg *sync.WaitGroup) *Server {
 	s := &Server{
 		CTX:           ctx,
 		RP:            rp,
 		DB:            db,
-		S3Client:      s3Client,
+		Storage:       store,
 		ElasticClient: elasticClient,
 		Config:        config,
 
@@ -75,7 +76,7 @@ func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redi
 	router := chi.NewRouter()
 
 	//  set up our middlewares
-	router.Use(middleware.DefaultCompress)
+	router.Use(middleware.Compress(flate.DefaultCompression))
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(panicRecovery)
@@ -212,21 +213,11 @@ type Server struct {
 	CTX           context.Context
 	RP            *redis.Pool
 	DB            *sqlx.DB
-	S3Client      s3iface.S3API
+	Storage       storage.Storage
 	Config        *config.Config
 	ElasticClient *elastic.Client
 
 	wg *sync.WaitGroup
 
 	httpServer *http.Server
-}
-
-// ErrorResponse is the type for our error responses, it just contains a single error field
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
-// NewErrorResponse creates a new error response from the passed in errro
-func NewErrorResponse(err error) *ErrorResponse {
-	return &ErrorResponse{err.Error()}
 }

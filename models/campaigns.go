@@ -2,15 +2,18 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -37,8 +40,11 @@ type OffsetUnit string
 type StartMode string
 
 const (
-	// CreatedOnKey
+	// CreatedOnKey is key of created on system field
 	CreatedOnKey = "created_on"
+
+	// LastSeenOnKey is key of last seen on system field
+	LastSeenOnKey = "last_seen_on"
 
 	// OffsetMinute means our offset is in minutes
 	OffsetMinute = OffsetUnit("M")
@@ -126,12 +132,15 @@ func (e *CampaignEvent) QualifiesByGroup(contact *flows.Contact) bool {
 
 // QualifiesByField returns whether the passed in contact qualifies for this event by group membership
 func (e *CampaignEvent) QualifiesByField(contact *flows.Contact) bool {
-	if e.RelativeToKey() == CreatedOnKey {
+	switch e.RelativeToKey() {
+	case CreatedOnKey:
 		return true
+	case LastSeenOnKey:
+		return contact.LastSeenOn() != nil
+	default:
+		value := contact.Fields()[e.RelativeToKey()]
+		return value != nil
 	}
-
-	value := contact.Fields()[e.RelativeToKey()]
-	return value != nil
 }
 
 // ScheduleForContact calculates the next fire ( if any) for the passed in contact
@@ -143,10 +152,16 @@ func (e *CampaignEvent) ScheduleForContact(tz *time.Location, now time.Time, con
 
 	var start time.Time
 
-	// created on is a special case
-	if e.RelativeToKey() == CreatedOnKey {
+	switch e.RelativeToKey() {
+	case CreatedOnKey:
 		start = contact.CreatedOn()
-	} else {
+	case LastSeenOnKey:
+		value := contact.LastSeenOn()
+		if value == nil {
+			return nil, nil
+		}
+		start = *value
+	default:
 		// everything else is just a normal field
 		value := contact.Fields()[e.RelativeToKey()]
 
@@ -254,7 +269,7 @@ func loadCampaigns(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Campai
 	campaigns := make([]*Campaign, 0, 2)
 	for rows.Next() {
 		campaign := &Campaign{}
-		err := readJSONRow(rows, &campaign.c)
+		err := dbutil.ReadJSONRow(rows, &campaign.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling campaign")
 		}
@@ -325,7 +340,7 @@ func MarkEventsFired(ctx context.Context, tx Queryer, fires []*EventFire, fired 
 		updates = append(updates, f)
 	}
 
-	return BulkSQL(ctx, "mark events fired", tx, markEventsFired, updates)
+	return BulkQuery(ctx, "mark events fired", tx, markEventsFired, updates)
 }
 
 const markEventsFired = `
@@ -443,7 +458,7 @@ func DeleteUnfiredEventFires(ctx context.Context, tx Queryer, removes []*FireDel
 	for i := range removes {
 		is[i] = removes[i]
 	}
-	return BulkSQL(ctx, "removing campaign event fires", tx, removeUnfiredFiresSQL, is)
+	return BulkQuery(ctx, "removing campaign event fires", tx, removeUnfiredFiresSQL, is)
 }
 
 const removeUnfiredFiresSQL = `
@@ -478,6 +493,18 @@ func DeleteUnfiredContactEvents(ctx context.Context, tx Queryer, contactID Conta
 	return nil
 }
 
+const insertEventFiresSQL = `
+INSERT INTO campaigns_eventfire(contact_id,  event_id,  scheduled)
+                         VALUES(:contact_id, :event_id, :scheduled)
+ON CONFLICT DO NOTHING
+`
+
+type FireAdd struct {
+	ContactID ContactID       `db:"contact_id"`
+	EventID   CampaignEventID `db:"event_id"`
+	Scheduled time.Time       `db:"scheduled"`
+}
+
 // AddEventFires adds the passed in event fires to our db
 func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 	if len(adds) == 0 {
@@ -489,20 +516,7 @@ func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 	for i := range adds {
 		is[i] = adds[i]
 	}
-	return BulkSQL(ctx, "adding campaign event fires", tx, insertEventFiresSQL, is)
-}
-
-const insertEventFiresSQL = `
-	INSERT INTO 
-		campaigns_eventfire
-		(contact_id, event_id, scheduled)
-	VALUES(:contact_id, :event_id, :scheduled)
-`
-
-type FireAdd struct {
-	ContactID ContactID       `db:"contact_id"`
-	EventID   CampaignEventID `db:"event_id"`
-	Scheduled time.Time       `db:"scheduled"`
+	return BulkQueryBatches(ctx, "adding campaign event fires", tx, insertEventFiresSQL, 1000, is)
 }
 
 // DeleteUnfiredEventsForGroupRemoval deletes any unfired events for all campaigns that are
@@ -573,4 +587,128 @@ func AddCampaignEventsForGroupAddition(ctx context.Context, tx Queryer, org *Org
 
 	// add all our new event fires
 	return AddEventFires(ctx, tx, fas)
+}
+
+// ScheduleCampaignEvent calculates event fires for a new campaign event
+func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, eventID CampaignEventID) error {
+	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshCampaigns)
+	if err != nil {
+		return errors.Wrapf(err, "unable to load org: %d", orgID)
+	}
+
+	event := oa.CampaignEventByID(eventID)
+	if event == nil {
+		return errors.Errorf("can't find campaign event with id %d", eventID)
+	}
+
+	field := oa.FieldByKey(event.RelativeToKey())
+	if field == nil {
+		return errors.Errorf("can't find field with key %s", event.RelativeToKey())
+	}
+
+	eligible, err := campaignEventEligibleContacts(ctx, db, event.campaign.GroupID(), field)
+	if err != nil {
+		return errors.Wrapf(err, "unable to calculate eligible contacts for event %d", eventID)
+	}
+
+	fas := make([]*FireAdd, 0, len(eligible))
+	tz := oa.Env().Timezone()
+
+	for _, el := range eligible {
+		if el.RelToValue != nil {
+			start := *el.RelToValue
+
+			// calculate next fire for this contact
+			scheduled, err := event.ScheduleForTime(tz, time.Now(), start)
+			if err != nil {
+				return errors.Wrapf(err, "error calculating offset for start: %s and event: %d", start, eventID)
+			}
+
+			if scheduled != nil {
+				fas = append(fas, &FireAdd{ContactID: el.ContactID, EventID: eventID, Scheduled: *scheduled})
+			}
+		}
+	}
+
+	// add all our new event fires
+	return AddEventFires(ctx, db, fas)
+}
+
+type eligibleContact struct {
+	ContactID  ContactID  `db:"contact_id"`
+	RelToValue *time.Time `db:"rel_to_value"`
+}
+
+const eligibleContactsForCreatedOnSQL = `
+SELECT 
+	c.id AS contact_id,
+	c.created_on AS rel_to_value
+FROM 
+	contacts_contact c
+INNER JOIN
+    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+WHERE
+    gc.contactgroup_id = $1 AND c.is_active = TRUE
+`
+
+const eligibleContactsForLastSeenOnSQL = `
+SELECT 
+	c.id AS contact_id, 
+	c.last_seen_on AS rel_to_value
+FROM 
+	contacts_contact c
+INNER JOIN
+    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+WHERE
+    gc.contactgroup_id = $1 AND c.is_active = TRUE AND c.last_seen_on IS NOT NULL
+`
+
+const eligibleContactsForFieldSQL = `
+SELECT 
+	c.id AS contact_id, 
+	(c.fields->$2->>'datetime')::timestamptz AS rel_to_value
+FROM 
+	contacts_contact c
+INNER JOIN
+    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+WHERE
+    gc.contactgroup_id = $1 AND c.is_active = TRUE AND ARRAY[$2]::text[] <@ (extract_jsonb_keys(c.fields)) IS NOT NULL
+`
+
+func campaignEventEligibleContacts(ctx context.Context, db *sqlx.DB, groupID GroupID, field *Field) ([]*eligibleContact, error) {
+	var query string
+	var params []interface{}
+
+	switch field.Key() {
+	case CreatedOnKey:
+		query = eligibleContactsForCreatedOnSQL
+		params = []interface{}{groupID}
+	case LastSeenOnKey:
+		query = eligibleContactsForLastSeenOnSQL
+		params = []interface{}{groupID}
+	default:
+		query = eligibleContactsForFieldSQL
+		params = []interface{}{groupID, field.UUID()}
+	}
+
+	rows, err := db.QueryxContext(ctx, query, params...)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrapf(err, "error querying for eligible contacts")
+	}
+	defer rows.Close()
+
+	contacts := make([]*eligibleContact, 0, 100)
+
+	for rows.Next() {
+		contact := &eligibleContact{}
+
+		err := rows.StructScan(&contact)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning eligible contact result")
+		}
+
+		contacts = append(contacts, contact)
+	}
+
+	return contacts, nil
 }

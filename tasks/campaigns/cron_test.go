@@ -4,23 +4,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/tasks"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCampaigns(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
+	db := testsuite.DB()
 	rp := testsuite.RP()
 	rc := testsuite.RC()
 	defer rc.Close()
 
+	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: nil}
+
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
-	db := testsuite.DB()
 	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, models.CathyID, models.GeorgeID, models.RemindersEvent1ID)
 	time.Sleep(10 * time.Millisecond)
 
@@ -33,8 +40,11 @@ func TestCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
+	typedTask, err := tasks.ReadTask(task.Type, task.Task)
+	require.NoError(t, err)
+
 	// work on that task
-	err = fireEventFires(ctx, db, rp, task)
+	err = typedTask.Perform(ctx, mr)
 	assert.NoError(t, err)
 
 	// should now have a flow run for that contact and flow
@@ -45,13 +55,15 @@ func TestCampaigns(t *testing.T) {
 func TestIVRCampaigns(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
+	db := testsuite.DB()
 	rp := testsuite.RP()
 	rc := testsuite.RC()
 	defer rc.Close()
 
+	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: nil}
+
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
-	db := testsuite.DB()
 	db.MustExec(`UPDATE campaigns_campaignevent SET flow_id = $1 WHERE id = $2`, models.IVRFlowID, models.RemindersEvent1ID)
 	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, models.CathyID, models.GeorgeID, models.RemindersEvent1ID)
 	time.Sleep(10 * time.Millisecond)
@@ -65,8 +77,11 @@ func TestIVRCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
+	typedTask, err := tasks.ReadTask(task.Type, task.Task)
+	require.NoError(t, err)
+
 	// work on that task
-	err = fireEventFires(ctx, db, rp, task)
+	err = typedTask.Perform(ctx, mr)
 	assert.NoError(t, err)
 
 	// should now have a flow start created

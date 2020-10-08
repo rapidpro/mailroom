@@ -8,6 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
@@ -70,7 +71,7 @@ func TestIVR(t *testing.T) {
 
 var client = &MockClient{}
 
-func newMockClient(channel *models.Channel) (ivr.Client, error) {
+func newMockClient(httpClient *http.Client, channel *models.Channel) (ivr.Client, error) {
 	return client, nil
 }
 
@@ -79,12 +80,12 @@ type MockClient struct {
 	callError error
 }
 
-func (c *MockClient) RequestCall(client *http.Client, number urns.URN, handleURL string, statusURL string) (ivr.CallID, error) {
-	return c.callID, c.callError
+func (c *MockClient) RequestCall(number urns.URN, handleURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
+	return c.callID, nil, c.callError
 }
 
-func (c *MockClient) HangupCall(client *http.Client, externalID string) error {
-	return nil
+func (c *MockClient) HangupCall(externalID string) (*httpx.Trace, error) {
+	return nil, nil
 }
 
 func (c *MockClient) WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {

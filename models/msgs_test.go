@@ -1,4 +1,4 @@
-package models
+package models_test
 
 import (
 	"fmt"
@@ -10,116 +10,127 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestMsgs(t *testing.T) {
+func TestOutgoingMsgs(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	orgID := OrgID(1)
-	channels, err := loadChannels(ctx, db, orgID)
-	assert.NoError(t, err)
-
-	channel := channels[0].(*Channel)
-	chanUUID := channels[0].UUID()
-
 	tcs := []struct {
-		ChannelUUID      assets.ChannelUUID
-		Channel          *Channel
-		Text             string
-		ContactID        ContactID
-		URN              urns.URN
-		ContactURNID     URNID
-		Attachments      []utils.Attachment
-		QuickReplies     []string
-		Topic            flows.MsgTopic
+		ChannelUUID  assets.ChannelUUID
+		Text         string
+		ContactID    models.ContactID
+		URN          urns.URN
+		URNID        models.URNID
+		Attachments  []utils.Attachment
+		QuickReplies []string
+		Topic        flows.MsgTopic
+		SuspendedOrg bool
+
+		ExpectedStatus   models.MsgStatus
 		ExpectedMetadata map[string]interface{}
 		ExpectedMsgCount int
-		HasErr           bool
+		HasError         bool
 	}{
 		{
-			chanUUID, channel,
-			"missing urn id",
-			CathyID,
-			urns.URN("tel:+250700000001"),
-			URNID(0),
-			nil,
-			nil,
-			flows.NilMsgTopic,
-			map[string]interface{}{},
-			1,
-			true,
+			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:             "missing urn id",
+			ContactID:        models.CathyID,
+			URN:              urns.URN("tel:+250700000001"),
+			URNID:            models.URNID(0),
+			ExpectedStatus:   models.MsgStatusQueued,
+			ExpectedMetadata: map[string]interface{}{},
+			ExpectedMsgCount: 1,
+			HasError:         true,
 		},
 		{
-			chanUUID,
-			channel,
-			"test outgoing",
-			CathyID,
-			urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)),
-			CathyURNID,
-			nil,
-			[]string{"yes", "no"},
-			flows.MsgTopicPurchase,
-			map[string]interface{}{
+			ChannelUUID:    "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:           "test outgoing",
+			ContactID:      models.CathyID,
+			URN:            urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
+			URNID:          models.CathyURNID,
+			QuickReplies:   []string{"yes", "no"},
+			Topic:          flows.MsgTopicPurchase,
+			ExpectedStatus: models.MsgStatusQueued,
+			ExpectedMetadata: map[string]interface{}{
 				"quick_replies": []string{"yes", "no"},
 				"topic":         "purchase",
 			},
-			1,
-			false,
+			ExpectedMsgCount: 1,
 		},
 		{
-			chanUUID,
-			channel,
-			"test outgoing",
-			CathyID,
-			urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", CathyURNID)),
-			CathyURNID,
-			[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
-			nil,
-			flows.NilMsgTopic,
-			map[string]interface{}{},
-			2,
-			false},
+			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:             "test outgoing",
+			ContactID:        models.CathyID,
+			URN:              urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
+			URNID:            models.CathyURNID,
+			Attachments:      []utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
+			ExpectedStatus:   models.MsgStatusQueued,
+			ExpectedMetadata: map[string]interface{}{},
+			ExpectedMsgCount: 2,
+		},
+		{
+			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:             "suspended org",
+			ContactID:        models.CathyID,
+			URN:              urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
+			URNID:            models.CathyURNID,
+			SuspendedOrg:     true,
+			ExpectedStatus:   models.MsgStatusFailed,
+			ExpectedMetadata: map[string]interface{}{},
+			ExpectedMsgCount: 1,
+		},
 	}
 
 	now := time.Now()
-	time.Sleep(time.Millisecond * 10)
 
 	for _, tc := range tcs {
 		tx, err := db.BeginTxx(ctx, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
+
+		db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, tc.SuspendedOrg, models.Org1)
+
+		oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
+		require.NoError(t, err)
+
+		channel := oa.ChannelByUUID(tc.ChannelUUID)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic)
-		msg, err := NewOutgoingMsg(orgID, tc.Channel, tc.ContactID, flowMsg, now)
+		msg, err := models.NewOutgoingMsg(oa.Org(), channel, tc.ContactID, flowMsg, now)
 
-		if err == nil {
-			assert.False(t, tc.HasErr)
-			err = InsertMessages(ctx, tx, []*Msg{msg})
+		if tc.HasError {
+			assert.Error(t, err)
+		} else {
 			assert.NoError(t, err)
-			assert.Equal(t, orgID, msg.OrgID())
+
+			err = models.InsertMessages(ctx, tx, []*models.Msg{msg})
+			assert.NoError(t, err)
+			assert.Equal(t, oa.OrgID(), msg.OrgID())
 			assert.Equal(t, tc.Text, msg.Text())
 			assert.Equal(t, tc.ContactID, msg.ContactID())
-			assert.Equal(t, tc.Channel, msg.Channel())
+			assert.Equal(t, channel, msg.Channel())
 			assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
 			assert.Equal(t, tc.URN, msg.URN())
-			if tc.ContactURNID != NilURNID {
-				assert.Equal(t, tc.ContactURNID, *msg.ContactURNID())
+			if tc.URNID != models.NilURNID {
+				assert.Equal(t, tc.URNID, *msg.ContactURNID())
 			} else {
 				assert.Nil(t, msg.ContactURNID())
 			}
+
+			assert.Equal(t, tc.ExpectedStatus, msg.Status())
 			assert.Equal(t, tc.ExpectedMetadata, msg.Metadata())
 			assert.Equal(t, tc.ExpectedMsgCount, msg.MsgCount())
 			assert.Equal(t, now, msg.CreatedOn())
 			assert.True(t, msg.ID() > 0)
 			assert.True(t, msg.QueuedOn().After(now))
 			assert.True(t, msg.ModifiedOn().After(now))
-		} else {
-			if !tc.HasErr {
-				assert.Fail(t, "unexpected error: %s", err.Error())
-			}
 		}
+
 		tx.Rollback()
 	}
 }
@@ -140,6 +151,6 @@ func TestNormalizeAttachment(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assert.Equal(t, tc.normalized, string(NormalizeAttachment(utils.Attachment(tc.raw))))
+		assert.Equal(t, tc.normalized, string(models.NormalizeAttachment(utils.Attachment(tc.raw))))
 	}
 }

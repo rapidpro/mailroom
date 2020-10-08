@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils/uuids"
 	_ "github.com/nyaruka/mailroom/hooks"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
@@ -252,25 +252,28 @@ func TestChannelEvents(t *testing.T) {
 		models.CathyID)
 
 	tcs := []struct {
-		EventType models.ChannelEventType
-		ContactID models.ContactID
-		URNID     models.URNID
-		OrgID     models.OrgID
-		ChannelID models.ChannelID
-		Extra     map[string]interface{}
-		Response  string
+		EventType      models.ChannelEventType
+		ContactID      models.ContactID
+		URNID          models.URNID
+		OrgID          models.OrgID
+		ChannelID      models.ChannelID
+		Extra          map[string]interface{}
+		Response       string
+		UpdateLastSeen bool
 	}{
-		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?"},
-		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, ""},
-		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, ""},
-		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, ""},
-		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "Pick a number between 1-10."},
+		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?", true},
+		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "", true},
+		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "", false},
+		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "", true},
+		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "Pick a number between 1-10.", true},
 	}
 
 	models.FlushCache()
 
-	last := time.Now()
 	for i, tc := range tcs {
+		start := time.Now()
+		time.Sleep(time.Millisecond * 5)
+
 		event := models.NewChannelEvent(tc.EventType, tc.OrgID, tc.ChannelID, tc.ContactID, tc.URNID, tc.Extra, false)
 		eventJSON, err := json.Marshal(event)
 		assert.NoError(t, err)
@@ -291,13 +294,19 @@ func TestChannelEvents(t *testing.T) {
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
-		var text string
-		err = db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, last)
-		if err != nil {
-			logrus.WithError(err).Error("error making query")
+		if tc.Response != "" {
+			var text string
+			err = db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.Response, text, "%d: response: '%s' is not '%s'", i, text, tc.Response)
 		}
-		assert.Equal(t, tc.Response, text, "%d: response: '%s' is not '%s'", i, text, tc.Response)
-		last = time.Now()
+
+		if tc.UpdateLastSeen {
+			var lastSeen time.Time
+			err = db.Get(&lastSeen, `SELECT last_seen_on FROM contacts_contact WHERE id = $1`, tc.ContactID)
+			assert.NoError(t, err)
+			assert.True(t, lastSeen.Equal(start) || lastSeen.After(start), "%d: expected last seen to be updated", i)
+		}
 	}
 }
 
@@ -338,7 +347,7 @@ func TestStopEvent(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, models.GeorgeID}, 1)
 
 	// that cathy is stopped
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND is_stopped = TRUE`, []interface{}{models.CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{models.CathyID}, 1)
 
 	// and has no upcoming events
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{models.CathyID}, 0)

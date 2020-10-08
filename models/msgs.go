@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -19,7 +20,6 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/gsm7"
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
@@ -124,10 +124,12 @@ type Msg struct {
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"`
 
-		// These three fields are set on the last outgoing message in a session's sprint. In the case
+		SessionID     SessionID     `json:"session_id,omitempty"`
+		SessionStatus SessionStatus `json:"session_status,omitempty"`
+
+		// These fields are set on the last outgoing message in a session's sprint. In the case
 		// of the session being at a wait with a timeout then the timeout will be set. It is up to
 		// Courier to update the session's timeout appropriately after sending the message.
-		SessionID            SessionID  `json:"session_id,omitempty"`
 		SessionWaitStartedOn *time.Time `json:"session_wait_started_on,omitempty"`
 		SessionTimeout       int        `json:"session_timeout,omitempty"`
 	}
@@ -281,21 +283,26 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 	return msg, nil
 }
 
-// NewOutgoingMsg creates an outgoing message for the passed in flow message. Note that this message is created in a queued state!
-func NewOutgoingMsg(orgID OrgID, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+// NewOutgoingMsg creates an outgoing message for the passed in flow message.
+func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	msg := &Msg{}
-
 	m := &msg.m
+
+	// we fail messages for suspended orgs right away
+	status := MsgStatusQueued
+	if org.Suspended() {
+		status = MsgStatusFailed
+	}
 
 	m.UUID = out.UUID()
 	m.Text = out.Text()
 	m.HighPriority = false
 	m.Direction = DirectionOut
-	m.Status = MsgStatusQueued
+	m.Status = status
 	m.Visibility = VisibilityVisible
 	m.MsgType = TypeFlow
 	m.ContactID = contactID
-	m.OrgID = orgID
+	m.OrgID = org.ID()
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
@@ -395,9 +402,13 @@ func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
 }
 
-// SetTimeout sets the timeout for this message
-func (m *Msg) SetTimeout(id SessionID, start time.Time, timeout time.Duration) {
+func (m *Msg) SetSession(id SessionID, status SessionStatus) {
 	m.m.SessionID = id
+	m.m.SessionStatus = status
+}
+
+// SetTimeout sets the timeout for this message
+func (m *Msg) SetTimeout(start time.Time, timeout time.Duration) {
 	m.m.SessionWaitStartedOn = &start
 	m.m.SessionTimeout = int(timeout / time.Second)
 }
@@ -409,7 +420,7 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 		is[i] = &msgs[i].m
 	}
 
-	return BulkSQL(ctx, "insert messages", tx, insertMsgSQL, is)
+	return BulkQuery(ctx, "insert messages", tx, insertMsgSQL, is)
 }
 
 const insertMsgSQL = `
@@ -467,7 +478,7 @@ func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status M
 		is[i] = m
 	}
 
-	return BulkSQL(ctx, "updating message status", tx, updateMsgStatusSQL, is)
+	return BulkQuery(ctx, "updating message status", tx, updateMsgStatusSQL, is)
 }
 
 const updateMsgStatusSQL = `
@@ -561,7 +572,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our broadcast
-	err := BulkSQL(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
+	err := BulkQuery(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.BroadcastID())
 	}
@@ -576,7 +587,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our contacts
-	err = BulkSQL(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
+	err = BulkQuery(ctx, "inserting broadcast contacts", db, insertBroadcastContactsSQL, contacts)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting contacts for broadcast")
 	}
@@ -591,7 +602,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our groups
-	err = BulkSQL(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
+	err = BulkQuery(ctx, "inserting broadcast groups", db, insertBroadcastGroupsSQL, groups)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting groups for broadcast")
 	}
@@ -610,7 +621,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	}
 
 	// insert our urns
-	err = BulkSQL(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
+	err = BulkQuery(ctx, "inserting broadcast urns", db, insertBroadcastURNsSQL, urns)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting URNs for broadcast")
 	}
@@ -769,7 +780,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 
 	// utility method to build up our message
 	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
-		if c.IsStopped() || c.IsBlocked() {
+		if c.Status() != ContactStatusActive {
 			return nil, nil
 		}
 
@@ -878,7 +889,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingMsg(oa.OrgID(), channel, c.ID(), out, time.Now())
+		msg, err := NewOutgoingMsg(oa.Org(), channel, c.ID(), out, time.Now())
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")

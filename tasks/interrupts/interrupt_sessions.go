@@ -2,19 +2,21 @@ package interrupts
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/tasks"
+
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 )
 
+// TypeInterruptSessions is the type of the interrupt session task
+const TypeInterruptSessions = "interrupt_sessions"
+
 func init() {
-	mailroom.AddTaskFunction(queue.InterruptSessions, handleInterruptSessions)
+	tasks.RegisterType(TypeInterruptSessions, func() tasks.Task { return &InterruptSessionsTask{} })
 }
 
 // InterruptSessionsTask is our task for interrupting sessions
@@ -56,36 +58,24 @@ WHERE
 	fs.current_flow_id = ANY($1);
 `
 
-// handleInterruptSessions interrupts all the passed in sessions
-func handleInterruptSessions(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*60)
-	defer cancel()
-
-	// decode our task body
-	if task.Type != queue.InterruptSessions {
-		return errors.Errorf("unknown event type passed to interrupt worker: %s", task.Type)
-	}
-	intTask := &InterruptSessionsTask{}
-	err := json.Unmarshal(task.Task, intTask)
-	if err != nil {
-		return errors.Wrapf(err, "error unmarshalling interrupt task: %s", string(task.Task))
-	}
-
-	return interruptSessions(ctx, mr.DB, intTask)
+// Timeout is the maximum amount of time the task can run for
+func (t *InterruptSessionsTask) Timeout() time.Duration {
+	return time.Hour
 }
 
-// InterruptSessions interrupts all the passed in sessions
-func interruptSessions(ctx context.Context, db *sqlx.DB, task *InterruptSessionsTask) error {
+func (t *InterruptSessionsTask) Perform(ctx context.Context, mr *mailroom.Mailroom) error {
+	db := mr.DB
+
 	sessionIDs := make(map[models.SessionID]bool)
-	for _, sid := range task.SessionIDs {
+	for _, sid := range t.SessionIDs {
 		sessionIDs[sid] = true
 	}
 
 	// if we have ivr channel ids, explode those to session ids
-	if len(task.ChannelIDs) > 0 {
-		channelSessionIDs := make([]models.SessionID, 0, len(task.ChannelIDs))
+	if len(t.ChannelIDs) > 0 {
+		channelSessionIDs := make([]models.SessionID, 0, len(t.ChannelIDs))
 
-		err := db.SelectContext(ctx, &channelSessionIDs, activeSessionIDsForChannelsSQL, pq.Array(task.ChannelIDs))
+		err := db.SelectContext(ctx, &channelSessionIDs, activeSessionIDsForChannelsSQL, pq.Array(t.ChannelIDs))
 		if err != nil {
 			return errors.Wrapf(err, "error selecting sessions for channels")
 		}
@@ -96,10 +86,10 @@ func interruptSessions(ctx context.Context, db *sqlx.DB, task *InterruptSessions
 	}
 
 	// if we have contact ids, explode those to session ids
-	if len(task.ContactIDs) > 0 {
-		contactSessionIDs := make([]models.SessionID, 0, len(task.ContactIDs))
+	if len(t.ContactIDs) > 0 {
+		contactSessionIDs := make([]models.SessionID, 0, len(t.ContactIDs))
 
-		err := db.SelectContext(ctx, &contactSessionIDs, activeSessionIDsForContactsSQL, pq.Array(task.ContactIDs))
+		err := db.SelectContext(ctx, &contactSessionIDs, activeSessionIDsForContactsSQL, pq.Array(t.ContactIDs))
 		if err != nil {
 			return errors.Wrapf(err, "error selecting sessions for contacts")
 		}
@@ -110,10 +100,10 @@ func interruptSessions(ctx context.Context, db *sqlx.DB, task *InterruptSessions
 	}
 
 	// if we have flow ids, explode those to session ids
-	if len(task.FlowIDs) > 0 {
-		flowSessionIDs := make([]models.SessionID, 0, len(task.FlowIDs))
+	if len(t.FlowIDs) > 0 {
+		flowSessionIDs := make([]models.SessionID, 0, len(t.FlowIDs))
 
-		err := db.SelectContext(ctx, &flowSessionIDs, activeSessionIDsForFlowsSQL, pq.Array(task.FlowIDs))
+		err := db.SelectContext(ctx, &flowSessionIDs, activeSessionIDsForFlowsSQL, pq.Array(t.FlowIDs))
 		if err != nil {
 			return errors.Wrapf(err, "error selecting sessions for flows")
 		}

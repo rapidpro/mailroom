@@ -11,15 +11,16 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/locker"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/nyaruka/mailroom/queue"
 	"github.com/nyaruka/mailroom/runner"
+	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -45,6 +46,21 @@ func AddHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task) 
 	return addHandleTask(rc, contactID, task, false)
 }
 
+// addContactTask pushes a single contact task on our queue. Note this does not push the actual content of the task
+// only that a task exists for the contact, addHandleTask should be used if the task has already been pushed
+// off the contact specific queue.
+func addContactTask(rc redis.Conn, orgID models.OrgID, contactID models.ContactID) error {
+	// create our contact event
+	contactTask := &HandleEventTask{ContactID: contactID}
+
+	// then add a handle task for that contact on our global handler queue
+	err := queue.AddTask(rc, queue.HandlerQueue, queue.HandleContactEvent, int(orgID), contactTask, queue.DefaultPriority)
+	if err != nil {
+		return errors.Wrapf(err, "error adding handle event task")
+	}
+	return nil
+}
+
 // addHandleTask adds a single task for the passed in contact. `front` specifies whether the task
 // should be inserted in front of all other tasks for that contact
 func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, front bool) error {
@@ -66,15 +82,7 @@ func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, 
 		return errors.Wrapf(err, "error adding contact event")
 	}
 
-	// create our contact event
-	contactTask := &HandleEventTask{ContactID: contactID}
-
-	// then add a handle task for that contact
-	err = queue.AddTask(rc, queue.HandlerQueue, queue.HandleContactEvent, task.OrgID, contactTask, queue.DefaultPriority)
-	if err != nil {
-		return errors.Wrapf(err, "error adding handle event task")
-	}
-	return nil
+	return addContactTask(rc, models.OrgID(task.OrgID), contactID)
 }
 
 func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
@@ -95,12 +103,24 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 
 	// acquire the lock for this contact
 	lockID := models.ContactLock(models.OrgID(task.OrgID), eventTask.ContactID)
-	lock, err := locker.GrabLock(rp, lockID, time.Minute*5, time.Minute*5)
+	lock, err := locker.GrabLock(rp, lockID, time.Minute*5, time.Second*10)
 	if err != nil {
 		return errors.Wrapf(err, "error acquiring lock for contact %d", eventTask.ContactID)
 	}
+
+	// we didn't get the lock within our timeout, skip and requeue for later
 	if lock == "" {
-		return errors.Errorf("unable to acquire lock for contact %d in timeout period, skipping", eventTask.ContactID)
+		rc := rp.Get()
+		defer rc.Close()
+		err = addContactTask(rc, models.OrgID(task.OrgID), eventTask.ContactID)
+		if err != nil {
+			return errors.Wrapf(err, "error re-adding contact task after failing to get lock")
+		}
+		logrus.WithFields(logrus.Fields{
+			"org_id":     task.OrgID,
+			"contact_id": eventTask.ContactID,
+		}).Info("failed to get lock for contact, requeued and skipping")
+		return nil
 	}
 	defer locker.ReleaseLock(rp, lockID, lock)
 
@@ -217,8 +237,8 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return errors.Wrapf(err, "error loading contact")
 	}
 
-	// contact has been deleted or is blocked, ignore this event
-	if len(contacts) == 0 || contacts[0].IsBlocked() {
+	// contact has been deleted or is blocked/stopped/archived, ignore this event
+	if len(contacts) == 0 || contacts[0].Status() != models.ContactStatusActive {
 		return nil
 	}
 
@@ -314,14 +334,22 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// contact has been deleted or is blocked, ignore this event
-	if len(contacts) == 0 || contacts[0].IsBlocked() {
+	if len(contacts) == 0 || contacts[0].Status() == models.ContactStatusBlocked {
 		return nil, nil
 	}
 
 	modelContact := contacts[0]
 
+	if models.ContactSeenEvents[eventType] {
+		err = modelContact.UpdateLastSeenOn(ctx, db, event.OccurredOn())
+		if err != nil {
+			return nil, errors.Wrap(err, "error updating contact last_seen_on")
+		}
+	}
+
 	// do we have associated trigger?
 	var trigger *models.Trigger
+
 	switch eventType {
 
 	case models.NewConversationEventType:
@@ -336,7 +364,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	case models.MOCallEventType:
 		trigger = models.FindMatchingMOCallTrigger(oa, modelContact)
 
-	case models.WelcomeMessateEventType:
+	case models.WelcomeMessageEventType:
 		trigger = nil
 
 	default:
@@ -449,11 +477,19 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction for stopping contact")
 	}
+
 	err = models.StopContact(ctx, tx, event.OrgID, event.ContactID)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
+
+	err = models.UpdateContactLastSeenOn(ctx, tx, event.ContactID, event.OccurredOn)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	err = tx.Commit()
 	if err != nil {
 		return errors.Wrapf(err, "unable to commit for contact stop")
@@ -509,7 +545,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
-	if channel == nil || modelContact.IsBlocked() {
+	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
 		err := models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.TypeInbox, topupID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking blocked or nil channel message as handled")
@@ -519,7 +555,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 	// stopped contact? they are unstopped if they send us an incoming message
 	newContact := event.NewContact
-	if modelContact.IsStopped() {
+	if modelContact.Status() == models.ContactStatusStopped {
 		err := modelContact.Unstop(ctx, db)
 		if err != nil {
 			return errors.Wrapf(err, "error unstopping contact")
@@ -631,10 +667,29 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		return nil
 	}
 
-	err = models.UpdateMessage(ctx, db, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topupID)
+	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
+	err = handleAsInbox(ctx, db, rp, oa, contact, msgIn, topupID)
+	if err != nil {
+		return errors.Wrapf(err, "error handling inbox message")
+	}
+	return nil
+}
+
+func handleAsInbox(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID) error {
+	msgEvent := events.NewMsgReceived(msg)
+	contact.SetLastSeenOn(msgEvent.CreatedOn())
+	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
+
+	err := models.HandleAndCommitEvents(ctx, db, rp, oa, contactEvents)
+	if err != nil {
+		return errors.Wrap(err, "error handling inbox message events")
+	}
+
+	err = models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, models.TypeInbox, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
+
 	return nil
 }
 
@@ -662,11 +717,13 @@ type MsgEvent struct {
 	Text          string             `json:"text"`
 	Attachments   []utils.Attachment `json:"attachments"`
 	NewContact    bool               `json:"new_contact"`
+	CreatedOn     time.Time          `json:"created_on"`
 }
 
 type StopEvent struct {
-	ContactID models.ContactID `json:"contact_id"`
-	OrgID     models.OrgID     `json:"org_id"`
+	ContactID  models.ContactID `json:"contact_id"`
+	OrgID      models.OrgID     `json:"org_id"`
+	OccurredOn time.Time        `json:"occurred_on"`
 }
 
 // NewTimeoutEvent creates a new event task for the passed in timeout event

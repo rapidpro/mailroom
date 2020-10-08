@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom/testsuite"
+
 	"github.com/stretchr/testify/assert"
 )
 
