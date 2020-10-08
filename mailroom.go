@@ -185,10 +185,7 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// initialize our elastic client
-	mr.ElasticClient, err = elastic.NewClient(
-		elastic.SetURL(mr.Config.Elastic),
-		elastic.SetSniff(false),
-	)
+	mr.ElasticClient, err = newElasticClient(mr.Config.Elastic)
 	if err != nil {
 		log.WithError(err).Error("unable to connect to elastic, check configuration")
 	} else {
@@ -235,4 +232,17 @@ func (mr *Mailroom) Stop() error {
 	mr.ElasticClient.Stop()
 	logrus.Info("mailroom stopped")
 	return nil
+}
+
+func newElasticClient(url string) (*elastic.Client, error) {
+	// enable retrying
+	backoff := elastic.NewSimpleBackoff(500, 1000, 2000)
+	backoff.Jitter(true)
+	retrier := elastic.NewBackoffRetrier(backoff)
+
+	return elastic.NewClient(
+		elastic.SetURL(url),
+		elastic.SetSniff(false),
+		elastic.SetRetrier(retrier),
+	)
 }
