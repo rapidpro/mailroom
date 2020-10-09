@@ -28,8 +28,11 @@ type eventCallbackRequest struct {
 }
 
 type agentMessageData struct {
-	Text        string   `json:"text"`
-	Attachments []string `json:"attachments"`
+	Text        string `json:"text"`
+	Attachments []struct {
+		Type string `json:"type"`
+		URL  string `json:"url"`
+	} `json:"attachments"`
 }
 
 func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
@@ -67,9 +70,12 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 			return err, http.StatusBadRequest, nil
 		}
 
-		fmt.Println(data)
+		var attachments []string
+		for _, attachment := range data.Attachments {
+			attachments = append(attachments, attachment.URL)
+		}
 
-		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, data.Attachments)
+		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, attachments)
 
 	case "close-room":
 		err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)

@@ -101,7 +101,7 @@
     "headers": {
       "Authorization": "Token 123456789"
     },
-    "body": "{\"type\":\"agent-message\",\"ticketID\":\"c69f103c-db64-4481-815b-1112890419ef\",\"visitor\":{\"token\":\"1234\"},\"data\":{\"attachments\":[\"https://link.to/image.jpg\"]}}",
+    "body": "{\"type\":\"agent-message\",\"ticketID\":\"c69f103c-db64-4481-815b-1112890419ef\",\"visitor\":{\"token\":\"1234\"},\"data\":{\"attachments\":[{\"type\": \"image/jpg\", \"url\": \"https://link.to/image.jpg\"}]}}",
     "http_mocks": {
       "https://link.to/image.jpg": [
         {
