@@ -3,7 +3,7 @@ package mailgun
 import (
 	"testing"
 
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"

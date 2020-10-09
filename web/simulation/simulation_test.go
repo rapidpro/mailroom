@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/stretchr/testify/assert"

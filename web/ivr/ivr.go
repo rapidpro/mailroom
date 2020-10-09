@@ -13,9 +13,9 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/ivr"
-	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/tasks/handler"
+	"github.com/nyaruka/mailroom/core/ivr"
+	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/go-chi/chi"

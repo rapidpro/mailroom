@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/uuids"
-	_ "github.com/nyaruka/mailroom/hooks"
-	"github.com/nyaruka/mailroom/models"
+	_ "github.com/nyaruka/mailroom/core/handlers"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 )

@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
@@ -126,7 +126,7 @@ func TestSendReply(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
-	image, err := ioutil.ReadFile("../../models/testdata/test.jpg")
+	image, err := ioutil.ReadFile("../../core/models/testdata/test.jpg")
 	require.NoError(t, err)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)

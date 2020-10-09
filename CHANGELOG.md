@@ -1,3 +1,11 @@
+v5.7.30
+----------
+ * Reorganization of core packages
+
+v5.7.29
+----------
+ * Fix race condition when bulk getting/creating contacts
+
 v5.7.28
 ----------
  * Add contact/resolve endpoint to assist with channel events still handled in RP

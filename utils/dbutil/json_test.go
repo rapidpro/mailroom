@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 

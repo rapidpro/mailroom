@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
+
 	"github.com/pkg/errors"
 )
 

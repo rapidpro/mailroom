@@ -12,12 +12,12 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/buger/jsonparser"
-	_ "github.com/nyaruka/mailroom/hooks"
+	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/stretchr/testify/assert"
 )
 

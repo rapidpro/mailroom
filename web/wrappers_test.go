@@ -7,7 +7,7 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/stretchr/testify/assert"

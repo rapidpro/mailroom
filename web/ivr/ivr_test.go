@@ -13,19 +13,19 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/tasks/starts"
+	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 
-	_ "github.com/nyaruka/mailroom/hooks"
-	"github.com/nyaruka/mailroom/ivr/nexmo"
-	"github.com/nyaruka/mailroom/ivr/twiml"
-	ivr_tasks "github.com/nyaruka/mailroom/tasks/ivr"
+	_ "github.com/nyaruka/mailroom/core/handlers"
+	"github.com/nyaruka/mailroom/core/ivr/nexmo"
+	"github.com/nyaruka/mailroom/core/ivr/twiml"
+	ivr_tasks "github.com/nyaruka/mailroom/core/tasks/ivr"
 )
 
 func TestTwilioIVR(t *testing.T) {

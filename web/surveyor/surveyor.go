@@ -12,8 +12,8 @@ import (
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"

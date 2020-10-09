@@ -11,7 +11,7 @@ import (
 
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/gomodule/redigo/redis"

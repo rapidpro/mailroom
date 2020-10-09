@@ -11,7 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets"
 
 	"github.com/pkg/errors"

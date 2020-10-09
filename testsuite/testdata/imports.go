@@ -6,7 +6,7 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
