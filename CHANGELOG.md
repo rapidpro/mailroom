@@ -1,3 +1,8 @@
+v5.7.31
+----------
+ * Update to latest goflow to get for normalizing numbers from The Gambia
+ * Enable retrying on the elastic client
+
 v5.7.30
 ----------
  * Reorganization of core packages
