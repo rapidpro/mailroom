@@ -411,7 +411,7 @@ func TestTimedEvents(t *testing.T) {
 	last := time.Now()
 	var sessionID models.SessionID
 	var runID models.FlowRunID
-	var runExpiration time.Time
+	var runExpiration *time.Time
 
 	for i, tc := range tcs {
 		time.Sleep(50 * time.Millisecond)
@@ -444,8 +444,11 @@ func TestTimedEvents(t *testing.T) {
 			} else if tc.Message == "child" {
 				db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE session_id = $1 AND is_active = FALSE`, sessionID)
 				db.Get(&runID, `SELECT id FROM flows_flowrun WHERE session_id = $1 AND is_active = FALSE`, sessionID)
+			} else if runExpiration != nil {
+				expiration = *runExpiration
 			} else {
-				expiration = runExpiration
+				// exited runs no longer have expiration set so just fake a value - the task will ignore inactive runs anyway
+				expiration = time.Now().Add(time.Hour * 24)
 			}
 
 			task = newTimedTask(
