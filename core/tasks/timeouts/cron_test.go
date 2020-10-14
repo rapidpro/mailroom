@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/flows"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/utils/marker"
 
 	"github.com/stretchr/testify/assert"
@@ -19,6 +21,7 @@ import (
 func TestTimeouts(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
+	db := testsuite.DB()
 	rp := testsuite.RP()
 	rc := testsuite.RC()
 	defer rc.Close()
@@ -27,9 +30,11 @@ func TestTimeouts(t *testing.T) {
 	assert.NoError(t, err)
 
 	// need to create a session that has an expired timeout
-	db := testsuite.DB()
-	db.MustExec(`INSERT INTO flows_flowsession(uuid, org_id, status, responded, contact_id, created_on, timeout_on) VALUES ($1, 1, 'W', TRUE, $2, NOW(), NOW());`, uuids.New(), models.CathyID)
-	db.MustExec(`INSERT INTO flows_flowsession(uuid, org_id, status, responded, contact_id, created_on, timeout_on) VALUES ($1, 1, 'W', TRUE, $2, NOW(), NOW()+ interval '1' day);`, uuids.New(), models.GeorgeID)
+	s1TimeoutOn := time.Now()
+	testdata.InsertFlowSession(t, db, flows.SessionUUID(uuids.New()), models.Org1, models.CathyID, models.SessionStatusWaiting, &s1TimeoutOn)
+	s2TimeoutOn := time.Now().Add(time.Hour * 24)
+	testdata.InsertFlowSession(t, db, flows.SessionUUID(uuids.New()), models.Org1, models.GeorgeID, models.SessionStatusWaiting, &s2TimeoutOn)
+
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our timeouts
