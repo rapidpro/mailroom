@@ -166,9 +166,6 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 	oa, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
 	assert.NoError(t, err)
 
-	oa, err = oa.Clone(ctx, db)
-	assert.NoError(t, err)
-
 	// reuse id from one of our real flows
 	flowUUID := models.FavoritesFlowUUID
 
@@ -178,8 +175,8 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		flowDef, err := json.Marshal(testFlow)
 		require.NoError(t, err)
 
-		// overide definition on real flow
-		oa.SetFlowDefinition(flowUUID, flowDef)
+		oa, err = oa.CloneForSimulation(ctx, db, map[assets.FlowUUID]json.RawMessage{flowUUID: flowDef}, nil)
+		assert.NoError(t, err)
 
 		flow, err := oa.Flow(flowUUID)
 		require.NoError(t, err)

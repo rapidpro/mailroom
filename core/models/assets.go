@@ -67,8 +67,6 @@ type OrgAssets struct {
 
 	locations        []assets.LocationHierarchy
 	locationsBuiltAt time.Time
-
-	cloneOf *OrgAssets
 }
 
 var ErrNotFound = errors.New("not found")
@@ -412,11 +410,38 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 	return a.fieldsByKey[key]
 }
 
-// Clone clones our org assets, returning a copy that can be modified without affecting the main
-func (a *OrgAssets) Clone(ctx context.Context, db *sqlx.DB) (*OrgAssets, error) {
+// CloneForSimulation clones our org assets for simulation
+func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
 	clone, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows|RefreshChannels)
-	clone.cloneOf = a
+
+	for flowUUID, newDef := range newDefs {
+		// get the original flow
+		flowAsset, err := a.Flow(flowUUID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to find flow with UUID '%s'", flowUUID)
+		}
+		f := flowAsset.(*Flow)
+
+		// make a clone of the flow with the provided definition
+		cf := &Flow{}
+		cf.f.UUID = flowUUID
+		cf.f.ID = f.f.ID
+		cf.f.Name = f.f.Name
+		cf.f.Config = f.f.Config
+		cf.f.FlowType = f.f.FlowType
+		cf.f.Version = f.f.Version
+		cf.f.IgnoreTriggers = f.f.IgnoreTriggers
+		cf.f.Definition = newDef
+
+		clone.flowByUUID[flowUUID] = cf
+		clone.flowByID[cf.ID()] = cf
+	}
+
+	for _, channel := range testChannels {
+		// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
+		clone.channels = append(clone.channels, channel)
+	}
 
 	// rebuild our session assets with our new items
 	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig())
@@ -425,18 +450,6 @@ func (a *OrgAssets) Clone(ctx context.Context, db *sqlx.DB) (*OrgAssets, error) 
 	}
 
 	return clone, err
-}
-
-// AddTestChannel adds a test channel to our org, this is only used in session assets during simulation
-func (a *OrgAssets) AddTestChannel(channel assets.Channel) {
-	if a.cloneOf == nil {
-		panic("can only add test channels to cloned orgs")
-	}
-
-	a.channels = append(a.channels, channel)
-	a.sessionAssets, _ = engine.NewSessionAssets(a.Env(), a, goflow.MigrationConfig())
-
-	// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
 }
 
 // Flow returns the flow with the passed in UUID
@@ -497,35 +510,6 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 	a.flowCacheLock.Unlock()
 
 	return dbFlow, nil
-}
-
-// SetFlowDefinition sets the flow definition for the given flow. Should only be used for simulation and testing.
-func (a *OrgAssets) SetFlowDefinition(uuid assets.FlowUUID, definition json.RawMessage) error {
-	if a.cloneOf == nil {
-		panic("can only override flow definitions on cloned orgs")
-	}
-
-	// get the original flow
-	flowAsset, err := a.cloneOf.Flow(uuid)
-	if err != nil {
-		return errors.Wrapf(err, "unable to find flow with UUID '%s'", uuid)
-	}
-	f := flowAsset.(*Flow)
-
-	// make a clone of the flow with the provided definition
-	clone := &Flow{}
-	clone.f.UUID = uuid
-	clone.f.ID = f.f.ID
-	clone.f.Name = f.f.Name
-	clone.f.Config = f.f.Config
-	clone.f.FlowType = f.f.FlowType
-	clone.f.Version = f.f.Version
-	clone.f.IgnoreTriggers = f.f.IgnoreTriggers
-	clone.f.Definition = definition
-
-	a.flowByUUID[uuid] = clone
-	a.flowByID[clone.ID()] = clone
-	return nil
 }
 
 func (a *OrgAssets) Campaigns() []*Campaign {

@@ -1,8 +1,11 @@
 package models_test
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
@@ -10,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSetFlowDefinition(t *testing.T) {
+func TestCloneForSimulation(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 	models.FlushCache()
@@ -18,25 +21,35 @@ func TestSetFlowDefinition(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	require.NoError(t, err)
 
-	// panic trying to set definition on non-cloned assets
-	require.Panics(t, func() { oa.SetFlowDefinition(models.FavoritesFlowUUID, []byte(`{}`)) })
-
-	oa, err = oa.Clone(ctx, db)
-	require.NoError(t, err)
-
-	// can't override definition for non-existing flow
-	err = oa.SetFlowDefinition("a121f1af-7dfa-47af-9d22-9726372e2daa", []byte(`{}`))
-	assert.EqualError(t, err, "unable to find flow with UUID 'a121f1af-7dfa-47af-9d22-9726372e2daa': not found")
-
-	newDef := []byte(`{
+	newFavoritesDef := `{
 		"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85",
 		"name": "Favorites",
 		"nodes": []
-	}`)
-	err = oa.SetFlowDefinition(models.FavoritesFlowUUID, newDef)
+	}`
+
+	newDefs := map[assets.FlowUUID]json.RawMessage{
+		models.FavoritesFlowUUID: []byte(newFavoritesDef),
+	}
+
+	testChannels := []assets.Channel{
+		types.NewChannel("d7be3965-4c76-4abd-af78-ebc0b84ab621", "Test Channel 1", "1234567890", []string{"tel"}, nil, nil),
+		types.NewChannel("fd130d20-65f8-43fc-a3c5-a3fa4d1e4193", "Test Channel 2", "2345678901", []string{"tel"}, nil, nil),
+	}
+
+	oa, err = oa.CloneForSimulation(ctx, db, newDefs, testChannels)
 	require.NoError(t, err)
 
+	// should get new definition
 	flow, err := oa.Flow(models.FavoritesFlowUUID)
 	require.NoError(t, err)
-	assert.Equal(t, string(newDef), string(flow.Definition()))
+	assert.Equal(t, newFavoritesDef, string(flow.Definition()))
+
+	// test channels should be accesible to engine
+	testChannel1 := oa.SessionAssets().Channels().Get("d7be3965-4c76-4abd-af78-ebc0b84ab621")
+	assert.Equal(t, "Test Channel 1", testChannel1.Name())
+	testChannel2 := oa.SessionAssets().Channels().Get("fd130d20-65f8-43fc-a3c5-a3fa4d1e4193")
+	assert.Equal(t, "Test Channel 2", testChannel2.Name())
+
+	oa, err = oa.CloneForSimulation(ctx, db, map[assets.FlowUUID]json.RawMessage{"a121f1af-7dfa-47af-9d22-9726372e2daa": []byte(newFavoritesDef)}, nil)
+	assert.EqualError(t, err, "unable to find flow with UUID 'a121f1af-7dfa-47af-9d22-9726372e2daa': not found")
 }
