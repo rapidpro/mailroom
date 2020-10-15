@@ -170,20 +170,19 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 	assert.NoError(t, err)
 
 	// reuse id from one of our real flows
-	flowID := models.FavoritesFlowID
+	flowUUID := models.FavoritesFlowUUID
 
 	for i, tc := range tcs {
-		// new UUID for each test so our definition doesn't get cached
-		flowUUID := assets.FlowUUID(uuids.New())
-
 		// build our flow for this test case
 		testFlow := createTestFlow(t, flowUUID, tc)
 		flowDef, err := json.Marshal(testFlow)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		// add it to our org
-		flow := oa.SetFlow(flowID, flowUUID, testFlow.Name(), flowDef)
-		assert.NoError(t, err)
+		// overide definition on real flow
+		oa.SetFlowDefinition(flowUUID, flowDef)
+
+		flow, err := oa.Flow(flowUUID)
+		require.NoError(t, err)
 
 		options := runner.NewStartOptions()
 		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, session []*models.Session) error {
@@ -198,12 +197,12 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
 			msg := tc.Msgs[models.ContactID(contact.ID())]
 			if msg == nil {
-				return triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
+				return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Manual().Build()
 			}
-			return triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msg).Build()
+			return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Msg(msg).Build()
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, oa, flow, []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
+		_, err = runner.StartFlow(ctx, db, rp, oa, flow.(*models.Flow), []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
 		assert.NoError(t, err)
 
 		results := make(map[models.ContactID]modifyResult)

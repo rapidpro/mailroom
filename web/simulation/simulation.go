@@ -118,7 +118,7 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 	// for each of our passed in definitions
 	for _, flow := range request.Flows {
 		// populate our flow in our org from our request
-		err = populateFlow(oa, flow.UUID, flow.Definition)
+		err = oa.SetFlowDefinition(flow.UUID, flow.Definition)
 		if err != nil {
 			return nil, http.StatusBadRequest, err
 		}
@@ -195,7 +195,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// for each of our passed in definitions
 	for _, flow := range request.Flows {
 		// populate our flow in our org from our request
-		err = populateFlow(oa, flow.UUID, flow.Definition)
+		err = oa.SetFlowDefinition(flow.UUID, flow.Definition)
 		if err != nil {
 			return nil, http.StatusBadRequest, err
 		}
@@ -265,16 +265,4 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	return newSimulationResponse(session, sprint), http.StatusOK, nil
-}
-
-// populateFlow takes care of setting the definition for the flow with the passed in UUID according to the passed in definitions
-func populateFlow(oa *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawMessage) error {
-	f, err := oa.Flow(uuid)
-	if err != nil {
-		return errors.Wrapf(err, "unable to find flow with uuid: %s", uuid)
-	}
-	flow := f.(*models.Flow)
-
-	oa.SetFlow(flow.ID(), flow.UUID(), flow.Name(), flowDef)
-	return nil
 }
