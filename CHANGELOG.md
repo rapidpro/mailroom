@@ -1,3 +1,8 @@
+v5.7.33
+----------
+ * Update to goflow v0.105.4
+ * Fix cloning of flows during simulation so that ignore keyword triggers is cloned too
+
 v5.7.32
 ----------
  * Update to goflow v0.105.3 to get support for arabic numerals in has_number tests
