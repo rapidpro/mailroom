@@ -413,7 +413,7 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 // CloneForSimulation clones our org assets for simulation
 func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
-	clone, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows|RefreshChannels)
+	clone, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows)
 
 	for flowUUID, newDef := range newDefs {
 		// get the original flow
@@ -424,15 +424,7 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs
 		f := flowAsset.(*Flow)
 
 		// make a clone of the flow with the provided definition
-		cf := &Flow{}
-		cf.f.UUID = flowUUID
-		cf.f.ID = f.f.ID
-		cf.f.Name = f.f.Name
-		cf.f.Config = f.f.Config
-		cf.f.FlowType = f.f.FlowType
-		cf.f.Version = f.f.Version
-		cf.f.IgnoreTriggers = f.f.IgnoreTriggers
-		cf.f.Definition = newDef
+		cf := f.cloneWithNewDefinition(newDef)
 
 		clone.flowByUUID[flowUUID] = cf
 		clone.flowByID[cf.ID()] = cf
