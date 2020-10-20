@@ -1,10 +1,9 @@
 package tickets_test
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
-	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
@@ -126,14 +125,10 @@ func TestSendReply(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
-	image, err := ioutil.ReadFile("../../core/models/testdata/test.jpg")
+	imageBody, err := os.Open("../../core/models/testdata/test.jpg")
 	require.NoError(t, err)
 
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://coolfilesfortickets.com/a.jpg": {httpx.MockResponse{Status: 200, Body: image}},
-		"http://badfiles.com/b.jpg":            {httpx.MockResponse{Status: 400, Body: nil}},
-	}))
+	image := &tickets.File{URL: "http://coolfiles.com/a.jpg", ContentType: "image/jpeg", Body: imageBody}
 
 	ticketUUID := flows.TicketUUID("f7358870-c3dd-450d-b5ae-db2eb50216ba")
 
@@ -143,7 +138,7 @@ func TestSendReply(t *testing.T) {
 	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
 	require.NoError(t, err)
 
-	msg, err := tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []string{"http://coolfilesfortickets.com/a.jpg"})
+	msg, err := tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []*tickets.File{image})
 	require.NoError(t, err)
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
@@ -151,7 +146,7 @@ func TestSendReply(t *testing.T) {
 	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg"}, msg.Attachments())
 	assert.FileExists(t, "_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg")
 
-	// try with file that can't be fetched
-	_, err = tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []string{"http://badfiles.com/b.jpg"})
-	assert.EqualError(t, err, "error fetching file http://badfiles.com/b.jpg for ticket reply: fetch returned non-200 response")
+	// try with file that can't be read (i.e. same file again which is already closed)
+	_, err = tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []*tickets.File{image})
+	assert.EqualError(t, err, "error storing attachment http://coolfiles.com/a.jpg for ticket reply: unable to read attachment content: read ../../core/models/testdata/test.jpg: file already closed")
 }

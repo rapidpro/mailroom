@@ -25,18 +25,19 @@ func init() {
 }
 
 type receiveRequest struct {
-	Recipient    string `form:"recipient"     validate:"required,email"`
-	Sender       string `form:"sender"        validate:"required,email"`
-	From         string `form:"From"`
-	ReplyTo      string `form:"Reply-To"`
-	MessageID    string `form:"Message-Id"    validate:"required"`
-	Subject      string `form:"subject"       validate:"required"`
-	PlainBody    string `form:"body-plain"`
-	StrippedText string `form:"stripped-text" validate:"required"`
-	HTMLBody     string `form:"body-html"`
-	Timestamp    string `form:"timestamp"     validate:"required"`
-	Token        string `form:"token"         validate:"required"`
-	Signature    string `form:"signature"     validate:"required"`
+	Recipient       string `form:"recipient"     validate:"required,email"`
+	Sender          string `form:"sender"        validate:"required,email"`
+	From            string `form:"From"`
+	ReplyTo         string `form:"Reply-To"`
+	MessageID       string `form:"Message-Id"    validate:"required"`
+	Subject         string `form:"subject"       validate:"required"`
+	PlainBody       string `form:"body-plain"`
+	StrippedText    string `form:"stripped-text" validate:"required"`
+	HTMLBody        string `form:"body-html"`
+	Timestamp       string `form:"timestamp"     validate:"required"`
+	Token           string `form:"token"         validate:"required"`
+	Signature       string `form:"signature"     validate:"required"`
+	AttachmentCount int    `form:"attachment-count"`
 }
 
 // see https://documentation.mailgun.com/en/latest/user_manual.html#securing-webhooks
@@ -61,12 +62,22 @@ var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\
 
 func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &receiveRequest{}
-	if err := web.DecodeAndValidateForm(request, r); err != nil {
+	if err := web.DecodeAndValidateMultipartForm(request, r); err != nil {
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
 	}
 
 	if !request.verify(s.Config.MailgunSigningKey) {
 		return errors.New("request signature validation failed"), http.StatusForbidden, nil
+	}
+
+	// decode any attachments
+	files := make([]*tickets.File, request.AttachmentCount)
+	for i := range files {
+		file, header, err := r.FormFile(fmt.Sprintf("attachment-%d", i+1))
+		if err != nil {
+			return errors.Wrapf(err, "error decoding attachment #%d", i+1), http.StatusBadRequest, nil
+		}
+		files[i] = &tickets.File{URL: header.Filename, ContentType: header.Header.Get("Content-Type"), Body: file}
 	}
 
 	// recipient is in the format ticket+<ticket-uuid>@... parse it out
@@ -112,7 +123,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *model
 		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 	}
 
-	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, request.StrippedText, nil)
+	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, request.StrippedText, files)
 	if err != nil {
 		return err, http.StatusInternalServerError, nil
 	}
