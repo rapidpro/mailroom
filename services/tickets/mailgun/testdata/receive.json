@@ -217,44 +217,10 @@
         }
     },
     {
-        "label": "forwarded response if message was created",
+        "label": "forwarded response if message was created (no attachments, request sent as urlencoded form)",
         "method": "POST",
         "path": "/mr/tickets/types/mailgun/receive",
-        "body": [
-            {
-                "name": "recipient",
-                "data": "ticket+c69f103c-db64-4481-815b-1112890419ef@mr.nyaruka.com"
-            },
-            {
-                "name": "sender",
-                "data": "bob@acme.com"
-            },
-            {
-                "name": "subject",
-                "data": "Re: [RapidPro-Tickets] New ticket"
-            },
-            {
-                "name": "Message-Id",
-                "data": "<12345@mail.gmail.com>"
-            },
-            {
-                "name": "stripped-text",
-                "data": "Hello"
-            },
-            {
-                "name": "timestamp",
-                "data": "1590088411"
-            },
-            {
-                "name": "token",
-                "data": "987654321"
-            },
-            {
-                "name": "signature",
-                "data": "3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e"
-            }
-        ],
-        "body_encode": "multipart",
+        "body": "recipient=ticket%2Bc69f103c-db64-4481-815b-1112890419ef%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A%20%5BRapidPro-Tickets%5D%20New%20ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
         "status": 200,
         "response": {
             "action": "forwarded",
@@ -273,7 +239,7 @@
         ]
     },
     {
-        "label": "forwarded response if message was created - with attachments",
+        "label": "forwarded response if message was created (attachments, request sent as multipart encoded form)",
         "method": "POST",
         "path": "/mr/tickets/types/mailgun/receive",
         "body": [

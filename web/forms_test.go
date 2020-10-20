@@ -58,7 +58,7 @@ func TestDecodeAndValidateMultipartForm(t *testing.T) {
 	require.NoError(t, err)
 
 	form := &TestForm{}
-	err = web.DecodeAndValidateMultipartForm(form, request)
+	err = web.DecodeAndValidateForm(form, request)
 
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"a", "b"}, form.Foo)
@@ -72,6 +72,6 @@ func TestDecodeAndValidateMultipartForm(t *testing.T) {
 	require.NoError(t, err)
 
 	form = &TestForm{}
-	err = web.DecodeAndValidateMultipartForm(form, request)
+	err = web.DecodeAndValidateForm(form, request)
 	assert.Error(t, err)
 }
