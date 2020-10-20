@@ -55,7 +55,6 @@ func RunWebTests(t *testing.T, truthFile string) {
 		Headers      map[string]string    `json:"headers,omitempty"`
 		Body         json.RawMessage      `json:"body,omitempty"`
 		BodyEncode   string               `json:"body_encode,omitempty"`
-		Files        map[string]string    `json:"files,omitempty"`
 		Status       int                  `json:"status"`
 		Response     json.RawMessage      `json:"response,omitempty"`
 		ResponseFile string               `json:"response_file,omitempty"`
@@ -86,26 +85,27 @@ func RunWebTests(t *testing.T, truthFile string) {
 
 		testURL := "http://localhost:8090" + tc.Path
 		var req *http.Request
-		if tc.BodyEncode == "multipart" || len(tc.Files) > 0 {
+		if tc.BodyEncode == "multipart" {
 			var parts []MultiPartPart
 			err = json.Unmarshal(tc.Body, &parts)
 			require.NoError(t, err)
 
 			req, err = MakeMultipartRequest(tc.Method, testURL, parts, tc.Headers)
+
+		} else if len(tc.Body) >= 2 && tc.Body[0] == '"' { // if body is a string, treat it as a URL encoded submission
+			bodyStr := ""
+			json.Unmarshal(tc.Body, &bodyStr)
+			bodyReader := strings.NewReader(bodyStr)
+			req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 		} else {
-			// if body is a string, treat it as a URL encoded submission
-			if len(tc.Body) >= 2 && tc.Body[0] == '"' {
-				bodyStr := ""
-				json.Unmarshal(tc.Body, &bodyStr)
-				bodyReader := strings.NewReader(bodyStr)
-				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			} else {
-				bodyReader := bytes.NewReader([]byte(tc.Body))
-				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			}
+			bodyReader := bytes.NewReader([]byte(tc.Body))
+			req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 		}
+
 		assert.NoError(t, err, "%s: error creating request", tc.Label)
 
 		resp, err := http.DefaultClient.Do(req)
