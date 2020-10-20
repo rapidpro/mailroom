@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/flows"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/utils/marker"
 
 	"github.com/stretchr/testify/assert"
@@ -35,30 +37,28 @@ func TestExpirations(t *testing.T) {
 	db := testsuite.DB()
 
 	// create a few sessions
-	var s1, s2 models.SessionID
-	err = db.Get(&s1, `INSERT INTO flows_flowsession(uuid, org_id, status, responded, contact_id, created_on) VALUES ($1, 1, 'W', TRUE, $2, NOW()) RETURNING id;`, uuids.New(), models.CathyID)
-	assert.NoError(t, err)
-
-	err = db.Get(&s2, `INSERT INTO flows_flowsession(uuid, org_id, status, responded, contact_id, created_on) VALUES ($1, 1, 'W', TRUE, $2, NOW()) RETURNING id;`, uuids.New(), models.GeorgeID)
-	assert.NoError(t, err)
-
-	var r1, r2, r3, r4 models.FlowRunID
+	s1 := testdata.InsertFlowSession(t, db, flows.SessionUUID(uuids.New()), models.Org1, models.CathyID, models.SessionStatusWaiting, nil)
+	s2 := testdata.InsertFlowSession(t, db, flows.SessionUUID(uuids.New()), models.Org1, models.GeorgeID, models.SessionStatusWaiting, nil)
+	s3 := testdata.InsertFlowSession(t, db, flows.SessionUUID(uuids.New()), models.Org1, models.BobID, models.SessionStatusWaiting, nil)
 
 	// simple run, no parent
-	err = db.Get(&r1, `INSERT INTO flows_flowrun(session_id, status, uuid, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id, expires_on) VALUES($1, $2, 'f240ab19-ed5d-4b51-b934-f2fbb9f8e5ad', TRUE, NOW(), NOW(), TRUE, $3, $4, 1, NOW()) RETURNING id;`, s1, models.RunStatusWaiting, models.CathyID, models.FavoritesFlowID)
-	assert.NoError(t, err)
+	r1ExpiresOn := time.Now()
+	testdata.InsertFlowRun(t, db, "f240ab19-ed5d-4b51-b934-f2fbb9f8e5ad", models.Org1, s1, models.CathyID, models.FavoritesFlowID, models.RunStatusWaiting, "", &r1ExpiresOn)
 
 	// parent run
-	err = db.Get(&r2, `INSERT INTO flows_flowrun(session_id, status, uuid, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id, expires_on) VALUES($1, $2, 'c4126b59-7a61-4ed5-a2da-c7857580355b', TRUE, NOW(), NOW(), TRUE, $3, $4, 1, NOW() + interval '1' day) RETURNING id;`, s2, models.RunStatusWaiting, models.GeorgeID, models.FavoritesFlowID)
-	assert.NoError(t, err)
+	r2ExpiresOn := time.Now().Add(time.Hour * 24)
+	testdata.InsertFlowRun(t, db, "c4126b59-7a61-4ed5-a2da-c7857580355b", models.Org1, s2, models.GeorgeID, models.FavoritesFlowID, models.RunStatusWaiting, "", &r2ExpiresOn)
 
 	// child run
-	err = db.Get(&r3, `INSERT INTO flows_flowrun(session_id, status, parent_uuid, uuid, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id, expires_on) VALUES($1, $2, 'c4126b59-7a61-4ed5-a2da-c7857580355b', 'a87b7079-5a3c-4e5f-8a6a-62084807c522', TRUE, NOW(), NOW(), TRUE, $3, $4, 1, NOW()) RETURNING id;`, s2, models.RunStatusWaiting, models.GeorgeID, models.FavoritesFlowID)
-	assert.NoError(t, err)
+	r3ExpiresOn := time.Now()
+	testdata.InsertFlowRun(t, db, "a87b7079-5a3c-4e5f-8a6a-62084807c522", models.Org1, s2, models.GeorgeID, models.FavoritesFlowID, models.RunStatusWaiting, "c4126b59-7a61-4ed5-a2da-c7857580355b", &r3ExpiresOn)
 
 	// run with no session
-	err = db.Get(&r4, `INSERT INTO flows_flowrun(session_id, status, uuid, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id, expires_on) VALUES($1, $2, 'd64fac33-933f-44b4-a6e4-53283d07a609', TRUE, NOW(), NOW(), TRUE, $3, $4, 1, NOW()) RETURNING id;`, nil, models.RunStatusWaiting, models.CathyID, models.FavoritesFlowID)
-	assert.NoError(t, err)
+	r4ExpiresOn := time.Now()
+	testdata.InsertFlowRun(t, db, "d64fac33-933f-44b4-a6e4-53283d07a609", models.Org1, models.SessionID(0), models.CathyID, models.FavoritesFlowID, models.RunStatusWaiting, "", &r4ExpiresOn)
+
+	// run with no expires_on
+	testdata.InsertFlowRun(t, db, "4391fdc4-25ca-4e66-8e05-0cd3a6cbb6a2", models.Org1, s3, models.BobID, models.FavoritesFlowID, models.RunStatusWaiting, "", nil)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -67,6 +67,9 @@ func TestExpirations(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{models.GeorgeID}, 2)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.GeorgeID}, 0)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{models.BobID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.BobID}, 0)
 
 	// expire our runs
 	err = expireRuns(ctx, db, rp, expirationLock, "foo")
@@ -79,6 +82,10 @@ func TestExpirations(t *testing.T) {
 	// should still have two active runs for George as it needs to continue
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{models.GeorgeID}, 2)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.GeorgeID}, 0)
+
+	// runs without expires_on won't be expired
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{models.BobID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.BobID}, 0)
 
 	// should have created one task
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)

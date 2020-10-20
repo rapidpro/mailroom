@@ -1,3 +1,17 @@
+v5.7.33
+----------
+ * Update to goflow v0.105.4
+ * Fix cloning of flows during simulation so that ignore keyword triggers is cloned too
+
+v5.7.32
+----------
+ * Update to goflow v0.105.3 to get support for arabic numerals in has_number tests
+
+v5.7.31
+----------
+ * Update to latest goflow to get for normalizing numbers from The Gambia
+ * Enable retrying on the elastic client
+
 v5.7.30
 ----------
  * Reorganization of core packages

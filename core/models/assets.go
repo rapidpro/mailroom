@@ -29,8 +29,7 @@ type OrgAssets struct {
 
 	sessionAssets flows.SessionAssets
 
-	flowByUUID map[assets.FlowUUID]assets.Flow
-
+	flowByUUID    map[assets.FlowUUID]assets.Flow
 	flowByID      map[FlowID]assets.Flow
 	flowCacheLock sync.RWMutex
 
@@ -68,8 +67,6 @@ type OrgAssets struct {
 
 	locations        []assets.LocationHierarchy
 	locationsBuiltAt time.Time
-
-	cloned bool
 }
 
 var ErrNotFound = errors.New("not found")
@@ -413,31 +410,38 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 	return a.fieldsByKey[key]
 }
 
-// Clone clones our org assets, returning a copy that can be modified without affecting the main
-func (a *OrgAssets) Clone(ctx context.Context, db *sqlx.DB) (*OrgAssets, error) {
+// CloneForSimulation clones our org assets for simulation
+func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
-	org, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows|RefreshChannels)
-	org.cloned = true
+	clone, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows)
+
+	for flowUUID, newDef := range newDefs {
+		// get the original flow
+		flowAsset, err := a.Flow(flowUUID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to find flow with UUID '%s'", flowUUID)
+		}
+		f := flowAsset.(*Flow)
+
+		// make a clone of the flow with the provided definition
+		cf := f.cloneWithNewDefinition(newDef)
+
+		clone.flowByUUID[flowUUID] = cf
+		clone.flowByID[cf.ID()] = cf
+	}
+
+	for _, channel := range testChannels {
+		// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
+		clone.channels = append(clone.channels, channel)
+	}
 
 	// rebuild our session assets with our new items
-	org.sessionAssets, err = engine.NewSessionAssets(a.Env(), org, goflow.MigrationConfig())
+	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig())
 	if err != nil {
-		return nil, errors.Wrapf(err, "error build session assets for org: %d", org.OrgID())
+		return nil, errors.Wrapf(err, "error build session assets for org: %d", clone.OrgID())
 	}
 
-	return org, err
-}
-
-// AddTestChannel adds a test channel to our org, this is only used in session assets during simulation
-func (a *OrgAssets) AddTestChannel(channel assets.Channel) {
-	if !a.cloned {
-		panic("can only add test channels to cloned orgs")
-	}
-
-	a.channels = append(a.channels, channel)
-	a.sessionAssets, _ = engine.NewSessionAssets(a.Env(), a, goflow.MigrationConfig())
-
-	// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
+	return clone, err
 }
 
 // Flow returns the flow with the passed in UUID
@@ -498,24 +502,6 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 	a.flowCacheLock.Unlock()
 
 	return dbFlow, nil
-}
-
-// SetFlow sets the flow definition for the passed in ID. Should only be used for unit tests
-func (a *OrgAssets) SetFlow(id FlowID, uuid assets.FlowUUID, name string, definition json.RawMessage) *Flow {
-	if !a.cloned {
-		panic("can only override flow definitions on cloned orgs")
-	}
-
-	f := &Flow{}
-	f.f.UUID = uuid
-	f.f.Name = name
-	f.f.ID = id
-	f.f.Definition = definition
-
-	a.flowByID[id] = f
-	a.flowByUUID[uuid] = f
-
-	return f
 }
 
 func (a *OrgAssets) Campaigns() []*Campaign {

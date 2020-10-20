@@ -92,6 +92,13 @@ func (f *Flow) FlowReference() *assets.FlowReference {
 	return assets.NewFlowReference(f.UUID(), f.Name())
 }
 
+// clones this flow but gives it the provided definition (used for simulation)
+func (f *Flow) cloneWithNewDefinition(def []byte) *Flow {
+	c := *f
+	c.f.Definition = def
+	return &c
+}
+
 func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
 	// first try to look up in our assets
 	flow, _ := oa.Flow(flowUUID)

@@ -214,15 +214,15 @@ func TestContactRuns(t *testing.T) {
 
 	tcs := []struct {
 		Message       string
-		SessionStatus string
-		RunActive     bool
+		SessionStatus flows.SessionStatus
+		RunStatus     models.RunStatus
 		Substring     string
 		PathLength    int
 		EventLength   int
 	}{
-		{"Red", "W", true, "%I like Red too%", 4, 3},
-		{"Mutzig", "W", true, "%they made red Mutzig%", 6, 5},
-		{"Luke", "C", false, "%Thanks Luke%", 7, 7},
+		{"Red", models.SessionStatusWaiting, models.RunStatusWaiting, "%I like Red too%", 4, 3},
+		{"Mutzig", models.SessionStatusWaiting, models.RunStatusWaiting, "%they made red Mutzig%", 6, 5},
+		{"Luke", models.SessionStatusCompleted, models.RunStatusCompleted, "%Thanks Luke%", 7, 7},
 	}
 
 	session := sessions[0]
@@ -242,12 +242,22 @@ func TestContactRuns(t *testing.T) {
 			[]interface{}{contact.ID(), flow.ID(), tc.SessionStatus}, 1, "%d: didn't find expected session", i,
 		)
 
+		runIsActive := tc.RunStatus == models.RunStatusActive || tc.RunStatus == models.RunStatusWaiting
+
+		runQuery := `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
+		AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
+		AND json_array_length(path::json) = $5 AND json_array_length(events::json) = $6
+		AND session_id IS NOT NULL `
+
+		if runIsActive {
+			runQuery += `AND expires_on IS NOT NULL`
+		} else {
+			runQuery += `AND expires_on IS NULL`
+		}
+
 		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-			 AND is_active = $3 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
-			 AND json_array_length(path::json) = $4 AND json_array_length(events::json) = $5
-			 AND session_id IS NOT NULL AND expires_on IS NOT NULL`,
-			[]interface{}{contact.ID(), flow.ID(), tc.RunActive, tc.PathLength, tc.EventLength}, 1, "%d: didn't find expected run", i,
+			runQuery,
+			[]interface{}{contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength, tc.EventLength}, 1, "%d: didn't find expected run", i,
 		)
 
 		testsuite.AssertQueryCount(t, db,
