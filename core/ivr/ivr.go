@@ -3,7 +3,6 @@ package ivr
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -471,19 +470,12 @@ func ResumeIVRFlow(
 			return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("unable to download attachment, ending call"))
 		}
 
-		// download our body
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "unable to download attachment body, ending call"))
-		}
-		resp.Body.Close()
-
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(attachment.URL())
 
-		attachment, err = oa.Org().StoreAttachment(store, filename, body)
+		attachment, err = oa.Org().StoreAttachment(store, filename, attachment.ContentType(), resp.Body)
 		if err != nil {
-			return errors.Wrapf(err, "unable to store IVR attachment")
+			return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "unable to download and store attachment, ending call"))
 		}
 	}
 

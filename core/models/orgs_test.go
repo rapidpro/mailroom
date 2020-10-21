@@ -1,7 +1,7 @@
 package models
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -64,14 +64,18 @@ func TestStoreAttachment(t *testing.T) {
 	store := testsuite.Storage()
 	defer testsuite.ResetStorage()
 
-	image, err := ioutil.ReadFile("testdata/test.jpg")
+	image, err := os.Open("testdata/test.jpg")
 	require.NoError(t, err)
 
 	org, err := loadOrg(ctx, db, Org1)
 	assert.NoError(t, err)
 
-	attachment, err := org.StoreAttachment(store, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", image)
+	attachment, err := org.StoreAttachment(store, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)
 	require.NoError(t, err)
 
 	assert.Equal(t, utils.Attachment("image/jpeg:_test_storage/media/1/6683/83ba/668383ba-387c-49bc-b164-1213ac0ea7aa.jpg"), attachment)
+
+	// err trying to read from same reader again
+	_, err = org.StoreAttachment(store, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)
+	assert.EqualError(t, err, "unable to read attachment content: read testdata/test.jpg: file already closed")
 }

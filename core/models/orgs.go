@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -172,17 +174,26 @@ func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryCo
 }
 
 // StoreAttachment saves an attachment to storage
-func (o *Org) StoreAttachment(s storage.Storage, filename string, content []byte) (utils.Attachment, error) {
+func (o *Org) StoreAttachment(s storage.Storage, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
 	prefix := config.Mailroom.S3MediaPrefix
 
-	contentType := http.DetectContentType(content)
-	contentType, _, _ = mime.ParseMediaType(contentType)
+	// read the content
+	contentBytes, err := ioutil.ReadAll(content)
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to read attachment content")
+	}
+	content.Close()
+
+	if contentType == "" {
+		contentType = http.DetectContentType(contentBytes)
+		contentType, _, _ = mime.ParseMediaType(contentType)
+	}
 
 	path := o.attachmentPath(prefix, filename)
 
-	url, err := s.Put(path, contentType, content)
+	url, err := s.Put(path, contentType, contentBytes)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "unable to store attachment content")
 	}
 
 	return utils.Attachment(contentType + ":" + url), nil

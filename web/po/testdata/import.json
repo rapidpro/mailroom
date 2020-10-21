@@ -12,20 +12,26 @@
         "label": "import PO into single flow",
         "method": "POST",
         "path": "/mr/po/import",
-        "body": {
-            "org_id": [
-                "1"
-            ],
-            "flow_ids": [
-                "10000"
-            ],
-            "language": [
-                "spa"
-            ]
-        },
-        "files": {
-            "po": "msgid \"Blue\"\nmsgstr \"Azul\"\n\n"
-        },
+        "body": [
+            {
+                "name": "org_id",
+                "data": "1"
+            },
+            {
+                "name": "flow_ids",
+                "data": "10000"
+            },
+            {
+                "name": "language",
+                "data": "spa"
+            },
+            {
+                "name": "po",
+                "filename": "test.po",
+                "data": "msgid \"Blue\"\nmsgstr \"Azul\"\n\n"
+            }
+        ],
+        "body_encode": "multipart",
         "status": 200,
         "response": {
             "flows": [
