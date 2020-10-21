@@ -1,6 +1,7 @@
 package mailgun_test
 
 import (
+	"bytes"
 	"net/http"
 	"testing"
 
@@ -45,7 +46,10 @@ func TestSendMessage(t *testing.T) {
 		"support@acme.com",
 		"Need help",
 		"Where are my cookies?",
-		[]mailgun.File{{"test.jpg", []byte(`IMANIMAGE`)}, {"test.mp4", []byte(`IMAVIDEO`)}},
+		[]*mailgun.EmailAttachment{
+			{"test.jpg", "image/jpeg", bytes.NewReader([]byte(`IMANIMAGE`))},
+			{"test.mp4", "audio/mp4", bytes.NewReader([]byte(`IMAVIDEO`))},
+		},
 		map[string]string{"In-Reply-To": "12415"},
 	)
 	assert.NoError(t, err)

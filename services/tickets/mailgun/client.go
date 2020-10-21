@@ -3,8 +3,10 @@ package mailgun
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"sort"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -43,23 +45,34 @@ type messageResponse struct {
 	ID string `json:"id"`
 }
 
-type File struct {
-	Filename string
-	Data     []byte
+// EmailAttachment is an email attachment
+type EmailAttachment struct {
+	Filename    string
+	ContentType string
+	Body        io.Reader
 }
 
 // SendMessage sends a new email message and returns the ID
 // see https://documentation.mailgun.com/en/latest/api-sending.html
-func (c *Client) SendMessage(from, to, subject, text string, attachments []File, headers map[string]string) (string, *httpx.Trace, error) {
-	writeBody := func(w *multipart.Writer) {
+func (c *Client) SendMessage(from, to, subject, text string, attachments []*EmailAttachment, headers map[string]string) (string, *httpx.Trace, error) {
+	writeBody := func(w *multipart.Writer) error {
 		w.WriteField("from", from)
 		w.WriteField("to", to)
 		w.WriteField("subject", subject)
 		w.WriteField("text", text)
 
 		for _, attachment := range attachments {
-			fw, _ := w.CreateFormFile("attachment", attachment.Filename)
-			fw.Write(attachment.Data)
+			h := make(textproto.MIMEHeader)
+			h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="attachment"; filename="%s"`, attachment.Filename))
+			h.Set("Content-Type", attachment.ContentType)
+			fw, err := w.CreatePart(h)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(fw, attachment.Body)
+			if err != nil {
+				return err
+			}
 		}
 
 		// for the sake of tests, we want to output headers in consistent order
@@ -72,6 +85,7 @@ func (c *Client) SendMessage(from, to, subject, text string, attachments []File,
 		for _, k := range headerKeys {
 			w.WriteField("h:"+k, headers[k])
 		}
+		return nil
 	}
 
 	trace, err := c.post("messages", writeBody)
@@ -93,11 +107,15 @@ func (c *Client) SendMessage(from, to, subject, text string, attachments []File,
 	return response.ID, trace, nil
 }
 
-func (c *Client) post(endpoint string, payload func(w *multipart.Writer)) (*httpx.Trace, error) {
+func (c *Client) post(endpoint string, payload func(w *multipart.Writer) error) (*httpx.Trace, error) {
 	b := &bytes.Buffer{}
 	w := multipart.NewWriter(b)
 	w.SetBoundary(string(uuids.New()))
-	payload(w)
+
+	if err := payload(w); err != nil {
+		return nil, err
+	}
+
 	w.Close()
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/%s", apiBaseURL, c.domain, endpoint), bytes.NewReader(b.Bytes()))
