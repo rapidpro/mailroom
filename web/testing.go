@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strings"
 	"sync"
 	"testing"
@@ -52,7 +54,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 		Path         string               `json:"path"`
 		Headers      map[string]string    `json:"headers,omitempty"`
 		Body         json.RawMessage      `json:"body,omitempty"`
-		Files        map[string]string    `json:"files,omitempty"`
+		BodyEncode   string               `json:"body_encode,omitempty"`
 		Status       int                  `json:"status"`
 		Response     json.RawMessage      `json:"response,omitempty"`
 		ResponseFile string               `json:"response_file,omitempty"`
@@ -83,26 +85,27 @@ func RunWebTests(t *testing.T, truthFile string) {
 
 		testURL := "http://localhost:8090" + tc.Path
 		var req *http.Request
-		if len(tc.Files) > 0 {
-			values := make(map[string][]string)
-			err = json.Unmarshal(tc.Body, &values)
+		if tc.BodyEncode == "multipart" {
+			var parts []MultiPartPart
+			err = json.Unmarshal(tc.Body, &parts)
 			require.NoError(t, err)
 
-			req, err = MakeMultipartRequest(tc.Method, testURL, values, tc.Files, tc.Headers)
+			req, err = MakeMultipartRequest(tc.Method, testURL, parts, tc.Headers)
+
+		} else if len(tc.Body) >= 2 && tc.Body[0] == '"' { // if body is a string, treat it as a URL encoded submission
+			bodyStr := ""
+			json.Unmarshal(tc.Body, &bodyStr)
+			bodyReader := strings.NewReader(bodyStr)
+			req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 		} else {
-			// if body is a string, treat it as a URL encoded submission
-			if len(tc.Body) >= 2 && tc.Body[0] == '"' {
-				bodyStr := ""
-				json.Unmarshal(tc.Body, &bodyStr)
-				bodyReader := strings.NewReader(bodyStr)
-				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			} else {
-				bodyReader := bytes.NewReader([]byte(tc.Body))
-				req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			}
+			bodyReader := bytes.NewReader([]byte(tc.Body))
+			req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 		}
+
 		assert.NoError(t, err, "%s: error creating request", tc.Label)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -172,25 +175,39 @@ func RunWebTests(t *testing.T, truthFile string) {
 	}
 }
 
-func MakeMultipartRequest(method, url string, fields map[string][]string, files map[string]string, headers map[string]string) (*http.Request, error) {
+// MultiPartPart is a single part in a multipart encoded request
+type MultiPartPart struct {
+	Name        string `json:"name"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"content-type"`
+	Data        string `json:"data"`
+}
+
+// MakeMultipartRequest makes a multipart encoded request
+func MakeMultipartRequest(method, url string, parts []MultiPartPart, headers map[string]string) (*http.Request, error) {
 	b := &bytes.Buffer{}
 	w := multipart.NewWriter(b)
 
-	for key, values := range fields {
-		for _, value := range values {
-			fw, err := w.CreateFormField(key)
-			if err != nil {
-				return nil, err
+	for _, part := range parts {
+		var fw io.Writer
+		var err error
+		if part.Filename != "" {
+			contentType := part.ContentType
+			if contentType == "" {
+				contentType = "application/octet-stream"
 			}
-			io.WriteString(fw, value)
+
+			h := make(textproto.MIMEHeader)
+			h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, part.Name, part.Filename))
+			h.Set("Content-Type", contentType)
+			fw, err = w.CreatePart(h)
+		} else {
+			fw, err = w.CreateFormField(part.Name)
 		}
-	}
-	for key, value := range files {
-		fw, err := w.CreateFormFile(key, key)
 		if err != nil {
 			return nil, err
 		}
-		io.WriteString(fw, value)
+		io.WriteString(fw, part.Data)
 	}
 
 	w.Close()

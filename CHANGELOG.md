@@ -1,3 +1,7 @@
+v5.7.36
+----------
+ * Incoming attachments for mailgun ticketers
+
 v5.7.33
 ----------
  * Update to goflow v0.105.4
