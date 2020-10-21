@@ -177,10 +177,17 @@ func (s *service) sendInTicket(ticket *models.Ticket, text string, attachments [
 }
 
 func (s *service) send(from, to, subject, text string, attachments []utils.Attachment, headers map[string]string, logHTTP flows.HTTPLogCallback) (string, error) {
-	// TODO fetch attachments to send
-	var files []File
+	// fetch our attachments and convert to email attachments
+	emailAttachments := make([]*EmailAttachment, len(attachments))
+	for i, attachment := range attachments {
+		file, err := tickets.FetchFile(attachment.URL(), nil)
+		if err != nil {
+			return "", errors.Wrapf(err, "error fetching attachment file")
+		}
+		emailAttachments[i] = &EmailAttachment{Filename: "untitled", ContentType: file.ContentType, Body: file.Body}
+	}
 
-	msgID, trace, err := s.client.SendMessage(from, to, subject, text, files, headers)
+	msgID, trace, err := s.client.SendMessage(from, to, subject, text, emailAttachments, headers)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
