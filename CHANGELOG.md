@@ -1,3 +1,7 @@
+v5.7.37
+----------
+ * Add support for outgoing mailgun ticket attachments
+
 v5.7.36
 ----------
  * Incoming attachments for mailgun ticketers
