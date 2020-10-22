@@ -17,8 +17,10 @@ import (
 const (
 	typeRocketChat = "rocketchat"
 
-	configBaseURL = "base_url"
-	configSecret  = "secret"
+	configBaseURL        = "base_url"
+	configSecret         = "secret"
+	configAdminAuthToken = "admin_auth_token"
+	configAdminUserID    = "admin_user_id"
 )
 
 func init() {

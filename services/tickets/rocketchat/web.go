@@ -70,12 +70,25 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 			return err, http.StatusBadRequest, nil
 		}
 
+		// fetch files
+		files := make([]*tickets.File, len(data.Attachments))
+		for i, attachment := range data.Attachments {
+			headers := map[string]string{
+				"X-Auth-Token": ticketer.Config(configAdminAuthToken),
+				"X-User-Id":    ticketer.Config(configAdminUserID),
+			}
+			files[i], err = tickets.FetchFile(attachment.URL, headers)
+			if err != nil {
+				return errors.Wrapf(err, "error fetching ticket file '%s'", attachment), http.StatusBadRequest, nil
+			}
+		}
+
 		var attachments []string
 		for _, attachment := range data.Attachments {
 			attachments = append(attachments, attachment.URL)
 		}
 
-		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, attachments)
+		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, files)
 
 	case "close-room":
 		err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)
