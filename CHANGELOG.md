@@ -1,3 +1,7 @@
+v5.7.38
+----------
+ * Always request Mp3 files from Twilio IVR recordings
+
 v5.7.37
 ----------
  * Add support for outgoing mailgun ticket attachments
