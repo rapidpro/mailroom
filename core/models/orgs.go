@@ -24,7 +24,6 @@ import (
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
-	"gopkg.in/h2non/filetype.v1"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -188,44 +187,6 @@ func (o *Org) StoreAttachment(s storage.Storage, filename string, contentType st
 	if contentType == "" {
 		contentType = http.DetectContentType(contentBytes)
 		contentType, _, _ = mime.ParseMediaType(contentType)
-	}
-
-	mimeType := ""
-	extension := filepath.Ext(filename)
-	if extension != "" {
-		extension = extension[1:]
-	}
-
-	// first try getting our mime type from the first 300 bytes of our body
-	fileType, err := filetype.Match(contentBytes[:300])
-	if fileType != filetype.Unknown {
-		mimeType = fileType.MIME.Value
-		extension = fileType.Extension
-	} else {
-		// if that didn't work, try from our extension
-		fileType = filetype.GetType(extension)
-		if fileType != filetype.Unknown {
-			mimeType = fileType.MIME.Value
-			extension = fileType.Extension
-		}
-	}
-
-	// we still don't know our mime type, use our content header instead
-	if mimeType == "" {
-		mimeType, _, _ = mime.ParseMediaType(contentType)
-		if extension == "" {
-			extensions, err := mime.ExtensionsByType(mimeType)
-			if extensions == nil || err != nil {
-				extension = ""
-			} else {
-				extension = extensions[0][1:]
-			}
-		}
-	}
-
-	// update filname to make sure we include the proper extension
-	if extension != "" && !strings.HasSuffix(filename, fmt.Sprintf(".%s", extension)) {
-		filename = fmt.Sprintf("%s.%s", filename, extension)
 	}
 
 	path := o.attachmentPath(prefix, filename)
