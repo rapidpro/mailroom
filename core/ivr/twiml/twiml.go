@@ -251,7 +251,7 @@ func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, err
 		if url == "" {
 			return "", ivr.NilAttachment, nil
 		}
-		return "", utils.Attachment("audio:" + r.Form.Get("RecordingUrl")), nil
+		return "", utils.Attachment("audio/mp3:" + url + ".mp3"), nil
 	default:
 		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
 	}
