@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -133,6 +134,17 @@ func TestOutgoingMsgs(t *testing.T) {
 
 		tx.Rollback()
 	}
+}
+
+func TestGetMessageIDFromUUID(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	msgIn := testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi there")
+
+	msgID, err := models.GetMessageIDFromUUID(ctx, db, msgIn.UUID())
+
+	require.NoError(t, err)
+	assert.Equal(t, models.MsgID(msgIn.ID()), msgID)
 }
 
 func TestNormalizeAttachment(t *testing.T) {

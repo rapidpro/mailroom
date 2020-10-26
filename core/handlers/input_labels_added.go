@@ -20,12 +20,27 @@ func init() {
 
 // handleInputLabelsAdded is called for each input labels added event in a scene
 func handleInputLabelsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+	if scene.Session() == nil {
+		return errors.Errorf("cannot add label, not in a session")
+	}
+
 	event := e.(*events.InputLabelsAddedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
 		"session_id":   scene.SessionID(),
 		"labels":       event.Labels,
 	}).Debug("input labels added")
+
+	// in the case this session was started/resumed from a msg event, we have the msg ID cached on the session
+	inputMsgID := scene.Session().IncomingMsgID()
+
+	if inputMsgID == models.NilMsgID {
+		var err error
+		inputMsgID, err = models.GetMessageIDFromUUID(ctx, tx, flows.MsgUUID(event.InputUUID))
+		if err != nil {
+			return errors.Wrap(err, "unable to find input message")
+		}
+	}
 
 	// for each label add an insertion
 	for _, l := range event.Labels {
@@ -34,18 +49,7 @@ func handleInputLabelsAdded(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa
 			return errors.Errorf("unable to find label with UUID: %s", l.UUID)
 		}
 
-		if scene.Session() == nil {
-			return errors.Errorf("cannot add label, not in a session")
-		}
-
-		if scene.Session().IncomingMsgID() == models.NilMsgID {
-			return errors.Errorf("cannot add label, no incoming message for scene: %d", scene.SessionID())
-		}
-
-		scene.AppendToEventPreCommitHook(hooks.CommitAddedLabelsHook, &models.MsgLabelAdd{
-			MsgID:   scene.Session().IncomingMsgID(),
-			LabelID: label.ID(),
-		})
+		scene.AppendToEventPreCommitHook(hooks.CommitAddedLabelsHook, &models.MsgLabelAdd{MsgID: inputMsgID, LabelID: label.ID()})
 	}
 
 	return nil
