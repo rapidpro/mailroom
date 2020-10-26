@@ -1,3 +1,7 @@
+v5.7.39
+----------
+ * Fix input_labels_added event handling when session input ID isn't set
+
 v5.7.38
 ----------
  * Always request Mp3 files from Twilio IVR recordings
