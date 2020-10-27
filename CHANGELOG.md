@@ -1,3 +1,7 @@
+v5.7.40
+----------
+ * Update to goflow v0.105.5
+
 v5.7.39
 ----------
  * Fix input_labels_added event handling when session input ID isn't set
