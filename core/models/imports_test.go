@@ -41,6 +41,9 @@ func TestContactImports(t *testing.T) {
 	// add dynamic group to test imported contacts are added to it
 	testdata.InsertContactGroup(t, db, models.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
 
+	// give our org a country by setting country on a channel
+	db.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, models.TwilioChannelID)
+
 	testJSON, err := ioutil.ReadFile("testdata/imports.json")
 	require.NoError(t, err)
 
