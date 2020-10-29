@@ -936,7 +936,6 @@ SET
 	exit_type = $2,
 	exited_on = $3,
 	status = $4,
-	timeout_on = NULL,
 	modified_on = NOW()
 WHERE
 	id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND is_active = TRUE)
