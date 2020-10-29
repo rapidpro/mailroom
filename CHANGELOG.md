@@ -1,3 +1,8 @@
+v5.7.41
+----------
+ * Update to latest goflow v0.106.0
+ * Don't write to flows_flowrun.timeout_on so it can be dropped
+
 v5.7.40
 ----------
  * Update to goflow v0.105.5
