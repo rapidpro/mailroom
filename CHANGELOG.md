@@ -1,3 +1,7 @@
+v5.7.43
+----------
+ * Update to latest goflow v0.106.1
+
 v5.7.42
 ----------
  * Prevent importing invalid URNs during import
