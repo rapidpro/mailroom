@@ -705,6 +705,13 @@ func uniqueContactIDs(urnMap map[urns.URN]ContactID) []ContactID {
 // Tries to create a new contact for the passed in org with the passed in URNs. Returned error can be tested with `dbutil.IsUniqueViolation` to
 // determine if problem was one or more of the URNs already exist and are assigned to other contacts.
 func tryInsertContactAndURNs(ctx context.Context, db QueryerWithTx, orgID OrgID, userID UserID, name string, language envs.Language, urnz []urns.URN, channelID ChannelID) (ContactID, error) {
+	// check the URNs are valid
+	for _, urn := range urnz {
+		if err := urn.Validate(); err != nil {
+			return NilContactID, errors.Wrapf(err, "can't insert invalid URN '%s'", urn)
+		}
+	}
+
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return NilContactID, errors.Wrapf(err, "error beginning transaction")
