@@ -455,7 +455,7 @@
         ]
     },
     {
-        "description": "URNs always normalized for lookup and addition",
+        "description": "URNs always normalized for lookup and addition, and invalid URNs rejected",
         "specs": [
             {
                 "name": "Anne",
@@ -463,12 +463,23 @@
                     "tel:6055700001",
                     "tel:6055700005"
                 ]
+            },
+            {
+                "name": "Xavier",
+                "urns": [
+                    "xyz:1234567"
+                ]
             }
         ],
         "num_created": 0,
         "num_updated": 1,
-        "num_errored": 0,
-        "errors": [],
+        "num_errored": 1,
+        "errors": [
+            {
+                "message": "Unable to find or create contact with URNs xyz:1234567",
+                "record": 1
+            }
+        ],
         "contacts": [
             {
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
