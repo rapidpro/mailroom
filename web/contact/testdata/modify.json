@@ -984,6 +984,55 @@
         ]
     },
     {
+        "label": "add an invalid URN",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "urns",
+                    "modification": "append",
+                    "urns": [
+                        "xyz:12345"
+                    ]
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "timezone": "America/Los_Angeles",
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "urns": [
+                        "tel:+255788555111?id=20121&priority=1000"
+                    ]
+                },
+                "events": [
+                    {
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "text": "'xyz:12345' is not valid URN",
+                        "type": "error"
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contacturn WHERE identity = 'xyz:12345'",
+                "count": 0
+            }
+        ]
+    },
+    {
         "label": "add URN (deprecated urn modifier)",
         "method": "POST",
         "path": "/mr/contact/modify",
