@@ -1,3 +1,7 @@
+v6.0.0
+----------
+ * Update test database
+
 v5.7.44
 ----------
  * Add ticket service for Rocket.Chat
