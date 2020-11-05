@@ -53,19 +53,13 @@ Recommended settings for error and performance monitoring:
 
 # Development
 
-Install Mailroom source in your workspace with:
-
-```
-go get github.com/nyaruka/mailroom
-```
-
-Build Mailroom with:
+Once you've checked out the code, you can build Mailroom with:
 
 ```
 go build github.com/nyaruka/mailroom/cmd/mailroom
 ```
 
-This will create a new executable in your current directory `mailroom`
+This will create a new executable in $GOPATH/bin called `mailroom`.
 
 To run the tests you need to create the test database:
 
