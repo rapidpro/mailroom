@@ -1,3 +1,7 @@
+v5.7.44
+----------
+ * Add ticket service for Rocket.Chat
+
 v5.7.43
 ----------
  * Update to latest goflow v0.106.1
