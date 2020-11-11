@@ -631,7 +631,8 @@ FROM (
 ) AS
 	r(uuid, is_active, exit_type, status, exited_on, expires_on, responded, results, path, events, current_node_uuid)
 WHERE
-	fr.uuid = r.uuid::uuid
+	fr.uuid = r.uuid::uuid AND
+	fr.expires_on > NOW()
 `
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
