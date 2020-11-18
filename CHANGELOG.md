@@ -1,3 +1,7 @@
+v6.0.2
+----------
+ * pin goreleaser, explicit inclusion of /docs/*, completions and functions
+
 v6.0.1
 ----------
  * add log when queuing to courier
