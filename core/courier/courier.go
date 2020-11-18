@@ -52,7 +52,7 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 			logrus.WithFields(logrus.Fields{
 				"msgs":         len(batch),
 				"channel_uuid": currentChannel.UUID(),
-				"epapsed":      time.Since(start),
+				"elapsed":      time.Since(start),
 			}).Info("msgs queued to courier")
 		}
 		return nil
