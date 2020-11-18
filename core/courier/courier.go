@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -43,10 +44,16 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 			if err != nil {
 				return err
 			}
+			start := time.Now()
 			_, err = queueMsg.Do(rc, epochMS, "msgs", currentChannel.UUID(), currentChannel.TPS(), priority, batchJSON)
 			if err != nil {
 				return err
 			}
+			logrus.WithFields(logrus.Fields{
+				"msgs":         len(batch),
+				"channel_uuid": currentChannel.UUID(),
+				"elapsed":      time.Since(start),
+			}).Info("msgs queued to courier")
 		}
 		return nil
 	}
