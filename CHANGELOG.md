@@ -1,3 +1,7 @@
+v6.0.3
+----------
+ * correct name for completion.json in release
+
 v6.0.2
 ----------
  * pin goreleaser, explicit inclusion of /docs/*, completions and functions
