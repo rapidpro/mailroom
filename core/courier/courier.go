@@ -44,6 +44,7 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 			if err != nil {
 				return err
 			}
+			start := time.Now()
 			_, err = queueMsg.Do(rc, epochMS, "msgs", currentChannel.UUID(), currentChannel.TPS(), priority, batchJSON)
 			if err != nil {
 				return err
@@ -51,6 +52,7 @@ func QueueMessages(rc redis.Conn, msgs []*models.Msg) error {
 			logrus.WithFields(logrus.Fields{
 				"msgs":         len(batch),
 				"channel_uuid": currentChannel.UUID(),
+				"epapsed":      time.Since(start),
 			}).Info("msgs queued to courier")
 		}
 		return nil
