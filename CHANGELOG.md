@@ -1,3 +1,7 @@
+v6.0.1
+----------
+ * add log when queuing to courier
+
 v6.0.0
 ----------
  * Update test database
