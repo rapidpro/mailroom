@@ -84,7 +84,7 @@ func NewMailroomConfig() *Config {
 		WebhooksInitialBackoff: 5000,
 		WebhooksBackoffJitter:  0.5,
 		SMTPServer:             "",
-		DisallowedIPs:          `127.0.0.1,::1`,
+		DisallowedIPs:          `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`,
 		MaxStepsPerSprint:      100,
 		MaxValueLength:         640,
 
@@ -106,19 +106,40 @@ func NewMailroomConfig() *Config {
 	}
 }
 
-func (c *Config) ParseDisallowedIPs() ([]net.IP, error) {
+// Validate validates the config
+func (c *Config) Validate() error {
+	_, _, err := c.ParseDisallowedIPs()
+	if err != nil {
+		return errors.Wrap(err, "unable to parse DisallowedIPs")
+	}
+	return nil
+}
+
+// ParseDisallowedIPs parses the list of IPs and IP networks (written in CIDR notation)
+func (c *Config) ParseDisallowedIPs() ([]net.IP, []*net.IPNet, error) {
 	addrs, err := csv.NewReader(strings.NewReader(c.DisallowedIPs)).Read()
 	if err != nil && err != io.EOF {
-		return nil, err
-	}
-	ips := make([]net.IP, 0, len(addrs))
-	for _, addr := range addrs {
-		ip := net.ParseIP(addr)
-		if ip == nil {
-			return nil, errors.Errorf("couldn't parse '%s' as an IP address", addr)
-		}
-		ips = append(ips, ip)
+		return nil, nil, err
 	}
 
-	return ips, nil
+	ips := make([]net.IP, 0, len(addrs))
+	ipNets := make([]*net.IPNet, 0, len(addrs))
+
+	for _, addr := range addrs {
+		if strings.Contains(addr, "/") {
+			_, ipNet, err := net.ParseCIDR(addr)
+			if err != nil {
+				return nil, nil, errors.Errorf("couldn't parse '%s' as an IP network", addr)
+			}
+			ipNets = append(ipNets, ipNet)
+		} else {
+			ip := net.ParseIP(addr)
+			if ip == nil {
+				return nil, nil, errors.Errorf("couldn't parse '%s' as an IP address", addr)
+			}
+			ips = append(ips, ip)
+		}
+	}
+
+	return ips, ipNets, nil
 }
