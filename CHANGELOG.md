@@ -1,3 +1,7 @@
+v6.1.0
+----------
+ * Configure engine to disallow HTTP requests to private networks
+
 v6.0.3
 ----------
  * correct name for completion.json in release
