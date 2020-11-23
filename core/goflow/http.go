@@ -39,7 +39,7 @@ func HTTP() (*http.Client, *httpx.RetryConfig, *httpx.AccessConfig) {
 			config.Mailroom.WebhooksBackoffJitter,
 		)
 
-		disallowedIPs, disallowedNets, _ := config.Mailroom.ParseDisallowedIPs()
+		disallowedIPs, disallowedNets, _ := config.Mailroom.ParseDisallowedNetworks()
 		httpAccess = httpx.NewAccessConfig(10*time.Second, disallowedIPs, disallowedNets)
 	})
 	return httpClient, httpRetries, httpAccess
