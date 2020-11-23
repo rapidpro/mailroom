@@ -56,6 +56,11 @@ func main() {
 	)
 	loader.MustLoad()
 
+	// ensure config is valid
+	if err := config.Validate(); err != nil {
+		logrus.Fatalf("invalid config: %s", err)
+	}
+
 	// if we have a custom version, use it
 	if version != "Dev" {
 		config.Version = version
