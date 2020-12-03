@@ -1,3 +1,7 @@
+v6.1.1
+----------
+ * Update to latest goflow v0.106.3
+
 v6.1.0
 ----------
  * Configure engine to disallow HTTP requests to private networks
