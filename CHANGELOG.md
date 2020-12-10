@@ -1,3 +1,8 @@
+v6.1.2
+----------
+ * Ensure field and group assets used for imports are fresh
+ * Add support for internal type ticketers
+
 v6.1.1
 ----------
  * Update to latest goflow v0.106.3
