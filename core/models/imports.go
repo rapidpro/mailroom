@@ -82,7 +82,7 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID O
 	}
 
 	// grab our org assets
-	oa, err := GetOrgAssets(ctx, db, orgID)
+	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshFields|RefreshGroups)
 	if err != nil {
 		return errors.Wrap(err, "error loading org assets")
 	}
