@@ -154,7 +154,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			}
 
 		} else {
-			imp.contact, imp.flowContact, err = GetOrCreateContact(ctx, db, oa, spec.URNs, NilChannelID)
+			imp.contact, imp.flowContact, imp.created, err = GetOrCreateContact(ctx, db, oa, spec.URNs, NilChannelID)
 			if err != nil {
 				urnStrs := make([]string, len(spec.URNs))
 				for i := range spec.URNs {

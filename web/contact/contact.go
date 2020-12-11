@@ -197,7 +197,7 @@ func handleResolve(ctx context.Context, s *web.Server, r *http.Request) (interfa
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	_, contact, err := models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{request.URN}, request.ChannelID)
+	_, contact, created, err := models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{request.URN}, request.ChannelID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error getting or creating contact")
 	}
@@ -217,5 +217,6 @@ func handleResolve(ctx context.Context, s *web.Server, r *http.Request) (interfa
 			"id":       models.GetURNInt(urn, "id"),
 			"identity": urn.Identity(),
 		},
+		"created": created,
 	}, http.StatusOK, nil
 }
