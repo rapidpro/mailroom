@@ -49,7 +49,8 @@
             "urn": {
                 "id": 10001,
                 "identity": "tel:+16055742222"
-            }
+            },
+            "created": false
         },
         "db_assertions": [
             {
@@ -82,7 +83,8 @@
             "urn": {
                 "id": 20121,
                 "identity": "tel:+16055747777"
-            }
+            },
+            "created": true
         },
         "db_assertions": [
             {

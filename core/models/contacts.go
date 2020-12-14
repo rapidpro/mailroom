@@ -557,7 +557,7 @@ func CreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, userID 
 // * If URNs exists and belongs to a single contact it returns that contact (other URNs are not assigned to the contact).
 // * If URNs exists and belongs to multiple contacts it will return an error.
 //
-func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN, channelID ChannelID) (*Contact, *flows.Contact, error) {
+func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN, channelID ChannelID) (*Contact, *flows.Contact, bool, error) {
 	// ensure all URNs are normalized
 	for i, urn := range urnz {
 		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
@@ -565,30 +565,30 @@ func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, ur
 
 	contactID, created, err := getOrCreateContact(ctx, db, oa.OrgID(), urnz, channelID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
 	// load a full contact so that we can calculate dynamic groups
 	contacts, err := LoadContacts(ctx, db, oa, []ContactID{contactID})
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "error loading new contact")
+		return nil, nil, false, errors.Wrapf(err, "error loading new contact")
 	}
 	contact := contacts[0]
 
 	flowContact, err := contact.FlowContact(oa)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "error creating flow contact")
+		return nil, nil, false, errors.Wrapf(err, "error creating flow contact")
 	}
 
 	// calculate dynamic groups if contact was created
 	if created {
 		err := CalculateDynamicGroups(ctx, db, oa, flowContact)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "error calculating dynamic groups")
+			return nil, nil, false, errors.Wrapf(err, "error calculating dynamic groups")
 		}
 	}
 
-	return contact, flowContact, nil
+	return contact, flowContact, created, nil
 }
 
 // GetOrCreateContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
@@ -608,7 +608,7 @@ func GetOrCreateContactIDsFromURNs(ctx context.Context, db QueryerWithTx, oa *Or
 	// create any contacts that are missing
 	for urn, contactID := range owners {
 		if contactID == NilContactID {
-			contact, _, err := GetOrCreateContact(ctx, db, oa, []urns.URN{urn}, NilChannelID)
+			contact, _, _, err := GetOrCreateContact(ctx, db, oa, []urns.URN{urn}, NilChannelID)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating contact")
 			}
