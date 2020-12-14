@@ -1,3 +1,7 @@
+v6.1.3
+----------
+ * Fix misreporting created contacts as updated during imports
+
 v6.1.2
 ----------
  * Ensure field and group assets used for imports are fresh
