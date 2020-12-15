@@ -1,3 +1,7 @@
+v6.1.4
+----------
+ * Variable timeout for fire campaign task
+
 v6.1.3
 ----------
  * Fix misreporting created contacts as updated during imports
