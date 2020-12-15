@@ -36,7 +36,8 @@ type FireCampaignEventTask struct {
 
 // Timeout is the maximum amount of time the task can run for
 func (t *FireCampaignEventTask) Timeout() time.Duration {
-	return time.Minute * 5
+	// base of 5 minutes + one minute per fire
+	return time.Minute*5 + time.Minute*time.Duration(len(t.FireIDs))
 }
 
 // Perform handles firing campaign events
