@@ -1,3 +1,7 @@
+v6.1.5
+----------
+ * Update to goflow v0.107.1
+
 v6.1.4
 ----------
  * Variable timeout for fire campaign task
