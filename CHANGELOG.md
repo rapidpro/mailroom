@@ -1,3 +1,40 @@
+v6.1.5
+----------
+ * Update to goflow v0.107.1
+
+v6.1.4
+----------
+ * Variable timeout for fire campaign task
+
+v6.1.3
+----------
+ * Fix misreporting created contacts as updated during imports
+
+v6.1.2
+----------
+ * Ensure field and group assets used for imports are fresh
+ * Add support for internal type ticketers
+
+v6.1.1
+----------
+ * Update to latest goflow v0.106.3
+
+v6.1.0
+----------
+ * Configure engine to disallow HTTP requests to private networks
+
+v6.0.3
+----------
+ * correct name for completion.json in release
+
+v6.0.2
+----------
+ * pin goreleaser, explicit inclusion of /docs/*, completions and functions
+
+v6.0.1
+----------
+ * add log when queuing to courier
+
 v6.0.0
 ----------
  * Update test database
