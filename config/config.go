@@ -56,11 +56,14 @@ type Config struct {
 	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
 
-	FCMKey string `help:"the FCM API key used to notify Android relayers to sync"`
+	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
+	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 
 	AuthToken string `help:"the token clients will need to authenticate web requests"`
 	Address   string `help:"the address to bind our web server to"`
 	Port      int    `help:"the port to bind our web server to"`
+
+	UUIDSeed int `help:"seed to use for UUID generation in a testing environment"`
 
 	YourlsLogin    string `help:"the YoURLs API login used to generate shorten links"`
 	YourlsPassword string `help:"the YoURLs API password used to access the shorten link generated"`
@@ -95,13 +98,15 @@ func NewMailroomConfig() *Config {
 		S3MediaPrefix:      "/media/",
 		S3DisableSSL:       false,
 		S3ForcePathStyle:   false,
-		AWSAccessKeyID:     "missing_aws_access_key_id",
-		AWSSecretAccessKey: "missing_aws_secret_access_key",
+		AWSAccessKeyID:     "",
+		AWSSecretAccessKey: "",
 
 		RetryPendingMessages: true,
 
 		Address: "localhost",
 		Port:    8090,
+
+		UUIDSeed: 0,
 
 		YourlsLogin:    "",
 		YourlsPassword: "",

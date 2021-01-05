@@ -1,3 +1,376 @@
+v6.0.3
+----------
+ * correct name for completion.json in release
+
+v6.0.2
+----------
+ * pin goreleaser, explicit inclusion of /docs/*, completions and functions
+
+v6.0.1
+----------
+ * add log when queuing to courier
+
+v6.0.0
+----------
+ * Update test database
+
+v5.7.44
+----------
+ * Add ticket service for Rocket.Chat
+
+v5.7.43
+----------
+ * Update to latest goflow v0.106.1
+
+v5.7.42
+----------
+ * Prevent importing invalid URNs during import
+
+v5.7.41
+----------
+ * Update to latest goflow v0.106.0
+ * Don't write to flows_flowrun.timeout_on so it can be dropped
+
+v5.7.40
+----------
+ * Update to goflow v0.105.5
+
+v5.7.39
+----------
+ * Fix input_labels_added event handling when session input ID isn't set
+
+v5.7.38
+----------
+ * Always request Mp3 files from Twilio IVR recordings
+
+v5.7.37
+----------
+ * Add support for outgoing mailgun ticket attachments
+
+v5.7.36
+----------
+ * Incoming attachments for mailgun ticketers
+
+v5.7.33
+----------
+ * Update to goflow v0.105.4
+ * Fix cloning of flows during simulation so that ignore keyword triggers is cloned too
+
+v5.7.32
+----------
+ * Update to goflow v0.105.3 to get support for arabic numerals in has_number tests
+
+v5.7.31
+----------
+ * Update to latest goflow to get for normalizing numbers from The Gambia
+ * Enable retrying on the elastic client
+
+v5.7.30
+----------
+ * Reorganization of core packages
+
+v5.7.29
+----------
+ * Fix race condition when bulk getting/creating contacts
+
+v5.7.28
+----------
+ * Add contact/resolve endpoint to assist with channel events still handled in RP
+
+v5.7.27
+----------
+ * If a flow start task creates new contacts, save those back to the start
+
+v5.7.26
+----------
+ * Add mockable DB to enable testing database errors
+ * CreateContact also should do lookup before trying to create new contact with URNs
+ * Imports 2.0
+
+v5.7.25
+----------
+ * Pass org from the base task to task structs to remove need for duplicating it in the task body
+
+v5.7.24
+----------
+ * Add SessionStatus to messages queued to courier
+
+v5.7.23
+----------
+ * Make defining new task types easier and drier
+ * Better locking when handling
+ * Fix and simplify creation of channel logs in IVR handlers
+
+v5.7.22
+----------
+ * Update to latest goflow v0.104.1
+
+v5.7.21
+----------
+ * Simplify test-smtp cmd using smtpx package
+ * Create new dbutil package with generic DB stuff
+ * Add task to calculate fires for new campaign event
+
+v5.7.20
+----------
+ * Fix incoming attachments from Zendesk
+
+v5.7.19
+----------
+ * Update to latest goflow
+ * Empty contact names and languages should be saved as NULL
+ * Delete no longer used utils/celery package
+
+v5.7.18
+----------
+ * Update to latest goflow
+ * Add support for incoming attachments on ticketing services
+
+v5.7.17
+----------
+ * Use status for elastic queries that need to filter out non-active contacts
+
+v5.7.16
+----------
+ * Add support for excluding contacts from searches by ids
+ * Rework utils/storage to be generic and moveable to gocommon
+
+v5.7.15
+----------
+ * Add create contact endpoint which uses modifiers to add fields and groups to contacts
+ * Rework contact creation functions to support creation with multiple URNs
+
+v5.7.14
+----------
+ * Stop writing is_blocked and is_stopped
+
+v5.7.13
+----------
+ * Read from contact.status intead of is_stopped/is_blocked
+ * Implement saving of zendesk ticket files as attachments
+ * Abstract S3 code so tests and dev envs can use file storage
+
+v5.7.12
+----------
+ * Fix inserting channel logs and add test
+
+v5.7.11
+----------
+ * Always write contact.status when writing is_blocked or is_stopped
+ * Convert IVR code to use goflow's httpx package
+
+v5.7.10
+----------
+ * Tweak goreleaser config to include subdirectories inside docs folder
+
+v5.7.9
+----------
+ * Update to goflow v0.101.2
+ * Bundle localized goflow docs in release
+
+v5.7.8
+----------
+ * Recalculate event fires for campaign events based on last_seen_on
+
+v5.7.7
+----------
+ * Update to latest goflow v0.100.0
+
+v5.7.6
+----------
+ * Remove protection for overwriting last_seen_on with older values
+
+v5.7.5
+----------
+ * Update last_seen_on when handling certain channel events
+ * Update last_seen_on when we receive a message from a contact
+
+v5.7.4
+----------
+ * Fail outgoing messages for suspended orgs
+ * Refresh groups as well as fields for contact query parsing
+
+v5.7.3
+----------
+ * Update to goflow v0.99.0
+
+v5.7.2
+----------
+ * Update to latest goflow v0.98.0
+ * Render rich errors with code and extra field
+
+v5.7.1
+----------
+ * Update to latest goflow v0.96.0
+ * Add loop protection by passing session history to new flow action triggers
+
+v5.7.0
+----------
+ * Set user and origin on manual triggers
+ * Switch to trigger builders
+
+v5.6.1
+----------
+ * expire runs that have no session, just warn while doing so
+
+v5.6.0
+----------
+ * 5.6.0 Release Candidate
+
+v5.5.38 
+----------
+ * Varible naming consistency
+
+v5.5.37
+----------
+ * Fix reading of modifiers so always ignore modifier that becomes noop
+
+v5.5.36
+----------
+ * Sead country from templates
+ * Ignore missing assets when reading modifiers
+ * Fail flow starts which can't be started
+
+v5.5.35
+----------
+ * Update to latest goflow and add tests for field modifiers
+
+v5.5.34
+----------
+ * Fix detaching URNs
+
+v5.5.33
+----------
+ * Update to latest goflow v0.93.0
+
+v5.5.32
+----------
+ * When blocking contacts archive any triggers which only apply to them
+
+v5.5.31
+----------
+ * Messages without topups should be queued
+ * Continue handling as normal for suspended orgs
+
+v5.5.30
+----------
+ * Org being suspended should stop message handling
+ * Make decrementing org credit optional
+
+v5.5.29
+----------
+ * Return query inspection results as new metadata field in responses
+ * Update to latest goflow v0.92.0
+
+v5.5.28
+----------
+ * Don't do any decoration of email ticket subjects
+
+v5.5.27
+----------
+ * Allow searching by UUID, as well != matches on ID and UUID
+ * Update to latest goflow v0.91.1 to fix clearing fields
+ * Maybe fix intermittently failing test
+
+v5.5.26
+----------
+ * Update to goflow v0.89.0
+
+v5.5.25
+----------
+ * Add endpoint to change a flow language
+
+v5.5.24
+----------
+ * Tickets fixes and improvements
+ * Update to goflow v0.87.0
+
+v5.5.17
+----------
+ * Send email when reopening mailgun ticket
+
+v5.5.16
+----------
+ * Implement closing of tickets in zendesk from mailroom
+
+v5.5.15
+----------
+ * Send close notification emails in mailgun tickets
+ * Reply back to users who replies aren't permitted to go to the ticket
+ * Simplify sharing of HTTP configuration between services
+ * Add simulator ticket service to fake creating tickets
+ * Fix verifying sender when receiving mailgun reply
+
+v5.5.14
+----------
+ * Basic handling of tickets (mailgun and zendesk ticketer types)
+
+v5.5.13
+----------
+ * Update to goflow v0.85.0
+ * Use go 1.14 and do some minor dep updatse
+ * Bump max request bytes to 32MB for web server
+ * Implement hooks for status modifier events
+
+v5.5.12
+----------
+ * Update to goflow v0.83.1
+
+v5.5.11
+----------
+ * Update to goflow v0.83.0
+ * Don't blow up if flow is deleted during simulation
+
+v5.5.10
+----------
+ * Update to goflow v0.82.0
+ * Populate flows_flowstart.start_type
+
+v5.5.9
+----------
+ * Set org on new flow starts
+ * Allow for seeded UUID generation in testing environments with -uuid-seed switch
+ * Set language attribute from ivr_created_event on TwiML say action
+
+v5.5.8
+----------
+ * Update flow start modified_on when making changes
+ * Add method to set modified_by on contacts
+
+v5.5.7
+----------
+ * Update to latest goflow v0.81.0
+
+v5.5.6
+----------
+ * Update to latest goflow v0.79.1
+
+v5.5.5
+----------
+ * Update mailroom test db
+ * Only Prometheus group can access metrics
+
+v5.5.4
+----------
+ * Drop no longer used validate_with_org_id param on inspect endpoint
+ * Add endpoints to export and import PO files from flows
+
+v5.5.3
+----------
+ * Add decode_html Excellent function
+
+v5.5.2
+----------
+ * Change to using basic auth for org specific prom metrics endpoint
+
+v5.5.1
+----------
+ * Update to latest goflow v0.78.0
+
+v5.5.0
+----------
+ * Add prometheus endpoint for org level metrics
+
 v5.4.4
 ----------
  * Update to latest goflow v0.77.4

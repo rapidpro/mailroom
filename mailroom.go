@@ -9,16 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/s3utils"
+	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/web"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/librato"
@@ -52,7 +47,7 @@ type Mailroom struct {
 	DB            *sqlx.DB
 	RP            *redis.Pool
 	ElasticClient *elastic.Client
-	S3Client      s3iface.S3API
+	Storage       storage.Storage
 
 	Quit      chan bool
 	CTX       context.Context
@@ -163,32 +158,34 @@ func (mr *Mailroom) Start() error {
 		log.Info("redis ok")
 	}
 
-	// create our s3 client
-	s3Session, err := session.NewSession(&aws.Config{
-		Credentials:      credentials.NewStaticCredentials(mr.Config.AWSAccessKeyID, mr.Config.AWSSecretAccessKey, ""),
-		Endpoint:         aws.String(mr.Config.S3Endpoint),
-		Region:           aws.String(mr.Config.S3Region),
-		DisableSSL:       aws.Bool(mr.Config.S3DisableSSL),
-		S3ForcePathStyle: aws.Bool(mr.Config.S3ForcePathStyle),
-	})
-	if err != nil {
-		return err
-	}
-	mr.S3Client = s3.New(s3Session)
-
-	// test out our S3 credentials
-	err = s3utils.TestS3(mr.S3Client, mr.Config.S3MediaBucket)
-	if err != nil {
-		log.WithError(err).Error("s3 bucket not reachable")
+	// create our storage (S3 or file system)
+	if mr.Config.AWSAccessKeyID != "" {
+		s3Client, err := storage.NewS3Client(&storage.S3Options{
+			AWSAccessKeyID:     mr.Config.AWSAccessKeyID,
+			AWSSecretAccessKey: mr.Config.AWSSecretAccessKey,
+			Endpoint:           mr.Config.S3Endpoint,
+			Region:             mr.Config.S3Region,
+			DisableSSL:         mr.Config.S3DisableSSL,
+			ForcePathStyle:     mr.Config.S3ForcePathStyle,
+		})
+		if err != nil {
+			return err
+		}
+		mr.Storage = storage.NewS3(s3Client, mr.Config.S3MediaBucket)
 	} else {
-		log.Info("s3 bucket ok")
+		mr.Storage = storage.NewFS("_storage")
+	}
+
+	// test our storage
+	err = mr.Storage.Test()
+	if err != nil {
+		log.WithError(err).Error(mr.Storage.Name() + " storage not available")
+	} else {
+		log.Info(mr.Storage.Name() + " storage ok")
 	}
 
 	// initialize our elastic client
-	mr.ElasticClient, err = elastic.NewClient(
-		elastic.SetURL(mr.Config.Elastic),
-		elastic.SetSniff(false),
-	)
+	mr.ElasticClient, err = newElasticClient(mr.Config.Elastic)
 	if err != nil {
 		log.WithError(err).Error("unable to connect to elastic, check configuration")
 	} else {
@@ -211,7 +208,7 @@ func (mr *Mailroom) Start() error {
 	mr.handlerForeman.Start()
 
 	// start our web server
-	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.S3Client, mr.ElasticClient, mr.WaitGroup)
+	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.Storage, mr.ElasticClient, mr.WaitGroup)
 	mr.webserver.Start()
 
 	logrus.Info("mailroom started")
@@ -235,4 +232,17 @@ func (mr *Mailroom) Stop() error {
 	mr.ElasticClient.Stop()
 	logrus.Info("mailroom stopped")
 	return nil
+}
+
+func newElasticClient(url string) (*elastic.Client, error) {
+	// enable retrying
+	backoff := elastic.NewSimpleBackoff(500, 1000, 2000)
+	backoff.Jitter(true)
+	retrier := elastic.NewBackoffRetrier(backoff)
+
+	return elastic.NewClient(
+		elastic.SetURL(url),
+		elastic.SetSniff(false),
+		elastic.SetRetrier(retrier),
+	)
 }

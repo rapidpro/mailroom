@@ -5,18 +5,17 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/greatnonprofits-nfp/goflow/assets"
-
-	"github.com/greatnonprofits-nfp/goflow/flows/actions/modifiers"
-
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/greatnonprofits-nfp/goflow/flows"
-	"github.com/greatnonprofits-nfp/goflow/flows/engine"
-	"github.com/greatnonprofits-nfp/goflow/flows/events"
-	"github.com/greatnonprofits-nfp/goflow/utils"
-	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/pkg/errors"
 )
 
@@ -56,9 +55,9 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
-	// grab our org
+	// grab our org assets
 	orgID := ctx.Value(web.OrgIDKey).(models.OrgID)
-	org, err := models.GetOrgAssets(s.CTX, s.DB, orgID)
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, orgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -69,7 +68,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Errorf("missing request user")
 	}
 
-	fs, err := goflow.Engine().ReadSession(org.SessionAssets(), request.Session, assets.IgnoreMissing)
+	fs, err := goflow.Engine().ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading session")
 	}
@@ -85,55 +84,37 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// and our modifiers
-	contactModifiers := make([]flows.Modifier, 0, len(request.Modifiers))
-	for _, m := range request.Modifiers {
-		modifier, err := modifiers.ReadModifier(org.SessionAssets(), m, assets.IgnoreMissing)
-
-		// if this modifier turned into a no-op, ignore
-		if err == modifiers.ErrNoModifier {
-			continue
-		}
-		if err != nil {
-			return nil, http.StatusBadRequest, errors.Wrapf(err, "error unmarshalling modifier: %s", string(m))
-		}
-		contactModifiers = append(contactModifiers, modifier)
+	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.IgnoreMissing)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
 	}
 
-	// create / assign our contact
-	urn := urns.NilURN
+	// get the current version of this contact from the database
+	var flowContact *flows.Contact
+
 	if len(fs.Contact().URNs()) > 0 {
-		urn = fs.Contact().URNs()[0].URN()
+		// create / fetch our contact based on the highest priority URN
+		urn := fs.Contact().URNs()[0].URN()
+
+		_, flowContact, err = models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{urn}, models.NilChannelID)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
+		}
+	} else {
+		_, flowContact, err = models.CreateContact(ctx, s.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to create contact")
+		}
 	}
 
-	// create / fetch our contact based on the highest priority URN
-	contactID, err := models.CreateContact(ctx, s.DB, org, urn)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
-	}
-
-	// load that contact to get the current groups and UUID
-	contacts, err := models.LoadContacts(ctx, s.DB, org, []models.ContactID{contactID})
-	if err == nil && len(contacts) == 0 {
-		err = errors.Errorf("no contacts loaded")
-	}
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading contact")
-	}
-
-	// load our flow contact
-	flowContact, err := contacts[0].FlowContact(org)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error loading flow contact")
-	}
-
-	modifierEvents := make([]flows.Event, 0, len(contactModifiers))
+	modifierEvents := make([]flows.Event, 0, len(mods))
 	appender := func(e flows.Event) {
 		modifierEvents = append(modifierEvents, e)
 	}
 
 	// run through each contact modifier, applying it to our contact
-	for _, m := range contactModifiers {
-		m.Apply(org.Env(), org.SessionAssets(), flowContact, appender)
+	for _, m := range mods {
+		m.Apply(oa.Env(), oa.SessionAssets(), flowContact, appender)
 	}
 
 	// set this updated contact on our session
@@ -145,14 +126,14 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// create our sprint
-	sprint := engine.NewSprint(contactModifiers, modifierEvents)
+	sprint := engine.NewSprint(mods, modifierEvents)
 
 	// write our session out
 	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for session write")
 	}
-	sessions, err := models.WriteSessions(ctx, tx, s.RP, org, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
+	sessions, err := models.WriteSessions(ctx, tx, s.RP, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
 	if err == nil && len(sessions) == 0 {
 		err = errors.Errorf("no sessions written")
 	}
@@ -171,7 +152,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// write our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, org, []*models.Scene{sessions[0].Scene()})
+	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, oa, []*models.Scene{sessions[0].Scene()})
 	if err != nil {
 		tx.Rollback()
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying post commit hooks")

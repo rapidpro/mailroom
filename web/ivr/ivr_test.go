@@ -13,26 +13,26 @@ import (
 
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/tasks/starts"
+	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 
-	_ "github.com/nyaruka/mailroom/hooks"
-	"github.com/nyaruka/mailroom/ivr"
-	"github.com/nyaruka/mailroom/ivr/nexmo"
-	"github.com/nyaruka/mailroom/ivr/twiml"
-	ivr_tasks "github.com/nyaruka/mailroom/tasks/ivr"
+	_ "github.com/nyaruka/mailroom/core/handlers"
+	"github.com/nyaruka/mailroom/core/ivr/nexmo"
+	"github.com/nyaruka/mailroom/core/ivr/twiml"
+	ivr_tasks "github.com/nyaruka/mailroom/core/tasks/ivr"
 )
 
 func TestTwilioIVR(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
+	defer testsuite.ResetStorage()
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +60,7 @@ func TestTwilioIVR(t *testing.T) {
 	twiml.IgnoreSignatures = true
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.Storage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -70,7 +70,7 @@ func TestTwilioIVR(t *testing.T) {
 	// create a flow start for cathy and george
 	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+16055741111?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
 
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(models.Org1, models.StartTypeTrigger, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
 		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
 		WithParentSummary(parentSummary)
 
@@ -327,6 +327,7 @@ func TestNexmoIVR(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
+	defer testsuite.ResetStorage()
 	models.FlushCache()
 
 	// deactivate our twilio channel
@@ -343,7 +344,7 @@ func TestNexmoIVR(t *testing.T) {
 		} else {
 			type CallForm struct {
 				To []struct {
-					Number int64 `json:"number`
+					Number int64 `json:"number"`
 				} `json:"to"`
 			}
 			body, _ := ioutil.ReadAll(r.Body)
@@ -364,17 +365,16 @@ func TestNexmoIVR(t *testing.T) {
 	defer ts.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.Storage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 
-	ivr.WriteAttachments = false
 	nexmo.BaseURL = ts.URL
 	nexmo.IgnoreSignatures = true
 
 	// create a flow start for cathy and george
 	extra := json.RawMessage(`{"ref_id":"123"}`)
-	start := models.NewFlowStart(models.Org1, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(models.Org1, models.StartTypeTrigger, models.IVRFlow, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
 		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
 		WithExtra(extra)
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})

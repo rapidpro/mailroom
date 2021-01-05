@@ -6,17 +6,17 @@ import (
 	"net/http"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/greatnonprofits-nfp/goflow/assets"
-	"github.com/greatnonprofits-nfp/goflow/assets/static/types"
-	"github.com/greatnonprofits-nfp/goflow/excellent/tools"
-	xtypes "github.com/greatnonprofits-nfp/goflow/excellent/types"
-	"github.com/greatnonprofits-nfp/goflow/flows"
-	"github.com/greatnonprofits-nfp/goflow/flows/events"
-	"github.com/greatnonprofits-nfp/goflow/flows/resumes"
-	"github.com/greatnonprofits-nfp/goflow/flows/triggers"
-	"github.com/greatnonprofits-nfp/goflow/utils"
-	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/assets/static/types"
+	"github.com/nyaruka/goflow/excellent/tools"
+	xtypes "github.com/nyaruka/goflow/excellent/types"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/resumes"
+	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 )
@@ -37,6 +37,22 @@ type sessionRequest struct {
 	Assets struct {
 		Channels []*types.Channel `json:"channels"`
 	} `json:"assets"`
+}
+
+func (r *sessionRequest) flows() map[assets.FlowUUID]json.RawMessage {
+	flows := make(map[assets.FlowUUID]json.RawMessage, len(r.Flows))
+	for _, fd := range r.Flows {
+		flows[fd.UUID] = fd.Definition
+	}
+	return flows
+}
+
+func (r *sessionRequest) channels() []assets.Channel {
+	chs := make([]assets.Channel, len(r.Assets.Channels))
+	for i := range r.Assets.Channels {
+		chs[i] = r.Assets.Channels[i]
+	}
+	return chs
 }
 
 type simulationResponse struct {
@@ -78,16 +94,16 @@ type startRequest struct {
 }
 
 // handleSimulationEvents takes care of updating our db with any events needed during simulation
-func handleSimulationEvents(ctx context.Context, db models.Queryer, org *models.OrgAssets, es []flows.Event) error {
+func handleSimulationEvents(ctx context.Context, db models.Queryer, oa *models.OrgAssets, es []flows.Event) error {
 	// nicpottier: this could be refactored into something more similar to how we handle normal events (ie hooks) if
 	// we see ourselves taking actions for more than just webhook events
 	wes := make([]*models.WebhookEvent, 0)
 	for _, e := range es {
 		if e.Type() == events.TypeResthookCalled {
 			rec := e.(*events.ResthookCalledEvent)
-			resthook := org.ResthookBySlug(rec.Resthook)
+			resthook := oa.ResthookBySlug(rec.Resthook)
 			if resthook != nil {
-				we := models.NewWebhookEvent(org.OrgID(), resthook.ID(), string(rec.Payload), rec.CreatedOn())
+				we := models.NewWebhookEvent(oa.OrgID(), resthook.ID(), string(rec.Payload), rec.CreatedOn())
 				wes = append(wes, we)
 			}
 		}
@@ -104,49 +120,36 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
-	// clone it since we will be modifying it
-	org, err = org.Clone(s.CTX, s.DB)
+
+	// create clone of assets for simulation
+	oa, err = oa.CloneForSimulation(s.CTX, s.DB, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to clone org")
 	}
 
-	// for each of our passed in definitions
-	for _, flow := range request.Flows {
-		// populate our flow in our org from our request
-		err = populateFlow(org, flow.UUID, flow.Definition)
-		if err != nil {
-			return nil, http.StatusBadRequest, err
-		}
-	}
-
-	// populate any test channels
-	for _, channel := range request.Assets.Channels {
-		org.AddTestChannel(channel)
-	}
-
 	// read our trigger
-	trigger, err := triggers.ReadTrigger(org.SessionAssets(), request.Trigger, assets.IgnoreMissing)
+	trigger, err := triggers.ReadTrigger(oa.SessionAssets(), request.Trigger, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
 
-	return triggerFlow(ctx, s.DB, org, trigger)
+	return triggerFlow(ctx, s.DB, oa, trigger)
 }
 
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
-func triggerFlow(ctx context.Context, db *sqlx.DB, org *models.OrgAssets, trigger flows.Trigger) (interface{}, int, error) {
+func triggerFlow(ctx context.Context, db *sqlx.DB, oa *models.OrgAssets, trigger flows.Trigger) (interface{}, int, error) {
 	// start our flow session
-	session, sprint, err := goflow.Simulator().NewSession(org.SessionAssets(), trigger)
+	session, sprint, err := goflow.Simulator().NewSession(oa.SessionAssets(), trigger)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
 
-	err = handleSimulationEvents(ctx, db, org, sprint.Events())
+	err = handleSimulationEvents(ctx, db, oa, sprint.Events())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
@@ -180,39 +183,25 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusBadRequest, err
 	}
 
-	// grab our org
-	org, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	// grab our org assets
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
-	// clone it as we will modify it
-	org, err = org.Clone(s.CTX, s.DB)
+	// create clone of assets for simulation
+	oa, err = oa.CloneForSimulation(s.CTX, s.DB, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
-	// for each of our passed in definitions
-	for _, flow := range request.Flows {
-		// populate our flow in our org from our request
-		err = populateFlow(org, flow.UUID, flow.Definition)
-		if err != nil {
-			return nil, http.StatusBadRequest, err
-		}
-	}
-
-	// populate any test channels
-	for _, channel := range request.Assets.Channels {
-		org.AddTestChannel(channel)
-	}
-
-	session, err := goflow.Simulator().ReadSession(org.SessionAssets(), request.Session, assets.IgnoreMissing)
+	session, err := goflow.Simulator().ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// read our resume
-	resume, err := resumes.ReadResume(org.SessionAssets(), request.Resume, assets.IgnoreMissing)
+	resume, err := resumes.ReadResume(oa.SessionAssets(), request.Resume, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -220,12 +209,12 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	// if this is a msg resume we want to check whether it might be caught by a trigger
 	if resume.Type() == resumes.TypeMsg {
 		msgResume := resume.(*resumes.MsgResume)
-		trigger := models.FindMatchingMsgTrigger(org, msgResume.Contact(), msgResume.Msg().Text())
+		trigger := models.FindMatchingMsgTrigger(oa, msgResume.Contact(), msgResume.Msg().Text())
 		if trigger != nil {
 			var flow *models.Flow
 			for _, r := range session.Runs() {
 				if r.Status() == flows.RunStatusWaiting {
-					f, _ := org.Flow(r.Flow().UUID())
+					f, _ := oa.Flow(r.FlowReference().UUID)
 					if f != nil {
 						flow = f.(*models.Flow)
 					}
@@ -235,17 +224,15 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 			// we don't have a current flow or the current flow doesn't ignore triggers
 			if flow == nil || (!flow.IgnoreTriggers() && trigger.TriggerType() == models.KeywordTriggerType) {
-				triggeredFlow, err := org.FlowByID(trigger.FlowID())
+				triggeredFlow, err := oa.FlowByID(trigger.FlowID())
 				if err != nil && err != models.ErrNotFound {
 					return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load triggered flow")
 				}
 
 				if triggeredFlow != nil {
-					triggerExtraXValue := xtypes.JSONToXValue([]byte(trigger.Extra()))
-					triggerExtraXObject, _ := xtypes.ToXObject(org.Env(), triggerExtraXValue)
-
-					trigger := triggers.NewMsg(org.Env(), triggeredFlow.FlowReference(), resume.Contact(), msgResume.Msg(), trigger.Match(), triggerExtraXObject)
-					return triggerFlow(ctx, s.DB, org, trigger)
+                    // TODO Fix trigger params here
+					trigger := triggers.NewBuilder(oa.Env(), triggeredFlow.FlowReference(), resume.Contact()).Msg(msgResume.Msg()).WithMatch(trigger.Match()).Build()
+					return triggerFlow(ctx, s.DB, oa, trigger)
 				}
 			}
 		}
@@ -262,22 +249,10 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, err
 	}
 
-	err = handleSimulationEvents(ctx, s.DB, org, sprint.Events())
+	err = handleSimulationEvents(ctx, s.DB, oa, sprint.Events())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
 
 	return newSimulationResponse(session, sprint), http.StatusOK, nil
-}
-
-// populateFlow takes care of setting the definition for the flow with the passed in UUID according to the passed in definitions
-func populateFlow(org *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawMessage) error {
-	f, err := org.Flow(uuid)
-	if err != nil {
-		return errors.Wrapf(err, "unable to find flow with uuid: %s", uuid)
-	}
-	flow := f.(*models.Flow)
-
-	org.SetFlow(flow.ID(), flow.UUID(), flow.Name(), flowDef)
-	return nil
 }

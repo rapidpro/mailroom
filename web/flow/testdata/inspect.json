@@ -1,0 +1,342 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/flow/inspect",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "inspect valid legacy flow",
+        "method": "POST",
+        "path": "/mr/flow/inspect",
+        "body": {
+            "org_id": 1,
+            "flow": {
+                "entry": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                "action_sets": [
+                    {
+                        "uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                        "x": 107,
+                        "y": 0,
+                        "destination": null,
+                        "actions": [
+                            {
+                                "type": "add_group",
+                                "uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+                                "groups": [
+                                    {
+                                        "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                        "name": "Testers"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "reply",
+                                "uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+                                "msg": {
+                                    "eng": "Your birthdate is soon"
+                                },
+                                "media": {},
+                                "quick_replies": [],
+                                "send_all": false
+                            }
+                        ],
+                        "exit_uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+                    }
+                ],
+                "rule_sets": [],
+                "base_language": "eng",
+                "flow_type": "M",
+                "version": "11.12",
+                "metadata": {
+                    "expires": 10080,
+                    "saved_on": "2019-03-04T17:37:06.873734Z",
+                    "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+                    "name": "Valid Legacy Flow",
+                    "revision": 106
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "dependencies": [
+                {
+                    "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "name": "Testers",
+                    "type": "group"
+                }
+            ],
+            "issues": [],
+            "results": [],
+            "waiting_exits": [],
+            "parent_refs": []
+        }
+    },
+    {
+        "label": "inspect legacy flow with missing dependencies",
+        "method": "POST",
+        "path": "/mr/flow/inspect",
+        "body": {
+            "org_id": 1,
+            "flow": {
+                "entry": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                "action_sets": [
+                    {
+                        "uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                        "x": 107,
+                        "y": 0,
+                        "destination": null,
+                        "actions": [
+                            {
+                                "type": "add_group",
+                                "uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+                                "groups": [
+                                    {
+                                        "uuid": "1465eb20-066d-4933-a8b4-62fe7b19fd39",
+                                        "name": "I Don't Exist"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "reply",
+                                "uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+                                "msg": {
+                                    "eng": "Your birthdate is @contact.birthdate"
+                                },
+                                "media": {},
+                                "quick_replies": [],
+                                "send_all": false
+                            }
+                        ],
+                        "exit_uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+                    }
+                ],
+                "rule_sets": [],
+                "base_language": "eng",
+                "flow_type": "M",
+                "version": "11.12",
+                "metadata": {
+                    "expires": 10080,
+                    "saved_on": "2019-03-04T17:37:06.873734Z",
+                    "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+                    "name": "Valid Legacy Flow",
+                    "revision": 106
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "dependencies": [
+                {
+                    "key": "birthdate",
+                    "name": "",
+                    "type": "field",
+                    "missing": true
+                },
+                {
+                    "uuid": "1465eb20-066d-4933-a8b4-62fe7b19fd39",
+                    "name": "I Don't Exist",
+                    "type": "group",
+                    "missing": true
+                }
+            ],
+            "issues": [
+                {
+                    "type": "missing_dependency",
+                    "node_uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                    "action_uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+                    "description": "missing field dependency 'birthdate'",
+                    "dependency": {
+                        "key": "birthdate",
+                        "name": "",
+                        "type": "field"
+                    }
+                },
+                {
+                    "type": "missing_dependency",
+                    "node_uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                    "action_uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+                    "description": "missing group dependency '1465eb20-066d-4933-a8b4-62fe7b19fd39'",
+                    "dependency": {
+                        "uuid": "1465eb20-066d-4933-a8b4-62fe7b19fd39",
+                        "name": "I Don't Exist",
+                        "type": "group"
+                    }
+                }
+            ],
+            "results": [],
+            "waiting_exits": [],
+            "parent_refs": []
+        }
+    },
+    {
+        "label": "inspect valid v13 flow",
+        "method": "POST",
+        "path": "/mr/flow/inspect",
+        "body": {
+            "dependency_mapping": {
+                "8f107d42-7416-4cf2-9a51-9490361ad517": "1cf84575-ee14-4253-88b6-e3675c04a066",
+                "ebe441b4-c581-4b03-b544-5695cfe29bc1": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+            },
+            "flow": {
+                "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+                "name": "Valid Flow",
+                "spec_version": "13.0.0",
+                "language": "eng",
+                "type": "messaging",
+                "revision": 106,
+                "expire_after_minutes": 10080,
+                "localization": {},
+                "nodes": [
+                    {
+                        "uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                        "actions": [
+                            {
+                                "type": "add_contact_groups",
+                                "uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+                                "groups": [
+                                    {
+                                        "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                        "name": "Testers"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "set_run_result",
+                                "uuid": "05a5cb7c-bb8a-4ad9-af90-ef9887cc370e",
+                                "name": "Answer",
+                                "value": "Yes"
+                            }
+                        ],
+                        "exits": [
+                            {
+                                "uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "org_id": 1
+        },
+        "status": 200,
+        "response": {
+            "dependencies": [
+                {
+                    "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "name": "Testers",
+                    "type": "group"
+                }
+            ],
+            "issues": [],
+            "results": [
+                {
+                    "key": "answer",
+                    "name": "Answer",
+                    "categories": [],
+                    "node_uuids": [
+                        "6fde1a09-3997-47dd-aff0-92e8aff3a642"
+                    ]
+                }
+            ],
+            "waiting_exits": [],
+            "parent_refs": []
+        }
+    },
+    {
+        "label": "inspect structurally invalid flow",
+        "method": "POST",
+        "path": "/mr/flow/inspect",
+        "body": {
+            "org_id": 1,
+            "flow": {
+                "uuid": "8f107d42-7416-4cf2-9a51-9490361ad517",
+                "name": "Invalid Flow",
+                "spec_version": "13.0.0",
+                "language": "eng",
+                "type": "messaging",
+                "revision": 106,
+                "expire_after_minutes": 10080,
+                "localization": {},
+                "nodes": [
+                    {
+                        "uuid": "6fde1a09-3997-47dd-aff0-92e8aff3a642",
+                        "actions": [
+                            {
+                                "type": "add_contact_groups",
+                                "uuid": "23337aa9-0d3d-4e70-876e-9a2633d1e5e4",
+                                "groups": [
+                                    {
+                                        "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                                        "name": "Testers"
+                                    }
+                                ]
+                            }
+                        ],
+                        "exits": [
+                            {
+                                "uuid": "d3f3f024-a90e-43a5-bd5a-7056f5bea699",
+                                "destination_uuid": "55fbef81-4151-4589-9f0a-8e5c44f6b5a3"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "status": 422,
+        "response": {
+            "error": "unable to read flow: invalid node[uuid=6fde1a09-3997-47dd-aff0-92e8aff3a642]: destination 55fbef81-4151-4589-9f0a-8e5c44f6b5a3 of exit[uuid=d3f3f024-a90e-43a5-bd5a-7056f5bea699] isn't a known node"
+        }
+    },
+    {
+        "label": "inspect legacy single message flow",
+        "method": "POST",
+        "path": "/mr/flow/inspect",
+        "body": {
+            "org_id": 1,
+            "flow": {
+                "version": "11.12",
+                "entry": "59329bcc-393e-4b36-af14-27b4c9454d0c",
+                "base_language": "fra",
+                "rule_sets": [],
+                "action_sets": [
+                    {
+                        "x": 100,
+                        "y": 0,
+                        "uuid": "59329bcc-393e-4b36-af14-27b4c9454d0c",
+                        "exit_uuid": "fe6d02da-7984-4027-b1b5-7b0cbfbb1cc9",
+                        "actions": [
+                            {
+                                "type": "reply",
+                                "uuid": "e3c3de21-8d7c-4d46-827f-3b2a917671ea",
+                                "msg": {
+                                    "fra": "Bonsoir cher parent, veuillez envoyer votre enfant dans un centre de sante demain pour la prise du Rota"
+                                },
+                                "media": {},
+                                "quick_replies": [],
+                                "send_all": false
+                            }
+                        ]
+                    }
+                ],
+                "metadata": {
+                    "revision": 1
+                },
+                "name": "Single Message (24012)",
+                "uuid": "2306967b-0904-4c56-b071-2acf3480d20f",
+                "revision": 1,
+                "expire_after_minutes": 720
+            }
+        },
+        "status": 200,
+        "response": {
+            "dependencies": [],
+            "issues": [],
+            "results": [],
+            "waiting_exits": [],
+            "parent_refs": []
+        }
+    }
+]

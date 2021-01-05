@@ -1,0 +1,295 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/flow/migrate",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "migrate minimal legacy flow",
+        "method": "POST",
+        "path": "/mr/flow/migrate",
+        "body": {
+            "flow": {
+                "base_language": "eng",
+                "action_sets": [
+                    {
+                        "y": 0,
+                        "x": 100,
+                        "destination": null,
+                        "uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
+                        "actions": [
+                            {
+                                "uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf",
+                                "msg": {
+                                    "eng": "Hello world"
+                                },
+                                "type": "reply"
+                            }
+                        ],
+                        "exit_uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+                    }
+                ],
+                "version": 8,
+                "flow_type": "F",
+                "entry": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
+                "rule_sets": [],
+                "metadata": {
+                    "uuid": "42362831-f376-4df1-b6d9-a80b102821d9",
+                    "expires": 10080,
+                    "revision": 1,
+                    "id": 41049,
+                    "name": "No ruleset flow",
+                    "saved_on": "2015-11-20T11:02:19.790131Z"
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "_ui": {
+                "nodes": {
+                    "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5": {
+                        "position": {
+                            "left": 100,
+                            "top": 0
+                        },
+                        "type": "execute_actions"
+                    }
+                },
+                "stickies": {}
+            },
+            "expire_after_minutes": 10080,
+            "language": "eng",
+            "localization": {},
+            "name": "No ruleset flow",
+            "nodes": [
+                {
+                    "actions": [
+                        {
+                            "text": "Hello world",
+                            "type": "send_msg",
+                            "uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf"
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+                        }
+                    ],
+                    "uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5"
+                }
+            ],
+            "revision": 1,
+            "spec_version": "13.1.0",
+            "type": "messaging",
+            "uuid": "42362831-f376-4df1-b6d9-a80b102821d9"
+        }
+    },
+    {
+        "label": "migrate minimal v13 flow",
+        "method": "POST",
+        "path": "/mr/flow/migrate",
+        "body": {
+            "flow": {
+                "uuid": "42362831-f376-4df1-b6d9-a80b102821d9",
+                "name": "Simple Flow",
+                "revision": 1,
+                "spec_version": "13.0.0",
+                "type": "messaging",
+                "expire_after_minutes": 10080,
+                "language": "eng",
+                "localization": {},
+                "nodes": [
+                    {
+                        "actions": [
+                            {
+                                "text": "Hello world",
+                                "type": "send_msg",
+                                "uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf"
+                            }
+                        ],
+                        "exits": [
+                            {
+                                "uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+                            }
+                        ],
+                        "uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5"
+                    }
+                ],
+                "_ui": {
+                    "nodes": {
+                        "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5": {
+                            "position": {
+                                "left": 100,
+                                "top": 0
+                            },
+                            "type": "execute_actions"
+                        }
+                    },
+                    "stickies": {}
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "_ui": {
+                "nodes": {
+                    "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5": {
+                        "position": {
+                            "left": 100,
+                            "top": 0
+                        },
+                        "type": "execute_actions"
+                    }
+                },
+                "stickies": {}
+            },
+            "expire_after_minutes": 10080,
+            "language": "eng",
+            "localization": {},
+            "name": "Simple Flow",
+            "nodes": [
+                {
+                    "actions": [
+                        {
+                            "text": "Hello world",
+                            "type": "send_msg",
+                            "uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf"
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+                        }
+                    ],
+                    "uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5"
+                }
+            ],
+            "revision": 1,
+            "spec_version": "13.1.0",
+            "type": "messaging",
+            "uuid": "42362831-f376-4df1-b6d9-a80b102821d9"
+        }
+    },
+    {
+        "label": "migrate legacy flow to specific version",
+        "method": "POST",
+        "path": "/mr/flow/migrate",
+        "body": {
+            "flow": {
+                "base_language": "eng",
+                "action_sets": [
+                    {
+                        "y": 0,
+                        "x": 100,
+                        "destination": null,
+                        "uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
+                        "actions": [
+                            {
+                                "uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf",
+                                "msg": {
+                                    "eng": "Hello world"
+                                },
+                                "type": "reply"
+                            }
+                        ],
+                        "exit_uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+                    }
+                ],
+                "version": 8,
+                "flow_type": "F",
+                "entry": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5",
+                "rule_sets": [],
+                "metadata": {
+                    "uuid": "42362831-f376-4df1-b6d9-a80b102821d9",
+                    "expires": 10080,
+                    "revision": 1,
+                    "id": 41049,
+                    "name": "No ruleset flow",
+                    "saved_on": "2015-11-20T11:02:19.790131Z"
+                }
+            },
+            "to_version": "13.0.0"
+        },
+        "status": 200,
+        "response": {
+            "_ui": {
+                "nodes": {
+                    "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5": {
+                        "type": "execute_actions",
+                        "position": {
+                            "left": 100,
+                            "top": 0
+                        }
+                    }
+                },
+                "stickies": {}
+            },
+            "expire_after_minutes": 10080,
+            "language": "eng",
+            "localization": {},
+            "name": "No ruleset flow",
+            "nodes": [
+                {
+                    "actions": [
+                        {
+                            "text": "Hello world",
+                            "type": "send_msg",
+                            "uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf"
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+                        }
+                    ],
+                    "uuid": "e41e7aad-de93-4cc0-ae56-d6af15ba1ac5"
+                }
+            ],
+            "revision": 1,
+            "spec_version": "13.0.0",
+            "type": "messaging",
+            "uuid": "42362831-f376-4df1-b6d9-a80b102821d9"
+        }
+    },
+    {
+        "label": "migrate invalid v13 flow",
+        "method": "POST",
+        "path": "/mr/flow/migrate",
+        "body": {
+            "flow": {
+                "uuid": "42362831-f376-4df1-b6d9-a80b102821d9",
+                "name": "Invalid Flow",
+                "revision": 1,
+                "spec_version": "13.0.0",
+                "type": "messaging",
+                "expire_after_minutes": 10080,
+                "language": "eng",
+                "localization": {},
+                "nodes": [
+                    {
+                        "actions": [
+                            {
+                                "text": "Hello world",
+                                "type": "send_msg",
+                                "uuid": "0aaa6871-15fb-408c-9f33-2d7d8f6d5baf"
+                            }
+                        ],
+                        "exits": [
+                            {
+                                "uuid": "40c6cb36-bb44-479a-8ed1-d3f8df3a134d"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "status": 422,
+        "response": {
+            "error": "unable to read migrated flow: unable to read node: field 'uuid' is required"
+        }
+    }
+]

@@ -12,6 +12,9 @@ dist
 docs/*
 docs
 
+.DS_Store
+_storage/
+
 # Test binary, build with `go test -c`
 *.test
 

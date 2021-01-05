@@ -3,7 +3,6 @@ package simulation
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,7 +12,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/stretchr/testify/assert"
@@ -328,7 +327,6 @@ func TestServer(t *testing.T) {
 			json.Unmarshal(content, &parsed)
 			sessionJSON, _ := json.Marshal(parsed["session"])
 			session = string(sessionJSON)
-			fmt.Println(session)
 
 			context, hasContext := parsed["context"]
 			if hasContext {

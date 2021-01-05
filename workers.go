@@ -5,7 +5,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/core/queue"
+
 	"github.com/sirupsen/logrus"
 )
 
