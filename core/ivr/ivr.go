@@ -400,7 +400,7 @@ func ResumeIVRFlow(
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
-	session, err := models.ActiveSessionForContact(ctx, db, oa, models.IVRFlow, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, oa, models.FlowTypeVoice, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading session for contact")
 	}

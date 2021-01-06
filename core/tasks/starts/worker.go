@@ -153,7 +153,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 	// task is different if we are an IVR flow
 	taskType := queue.StartFlowBatch
-	if start.FlowType() == models.IVRFlow {
+	if start.FlowType() == models.FlowTypeVoice {
 		taskType = queue.StartIVRFlowBatch
 	}
 

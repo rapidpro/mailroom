@@ -27,9 +27,10 @@ type FlowType string
 
 // flow type constants
 const (
-	IVRFlow       = FlowType("V")
-	MessagingFlow = FlowType("M")
-	SurveyorFlow  = FlowType("S")
+	FlowTypeMessaging = FlowType("M")
+	FlowTypePassive   = FlowType("P")
+	FlowTypeSurveyor  = FlowType("S")
+	FlowTypeVoice     = FlowType("V")
 )
 
 const (
@@ -37,9 +38,10 @@ const (
 )
 
 var flowTypeMapping = map[flows.FlowType]FlowType{
-	flows.FlowTypeMessaging:        MessagingFlow,
-	flows.FlowTypeVoice:            IVRFlow,
-	flows.FlowTypeMessagingOffline: SurveyorFlow,
+	flows.FlowTypeMessaging:        FlowTypeMessaging,
+	flows.FlowTypeMessagingPassive: FlowTypePassive,
+	flows.FlowTypeMessagingOffline: FlowTypeSurveyor,
+	flows.FlowTypeVoice:            FlowTypeVoice,
 }
 
 // Flow is the mailroom type for a flow

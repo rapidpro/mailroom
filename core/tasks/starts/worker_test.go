@@ -214,7 +214,7 @@ func TestStarts(t *testing.T) {
 		mes.NextResponse = tc.QueryResponse
 
 		// handle our start task
-		start := models.NewFlowStart(models.Org1, models.StartTypeManual, models.MessagingFlow, tc.FlowID, tc.RestartParticipants, tc.IncludeActive).
+		start := models.NewFlowStart(models.Org1, models.StartTypeManual, models.FlowTypeMessaging, tc.FlowID, tc.RestartParticipants, tc.IncludeActive).
 			WithGroupIDs(tc.GroupIDs).
 			WithContactIDs(tc.ContactIDs).
 			WithQuery(tc.Query).
