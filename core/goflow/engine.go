@@ -5,9 +5,9 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/goflow/services/webhooks"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/engine"
+	"github.com/greatnonprofits-nfp/goflow/services/webhooks"
 	"github.com/nyaruka/mailroom/config"
 
 	"github.com/shopspring/decimal"

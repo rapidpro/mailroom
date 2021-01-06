@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/nyaruka/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"

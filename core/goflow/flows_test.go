@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/test"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/test"
 	"github.com/nyaruka/mailroom/core/goflow"
 
 	"github.com/Masterminds/semver"

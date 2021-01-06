@@ -6,9 +6,9 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"

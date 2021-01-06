@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"

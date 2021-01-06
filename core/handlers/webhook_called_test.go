@@ -8,8 +8,8 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/actions"
 )
 
 func TestWebhookCalled(t *testing.T) {

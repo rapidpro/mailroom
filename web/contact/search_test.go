@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/test"
+	"github.com/greatnonprofits-nfp/goflow/test"
 	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"

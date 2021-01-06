@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/test"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 

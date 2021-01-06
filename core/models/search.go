@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/contactql"
-	"github.com/nyaruka/goflow/contactql/es"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/contactql"
+	"github.com/greatnonprofits-nfp/goflow/contactql/es"
 
 	"github.com/olivere/elastic"
 	"github.com/pkg/errors"

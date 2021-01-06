@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/nyaruka/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/jmoiron/sqlx"

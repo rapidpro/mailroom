@@ -11,14 +11,14 @@ import (
 
 	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/excellent"
-	"github.com/nyaruka/goflow/excellent/types"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
-	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/excellent"
+	"github.com/greatnonprofits-nfp/goflow/excellent/types"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/definition/legacy/expressions"
+	"github.com/greatnonprofits-nfp/goflow/flows/events"
+	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/null"
 
@@ -934,7 +934,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{})
-		msg, err := NewOutgoingMsg(oa.Org(), channel, c.ID(), out, time.Now(), c.uuid, ctx, db)
+		msg, err := NewOutgoingMsg(oa.Org(), channel, c.ID(), out, time.Now())
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")

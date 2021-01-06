@@ -2,9 +2,9 @@ package contact
 
 import (
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/modifiers"
+	"github.com/greatnonprofits-nfp/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/pkg/errors"

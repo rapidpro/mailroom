@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/null"
 

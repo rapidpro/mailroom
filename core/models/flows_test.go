@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"

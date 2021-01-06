@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/goflow/flows/events"
+	"github.com/greatnonprofits-nfp/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/gomodule/redigo/redis"

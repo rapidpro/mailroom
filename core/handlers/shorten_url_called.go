@@ -1,8 +1,8 @@
-package hooks
+package handlers
 
 import (
 	"github.com/greatnonprofits-nfp/goflow/flows/events"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 )
 
 func init() {

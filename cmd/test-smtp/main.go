@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/nyaruka/ezconf"
-	"github.com/nyaruka/goflow/utils/smtpx"
+	"github.com/greatnonprofits-nfp/goflow/utils/smtpx"
 
 	"github.com/sirupsen/logrus"
 )

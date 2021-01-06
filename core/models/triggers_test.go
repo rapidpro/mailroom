@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/jmoiron/sqlx"

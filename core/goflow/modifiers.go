@@ -3,9 +3,9 @@ package goflow
 import (
 	"encoding/json"
 
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/modifiers"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/modifiers"
 
 	"github.com/pkg/errors"
 )

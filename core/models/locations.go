@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/envs"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"

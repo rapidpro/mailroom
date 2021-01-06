@@ -15,11 +15,11 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/storage"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/services/airtime/dtone"
-	"github.com/nyaruka/goflow/services/email/smtp"
-	"github.com/nyaruka/goflow/utils"
+	"github.com/greatnonprofits-nfp/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/services/airtime/dtone"
+	"github.com/greatnonprofits-nfp/goflow/services/email/smtp"
+	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -120,6 +120,9 @@ func (o *Org) MaxValueLength() int { return o.env.MaxValueLength() }
 
 // DefaultLocale combines the default languages and countries into a locale
 func (o *Org) DefaultLocale() envs.Locale { return o.env.DefaultLocale() }
+
+// Links returns the links added on this org
+func (o *Org) Links() []string { return o.env.Links() }
 
 // LocationResolver returns a resolver for locations
 func (o *Org) LocationResolver() envs.LocationResolver { return o.env.LocationResolver() }

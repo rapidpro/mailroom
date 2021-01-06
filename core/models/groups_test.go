@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 

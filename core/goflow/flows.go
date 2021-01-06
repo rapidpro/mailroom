@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/definition"
-	"github.com/nyaruka/goflow/flows/definition/migrations"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/definition"
+	"github.com/greatnonprofits-nfp/goflow/flows/definition/migrations"
 	"github.com/nyaruka/mailroom/config"
 
 	"github.com/Masterminds/semver"

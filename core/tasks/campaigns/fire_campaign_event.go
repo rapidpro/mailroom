@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/greatnonprofits-nfp/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"

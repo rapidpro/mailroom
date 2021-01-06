@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 

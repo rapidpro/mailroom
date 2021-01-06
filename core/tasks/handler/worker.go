@@ -5,29 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/excellent/types"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/resumes"
-	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/librato"
-	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/queue"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/utils/locker"
-	"github.com/nyaruka/null"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/nfnt/resize"
-	"github.com/gofrs/uuid"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/rwcarlsen/goexif/exif"
 	"strings"
 	"os"
 	"path"
@@ -37,6 +14,30 @@ import (
 	"database/sql"
 	"image/png"
 	"image"
+
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/storage"
+	"github.com/greatnonprofits-nfp/goflow/excellent/types"
+	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows/events"
+	"github.com/greatnonprofits-nfp/goflow/flows/resumes"
+	"github.com/greatnonprofits-nfp/goflow/flows/triggers"
+	"github.com/greatnonprofits-nfp/goflow/utils"
+	"github.com/nyaruka/librato"
+	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/runner"
+	"github.com/nyaruka/mailroom/utils/locker"
+	"github.com/nyaruka/null"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/nfnt/resize"
+	"github.com/gofrs/uuid"
+	"github.com/rwcarlsen/goexif/exif"
 )
 
 const (
@@ -99,12 +100,12 @@ func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, 
 }
 
 func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	return handleContactEvent(ctx, mr.DB, mr.RP, task, mr.S3Client, mr.Config)
+	return handleContactEvent(ctx, mr.DB, mr.RP, task, mr.Storage, mr.Config)
 }
 
 // handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
 // a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task, s3Client s3iface.S3API, config *config.Config) error {
+func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task, s3storage storage.Storage, config *config.Config) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -189,7 +190,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
 			}
-			err = handleMsgEvent(ctx, db, rp, msg, s3Client, config)
+			err = handleMsgEvent(ctx, db, rp, msg, s3storage, config)
 
 		case TimeoutEventType, ExpirationEventType:
 			evt := &TimedEvent{}
@@ -511,7 +512,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 }
 
 // handleMsgEvent is called when a new message arrives from a contact
-func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent, s3Client s3iface.S3API, config *config.Config) error {
+func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent, s3storage storage.Storage, config *config.Config) error {
 	oa, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -619,7 +620,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		}
 
 		if len(event.Attachments) > 0 {
-			flowImageErr := NewHandleFlowImage(ctx, db, s3Client, config, event.OrgID, event.ContactID, flow.ID(), event.Attachments)
+			flowImageErr := NewHandleFlowImage(ctx, db, s3storage, config, event.OrgID, event.ContactID, flow.ID(), event.Attachments)
 			if flowImageErr != nil {
 				return errors.Wrapf(err, "error handling flow image")
 			}
@@ -667,10 +668,10 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 				return nil
 			}
 
-			triggerExtraXValue := types.JSONToXValue([]byte(trigger.Extra()))
-			triggerExtraXObject, _ := types.ToXObject(org.Env(), triggerExtraXValue)
+			//triggerExtraXValue := types.JSONToXValue([]byte(trigger.Extra()))
+			//triggerExtraXObject, _ := types.ToXObject(oa.Env(), triggerExtraXValue)
 
-            // TODO Add trigger params
+			// TODO Add trigger params
 
 			// otherwise build the trigger and start the flow directly
 			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
@@ -785,7 +786,7 @@ func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID
 	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, runID, time)
 }
 
-func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API, config *config.Config, orgID models.OrgID, contactID models.ContactID, flowID models.FlowID, attachments []utils.Attachment) error {
+func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3storage storage.Storage, config *config.Config, orgID models.OrgID, contactID models.ContactID, flowID models.FlowID, attachments []utils.Attachment) error {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction")
@@ -843,7 +844,8 @@ func NewHandleFlowImage(ctx context.Context, db *sqlx.DB, s3Client s3iface.S3API
 			}
 
 			content, _ := ioutil.ReadFile(tmpImageName)
-			thumbnailURL, _ = s3utils.PutS3File(s3Client, config.S3MediaBucket, s3Path, "image/jpeg", content)
+
+			thumbnailURL, _ = s3storage.Put(s3Path, "image/jpeg", content)
 
 			// Removing the file created on /tmp directory
 			os.Remove(tmpImageName)

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"

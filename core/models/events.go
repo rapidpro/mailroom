@@ -3,7 +3,7 @@ package models
 import (
 	"context"
 
-	"github.com/nyaruka/goflow/flows"
+	"github.com/greatnonprofits-nfp/goflow/flows"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"

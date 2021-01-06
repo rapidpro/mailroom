@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/goflow/contactql"
-	"github.com/nyaruka/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/contactql"
+	"github.com/greatnonprofits-nfp/goflow/envs"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"

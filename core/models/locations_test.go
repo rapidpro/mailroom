@@ -3,7 +3,7 @@ package models
 import (
 	"testing"
 
-	"github.com/nyaruka/goflow/envs"
+	"github.com/greatnonprofits-nfp/goflow/envs"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
