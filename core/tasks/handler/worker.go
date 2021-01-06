@@ -668,13 +668,11 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 				return nil
 			}
 
-			//triggerExtraXValue := types.JSONToXValue([]byte(trigger.Extra()))
-			//triggerExtraXObject, _ := types.ToXObject(oa.Env(), triggerExtraXValue)
-
-			// TODO Add trigger params
+			triggerExtraXValue := types.JSONToXValue([]byte(trigger.Extra()))
+			triggerExtraXObject, _ := types.ToXObject(oa.Env(), triggerExtraXValue)
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
+			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).WithParams(triggerExtraXObject).Build()
 			_, err = runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
