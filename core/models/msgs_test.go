@@ -101,7 +101,7 @@ func TestOutgoingMsgs(t *testing.T) {
 
 		channel := oa.ChannelByUUID(tc.ChannelUUID)
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic)
+		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, "", flows.ShareableIconsConfig{})
 		msg, err := models.NewOutgoingMsg(oa.Org(), channel, tc.ContactID, flowMsg, now)
 
 		if tc.HasError {

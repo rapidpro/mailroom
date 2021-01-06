@@ -36,7 +36,7 @@ func createMsg(t *testing.T, m msgSpec) *models.Msg {
 
 	channel := oa.ChannelByUUID(m.ChannelUUID)
 
-	flowMsg := flows.NewMsgOut(m.URN, channel.ChannelReference(), m.Text, nil, nil, nil, flows.NilMsgTopic)
+	flowMsg := flows.NewMsgOut(m.URN, channel.ChannelReference(), m.Text, nil, nil, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{})
 	msg, err := models.NewOutgoingMsg(oa.Org(), channel, m.ContactID, flowMsg, time.Now())
 	require.NoError(t, err)
 	return msg

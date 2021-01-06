@@ -51,7 +51,7 @@ func TestResponseForSprint(t *testing.T) {
 			`<Response><Say>hello world</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic))},
+			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{}))},
 			nil,
 			`<Response><Play>https://mailroom.io/recordings/foo.wav</Play><Hangup></Hangup></Response>`,
 		},
