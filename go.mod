@@ -1,11 +1,8 @@
 module github.com/nyaruka/mailroom
 
-replace github.com/greatnonprofits-nfp/goflow => /Users/teehamaral/GNP/goflow
-
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/apex/log v1.1.4
-	github.com/aws/aws-sdk-go v1.34.31
 	github.com/buger/jsonparser v1.0.0
 	github.com/certifi/gocertifi v0.0.0-20200211180108-c7c1fbc02894 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -16,7 +13,7 @@ require (
 	github.com/golang/protobuf v1.4.0
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.1.0
-	github.com/greatnonprofits-nfp/goflow v0.0.0-00010101000000-000000000000
+	github.com/greatnonprofits-nfp/goflow v0.50.3-0.20210106205143-ab6f7b95fefd
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lib/pq v1.4.0
@@ -24,7 +21,6 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.6.1
-	github.com/nyaruka/goflow v0.106.1
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0
