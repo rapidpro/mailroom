@@ -90,7 +90,7 @@ func TestGetExpired(t *testing.T) {
 	assert.Nil(t, schedules[1].Broadcast())
 	start := schedules[1].FlowStart()
 	assert.NotNil(t, start)
-	assert.Equal(t, MessagingFlow, start.FlowType())
+	assert.Equal(t, FlowTypeMessaging, start.FlowType())
 	assert.Equal(t, FavoritesFlowID, start.FlowID())
 	assert.Equal(t, Org1, start.OrgID())
 	assert.Equal(t, []ContactID{CathyID, GeorgeID}, start.ContactIDs())
