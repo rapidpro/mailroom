@@ -33,6 +33,11 @@ const (
 	FlowTypeVoice     = FlowType("V")
 )
 
+// Interrupts returns whether this flow type interrupts existing sessions
+func (t FlowType) Interrupts() bool {
+	return t != FlowTypePassive
+}
+
 const (
 	flowConfigIVRRetryMinutes = "ivr_retry"
 )

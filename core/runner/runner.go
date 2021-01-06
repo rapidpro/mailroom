@@ -226,7 +226,7 @@ func StartFlowBatch(
 	options := NewStartOptions()
 	options.RestartParticipants = batch.RestartParticipants()
 	options.IncludeActive = batch.IncludeActive()
-	options.Interrupt = flow.FlowType() != models.FlowTypePassive
+	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
 
