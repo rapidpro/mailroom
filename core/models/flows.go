@@ -43,10 +43,10 @@ const (
 )
 
 var flowTypeMapping = map[flows.FlowType]FlowType{
-	flows.FlowTypeMessaging:        FlowTypeMessaging,
-	flows.FlowTypeMessagingPassive: FlowTypeBackground,
-	flows.FlowTypeMessagingOffline: FlowTypeSurveyor,
-	flows.FlowTypeVoice:            FlowTypeVoice,
+	flows.FlowTypeMessaging:           FlowTypeMessaging,
+	flows.FlowTypeMessagingBackground: FlowTypeBackground,
+	flows.FlowTypeMessagingOffline:    FlowTypeSurveyor,
+	flows.FlowTypeVoice:               FlowTypeVoice,
 }
 
 // Flow is the mailroom type for a flow
