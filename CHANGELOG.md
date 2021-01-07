@@ -1,3 +1,8 @@
+v6.1.6
+----------
+ * Update to latest goflow v0.107.2
+ * Add support for passive flows
+
 v6.1.5
 ----------
  * Update to goflow v0.107.1
