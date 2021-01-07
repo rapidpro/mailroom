@@ -1,3 +1,7 @@
+v6.1.8
+----------
+ * Update to latest goflow 0.108.0
+
 v6.1.7
 ----------
  * Use background instead of passive
