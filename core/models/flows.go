@@ -27,15 +27,15 @@ type FlowType string
 
 // flow type constants
 const (
-	FlowTypeMessaging = FlowType("M")
-	FlowTypePassive   = FlowType("P")
-	FlowTypeSurveyor  = FlowType("S")
-	FlowTypeVoice     = FlowType("V")
+	FlowTypeMessaging  = FlowType("M")
+	FlowTypeBackground = FlowType("B")
+	FlowTypeSurveyor   = FlowType("S")
+	FlowTypeVoice      = FlowType("V")
 )
 
 // Interrupts returns whether this flow type interrupts existing sessions
 func (t FlowType) Interrupts() bool {
-	return t != FlowTypePassive
+	return t != FlowTypeBackground
 }
 
 const (
@@ -44,7 +44,7 @@ const (
 
 var flowTypeMapping = map[flows.FlowType]FlowType{
 	flows.FlowTypeMessaging:        FlowTypeMessaging,
-	flows.FlowTypeMessagingPassive: FlowTypePassive,
+	flows.FlowTypeMessagingPassive: FlowTypeBackground,
 	flows.FlowTypeMessagingOffline: FlowTypeSurveyor,
 	flows.FlowTypeVoice:            FlowTypeVoice,
 }

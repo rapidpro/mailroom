@@ -39,8 +39,8 @@ func TestStarts(t *testing.T) {
 
 	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: rp, ElasticClient: es}
 
-	// convert our single message flow to an actual passive flow that shouldn't interrupt
-	db.MustExec(`UPDATE flows_flow SET flow_type = 'P' WHERE id = $1`, models.SingleMessageFlowID)
+	// convert our single message flow to an actual background flow that shouldn't interrupt
+	db.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, models.SingleMessageFlowID)
 
 	// insert a flow run for one of our contacts
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
@@ -236,7 +236,7 @@ func TestStarts(t *testing.T) {
 			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 1, models.SingleMessageFlowID: 0},
 		},
 		{
-			label:                "Passive flow",
+			label:                "Background flow",
 			flowID:               models.SingleMessageFlowID,
 			contactIDs:           []models.ContactID{models.BobID},
 			includeActive:        true,
