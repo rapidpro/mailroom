@@ -1,4 +1,4 @@
-package courier_test
+package msgio_test
 
 import (
 	"encoding/json"
@@ -9,8 +9,8 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/core/courier"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,7 @@ type msgSpec struct {
 	Failed      bool
 }
 
-func createMsg(t *testing.T, m msgSpec) *models.Msg {
+func (m *msgSpec) createMsg(t *testing.T) *models.Msg {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 	db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, models.Org1)
@@ -103,28 +103,6 @@ func TestQueueMessages(t *testing.T) {
 			},
 		},
 		{
-			Description: "1 queueable message and 1 Android",
-			Msgs: []msgSpec{
-				{
-					ChannelUUID: androidChannelUUID,
-					Text:        "normal msg 1",
-					ContactID:   models.CathyID,
-					URN:         urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-					URNID:       models.CathyURNID,
-				},
-				{
-					ChannelUUID: models.TwilioChannelUUID,
-					Text:        "normal msg 1",
-					ContactID:   models.CathyID,
-					URN:         urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-					URNID:       models.CathyURNID,
-				},
-			},
-			QueueSizes: map[string]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": 1,
-			},
-		},
-		{
 			Description: "0 messages",
 			Msgs:        []msgSpec{},
 			QueueSizes: map[string]int{
@@ -134,13 +112,15 @@ func TestQueueMessages(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		var contactID models.ContactID
 		msgs := make([]*models.Msg, len(tc.Msgs))
-		for i := range tc.Msgs {
-			msgs[i] = createMsg(t, tc.Msgs[i])
+		for i, ms := range tc.Msgs {
+			msgs[i] = ms.createMsg(t)
+			contactID = ms.ContactID
 		}
 
 		rc.Do("FLUSHDB")
-		courier.QueueMessages(rc, msgs)
+		msgio.QueueCourierMessages(rc, contactID, msgs)
 
 		for queueKey, size := range tc.QueueSizes {
 			if size == 0 {
@@ -163,6 +143,18 @@ func TestQueueMessages(t *testing.T) {
 			}
 		}
 	}
+
+	// check that trying to queue a courier message will panic
+	assert.Panics(t, func() {
+		ms := msgSpec{
+			ChannelUUID: androidChannelUUID,
+			Text:        "android msg",
+			ContactID:   models.CathyID,
+			URN:         urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
+			URNID:       models.CathyURNID,
+		}
+		msgio.QueueCourierMessages(rc, models.CathyID, []*models.Msg{ms.createMsg(t)})
+	})
 
 	testsuite.Reset()
 }
