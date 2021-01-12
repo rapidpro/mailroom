@@ -15,7 +15,8 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, msgs [
 	courierMsgs := make(map[models.ContactID][]*models.Msg, 100)
 
 	// android channels that need to be notified to sync
-	androidChannels := make(map[*models.Channel]bool)
+	androidChannels := make([]*models.Channel, 0, 5)
+	androidChannelsSeen := make(map[*models.Channel]bool)
 
 	// messages that need to be marked as pending
 	pending := make([]*models.Msg, 0, 1)
@@ -25,7 +26,10 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, msgs [
 		channel := msg.Channel()
 		if channel != nil {
 			if channel.Type() == models.ChannelTypeAndroid {
-				androidChannels[channel] = true
+				if !androidChannelsSeen[channel] {
+					androidChannels = append(androidChannels, channel)
+				}
+				androidChannelsSeen[channel] = true
 			} else {
 				courierMsgs[msg.ContactID()] = append(courierMsgs[msg.ContactID()], msg)
 			}
