@@ -463,12 +463,6 @@ func MarkMessagesPending(ctx context.Context, db Queryer, msgs []*Msg) error {
 	return updateMessageStatus(ctx, db, msgs, MsgStatusPending)
 }
 
-// MarkMessagesQueued marks the passed in messages as queued
-func MarkMessagesQueued(ctx context.Context, db Queryer, msgs []*Msg) error {
-	return updateMessageStatus(ctx, db, msgs, MsgStatusQueued)
-}
-
-// MarkMessagesQueued marks the passed in messages as queued
 func updateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status MsgStatus) error {
 	is := make([]interface{}, len(msgs))
 	for i, msg := range msgs {
@@ -490,7 +484,7 @@ FROM (
 ) AS
 	m(id, status)
 WHERE
-	msgs_msg.id = m.id::int
+	msgs_msg.id = m.id::bigint
 `
 
 // GetMessageIDFromUUID gets the ID of a message from its UUID
