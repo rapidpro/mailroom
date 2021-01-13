@@ -2,6 +2,7 @@ package msgio
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/nyaruka/mailroom/core/models"
 
@@ -37,6 +38,9 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, msgs [
 			pending = append(pending, msg)
 		}
 	}
+
+	fmt.Printf("%v\n", androidChannels)
+	fmt.Printf("%v\n", androidChannelsSeen)
 
 	// if there are courier messages to send, do so
 	if len(courierMsgs) > 0 {

@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,9 +19,11 @@ import (
 )
 
 type MockFCMEndpoint struct {
-	server   *httptest.Server
-	tokens   []string
-	messages []*fcm.Message
+	server *httptest.Server
+	tokens []string
+
+	// log of messages sent to this endpoint
+	Messages []*fcm.Message
 }
 
 func (m *MockFCMEndpoint) Handle(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +34,7 @@ func (m *MockFCMEndpoint) Handle(w http.ResponseWriter, r *http.Request) {
 	message := &fcm.Message{}
 	jsonx.Unmarshal(requestBody, message)
 
-	m.messages = append(m.messages, message)
+	m.Messages = append(m.Messages, message)
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -44,6 +47,15 @@ func (m *MockFCMEndpoint) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (m *MockFCMEndpoint) Stop() {
+	m.server.Close()
+}
+
+func (m *MockFCMEndpoint) Client(apiKey string) *fcm.Client {
+	client, _ := fcm.NewClient("FCMKEY123", fcm.WithEndpoint(m.server.URL))
+	return client
+}
+
 func newMockFCMEndpoint(tokens ...string) *MockFCMEndpoint {
 	mock := &MockFCMEndpoint{tokens: tokens}
 	mock.server = httptest.NewServer(http.HandlerFunc(mock.Handle))
@@ -51,34 +63,34 @@ func newMockFCMEndpoint(tokens ...string) *MockFCMEndpoint {
 }
 
 func TestSyncAndroidChannels(t *testing.T) {
-	ctx, db, _ := testsuite.Reset()
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
 
 	mockFCM := newMockFCMEndpoint("FCMID3")
-	defer mockFCM.server.Close()
+	defer mockFCM.Stop()
 
-	client, _ := fcm.NewClient("FCMKEY123", fcm.WithEndpoint(mockFCM.server.URL))
-	msgio.SetFCMClient(client)
+	msgio.SetFCMClient(mockFCM.Client("FCMKEY123"))
 
-	// convert the existing channels to be Android channels
-	db.MustExec(`UPDATE channels_channel SET name = 'Android 1', channel_type = 'A', config = '{"FCM_ID": ""}'::json WHERE id = $1`, models.TwitterChannelID)      // no FCM ID
-	db.MustExec(`UPDATE channels_channel SET name = 'Android 2', channel_type = 'A', config = '{"FCM_ID": "FCMID2"}'::json WHERE id = $1`, models.TwilioChannelID) // invalid FCM ID
-	db.MustExec(`UPDATE channels_channel SET name = 'Android 3', channel_type = 'A', config = '{"FCM_ID": "FCMID3"}'::json WHERE id = $1`, models.NexmoChannelID)  // valid FCM ID
+	// create some Android channels
+	channel1ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": ""})       // no FCM ID
+	channel2ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"}) // invalid FCM ID
+	channel3ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"}) // valid FCM ID
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshChannels)
 	require.NoError(t, err)
 
-	channel1 := oa.ChannelByUUID(models.TwitterChannelUUID)
-	channel2 := oa.ChannelByUUID(models.TwilioChannelUUID)
-	channel3 := oa.ChannelByUUID(models.NexmoChannelUUID)
+	channel1 := oa.ChannelByID(channel1ID)
+	channel2 := oa.ChannelByID(channel2ID)
+	channel3 := oa.ChannelByID(channel3ID)
 
 	msgio.SyncAndroidChannels([]*models.Channel{channel1, channel2, channel3})
 
 	// check that we try to sync the 2 channels with FCM IDs, even tho one fails
-	assert.Equal(t, 2, len(mockFCM.messages))
-	assert.Equal(t, "FCMID2", mockFCM.messages[0].Token)
-	assert.Equal(t, "FCMID3", mockFCM.messages[1].Token)
+	assert.Equal(t, 2, len(mockFCM.Messages))
+	assert.Equal(t, "FCMID2", mockFCM.Messages[0].Token)
+	assert.Equal(t, "FCMID3", mockFCM.Messages[1].Token)
 
-	assert.Equal(t, "high", mockFCM.messages[0].Priority)
-	assert.Equal(t, "sync", mockFCM.messages[0].CollapseKey)
-	assert.Equal(t, map[string]interface{}{"msg": "sync"}, mockFCM.messages[0].Data)
+	assert.Equal(t, "high", mockFCM.Messages[0].Priority)
+	assert.Equal(t, "sync", mockFCM.Messages[0].CollapseKey)
+	assert.Equal(t, map[string]interface{}{"msg": "sync"}, mockFCM.Messages[0].Data)
 }

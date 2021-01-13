@@ -2,55 +2,32 @@ package msgio_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
-	"time"
 
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type msgSpec struct {
-	ChannelUUID assets.ChannelUUID
-	Text        string
-	ContactID   models.ContactID
-	URN         urns.URN
-	URNID       models.URNID
-	Failed      bool
-}
-
-func (m *msgSpec) createMsg(t *testing.T) *models.Msg {
+func TestQueueCourierMessages(t *testing.T) {
 	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, models.Org1)
-
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
-	require.NoError(t, err)
-
-	channel := oa.ChannelByUUID(m.ChannelUUID)
-
-	flowMsg := flows.NewMsgOut(m.URN, channel.ChannelReference(), m.Text, nil, nil, nil, flows.NilMsgTopic)
-	msg, err := models.NewOutgoingMsg(oa.Org(), channel, m.ContactID, flowMsg, time.Now())
-	require.NoError(t, err)
-	return msg
-}
-
-func TestQueueMessages(t *testing.T) {
 	db := testsuite.DB()
 	rc := testsuite.RC()
 	testsuite.Reset()
 	models.FlushCache()
 
-	// convert the Twitter channel to be an Android channel
-	db.MustExec(`UPDATE channels_channel SET name = 'Android', channel_type = 'A' WHERE id = $1`, models.TwitterChannelID)
-	androidChannelUUID := models.TwitterChannelUUID
+	defer rc.Close()
+
+	// create an Andoid channel
+	androidChannelID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg|models.RefreshChannels)
+	require.NoError(t, err)
 
 	tests := []struct {
 		Description string
@@ -61,18 +38,14 @@ func TestQueueMessages(t *testing.T) {
 			Description: "2 queueable messages",
 			Msgs: []msgSpec{
 				{
-					ChannelUUID: models.TwilioChannelUUID,
-					Text:        "normal msg 1",
-					ContactID:   models.CathyID,
-					URN:         urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-					URNID:       models.CathyURNID,
+					ChannelID: models.TwilioChannelID,
+					ContactID: models.CathyID,
+					URNID:     models.CathyURNID,
 				},
 				{
-					ChannelUUID: models.TwilioChannelUUID,
-					Text:        "normal msg 2",
-					ContactID:   models.CathyID,
-					URN:         urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-					URNID:       models.CathyURNID,
+					ChannelID: models.TwilioChannelID,
+					ContactID: models.CathyID,
+					URNID:     models.CathyURNID,
 				},
 			},
 			QueueSizes: map[string]int{
@@ -83,19 +56,15 @@ func TestQueueMessages(t *testing.T) {
 			Description: "1 queueable message and 1 failed",
 			Msgs: []msgSpec{
 				{
-					ChannelUUID: models.TwilioChannelUUID,
-					Text:        "normal msg 1",
-					ContactID:   models.CathyID,
-					URN:         urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-					URNID:       models.CathyURNID,
-					Failed:      true,
+					ChannelID: models.TwilioChannelID,
+					ContactID: models.CathyID,
+					URNID:     models.CathyURNID,
+					Failed:    true,
 				},
 				{
-					ChannelUUID: models.TwilioChannelUUID,
-					Text:        "normal msg 1",
-					ContactID:   models.CathyID,
-					URN:         urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-					URNID:       models.CathyURNID,
+					ChannelID: models.TwilioChannelID,
+					ContactID: models.CathyID,
+					URNID:     models.CathyURNID,
 				},
 			},
 			QueueSizes: map[string]int{
@@ -115,46 +84,48 @@ func TestQueueMessages(t *testing.T) {
 		var contactID models.ContactID
 		msgs := make([]*models.Msg, len(tc.Msgs))
 		for i, ms := range tc.Msgs {
-			msgs[i] = ms.createMsg(t)
+			msgs[i] = ms.createMsg(t, db, oa)
 			contactID = ms.ContactID
 		}
 
 		rc.Do("FLUSHDB")
 		msgio.QueueCourierMessages(rc, contactID, msgs)
 
-		for queueKey, size := range tc.QueueSizes {
-			if size == 0 {
-				result, err := rc.Do("ZCARD", queueKey)
-				require.NoError(t, err)
-				assert.Equal(t, size, int(result.(int64)))
-			} else {
-				result, err := rc.Do("ZPOPMAX", queueKey)
-				require.NoError(t, err)
-
-				results := result.([]interface{})
-				assert.Equal(t, 2, len(results)) // result is (item, score)
-
-				batchJSON := results[0].([]byte)
-				var batch []map[string]interface{}
-				err = json.Unmarshal(batchJSON, &batch)
-				require.NoError(t, err)
-
-				assert.Equal(t, size, len(batch))
-			}
-		}
+		assertCourierQueueSizes(t, rc, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 	}
 
 	// check that trying to queue a courier message will panic
 	assert.Panics(t, func() {
 		ms := msgSpec{
-			ChannelUUID: androidChannelUUID,
-			Text:        "android msg",
-			ContactID:   models.CathyID,
-			URN:         urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-			URNID:       models.CathyURNID,
+			ChannelID: androidChannelID,
+			ContactID: models.CathyID,
+			URNID:     models.CathyURNID,
 		}
-		msgio.QueueCourierMessages(rc, models.CathyID, []*models.Msg{ms.createMsg(t)})
+		msgio.QueueCourierMessages(rc, models.CathyID, []*models.Msg{ms.createMsg(t, db, oa)})
 	})
 
 	testsuite.Reset()
+}
+
+func assertCourierQueueSizes(t *testing.T, rc redis.Conn, sizes map[string]int, msgAndArgs ...interface{}) {
+	for queueKey, size := range sizes {
+		if size == 0 {
+			result, err := rc.Do("ZCARD", queueKey)
+			require.NoError(t, err)
+			assert.Equal(t, size, int(result.(int64)))
+		} else {
+			result, err := rc.Do("ZPOPMAX", queueKey)
+			require.NoError(t, err)
+
+			results := result.([]interface{})
+			assert.Equal(t, 2, len(results)) // result is (item, score)
+
+			batchJSON := results[0].([]byte)
+			var batch []map[string]interface{}
+			err = json.Unmarshal(batchJSON, &batch)
+			require.NoError(t, err)
+
+			assert.Equal(t, size, len(batch), msgAndArgs...)
+		}
+	}
 }
