@@ -190,16 +190,11 @@ func TestMarkMessages(t *testing.T) {
 
 	msg1 := insertMsg("Hello")
 	msg2 := insertMsg("Hola")
-	msg3 := insertMsg("Howdy")
+	insertMsg("Howdy")
 
 	models.MarkMessagesPending(ctx, db, []*models.Msg{msg1, msg2})
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 2)
-
-	models.MarkMessagesQueued(ctx, db, []*models.Msg{msg1, msg3})
-
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`, nil, 2)
 
 	// try running on database with BIGINT message ids
 	db.MustExec(`ALTER TABLE "msgs_msg" ALTER COLUMN "id" TYPE bigint USING "id"::bigint;`)
@@ -213,5 +208,5 @@ func TestMarkMessages(t *testing.T) {
 	err = models.MarkMessagesPending(ctx, db, []*models.Msg{msg4})
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 3)
 }
