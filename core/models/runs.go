@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/edganiukov/fcm"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -458,7 +459,7 @@ func (s *Session) calculateTimeout(fs flows.Session, sprint flows.Sprint) {
 }
 
 // WriteUpdatedSession updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
-func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
+func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
 	// make sure we have our seen runs
 	if s.seenRuns == nil {
 		return errors.Errorf("missing seen runs, cannot update session")
@@ -588,7 +589,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = ApplyEventPreCommitHooks(ctx, tx, rp, org, []*Scene{s.scene})
+	err = ApplyEventPreCommitHooks(ctx, tx, rp, fc, org, []*Scene{s.scene})
 	if err != nil {
 		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
@@ -636,7 +637,7 @@ WHERE
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
+func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, org *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
 	if len(ss) == 0 {
 		return nil, nil
 	}
@@ -733,7 +734,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAss
 	}
 
 	// gather all our pre commit events, group them by hook
-	err = ApplyEventPreCommitHooks(ctx, tx, rp, org, scenes)
+	err = ApplyEventPreCommitHooks(ctx, tx, rp, fc, org, scenes)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}

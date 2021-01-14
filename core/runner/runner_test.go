@@ -60,7 +60,7 @@ func TestCampaignStarts(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, models.Org1, fires, models.CampaignFlowUUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
+	sessions, err := FireCampaignEvents(ctx, db, rp, nil, models.Org1, fires, models.CampaignFlowUUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions))
 
@@ -142,7 +142,7 @@ func TestBatchStart(t *testing.T) {
 			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
-		sessions, err := StartFlowBatch(ctx, db, rp, batch)
+		sessions, err := StartFlowBatch(ctx, db, rp, nil, batch)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
@@ -191,7 +191,7 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
-	sessions, err := StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, nil, true)
+	sessions, err := StartFlowForContacts(ctx, db, rp, nil, oa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
@@ -232,7 +232,7 @@ func TestContactRuns(t *testing.T) {
 		msg.SetID(10)
 		resume := resumes.NewMsg(oa.Env(), contact, msg)
 
-		session, err = ResumeFlow(ctx, db, rp, oa, session, resume, nil)
+		session, err = ResumeFlow(ctx, db, rp, nil, oa, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 

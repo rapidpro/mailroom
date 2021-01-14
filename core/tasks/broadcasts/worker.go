@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
@@ -145,11 +146,11 @@ func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *
 	}
 
 	// try to send the batch
-	return SendBroadcastBatch(ctx, mr.DB, mr.RP, broadcast)
+	return SendBroadcastBatch(ctx, mr.DB, mr.RP, mr.FCMClient, broadcast)
 }
 
 // SendBroadcastBatch sends the passed in broadcast batch
-func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.BroadcastBatch) error {
+func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, bcast *models.BroadcastBatch) error {
 	// always set our broadcast as sent if it is our last
 	defer func() {
 		if bcast.IsLast() {
@@ -171,6 +172,6 @@ func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast 
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
-	msgio.SendMessages(ctx, db, rp, msgs)
+	msgio.SendMessages(ctx, db, rp, fc, msgs)
 	return nil
 }

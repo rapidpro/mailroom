@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/edganiukov/fcm"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/uuids"
@@ -80,7 +81,7 @@ func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
-func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, ticket *models.Ticket, text string, files []*File) (*models.Msg, error) {
+func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, store storage.Storage, ticket *models.Ticket, text string, files []*File) (*models.Msg, error) {
 	// look up our assets
 	oa, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
 	if err != nil {
@@ -110,7 +111,7 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
 
-	msgio.SendMessages(ctx, db, rp, msgs)
+	msgio.SendMessages(ctx, db, rp, fc, msgs)
 	return msgs[0], nil
 }
 

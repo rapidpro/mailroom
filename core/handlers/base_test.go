@@ -199,7 +199,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Msg(msg).Build()
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, oa, flow.(*models.Flow), []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
+		_, err = runner.StartFlow(ctx, db, rp, nil, oa, flow.(*models.Flow), []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
 		assert.NoError(t, err)
 
 		results := make(map[models.ContactID]modifyResult)
@@ -240,7 +240,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			assert.NoError(t, err)
 		}
 
-		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, oa, scenes)
+		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, nil, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -249,7 +249,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		tx, err = db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
+		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, nil, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()

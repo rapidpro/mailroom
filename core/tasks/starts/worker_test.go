@@ -284,7 +284,7 @@ func TestStarts(t *testing.T) {
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
 
-			_, err = runner.StartFlowBatch(ctx, db, rp, batch)
+			_, err = runner.StartFlowBatch(ctx, db, rp, nil, batch)
 			assert.NoError(t, err)
 		}
 

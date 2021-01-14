@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/go-chi/chi"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -12,7 +14,6 @@ import (
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
-	"net/http"
 )
 
 func init() {
@@ -88,7 +89,7 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 			attachments = append(attachments, attachment.URL)
 		}
 
-		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, files)
+		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.FCMClient, s.Storage, ticket, data.Text, files)
 
 	case "close-room":
 		err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)

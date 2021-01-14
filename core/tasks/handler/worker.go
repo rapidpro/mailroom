@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
@@ -86,12 +87,12 @@ func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, 
 }
 
 func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	return handleContactEvent(ctx, mr.DB, mr.RP, task)
+	return handleContactEvent(ctx, mr.DB, mr.RP, mr.FCMClient, task)
 }
 
 // handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
 // a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
+func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -168,7 +169,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling channel event: %s", event)
 			}
-			_, err = HandleChannelEvent(ctx, db, rp, models.ChannelEventType(contactEvent.Type), evt, nil)
+			_, err = HandleChannelEvent(ctx, db, rp, fc, models.ChannelEventType(contactEvent.Type), evt, nil)
 
 		case MsgEventType:
 			msg := &MsgEvent{}
@@ -176,7 +177,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
 			}
-			err = handleMsgEvent(ctx, db, rp, msg)
+			err = handleMsgEvent(ctx, db, rp, fc, msg)
 
 		case TimeoutEventType, ExpirationEventType:
 			evt := &TimedEvent{}
@@ -184,7 +185,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling timeout event: %s", event)
 			}
-			err = handleTimedEvent(ctx, db, rp, contactEvent.Type, evt)
+			err = handleTimedEvent(ctx, db, rp, fc, contactEvent.Type, evt)
 
 		default:
 			return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
@@ -223,7 +224,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 }
 
 // handleTimedEvent is called for timeout events
-func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *TimedEvent) error {
+func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, eventType string, event *TimedEvent) error {
 	start := time.Now()
 	log := logrus.WithField("event_type", eventType).WithField("contact_id", event.OrgID).WithField("session_id", event.SessionID)
 	oa, err := models.GetOrgAssets(ctx, db, event.OrgID)
@@ -304,7 +305,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return errors.Errorf("unknown event type: %s", eventType)
 	}
 
-	_, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, nil)
+	_, err = runner.ResumeFlow(ctx, db, rp, fc, oa, session, resume, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming flow for timeout")
 	}
@@ -314,7 +315,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 }
 
 // HandleChannelEvent is called for channel events
-func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
+func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
 	oa, err := models.GetOrgAssets(ctx, db, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
@@ -461,7 +462,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, fc, oa, flow, []flows.Trigger{flowTrigger}, hook, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -498,7 +499,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 }
 
 // handleMsgEvent is called when a new message arrives from a contact
-func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent) error {
+func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, event *MsgEvent) error {
 	oa, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -649,7 +650,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 			// otherwise build the trigger and start the flow directly
 			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
-			_, err = runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, hook, true)
+			_, err = runner.StartFlowForContacts(ctx, db, rp, fc, oa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -660,7 +661,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	// if there is a session, resume it
 	if session != nil && flow != nil {
 		resume := resumes.NewMsg(oa.Env(), contact, msgIn)
-		_, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, hook)
+		_, err = runner.ResumeFlow(ctx, db, rp, fc, oa, session, resume, hook)
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
 		}
@@ -668,19 +669,19 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
-	err = handleAsInbox(ctx, db, rp, oa, contact, msgIn, topupID)
+	err = handleAsInbox(ctx, db, rp, fc, oa, contact, msgIn, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
 	}
 	return nil
 }
 
-func handleAsInbox(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID) error {
+func handleAsInbox(ctx context.Context, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID) error {
 	msgEvent := events.NewMsgReceived(msg)
 	contact.SetLastSeenOn(msgEvent.CreatedOn())
 	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
 
-	err := models.HandleAndCommitEvents(ctx, db, rp, oa, contactEvents)
+	err := models.HandleAndCommitEvents(ctx, db, rp, fc, oa, contactEvents)
 	if err != nil {
 		return errors.Wrap(err, "error handling inbox message events")
 	}

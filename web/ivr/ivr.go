@@ -136,7 +136,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, w h
 	}
 
 	// try to handle this event
-	session, err := handler.HandleChannelEvent(ctx, s.DB, s.RP, models.MOCallEventType, event, conn)
+	session, err := handler.HandleChannelEvent(ctx, s.DB, s.RP, s.FCMClient, models.MOCallEventType, event, conn)
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error handling incoming call")
 
@@ -166,7 +166,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, w h
 	}
 
 	// try to handle it, this time looking for a missed call event
-	session, err = handler.HandleChannelEvent(ctx, s.DB, s.RP, models.MOMissEventType, event, nil)
+	session, err = handler.HandleChannelEvent(ctx, s.DB, s.RP, s.FCMClient, models.MOMissEventType, event, nil)
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error handling missed call")
 		return channel, conn, client.WriteErrorResponse(w, errors.Wrapf(err, "error handling missed call"))
@@ -290,14 +290,14 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, w http.Resp
 	switch request.Action {
 	case actionStart:
 		err = ivr.StartIVRFlow(
-			ctx, s.DB, s.RP, client, resumeURL,
+			ctx, s.DB, s.RP, s.FCMClient, client, resumeURL,
 			oa, channel, conn, contacts[0], urn, conn.StartID(),
 			r, w,
 		)
 
 	case actionResume:
 		err = ivr.ResumeIVRFlow(
-			ctx, s.Config, s.DB, s.RP, s.Storage, resumeURL, client,
+			ctx, s.Config, s.DB, s.RP, s.FCMClient, s.Storage, resumeURL, client,
 			oa, channel, conn, contacts[0], urn,
 			r, w,
 		)
