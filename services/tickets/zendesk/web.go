@@ -85,7 +85,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		}
 	}
 
-	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, request.Message, files)
+	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.FCMClient, s.Storage, ticket, request.Message, files)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

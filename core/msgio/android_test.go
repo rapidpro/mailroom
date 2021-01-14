@@ -69,7 +69,7 @@ func TestSyncAndroidChannels(t *testing.T) {
 	mockFCM := newMockFCMEndpoint("FCMID3")
 	defer mockFCM.Stop()
 
-	msgio.SetFCMClient(mockFCM.Client("FCMKEY123"))
+	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Android channels
 	channel1ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": ""})       // no FCM ID
@@ -83,7 +83,7 @@ func TestSyncAndroidChannels(t *testing.T) {
 	channel2 := oa.ChannelByID(channel2ID)
 	channel3 := oa.ChannelByID(channel3ID)
 
-	msgio.SyncAndroidChannels([]*models.Channel{channel1, channel2, channel3})
+	msgio.SyncAndroidChannels(fc, []*models.Channel{channel1, channel2, channel3})
 
 	// check that we try to sync the 2 channels with FCM IDs, even tho one fails
 	assert.Equal(t, 2, len(mockFCM.Messages))

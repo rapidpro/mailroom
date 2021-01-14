@@ -6,11 +6,12 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/apex/log"
+	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 )
 
 // SendMessages tries to send the given messages via Courier or Android syncing
-func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, msgs []*models.Msg) {
+func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fcm.Client, msgs []*models.Msg) {
 	// messages to be sent by courier, organized by contact
 	courierMsgs := make(map[models.ContactID][]*models.Msg, 100)
 
@@ -61,7 +62,7 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, msgs [
 
 	// if we have any android messages, trigger syncs for the unique channels
 	if len(androidChannels) > 0 {
-		SyncAndroidChannels(androidChannels)
+		SyncAndroidChannels(fc, androidChannels)
 	}
 
 	// any messages that didn't get sent should be moved back to pending (they are queued at creation to save an

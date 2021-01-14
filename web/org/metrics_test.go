@@ -25,7 +25,7 @@ func TestMetrics(t *testing.T) {
 	db.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 8, 1);`, models.Org1, adminToken)
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, nil, wg)
 	server.Start()
 
 	// wait for the server to start

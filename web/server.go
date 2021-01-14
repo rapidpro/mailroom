@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
 
+	"github.com/edganiukov/fcm"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/gomodule/redigo/redis"
@@ -61,14 +62,16 @@ func RegisterRoute(method string, pattern string, handler Handler) {
 }
 
 // NewServer creates a new web server, it will need to be started after being created
-func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage, elasticClient *elastic.Client, wg *sync.WaitGroup) *Server {
+func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage, elasticClient *elastic.Client, fc *fcm.Client, wg *sync.WaitGroup) *Server {
 	s := &Server{
 		CTX:           ctx,
 		RP:            rp,
 		DB:            db,
 		Storage:       store,
 		ElasticClient: elasticClient,
-		Config:        config,
+		FCMClient:     fc,
+
+		Config: config,
 
 		wg: wg,
 	}
@@ -216,6 +219,7 @@ type Server struct {
 	Storage       storage.Storage
 	Config        *config.Config
 	ElasticClient *elastic.Client
+	FCMClient     *fcm.Client
 
 	wg *sync.WaitGroup
 
