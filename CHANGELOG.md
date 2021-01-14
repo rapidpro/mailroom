@@ -1,3 +1,10 @@
+v6.1.10
+----------
+ * Simplify FCM client code
+ * Fix updating message status when id column is bigint
+ * Ensure courier messages are always queued for a single contact
+ * Fix not triggering FCM syncs for broadcasts and ticket reply messages
+
 v6.1.9
 ----------
  * Update to goflow v0.109.0
