@@ -110,7 +110,7 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
 
-	msgio.SendMessages(ctx, db, rp, msgs)
+	msgio.SendMessages(ctx, db, rp, nil, msgs)
 	return msgs[0], nil
 }
 

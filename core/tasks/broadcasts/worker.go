@@ -171,6 +171,6 @@ func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast 
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
-	msgio.SendMessages(ctx, db, rp, msgs)
+	msgio.SendMessages(ctx, db, rp, nil, msgs)
 	return nil
 }

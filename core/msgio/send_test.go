@@ -62,7 +62,7 @@ func TestSendMessages(t *testing.T) {
 	mockFCM := newMockFCMEndpoint("FCMID3")
 	defer mockFCM.Stop()
 
-	msgio.SetFCMClient(mockFCM.Client("FCMKEY123"))
+	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Andoid channels
 	androidChannel1ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID1"})
@@ -151,7 +151,7 @@ func TestSendMessages(t *testing.T) {
 		rc.Do("FLUSHDB")
 		mockFCM.Messages = nil
 
-		msgio.SendMessages(ctx, db, rp, msgs)
+		msgio.SendMessages(ctx, db, rp, fc, msgs)
 
 		assertCourierQueueSizes(t, rc, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 
