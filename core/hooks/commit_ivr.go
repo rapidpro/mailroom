@@ -5,7 +5,6 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 
-	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -17,7 +16,7 @@ var CommitIVRHook models.EventCommitHook = &commitIVRHook{}
 type commitIVRHook struct{}
 
 // Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
-func (h *commitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitIVRHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	msgs := make([]*models.Msg, 0, len(scenes))
 	for _, s := range scenes {
 		for _, m := range s {

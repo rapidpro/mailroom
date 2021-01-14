@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 
-	"github.com/edganiukov/fcm"
 	"github.com/nyaruka/goflow/flows"
 
 	"github.com/gomodule/redigo/redis"
@@ -129,11 +128,11 @@ func ApplyPreWriteEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *O
 
 // EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
 type EventCommitHook interface {
-	Apply(context.Context, *sqlx.Tx, *redis.Pool, *fcm.Client, *OrgAssets, map[*Scene][]interface{}) error
+	Apply(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, map[*Scene][]interface{}) error
 }
 
 // ApplyEventPreCommitHooks runs through all the pre event hooks for the passed in sessions and applies their events
-func ApplyEventPreCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, org *OrgAssets, scenes []*Scene) error {
+func ApplyEventPreCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scenes []*Scene) error {
 	// gather all our hook events together across our sessions
 	preHooks := make(map[EventCommitHook]map[*Scene][]interface{})
 	for _, s := range scenes {
@@ -149,7 +148,7 @@ func ApplyEventPreCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 
 	// now fire each of our hooks
 	for hook, args := range preHooks {
-		err := hook.Apply(ctx, tx, rp, fc, org, args)
+		err := hook.Apply(ctx, tx, rp, org, args)
 		if err != nil {
 			return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 		}
@@ -159,7 +158,7 @@ func ApplyEventPreCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 }
 
 // ApplyEventPostCommitHooks runs through all the post event hooks for the passed in sessions and applies their events
-func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, org *OrgAssets, scenes []*Scene) error {
+func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scenes []*Scene) error {
 	// gather all our hook events together across our sessions
 	postHooks := make(map[EventCommitHook]map[*Scene][]interface{})
 	for _, s := range scenes {
@@ -175,7 +174,7 @@ func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 
 	// now fire each of our hooks
 	for hook, args := range postHooks {
-		err := hook.Apply(ctx, tx, rp, fc, org, args)
+		err := hook.Apply(ctx, tx, rp, org, args)
 		if err != nil {
 			return errors.Wrapf(err, "error applying post commit hook: %v", hook)
 		}
@@ -185,7 +184,7 @@ func ApplyEventPostCommitHooks(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool,
 }
 
 // HandleAndCommitEvents takes a set of contacts and events, handles the events and applies any hooks, and commits everything
-func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool, fc *fcm.Client, oa *OrgAssets, contactEvents map[*flows.Contact][]flows.Event) error {
+func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool, oa *OrgAssets, contactEvents map[*flows.Contact][]flows.Event) error {
 	// create scenes for each contact
 	scenes := make([]*Scene, 0, len(contactEvents))
 	for contact := range contactEvents {
@@ -208,7 +207,7 @@ func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = ApplyEventPreCommitHooks(ctx, tx, rp, fc, oa, scenes)
+	err = ApplyEventPreCommitHooks(ctx, tx, rp, oa, scenes)
 	if err != nil {
 		return errors.Wrapf(err, "error applying pre commit hooks")
 	}
@@ -225,7 +224,7 @@ func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool
 	}
 
 	// apply the post commit hooks
-	err = ApplyEventPostCommitHooks(ctx, tx, rp, fc, oa, scenes)
+	err = ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
 	if err != nil {
 		return errors.Wrapf(err, "error applying post commit hooks")
 	}
@@ -238,7 +237,7 @@ func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool
 }
 
 // ApplyModifiers modifies contacts by applying modifiers and handling the resultant events
-func ApplyModifiers(ctx context.Context, db QueryerWithTx, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
+func ApplyModifiers(ctx context.Context, db QueryerWithTx, rp *redis.Pool, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
@@ -253,7 +252,7 @@ func ApplyModifiers(ctx context.Context, db QueryerWithTx, oa *OrgAssets, modifi
 		eventsByContact[contact] = events
 	}
 
-	err := HandleAndCommitEvents(ctx, db, nil, nil, oa, eventsByContact)
+	err := HandleAndCommitEvents(ctx, db, rp, oa, eventsByContact)
 	if err != nil {
 		return nil, errors.Wrap(err, "error commiting events")
 	}

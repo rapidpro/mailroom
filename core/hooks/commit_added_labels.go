@@ -6,7 +6,6 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 
-	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 )
@@ -17,7 +16,7 @@ var CommitAddedLabelsHook models.EventCommitHook = &commitAddedLabelsHook{}
 type commitAddedLabelsHook struct{}
 
 // Apply applies our input labels added, committing them in a single batch
-func (h *commitAddedLabelsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitAddedLabelsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build our list of msg label adds, we dedupe these so we never double add in the same transaction
 	seen := make(map[string]bool)
 	adds := make([]*models.MsgLabelAdd, 0, len(scenes))

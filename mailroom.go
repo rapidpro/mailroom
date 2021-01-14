@@ -10,14 +10,13 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/storage"
-	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/web"
 
-	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/librato"
 	"github.com/olivere/elastic"
 	"github.com/sirupsen/logrus"
 )
@@ -48,7 +47,6 @@ type Mailroom struct {
 	DB            *sqlx.DB
 	RP            *redis.Pool
 	ElasticClient *elastic.Client
-	FCMClient     *fcm.Client
 	Storage       storage.Storage
 
 	Quit      chan bool
@@ -194,14 +192,6 @@ func (mr *Mailroom) Start() error {
 		log.Info("elastic ok")
 	}
 
-	// initialize our FCM client
-	mr.FCMClient, err = fcm.NewClient(mr.Config.FCMKey)
-	if err != nil {
-		log.WithError(err).Error("unable to create FCM client, check configuration")
-	} else {
-		log.Info("firebase cloud messaging ok")
-	}
-
 	for _, initFunc := range initFunctions {
 		initFunc(mr)
 	}
@@ -218,7 +208,7 @@ func (mr *Mailroom) Start() error {
 	mr.handlerForeman.Start()
 
 	// start our web server
-	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.Storage, mr.ElasticClient, mr.FCMClient, mr.WaitGroup)
+	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.Storage, mr.ElasticClient, mr.WaitGroup)
 	mr.webserver.Start()
 
 	logrus.Info("mailroom started")

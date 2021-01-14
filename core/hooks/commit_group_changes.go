@@ -5,7 +5,6 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 
-	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -17,7 +16,7 @@ var CommitGroupChangesHook models.EventCommitHook = &commitGroupChangesHook{}
 type commitGroupChangesHook struct{}
 
 // Apply squashes and adds or removes all our contact groups
-func (h *commitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitGroupChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of all adds and removes
 	adds := make([]*models.GroupAdd, 0, len(scenes))
 	removes := make([]*models.GroupRemove, 0, len(scenes))

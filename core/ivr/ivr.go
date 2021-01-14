@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/edganiukov/fcm"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/urns"
@@ -297,7 +296,7 @@ func WriteErrorResponse(ctx context.Context, db *sqlx.DB, client Client, conn *m
 
 // StartIVRFlow takes care of starting the flow in the passed in start for the passed in contact and URN
 func StartIVRFlow(
-	ctx context.Context, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, client Client, resumeURL string, oa *models.OrgAssets,
+	ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, resumeURL string, oa *models.OrgAssets,
 	channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN, startID models.StartID,
 	r *http.Request, w http.ResponseWriter) error {
 
@@ -371,7 +370,7 @@ func StartIVRFlow(
 	}
 
 	// start our flow
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, fc, oa, flow, []flows.Trigger{trigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, hook, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow")
 	}
@@ -391,7 +390,7 @@ func StartIVRFlow(
 
 // ResumeIVRFlow takes care of resuming the flow in the passed in start for the passed in contact and URN
 func ResumeIVRFlow(
-	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, fc *fcm.Client, store storage.Storage,
+	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage,
 	resumeURL string, client Client,
 	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
@@ -524,7 +523,7 @@ func ResumeIVRFlow(
 		}
 	}
 
-	session, err = runner.ResumeFlow(ctx, db, rp, fc, oa, session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}

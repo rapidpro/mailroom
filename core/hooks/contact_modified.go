@@ -5,7 +5,6 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 
-	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -17,7 +16,7 @@ var ContactModifiedHook models.EventCommitHook = &contactModifiedHook{}
 type contactModifiedHook struct{}
 
 // Apply squashes and updates modified_on on all the contacts passed in
-func (h *contactModifiedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *contactModifiedHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// our lists of contact ids
 	contactIDs := make([]models.ContactID, 0, len(scenes))
 

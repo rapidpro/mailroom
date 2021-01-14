@@ -133,7 +133,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for session write")
 	}
-	sessions, err := models.WriteSessions(ctx, tx, s.RP, nil, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
+	sessions, err := models.WriteSessions(ctx, tx, s.RP, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
 	if err == nil && len(sessions) == 0 {
 		err = errors.Errorf("no sessions written")
 	}
@@ -152,7 +152,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// write our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, nil, oa, []*models.Scene{sessions[0].Scene()})
+	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, oa, []*models.Scene{sessions[0].Scene()})
 	if err != nil {
 		tx.Rollback()
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying post commit hooks")

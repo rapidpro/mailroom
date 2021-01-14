@@ -6,7 +6,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 
-	"github.com/edganiukov/fcm"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 )
@@ -17,7 +16,7 @@ var SendMessagesHook models.EventCommitHook = &sendMessagesHook{}
 type sendMessagesHook struct{}
 
 // Apply sends all non-android messages to courier
-func (h *sendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, fc *fcm.Client, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *sendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	msgs := make([]*models.Msg, 0, 1)
 
 	// for each scene gather all our messages
@@ -36,6 +35,6 @@ func (h *sendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 		msgs = append(msgs, sceneMsgs...)
 	}
 
-	msgio.SendMessages(ctx, tx, rp, fc, msgs)
+	msgio.SendMessages(ctx, tx, rp, msgs)
 	return nil
 }

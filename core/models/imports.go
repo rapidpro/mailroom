@@ -113,7 +113,7 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID O
 	}
 
 	// and apply in bulk
-	_, err = ApplyModifiers(ctx, db, oa, modifiersByContact)
+	_, err = ApplyModifiers(ctx, db, nil, oa, modifiersByContact)
 	if err != nil {
 		return errors.Wrap(err, "error applying modifiers")
 	}

@@ -39,7 +39,7 @@ func TestSearch(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, client, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, client, wg)
 	server.Start()
 
 	// give our server time to start
