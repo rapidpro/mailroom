@@ -238,7 +238,7 @@ func HandleAndCommitEvents(ctx context.Context, db QueryerWithTx, rp *redis.Pool
 }
 
 // ApplyModifiers modifies contacts by applying modifiers and handling the resultant events
-func ApplyModifiers(ctx context.Context, db QueryerWithTx, rp *redis.Pool, fc *fcm.Client, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
+func ApplyModifiers(ctx context.Context, db QueryerWithTx, oa *OrgAssets, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
@@ -253,7 +253,7 @@ func ApplyModifiers(ctx context.Context, db QueryerWithTx, rp *redis.Pool, fc *f
 		eventsByContact[contact] = events
 	}
 
-	err := HandleAndCommitEvents(ctx, db, rp, fc, oa, eventsByContact)
+	err := HandleAndCommitEvents(ctx, db, nil, nil, oa, eventsByContact)
 	if err != nil {
 		return nil, errors.Wrap(err, "error commiting events")
 	}
