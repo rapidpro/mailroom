@@ -35,6 +35,6 @@ func (h *sendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 		msgs = append(msgs, sceneMsgs...)
 	}
 
-	msgio.SendMessages(ctx, tx, rp, msgs)
+	msgio.SendMessages(ctx, tx, rp, nil, msgs)
 	return nil
 }
