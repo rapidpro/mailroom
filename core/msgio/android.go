@@ -1,7 +1,6 @@
 package msgio
 
 import (
-	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom/config"
@@ -12,27 +11,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var clientInit sync.Once
-var fcmClient *fcm.Client
-
-func init() {
-	clientInit.Do(func() {
-		if config.Mailroom.FCMKey == "" {
-			logrus.Error("fcm not configured, no syncing of android channels")
-			return
-		}
-
-		var err error
-		fcmClient, err = fcm.NewClient(config.Mailroom.FCMKey)
-		if err != nil {
-			panic(errors.Wrap(err, "unable to create FCM client"))
-		}
-	})
-}
-
 // SyncAndroidChannels tries to trigger syncs of the given Android channels via FCM
-func SyncAndroidChannels(channels []*models.Channel) {
-	if fcmClient == nil {
+func SyncAndroidChannels(fc *fcm.Client, channels []*models.Channel) {
+	if fc == nil {
 		logrus.Warn("skipping Android sync as instance has not configured FCM")
 		return
 	}
@@ -52,7 +33,7 @@ func SyncAndroidChannels(channels []*models.Channel) {
 		}
 
 		start := time.Now()
-		_, err := fcmClient.Send(sync)
+		_, err := fc.Send(sync)
 
 		if err != nil {
 			// log failures but continue, relayer will sync on its own
@@ -63,7 +44,14 @@ func SyncAndroidChannels(channels []*models.Channel) {
 	}
 }
 
-// SetFCMClient sets the FCM client. Used for testing.
-func SetFCMClient(client *fcm.Client) {
-	fcmClient = client
+// CreateFCMClient creates an FCM client based on the configured FCM API key
+func CreateFCMClient() *fcm.Client {
+	if config.Mailroom.FCMKey == "" {
+		return nil
+	}
+	client, err := fcm.NewClient(config.Mailroom.FCMKey)
+	if err != nil {
+		panic(errors.Wrap(err, "unable to create FCM client"))
+	}
+	return client
 }
