@@ -1,3 +1,7 @@
+v6.1.11
+----------
+ * Update to latest goflow v0.109.4
+
 v6.1.10
 ----------
  * Simplify FCM client code
