@@ -1018,9 +1018,9 @@
                 },
                 "events": [
                     {
+                        "type": "error",
                         "created_on": "2018-07-06T12:30:00.123456789Z",
-                        "text": "'xyz:12345' is not valid URN",
-                        "type": "error"
+                        "text": "'xyz:12345' is not valid URN"
                     }
                 ]
             }

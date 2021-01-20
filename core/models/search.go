@@ -11,7 +11,7 @@ import (
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/contactql/es"
 
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -77,7 +77,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
 
-	s := client.Search("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	s := client.Search("contacts").TrackTotalHits(true).Routing(strconv.FormatInt(int64(org.OrgID()), 10))
 	s = s.Size(pageSize).From(offset).Query(eq).SortBy(fieldSort).FetchSource(false)
 
 	results, err := s.Do(ctx)
@@ -110,7 +110,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 		"total_count": results.Hits.TotalHits,
 	}).Debug("paged contact query complete")
 
-	return parsed, ids, results.Hits.TotalHits, nil
+	return parsed, ids, results.Hits.TotalHits.Value, nil
 }
 
 // ContactIDsForQuery returns the ids of all the contacts that match the passed in query

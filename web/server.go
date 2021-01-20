@@ -17,7 +17,7 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
