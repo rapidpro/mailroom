@@ -2,6 +2,7 @@ package rocketchat
 
 import (
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 const (
@@ -78,6 +80,17 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 			Phone:       phone,
 		},
 		TicketID: string(ticketUUID),
+	}
+	room.SessionStart = session.Runs()[0].CreatedOn().Add(-time.Minute).Format(time.RFC3339)
+
+	// to fully support the RocketChat ticketer, look up extra fields from ticket body for now
+	extra := &struct {
+		Department   string            `json:"department"`
+		CustomFields map[string]string `json:"customFields"`
+	}{}
+	if err := jsonx.Unmarshal([]byte(body), extra); err == nil {
+		room.Visitor.Department = extra.Department
+		room.Visitor.CustomFields = extra.CustomFields
 	}
 
 	roomID, trace, err := s.client.CreateRoom(room)
