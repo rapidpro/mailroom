@@ -1,3 +1,7 @@
+v6.2.0
+----------
+ * Update to Elastic v7 (backwards incompatible change)
+
 v6.1.13
 ----------
  * Update to latest goflow
