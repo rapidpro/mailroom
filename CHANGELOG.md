@@ -1,3 +1,7 @@
+v6.1.14
+----------
+ * Support ElasticSearch 7.2 (backwards incompatible to Elastic 6.*)
+
 v6.1.13
 ----------
  * Update to latest goflow
