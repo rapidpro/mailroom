@@ -19,7 +19,7 @@ func TestCreateRoom(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		baseURL + "/room": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{ "error": "There's no agents online" }`),
+			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a department for name: kitchen" }`),
 			httpx.NewMockResponse(201, nil, `{ "id": "uiF7ybjsv7PSJGSw6" }`),
 		},
 	}))
@@ -29,18 +29,20 @@ func TestCreateRoom(t *testing.T) {
 		Visitor: rocketchat.Visitor{
 			Token:       "1234",
 			ContactUUID: "88ff1e41-c1f8-4637-af8e-d56acbde9171",
+			Department:  "kitchen",
 			Name:        "Bob",
 			Email:       "bob@acme.com",
 			Phone:       "+16055741111",
 		},
 		TicketID:     "88ff1e41-c1f8-4637-af8e-d56acbde9171",
+		SessionStart: "2020-08-03T13:42:53.388037-04:00",
 	}
 
 	_, _, err := client.CreateRoom(room)
 	assert.EqualError(t, err, "unable to connect to server")
 
 	_, _, err = client.CreateRoom(room)
-	assert.EqualError(t, err, "There's no agents online")
+	assert.EqualError(t, err, "Could not find a department for name: kitchen")
 
 	id, trace, err := client.CreateRoom(room)
 	assert.NoError(t, err)
