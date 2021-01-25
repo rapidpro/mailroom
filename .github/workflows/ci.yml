@@ -2,12 +2,13 @@ name: CI
 on: [push, pull_request]
 env:
   go-version: '1.14.x'
+  postgis-version: '2.5'
 jobs:
   test:
     name: Test
     strategy:
       matrix:
-        pg-version: ['10', '11']
+        pg-version: ['11', '12']
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -19,18 +20,22 @@ jobs:
         redis version: '5'
 
     - name: Install PostgreSQL
-      uses: nyaruka/postgis-action@v1.0.0
+      uses: nyaruka/postgis-action@v2
       with:
         postgresql version: ${{ matrix.pg-version }}
+        postgis version: ${{ env.postgis-version }}
+        postgresql password: temba
 
     - name: Install Linux packages
       run: sudo apt install -y --no-install-recommends postgresql-client
 
     - name: Initialize database
+      # we create our test database with a different user so that we can drop everything owned by this user between tests
       run: |
-        psql -h localhost -U postgres -c "CREATE USER mailroom_test PASSWORD 'temba';"
-        psql -h localhost -U postgres -c "ALTER ROLE mailroom_test WITH SUPERUSER;"
-        psql -h localhost -U postgres -c "CREATE DATABASE mailroom_test;"
+        export PGPASSWORD=temba
+        psql -h localhost -U postgres --no-password -c "CREATE USER mailroom_test PASSWORD 'temba';"
+        psql -h localhost -U postgres --no-password -c "ALTER ROLE mailroom_test WITH SUPERUSER;"
+        psql -h localhost -U postgres --no-password -c "CREATE DATABASE mailroom_test;"
 
     - name: Install Go
       uses: actions/setup-go@v1
@@ -38,7 +43,9 @@ jobs:
         go-version: ${{ env.go-version }}
 
     - name: Run tests
-      run: go test -p=1 -coverprofile=coverage.text -covermode=atomic ./...
+      run: |
+        export PGPASSWORD=temba
+        go test -p=1 -coverprofile=coverage.text -covermode=atomic ./...
 
     - name: Upload coverage
       if: success()
