@@ -19,7 +19,7 @@ jobs:
         redis version: '5'
 
     - name: Install PostgreSQL
-      uses: nyaruka/postgis-action@v1
+      uses: nyaruka/postgis-action@v1.0.0
       with:
         postgresql version: ${{ matrix.pg-version }}
 
