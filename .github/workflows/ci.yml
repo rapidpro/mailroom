@@ -7,7 +7,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        pg-version: ['11-2.5', '12-2.5']
+        pg-version: ['10', '11']
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -19,7 +19,7 @@ jobs:
         redis version: '5'
 
     - name: Install PostgreSQL
-      uses: nyaruka/postgis-action@master
+      uses: nyaruka/postgis-action@v1
       with:
         postgresql version: ${{ matrix.pg-version }}
 
