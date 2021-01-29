@@ -74,7 +74,7 @@ var ErrNotFound = errors.New("not found")
 var orgCache = cache.New(time.Minute*15, time.Minute*15)
 
 const cacheTimeout = time.Second * 5
-const locationCacheTimeout = time.Hour
+const locationCacheTimeout = time.Second * 60
 
 // FlushCache clears our entire org cache
 func FlushCache() {
