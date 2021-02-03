@@ -1,3 +1,8 @@
+v6.1.15
+----------
+ * Update phonenumbers lib
+ * Decrease locations cache timeout to 1 minute
+
 v6.1.14
 ----------
  * Support ElasticSearch 7.2 (backwards incompatible to Elastic 6.*)
