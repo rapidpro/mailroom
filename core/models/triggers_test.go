@@ -56,6 +56,7 @@ func TestChannelTriggers(t *testing.T) {
 		{"", TwilioChannelID, NilTriggerID},
 		{"foo", TwilioChannelID, NilTriggerID},
 		{"foo", TwitterChannelID, fooID},
+		{"FOO", TwitterChannelID, fooID},
 		{"bar", TwilioChannelID, barID},
 		{"bar", TwitterChannelID, barID},
 		{"zap", TwilioChannelID, NilTriggerID},
@@ -106,6 +107,7 @@ func TestTriggers(t *testing.T) {
 		TriggerID TriggerID
 	}{
 		{"join", cathy, joinID},
+		{"JOIN", cathy, joinID},
 		{"join this", cathy, joinID},
 		{"resist", george, resistID},
 		{"resist", cathy, farmersID},
