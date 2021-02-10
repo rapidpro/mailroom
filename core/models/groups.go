@@ -312,7 +312,10 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 	// add our contacts in batches of 500
 	batch := make([]ContactID, 0, 500)
 	for _, id := range contactIDs {
-		batch = append(batch, id)
+		exists, _ := CheckContact(ctx, db, org, id)
+		if exists == true {
+			batch = append(batch, id)
+		}
 
 		if len(batch) == 500 {
 			err := addBatch(batch)
@@ -396,8 +399,6 @@ func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, 
 	if err != nil {
 		return 0, errors.Wrapf(err, "error removing contacts from group: %d", groupID)
 	}
-
-	// TODO Here we need to handle if the contact is still on DB before adding it on contact_groups relationship
 
 	// then add them all
 	err = AddContactsToGroupAndCampaigns(ctx, db, org, groupID, adds)

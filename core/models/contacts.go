@@ -233,6 +233,23 @@ func LoadContact(ctx context.Context, db Queryer, org *OrgAssets, id ContactID) 
 	return contacts[0], nil
 }
 
+// CheckContact checks if a contact really exists on DB
+func CheckContact(ctx context.Context, db Queryer, org *OrgAssets, id ContactID) (bool, error) {
+	result, err := db.ExecContext(ctx, checkContactSQL, id, org.orgID)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := result.RowsAffected()
+	if rows == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+const checkContactSQL = `SELECT id FROM public.contacts_contact WHERE id = $1 AND org_id = $2;`
+
 // LoadContacts loads a set of contacts for the passed in ids. Note that the order of the returned contacts
 // won't necessarily match the order of the ids.
 func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []ContactID) ([]*Contact, error) {
