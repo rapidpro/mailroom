@@ -128,18 +128,6 @@ IN (
 );
 `
 
-const cleanContactGroupRelationshipSQL = `DELETE FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1;`
-
-// RemoveRestOfTheContactsFromGroup removes the rest of the contacts from the passed in group, making sure that all
-// contacts were removed from this group
-func RemoveRestOfTheContactsFromGroup(ctx context.Context, db *sqlx.DB, groupID GroupID) error {
-	_, err := db.ExecContext(ctx, cleanContactGroupRelationshipSQL, groupID)
-	if err != nil {
-		return errors.Wrapf(err, "error cleaning contact group relationship: %d", groupID)
-	}
-	return nil
-}
-
 // AddContactsToGroups fires a bulk SQL query to remove all the contacts in the passed in groups
 func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) error {
 	if len(adds) == 0 {
@@ -409,13 +397,7 @@ func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, 
 		return 0, errors.Wrapf(err, "error removing contacts from group: %d", groupID)
 	}
 
-	restIds, err := ContactIDsForGroupIDs(ctx, db, []GroupID{groupID})
-	if len(restIds) > 0 {
-		err = RemoveRestOfTheContactsFromGroup(ctx, db, groupID)
-		if err != nil {
-			return 0, errors.Wrapf(err, "error cleaning the contacts group: %d", groupID)
-		}
-	}
+	// TODO Here we need to handle if the contact is still on DB before adding it on contact_groups relationship
 
 	// then add them all
 	err = AddContactsToGroupAndCampaigns(ctx, db, org, groupID, adds)
