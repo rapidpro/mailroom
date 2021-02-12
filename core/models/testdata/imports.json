@@ -15,8 +15,8 @@
                 ]
             }
         ],
-        "num_created": 0,
-        "num_updated": 2,
+        "num_created": 2,
+        "num_updated": 0,
         "num_errored": 0,
         "errors": [],
         "contacts": [
@@ -61,8 +61,8 @@
                 ]
             }
         ],
-        "num_created": 0,
-        "num_updated": 1,
+        "num_created": 1,
+        "num_updated": 0,
         "num_errored": 0,
         "errors": [],
         "contacts": [
@@ -476,8 +476,8 @@
         "num_errored": 1,
         "errors": [
             {
-                "message": "Unable to find or create contact with URNs xyz:1234567",
-                "record": 1
+                "record": 1,
+                "message": "Unable to find or create contact with URNs xyz:1234567"
             }
         ],
         "contacts": [
