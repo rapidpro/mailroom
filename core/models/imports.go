@@ -141,6 +141,12 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 		spec := imp.spec
 
 		uuid := spec.UUID
+
+		if len(spec.URNs) == 0 && !(oa.Org().RedactionPolicy() == "urns" || uuid != "") {
+			addError("Missing any valid URNs; at least one should be provided or a Contact UUID")
+			continue
+		}
+
 		if uuid != "" {
 			imp.contact = contactsByUUID[uuid]
 			if imp.contact == nil {
@@ -154,7 +160,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			}
 
 		} else {
-			imp.contact, imp.flowContact, err = GetOrCreateContact(ctx, db, oa, spec.URNs, NilChannelID)
+			imp.contact, imp.flowContact, imp.created, err = GetOrCreateContact(ctx, db, oa, spec.URNs, NilChannelID)
 			if err != nil {
 				urnStrs := make([]string, len(spec.URNs))
 				for i := range spec.URNs {
