@@ -1,4 +1,4 @@
-package internal_test
+package intern_test
 
 import (
 	"net/http"
@@ -12,7 +12,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/services/tickets/internal"
+	intern "github.com/nyaruka/mailroom/services/tickets/intern"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "internal"))
 
-	svc, err := internal.NewService(
+	svc, err := intern.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -70,7 +70,7 @@ func TestCloseAndReopen(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
-	svc, err := internal.NewService(http.DefaultClient, nil, ticketer, nil)
+	svc, err := intern.NewService(http.DefaultClient, nil, ticketer, nil)
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
