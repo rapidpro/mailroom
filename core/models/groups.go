@@ -277,6 +277,13 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 			return errors.Wrapf(err, "error adding contacts to group: %d", groupID)
 		}
 
+		// now updating our contacts to be able to search them on the dynamic contact group
+		err = UpdateContactModifiedOn(ctx, db, batch)
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error updating modified_on on adding contacts to group: %d", groupID)
+		}
+
 		// now load our contacts and add update their campaign events
 		contacts, err := LoadContacts(ctx, tx, org, batch)
 		if err != nil {
