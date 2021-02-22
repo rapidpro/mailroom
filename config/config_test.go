@@ -16,11 +16,14 @@ func TestParseDisallowedNetworks(t *testing.T) {
 	privateNetwork2 := &net.IPNet{IP: net.IPv4(172, 16, 0, 0).To4(), Mask: net.CIDRMask(12, 32)}
 	privateNetwork3 := &net.IPNet{IP: net.IPv4(192, 168, 0, 0).To4(), Mask: net.CIDRMask(16, 32)}
 
+	linkLocalIPv4 := &net.IPNet{IP: net.IPv4(169, 254, 0, 0).To4(), Mask: net.CIDRMask(16, 32)}
+	_, linkLocalIPv6, _ := net.ParseCIDR("fe80::/10")
+
 	// test with config defaults
 	ips, ipNets, err := cfg.ParseDisallowedNetworks()
 	assert.NoError(t, err)
 	assert.Equal(t, []net.IP{net.IPv4(127, 0, 0, 1), net.ParseIP(`::1`)}, ips)
-	assert.Equal(t, []*net.IPNet{privateNetwork1, privateNetwork2, privateNetwork3}, ipNets)
+	assert.Equal(t, []*net.IPNet{privateNetwork1, privateNetwork2, privateNetwork3, linkLocalIPv4, linkLocalIPv6}, ipNets)
 
 	// test with empty
 	cfg.DisallowedNetworks = ``

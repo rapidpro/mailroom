@@ -84,7 +84,7 @@ func NewMailroomConfig() *Config {
 		WebhooksInitialBackoff: 5000,
 		WebhooksBackoffJitter:  0.5,
 		SMTPServer:             "",
-		DisallowedNetworks:     `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`,
+		DisallowedNetworks:     `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fe80::/10`,
 		MaxStepsPerSprint:      100,
 		MaxValueLength:         640,
 

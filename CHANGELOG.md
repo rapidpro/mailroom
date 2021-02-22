@@ -1,3 +1,12 @@
+v6.1.17
+----------
+ * Should match referral trigger with case insensitive
+
+v6.1.16
+----------
+ * Update to latest goflow
+ * Add link local ips to default disallowed networks config
+
 v6.1.15
 ----------
  * Update phonenumbers lib
