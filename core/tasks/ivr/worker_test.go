@@ -10,7 +10,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
@@ -88,7 +87,7 @@ func (c *MockClient) HangupCall(externalID string) (*httpx.Trace, error) {
 	return nil, nil
 }
 
-func (c *MockClient) WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {
+func (c *MockClient) WriteSessionResponse(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {
 	return nil
 }
 
@@ -100,8 +99,8 @@ func (c *MockClient) WriteEmptyResponse(w http.ResponseWriter, msg string) error
 	return nil
 }
 
-func (c *MockClient) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
-	return "", ivr.NilAttachment, nil
+func (c *MockClient) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
+	return nil, nil
 }
 
 func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
@@ -109,6 +108,10 @@ func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus,
 }
 
 func (c *MockClient) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+	return nil, nil
+}
+
+func (c *MockClient) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 
