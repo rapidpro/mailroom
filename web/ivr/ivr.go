@@ -364,6 +364,8 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, w http.Re
 		return channel, nil, writeClientError(w, errors.Wrapf(err, "error while preprocessing status"))
 	}
 	if len(body) > 0 {
+		contentType := http.DetectContentType(body)
+		w.Header().Set("Content-Type", contentType)
 		_, err := w.Write(body)
 		return channel, nil, err
 	}
