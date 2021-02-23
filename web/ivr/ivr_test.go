@@ -109,7 +109,7 @@ func TestTwilioIVR(t *testing.T) {
 		ConnectionID models.ConnectionID
 		Form         url.Values
 		StatusCode   int
-		Contains     string
+		Contains     []string
 	}{
 		{
 			Action:       "start",
@@ -117,7 +117,7 @@ func TestTwilioIVR(t *testing.T) {
 			ConnectionID: models.ConnectionID(1),
 			Form:         nil,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two.  This flow was triggered by Cathy",
+			Contains:     []string{"Hello there. Please enter one or two.  This flow was triggered by Cathy"},
 		},
 		{
 			Action:       "resume",
@@ -129,7 +129,7 @@ func TestTwilioIVR(t *testing.T) {
 				"timeout":    []string{"true"},
 			},
 			StatusCode: 200,
-			Contains:   "Sorry, that is not one or two, try again.",
+			Contains:   []string{"Sorry, that is not one or two, try again."},
 		},
 		{
 			Action:       "resume",
@@ -141,7 +141,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"1"},
 			},
 			StatusCode: 200,
-			Contains:   "Great! You said One.",
+			Contains:   []string{"Great! You said One."},
 		},
 		{
 			Action:       "resume",
@@ -153,7 +153,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"101"},
 			},
 			StatusCode: 200,
-			Contains:   "too big",
+			Contains:   []string{"too big"},
 		},
 		{
 			Action:       "resume",
@@ -165,7 +165,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"56"},
 			},
 			StatusCode: 200,
-			Contains:   "You picked the number 56",
+			Contains:   []string{"You picked the number 56"},
 		},
 		{
 			Action:       "resume",
@@ -177,7 +177,26 @@ func TestTwilioIVR(t *testing.T) {
 				// no recording as we don't have S3 to back us up, flow just moves forward
 			},
 			StatusCode: 200,
-			Contains:   "I hope hearing that makes you feel better",
+			Contains: []string{
+				"I hope hearing that makes you feel better",
+				"<Dial ",
+				"2065551212",
+			},
+		},
+		{
+			Action:       "resume",
+			ChannelUUID:  models.TwilioChannelUUID,
+			ConnectionID: models.ConnectionID(1),
+			Form: url.Values{
+				"CallStatus":     []string{"in-progress"},
+				"DialCallStatus": []string{"answered"},
+				"wait_type":      []string{"dial"},
+			},
+			StatusCode: 200,
+			Contains: []string{
+				"Great, they answered.",
+				"<Hangup",
+			},
 		},
 		{
 			Action:       "status",
@@ -189,7 +208,7 @@ func TestTwilioIVR(t *testing.T) {
 				"CallDuration": []string{"50"},
 			},
 			StatusCode: 200,
-			Contains:   "status updated: D",
+			Contains:   []string{"status updated: D"},
 		},
 		{
 			Action:       "start",
@@ -197,7 +216,7 @@ func TestTwilioIVR(t *testing.T) {
 			ConnectionID: models.ConnectionID(2),
 			Form:         nil,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two.",
+			Contains:     []string{"Hello there. Please enter one or two."},
 		},
 		{
 			Action:       "resume",
@@ -209,7 +228,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Digits":     []string{"56"},
 			},
 			StatusCode: 200,
-			Contains:   "<!--call completed-->",
+			Contains:   []string{"<!--call completed-->"},
 		},
 		{
 			Action:       "incoming",
@@ -221,7 +240,7 @@ func TestTwilioIVR(t *testing.T) {
 				"Caller":     []string{"+12065551212"},
 			},
 			StatusCode: 200,
-			Contains:   "missed call handled",
+			Contains:   []string{"missed call handled"},
 		},
 		{
 			Action:       "status",
@@ -233,7 +252,7 @@ func TestTwilioIVR(t *testing.T) {
 				"CallDuration": []string{"50"},
 			},
 			StatusCode: 200,
-			Contains:   "<!--status updated: F-->",
+			Contains:   []string{"<!--status updated: F-->"},
 		},
 	}
 
@@ -257,7 +276,10 @@ func TestTwilioIVR(t *testing.T) {
 		assert.Equal(t, tc.StatusCode, resp.StatusCode)
 
 		body, _ := ioutil.ReadAll(resp.Body)
-		assert.Containsf(t, string(body), tc.Contains, "%d does not contain expected body", i)
+
+		for _, needle := range tc.Contains {
+			assert.Containsf(t, string(body), needle, "%d does not contain expected body", i)
+		}
 	}
 
 	// check our final state of sessions, runs, msgs, connections
@@ -288,7 +310,7 @@ func TestTwilioIVR(t *testing.T) {
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
 		[]interface{}{models.CathyID},
-		7,
+		8,
 	)
 
 	testsuite.AssertQueryCount(t, db,
@@ -306,7 +328,7 @@ func TestTwilioIVR(t *testing.T) {
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`,
 		[]interface{}{},
-		8,
+		9,
 	)
 
 	testsuite.AssertQueryCount(t, db,

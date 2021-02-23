@@ -41,7 +41,7 @@ import (
 var BaseURL = `https://api.nexmo.com/v1/calls`
 
 // IgnoreSignatures sets whether we ignore signatures (for unit tests)
-var IgnoreSignatures = true
+var IgnoreSignatures = false
 
 var callStatusMap = map[string]flows.DialStatus{
 	"cancelled": flows.DialStatusFailed,
@@ -490,7 +490,7 @@ func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 		case "gather":
 			// this could be a timeout, in which case we return nothing at all
 			if input.TimedOut {
-				return ivr.TimeoutResume{}, nil
+				return ivr.InputResume{}, nil
 			}
 
 			return ivr.InputResume{Input: input.DTMF}, nil

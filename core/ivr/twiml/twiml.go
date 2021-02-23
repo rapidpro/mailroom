@@ -36,7 +36,7 @@ import (
 var BaseURL = `https://api.twilio.com`
 
 // IgnoreSignatures controls whether we ignore signatures (public for testing overriding)
-var IgnoreSignatures = true
+var IgnoreSignatures = false
 
 var dialStatusMap = map[string]flows.DialStatus{
 	"completed": flows.DialStatusAnswered,
@@ -242,13 +242,13 @@ func (c *client) HangupCall(callID string) (*httpx.Trace, error) {
 
 // InputForRequest returns the input for the passed in request, if any
 func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
-	// this could be a timeout, in which case we return nothing at all
+	// this could be a timeout, in which case we return an empty input
 	timeout := r.Form.Get("timeout")
 	if timeout == "true" {
-		return ivr.TimeoutResume{}, nil
+		return ivr.InputResume{}, nil
 	}
 
-	// this could be empty, in which case we return nothing at all
+	// this could be empty, in which case we return an empty input
 	empty := r.Form.Get("empty")
 	if empty == "true" {
 		return ivr.InputResume{}, nil
@@ -259,12 +259,14 @@ func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	switch waitType {
 	case "gather":
 		return ivr.InputResume{Input: r.Form.Get("Digits")}, nil
+
 	case "record":
 		url := r.Form.Get("RecordingUrl")
 		if url == "" {
 			return ivr.InputResume{}, nil
 		}
 		return ivr.InputResume{Attachment: utils.Attachment("audio/mp3:" + url + ".mp3")}, nil
+
 	case "dial":
 		twStatus := r.Form.Get("DialCallStatus")
 		status := dialStatusMap[twStatus]

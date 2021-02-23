@@ -469,6 +469,9 @@ func ResumeIVRFlow(
 
 	case DialResume:
 		resume, clientErr, err = buildDialResume(oa, contact, res)
+
+	default:
+		return fmt.Errorf("unknown resume type: %vvv", ivrResume)
 	}
 
 	if err != nil {
@@ -478,7 +481,7 @@ func ResumeIVRFlow(
 		return client.WriteErrorResponse(w, clientErr)
 	}
 	if resume == nil {
-		return client.WriteErrorResponse(w, fmt.Errorf("call completed"))
+		return client.WriteErrorResponse(w, fmt.Errorf("no resume found, ending call"))
 	}
 
 	session, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, hook)
