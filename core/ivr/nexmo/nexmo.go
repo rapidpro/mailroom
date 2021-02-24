@@ -37,8 +37,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// BaseURL for Nexmo calls, public so our main IVR test can change it
-var BaseURL = `https://api.nexmo.com/v1/calls`
+// CallURL is the API endpoint for Nexmo calls, public so our main IVR test can change it
+var CallURL = `https://api.nexmo.com/v1/calls`
 
 // IgnoreSignatures sets whether we ignore signatures (for unit tests)
 var IgnoreSignatures = false
@@ -77,7 +77,7 @@ var indentMarshal = true
 type client struct {
 	httpClient *http.Client
 	channel    *models.Channel
-	baseURL    string
+	callURL    string
 	appID      string
 	privateKey *rsa.PrivateKey
 }
@@ -102,7 +102,7 @@ func NewClientFromChannel(httpClient *http.Client, channel *models.Channel) (ivr
 	return &client{
 		httpClient: httpClient,
 		channel:    channel,
-		baseURL:    BaseURL,
+		callURL:    CallURL,
 		appID:      appID,
 		privateKey: privateKey,
 	}, nil
@@ -185,8 +185,12 @@ func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Po
 		return nil, nil
 	}
 
-	// check the type of this status, we only care about preprocessing "transfer" statuses
-	nxType, _ := jsonparser.GetString(body, "type")
+	// check the type of this status, we don't care about preprocessing "transfer" statuses
+	nxType, err := jsonparser.GetString(body, "type")
+	if err == jsonparser.MalformedJsonError {
+		return nil, errors.Wrapf(err, "invalid json body: %s", body)
+	}
+
 	if nxType == "transfer" {
 		return c.MakeEmptyResponseBody(fmt.Sprintf("ignoring conversation callback")), nil
 	}
@@ -209,6 +213,8 @@ func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Po
 	redisKey := fmt.Sprintf("dial_%s", legUUID)
 	dialContinue, err := redis.String(rc.Do("get", redisKey))
 
+	logrus.WithField("redisKey", redisKey).WithField("redisValue", dialContinue).WithError(err).WithField("status", nxStatus).Debug("looking up dial continue")
+
 	// no associated call, move on
 	if err == redis.ErrNil {
 		return nil, nil
@@ -225,6 +231,7 @@ func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Po
 	// we found an associated call, if the status is complete, have it continue, we call out to
 	// redis and hand it our flow to resume on to get the next NCCO
 	if nxStatus == "completed" {
+		logrus.Debug("found completed call, trying to finish with call ID: ", callUUID)
 		statusKey := fmt.Sprintf("dial_status_%s", callUUID)
 		status, err := redis.String(rc.Do("get", statusKey))
 		if err == redis.ErrNil {
@@ -248,14 +255,14 @@ func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Po
 				"url":  []string{resumeURL},
 			},
 		}
-		trace, err := c.makeRequest(http.MethodPut, fmt.Sprintf("https://api.nexmo.com/v1/calls/%s", callUUID), nxBody)
+		trace, err := c.makeRequest(http.MethodPut, c.callURL+"/"+callUUID, nxBody)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reconnecting flow for call: %s", callUUID)
 		}
 
 		// nexmo return 204 on successful updates
 		if trace.Response.StatusCode != http.StatusNoContent {
-			return nil, errors.Wrapf(err, "error reconnecting flow for call: %s, received %d from nexmo", callUUID, trace.Response.StatusCode)
+			return nil, fmt.Errorf("error reconnecting flow for call: %s, received %d from nexmo", callUUID, trace.Response.StatusCode)
 		}
 
 		return c.MakeEmptyResponseBody(fmt.Sprintf("reconnected call: %s to flow with dial status: %s", callUUID, status)), nil
@@ -273,6 +280,7 @@ func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Po
 			return nil, errors.Wrapf(err, "error inserting recording URL into redis")
 		}
 
+		logrus.WithField("redisKey", redisKey).WithField("status", status).WithField("callUUID", callUUID).Debug("saved intermediary dial status for call")
 		return c.MakeEmptyResponseBody(fmt.Sprintf("updated status for call: %s to: %s", callUUID, status)), nil
 	}
 
@@ -366,7 +374,12 @@ func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Po
 
 type Phone struct {
 	Type   string `json:"type"`
-	Number int    `json:"number"`
+	Number string `json:"number"`
+}
+
+type NCCO struct {
+	Action string `json:"action"`
+	Name   string `json:"name"`
 }
 
 type CallRequest struct {
@@ -376,6 +389,9 @@ type CallRequest struct {
 	AnswerMethod string   `json:"answer_method"`
 	EventURL     []string `json:"event_url"`
 	EventMethod  string   `json:"event_method"`
+
+	NCCO         []NCCO `json:"ncco,omitempty"`
+	RingingTimer int    `json:"ringing_timer,omitempty"`
 }
 
 // CallResponse is our struct for a Nexmo call response
@@ -401,19 +417,11 @@ func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string
 		EventURL:    []string{statusURL + "?sig=" + url.QueryEscape(c.calculateSignature(statusURL))},
 		EventMethod: http.MethodPost,
 	}
-	rawTo, err := strconv.Atoi(number.Path())
-	if err != nil {
-		return ivr.NilCallID, nil, errors.Wrapf(err, "unable to turn urn path into number: %s", number.Path())
-	}
-	callR.To = append(callR.To, Phone{Type: "phone", Number: rawTo})
 
-	rawFrom, err := strconv.Atoi(c.channel.Address())
-	if err != nil {
-		return ivr.NilCallID, nil, errors.Wrapf(err, "unable to turn urn path into number: %s", number.Path())
-	}
-	callR.From = Phone{Type: "phone", Number: rawFrom}
+	callR.To = append(callR.To, Phone{Type: "phone", Number: strings.TrimLeft(number.Path(), "+")})
+	callR.From = Phone{Type: "phone", Number: strings.TrimLeft(c.channel.Address(), "+")}
 
-	trace, err := c.makeRequest(http.MethodPost, BaseURL, callR)
+	trace, err := c.makeRequest(http.MethodPost, c.callURL, callR)
 	if err != nil {
 		return ivr.NilCallID, trace, errors.Wrapf(err, "error trying to start call")
 	}
@@ -441,7 +449,7 @@ func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string
 // HangupCall asks Nexmo to hang up the call that is passed in
 func (c *client) HangupCall(callID string) (*httpx.Trace, error) {
 	hangupBody := map[string]string{"action": "hangup"}
-	url := BaseURL + "/" + callID
+	url := c.callURL + "/" + callID
 	trace, err := c.makeRequest(http.MethodPut, url, hangupBody)
 	if err != nil {
 		return trace, errors.Wrapf(err, "error trying to hangup call")
@@ -804,22 +812,6 @@ type Conversation struct {
 	Name   string `json:"name"`
 }
 
-type Call struct {
-	To [1]struct {
-		Type   string `json:"type"`
-		Number string `json:"number"`
-	} `json:"to"`
-	From struct {
-		Type   string `json:"type"`
-		Number string `json:"number"`
-	} `json:"from"`
-	NCCO [1]struct {
-		Action string `json:"action"`
-		Name   string `json:"name"`
-	} `json:"ncco"`
-	RingingTimer int `json:"ringing_timer,omitempty"`
-}
-
 func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
@@ -887,6 +879,13 @@ func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel 
 			}
 
 		case *waits.ActivatedDialWait:
+			// Nexmo handles forwards a bit differently. We have to create a new call to the forwarded number, then
+			// join the current call with the call we are starting.
+			//
+			// See: https://developer.nexmo.com/use-cases/contact-center
+			//
+			// We then track the state of that call, restarting NCCO control of the original call when
+			// the transfer has completed.
 			conversationUUID := string(uuids.New())
 			connect := &Conversation{
 				Action: "conversation",
@@ -895,19 +894,15 @@ func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel 
 			waitActions = append(waitActions, connect)
 
 			// create our outbound call with the same conversation UUID
-			call := Call{}
-			call.To[0].Type = "phone"
-			call.To[0].Number = wait.URN().Path()
-			call.From.Type = "phone"
-			call.From.Number = channel.Address()
-			call.NCCO[0].Action = "conversation"
-			call.NCCO[0].Name = conversationUUID
-
+			call := CallRequest{}
+			call.To = append(call.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN().Path(), "+")})
+			call.From = Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")}
+			call.NCCO = append(call.NCCO, NCCO{Action: "conversation", Name: conversationUUID})
 			if wait.TimeoutSeconds() != nil {
 				call.RingingTimer = *wait.TimeoutSeconds()
 			}
 
-			trace, err := c.makeRequest(http.MethodPost, BaseURL, call)
+			trace, err := c.makeRequest(http.MethodPost, c.callURL, call)
 			logrus.WithField("trace", trace).Debug("initiated new call for transfer")
 			if err != nil {
 				return "", errors.Wrapf(err, "error trying to start call")
@@ -929,11 +924,12 @@ func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel 
 
 			eventURL := resumeURL + "&wait_type=dial"
 			redisKey := fmt.Sprintf("dial_%s", transferUUID)
-			_, err = rc.Do("setex", redisKey, 3600, fmt.Sprintf("%s:%s", conn.ExternalID(), eventURL))
+			redisValue := fmt.Sprintf("%s:%s", conn.ExternalID(), eventURL)
+			_, err = rc.Do("setex", redisKey, 3600, redisValue)
 			if err != nil {
 				return "", errors.Wrapf(err, "error inserting transfer ID into redis")
 			}
-			logrus.WithField("transferUUID", transferUUID).WithField("callID", conn.ExternalID()).Debug("saved away call id")
+			logrus.WithField("transferUUID", transferUUID).WithField("callID", conn.ExternalID()).WithField("redisKey", redisKey).WithField("redisValue", redisValue).Debug("saved away call id")
 
 		default:
 			return "", errors.Errorf("unable to use wait in IVR call, unknow wait type: %s", w)

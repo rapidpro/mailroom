@@ -366,19 +366,28 @@ func TestNexmoIVR(t *testing.T) {
 		} else {
 			type CallForm struct {
 				To []struct {
-					Number int64 `json:"number"`
+					Number string `json:"number"`
 				} `json:"to"`
+				Action string `json:"action,omitempty"`
 			}
 			body, _ := ioutil.ReadAll(r.Body)
-			logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).Info("test server called")
 			form := &CallForm{}
 			json.Unmarshal(body, form)
-			if form.To[0].Number == 16055741111 {
+			logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).WithField("form", form).Info("test server called")
+
+			// end of a leg
+			if form.Action == "transfer" {
+				w.WriteHeader(http.StatusNoContent)
+			} else if form.To[0].Number == "16055741111" {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{ "uuid": "Call1","status": "started","direction": "outbound","conversation_uuid": "Conversation1"}`))
-			} else if form.To[0].Number == 16055743333 {
+			} else if form.To[0].Number == "16055743333" {
 				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte(`{ "uuid": "Call2","status": "started","direction": "outbound","conversation_uuid": "Conversation2"}`))
+			} else if form.To[0].Number == "2065551212" {
+				// start of a transfer leg
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte(`{ "uuid": "Call3","status": "started","direction": "outbound","conversation_uuid": "Conversation3"}`))
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -391,7 +400,7 @@ func TestNexmoIVR(t *testing.T) {
 	server.Start()
 	defer server.Stop()
 
-	nexmo.BaseURL = ts.URL
+	nexmo.CallURL = ts.URL
 	nexmo.IgnoreSignatures = true
 
 	// create a flow start for cathy and george
@@ -428,23 +437,26 @@ func TestNexmoIVR(t *testing.T) {
 	)
 
 	tcs := []struct {
+		Label        string
 		Action       string
 		ChannelUUID  assets.ChannelUUID
 		ConnectionID models.ConnectionID
 		Form         url.Values
 		Body         string
 		StatusCode   int
-		Contains     string
+		Contains     []string
 	}{
 		{
+			Label:        "start and prompt",
 			Action:       "start",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two. Your reference id is 123",
+			Contains:     []string{"Hello there. Please enter one or two. Your reference id is 123"},
 		},
 		{
+			Label:        "invalid dtmf",
 			Action:       "resume",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(1),
@@ -453,9 +465,10 @@ func TestNexmoIVR(t *testing.T) {
 			},
 			Body:       `{"dtmf":"3","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
 			StatusCode: 200,
-			Contains:   "Sorry, that is not one or two, try again.",
+			Contains:   []string{"Sorry, that is not one or two, try again."},
 		},
 		{
+			Label:        "dtmf 1",
 			Action:       "resume",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(1),
@@ -464,9 +477,10 @@ func TestNexmoIVR(t *testing.T) {
 			},
 			Body:       `{"dtmf":"1","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
 			StatusCode: 200,
-			Contains:   "Great! You said One.",
+			Contains:   []string{"Great! You said One."},
 		},
 		{
+			Label:        "dtmf too large",
 			Action:       "resume",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(1),
@@ -475,9 +489,10 @@ func TestNexmoIVR(t *testing.T) {
 			},
 			Body:       `{"dtmf":"101","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
 			StatusCode: 200,
-			Contains:   "too big",
+			Contains:   []string{"too big"},
 		},
 		{
+			Label:        "dtmf 56",
 			Action:       "resume",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(1),
@@ -486,9 +501,10 @@ func TestNexmoIVR(t *testing.T) {
 			},
 			Body:       `{"dtmf":"56","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
 			StatusCode: 200,
-			Contains:   "You picked the number 56",
+			Contains:   []string{"You picked the number 56"},
 		},
 		{
+			Label:        "recording callback",
 			Action:       "resume",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(1),
@@ -498,9 +514,10 @@ func TestNexmoIVR(t *testing.T) {
 			},
 			Body:       fmt.Sprintf(`{"recording_url": "%s", "end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","status":"answered","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`, ts.URL+"?recording=true"),
 			StatusCode: 200,
-			Contains:   "inserted recording url",
+			Contains:   []string{"inserted recording url"},
 		},
 		{
+			Label:        "resume with recording",
 			Action:       "resume",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(1),
@@ -510,25 +527,59 @@ func TestNexmoIVR(t *testing.T) {
 			},
 			Body:       `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","status":"answered","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z", "recording_url": "http://foo.bar/"}`,
 			StatusCode: 200,
-			Contains:   "I hope hearing that makes you feel better.",
+			Contains:   []string{"I hope hearing that makes you feel better.", `"action": "conversation"`},
 		},
 		{
+			Label:        "transfer answered",
+			Action:       "status",
+			ChannelUUID:  models.NexmoChannelUUID,
+			ConnectionID: models.ConnectionID(1),
+			Body:         `{"uuid": "Call3", "status": "answered"}`,
+			StatusCode:   200,
+			Contains:     []string{"updated status for call: Call1 to: answered"},
+		},
+		{
+			Label:        "transfer completed",
+			Action:       "status",
+			ChannelUUID:  models.NexmoChannelUUID,
+			ConnectionID: models.ConnectionID(1),
+			Body:         `{"uuid": "Call3", "duration": "25", "status": "completed"}`,
+			StatusCode:   200,
+			Contains:     []string{"reconnected call: Call1 to flow with dial status: answered"},
+		},
+		{
+			Label:        "transfer callback",
+			Action:       "resume",
+			ChannelUUID:  models.NexmoChannelUUID,
+			ConnectionID: models.ConnectionID(1),
+			Form: url.Values{
+				"wait_type":     []string{"dial"},
+				"dial_status":   []string{"answered"},
+				"dial_duration": []string{"25"},
+			},
+			StatusCode: 200,
+			Contains:   []string{"Great, they answered."},
+		},
+		{
+			Label:        "call complete",
 			Action:       "status",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
-			Contains:     "status updated: D",
+			Contains:     []string{"status updated: D"},
 		},
 		{
+			Label:        "new call",
 			Action:       "start",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(2),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
-			Contains:     "Hello there. Please enter one or two.",
+			Contains:     []string{"Hello there. Please enter one or two."},
 		},
 		{
+			Label:        "new call dtmf 1",
 			Action:       "resume",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(2),
@@ -537,35 +588,38 @@ func TestNexmoIVR(t *testing.T) {
 			},
 			Body:       `{"dtmf":"1","timed_out":false,"uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
 			StatusCode: 200,
-			Contains:   "Great! You said One.",
+			Contains:   []string{"Great! You said One."},
 		},
 		{
+			Label:        "new call ended",
 			Action:       "status",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(2),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call2","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
-			Contains:     "status updated: D",
+			Contains:     []string{"status updated: D"},
 		},
 		{
+			Label:        "incoming call",
 			Action:       "incoming",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(3),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call3","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
-			Contains:     "missed call handled",
+			Contains:     []string{"missed call handled"},
 		},
 		{
+			Label:        "failed call",
 			Action:       "status",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(3),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call3","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
-			Contains:     "status updated: F",
+			Contains:     []string{"updated status for call: Call1 to: failed"},
 		},
 	}
 
-	for i, tc := range tcs {
+	for _, tc := range tcs {
 		form := url.Values{
 			"action":     []string{tc.Action},
 			"connection": []string{fmt.Sprintf("%d", tc.ConnectionID)},
@@ -588,7 +642,11 @@ func TestNexmoIVR(t *testing.T) {
 		assert.Equal(t, tc.StatusCode, resp.StatusCode)
 
 		body, _ := ioutil.ReadAll(resp.Body)
-		assert.Containsf(t, string(body), tc.Contains, "%d does not contain expected body", i)
+		for _, needle := range tc.Contains {
+			if !assert.Containsf(t, string(body), needle, "testcase '%s' does not contain expected body", tc.Label) {
+				t.FailNow()
+			}
+		}
 	}
 
 	// check our final state of sessions, runs, msgs, connections
@@ -619,7 +677,7 @@ func TestNexmoIVR(t *testing.T) {
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
 		[]interface{}{models.CathyID},
-		8,
+		9,
 	)
 
 	testsuite.AssertQueryCount(t, db,
@@ -637,7 +695,7 @@ func TestNexmoIVR(t *testing.T) {
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`,
 		[]interface{}{},
-		9,
+		10,
 	)
 
 	testsuite.AssertQueryCount(t, db,
