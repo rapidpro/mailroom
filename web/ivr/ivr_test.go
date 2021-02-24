@@ -604,7 +604,7 @@ func TestNexmoIVR(t *testing.T) {
 			Action:       "incoming",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(3),
-			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call3","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
+			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call4","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
 			Contains:     []string{"missed call handled"},
 		},
@@ -613,9 +613,9 @@ func TestNexmoIVR(t *testing.T) {
 			Action:       "status",
 			ChannelUUID:  models.NexmoChannelUUID,
 			ConnectionID: models.ConnectionID(3),
-			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call3","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
+			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call4","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
-			Contains:     []string{"updated status for call: Call1 to: failed"},
+			Contains:     []string{"status updated: F"},
 		},
 	}
 
