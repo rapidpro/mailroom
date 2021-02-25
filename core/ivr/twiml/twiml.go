@@ -517,9 +517,10 @@ func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait,
 	}
 
 	if w != nil {
-		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
-		if isMsgWait {
-			switch hint := msgWait.Hint().(type) {
+		switch wait := w.(type) {
+
+		case *waits.ActivatedMsgWait:
+			switch hint := wait.Hint().(type) {
 			case *hints.DigitsHint:
 				resumeURL = resumeURL + "&wait_type=gather"
 				gather := &Gather{
@@ -541,20 +542,19 @@ func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait,
 				r.Commands = commands
 
 			default:
-				return "", errors.Errorf("unable to use wait in IVR call, unknow type: %s", msgWait.Hint().Type())
-			}
-		} else {
-			dialWait, isDialWait := w.(*waits.ActivatedDialWait)
-			if !isDialWait {
-				return "", fmt.Errorf("unable to use wait type in Twilio call: %x", w)
+				return "", errors.Errorf("unable to use hint in IVR call, unknow type: %s", wait.Hint().Type())
 			}
 
-			dial := Dial{Action: resumeURL + "&wait_type=dial", Number: dialWait.URN().Path()}
+		case *waits.ActivatedDialWait:
+			dial := Dial{Action: resumeURL + "&wait_type=dial", Number: wait.URN().Path()}
 			if w.TimeoutSeconds() != nil {
 				dial.Timeout = *w.TimeoutSeconds()
 			}
 			commands = append(commands, dial)
 			r.Commands = commands
+
+		default:
+			return "", fmt.Errorf("unable to use wait type in Twilio call: %x", w)
 		}
 	} else {
 		// no wait? call is over, hang up

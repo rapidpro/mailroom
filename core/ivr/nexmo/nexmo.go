@@ -516,29 +516,27 @@ func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 		}
 	}
 
-	// non-input case of getting a dial
-	switch waitType {
-	case "dial":
-		status := r.URL.Query().Get("dial_status")
-		if status == "" {
-			return nil, errors.Errorf("unable to find dial_status in query url")
-		}
-		duration := 0
-		d := r.URL.Query().Get("dial_duration")
-		if d != "" {
-			parsed, err := strconv.Atoi(d)
-			if err != nil {
-				return nil, errors.Errorf("non-integer duration in query url")
-			}
-			duration = parsed
-		}
-
-		logrus.WithField("status", status).WithField("duration", duration).Info("input found dial status and duration")
-		return ivr.DialResume{Status: flows.DialStatus(status), Duration: duration}, nil
-
-	default:
+	// only remaining type should be dial
+	if waitType != "dial" {
 		return nil, errors.Errorf("unknown wait_type: %s", waitType)
 	}
+
+	status := r.URL.Query().Get("dial_status")
+	if status == "" {
+		return nil, errors.Errorf("unable to find dial_status in query url")
+	}
+	duration := 0
+	d := r.URL.Query().Get("dial_duration")
+	if d != "" {
+		parsed, err := strconv.Atoi(d)
+		if err != nil {
+			return nil, errors.Errorf("non-integer duration in query url")
+		}
+		duration = parsed
+	}
+
+	logrus.WithField("status", status).WithField("duration", duration).Info("input found dial status and duration")
+	return ivr.DialResume{Status: flows.DialStatus(status), Duration: duration}, nil
 }
 
 type StatusRequest struct {
@@ -662,12 +660,14 @@ func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
 		return errors.Wrapf(err, "error marshalling ncco error")
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(body)
 	return err
 }
 
 // WriteEmptyResponse writes an empty (but valid) response
 func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
+	w.Header().Set("Content-Type", "application/json")
 	_, err := w.Write(c.MakeEmptyResponseBody(msg))
 	return err
 }
