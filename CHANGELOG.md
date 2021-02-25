@@ -1,3 +1,8 @@
+v6.1.18
+----------
+ * Update to latest goflow
+ * Rename tickets/internal package
+
 v6.1.17
 ----------
  * Should match referral trigger with case insensitive
