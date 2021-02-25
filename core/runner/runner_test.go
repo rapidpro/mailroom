@@ -62,12 +62,12 @@ func TestCampaignStarts(t *testing.T) {
 	}
 	sessions, err := FireCampaignEvents(ctx, db, rp, models.Org1, fires, models.CampaignFlowUUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(sessions))
+	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
 		 AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
-		[]interface{}{pq.Array(contacts)}, 2,
+		[]interface{}{pq.Array(contacts)}, 2, "expected only two sessions to be created",
 	)
 
 	testsuite.AssertQueryCount(t, db,
@@ -75,24 +75,24 @@ func TestCampaignStarts(t *testing.T) {
 		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND session_id IS NOT NULL`,
-		[]interface{}{pq.Array(contacts), models.CampaignFlowID}, 2,
+		[]interface{}{pq.Array(contacts), models.CampaignFlowID}, 2, "expected only two runs to be created",
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
 		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
 		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $2`,
-		[]interface{}{pq.Array(contacts), models.TwilioChannelID}, 2,
+		[]interface{}{pq.Array(contacts), models.TwilioChannelID}, 2, "expected only two messages to be sent",
 	)
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`, nil, 0)
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`, nil, 0, "expected all events to be fired")
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, []interface{}{models.CathyID, models.BobID, models.RemindersEvent2ID}, 2)
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, []interface{}{models.CathyID, models.BobID, models.RemindersEvent2ID}, 2, "expected bob and cathy to have their event sent to fired")
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{models.AlexandriaID, models.RemindersEvent2ID}, 1)
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{models.AlexandriaID, models.RemindersEvent2ID}, 1, "expected alexandria to have her event set to skipped")
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, []interface{}{models.CathyID}, 1)
