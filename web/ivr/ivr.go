@@ -149,7 +149,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, w h
 		resumeURL := buildResumeURL(channel, conn, urn)
 
 		// have our client output our session status
-		err = client.WriteSessionResponse(session, urn, resumeURL, r, w)
+		err = client.WriteSessionResponse(ctx, s.RP, channel, conn, session, urn, resumeURL, r, w)
 		if err != nil {
 			return channel, conn, errors.Wrapf(err, "error writing ivr response for start")
 		}
@@ -356,6 +356,18 @@ func handleStatus(ctx context.Context, s *web.Server, r *http.Request, w http.Re
 	err = client.ValidateRequestSignature(r)
 	if err != nil {
 		return channel, nil, writeClientError(w, errors.Wrapf(err, "request failed signature validation"))
+	}
+
+	// preprocess this status
+	body, err := client.PreprocessStatus(ctx, s.DB, s.RP, r)
+	if err != nil {
+		return channel, nil, client.WriteErrorResponse(w, errors.Wrapf(err, "error while preprocessing status"))
+	}
+	if len(body) > 0 {
+		contentType := http.DetectContentType(body)
+		w.Header().Set("Content-Type", contentType)
+		_, err := w.Write(body)
+		return channel, nil, err
 	}
 
 	// get our external id
