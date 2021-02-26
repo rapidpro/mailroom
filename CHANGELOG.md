@@ -1,3 +1,8 @@
+v6.1.19
+----------
+ * Fix campaign even firing for background flows
+ * IVR forwards for Nexmo and Twilio
+
 v6.1.18
 ----------
  * Update to latest goflow
