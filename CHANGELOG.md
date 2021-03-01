@@ -1,3 +1,7 @@
+v6.2.0
+----------
+ * 6.2.0 Release Candidate
+
 v6.1.19 
 ----------
  * Fix campaign even firing for background flows
