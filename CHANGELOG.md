@@ -1,4 +1,4 @@
-v6.1.19
+v6.1.19 
 ----------
  * Fix campaign even firing for background flows
  * IVR forwards for Nexmo and Twilio
