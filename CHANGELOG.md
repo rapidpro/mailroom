@@ -1,3 +1,7 @@
+v6.2.1
+----------
+ * use SaveRequest() so our ivr logs always have bodies
+
 v6.2.0
 ----------
  * 6.2.0 Release Candidate
