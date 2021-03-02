@@ -34,6 +34,12 @@ type ivrHandlerFn func(ctx context.Context, s *web.Server, r *http.Request, w ht
 func newIVRHandler(handler ivrHandlerFn) web.Handler {
 	return func(ctx context.Context, s *web.Server, r *http.Request, w http.ResponseWriter) error {
 		recorder := httpx.NewRecorder(r, w)
+
+		// immediately save our request body so we have a complete channel log
+		err := recorder.SaveRequest()
+		if err != nil {
+			return errors.Wrapf(err, "error reading request body")
+		}
 		ww := recorder.ResponseWriter
 
 		channel, connection, rerr := handler(ctx, s, r, ww)
