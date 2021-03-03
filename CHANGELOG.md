@@ -1,3 +1,7 @@
+v6.2.2
+----------
+ * Update to latest goflow
+
 v6.2.1
 ----------
  * use SaveRequest() so our ivr logs always have bodies
