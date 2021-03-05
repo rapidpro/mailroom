@@ -60,6 +60,9 @@ func TestResolveContacts(t *testing.T) {
 	// detach Cathy's tel URN
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.CathyID)
 
+	// to be deterministic, update the creation date on bob
+	db.MustExec(`UPDATE contacts_contact SET created_on = $1 WHERE id = $2`, time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC), models.BobID)
+
 	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
 
 	web.RunWebTests(t, "testdata/resolve.json")

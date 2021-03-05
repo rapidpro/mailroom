@@ -40,8 +40,8 @@ func TestInterrupts(t *testing.T) {
 		assert.NoError(t, err)
 
 		// give session one active run too
-		db.MustExec(`INSERT INTO flows_flowrun(uuid, is_active, status, created_on, modified_on, responded, contact_id, flow_id, session_id, org_id)
-			                            VALUES($1, TRUE, 'W', now(), now(), FALSE, $2, $3, $4, 1);`, uuids.New(), contactID, currentFlowID, sessionID)
+		db.MustExec(`INSERT INTO flows_flowrun(uuid, is_active, status, created_on, modified_on, expires_on, responded, contact_id, flow_id, session_id, org_id)
+			                            VALUES($1, TRUE, 'W', now(), now(), now(), FALSE, $2, $3, $4, 1);`, uuids.New(), contactID, currentFlowID, sessionID)
 
 		return sessionID
 	}

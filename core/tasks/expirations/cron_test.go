@@ -57,8 +57,8 @@ func TestExpirations(t *testing.T) {
 	r4ExpiresOn := time.Now()
 	testdata.InsertFlowRun(t, db, "d64fac33-933f-44b4-a6e4-53283d07a609", models.Org1, models.SessionID(0), models.CathyID, models.FavoritesFlowID, models.RunStatusWaiting, "", &r4ExpiresOn)
 
-	// run with no expires_on
-	testdata.InsertFlowRun(t, db, "4391fdc4-25ca-4e66-8e05-0cd3a6cbb6a2", models.Org1, s3, models.BobID, models.FavoritesFlowID, models.RunStatusWaiting, "", nil)
+	// completed run with no expires on
+	testdata.InsertFlowRun(t, db, "4391fdc4-25ca-4e66-8e05-0cd3a6cbb6a2", models.Org1, s3, models.BobID, models.FavoritesFlowID, models.RunStatusCompleted, "", nil)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -68,8 +68,8 @@ func TestExpirations(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{models.GeorgeID}, 2)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.GeorgeID}, 0)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{models.BobID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.BobID}, 0)
+	// already completed flow unchanged
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = FALSE AND contact_id = $1;`, []interface{}{models.BobID}, 1)
 
 	// expire our runs
 	err = expireRuns(ctx, db, rp, expirationLock, "foo")
@@ -83,9 +83,8 @@ func TestExpirations(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{models.GeorgeID}, 2)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.GeorgeID}, 0)
 
-	// runs without expires_on won't be expired
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{models.BobID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{models.BobID}, 0)
+	// already completed flow unchanged
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = FALSE AND contact_id = $1;`, []interface{}{models.BobID}, 1)
 
 	// should have created one task
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
