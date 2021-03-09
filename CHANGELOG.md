@@ -1,3 +1,7 @@
+v6.2.3
+----------
+ * Update to latest goflow with completed es and pt-BR translations
+
 v6.2.2
 ----------
  * Update to latest goflow
