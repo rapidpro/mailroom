@@ -78,12 +78,14 @@ var exitToSessionStatusMap = map[ExitType]SessionStatus{
 	ExitInterrupted: SessionStatusInterrupted,
 	ExitCompleted:   SessionStatusCompleted,
 	ExitExpired:     SessionStatusExpired,
+	ExitFailed:      SessionStatusFailed,
 }
 
 var exitToRunStatusMap = map[ExitType]RunStatus{
 	ExitInterrupted: RunStatusInterrupted,
 	ExitCompleted:   RunStatusCompleted,
 	ExitExpired:     RunStatusExpired,
+	ExitFailed:      RunStatusFailed,
 }
 
 var keptEvents = map[string]bool{
@@ -953,7 +955,8 @@ SET
 	ended_on = $2,
 	status = $3
 WHERE
-	id = ANY ($1)
+	id = ANY ($1) AND
+	status = 'W'
 `
 
 // InterruptContactRuns interrupts all runs and sesions that exist for the passed in list of contacts
