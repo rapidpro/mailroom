@@ -72,7 +72,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.Org
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
 			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_id", session.ID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow in resume")
-			return nil, models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitInterrupted, time.Now())
+			return nil, models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitFailed, time.Now())
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
 	}
