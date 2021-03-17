@@ -1,3 +1,7 @@
+v6.3.0
+----------
+ * Fail expirations that are no longer the active session
+
 v6.2.3
 ----------
  * Update to latest goflow with completed es and pt-BR translations
