@@ -1,3 +1,7 @@
+v6.3.2
+----------
+ * Simplify caching, keep orgs for 5s, reload everything
+
 v6.3.1
 ----------
  * Update to latest goflow
