@@ -71,10 +71,8 @@ type OrgAssets struct {
 
 var ErrNotFound = errors.New("not found")
 
-var orgCache = cache.New(time.Minute*15, time.Minute*15)
-
-const cacheTimeout = time.Second * 5
-const locationCacheTimeout = time.Second * 60
+// we cache org objects for 5 seconds, cleanup every minute (gets never return expired items)
+var orgCache = cache.New(time.Second*5, time.Minute)
 
 // FlushCache clears our entire org cache
 func FlushCache() {
@@ -91,7 +89,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		orgID:   orgID,
 	}
 
-	// inherit our built at if we reusing anything
+	// inherit our built at if we are reusing anything
 	if prev != nil && refresh&RefreshAll > 0 {
 		oa.builtAt = prev.builtAt
 	}
@@ -339,18 +337,6 @@ func GetOrgAssetsWithRefresh(ctx context.Context, db *sqlx.DB, orgID OrgID, refr
 	c, found := orgCache.Get(key)
 	if found {
 		cached = c.(*OrgAssets)
-	}
-
-	if found {
-		// we found assets to use, but they are stale, refresh everything but locations
-		if time.Since(cached.builtAt) > cacheTimeout {
-			refresh = ^RefreshLocations
-		}
-
-		// our locations are stale, refresh those
-		if time.Since(cached.locationsBuiltAt) > locationCacheTimeout {
-			refresh = refresh | RefreshLocations
-		}
 	}
 
 	// if found and nothing to refresh, return it
