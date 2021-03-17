@@ -1,3 +1,7 @@
+v6.3.1
+----------
+ * Update to latest goflow
+
 v6.3.0
 ----------
  * Fail expirations that are no longer the active session
