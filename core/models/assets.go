@@ -80,7 +80,7 @@ var assetLoaders = sync.Map{}
 // represents a goroutine loading assets for an org, stores the loaded assets (and possible error) and
 // a channel to notify any listeners that the loading is complete
 type assetLoader struct {
-	ch     chan struct{}
+	done   chan struct{}
 	assets *OrgAssets
 	err    error
 }
@@ -88,14 +88,14 @@ type assetLoader struct {
 // loadOrgAssetsOnce is a thread safe method to create new org assets from the DB in a thread safe manner
 // that ensures only one goroutine is fetching the org at once. (others will block on the first completing)
 func loadOrgAssetsOnce(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
-	loader := assetLoader{ch: make(chan struct{})}
+	loader := assetLoader{done: make(chan struct{})}
 	actual, inFlight := assetLoaders.LoadOrStore(orgID, &loader)
 	actualLoader := actual.(*assetLoader)
 	if inFlight {
-		<-actualLoader.ch
+		<-actualLoader.done
 	} else {
 		actualLoader.assets, actualLoader.err = NewOrgAssets(ctx, db, orgID, nil, RefreshAll)
-		close(actualLoader.ch)
+		close(actualLoader.done)
 		assetLoaders.Delete(orgID)
 	}
 	return actualLoader.assets, actualLoader.err
