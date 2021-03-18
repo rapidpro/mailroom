@@ -74,6 +74,33 @@ var ErrNotFound = errors.New("not found")
 // we cache org objects for 5 seconds, cleanup every minute (gets never return expired items)
 var orgCache = cache.New(time.Second*5, time.Minute)
 
+// map of org id -> chanAndResult used to make sure we are only loading one org at a time
+var assetLoaders = sync.Map{}
+
+// represents a goroutine loading assets for an org, stores the loaded assets (and possible error) and
+// a channel to notify any listeners that the loading is complete
+type assetLoader struct {
+	ch     chan struct{}
+	assets *OrgAssets
+	err    error
+}
+
+// loadOrgAssetsOnce is a thread safe method to create new org assets from the DB in a thread safe manner
+// that ensures only one goroutine is fetching the org at once. (others will block on the first completing)
+func loadOrgAssetsOnce(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
+	loader := assetLoader{ch: make(chan struct{})}
+	actual, inFlight := assetLoaders.LoadOrStore(orgID, &loader)
+	actualLoader := actual.(*assetLoader)
+	if inFlight {
+		<-actualLoader.ch
+	} else {
+		actualLoader.assets, actualLoader.err = NewOrgAssets(ctx, db, orgID, nil, RefreshAll)
+		close(actualLoader.ch)
+		assetLoaders.Delete(orgID)
+	}
+	return actualLoader.assets, actualLoader.err
+}
+
 // FlushCache clears our entire org cache
 func FlushCache() {
 	orgCache.Flush()
@@ -344,7 +371,19 @@ func GetOrgAssetsWithRefresh(ctx context.Context, db *sqlx.DB, orgID OrgID, refr
 		return cached, nil
 	}
 
-	// otherwise build our new assets
+	// if it wasn't found at all, reload it
+	if !found {
+		o, err := loadOrgAssetsOnce(ctx, db, orgID)
+		if err != nil {
+			return nil, err
+		}
+
+		// cache it for the future
+		orgCache.SetDefault(key, o)
+		return o, nil
+	}
+
+	// otherwise we need to refresh only some parts, go do that
 	o, err := NewOrgAssets(ctx, db, orgID, cached, refresh)
 	if err != nil {
 		return nil, err
