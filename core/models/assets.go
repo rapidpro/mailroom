@@ -74,7 +74,7 @@ var ErrNotFound = errors.New("not found")
 // we cache org objects for 5 seconds, cleanup every minute (gets never return expired items)
 var orgCache = cache.New(time.Second*5, time.Minute)
 
-// map of org id -> chanAndResult used to make sure we are only loading one org at a time
+// map of org id -> assetLoader used to make sure we only load an individual org once when expired
 var assetLoaders = sync.Map{}
 
 // represents a goroutine loading assets for an org, stores the loaded assets (and possible error) and
