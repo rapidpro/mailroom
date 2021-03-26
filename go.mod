@@ -17,8 +17,8 @@ require (
 	github.com/lib/pq v1.4.0
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nyaruka/ezconf v0.2.1
-	github.com/nyaruka/gocommon v1.7.2
-	github.com/nyaruka/goflow v0.113.3
+	github.com/nyaruka/gocommon v1.8.0
+	github.com/nyaruka/goflow v0.114.0
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0

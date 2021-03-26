@@ -1,7 +1,6 @@
 package handlers_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -14,56 +13,331 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const msisdnResponse = `country=Ecuador
-countryid=727
-operator=Movistar Ecuador
-operatorid=1472
-connection_status=100
-destination_msisdn=593999000001
-destination_currency=USD
-product_list=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,33,40,44,50,55,60,70
-retail_price_list=1.30,2.60,3.90,5.20,6.50,7.80,9.00,10.40,11.70,13.00,14.30,15.60,16.90,18.20,19.50,20.80,22.10,23.40,24.70,26.00,27.30,28.60,29.90,31.20,32.50,33.80,35.00,36.30,37.60,38.90,40.60,51.90,54.10,64.80,67.60,73.80,86.10
-wholesale_price_list=0.99,1.98,2.97,3.96,4.95,5.82,6.79,7.76,8.73,9.70,10.67,11.64,12.61,13.58,14.55,15.52,16.49,17.46,18.43,19.40,20.37,21.34,22.31,23.28,24.25,25.22,26.19,27.16,28.13,29.10,32.45,38.80,43.26,48.50,54.07,58.98,68.81
-local_info_value_list=1.00,2.00,3.00,4.00,5.00,6.00,7.00,8.00,9.00,10.00,11.00,12.00,13.00,14.00,15.00,16.00,17.00,18.00,19.00,20.00,21.00,22.00,23.00,24.00,25.00,26.00,27.00,28.00,29.00,30.00,33.00,40.00,44.00,50.00,55.00,60.00,70.00
-local_info_amount_list=1.00,2.00,3.00,4.00,5.00,6.00,7.00,8.00,9.00,10.00,11.00,12.00,13.00,14.00,15.00,16.00,17.00,18.00,19.00,20.00,21.00,22.00,23.00,24.00,25.00,26.00,27.00,28.00,29.00,30.00,33.00,40.00,44.00,50.00,55.00,60.00,70.00
-local_info_currency=USD
-authentication_key=4433322221111
-error_code=0
-error_txt=Transaction successful
-`
+var lookupNumberResponse = `[
+	{
+		"country": {
+		"iso_code": "ECU",
+		"name": "Ecuador",
+		"regions": null
+		},
+		"id": 1596,
+		"identified": true,
+		"name": "Claro Ecuador",
+		"regions": null
+	},
+	{
+		"country": {
+		"iso_code": "ECU",
+		"name": "Ecuador",
+		"regions": null
+		},
+		"id": 1597,
+		"identified": false,
+		"name": "CNT Ecuador",
+		"regions": null
+	}
+]`
 
-const reserveResponse = `reserved_id=123456789
-authentication_key=4433322221111
-error_code=0
-error_txt=Transaction successful
-`
+var productsResponse = `[
+	{
+		"availability_zones": [
+			"INTERNATIONAL"
+		],
+		"benefits": [
+			{
+			"additional_information": null,
+			"amount": {
+				"base": 3,
+				"promotion_bonus": 0,
+				"total_excluding_tax": 3
+			},
+			"type": "CREDITS",
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+			}
+		],
+		"description": "",
+		"destination": {
+			"amount": 3,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		},
+		"id": 6035,
+		"name": "3 USD",
+		"operator": {
+			"country": {
+			"iso_code": "ECU",
+			"name": "Ecuador",
+			"regions": null
+			},
+			"id": 1596,
+			"name": "Claro Ecuador",
+			"regions": null
+		},
+		"prices": {
+			"retail": {
+			"amount": 4,
+			"fee": 0,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+			},
+			"wholesale": {
+			"amount": 3.6,
+			"fee": 0,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+			}
+		},
+		"promotions": null,
+		"rates": {
+			"base": 0.833333333333333,
+			"retail": 0.75,
+			"wholesale": 0.833333333333333
+		},
+		"regions": null,
+		"required_beneficiary_fields": null,
+		"required_credit_party_identifier_fields": [
+			[
+			"mobile_number"
+			]
+		],
+		"required_debit_party_identifier_fields": null,
+		"required_sender_fields": null,
+		"service": {
+			"id": 1,
+			"name": "Mobile"
+		},
+		"source": {
+			"amount": 3.6,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		},
+		"type": "FIXED_VALUE_RECHARGE",
+		"validity": null
+		},
+		{
+		"availability_zones": [
+			"INTERNATIONAL"
+		],
+		"benefits": [
+			{
+			"additional_information": null,
+			"amount": {
+				"base": 6,
+				"promotion_bonus": 0,
+				"total_excluding_tax": 6
+			},
+			"type": "CREDITS",
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+			}
+		],
+		"description": "",
+		"destination": {
+			"amount": 6,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		},
+		"id": 6036,
+		"name": "6 USD",
+		"operator": {
+			"country": {
+			"iso_code": "ECU",
+			"name": "Ecuador",
+			"regions": null
+			},
+			"id": 1596,
+			"name": "Claro Ecuador",
+			"regions": null
+		},
+		"prices": {
+			"retail": {
+			"amount": 7,
+			"fee": 0,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+			},
+			"wholesale": {
+			"amount": 6.3,
+			"fee": 0,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+			}
+		},
+		"promotions": null,
+		"rates": {
+			"base": 0.952380952380952,
+			"retail": 0.857142857142857,
+			"wholesale": 0.952380952380952
+		},
+		"regions": null,
+		"required_beneficiary_fields": null,
+		"required_credit_party_identifier_fields": [
+			[
+				"mobile_number"
+			]
+		],
+		"required_debit_party_identifier_fields": null,
+		"required_sender_fields": null,
+		"service": {
+			"id": 1,
+			"name": "Mobile"
+		},
+		"source": {
+			"amount": 6.3,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		},
+		"type": "FIXED_VALUE_RECHARGE",
+		"validity": null
+	}
+]`
 
-const topupResponse = `transactionid=837765537
-msisdn=a friend
-destination_msisdn=593999000001
-country=Ecuador
-countryid=727
-operator=Movistar Ecuador
-operatorid=1472
-reference_operator=
-originating_currency=USD
-destination_currency=USD
-product_requested=1
-actual_product_sent=1
-wholesale_price=0.99
-retail_price=1.30
-balance=27.03
-sms_sent=yes
-sms=
-cid1=
-cid2=
-cid3=
-authentication_key=4433322221111
-error_code=0
-error_txt=Transaction successful
-`
+var transactionConfirmedResponse = `{
+	"benefits": [
+		{
+			"additional_information": null,
+			"amount": {
+				"base": 3,
+				"promotion_bonus": 0,
+				"total_excluding_tax": 3
+			},
+			"type": "CREDITS",
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		}
+	],
+	"confirmation_date": "2021-03-24T20:05:06.111631000Z",
+	"confirmation_expiration_date": "2021-03-24T21:05:05.883561000Z",
+	"creation_date": "2021-03-24T20:05:05.883561000Z",
+	"credit_party_identifier": {
+		"mobile_number": "+593979123456"
+	},
+	"external_id": "EX12345",
+	"id": 2237512891,
+	"prices": {
+		"retail": {
+			"amount": 4,
+			"fee": 0,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		},
+		"wholesale": {
+			"amount": 3.6,
+			"fee": 0,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		}
+	},
+	"product": {
+		"description": "",
+		"id": 6035,
+		"name": "3 USD",
+		"operator": {
+			"country": {
+				"iso_code": "ECU",
+				"name": "Ecuador",
+				"regions": null
+			},
+			"id": 1596,
+			"name": "Claro Ecuador",
+			"regions": null
+		},
+		"regions": null,
+		"service": {
+			"id": 1,
+			"name": "Mobile"
+		},
+		"type": "FIXED_VALUE_RECHARGE"
+	},
+	"promotions": null,
+	"rates": {
+		"base": 0.833333333333333,
+		"retail": 0.75,
+		"wholesale": 0.833333333333333
+	},
+	"status": {
+		"class": {
+			"id": 2,
+			"message": "CONFIRMED"
+		},
+		"id": 20000,
+		"message": "CONFIRMED"
+	}
+}`
 
-var withCRLF = func(s string) string { return strings.Replace(s, "\n", "\r\n", -1) }
+var transactionRejectedResponse = `{
+	"benefits": [
+		{
+			"additional_information": null,
+			"amount": {
+				"base": 3,
+				"promotion_bonus": 0,
+				"total_excluding_tax": 3
+			},
+			"type": "CREDITS",
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		}
+	],
+	"confirmation_date": "2021-03-24T20:05:06.111631000Z",
+	"confirmation_expiration_date": "2021-03-24T21:05:05.883561000Z",
+	"creation_date": "2021-03-24T20:05:05.883561000Z",
+	"credit_party_identifier": {
+		"mobile_number": "+593979123456"
+	},
+	"external_id": "EX12345",
+	"id": 2237512891,
+	"prices": {
+		"retail": {
+			"amount": 4,
+			"fee": 0,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		},
+		"wholesale": {
+			"amount": 3.6,
+			"fee": 0,
+			"unit": "USD",
+			"unit_type": "CURRENCY"
+		}
+	},
+	"product": {
+		"description": "",
+		"id": 6035,
+		"name": "3 USD",
+		"operator": {
+			"country": {
+				"iso_code": "ECU",
+				"name": "Ecuador",
+				"regions": null
+			},
+			"id": 1596,
+			"name": "Claro Ecuador",
+			"regions": null
+		},
+		"regions": null,
+		"service": {
+			"id": 1,
+			"name": "Mobile"
+		},
+		"type": "FIXED_VALUE_RECHARGE"
+	},
+	"promotions": null,
+	"rates": {
+		"base": 0.833333333333333,
+		"retail": 0.75,
+		"wholesale": 0.833333333333333
+	},
+	"status": {
+		"class": {
+			"id": 2,
+			"message": "CONFIRMED"
+		},
+		"id": 20000,
+		"message": "CONFIRMED"
+	}
+}`
 
 func TestAirtimeTransferred(t *testing.T) {
 	testsuite.Reset()
@@ -71,23 +345,29 @@ func TestAirtimeTransferred(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://airtime-api.dtone.com/cgi-bin/shop/topup": {
-			httpx.NewMockResponse(200, nil, withCRLF(msisdnResponse)),
-			httpx.NewMockResponse(200, nil, withCRLF(reserveResponse)),
-			httpx.NewMockResponse(200, nil, withCRLF(topupResponse)),
-			httpx.NewMockResponse(200, nil, "error_code=13\r\nerror_txt=Oops\r\n"),
+		"https://dvs-api.dtone.com/v1/lookup/mobile-number/+16055741111": {
+			httpx.NewMockResponse(200, nil, lookupNumberResponse), // successful mobile number lookup
+		},
+		"https://dvs-api.dtone.com/v1/products?type=FIXED_VALUE_RECHARGE&operator_id=1596&per_page=100": {
+			httpx.NewMockResponse(200, nil, productsResponse),
+		},
+		"https://dvs-api.dtone.com/v1/transactions/sync": {
+			httpx.NewMockResponse(200, nil, transactionRejectedResponse),
+		},
+		"https://dvs-api.dtone.com/v1/lookup/mobile-number/+16055743333": {
+			httpx.MockConnectionError, // timeout x 3 retries
+			httpx.MockConnectionError,
+			httpx.MockConnectionError,
 		},
 	}))
 
-	testsuite.DB().MustExec(
-		`UPDATE orgs_org SET config = '{"TRANSFERTO_ACCOUNT_LOGIN": "nyaruka", "TRANSFERTO_AIRTIME_API_TOKEN": "123456789"}'::jsonb
-		WHERE id = $1`, models.Org1)
+	testsuite.DB().MustExec(`UPDATE orgs_org SET config = '{"dtone_key": "key123", "dtone_secret": "sesame"}'::jsonb WHERE id = $1`, models.Org1)
 
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewTransferAirtime(handlers.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.20`)}, "Transfer"),
+					actions.NewTransferAirtime(handlers.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`3.50`)}, "Transfer"),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
@@ -97,7 +377,7 @@ func TestAirtimeTransferred(t *testing.T) {
 					Count: 1,
 				},
 				{
-					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = FALSE AND url = 'https://airtime-api.dtone.com/cgi-bin/shop/topup'`,
+					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = FALSE AND url LIKE 'https://dvs-api.dtone.com/v1/%'`,
 					Args:  []interface{}{models.Org1},
 					Count: 3,
 				},
@@ -106,7 +386,7 @@ func TestAirtimeTransferred(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				models.GeorgeID: []flows.Action{
-					actions.NewTransferAirtime(handlers.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.20`)}, "Transfer"),
+					actions.NewTransferAirtime(handlers.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`3.50`)}, "Transfer"),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
@@ -116,7 +396,7 @@ func TestAirtimeTransferred(t *testing.T) {
 					Count: 1,
 				},
 				{
-					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = TRUE AND url = 'https://airtime-api.dtone.com/cgi-bin/shop/topup'`,
+					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = TRUE AND url LIKE 'https://dvs-api.dtone.com/v1/%'`,
 					Args:  []interface{}{models.Org1},
 					Count: 1,
 				},
