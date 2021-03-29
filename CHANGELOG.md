@@ -1,3 +1,8 @@
+v6.3.4
+----------
+ * Update to latest goflow
+ * Smarter loading for cache misses on org assets
+
 v6.3.3
 ----------
  * Update to latest goflow
