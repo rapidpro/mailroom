@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/goflow/services/airtime/dtone"
 	"github.com/nyaruka/goflow/services/email/smtp"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/smtpx"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -30,11 +31,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var emailRetries = smtpx.NewFixedRetries(time.Second*3, time.Second*6)
+
 // Register a airtime service factory with the engine
 func init() {
 	// give airtime transfers an extra long timeout
 	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
-	airtimeHTTPRetries := httpx.NewFixedRetries(5, 10)
+	airtimeHTTPRetries := httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
 	goflow.RegisterEmailServiceFactory(
 		func(session flows.Session) (flows.EmailService, error) {
@@ -157,7 +160,7 @@ func (o *Org) EmailService(httpClient *http.Client) (flows.EmailService, error) 
 	if connectionURL == "" {
 		return nil, errors.New("missing SMTP configuration")
 	}
-	return smtp.NewService(connectionURL)
+	return smtp.NewService(connectionURL, emailRetries)
 }
 
 // AirtimeService returns the airtime service for this org if one is configured

@@ -36,7 +36,7 @@ func main() {
 
 	m := smtpx.NewMessage([]string{options.To}, options.Subject, options.Body, "")
 
-	err = smtpx.Send(client, m)
+	err = smtpx.Send(client, m, nil)
 	if err != nil {
 		logrus.WithError(err).Fatal("error sending email")
 	}
