@@ -22,12 +22,12 @@ import (
 	"github.com/greatnonprofits-nfp/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 )
 
 // Register a airtime service factory with the engine
@@ -268,7 +268,7 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	$2::int AS max_value_length,
 	(SELECT iso_code FROM orgs_language WHERE id = o.primary_language_id) AS default_language,
 	(SELECT ARRAY_AGG(iso_code) FROM orgs_language WHERE org_id = o.id) AS allowed_languages,
-	(SELECT ARRAY_AGG(concat(uuid,':',destination)) FROM links_link WHERE org_id = o.id AND is_archived = false) links,
+	(SELECT ARRAY_AGG(concat(uuid,':',destination,':',send_full_link)) FROM links_link WHERE org_id = o.id AND is_archived = false) links,
 	COALESCE(
 		(
 			SELECT
