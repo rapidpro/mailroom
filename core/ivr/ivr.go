@@ -345,12 +345,12 @@ func StartIVRFlow(
 	if len(start.ParentSummary()) > 0 {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
 			FlowAction(history, start.ParentSummary()).
-			WithConnection(channel.ChannelReference(), urn).
+			WithConnection(channel.ChannelReference(), urn, conn.ExternalID()).
 			Build()
 	} else {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
 			Manual().
-			WithConnection(channel.ChannelReference(), urn).
+			WithConnection(channel.ChannelReference(), urn, conn.ExternalID()).
 			WithParams(params).
 			Build()
 	}

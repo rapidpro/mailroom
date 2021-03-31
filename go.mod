@@ -1,5 +1,7 @@
 module github.com/nyaruka/mailroom
 
+replace github.com/greatnonprofits-nfp/goflow => /Users/teehamaral/GNP/goflow
+
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/apex/log v1.1.4
