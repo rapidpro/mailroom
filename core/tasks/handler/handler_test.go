@@ -238,12 +238,12 @@ func TestChannelEvents(t *testing.T) {
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'N', NULL, 1, 1, 1, $2) RETURNING id`,
 		models.FavoritesFlowID, models.TwitterChannelID)
 
-	// trigger on our nexmo channel for referral and number flow
+	// trigger on our vonage channel for referral and number flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'R', NULL, 1, 1, 1, $2) RETURNING id`,
-		models.PickNumberFlowID, models.NexmoChannelID)
+		models.PickNumberFlowID, models.VonageChannelID)
 
 	// add a URN for cathy so we can test twitter URNs
 	testdata.InsertContactURN(t, db, models.Org1, models.BobID, urns.URN("twitterid:123456"), 10)
@@ -259,10 +259,10 @@ func TestChannelEvents(t *testing.T) {
 		UpdateLastSeen bool
 	}{
 		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?", true},
-		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "", true},
-		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "", false},
+		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "", true},
+		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "", false},
 		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "", true},
-		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "Pick a number between 1-10.", true},
+		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "Pick a number between 1-10.", true},
 	}
 
 	models.FlushCache()

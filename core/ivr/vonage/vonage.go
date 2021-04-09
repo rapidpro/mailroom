@@ -1,4 +1,4 @@
-package nexmo
+package vonage
 
 import (
 	"bytes"
@@ -37,7 +37,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// CallURL is the API endpoint for Nexmo calls, public so our main IVR test can change it
+// CallURL is the API endpoint for Vonage/Nexmo calls, public so our main IVR test can change it
 var CallURL = `https://api.nexmo.com/v1/calls`
 
 // IgnoreSignatures sets whether we ignore signatures (for unit tests)
@@ -54,7 +54,7 @@ var callStatusMap = map[string]flows.DialStatus{
 }
 
 const (
-	nexmoChannelType = models.ChannelType("NX")
+	vonageChannelType = models.ChannelType("NX")
 
 	gatherTimeout = 30
 	recordTimeout = 600
@@ -83,7 +83,7 @@ type client struct {
 }
 
 func init() {
-	ivr.RegisterClientType(nexmoChannelType, NewClientFromChannel)
+	ivr.RegisterClientType(vonageChannelType, NewClientFromChannel)
 }
 
 // NewClientFromChannel creates a new Twilio IVR client for the passed in account and and auth token
@@ -260,9 +260,9 @@ func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Po
 			return nil, errors.Wrapf(err, "error reconnecting flow for call: %s", callUUID)
 		}
 
-		// nexmo return 204 on successful updates
+		// vonage return 204 on successful updates
 		if trace.Response.StatusCode != http.StatusNoContent {
-			return nil, fmt.Errorf("error reconnecting flow for call: %s, received %d from nexmo", callUUID, trace.Response.StatusCode)
+			return nil, fmt.Errorf("error reconnecting flow for call: %s, received %d from vonage", callUUID, trace.Response.StatusCode)
 		}
 
 		return c.MakeEmptyResponseBody(fmt.Sprintf("reconnected call: %s to flow with dial status: %s", callUUID, status)), nil
@@ -394,7 +394,7 @@ type CallRequest struct {
 	RingingTimer int    `json:"ringing_timer,omitempty"`
 }
 
-// CallResponse is our struct for a Nexmo call response
+// CallResponse is our struct for a Vonage call response
 // {
 //  "uuid": "63f61863-4a51-4f6b-86e1-46edebcf9356",
 //  "status": "started",
@@ -446,7 +446,7 @@ func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string
 	return ivr.CallID(call.UUID), trace, nil
 }
 
-// HangupCall asks Nexmo to hang up the call that is passed in
+// HangupCall asks Vonage to hang up the call that is passed in
 func (c *client) HangupCall(callID string) (*httpx.Trace, error) {
 	hangupBody := map[string]string{"action": "hangup"}
 	url := c.callURL + "/" + callID
@@ -839,7 +839,7 @@ func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel 
 				waitActions = append(waitActions, input)
 
 			case *hints.AudioHint:
-				// Nexmo is goofy in that they do not synchronously send us recordings. Rather the move on in
+				// Vonage is goofy in that they do not synchronously send us recordings. Rather the move on in
 				// the NCCO script immediately and then asynchronously call the event URL on the record URL
 				// when the recording is ready.
 				//
@@ -861,7 +861,7 @@ func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel 
 				}
 				waitActions = append(waitActions, record)
 
-				// nexmo is goofy in that they do not call our event URL upon gathering the recording but
+				// Vonage is goofy in that they do not call our event URL upon gathering the recording but
 				// instead move on. So we need to put in an input here as well
 				eventURL = resumeURL + "&wait_type=record&recording_uuid=" + recordingUUID
 				eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
@@ -879,7 +879,7 @@ func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel 
 			}
 
 		case *waits.ActivatedDialWait:
-			// Nexmo handles forwards a bit differently. We have to create a new call to the forwarded number, then
+			// Vonage handles forwards a bit differently. We have to create a new call to the forwarded number, then
 			// join the current call with the call we are starting.
 			//
 			// See: https://developer.nexmo.com/use-cases/contact-center

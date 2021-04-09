@@ -51,8 +51,8 @@ func TestCloneForSimulation(t *testing.T) {
 	assert.Equal(t, "Test Channel 2", testChannel2.Name())
 
 	// as well as the regular channels
-	nexmo := clone.SessionAssets().Channels().Get(models.NexmoChannelUUID)
-	assert.Equal(t, "Nexmo", nexmo.Name())
+	vonage := clone.SessionAssets().Channels().Get(models.VonageChannelUUID)
+	assert.Equal(t, "Vonage", vonage.Name())
 
 	// original assets still has original flow definition
 	flow, err = oa.Flow(models.FavoritesFlowUUID)

@@ -13,7 +13,7 @@ func TestChannels(t *testing.T) {
 	db := testsuite.DB()
 
 	// add some tel specific config to channel 2
-	db.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"], "allow_international": true}' WHERE id = $1`, NexmoChannelID)
+	db.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"], "allow_international": true}' WHERE id = $1`, VonageChannelID)
 
 	// make twitter channel have a parent of twilio channel
 	db.MustExec(`UPDATE channels_channel SET parent_id = $1 WHERE id = $2`, TwilioChannelID, TwitterChannelID)
@@ -44,9 +44,9 @@ func TestChannels(t *testing.T) {
 			nil,
 		},
 		{
-			NexmoChannelID,
-			NexmoChannelUUID,
-			"Nexmo",
+			VonageChannelID,
+			VonageChannelUUID,
+			"Vonage",
 			"5789",
 			[]string{"tel"},
 			[]assets.ChannelRole{"send", "receive"},

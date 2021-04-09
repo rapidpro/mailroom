@@ -24,8 +24,8 @@ var Org1UUID = uuids.UUID("bf0514a5-9407-44c9-b0f9-3f36f9c18414")
 var TwilioChannelID = ChannelID(10000)
 var TwilioChannelUUID = assets.ChannelUUID("74729f45-7f29-4868-9dc4-90e491e3c7d8")
 
-var NexmoChannelID = ChannelID(10001)
-var NexmoChannelUUID = assets.ChannelUUID("19012bfd-3ce3-4cae-9bb9-76cf92c73d49")
+var VonageChannelID = ChannelID(10001)
+var VonageChannelUUID = assets.ChannelUUID("19012bfd-3ce3-4cae-9bb9-76cf92c73d49")
 
 var TwitterChannelID = ChannelID(10002)
 var TwitterChannelUUID = assets.ChannelUUID("0f661e8b-ea9d-4bd3-9953-d368340acf91")
