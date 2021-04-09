@@ -181,6 +181,7 @@ func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL stri
 	form.Set("From", c.channel.Address())
 	form.Set("Url", callbackURL)
 	form.Set("StatusCallback", statusURL)
+	form.Set("MachineDetection", "DetectMessageEnd")
 
 	sendURL := c.baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
 

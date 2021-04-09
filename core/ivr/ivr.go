@@ -341,16 +341,20 @@ func StartIVRFlow(
 	// our builder for the triggers that will be created for contacts
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 
+	// twilio credentials for checking voice call status
+	accountSID := channel.ConfigValue("account_sid", "")
+	authToken := channel.ConfigValue("auth_token", "")
+
 	var trigger flows.Trigger
 	if len(start.ParentSummary()) > 0 {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
 			FlowAction(history, start.ParentSummary()).
-			WithConnection(channel.ChannelReference(), urn, conn.ExternalID()).
+			WithConnection(channel.ChannelReference(), urn, conn.ExternalID(), fmt.Sprintf("%s:%s", accountSID, authToken)).
 			Build()
 	} else {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
 			Manual().
-			WithConnection(channel.ChannelReference(), urn, conn.ExternalID()).
+			WithConnection(channel.ChannelReference(), urn, conn.ExternalID(), fmt.Sprintf("%s:%s", accountSID, authToken)).
 			WithParams(params).
 			Build()
 	}
