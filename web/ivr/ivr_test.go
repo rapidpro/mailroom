@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/ivr/nexmo"
 	"github.com/nyaruka/mailroom/core/ivr/twiml"
+	"github.com/nyaruka/mailroom/core/ivr/vonage"
 	ivr_tasks "github.com/nyaruka/mailroom/core/tasks/ivr"
 )
 
@@ -345,7 +345,7 @@ func TestTwilioIVR(t *testing.T) {
 
 }
 
-func TestNexmoIVR(t *testing.T) {
+func TestVonageIVR(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
@@ -356,7 +356,7 @@ func TestNexmoIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, models.TwilioChannelID)
 
 	// add auth tokens
-	db.MustExec(`UPDATE channels_channel SET config = '{"nexmo_app_id": "app_id", "nexmo_app_private_key": "-----BEGIN PRIVATE KEY-----\nMIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAKNwapOQ6rQJHetP\nHRlJBIh1OsOsUBiXb3rXXE3xpWAxAha0MH+UPRblOko+5T2JqIb+xKf9Vi3oTM3t\nKvffaOPtzKXZauscjq6NGzA3LgeiMy6q19pvkUUOlGYK6+Xfl+B7Xw6+hBMkQuGE\nnUS8nkpR5mK4ne7djIyfHFfMu4ptAgMBAAECgYA+s0PPtMq1osG9oi4xoxeAGikf\nJB3eMUptP+2DYW7mRibc+ueYKhB9lhcUoKhlQUhL8bUUFVZYakP8xD21thmQqnC4\nf63asad0ycteJMLb3r+z26LHuCyOdPg1pyLk3oQ32lVQHBCYathRMcVznxOG16VK\nI8BFfstJTaJu0lK/wQJBANYFGusBiZsJQ3utrQMVPpKmloO2++4q1v6ZR4puDQHx\nTjLjAIgrkYfwTJBLBRZxec0E7TmuVQ9uJ+wMu/+7zaUCQQDDf2xMnQqYknJoKGq+\noAnyC66UqWC5xAnQS32mlnJ632JXA0pf9pb1SXAYExB1p9Dfqd3VAwQDwBsDDgP6\nHD8pAkEA0lscNQZC2TaGtKZk2hXkdcH1SKru/g3vWTkRHxfCAznJUaza1fx0wzdG\nGcES1Bdez0tbW4llI5By/skZc2eE3QJAFl6fOskBbGHde3Oce0F+wdZ6XIJhEgCP\niukIcKZoZQzoiMJUoVRrA5gqnmaYDI5uRRl/y57zt6YksR3KcLUIuQJAd242M/WF\n6YAZat3q/wEeETeQq1wrooew+8lHl05/Nt0cCpV48RGEhJ83pzBm3mnwHf8lTBJH\nx6XroMXsmbnsEw==\n-----END PRIVATE KEY-----", "callback_domain": "localhost:8090"}', role='SRCA' WHERE id = $1`, models.NexmoChannelID)
+	db.MustExec(`UPDATE channels_channel SET config = '{"nexmo_app_id": "app_id", "nexmo_app_private_key": "-----BEGIN PRIVATE KEY-----\nMIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAKNwapOQ6rQJHetP\nHRlJBIh1OsOsUBiXb3rXXE3xpWAxAha0MH+UPRblOko+5T2JqIb+xKf9Vi3oTM3t\nKvffaOPtzKXZauscjq6NGzA3LgeiMy6q19pvkUUOlGYK6+Xfl+B7Xw6+hBMkQuGE\nnUS8nkpR5mK4ne7djIyfHFfMu4ptAgMBAAECgYA+s0PPtMq1osG9oi4xoxeAGikf\nJB3eMUptP+2DYW7mRibc+ueYKhB9lhcUoKhlQUhL8bUUFVZYakP8xD21thmQqnC4\nf63asad0ycteJMLb3r+z26LHuCyOdPg1pyLk3oQ32lVQHBCYathRMcVznxOG16VK\nI8BFfstJTaJu0lK/wQJBANYFGusBiZsJQ3utrQMVPpKmloO2++4q1v6ZR4puDQHx\nTjLjAIgrkYfwTJBLBRZxec0E7TmuVQ9uJ+wMu/+7zaUCQQDDf2xMnQqYknJoKGq+\noAnyC66UqWC5xAnQS32mlnJ632JXA0pf9pb1SXAYExB1p9Dfqd3VAwQDwBsDDgP6\nHD8pAkEA0lscNQZC2TaGtKZk2hXkdcH1SKru/g3vWTkRHxfCAznJUaza1fx0wzdG\nGcES1Bdez0tbW4llI5By/skZc2eE3QJAFl6fOskBbGHde3Oce0F+wdZ6XIJhEgCP\niukIcKZoZQzoiMJUoVRrA5gqnmaYDI5uRRl/y57zt6YksR3KcLUIuQJAd242M/WF\n6YAZat3q/wEeETeQq1wrooew+8lHl05/Nt0cCpV48RGEhJ83pzBm3mnwHf8lTBJH\nx6XroMXsmbnsEw==\n-----END PRIVATE KEY-----", "callback_domain": "localhost:8090"}', role='SRCA' WHERE id = $1`, models.VonageChannelID)
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -400,8 +400,8 @@ func TestNexmoIVR(t *testing.T) {
 	server.Start()
 	defer server.Stop()
 
-	nexmo.CallURL = ts.URL
-	nexmo.IgnoreSignatures = true
+	vonage.CallURL = ts.URL
+	vonage.IgnoreSignatures = true
 
 	// create a flow start for cathy and george
 	extra := json.RawMessage(`{"ref_id":"123"}`)
@@ -449,7 +449,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "start and prompt",
 			Action:       "start",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -458,7 +458,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "invalid dtmf",
 			Action:       "resume",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -470,7 +470,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "dtmf 1",
 			Action:       "resume",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -482,7 +482,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "dtmf too large",
 			Action:       "resume",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -494,7 +494,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "dtmf 56",
 			Action:       "resume",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -506,7 +506,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "recording callback",
 			Action:       "resume",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":      []string{"recording_url"},
@@ -519,7 +519,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "resume with recording",
 			Action:       "resume",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":      []string{"record"},
@@ -532,7 +532,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "transfer answered",
 			Action:       "status",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"uuid": "Call3", "status": "answered"}`,
 			StatusCode:   200,
@@ -541,7 +541,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "transfer completed",
 			Action:       "status",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"uuid": "Call3", "duration": "25", "status": "completed"}`,
 			StatusCode:   200,
@@ -550,7 +550,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "transfer callback",
 			Action:       "resume",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":     []string{"dial"},
@@ -563,7 +563,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "call complete",
 			Action:       "status",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
@@ -572,7 +572,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "new call",
 			Action:       "start",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(2),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -581,7 +581,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "new call dtmf 1",
 			Action:       "resume",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(2),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -593,7 +593,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "new call ended",
 			Action:       "status",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(2),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call2","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
@@ -602,7 +602,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "incoming call",
 			Action:       "incoming",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(3),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call4","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -611,7 +611,7 @@ func TestNexmoIVR(t *testing.T) {
 		{
 			Label:        "failed call",
 			Action:       "status",
-			ChannelUUID:  models.NexmoChannelUUID,
+			ChannelUUID:  models.VonageChannelUUID,
 			ConnectionID: models.ConnectionID(3),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call4","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,

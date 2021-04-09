@@ -14,8 +14,8 @@ import (
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	_ "github.com/nyaruka/mailroom/core/hooks"
-	_ "github.com/nyaruka/mailroom/core/ivr/nexmo"
 	_ "github.com/nyaruka/mailroom/core/ivr/twiml"
+	_ "github.com/nyaruka/mailroom/core/ivr/vonage"
 	_ "github.com/nyaruka/mailroom/core/tasks/broadcasts"
 	_ "github.com/nyaruka/mailroom/core/tasks/campaigns"
 	_ "github.com/nyaruka/mailroom/core/tasks/contacts"

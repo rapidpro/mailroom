@@ -22,7 +22,7 @@ func TestOrgs(t *testing.T) {
 	defer tx.Rollback()
 
 	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", TwitterChannelID)
-	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", TwilioChannelID, NexmoChannelID)
+	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", TwilioChannelID, VonageChannelID)
 	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
 									VALUES(TRUE, NOW(), NOW(), 'French', 'fra', 1, 1, 2);`)
 	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
