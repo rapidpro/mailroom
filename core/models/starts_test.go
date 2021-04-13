@@ -45,7 +45,7 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, startID, start.ID())
 	assert.Equal(t, models.Org1, start.OrgID())
 	assert.Equal(t, models.SingleMessageFlowID, start.FlowID())
-	assert.Equal(t, models.MessagingFlow, start.FlowType())
+	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
 	assert.Equal(t, "", start.Query())
 	assert.Equal(t, models.DoRestartParticipants, start.RestartParticipants())
 	assert.Equal(t, models.DoIncludeActive, start.IncludeActive())

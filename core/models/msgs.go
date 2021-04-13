@@ -23,7 +23,6 @@ import (
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
 	"github.com/pkg/errors"
@@ -460,17 +459,11 @@ func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status Ms
 }
 
 // MarkMessagesPending marks the passed in messages as pending
-func MarkMessagesPending(ctx context.Context, tx *sqlx.Tx, msgs []*Msg) error {
-	return updateMessageStatus(ctx, tx, msgs, MsgStatusPending)
+func MarkMessagesPending(ctx context.Context, db Queryer, msgs []*Msg) error {
+	return updateMessageStatus(ctx, db, msgs, MsgStatusPending)
 }
 
-// MarkMessagesQueued marks the passed in messages as queued
-func MarkMessagesQueued(ctx context.Context, tx *sqlx.Tx, msgs []*Msg) error {
-	return updateMessageStatus(ctx, tx, msgs, MsgStatusQueued)
-}
-
-// MarkMessagesQueued marks the passed in messages as queued
-func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status MsgStatus) error {
+func updateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status MsgStatus) error {
 	is := make([]interface{}, len(msgs))
 	for i, msg := range msgs {
 		m := &msg.m
@@ -478,7 +471,7 @@ func updateMessageStatus(ctx context.Context, tx *sqlx.Tx, msgs []*Msg, status M
 		is[i] = m
 	}
 
-	return BulkQuery(ctx, "updating message status", tx, updateMsgStatusSQL, is)
+	return BulkQuery(ctx, "updating message status", db, updateMsgStatusSQL, is)
 }
 
 const updateMsgStatusSQL = `
@@ -491,7 +484,7 @@ FROM (
 ) AS
 	m(id, status)
 WHERE
-	msgs_msg.id = m.id::int
+	msgs_msg.id = m.id::bigint
 `
 
 // GetMessageIDFromUUID gets the ID of a message from its UUID

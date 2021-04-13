@@ -17,8 +17,8 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/core/courier"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/msgio"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -110,17 +110,8 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
 
-	msg := msgs[0]
-
-	// queue our message
-	rc := rp.Get()
-	defer rc.Close()
-
-	err = courier.QueueMessages(rc, []*models.Msg{msg})
-	if err != nil {
-		return msg, errors.Wrapf(err, "error queuing ticket reply")
-	}
-	return msg, nil
+	msgio.SendMessages(ctx, db, rp, nil, msgs)
+	return msgs[0], nil
 }
 
 var retries = httpx.NewFixedRetries(time.Second*5, time.Second*10)

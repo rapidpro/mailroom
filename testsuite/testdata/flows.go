@@ -33,8 +33,8 @@ func InsertFlowStart(t *testing.T, db *sqlx.DB, orgID models.OrgID, flowID model
 func InsertFlowSession(t *testing.T, db *sqlx.DB, uuid flows.SessionUUID, orgID models.OrgID, contactID models.ContactID, status models.SessionStatus, timeoutOn *time.Time) models.SessionID {
 	var id models.SessionID
 	err := db.Get(&id,
-		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, responded, created_on, timeout_on) 
-		 VALUES($1, $2, $3, $4, TRUE, NOW(), $5) RETURNING id`, uuid, orgID, contactID, status, timeoutOn,
+		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, responded, created_on, timeout_on, session_type) 
+		 VALUES($1, $2, $3, $4, TRUE, NOW(), $5, 'M') RETURNING id`, uuid, orgID, contactID, status, timeoutOn,
 	)
 	require.NoError(t, err)
 	return id

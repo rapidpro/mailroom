@@ -78,12 +78,14 @@ var exitToSessionStatusMap = map[ExitType]SessionStatus{
 	ExitInterrupted: SessionStatusInterrupted,
 	ExitCompleted:   SessionStatusCompleted,
 	ExitExpired:     SessionStatusExpired,
+	ExitFailed:      SessionStatusFailed,
 }
 
 var exitToRunStatusMap = map[ExitType]RunStatus{
 	ExitInterrupted: RunStatusInterrupted,
 	ExitCompleted:   RunStatusCompleted,
 	ExitExpired:     RunStatusExpired,
+	ExitFailed:      RunStatusFailed,
 }
 
 var keptEvents = map[string]bool{
@@ -861,6 +863,11 @@ WHERE
 
 // FindActiveSessionOverlap returns the list of contact ids which overlap with those passed in which are active in any other flows
 func FindActiveSessionOverlap(ctx context.Context, db *sqlx.DB, flowType FlowType, contacts []ContactID) ([]ContactID, error) {
+	// background flows should look at messaging flows when determing overlap (background flows can't be active by definition)
+	if flowType == FlowTypeBackground {
+		flowType = FlowTypeMessaging
+	}
+
 	var overlap []ContactID
 	err := db.SelectContext(ctx, &overlap, activeSessionOverlapSQL, flowType, pq.Array(contacts))
 	return overlap, err
@@ -948,7 +955,8 @@ SET
 	ended_on = $2,
 	status = $3
 WHERE
-	id = ANY ($1)
+	id = ANY ($1) AND
+	status = 'W'
 `
 
 // InterruptContactRuns interrupts all runs and sesions that exist for the passed in list of contacts

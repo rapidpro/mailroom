@@ -1,4 +1,4 @@
-package internal_test
+package intern_test
 
 import (
 	"net/http"
@@ -12,7 +12,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/services/tickets/internal"
+	intern "github.com/nyaruka/mailroom/services/tickets/intern"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "internal"))
 
-	svc, err := internal.NewService(
+	svc, err := intern.NewService(
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -49,7 +49,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	assert.Equal(t, 0, len(logger.Logs))
 
-	dbTicket := models.NewTicket(ticket.UUID, models.Org1, models.CathyID, models.MailgunID, "", "Need help", "Where are my cookies?", nil)
+	dbTicket := models.NewTicket(ticket.UUID, models.Org1, models.CathyID, models.InternalID, "", "Need help", "Where are my cookies?", nil)
 
 	logger = &flows.HTTPLogger{}
 	err = svc.Forward(
@@ -69,13 +69,13 @@ func TestCloseAndReopen(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
-	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
-	svc, err := internal.NewService(http.DefaultClient, nil, ticketer, nil)
+	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "internal"))
+	svc, err := intern.NewService(http.DefaultClient, nil, ticketer, nil)
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", models.Org1, models.CathyID, models.ZendeskID, "12", "New ticket", "Where my cookies?", nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", models.Org1, models.BobID, models.ZendeskID, "14", "Second ticket", "Where my shoes?", nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", models.Org1, models.CathyID, models.InternalID, "12", "New ticket", "Where my cookies?", nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", models.Org1, models.BobID, models.InternalID, "14", "Second ticket", "Where my shoes?", nil)
 
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 

@@ -9,8 +9,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/core/courier"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -171,14 +171,6 @@ func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast 
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
-	// and queue them to courier for sending
-	rc := rp.Get()
-	defer rc.Close()
-
-	err = courier.QueueMessages(rc, msgs)
-	if err != nil {
-		return errors.Wrapf(err, "error queuing broadcast messages")
-	}
-
+	msgio.SendMessages(ctx, db, rp, nil, msgs)
 	return nil
 }

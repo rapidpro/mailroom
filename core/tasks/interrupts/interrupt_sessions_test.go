@@ -34,8 +34,8 @@ func TestInterrupts(t *testing.T) {
 	insertSession := func(orgID models.OrgID, contactID models.ContactID, connectionID models.ConnectionID, currentFlowID models.FlowID) models.SessionID {
 		var sessionID models.SessionID
 		err := db.Get(&sessionID,
-			`INSERT INTO flows_flowsession(uuid, status, responded, created_on, org_id, contact_id, connection_id, current_flow_id)
-									VALUES($1, 'W', false, NOW(), $2, $3, $4, $5) RETURNING id`,
+			`INSERT INTO flows_flowsession(uuid, status, responded, created_on, org_id, contact_id, connection_id, current_flow_id, session_type)
+									VALUES($1, 'W', false, NOW(), $2, $3, $4, $5, 'M') RETURNING id`,
 			uuids.New(), orgID, contactID, connectionID, currentFlowID)
 		assert.NoError(t, err)
 

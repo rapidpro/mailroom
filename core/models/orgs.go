@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/goflow/services/airtime/dtone"
 	"github.com/nyaruka/goflow/services/email/smtp"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/goflow/utils/smtpx"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -30,11 +31,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var emailRetries = smtpx.NewFixedRetries(time.Second*3, time.Second*6)
+
 // Register a airtime service factory with the engine
 func init() {
 	// give airtime transfers an extra long timeout
 	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
-	airtimeHTTPRetries := httpx.NewFixedRetries(5, 10)
+	airtimeHTTPRetries := httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
 	goflow.RegisterEmailServiceFactory(
 		func(session flows.Session) (flows.EmailService, error) {
@@ -62,10 +65,9 @@ const (
 	// NilUserID si the id 0 considered as nil user id
 	NilUserID = UserID(0)
 
-	configSMTPServer    = "smtp_server"
-	configDTOneLogin    = "TRANSFERTO_ACCOUNT_LOGIN"
-	configDTOneToken    = "TRANSFERTO_AIRTIME_API_TOKEN"
-	configDTOnecurrency = "TRANSFERTO_ACCOUNT_CURRENCY"
+	configSMTPServer  = "smtp_server"
+	configDTOneKey    = "dtone_key"
+	configDTOneSecret = "dtone_secret"
 )
 
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
@@ -158,19 +160,18 @@ func (o *Org) EmailService(httpClient *http.Client) (flows.EmailService, error) 
 	if connectionURL == "" {
 		return nil, errors.New("missing SMTP configuration")
 	}
-	return smtp.NewService(connectionURL)
+	return smtp.NewService(connectionURL, emailRetries)
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
 func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryConfig) (flows.AirtimeService, error) {
-	login := o.ConfigValue(configDTOneLogin, "")
-	token := o.ConfigValue(configDTOneToken, "")
-	currency := o.ConfigValue(configDTOnecurrency, "")
+	key := o.ConfigValue(configDTOneKey, "")
+	secret := o.ConfigValue(configDTOneSecret, "")
 
-	if login == "" || token == "" {
-		return nil, errors.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneLogin, configDTOneToken, o.ID())
+	if key == "" || secret == "" {
+		return nil, errors.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneKey, configDTOneSecret, o.ID())
 	}
-	return dtone.NewService(httpClient, httpRetries, login, token, currency), nil
+	return dtone.NewService(httpClient, httpRetries, key, secret), nil
 }
 
 // StoreAttachment saves an attachment to storage
@@ -264,7 +265,7 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
 	$2::int AS max_value_length,
 	(SELECT iso_code FROM orgs_language WHERE id = o.primary_language_id) AS default_language,
-	(SELECT ARRAY_AGG(iso_code) FROM orgs_language WHERE org_id = o.id) AS allowed_languages,
+	(SELECT ARRAY_AGG(iso_code ORDER BY iso_code ASC) FROM orgs_language WHERE org_id = o.id) AS allowed_languages,
 	COALESCE(
 		(
 			SELECT

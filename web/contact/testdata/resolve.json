@@ -35,7 +35,7 @@
                 "name": "Bob",
                 "status": "active",
                 "timezone": "America/Los_Angeles",
-                "created_on": "2020-11-05T21:27:01.193966Z",
+                "created_on": "2021-04-09T14:51:56.517774Z",
                 "urns": [
                     "tel:+16055742222?id=10001&priority=1000"
                 ],
@@ -46,11 +46,11 @@
                     }
                 }
             },
+            "created": false,
             "urn": {
                 "id": 10001,
                 "identity": "tel:+16055742222"
-            },
-            "created": false
+            }
         },
         "db_assertions": [
             {
@@ -80,11 +80,11 @@
                     "tel:+16055747777?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20121&priority=1000"
                 ]
             },
+            "created": true,
             "urn": {
                 "id": 20121,
                 "identity": "tel:+16055747777"
-            },
-            "created": true
+            }
         },
         "db_assertions": [
             {

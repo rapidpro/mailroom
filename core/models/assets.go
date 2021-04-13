@@ -71,10 +71,35 @@ type OrgAssets struct {
 
 var ErrNotFound = errors.New("not found")
 
-var orgCache = cache.New(time.Minute*15, time.Minute*15)
+// we cache org objects for 5 seconds, cleanup every minute (gets never return expired items)
+var orgCache = cache.New(time.Second*5, time.Minute)
 
-const cacheTimeout = time.Second * 5
-const locationCacheTimeout = time.Hour
+// map of org id -> assetLoader used to make sure we only load an individual org once when expired
+var assetLoaders = sync.Map{}
+
+// represents a goroutine loading assets for an org, stores the loaded assets (and possible error) and
+// a channel to notify any listeners that the loading is complete
+type assetLoader struct {
+	done   chan struct{}
+	assets *OrgAssets
+	err    error
+}
+
+// loadOrgAssetsOnce is a thread safe method to create new org assets from the DB in a thread safe manner
+// that ensures only one goroutine is fetching the org at once. (others will block on the first completing)
+func loadOrgAssetsOnce(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
+	loader := assetLoader{done: make(chan struct{})}
+	actual, inFlight := assetLoaders.LoadOrStore(orgID, &loader)
+	actualLoader := actual.(*assetLoader)
+	if inFlight {
+		<-actualLoader.done
+	} else {
+		actualLoader.assets, actualLoader.err = NewOrgAssets(ctx, db, orgID, nil, RefreshAll)
+		close(actualLoader.done)
+		assetLoaders.Delete(orgID)
+	}
+	return actualLoader.assets, actualLoader.err
+}
 
 // FlushCache clears our entire org cache
 func FlushCache() {
@@ -91,7 +116,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		orgID:   orgID,
 	}
 
-	// inherit our built at if we reusing anything
+	// inherit our built at if we are reusing anything
 	if prev != nil && refresh&RefreshAll > 0 {
 		oa.builtAt = prev.builtAt
 	}
@@ -341,24 +366,24 @@ func GetOrgAssetsWithRefresh(ctx context.Context, db *sqlx.DB, orgID OrgID, refr
 		cached = c.(*OrgAssets)
 	}
 
-	if found {
-		// we found assets to use, but they are stale, refresh everything but locations
-		if time.Since(cached.builtAt) > cacheTimeout {
-			refresh = ^RefreshLocations
-		}
-
-		// our locations are stale, refresh those
-		if time.Since(cached.locationsBuiltAt) > locationCacheTimeout {
-			refresh = refresh | RefreshLocations
-		}
-	}
-
 	// if found and nothing to refresh, return it
 	if found && refresh == RefreshNone {
 		return cached, nil
 	}
 
-	// otherwise build our new assets
+	// if it wasn't found at all, reload it
+	if !found {
+		o, err := loadOrgAssetsOnce(ctx, db, orgID)
+		if err != nil {
+			return nil, err
+		}
+
+		// cache it for the future
+		orgCache.SetDefault(key, o)
+		return o, nil
+	}
+
+	// otherwise we need to refresh only some parts, go do that
 	o, err := NewOrgAssets(ctx, db, orgID, cached, refresh)
 	if err != nil {
 		return nil, err

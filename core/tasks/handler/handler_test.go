@@ -203,9 +203,9 @@ func TestMsgEvents(t *testing.T) {
 	assert.Equal(t, "Hey, how are you?", text)
 	previous := time.Now()
 
-	// and should have interrupted previous session
+	// and should have failed previous session
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from flows_flowsession where contact_id = $1 and status ='I' and current_flow_id = $2`,
+		`SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F' and current_flow_id = $2`,
 		[]interface{}{models.Org2FredID, models.Org2FavoritesFlowID}, 2,
 	)
 
@@ -238,12 +238,12 @@ func TestChannelEvents(t *testing.T) {
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'N', NULL, 1, 1, 1, $2) RETURNING id`,
 		models.FavoritesFlowID, models.TwitterChannelID)
 
-	// trigger on our nexmo channel for referral and number flow
+	// trigger on our vonage channel for referral and number flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'R', NULL, 1, 1, 1, $2) RETURNING id`,
-		models.PickNumberFlowID, models.NexmoChannelID)
+		models.PickNumberFlowID, models.VonageChannelID)
 
 	// add a URN for cathy so we can test twitter URNs
 	testdata.InsertContactURN(t, db, models.Org1, models.BobID, urns.URN("twitterid:123456"), 10)
@@ -259,10 +259,10 @@ func TestChannelEvents(t *testing.T) {
 		UpdateLastSeen bool
 	}{
 		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?", true},
-		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "", true},
-		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "", false},
+		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "", true},
+		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "", false},
 		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "", true},
-		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.NexmoChannelID, nil, "Pick a number between 1-10.", true},
+		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "Pick a number between 1-10.", true},
 	}
 
 	models.FlushCache()
@@ -406,6 +406,9 @@ func TestTimedEvents(t *testing.T) {
 
 		// respond one last time, should be done
 		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "done", "Ended", models.TwitterChannelID, models.Org1},
+
+		// start our favorite flow again
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, models.Org1},
 	}
 
 	last := time.Now()
@@ -485,4 +488,43 @@ func TestTimedEvents(t *testing.T) {
 
 		last = time.Now()
 	}
+
+	// test the case of a run and session no longer being the most recent but somehow still active, expiration should still work
+	r, err := db.QueryContext(ctx, `SELECT id, session_id from flows_flowrun WHERE contact_id = $1 and is_active = FALSE order by created_on asc limit 1`, models.CathyID)
+	assert.NoError(t, err)
+	defer r.Close()
+	r.Next()
+	r.Scan(&runID, &sessionID)
+
+	expiration := time.Now()
+
+	// set both to be active (this requires us to disable the path change trigger for a bit which asserts flows can't cross back into active status)
+	db.MustExec(`ALTER TABLE flows_flowrun DISABLE TRIGGER temba_flowrun_path_change`)
+	db.MustExec(`UPDATE flows_flowrun SET is_active = TRUE, status = 'W', expires_on = $2 WHERE id = $1`, runID, expiration)
+	db.MustExec(`UPDATE flows_flowsession SET status = 'W' WHERE id = $1`, sessionID)
+	db.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_path_change`)
+
+	// try to expire the run
+	task := newTimedTask(
+		ExpirationEventType,
+		models.Org1,
+		models.CathyID,
+		sessionID,
+		runID,
+		expiration,
+	)
+
+	err = AddHandleTask(rc, models.CathyID, task)
+	assert.NoError(t, err)
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	assert.NoError(t, err)
+
+	err = handleContactEvent(ctx, db, rp, task)
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, []interface{}{runID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'F' AND id = $1`, []interface{}{sessionID}, 1)
+
+	testsuite.ResetDB()
 }

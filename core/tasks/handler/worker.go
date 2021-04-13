@@ -225,7 +225,12 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 // handleTimedEvent is called for timeout events
 func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *TimedEvent) error {
 	start := time.Now()
-	log := logrus.WithField("event_type", eventType).WithField("contact_id", event.OrgID).WithField("session_id", event.SessionID)
+	log := logrus.WithFields(logrus.Fields{
+		"event_type": eventType,
+		"contact_id": event.ContactID,
+		"run_id":     event.RunID,
+		"session_id": event.SessionID,
+	})
 	oa, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -251,14 +256,18 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	}
 
 	// get the active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, db, oa, models.MessagingFlow, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}
 
-	// if we didn't find a session or it is another session, ignore
+	// if we didn't find a session or it is another session then this flow got interrupted and this is a race, fail it
 	if session == nil || session.ID() != event.SessionID {
-		log.Info("ignoring event, couldn't find active session")
+		log.Error("expiring run with mismatched session, session for run no longer active, failing runs and session")
+		err = models.ExitSessions(ctx, db, []models.SessionID{event.SessionID}, models.ExitFailed, time.Now())
+		if err != nil {
+			return errors.Wrapf(err, "error failing expired runs for session that is no longer active")
+		}
 		return nil
 	}
 
@@ -407,7 +416,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
-	if flow.FlowType() == models.IVRFlow && conn == nil {
+	if flow.FlowType() == models.FlowTypeVoice && conn == nil {
 		err = runner.TriggerIVRFlow(ctx, db, rp, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error while triggering ivr flow")
@@ -585,7 +594,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	trigger := models.FindMatchingMsgTrigger(oa, contact, event.Text)
 
 	// get any active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, db, oa, models.MessagingFlow, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}
@@ -597,7 +606,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 
 		// flow this session is in is gone, interrupt our session and reset it
 		if err == models.ErrNotFound {
-			err = models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitInterrupted, time.Now())
+			err = models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitFailed, time.Now())
 			session = nil
 		}
 
@@ -637,7 +646,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		// trigger flow is still active, start it
 		if flow != nil {
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
-			if flow.FlowType() == models.IVRFlow {
+			if flow.FlowType() == models.FlowTypeVoice {
 				err = runner.TriggerIVRFlow(ctx, db, rp, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, func(ctx context.Context, tx *sqlx.Tx) error {
 					return models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeFlow, topupID)
 				})

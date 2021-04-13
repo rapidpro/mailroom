@@ -1,4 +1,4 @@
-package nexmo
+package vonage
 
 import (
 	"bytes"
@@ -37,14 +37,24 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// BaseURL for Nexmo calls, public so our main IVR test can change it
-var BaseURL = `https://api.nexmo.com/v1/calls`
+// CallURL is the API endpoint for Vonage/Nexmo calls, public so our main IVR test can change it
+var CallURL = `https://api.nexmo.com/v1/calls`
 
 // IgnoreSignatures sets whether we ignore signatures (for unit tests)
 var IgnoreSignatures = false
 
+var callStatusMap = map[string]flows.DialStatus{
+	"cancelled": flows.DialStatusFailed,
+	"answered":  flows.DialStatusAnswered,
+	"busy":      flows.DialStatusBusy,
+	"timeout":   flows.DialStatusNoAnswer,
+	"failed":    flows.DialStatusFailed,
+	"rejected":  flows.DialStatusNoAnswer,
+	"canceled":  flows.DialStatusFailed,
+}
+
 const (
-	nexmoChannelType = models.ChannelType("NX")
+	vonageChannelType = models.ChannelType("NX")
 
 	gatherTimeout = 30
 	recordTimeout = 600
@@ -67,13 +77,13 @@ var indentMarshal = true
 type client struct {
 	httpClient *http.Client
 	channel    *models.Channel
-	baseURL    string
+	callURL    string
 	appID      string
 	privateKey *rsa.PrivateKey
 }
 
 func init() {
-	ivr.RegisterClientType(nexmoChannelType, NewClientFromChannel)
+	ivr.RegisterClientType(vonageChannelType, NewClientFromChannel)
 }
 
 // NewClientFromChannel creates a new Twilio IVR client for the passed in account and and auth token
@@ -92,7 +102,7 @@ func NewClientFromChannel(httpClient *http.Client, channel *models.Channel) (ivr
 	return &client{
 		httpClient: httpClient,
 		channel:    channel,
-		baseURL:    BaseURL,
+		callURL:    CallURL,
 		appID:      appID,
 		privateKey: privateKey,
 	}, nil
@@ -111,7 +121,6 @@ func readBody(r *http.Request) ([]byte, error) {
 }
 
 func (c *client) CallIDForRequest(r *http.Request) (string, error) {
-	// get our recording url out
 	body, err := readBody(r)
 	if err != nil {
 		return "", errors.Wrapf(err, "error reading body from request")
@@ -166,6 +175,116 @@ func (c *client) DownloadMedia(url string) (*http.Response, error) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	return http.DefaultClient.Do(req)
+}
+
+func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
+	// parse out the call status, we are looking for a leg of one of our conferences ending in the "forward" case
+	// get our recording url out
+	body, _ := readBody(r)
+	if len(body) == 0 {
+		return nil, nil
+	}
+
+	// check the type of this status, we don't care about preprocessing "transfer" statuses
+	nxType, err := jsonparser.GetString(body, "type")
+	if err == jsonparser.MalformedJsonError {
+		return nil, errors.Wrapf(err, "invalid json body: %s", body)
+	}
+
+	if nxType == "transfer" {
+		return c.MakeEmptyResponseBody(fmt.Sprintf("ignoring conversation callback")), nil
+	}
+
+	// grab our uuid out
+	legUUID, _ := jsonparser.GetString(body, "uuid")
+
+	// and our status
+	nxStatus, _ := jsonparser.GetString(body, "status")
+
+	// if we are missing either, this is just a notification of the establishment of the conversation, ignore
+	if legUUID == "" || nxStatus == "" {
+		return nil, nil
+	}
+
+	// look up to see whether this is a call we need to track
+	rc := rp.Get()
+	defer rc.Close()
+
+	redisKey := fmt.Sprintf("dial_%s", legUUID)
+	dialContinue, err := redis.String(rc.Do("get", redisKey))
+
+	logrus.WithField("redisKey", redisKey).WithField("redisValue", dialContinue).WithError(err).WithField("status", nxStatus).Debug("looking up dial continue")
+
+	// no associated call, move on
+	if err == redis.ErrNil {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "error looking up leg uuid: %s", redisKey)
+	}
+
+	// transfer the call back to our handle with the dial wait type
+	parts := strings.SplitN(dialContinue, ":", 2)
+	callUUID, resumeURL := parts[0], parts[1]
+
+	// we found an associated call, if the status is complete, have it continue, we call out to
+	// redis and hand it our flow to resume on to get the next NCCO
+	if nxStatus == "completed" {
+		logrus.Debug("found completed call, trying to finish with call ID: ", callUUID)
+		statusKey := fmt.Sprintf("dial_status_%s", callUUID)
+		status, err := redis.String(rc.Do("get", statusKey))
+		if err == redis.ErrNil {
+			return nil, fmt.Errorf("unable to find call status for: %s", callUUID)
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "error looking up call status for: %s", callUUID)
+		}
+
+		// duration of the call is in our body
+		duration, _ := jsonparser.GetString(body, "duration")
+
+		resumeURL += "&dial_status=" + status
+		resumeURL += "&dial_duration=" + duration
+		resumeURL += "&sig=" + c.calculateSignature(resumeURL)
+
+		nxBody := map[string]interface{}{
+			"action": "transfer",
+			"destination": map[string]interface{}{
+				"type": "ncco",
+				"url":  []string{resumeURL},
+			},
+		}
+		trace, err := c.makeRequest(http.MethodPut, c.callURL+"/"+callUUID, nxBody)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error reconnecting flow for call: %s", callUUID)
+		}
+
+		// vonage return 204 on successful updates
+		if trace.Response.StatusCode != http.StatusNoContent {
+			return nil, fmt.Errorf("error reconnecting flow for call: %s, received %d from vonage", callUUID, trace.Response.StatusCode)
+		}
+
+		return c.MakeEmptyResponseBody(fmt.Sprintf("reconnected call: %s to flow with dial status: %s", callUUID, status)), nil
+	}
+
+	// otherwise the call isn't over yet, instead stash away our status so we can use it to
+	// determine if the call was answered, busy etc..
+	status := callStatusMap[nxStatus]
+
+	// only store away valid final states
+	if status != "" {
+		redisKey := fmt.Sprintf("dial_status_%s", callUUID)
+		_, err = rc.Do("setex", redisKey, 300, status)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error inserting recording URL into redis")
+		}
+
+		logrus.WithField("redisKey", redisKey).WithField("status", status).WithField("callUUID", callUUID).Debug("saved intermediary dial status for call")
+		return c.MakeEmptyResponseBody(fmt.Sprintf("updated status for call: %s to: %s", callUUID, status)), nil
+	}
+
+	return c.MakeEmptyResponseBody(fmt.Sprintf("ignoring non final status for tranfer leg")), nil
 }
 
 func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
@@ -255,7 +374,12 @@ func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Po
 
 type Phone struct {
 	Type   string `json:"type"`
-	Number int    `json:"number"`
+	Number string `json:"number"`
+}
+
+type NCCO struct {
+	Action string `json:"action"`
+	Name   string `json:"name"`
 }
 
 type CallRequest struct {
@@ -265,9 +389,12 @@ type CallRequest struct {
 	AnswerMethod string   `json:"answer_method"`
 	EventURL     []string `json:"event_url"`
 	EventMethod  string   `json:"event_method"`
+
+	NCCO         []NCCO `json:"ncco,omitempty"`
+	RingingTimer int    `json:"ringing_timer,omitempty"`
 }
 
-// CallResponse is our struct for a Nexmo call response
+// CallResponse is our struct for a Vonage call response
 // {
 //  "uuid": "63f61863-4a51-4f6b-86e1-46edebcf9356",
 //  "status": "started",
@@ -290,19 +417,11 @@ func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string
 		EventURL:    []string{statusURL + "?sig=" + url.QueryEscape(c.calculateSignature(statusURL))},
 		EventMethod: http.MethodPost,
 	}
-	rawTo, err := strconv.Atoi(number.Path())
-	if err != nil {
-		return ivr.NilCallID, nil, errors.Wrapf(err, "unable to turn urn path into number: %s", number.Path())
-	}
-	callR.To = append(callR.To, Phone{Type: "phone", Number: rawTo})
 
-	rawFrom, err := strconv.Atoi(c.channel.Address())
-	if err != nil {
-		return ivr.NilCallID, nil, errors.Wrapf(err, "unable to turn urn path into number: %s", number.Path())
-	}
-	callR.From = Phone{Type: "phone", Number: rawFrom}
+	callR.To = append(callR.To, Phone{Type: "phone", Number: strings.TrimLeft(number.Path(), "+")})
+	callR.From = Phone{Type: "phone", Number: strings.TrimLeft(c.channel.Address(), "+")}
 
-	trace, err := c.makeRequest(http.MethodPost, BaseURL, callR)
+	trace, err := c.makeRequest(http.MethodPost, c.callURL, callR)
 	if err != nil {
 		return ivr.NilCallID, trace, errors.Wrapf(err, "error trying to start call")
 	}
@@ -327,10 +446,10 @@ func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string
 	return ivr.CallID(call.UUID), trace, nil
 }
 
-// HangupCall asks Nexmo to hang up the call that is passed in
+// HangupCall asks Vonage to hang up the call that is passed in
 func (c *client) HangupCall(callID string) (*httpx.Trace, error) {
 	hangupBody := map[string]string{"action": "hangup"}
-	url := BaseURL + "/" + callID
+	url := c.callURL + "/" + callID
 	trace, err := c.makeRequest(http.MethodPut, url, hangupBody)
 	if err != nil {
 		return trace, errors.Wrapf(err, "error trying to hangup call")
@@ -350,46 +469,74 @@ type NCCOInput struct {
 	Timestamp        string `json:"timestamp"`
 }
 
-// InputForRequest returns the input for the passed in request, if any
-func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
-	// parse our input
-	input := &NCCOInput{}
-	bb, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return "", ivr.NilAttachment, errors.Wrapf(err, "error reading request body")
-	}
-
-	err = json.Unmarshal(bb, input)
-	if err != nil {
-		return "", ivr.NilAttachment, errors.Wrapf(err, "unable to parse ncco request")
-	}
-
+// ResumeForRequest returns the resume (input or dial) for the passed in request, if any
+func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	// this could be empty, in which case we return nothing at all
 	empty := r.Form.Get("empty")
 	if empty == "true" {
-		return "", ivr.NilAttachment, nil
+		return ivr.InputResume{}, nil
 	}
 
-	// otherwise grab the right field based on our wait type
 	waitType := r.Form.Get("wait_type")
-	switch waitType {
-	case "gather":
-		// this could be a timeout, in which case we return nothing at all
-		if input.TimedOut {
-			return "", ivr.NilAttachment, nil
+
+	// if this is an input, parse that
+	if waitType == "gather" || waitType == "record" {
+		// parse our input
+		input := &NCCOInput{}
+		bb, err := readBody(r)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error reading request body")
 		}
 
-		return input.DTMF, ivr.NilAttachment, nil
-	case "record":
-		recordingURL := r.URL.Query().Get("recording_url")
-		if recordingURL == "" {
-			return "", ivr.NilAttachment, nil
+		err = json.Unmarshal(bb, input)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to parse ncco request")
 		}
-		logrus.WithField("recording_url", recordingURL).Info("input found recording")
-		return "", utils.Attachment("audio:" + recordingURL), nil
-	default:
-		return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", waitType)
+
+		// otherwise grab the right field based on our wait type
+		switch waitType {
+		case "gather":
+			// this could be a timeout, in which case we return nothing at all
+			if input.TimedOut {
+				return ivr.InputResume{}, nil
+			}
+
+			return ivr.InputResume{Input: input.DTMF}, nil
+
+		case "record":
+			recordingURL := r.URL.Query().Get("recording_url")
+			if recordingURL == "" {
+				return ivr.InputResume{}, nil
+			}
+			logrus.WithField("recording_url", recordingURL).Info("input found recording")
+			return ivr.InputResume{Attachment: utils.Attachment("audio:" + recordingURL)}, nil
+
+		default:
+			return nil, errors.Errorf("unknown wait_type: %s", waitType)
+		}
 	}
+
+	// only remaining type should be dial
+	if waitType != "dial" {
+		return nil, errors.Errorf("unknown wait_type: %s", waitType)
+	}
+
+	status := r.URL.Query().Get("dial_status")
+	if status == "" {
+		return nil, errors.Errorf("unable to find dial_status in query url")
+	}
+	duration := 0
+	d := r.URL.Query().Get("dial_duration")
+	if d != "" {
+		parsed, err := strconv.Atoi(d)
+		if err != nil {
+			return nil, errors.Errorf("non-integer duration in query url")
+		}
+		duration = parsed
+	}
+
+	logrus.WithField("status", status).WithField("duration", duration).Info("input found dial status and duration")
+	return ivr.DialResume{Status: flows.DialStatus(status), Duration: duration}, nil
 }
 
 type StatusRequest struct {
@@ -406,7 +553,7 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 	}
 
 	status := &StatusRequest{}
-	bb, err := ioutil.ReadAll(r.Body)
+	bb, err := readBody(r)
 	if err != nil {
 		logrus.WithError(err).Error("error reading status request body")
 		return models.ConnectionStatusErrored, 0
@@ -415,6 +562,11 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 	if err != nil {
 		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
 		return models.ConnectionStatusErrored, 0
+	}
+
+	// transfer status callbacks have no status, safe to ignore them
+	if status.Status == "" {
+		return models.ConnectionStatusInProgress, 0
 	}
 
 	switch status.Status {
@@ -468,8 +620,8 @@ func (c *client) ValidateRequestSignature(r *http.Request) error {
 	return nil
 }
 
-// WriteSessionResponse writes a TWIML response for the events in the passed in session
-func (c *client) WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+// WriteSessionResponse writes a NCCO response for the events in the passed in session
+func (c *client) WriteSessionResponse(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -482,11 +634,12 @@ func (c *client) WriteSessionResponse(session *models.Session, number urns.URN, 
 	}
 
 	// get our response
-	response, err := c.responseForSprint(resumeURL, session.Wait(), sprint.Events())
+	response, err := c.responseForSprint(ctx, rp, channel, conn, resumeURL, session.Wait(), sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write([]byte(response))
 	if err != nil {
 		return errors.Wrap(err, "error writing IVR response")
@@ -507,22 +660,27 @@ func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
 		return errors.Wrapf(err, "error marshalling ncco error")
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(body)
 	return err
 }
 
 // WriteEmptyResponse writes an empty (but valid) response
 func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
+	w.Header().Set("Content-Type", "application/json")
+	_, err := w.Write(c.MakeEmptyResponseBody(msg))
+	return err
+}
+
+func (c *client) MakeEmptyResponseBody(msg string) []byte {
 	msgBody := map[string]string{
 		"_message": msg,
 	}
 	body, err := json.Marshal(msgBody)
 	if err != nil {
-		return errors.Wrapf(err, "error marshalling ncco message")
+		panic(errors.Wrapf(err, "error marshalling message"))
 	}
-
-	_, err = w.Write(body)
-	return err
+	return body
 }
 
 func (c *client) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
@@ -644,73 +802,137 @@ type Record struct {
 	EventMethod  string   `json:"eventMethod"`
 }
 
-func (c *client) responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+type Endpoint struct {
+	Type   string `json:"type"`
+	Number string `json:"number"`
+}
+
+type Conversation struct {
+	Action string `json:"action"`
+	Name   string `json:"name"`
+}
+
+func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 
 	if w != nil {
-		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
-		if !isMsgWait {
-			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
-		}
+		switch wait := w.(type) {
+		case *waits.ActivatedMsgWait:
+			switch hint := wait.Hint().(type) {
+			case *hints.DigitsHint:
+				eventURL := resumeURL + "&wait_type=gather"
+				eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
+				input := &Input{
+					Action:       "input",
+					Timeout:      gatherTimeout,
+					SubmitOnHash: true,
+					EventURL:     []string{eventURL},
+					EventMethod:  http.MethodPost,
+				}
+				// limit our digits if asked to
+				if hint.Count != nil {
+					input.MaxDigits = *hint.Count
+				} else {
+					input.MaxDigits = 20
+				}
+				waitActions = append(waitActions, input)
 
-		switch hint := msgWait.Hint().(type) {
-		case *hints.DigitsHint:
-			eventURL := resumeURL + "&wait_type=gather"
-			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
-			input := &Input{
-				Action:       "input",
-				Timeout:      gatherTimeout,
-				SubmitOnHash: true,
-				EventURL:     []string{eventURL},
-				EventMethod:  http.MethodPost,
-			}
-			// limit our digits if asked to
-			if hint.Count != nil {
-				input.MaxDigits = *hint.Count
-			} else {
-				input.MaxDigits = 20
-			}
-			waitActions = append(waitActions, input)
+			case *hints.AudioHint:
+				// Vonage is goofy in that they do not synchronously send us recordings. Rather the move on in
+				// the NCCO script immediately and then asynchronously call the event URL on the record URL
+				// when the recording is ready.
+				//
+				// We deal with this by adding the record event with a status callback including a UUID
+				// which we will store the recording url under when it is received. Meanwhile we put an input
+				// with a 1 second timeout in the script that will get called / repeated until the UUID is
+				// populated at which time we will actually continue.
 
-		case *hints.AudioHint:
-			// Nexmo is goofy in that they do not synchronously send us recordings. Rather the move on in
-			// the NCCO script immediately and then asynchronously call the event URL on the record URL
-			// when the recording is ready.
+				recordingUUID := string(uuids.New())
+				eventURL := resumeURL + "&wait_type=recording_url&recording_uuid=" + recordingUUID
+				eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
+				record := &Record{
+					Action:       "record",
+					EventURL:     []string{eventURL},
+					EventMethod:  http.MethodPost,
+					EndOnKey:     "#",
+					Timeout:      recordTimeout,
+					EndOnSilence: 5,
+				}
+				waitActions = append(waitActions, record)
+
+				// Vonage is goofy in that they do not call our event URL upon gathering the recording but
+				// instead move on. So we need to put in an input here as well
+				eventURL = resumeURL + "&wait_type=record&recording_uuid=" + recordingUUID
+				eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
+				input := &Input{
+					Action:       "input",
+					Timeout:      1,
+					SubmitOnHash: true,
+					EventURL:     []string{eventURL},
+					EventMethod:  http.MethodPost,
+				}
+				waitActions = append(waitActions, input)
+
+			default:
+				return "", errors.Errorf("unable to use wait in IVR call, unknow hint type: %s", wait.Hint().Type())
+			}
+
+		case *waits.ActivatedDialWait:
+			// Vonage handles forwards a bit differently. We have to create a new call to the forwarded number, then
+			// join the current call with the call we are starting.
 			//
-			// We deal with this by adding the record event with a status callback including a UUID
-			// which we will store the recording url under when it is received. Meanwhile we put an input
-			// with a 1 second timeout in the script that will get called / repeated until the UUID is
-			// populated at which time we will actually continue.
-
-			recordingUUID := string(uuids.New())
-			eventURL := resumeURL + "&wait_type=recording_url&recording_uuid=" + recordingUUID
-			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
-			record := &Record{
-				Action:       "record",
-				EventURL:     []string{eventURL},
-				EventMethod:  http.MethodPost,
-				EndOnKey:     "#",
-				Timeout:      recordTimeout,
-				EndOnSilence: 5,
+			// See: https://developer.nexmo.com/use-cases/contact-center
+			//
+			// We then track the state of that call, restarting NCCO control of the original call when
+			// the transfer has completed.
+			conversationUUID := string(uuids.New())
+			connect := &Conversation{
+				Action: "conversation",
+				Name:   conversationUUID,
 			}
-			waitActions = append(waitActions, record)
+			waitActions = append(waitActions, connect)
 
-			// nexmo is goofy in that they do not call our event URL upon gathering the recording but
-			// instead move on. So we need to put in an input here as well
-			eventURL = resumeURL + "&wait_type=record&recording_uuid=" + recordingUUID
-			eventURL = eventURL + "&sig=" + url.QueryEscape(c.calculateSignature(eventURL))
-			input := &Input{
-				Action:       "input",
-				Timeout:      1,
-				SubmitOnHash: true,
-				EventURL:     []string{eventURL},
-				EventMethod:  http.MethodPost,
+			// create our outbound call with the same conversation UUID
+			call := CallRequest{}
+			call.To = append(call.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN().Path(), "+")})
+			call.From = Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")}
+			call.NCCO = append(call.NCCO, NCCO{Action: "conversation", Name: conversationUUID})
+			if wait.TimeoutSeconds() != nil {
+				call.RingingTimer = *wait.TimeoutSeconds()
 			}
-			waitActions = append(waitActions, input)
+
+			trace, err := c.makeRequest(http.MethodPost, c.callURL, call)
+			logrus.WithField("trace", trace).Debug("initiated new call for transfer")
+			if err != nil {
+				return "", errors.Wrapf(err, "error trying to start call")
+			}
+
+			if trace.Response.StatusCode != http.StatusCreated {
+				return "", errors.Errorf("received non 200 status for call start: %d", trace.Response.StatusCode)
+			}
+
+			// we save away our call id, as we want to continue our original call when that is complete
+			transferUUID, err := jsonparser.GetString(trace.ResponseBody, "uuid")
+			if err != nil {
+				return "", errors.Wrapf(err, "error reading call id from transfer")
+			}
+
+			// save away the tranfer id, connecting it to this connection
+			rc := rp.Get()
+			defer rc.Close()
+
+			eventURL := resumeURL + "&wait_type=dial"
+			redisKey := fmt.Sprintf("dial_%s", transferUUID)
+			redisValue := fmt.Sprintf("%s:%s", conn.ExternalID(), eventURL)
+			_, err = rc.Do("setex", redisKey, 3600, redisValue)
+			if err != nil {
+				return "", errors.Wrapf(err, "error inserting transfer ID into redis")
+			}
+			logrus.WithField("transferUUID", transferUUID).WithField("callID", conn.ExternalID()).WithField("redisKey", redisKey).WithField("redisValue", redisValue).Debug("saved away call id")
 
 		default:
-			return "", errors.Errorf("unable to use wait in IVR call, unknow type: %s", msgWait.Hint().Type())
+			return "", errors.Errorf("unable to use wait in IVR call, unknow wait type: %s", w)
 		}
 	}
 

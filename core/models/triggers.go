@@ -184,7 +184,7 @@ func FindMatchingReferralTrigger(org *OrgAssets, channel *Channel, referrerID st
 	for _, t := range org.Triggers() {
 		if t.TriggerType() == ReferralTriggerType {
 			// matches referrer id? that takes top precedence, return right away
-			if referrerID != "" && referrerID == t.ReferrerID() && (t.ChannelID() == NilChannelID || t.ChannelID() == channel.ID()) {
+			if strings.ToLower(referrerID) != "" && strings.ToLower(referrerID) == strings.ToLower(t.ReferrerID()) && (t.ChannelID() == NilChannelID || t.ChannelID() == channel.ID()) {
 				return t
 			}
 
