@@ -1,7 +1,5 @@
 module github.com/nyaruka/mailroom
 
-replace github.com/greatnonprofits-nfp/goflow => /Users/teehamaral/GNP/goflow
-
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/apex/log v1.1.4
@@ -15,7 +13,7 @@ require (
 	github.com/golang/protobuf v1.4.0
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.1.0
-	github.com/greatnonprofits-nfp/goflow v0.50.3-0.20210106205143-ab6f7b95fefd
+	github.com/greatnonprofits-nfp/goflow v0.50.3-0.20210409231809-a1009cb5fc09
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lib/pq v1.4.0
