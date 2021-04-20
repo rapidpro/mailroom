@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/envs"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/flows/modifiers"
+	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/pkg/errors"
 
 	"github.com/jmoiron/sqlx"
@@ -48,11 +48,13 @@ type ContactImportBatch struct {
 	RecordEnd   int `db:"record_end"`
 
 	// results written after processing this batch
-	NumCreated int             `db:"num_created"`
-	NumUpdated int             `db:"num_updated"`
-	NumErrored int             `db:"num_errored"`
-	Errors     json.RawMessage `db:"errors"`
-	FinishedOn *time.Time      `db:"finished_on"`
+	NumCreated   int             `db:"num_created"`
+	NumUpdated   int             `db:"num_updated"`
+	NumBlocked   int             `db:"num_blocked"`
+	NumErrored   int             `db:"num_errored"`
+	BlockedUUIDs json.RawMessage `db:"blocked_uuids"`
+	Errors       json.RawMessage `db:"errors"`
+	FinishedOn   *time.Time      `db:"finished_on"`
 }
 
 // Import does the actual import of this batch
@@ -245,6 +247,7 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 	numUpdated := 0
 	numErrored := 0
 	importErrors := make([]importError, 0, 10)
+	blockedUUIDs := make([]flows.ContactUUID, 0)
 	for _, imp := range imports {
 		if imp.contact == nil {
 			numErrored++
@@ -256,9 +259,18 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 		for _, e := range imp.errors {
 			importErrors = append(importErrors, importError{Record: imp.record, Message: e})
 		}
+		if imp.contact != nil && (imp.contact.Status() == ContactStatusBlocked) {
+			blockedUUIDs = append(blockedUUIDs, imp.contact.UUID())
+		}
 	}
 
 	errorsJSON, err := jsonx.Marshal(importErrors)
+	if err != nil {
+		return errors.Wrap(err, "error marshaling errors")
+	}
+
+	numBlocked := len(blockedUUIDs)
+	blockedUUIDsJson, err := jsonx.Marshal(blockedUUIDs)
 	if err != nil {
 		return errors.Wrap(err, "error marshaling errors")
 	}
@@ -267,6 +279,8 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 	b.Status = ContactImportStatusComplete
 	b.NumCreated = numCreated
 	b.NumUpdated = numUpdated
+	b.NumBlocked = numBlocked
+	b.BlockedUUIDs = blockedUUIDsJson
 	b.NumErrored = numErrored
 	b.Errors = errorsJSON
 	b.FinishedOn = &now
@@ -277,6 +291,8 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 			status = :status, 
 			num_created = :num_created, 
 			num_updated = :num_updated, 
+			num_blocked = :num_blocked,
+			blocked_uuids = :blocked_uuids,
 			num_errored = :num_errored, 
 			errors = :errors, 
 			finished_on = :finished_on 
