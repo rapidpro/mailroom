@@ -45,13 +45,13 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, tz, org.Timezone())
 	assert.Equal(t, 0, len(org.AllowedLanguages()))
 	assert.Equal(t, envs.Language(""), org.DefaultLanguage())
-	assert.Equal(t, "", org.DefaultLocale().ToISO639_2())
+	assert.Equal(t, "", org.DefaultLocale().ToBCP47())
 
 	org, err = loadOrg(ctx, tx, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, []envs.Language{"eng", "fra"}, org.AllowedLanguages())
 	assert.Equal(t, envs.Language("eng"), org.DefaultLanguage())
-	assert.Equal(t, "en", org.DefaultLocale().ToISO639_2())
+	assert.Equal(t, "en", org.DefaultLocale().ToBCP47())
 
 	_, err = loadOrg(ctx, tx, 99)
 	assert.Error(t, err)

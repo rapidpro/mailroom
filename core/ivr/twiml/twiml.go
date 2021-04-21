@@ -501,7 +501,7 @@ func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait,
 			if len(event.Msg.Attachments()) == 0 {
 				country := envs.DeriveCountryFromTel(number.Path())
 				locale := envs.NewLocale(event.Msg.TextLanguage, country)
-				languageCode := locale.ToISO639_2()
+				languageCode := locale.ToBCP47()
 
 				if _, valid := validLanguageCodes[languageCode]; !valid {
 					languageCode = ""
