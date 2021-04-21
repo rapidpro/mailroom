@@ -1,3 +1,8 @@
+v6.3.7
+----------
+ * Update to latest goflow
+ * Update test database and rename Nexmo to Vonage
+
 v6.3.6
 ----------
  * Update to latest goflow
