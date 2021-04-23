@@ -147,6 +147,21 @@ func TestGetMessageIDFromUUID(t *testing.T) {
 	assert.Equal(t, models.MsgID(msgIn.ID()), msgID)
 }
 
+func TestLoadMessages(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi 1")
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi 2")
+	testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi 3")
+
+	msgs, err := models.LoadMessages(ctx, db, models.Org1, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
+
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(msgs))
+	assert.Equal(t, "hi 1", msgs[0].Text())
+	assert.Equal(t, "hi 2", msgs[1].Text())
+}
+
 func TestNormalizeAttachment(t *testing.T) {
 	config.Mailroom.AttachmentDomain = "foo.bar.com"
 	defer func() { config.Mailroom.AttachmentDomain = "" }()
@@ -167,7 +182,7 @@ func TestNormalizeAttachment(t *testing.T) {
 	}
 }
 
-func TestMarkMessages(t *testing.T) {
+func TestUpdateMessageStatus(t *testing.T) {
 	ctx, db, _ := testsuite.Reset()
 	defer testsuite.Reset()
 
@@ -192,7 +207,7 @@ func TestMarkMessages(t *testing.T) {
 	msg2 := insertMsg("Hola")
 	insertMsg("Howdy")
 
-	models.MarkMessagesPending(ctx, db, []*models.Msg{msg1, msg2})
+	models.UpdateMessageStatus(ctx, db, []*models.Msg{msg1, msg2}, models.MsgStatusPending)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 2)
 
@@ -205,7 +220,7 @@ func TestMarkMessages(t *testing.T) {
 	msg4 := insertMsg("Big messages!")
 	assert.Equal(t, flows.MsgID(3000000000), msg4.ID())
 
-	err = models.MarkMessagesPending(ctx, db, []*models.Msg{msg4})
+	err = models.UpdateMessageStatus(ctx, db, []*models.Msg{msg4}, models.MsgStatusPending)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 3)

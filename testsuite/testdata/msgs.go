@@ -25,3 +25,17 @@ func InsertIncomingMsg(t *testing.T, db *sqlx.DB, orgID models.OrgID, contactID 
 	msg.SetID(id)
 	return msg
 }
+
+// InsertOutgoingMsg inserts an outgoing message
+func InsertOutgoingMsg(t *testing.T, db *sqlx.DB, orgID models.OrgID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *flows.MsgOut {
+	msg := flows.NewMsgOut(urn, nil, text, nil, nil, nil, flows.NilMsgTopic)
+
+	var id flows.MsgID
+	err := db.Get(&id,
+		`INSERT INTO msgs_msg(uuid, text, created_on, direction, status, visibility, msg_count, error_count, next_attempt, contact_id, contact_urn_id, org_id)
+	  	 VALUES($1, $2, NOW(), 'O', 'P', 'V', 1, 0, NOW(), $3, $4, $5) RETURNING id`, msg.UUID(), text, contactID, urnID, orgID)
+	require.NoError(t, err)
+
+	msg.SetID(id)
+	return msg
+}

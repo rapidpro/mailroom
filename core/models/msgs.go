@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent"
@@ -382,6 +384,59 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	return msg
 }
 
+var loadMessagesSQL = `
+SELECT 
+	id,
+	broadcast_id,
+	uuid,
+	text,
+	created_on,
+	direction,
+	status,
+	visibility,
+	msg_count,
+	error_count,
+	next_attempt,
+	external_id,
+	attachments,
+	metadata,
+	channel_id,
+	connection_id,
+	contact_id,
+	contact_urn_id,
+	response_to_id,
+	org_id,
+	topup_id
+FROM
+	msgs_msg
+WHERE
+	org_id = $1 AND
+	id = ANY($2)
+ORDER BY
+	id ASC`
+
+// LoadMessages loads the given messages for the passed in org
+func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, msgIDs []MsgID) ([]*Msg, error) {
+	rows, err := db.QueryxContext(ctx, loadMessagesSQL, orgID, pq.Array(msgIDs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying msgs for org: %d", orgID)
+	}
+	defer rows.Close()
+
+	msgs := make([]*Msg, 0)
+	for rows.Next() {
+		msg := &Msg{}
+		err = rows.StructScan(&msg.m)
+		if err != nil {
+			return nil, errors.Wrap(err, "error scanning msg row")
+		}
+
+		msgs = append(msgs, msg)
+	}
+
+	return msgs, nil
+}
+
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
 func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
@@ -458,12 +513,8 @@ func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status Ms
 	return nil
 }
 
-// MarkMessagesPending marks the passed in messages as pending
-func MarkMessagesPending(ctx context.Context, db Queryer, msgs []*Msg) error {
-	return updateMessageStatus(ctx, db, msgs, MsgStatusPending)
-}
-
-func updateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status MsgStatus) error {
+// UpdateMessageStatus updates status for the given messages
+func UpdateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status MsgStatus) error {
 	is := make([]interface{}, len(msgs))
 	for i, msg := range msgs {
 		m := &msg.m
@@ -947,6 +998,76 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 	}
 
 	return msgs, nil
+}
+
+// CloneMessages clones the given messages for resending
+func CloneMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
+	channels := oa.SessionAssets().Channels()
+	clones := make([]*Msg, len(msgs))
+
+	for i, msg := range msgs {
+		clone := &Msg{}
+		channelID := NilChannelID
+
+		urn, err := URNForID(ctx, db, oa, *msg.ContactURNID())
+		if err != nil {
+			return nil, errors.Wrap(err, "errr loading URN for cloned message")
+		}
+		contactURN, err := flows.ParseRawURN(channels, urn, assets.IgnoreMissing)
+		if err != nil {
+			return nil, errors.Wrap(err, "errr parsing URN for cloned message")
+		}
+		ch := channels.GetForURN(contactURN, assets.ChannelRoleSend)
+		if ch != nil {
+			channel := oa.ChannelByUUID(ch.UUID())
+			channelID = channel.ID()
+		}
+
+		// we fail messages for suspended orgs right away
+		status := MsgStatusQueued
+		if oa.Org().Suspended() {
+			status = MsgStatusFailed
+		}
+
+		m := &clone.m
+		m.UUID = flows.MsgUUID(uuids.New())
+		m.OrgID = oa.OrgID()
+		m.ContactID = msg.ContactID()
+		m.ContactURNID = msg.ContactURNID()
+		m.ChannelID = channelID
+		m.Text = msg.Text()
+		m.Attachments = msg.m.Attachments
+		m.Metadata = msg.m.Metadata
+		m.HighPriority = false
+		m.Direction = DirectionOut
+		m.Status = status
+		m.Visibility = VisibilityVisible
+		m.MsgType = msg.MsgType()
+		m.CreatedOn = dates.Now()
+
+		clones[i] = clone
+	}
+
+	// allocate a topup for these messages if org uses topups
+	topup, err := AllocateTopups(ctx, db, rp, oa.Org(), len(clones))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error allocating topup for cloned messages")
+	}
+
+	// if we have an active topup, assign it to our messages
+	if topup != NilTopupID {
+		for _, m := range clones {
+			m.SetTopup(topup)
+		}
+	}
+
+	// insert them in a single request
+	err = InsertMessages(ctx, db, clones)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting cloned messages")
+	}
+
+	return clones, nil
 }
 
 // MarkBroadcastSent marks the passed in broadcast as sent
