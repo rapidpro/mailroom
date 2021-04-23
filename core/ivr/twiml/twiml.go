@@ -269,11 +269,14 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 	case "in-progress", "initiated":
 		return models.ConnectionStatusInProgress, 0
 
+	case "busy", "no-answer":
+		return models.ConnectionStatusBusy, 0
+
 	case "completed":
 		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
 		return models.ConnectionStatusCompleted, duration
 
-	case "busy", "no-answer", "canceled", "failed":
+	case "canceled", "failed":
 		return models.ConnectionStatusErrored, 0
 
 	default:

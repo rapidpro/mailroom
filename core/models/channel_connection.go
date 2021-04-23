@@ -392,6 +392,23 @@ func (c *ChannelConnection) MarkFailed(ctx context.Context, db Queryer, now time
 	return nil
 }
 
+// MarkBusy updates the status for this connection
+func (c *ChannelConnection) MarkBusy(ctx context.Context, db Queryer, now time.Time) error {
+	c.c.Status = ConnectionStatusBusy
+	c.c.EndedOn = &now
+
+	_, err := db.ExecContext(ctx,
+		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, modified_on = NOW() WHERE id = $1`,
+		c.c.ID, c.c.Status, c.c.EndedOn,
+	)
+
+	if err != nil {
+		return errors.Wrapf(err, "error marking channel connection as failed")
+	}
+
+	return nil
+}
+
 // MarkThrottled updates the status for this connection to be queued, to be retried in a minute
 func (c *ChannelConnection) MarkThrottled(ctx context.Context, db Queryer, now time.Time) error {
 	c.c.Status = ConnectionStatusQueued
