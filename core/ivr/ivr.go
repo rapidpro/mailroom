@@ -582,6 +582,26 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *model
 		}
 	} else if status == models.ConnectionStatusFailed {
 		conn.MarkFailed(ctx, db, time.Now())
+	} else if status == models.ConnectionStatusBusy {
+		// on errors we need to look up the flow to know how long to wait before retrying
+		start, err := models.GetFlowStartAttributes(ctx, db, conn.StartID())
+		if err != nil {
+			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())
+		}
+
+		flow, err := oa.FlowByID(start.FlowID())
+		if err != nil {
+			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
+		}
+
+		// creating empty run even if the voice call was busy or no answer (it is getting billed on call's provider side)
+		contactID := flows.ContactID(conn.ContactID())
+		err = models.NewEmptyRun(ctx, db, contactID, flow.ID(), oa.OrgID())
+		if err != nil {
+			return errors.Wrapf(err, "error creating empty run")
+		}
+
+		conn.MarkBusy(ctx, db, time.Now())
 	} else {
 		if status != conn.Status() || duration > 0 {
 			err := conn.UpdateStatus(ctx, db, status, duration, time.Now())

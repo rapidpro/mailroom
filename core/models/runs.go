@@ -1060,3 +1060,60 @@ const expireRunsSQL = `
 	WHERE
 		id = ANY($1)
 `
+
+// NewEmptyRun enables to create an empty run, without results, only to log the contact interaction
+func NewEmptyRun(ctx context.Context, db Queryer, contactID flows.ContactID, flowID FlowID, orgID OrgID) error {
+	run := &FlowRun{}
+	r := &run.r
+	r.UUID = flows.RunUUID(uuids.New())
+	r.Status = RunStatusCompleted
+	r.CreatedOn = time.Now()
+	r.ExpiresOn = nil
+	r.ModifiedOn = time.Now()
+	r.ContactID = contactID
+	r.FlowID = flowID
+	r.StartID = NilStartID
+	r.OrgID = orgID
+	r.IsActive = false
+	r.ExitType = ExitCompleted
+	r.Responded = false
+
+	filteredEvents := make([]flows.Event, 0)
+	eventJSON, err := json.Marshal(filteredEvents)
+	if err != nil {
+		return errors.Wrapf(err, "error marshalling events for run on creating empty run")
+	}
+	r.Events = string(eventJSON)
+
+	path := make([]Step, 0)
+	pathJSON, err := json.Marshal(path)
+	if err != nil {
+		return err
+	}
+	r.Path = string(pathJSON)
+
+	results := make(flows.Results)
+	resultsJSON, err := json.Marshal(results)
+	if err != nil {
+		return errors.Wrapf(err, "error marshalling results for run on creating empty run")
+	}
+	r.Results = string(resultsJSON)
+
+	exitedOn := time.Now().Add(time.Second * 3)
+
+	_, err = db.ExecContext(ctx,
+		`
+			INSERT INTO
+				flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, status, expires_on, responded, results, path, events, current_node_uuid, contact_id, flow_id, org_id, session_id, start_id, parent_uuid, connection_id)
+				VALUES($1, $2, NOW(), NOW(), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+				RETURNING id
+			`,
+		r.UUID, r.IsActive, exitedOn, r.ExitType, r.Status, r.ExpiresOn, r.Responded, r.Results, r.Path, r.Events, nil, r.ContactID, r.FlowID, r.OrgID, nil, nil, nil, nil,
+	)
+
+	if err != nil {
+		return errors.Wrapf(err, "error writing empty run")
+	}
+
+	return nil
+}
