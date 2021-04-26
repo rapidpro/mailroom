@@ -150,16 +150,29 @@ func TestGetMessageIDFromUUID(t *testing.T) {
 func TestLoadMessages(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	msgOut1 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi 1")
-	msgOut2 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi 2")
-	testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi 3")
+	msgIn1 := testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "in 1")
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "out 2", nil)
+	msgOut3 := testdata.InsertOutgoingMsg(t, db, models.Org2, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "out 3", nil)
+	testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi 3", nil)
 
-	msgs, err := models.LoadMessages(ctx, db, models.Org1, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
+	ids := []models.MsgID{models.MsgID(msgIn1.ID()), models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID()), models.MsgID(msgOut3.ID())}
 
+	msgs, err := models.LoadMessages(ctx, db, models.Org1, models.DirectionOut, ids)
+
+	// should only return the outgoing messages for this org
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(msgs))
-	assert.Equal(t, "hi 1", msgs[0].Text())
-	assert.Equal(t, "hi 2", msgs[1].Text())
+	assert.Equal(t, "out 1", msgs[0].Text())
+	assert.Equal(t, []utils.Attachment{"image/jpeg:hi.jpg"}, msgs[0].Attachments())
+	assert.Equal(t, "out 2", msgs[1].Text())
+
+	msgs, err = models.LoadMessages(ctx, db, models.Org1, models.DirectionIn, ids)
+
+	// should only return the incoming message for this org
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(msgs))
+	assert.Equal(t, "in 1", msgs[0].Text())
 }
 
 func TestNormalizeAttachment(t *testing.T) {

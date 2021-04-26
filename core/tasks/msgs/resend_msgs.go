@@ -38,7 +38,7 @@ func (t *ResendMsgsTask) Perform(ctx context.Context, mr *mailroom.Mailroom, org
 		return errors.Wrap(err, "unable to load org")
 	}
 
-	msgs, err := models.LoadMessages(ctx, db, orgID, t.MsgIDs)
+	msgs, err := models.LoadMessages(ctx, db, orgID, models.DirectionOut, t.MsgIDs)
 	if err != nil {
 		return errors.Wrap(err, "error loading messages to resend")
 	}

@@ -411,13 +411,14 @@ FROM
 	msgs_msg
 WHERE
 	org_id = $1 AND
-	id = ANY($2)
+	direction = $2 AND
+	id = ANY($3)
 ORDER BY
 	id ASC`
 
 // LoadMessages loads the given messages for the passed in org
-func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, msgIDs []MsgID) ([]*Msg, error) {
-	rows, err := db.QueryxContext(ctx, loadMessagesSQL, orgID, pq.Array(msgIDs))
+func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, direction MsgDirection, msgIDs []MsgID) ([]*Msg, error) {
+	rows, err := db.QueryxContext(ctx, loadMessagesSQL, orgID, direction, pq.Array(msgIDs))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying msgs for org: %d", orgID)
 	}
