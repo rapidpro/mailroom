@@ -96,6 +96,7 @@ var validLanguageCodes = map[string]bool{
 	"zh-TW": true,
 }
 
+// For reference: https://www.twilio.com/docs/voice/twiml/say#attributes-language
 var validLanguagesInitialCode = map[string]bool{
 	"en": true,
 	"es": true,
