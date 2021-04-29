@@ -96,6 +96,15 @@ var validLanguageCodes = map[string]bool{
 	"zh-TW": true,
 }
 
+// For reference: https://www.twilio.com/docs/voice/twiml/say#attributes-language
+var validLanguagesInitialCode = map[string]bool{
+	"en": true,
+	"es": true,
+	"fr": true,
+	"it": true,
+	"de": true,
+}
+
 var indentMarshal = true
 
 type client struct {
@@ -468,8 +477,15 @@ func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait,
 				languageCode := locale.ToISO639_2()
 
 				if _, valid := validLanguageCodes[languageCode]; !valid {
-					languageCode = ""
+					if len(languageCode) < 2 {
+						languageCode = ""
+					} else if _, valid := validLanguagesInitialCode[languageCode[:2]]; !valid {
+						languageCode = ""
+					} else {
+						languageCode = languageCode[:2]
+					}
 				}
+
 				commands = append(commands, Say{Text: event.Msg.Text(), Language: languageCode})
 			} else {
 				for _, a := range event.Msg.Attachments() {
