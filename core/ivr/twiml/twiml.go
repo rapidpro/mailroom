@@ -477,7 +477,9 @@ func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait,
 				languageCode := locale.ToISO639_2()
 
 				if _, valid := validLanguageCodes[languageCode]; !valid {
-					if _, valid := validLanguagesInitialCode[languageCode[:2]]; !valid {
+					if len(languageCode) < 2 {
+						languageCode = ""
+					} else if _, valid := validLanguagesInitialCode[languageCode[:2]]; !valid {
 						languageCode = ""
 					} else {
 						languageCode = languageCode[:2]
