@@ -59,6 +59,7 @@ func (t *TemplateTranslation) Channel() assets.ChannelReference { return t.t.Cha
 func (t *TemplateTranslation) Language() envs.Language          { return t.t.Language }
 func (t *TemplateTranslation) Country() envs.Country            { return envs.Country(t.t.Country) }
 func (t *TemplateTranslation) Content() string                  { return t.t.Content }
+func (t *TemplateTranslation) Namespace() string                { return "" }
 func (t *TemplateTranslation) VariableCount() int               { return t.t.VariableCount }
 
 // loads the templates for the passed in org
