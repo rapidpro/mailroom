@@ -175,6 +175,42 @@ func TestLoadMessages(t *testing.T) {
 	assert.Equal(t, "in 1", msgs[0].Text())
 }
 
+func TestResendMessages(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	rp := testsuite.RP()
+
+	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	require.NoError(t, err)
+
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", nil)
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.BobID, models.BobURN, models.BobURNID, "out 2", nil)
+	testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "out 3", nil)
+
+	// make them look like failed messages
+	db.MustExec(`UPDATE msgs_msg SET status = 'F', sent_on = NOW(), error_count = 3`)
+
+	// give Bob's URN an affinity for the Vonage channel
+	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, models.VonageChannelID, models.BobURNID)
+
+	msgs, err := models.LoadMessages(ctx, db, models.Org1, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
+	require.NoError(t, err)
+
+	// resend both msgs
+	err = models.ResendMessages(ctx, db, rp, oa, msgs)
+	require.NoError(t, err)
+
+	// both messages should now have a channel, a topup and be marked for resending
+	assert.True(t, msgs[0].IsResend())
+	assert.Equal(t, models.TwilioChannelID, msgs[0].ChannelID())
+	assert.Equal(t, models.TopupID(1), msgs[0].TopupID())
+	assert.True(t, msgs[1].IsResend())
+	assert.Equal(t, models.VonageChannelID, msgs[1].ChannelID())
+	assert.Equal(t, models.TopupID(1), msgs[1].TopupID())
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND sent_on IS NULL`, nil, 2)
+}
+
 func TestNormalizeAttachment(t *testing.T) {
 	config.Mailroom.AttachmentDomain = "foo.bar.com"
 	defer func() { config.Mailroom.AttachmentDomain = "" }()
@@ -195,7 +231,7 @@ func TestNormalizeAttachment(t *testing.T) {
 	}
 }
 
-func TestUpdateMessageStatus(t *testing.T) {
+func TestMarkMessages(t *testing.T) {
 	ctx, db, _ := testsuite.Reset()
 	defer testsuite.Reset()
 
@@ -220,7 +256,7 @@ func TestUpdateMessageStatus(t *testing.T) {
 	msg2 := insertMsg("Hola")
 	insertMsg("Howdy")
 
-	models.UpdateMessageStatus(ctx, db, []*models.Msg{msg1, msg2}, models.MsgStatusPending)
+	models.MarkMessagesPending(ctx, db, []*models.Msg{msg1, msg2})
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 2)
 
@@ -233,7 +269,7 @@ func TestUpdateMessageStatus(t *testing.T) {
 	msg4 := insertMsg("Big messages!")
 	assert.Equal(t, flows.MsgID(3000000000), msg4.ID())
 
-	err = models.UpdateMessageStatus(ctx, db, []*models.Msg{msg4}, models.MsgStatusPending)
+	err = models.MarkMessagesPending(ctx, db, []*models.Msg{msg4})
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 3)

@@ -43,17 +43,11 @@ func (t *ResendMsgsTask) Perform(ctx context.Context, mr *mailroom.Mailroom, org
 		return errors.Wrap(err, "error loading messages to resend")
 	}
 
-	clones, err := models.CloneMessages(ctx, db, rp, oa, msgs)
+	err = models.ResendMessages(ctx, db, rp, oa, msgs)
 	if err != nil {
 		return errors.Wrap(err, "error cloning messages")
 	}
 
-	// update existing messages as RESENT
-	err = models.UpdateMessageStatus(ctx, db, msgs, models.MsgStatusResent)
-	if err != nil {
-		return errors.Wrap(err, "error updating message status")
-	}
-
-	msgio.SendMessages(ctx, db, rp, nil, clones)
+	msgio.SendMessages(ctx, db, rp, nil, msgs)
 	return nil
 }

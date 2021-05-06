@@ -71,7 +71,7 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fc
 	// any messages that didn't get sent should be moved back to pending (they are queued at creation to save an
 	// update in the common case)
 	if len(pending) > 0 {
-		err := models.UpdateMessageStatus(ctx, db, pending, models.MsgStatusPending)
+		err := models.MarkMessagesPending(ctx, db, pending)
 		if err != nil {
 			log.WithError(err).Error("error marking message as pending")
 		}
