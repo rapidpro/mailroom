@@ -3,9 +3,11 @@ package testdata
 import (
 	"testing"
 
+	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/jmoiron/sqlx"
@@ -22,6 +24,20 @@ func InsertIncomingMsg(t *testing.T, db *sqlx.DB, orgID models.OrgID, contactID 
 	require.NoError(t, err)
 
 	msg := flows.NewMsgIn(msgUUID, urn, nil, text, nil)
+	msg.SetID(id)
+	return msg
+}
+
+// InsertOutgoingMsg inserts an outgoing message
+func InsertOutgoingMsg(t *testing.T, db *sqlx.DB, orgID models.OrgID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string, attachments []utils.Attachment) *flows.MsgOut {
+	msg := flows.NewMsgOut(urn, nil, text, nil, nil, nil, flows.NilMsgTopic)
+
+	var id flows.MsgID
+	err := db.Get(&id,
+		`INSERT INTO msgs_msg(uuid, text, attachments, created_on, direction, status, visibility, msg_count, error_count, next_attempt, contact_id, contact_urn_id, org_id)
+	  	 VALUES($1, $2, $3, NOW(), 'O', 'P', 'V', 1, 0, NOW(), $4, $5, $6) RETURNING id`, msg.UUID(), text, pq.Array(attachments), contactID, urnID, orgID)
+	require.NoError(t, err)
+
 	msg.SetID(id)
 	return msg
 }
