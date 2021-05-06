@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -180,6 +181,8 @@ func TestResendMessages(t *testing.T) {
 	db := testsuite.DB()
 	rp := testsuite.RP()
 
+	db.MustExec(`DELETE FROM msgs_msg`)
+
 	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
 	require.NoError(t, err)
 
@@ -196,6 +199,8 @@ func TestResendMessages(t *testing.T) {
 	msgs, err := models.LoadMessages(ctx, db, models.Org1, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
 	require.NoError(t, err)
 
+	now := dates.Now()
+
 	// resend both msgs
 	err = models.ResendMessages(ctx, db, rp, oa, msgs)
 	require.NoError(t, err)
@@ -208,7 +213,7 @@ func TestResendMessages(t *testing.T) {
 	assert.Equal(t, models.VonageChannelID, msgs[1].ChannelID())
 	assert.Equal(t, models.TopupID(1), msgs[1].TopupID())
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND sent_on IS NULL`, nil, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, []interface{}{now}, 2)
 }
 
 func TestNormalizeAttachment(t *testing.T) {

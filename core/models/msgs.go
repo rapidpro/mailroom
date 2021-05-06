@@ -1014,13 +1014,13 @@ const updateMsgForResendingSQL = `
 		topup_id = r.topup_id::int,
 		status = 'P',
 		error_count = 0,
-		queued_on = NULL,
+		queued_on = r.queued_on::timestamp with time zone,
 		sent_on = NULL,
 		modified_on = NOW()
 	FROM (
-		VALUES(:id, :channel_id, :topup_id)
+		VALUES(:id, :channel_id, :topup_id, :queued_on)
 	) AS
-		r(id, channel_id, topup_id)
+		r(id, channel_id, topup_id, queued_on)
 	WHERE
 		m.id = r.id::bigint
 `
@@ -1056,7 +1056,7 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 
 		// mark message as being a resend so it will be queued to courier as such
 		msg.m.Status = MsgStatusPending
-		msg.m.QueuedOn = dates.ZeroDateTime
+		msg.m.QueuedOn = dates.Now()
 		msg.m.SentOn = dates.ZeroDateTime
 		msg.m.ErrorCount = 0
 		msg.m.IsResend = true
