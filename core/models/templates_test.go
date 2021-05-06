@@ -24,6 +24,7 @@ func TestTemplates(t *testing.T) {
 	tt := templates[0].Translations()[0]
 	assert.Equal(t, envs.Language("fra"), tt.Language())
 	assert.Equal(t, envs.NilCountry, tt.Country())
+	assert.Equal(t, "", tt.Namespace())
 	assert.Equal(t, TwitterChannelUUID, tt.Channel().UUID)
 	assert.Equal(t, "Salut!", tt.Content())
 
@@ -31,6 +32,7 @@ func TestTemplates(t *testing.T) {
 	tt = templates[1].Translations()[0]
 	assert.Equal(t, envs.Language("eng"), tt.Language())
 	assert.Equal(t, envs.Country("US"), tt.Country())
+	assert.Equal(t, "2d40b45c_25cd_4965_9019_f05d0124c5fa", tt.Namespace())
 	assert.Equal(t, TwitterChannelUUID, tt.Channel().UUID)
 	assert.Equal(t, "Hi {{1}}, are you still experiencing problems with {{2}}?", tt.Content())
 }
