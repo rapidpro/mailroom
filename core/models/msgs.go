@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
@@ -118,6 +119,7 @@ type Msg struct {
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
 		ResponseToID         MsgID              `db:"response_to_id"  json:"response_to_id"`
 		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
+		IsResend             bool               `                     json:"is_resend,omitempty"`
 		URN                  urns.URN           `                     json:"urn"`
 		URNAuth              null.String        `                     json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
@@ -164,6 +166,7 @@ func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
 func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
+func (m *Msg) IsResend() bool                   { return m.m.IsResend }
 
 func (m *Msg) SetTopup(topupID TopupID)               { m.m.TopupID = topupID }
 func (m *Msg) SetChannelID(channelID ChannelID)       { m.m.ChannelID = channelID }
@@ -380,6 +383,60 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	}
 
 	return msg
+}
+
+var loadMessagesSQL = `
+SELECT 
+	id,
+	broadcast_id,
+	uuid,
+	text,
+	created_on,
+	direction,
+	status,
+	visibility,
+	msg_count,
+	error_count,
+	next_attempt,
+	external_id,
+	attachments,
+	metadata,
+	channel_id,
+	connection_id,
+	contact_id,
+	contact_urn_id,
+	response_to_id,
+	org_id,
+	topup_id
+FROM
+	msgs_msg
+WHERE
+	org_id = $1 AND
+	direction = $2 AND
+	id = ANY($3)
+ORDER BY
+	id ASC`
+
+// LoadMessages loads the given messages for the passed in org
+func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, direction MsgDirection, msgIDs []MsgID) ([]*Msg, error) {
+	rows, err := db.QueryxContext(ctx, loadMessagesSQL, orgID, direction, pq.Array(msgIDs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying msgs for org: %d", orgID)
+	}
+	defer rows.Close()
+
+	msgs := make([]*Msg, 0)
+	for rows.Next() {
+		msg := &Msg{}
+		err = rows.StructScan(&msg.m)
+		if err != nil {
+			return nil, errors.Wrap(err, "error scanning msg row")
+		}
+
+		msgs = append(msgs, msg)
+	}
+
+	return msgs, nil
 }
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
@@ -947,6 +1004,73 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 	}
 
 	return msgs, nil
+}
+
+const updateMsgForResendingSQL = `
+	UPDATE
+		msgs_msg m
+	SET
+		channel_id = r.channel_id::int,
+		topup_id = r.topup_id::int,
+		status = 'P',
+		error_count = 0,
+		queued_on = r.queued_on::timestamp with time zone,
+		sent_on = NULL,
+		modified_on = NOW()
+	FROM (
+		VALUES(:id, :channel_id, :topup_id, :queued_on)
+	) AS
+		r(id, channel_id, topup_id, queued_on)
+	WHERE
+		m.id = r.id::bigint
+`
+
+// ResendMessages prepares messages for resending by reselecting a channel and marking them as PENDING
+func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) error {
+	channels := oa.SessionAssets().Channels()
+	resends := make([]interface{}, len(msgs))
+
+	for i, msg := range msgs {
+		// reselect channel for this message's URN
+		urn, err := URNForID(ctx, db, oa, *msg.ContactURNID())
+		if err != nil {
+			return errors.Wrap(err, "error loading URN")
+		}
+		contactURN, err := flows.ParseRawURN(channels, urn, assets.IgnoreMissing)
+		if err != nil {
+			return errors.Wrap(err, "error parsing URN")
+		}
+		ch := channels.GetForURN(contactURN, assets.ChannelRoleSend)
+		if ch != nil {
+			channel := oa.ChannelByUUID(ch.UUID())
+			msg.m.ChannelID = channel.ID()
+		} else {
+			msg.m.ChannelID = NilChannelID
+		}
+
+		// allocate a new topup for this message if org uses topups
+		msg.m.TopupID, err = AllocateTopups(ctx, db, rp, oa.Org(), 1)
+		if err != nil {
+			return errors.Wrapf(err, "error allocating topup for message resending")
+		}
+
+		// mark message as being a resend so it will be queued to courier as such
+		msg.m.Status = MsgStatusPending
+		msg.m.QueuedOn = dates.Now()
+		msg.m.SentOn = dates.ZeroDateTime
+		msg.m.ErrorCount = 0
+		msg.m.IsResend = true
+
+		resends[i] = msg.m
+	}
+
+	// update the messages in the database
+	err := BulkQuery(ctx, "updating messages for resending", db, updateMsgForResendingSQL, resends)
+	if err != nil {
+		return errors.Wrapf(err, "error updating messages for resending")
+	}
+
+	return nil
 }
 
 // MarkBroadcastSent marks the passed in broadcast as sent
