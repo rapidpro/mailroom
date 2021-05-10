@@ -1,3 +1,7 @@
+v6.3.8
+----------
+ * Add task to resend messages
+
 v6.3.7
 ----------
  * Update to latest goflow
