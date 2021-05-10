@@ -250,7 +250,7 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 	oa, err := models.GetOrgAssets(ctx, db, conn.OrgID())
 	hasMachineDetection := false
 	if err != nil && oa != nil {
-		hasMachineDetection = oa.Org().ConfigValue("MachineDetection", "false") == "true"
+		hasMachineDetection = oa.Org().ConfigValue("IVR_MACHINE_DETECTION", "false") == "true"
 	}
 
 	// try to request our call start
