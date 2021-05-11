@@ -45,7 +45,7 @@ func (t *ResendMsgsTask) Perform(ctx context.Context, mr *mailroom.Mailroom, org
 
 	err = models.ResendMessages(ctx, db, rp, oa, msgs)
 	if err != nil {
-		return errors.Wrap(err, "error cloning messages")
+		return errors.Wrap(err, "error resending messages")
 	}
 
 	msgio.SendMessages(ctx, db, rp, nil, msgs)

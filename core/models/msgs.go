@@ -1036,16 +1036,23 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 		if err != nil {
 			return errors.Wrap(err, "error loading URN")
 		}
+		msg.m.URN = urn // needs to be set for queueing to courier
+
 		contactURN, err := flows.ParseRawURN(channels, urn, assets.IgnoreMissing)
 		if err != nil {
 			return errors.Wrap(err, "error parsing URN")
 		}
+
 		ch := channels.GetForURN(contactURN, assets.ChannelRoleSend)
 		if ch != nil {
 			channel := oa.ChannelByUUID(ch.UUID())
 			msg.m.ChannelID = channel.ID()
+			msg.m.ChannelUUID = channel.UUID()
+			msg.channel = channel
 		} else {
 			msg.m.ChannelID = NilChannelID
+			msg.m.ChannelUUID = assets.ChannelUUID("")
+			msg.channel = nil
 		}
 
 		// allocate a new topup for this message if org uses topups

@@ -2,6 +2,7 @@ package testsuite
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const storageDir = "_test_storage"
@@ -130,4 +132,38 @@ func AssertQueryCount(t *testing.T, db *sqlx.DB, sql string, args []interface{},
 		assert.Fail(t, "error performing query: %s - %s", sql, err)
 	}
 	assert.Equal(t, count, c, errMsg...)
+}
+
+// AssertCourierQueues asserts the sizes of message batches in the named courier queues
+func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...interface{}) {
+	rc := RC()
+	defer rc.Close()
+
+	queueKeys, err := redis.Strings(rc.Do("KEYS", "msgs:????????-*"))
+	require.NoError(t, err)
+
+	actual := make(map[string][]int, len(queueKeys))
+	for _, queueKey := range queueKeys {
+		size, err := redis.Int64(rc.Do("ZCARD", queueKey))
+		require.NoError(t, err)
+		actual[queueKey] = make([]int, size)
+
+		if size > 0 {
+			results, err := redis.Values(rc.Do("ZPOPMAX", queueKey, size))
+			require.NoError(t, err)
+			require.Equal(t, int(size*2), len(results)) // result is (item, score, item, score, ...)
+
+			// unmarshal each item in the queue as a batch of messages
+			for i := 0; i < int(size); i++ {
+				batchJSON := results[i*2].([]byte)
+				var batch []map[string]interface{}
+				err = json.Unmarshal(batchJSON, &batch)
+				require.NoError(t, err)
+
+				actual[queueKey][i] = len(batch)
+			}
+		}
+	}
+
+	assert.Equal(t, expected, actual, errMsg...)
 }
