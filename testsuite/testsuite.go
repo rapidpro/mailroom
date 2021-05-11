@@ -134,7 +134,7 @@ func AssertQueryCount(t *testing.T, db *sqlx.DB, sql string, args []interface{},
 	assert.Equal(t, count, c, errMsg...)
 }
 
-// AssertCourierQueues asserts the sizes of named courier queues
+// AssertCourierQueues asserts the sizes of message batches in the named courier queues
 func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...interface{}) {
 	rc := RC()
 	defer rc.Close()
@@ -153,7 +153,7 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 			require.NoError(t, err)
 			require.Equal(t, int(size*2), len(results)) // result is (item, score, item, score, ...)
 
-			// unmarshal each item in the queu as a batch of messages
+			// unmarshal each item in the queue as a batch of messages
 			for i := 0; i < int(size); i++ {
 				batchJSON := results[i*2].([]byte)
 				var batch []map[string]interface{}
