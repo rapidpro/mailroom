@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
@@ -110,7 +109,7 @@ type simulatorTicketService struct {
 }
 
 func (s *simulatorTicketService) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	return flows.NewTicket(flows.TicketUUID(uuids.New()), s.ticketer.Reference(), subject, body, ""), nil
+	return flows.NewTicket(s.ticketer, subject, body, ""), nil
 }
 
 func simulatorAirtimeServiceFactory(session flows.Session) (flows.AirtimeService, error) {

@@ -34,8 +34,8 @@ func TestContacts(t *testing.T) {
 	db.MustExec(`UPDATE contacts_contact SET is_active = FALSE WHERE id = $1`, models.AlexandriaID)
 
 	modelContacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{models.CathyID, models.GeorgeID, models.BobID, models.AlexandriaID})
-	assert.NoError(t, err)
-	assert.Equal(t, 3, len(modelContacts))
+	require.NoError(t, err)
+	require.Equal(t, 3, len(modelContacts))
 
 	// convert to goflow contacts
 	contacts := make([]*flows.Contact, len(modelContacts))
@@ -44,29 +44,27 @@ func TestContacts(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	if len(contacts) == 3 {
-		assert.Equal(t, "Cathy", contacts[0].Name())
-		assert.Equal(t, len(contacts[0].URNs()), 1)
-		assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
-		assert.Equal(t, 1, contacts[0].Groups().Count())
+	assert.Equal(t, "Cathy", contacts[0].Name())
+	assert.Equal(t, len(contacts[0].URNs()), 1)
+	assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
+	assert.Equal(t, 1, contacts[0].Groups().Count())
 
-		assert.Equal(t, "Yobe", contacts[0].Fields()["state"].QueryValue())
-		assert.Equal(t, "Dokshi", contacts[0].Fields()["ward"].QueryValue())
-		assert.Equal(t, "F", contacts[0].Fields()["gender"].QueryValue())
-		assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
+	assert.Equal(t, "Yobe", contacts[0].Fields()["state"].QueryValue())
+	assert.Equal(t, "Dokshi", contacts[0].Fields()["ward"].QueryValue())
+	assert.Equal(t, "F", contacts[0].Fields()["gender"].QueryValue())
+	assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
 
-		assert.Equal(t, "Bob", contacts[1].Name())
-		assert.NotNil(t, contacts[1].Fields()["joined"].QueryValue())
-		assert.Equal(t, 2, len(contacts[1].URNs()))
-		assert.Equal(t, contacts[1].URNs()[0].String(), "tel:+16055742222?id=10001&priority=1000")
-		assert.Equal(t, contacts[1].URNs()[1].String(), "whatsapp:250788373373?id=20121&priority=999")
-		assert.Equal(t, 0, contacts[1].Groups().Count())
+	assert.Equal(t, "Bob", contacts[1].Name())
+	assert.NotNil(t, contacts[1].Fields()["joined"].QueryValue())
+	assert.Equal(t, 2, len(contacts[1].URNs()))
+	assert.Equal(t, contacts[1].URNs()[0].String(), "tel:+16055742222?id=10001&priority=1000")
+	assert.Equal(t, contacts[1].URNs()[1].String(), "whatsapp:250788373373?id=20121&priority=999")
+	assert.Equal(t, 0, contacts[1].Groups().Count())
 
-		assert.Equal(t, "George", contacts[2].Name())
-		assert.Equal(t, decimal.RequireFromString("30"), contacts[2].Fields()["age"].QueryValue())
-		assert.Equal(t, 0, len(contacts[2].URNs()))
-		assert.Equal(t, 0, contacts[2].Groups().Count())
-	}
+	assert.Equal(t, "George", contacts[2].Name())
+	assert.Equal(t, decimal.RequireFromString("30"), contacts[2].Fields()["age"].QueryValue())
+	assert.Equal(t, 0, len(contacts[2].URNs()))
+	assert.Equal(t, 0, contacts[2].Groups().Count())
 
 	// change bob to have a preferred URN and channel of our telephone
 	channel := org.ChannelByID(models.TwilioChannelID)

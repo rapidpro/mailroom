@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -29,7 +28,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 
 // Open just returns a new ticket - no external service to notify
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	return flows.NewTicket(flows.TicketUUID(uuids.New()), s.ticketer.Reference(), subject, body, ""), nil
+	return flows.NewTicket(s.ticketer, subject, body, ""), nil
 }
 
 // Forward is a noop

@@ -1,6 +1,10 @@
 package rocketchat_test
 
 import (
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -12,11 +16,9 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net/http"
-	"testing"
-	"time"
 )
 
 func TestOpenAndForward(t *testing.T) {
@@ -69,15 +71,10 @@ func TestOpenAndForward(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
 	assert.NoError(t, err)
-
-	assert.Equal(t, &flows.Ticket{
-		UUID:       flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"),
-		Ticketer:   ticketer.Reference(),
-		Subject:    "Need help",
-		Body:       "Where are my cookies?",
-		ExternalID: "uiF7ybjsv7PSJGSw6",
-	}, ticket)
-
+	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID)
+	assert.Equal(t, "Need help", ticket.Subject)
+	assert.Equal(t, "Where are my cookies?", ticket.Body)
+	assert.Equal(t, "uiF7ybjsv7PSJGSw6", ticket.ExternalID)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
