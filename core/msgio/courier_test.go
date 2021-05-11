@@ -1,10 +1,8 @@
 package msgio_test
 
 import (
-	"encoding/json"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -32,7 +30,7 @@ func TestQueueCourierMessages(t *testing.T) {
 	tests := []struct {
 		Description string
 		Msgs        []msgSpec
-		QueueSizes  map[string]int
+		QueueSizes  map[string][]int
 	}{
 		{
 			Description: "2 queueable messages",
@@ -48,8 +46,8 @@ func TestQueueCourierMessages(t *testing.T) {
 					URNID:     models.CathyURNID,
 				},
 			},
-			QueueSizes: map[string]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": 2,
+			QueueSizes: map[string][]int{
+				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2},
 			},
 		},
 		{
@@ -67,16 +65,14 @@ func TestQueueCourierMessages(t *testing.T) {
 					URNID:     models.CathyURNID,
 				},
 			},
-			QueueSizes: map[string]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": 1,
+			QueueSizes: map[string][]int{
+				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {1},
 			},
 		},
 		{
 			Description: "0 messages",
 			Msgs:        []msgSpec{},
-			QueueSizes: map[string]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": 0,
-			},
+			QueueSizes:  map[string][]int{},
 		},
 	}
 
@@ -91,7 +87,7 @@ func TestQueueCourierMessages(t *testing.T) {
 		rc.Do("FLUSHDB")
 		msgio.QueueCourierMessages(rc, contactID, msgs)
 
-		assertCourierQueueSizes(t, rc, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
+		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 	}
 
 	// check that trying to queue a courier message will panic
@@ -105,27 +101,4 @@ func TestQueueCourierMessages(t *testing.T) {
 	})
 
 	testsuite.Reset()
-}
-
-func assertCourierQueueSizes(t *testing.T, rc redis.Conn, sizes map[string]int, msgAndArgs ...interface{}) {
-	for queueKey, size := range sizes {
-		if size == 0 {
-			result, err := rc.Do("ZCARD", queueKey)
-			require.NoError(t, err)
-			assert.Equal(t, size, int(result.(int64)))
-		} else {
-			result, err := rc.Do("ZPOPMAX", queueKey)
-			require.NoError(t, err)
-
-			results := result.([]interface{})
-			assert.Equal(t, 2, len(results)) // result is (item, score)
-
-			batchJSON := results[0].([]byte)
-			var batch []map[string]interface{}
-			err = json.Unmarshal(batchJSON, &batch)
-			require.NoError(t, err)
-
-			assert.Equal(t, size, len(batch), msgAndArgs...)
-		}
-	}
 }

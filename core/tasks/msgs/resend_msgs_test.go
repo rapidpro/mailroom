@@ -1,6 +1,7 @@
 package msgs_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/nyaruka/goflow/utils"
@@ -40,4 +41,8 @@ func TestResendMsgs(t *testing.T) {
 		`SELECT count(*) FROM msgs_msg WHERE status = 'P' AND channel_id IS NOT NULL AND id IN ($1, $2)`,
 		[]interface{}{msgOut1.ID(), msgOut2.ID()}, 2,
 	)
+
+	testsuite.AssertCourierQueues(t, map[string][]int{
+		fmt.Sprintf("msgs:%s|10/0", models.TwilioChannelUUID): {1, 1},
+	}, "courier queue mismatch after resending")
 }

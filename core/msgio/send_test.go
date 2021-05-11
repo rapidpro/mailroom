@@ -75,7 +75,7 @@ func TestSendMessages(t *testing.T) {
 	tests := []struct {
 		Description     string
 		Msgs            []msgSpec
-		QueueSizes      map[string]int
+		QueueSizes      map[string][]int
 		FCMTokensSynced []string
 		PendingMsgs     int
 	}{
@@ -98,8 +98,8 @@ func TestSendMessages(t *testing.T) {
 					URNID:     models.CathyURNID,
 				},
 			},
-			QueueSizes: map[string]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": 2,
+			QueueSizes: map[string][]int{
+				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2},
 			},
 			FCMTokensSynced: []string{"FCMID1"},
 			PendingMsgs:     0,
@@ -123,7 +123,7 @@ func TestSendMessages(t *testing.T) {
 					URNID:     models.CathyURNID,
 				},
 			},
-			QueueSizes:      map[string]int{},
+			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{"FCMID1", "FCMID2"},
 			PendingMsgs:     0,
 		},
@@ -136,7 +136,7 @@ func TestSendMessages(t *testing.T) {
 					URNID:     models.CathyURNID,
 				},
 			},
-			QueueSizes:      map[string]int{},
+			QueueSizes:      map[string][]int{},
 			FCMTokensSynced: []string{},
 			PendingMsgs:     1,
 		},
@@ -153,7 +153,7 @@ func TestSendMessages(t *testing.T) {
 
 		msgio.SendMessages(ctx, db, rp, fc, msgs)
 
-		assertCourierQueueSizes(t, rc, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
+		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 
 		// check the FCM tokens that were synced
 		actualTokens := make([]string, len(mockFCM.Messages))
