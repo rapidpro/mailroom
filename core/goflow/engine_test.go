@@ -67,7 +67,7 @@ func TestSimulatorTicket(t *testing.T) {
 
 	ticket, err := svc.Open(nil, "New ticket", "Where are my cookies?", nil)
 	assert.NoError(t, err)
-	assert.Equal(t, models.MailgunUUID, ticket.Ticketer.UUID)
+	assert.Equal(t, models.MailgunUUID, ticket.Ticketer.UUID())
 	assert.Equal(t, "New ticket", ticket.Subject)
 	assert.Equal(t, "Where are my cookies?", ticket.Body)
 }

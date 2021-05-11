@@ -212,6 +212,7 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		c.urns,
 		groups,
 		c.fields,
+		[]*flows.TicketReference{}, // TODO
 		assets.IgnoreMissing,
 	)
 	if err != nil {

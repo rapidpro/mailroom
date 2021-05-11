@@ -39,14 +39,10 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
 	assert.NoError(t, err)
-	assert.Equal(t, &flows.Ticket{
-		UUID:       flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"),
-		Ticketer:   ticketer.Reference(),
-		Subject:    "Need help",
-		Body:       "Where are my cookies?",
-		ExternalID: "",
-	}, ticket)
-
+	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID)
+	assert.Equal(t, "Need help", ticket.Subject)
+	assert.Equal(t, "Where are my cookies?", ticket.Body)
+	assert.Equal(t, "", ticket.ExternalID)
 	assert.Equal(t, 0, len(logger.Logs))
 
 	dbTicket := models.NewTicket(ticket.UUID, models.Org1, models.CathyID, models.InternalID, "", "Need help", "Where are my cookies?", nil)

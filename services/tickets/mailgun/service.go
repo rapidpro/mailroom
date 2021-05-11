@@ -8,7 +8,6 @@ import (
 	"text/template"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -108,10 +107,10 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 
 // Open opens a ticket which for mailgun means just sending an initial email
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	ticketUUID := flows.TicketUUID(uuids.New())
+	ticket := flows.NewTicket(s.ticketer, subject, body, "")
 	contactDisplay := tickets.GetContactDisplay(session.Environment(), session.Contact())
 
-	from := s.ticketAddress(contactDisplay, ticketUUID)
+	from := s.ticketAddress(contactDisplay, ticket.UUID)
 	context := s.templateContext(subject, body, "", string(session.Contact().UUID()), contactDisplay)
 	fullBody := evaluateTemplate(openBodyTemplate, context)
 
@@ -123,7 +122,8 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		return nil, errors.Wrap(err, "error calling mailgun API")
 	}
 
-	return flows.NewTicket(ticketUUID, s.ticketer.Reference(), subject, body, msgID), nil
+	ticket.ExternalID = msgID
+	return ticket, nil
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {

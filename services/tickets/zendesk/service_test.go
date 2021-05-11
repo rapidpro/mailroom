@@ -86,16 +86,11 @@ func TestOpenAndForward(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 
 	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
-
 	assert.NoError(t, err)
-	assert.Equal(t, &flows.Ticket{
-		UUID:       flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"),
-		Ticketer:   ticketer.Reference(),
-		Subject:    "Need help",
-		Body:       "Where are my cookies?",
-		ExternalID: "",
-	}, ticket)
-
+	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID)
+	assert.Equal(t, "Need help", ticket.Subject)
+	assert.Equal(t, "Where are my cookies?", ticket.Body)
+	assert.Equal(t, "", ticket.ExternalID)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
