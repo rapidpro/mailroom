@@ -1,3 +1,9 @@
+v6.3.9
+----------
+ * Fix queueing of resent messages to courier and improve testing of queueing
+ * Update to latest goflow
+ * Add WA template translation namespace
+
 v6.3.8
 ----------
  * Add task to resend messages
