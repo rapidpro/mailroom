@@ -28,6 +28,12 @@ func TestContacts(t *testing.T) {
 	assert.NoError(t, err)
 
 	testdata.InsertContactURN(t, db, models.Org1, models.BobID, urns.URN("whatsapp:250788373373"), 999)
+	testdata.InsertOpenTicket(t, db, models.Org1, models.CathyID, models.MailgunID,
+		flows.TicketUUID("f808c16d-10ed-4dfd-a6d4-6331c0d618f8"), "Problem!", "Where are my shoes?", "1234")
+	testdata.InsertOpenTicket(t, db, models.Org1, models.CathyID, models.ZendeskID,
+		flows.TicketUUID("ddf9aa25-73d8-4c5a-bf63-f4e9525bbb3e"), "Another Problem!", "Where are my pants?", "2345")
+	testdata.InsertOpenTicket(t, db, models.Org1, models.BobID, models.MailgunID,
+		flows.TicketUUID("e86d6cc3-6acc-49d0-9a50-287e4794e415"), "Urgent", "His name is Bob", "")
 
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, models.GeorgeID)
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, models.GeorgeID)
@@ -44,34 +50,42 @@ func TestContacts(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	assert.Equal(t, "Cathy", contacts[0].Name())
-	assert.Equal(t, len(contacts[0].URNs()), 1)
-	assert.Equal(t, contacts[0].URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
-	assert.Equal(t, 1, contacts[0].Groups().Count())
+	cathy, bob, george := contacts[0], contacts[1], contacts[2]
 
-	assert.Equal(t, "Yobe", contacts[0].Fields()["state"].QueryValue())
-	assert.Equal(t, "Dokshi", contacts[0].Fields()["ward"].QueryValue())
-	assert.Equal(t, "F", contacts[0].Fields()["gender"].QueryValue())
-	assert.Equal(t, (*flows.FieldValue)(nil), contacts[0].Fields()["age"])
+	assert.Equal(t, "Cathy", cathy.Name())
+	assert.Equal(t, len(cathy.URNs()), 1)
+	assert.Equal(t, cathy.URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
+	assert.Equal(t, 1, cathy.Groups().Count())
+	assert.Equal(t, 2, cathy.Tickets().Count())
+	assert.Equal(t, "Problem!", cathy.Tickets().All()[0].Subject)
+	assert.Equal(t, "Another Problem!", cathy.Tickets().All()[1].Subject)
 
-	assert.Equal(t, "Bob", contacts[1].Name())
-	assert.NotNil(t, contacts[1].Fields()["joined"].QueryValue())
-	assert.Equal(t, 2, len(contacts[1].URNs()))
-	assert.Equal(t, contacts[1].URNs()[0].String(), "tel:+16055742222?id=10001&priority=1000")
-	assert.Equal(t, contacts[1].URNs()[1].String(), "whatsapp:250788373373?id=20121&priority=999")
-	assert.Equal(t, 0, contacts[1].Groups().Count())
+	assert.Equal(t, "Yobe", cathy.Fields()["state"].QueryValue())
+	assert.Equal(t, "Dokshi", cathy.Fields()["ward"].QueryValue())
+	assert.Equal(t, "F", cathy.Fields()["gender"].QueryValue())
+	assert.Equal(t, (*flows.FieldValue)(nil), cathy.Fields()["age"])
 
-	assert.Equal(t, "George", contacts[2].Name())
-	assert.Equal(t, decimal.RequireFromString("30"), contacts[2].Fields()["age"].QueryValue())
-	assert.Equal(t, 0, len(contacts[2].URNs()))
-	assert.Equal(t, 0, contacts[2].Groups().Count())
+	assert.Equal(t, "Bob", bob.Name())
+	assert.NotNil(t, bob.Fields()["joined"].QueryValue())
+	assert.Equal(t, 2, len(bob.URNs()))
+	assert.Equal(t, "tel:+16055742222?id=10001&priority=1000", bob.URNs()[0].String())
+	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())
+	assert.Equal(t, 0, bob.Groups().Count())
+	assert.Equal(t, 1, bob.Tickets().Count())
+	assert.Equal(t, "Urgent", bob.Tickets().All()[0].Subject)
+
+	assert.Equal(t, "George", george.Name())
+	assert.Equal(t, decimal.RequireFromString("30"), george.Fields()["age"].QueryValue())
+	assert.Equal(t, 0, len(george.URNs()))
+	assert.Equal(t, 0, george.Groups().Count())
+	assert.Equal(t, 0, george.Tickets().Count())
 
 	// change bob to have a preferred URN and channel of our telephone
 	channel := org.ChannelByID(models.TwilioChannelID)
 	err = modelContacts[1].UpdatePreferredURN(ctx, db, org, models.BobURNID, channel)
 	assert.NoError(t, err)
 
-	bob, err := modelContacts[1].FlowContact(org)
+	bob, err = modelContacts[1].FlowContact(org)
 	assert.NoError(t, err)
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())

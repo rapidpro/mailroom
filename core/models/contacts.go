@@ -80,6 +80,7 @@ type Contact struct {
 	fields     map[string]*flows.Value
 	groups     []*Group
 	urns       []urns.URN
+	tickets    []*flows.TicketReference
 	createdOn  time.Time
 	modifiedOn time.Time
 	lastSeenOn *time.Time
@@ -212,7 +213,7 @@ func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
 		c.urns,
 		groups,
 		c.fields,
-		[]*flows.TicketReference{}, // TODO
+		c.tickets,
 		assets.IgnoreMissing,
 	)
 	if err != nil {
@@ -306,6 +307,22 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 		}
 		contact.urns = contactURNs
 
+		// initialize our tickets
+		tickets := make([]*flows.TicketReference, 0, len(e.Tickets))
+		for _, t := range e.Tickets {
+			ticketer := org.TicketerByID(t.TicketerID)
+			if ticketer != nil {
+				tickets = append(tickets, flows.NewTicketReference(
+					t.UUID,
+					ticketer.Reference(),
+					t.Subject,
+					t.Body,
+					string(t.ExternalID),
+				))
+			}
+		}
+		contact.tickets = tickets
+
 		contacts = append(contacts, contact)
 	}
 
@@ -385,16 +402,6 @@ func queryContactIDs(ctx context.Context, db Queryer, query string, args ...inte
 	return ids, nil
 }
 
-// fieldValueEnvelope is our utility struct for the value of a field
-type fieldValueEnvelope struct {
-	Text     types.XText       `json:"text"`
-	Datetime *types.XDateTime  `json:"datetime,omitempty"`
-	Number   *types.XNumber    `json:"number,omitempty"`
-	State    envs.LocationPath `json:"state,omitempty"`
-	District envs.LocationPath `json:"district,omitempty"`
-	Ward     envs.LocationPath `json:"ward,omitempty"`
-}
-
 type ContactURN struct {
 	ID        URNID     `json:"id"          db:"id"`
 	Priority  int       `json:"priority"    db:"priority"`
@@ -436,17 +443,31 @@ func (u *ContactURN) AsURN(org *OrgAssets) (urns.URN, error) {
 
 // contactEnvelope is our JSON structure for a contact as read from the database
 type contactEnvelope struct {
-	ID         ContactID                                `json:"id"`
-	UUID       flows.ContactUUID                        `json:"uuid"`
-	Name       string                                   `json:"name"`
-	Language   envs.Language                            `json:"language"`
-	Status     ContactStatus                            `json:"status"`
-	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
-	GroupIDs   []GroupID                                `json:"group_ids"`
-	URNs       []ContactURN                             `json:"urns"`
-	CreatedOn  time.Time                                `json:"created_on"`
-	ModifiedOn time.Time                                `json:"modified_on"`
-	LastSeenOn *time.Time                               `json:"last_seen_on"`
+	ID       ContactID         `json:"id"`
+	UUID     flows.ContactUUID `json:"uuid"`
+	Name     string            `json:"name"`
+	Language envs.Language     `json:"language"`
+	Status   ContactStatus     `json:"status"`
+	Fields   map[assets.FieldUUID]struct {
+		Text     types.XText       `json:"text"`
+		Datetime *types.XDateTime  `json:"datetime,omitempty"`
+		Number   *types.XNumber    `json:"number,omitempty"`
+		State    envs.LocationPath `json:"state,omitempty"`
+		District envs.LocationPath `json:"district,omitempty"`
+		Ward     envs.LocationPath `json:"ward,omitempty"`
+	} `json:"fields"`
+	GroupIDs []GroupID    `json:"group_ids"`
+	URNs     []ContactURN `json:"urns"`
+	Tickets  []struct {
+		UUID       flows.TicketUUID `json:"uuid"`
+		TicketerID TicketerID       `json:"ticketer_id"`
+		ExternalID string           `json:"external_id"`
+		Subject    string           `json:"subject"`
+		Body       string           `json:"body"`
+	} `json:"tickets"`
+	CreatedOn  time.Time  `json:"created_on"`
+	ModifiedOn time.Time  `json:"modified_on"`
+	LastSeenOn *time.Time `json:"last_seen_on"`
 }
 
 const selectContactSQL = `
@@ -463,7 +484,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	last_seen_on,
 	fields,
 	g.groups AS group_ids,
-	u.urns AS urns
+	u.urns AS urns,
+	t.tickets AS tickets
 FROM
 	contacts_contact c
 LEFT JOIN (
@@ -498,6 +520,25 @@ LEFT JOIN (
 	GROUP BY 
 		contact_id
 ) u ON c.id = u.contact_id
+LEFT JOIN (
+	SELECT
+		contact_id,
+		array_agg(
+			json_build_object(
+				'uuid', t.uuid,
+				'subject', t.subject,
+				'body', t.body,
+				'external_id', t.external_id,
+				'ticketer_id', t.ticketer_id
+			) ORDER BY t.opened_on ASC, t.id ASC
+		) as tickets
+	FROM
+		tickets_ticket t
+	WHERE
+		t.status = 'O' AND t.contact_id = ANY($1)
+	GROUP BY
+		contact_id
+) t ON c.id = t.contact_id
 WHERE 
 	c.id = ANY($1) AND
 	is_active = TRUE AND

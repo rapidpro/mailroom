@@ -74,7 +74,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 
 // Open opens a ticket which for mailgun means just sending an initial email
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	ticket := flows.NewTicket(s.ticketer, subject, body, "")
+	ticket := flows.NewTicket(s.ticketer, subject, body)
 	contactDisplay := session.Contact().Format(session.Environment())
 
 	msg := &ExternalResource{
