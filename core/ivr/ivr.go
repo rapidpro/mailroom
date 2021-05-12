@@ -68,7 +68,7 @@ func GetClient(channel *models.Channel) (Client, error) {
 
 // Client defines the interface IVR clients must satisfy
 type Client interface {
-	RequestCall(number urns.URN, handleURL string, statusURL string) (CallID, *httpx.Trace, error)
+	RequestCall(number urns.URN, handleURL string, statusURL string, hasMachineDetection bool) (CallID, *httpx.Trace, error)
 
 	HangupCall(externalID string) (*httpx.Trace, error)
 
@@ -247,8 +247,14 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 		return errors.Wrapf(err, "unable to create ivr client")
 	}
 
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, conn.OrgID(), models.RefreshOrg)
+	hasMachineDetection := false
+	if err == nil && oa != nil {
+		hasMachineDetection = oa.Org().ConfigValue("IVR_MACHINE_DETECTION", "false") == "true"
+	}
+
 	// try to request our call start
-	callID, trace, err := c.RequestCall(telURN, resumeURL, statusURL)
+	callID, trace, err := c.RequestCall(telURN, resumeURL, statusURL, hasMachineDetection)
 
 	/// insert an channel log if we have an HTTP trace
 	if trace != nil {

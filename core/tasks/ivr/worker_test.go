@@ -80,7 +80,7 @@ type MockClient struct {
 	callError error
 }
 
-func (c *MockClient) RequestCall(number urns.URN, handleURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
+func (c *MockClient) RequestCall(number urns.URN, handleURL string, statusURL string, hasMachineDetection bool) (ivr.CallID, *httpx.Trace, error) {
 	return c.callID, nil, c.callError
 }
 

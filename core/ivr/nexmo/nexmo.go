@@ -282,7 +282,7 @@ type CallResponse struct {
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
+func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string, hasMachineDetection bool) (ivr.CallID, *httpx.Trace, error) {
 	callR := &CallRequest{
 		AnswerURL:    []string{resumeURL + "&sig=" + url.QueryEscape(c.calculateSignature(resumeURL))},
 		AnswerMethod: http.MethodPost,
