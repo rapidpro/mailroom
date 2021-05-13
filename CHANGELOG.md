@@ -1,3 +1,7 @@
+v6.3.11
+----------
+ * Expose open tickets as @contact.tickets
+
 v6.3.9
 ----------
  * Fix queueing of resent messages to courier and improve testing of queueing
