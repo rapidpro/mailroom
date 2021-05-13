@@ -101,7 +101,9 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets
 	logger := &HTTPLogger{}
 	err = service.Forward(t, msgUUID, text, attachments, logger.Ticketer(ticketer))
 
-	return logger.Insert(ctx, db)
+	logger.Insert(ctx, db)
+
+	return err
 }
 
 const selectOpenTicketsSQL = `
@@ -434,6 +436,11 @@ func (t *Ticketer) Type() string { return t.t.Type }
 
 // Config returns the named config value
 func (t *Ticketer) Config(key string) string { return t.t.Config[key] }
+
+// Reference returns an asset reference to this ticketer
+func (t *Ticketer) Reference() *assets.TicketerReference {
+	return assets.NewTicketerReference(t.t.UUID, t.t.Name)
+}
 
 // AsService builds the corresponding engine service for the passed in Ticketer
 func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {

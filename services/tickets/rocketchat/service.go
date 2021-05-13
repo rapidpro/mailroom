@@ -51,7 +51,7 @@ type VisitorToken models.ContactID
 
 // Open opens a ticket which for RocketChat means open a room associated to a visitor user
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	ticket := flows.NewTicket(s.ticketer, subject, body, "")
+	ticket := flows.NewTicket(s.ticketer, subject, body)
 	contact := session.Contact()
 	email := ""
 	phone := ""
