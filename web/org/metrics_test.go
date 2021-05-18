@@ -83,7 +83,7 @@ func TestMetrics(t *testing.T) {
 			Contains: []string{
 				`rapidpro_group_contact_count{group_name="Active",group_uuid="b97f69f7-5edf-45c7-9fda-d37066eae91d",group_type="system",org="UNICEF"} 124`,
 				`rapidpro_group_contact_count{group_name="Doctors",group_uuid="c153e265-f7c9-4539-9dbc-9b358714b638",group_type="user",org="UNICEF"} 121`,
-				`rapidpro_channel_msg_count{channel_name="Vonage",channel_uuid="19012bfd-3ce3-4cae-9bb9-76cf92c73d49",channel_type="NX",msg_direction="out",msg_type="message",org="UNICEF"} 0`,
+				`rapidpro_channel_msg_count{channel_name="Vonage",channel_uuid="19012bfd-3ce3-4cae-9bb9-76cf92c73d49",channel_type="NX",msg_direction="out",msg_type="message",org="UNICEF"} 1`,
 			},
 		},
 	}

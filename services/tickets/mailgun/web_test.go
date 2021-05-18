@@ -13,6 +13,8 @@ func TestReceive(t *testing.T) {
 	testsuite.Reset()
 	db := testsuite.DB()
 
+	db.MustExec(`DELETE FROM msgs_msg`)
+
 	// create a mailgun ticket for Cathy
 	testdata.InsertOpenTicket(t, db, models.Org1, models.CathyID, models.MailgunID, "c69f103c-db64-4481-815b-1112890419ef", "Need help", "Have you seen my cookies?", "")
 

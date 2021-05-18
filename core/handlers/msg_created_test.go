@@ -29,7 +29,8 @@ func TestMsgCreated(t *testing.T) {
 	// add a URN for cathy so we can test all urn sends
 	testdata.InsertContactURN(t, db, models.Org1, models.CathyID, urns.URN("tel:+12065551212"), 10)
 
-	// delete all URNs for bob
+	// delete all messages and URNs for bob
+	db.MustExec(`DELETE FROM msgs_msg`)
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, models.BobID)
 
 	// change alexandrias URN to a twitter URN and set her language to eng so that a template gets used for her
