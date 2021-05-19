@@ -51,6 +51,7 @@ func InsertContactURN(t *testing.T, db *sqlx.DB, orgID models.OrgID, contactID m
 
 // DeleteContactsAndURNs deletes all contacts and URNs
 func DeleteContactsAndURNs(t *testing.T, db *sqlx.DB) {
+	db.MustExec(`DELETE FROM msgs_msg`)
 	db.MustExec(`DELETE FROM contacts_contacturn`)
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts`)
 	db.MustExec(`DELETE FROM contacts_contact`)

@@ -29,6 +29,8 @@ func TestMsgEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
+	db.MustExec(`DELETE FROM msgs_msg`)
+
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
@@ -102,7 +104,7 @@ func TestMsgEvents(t *testing.T) {
 			ContactID: contactID,
 			OrgID:     orgID,
 			ChannelID: channelID,
-			MsgID:     flows.MsgID(1),
+			MsgID:     flows.MsgID(20001),
 			MsgUUID:   flows.MsgUUID(uuids.New()),
 			URN:       urn,
 			URNID:     urnID,
@@ -360,6 +362,8 @@ func TestTimedEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
+	db.MustExec(`DELETE FROM msgs_msg`)
+
 	// start to start our favorites flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
@@ -425,7 +429,7 @@ func TestTimedEvents(t *testing.T) {
 				ContactID: tc.ContactID,
 				OrgID:     tc.OrgID,
 				ChannelID: tc.ChannelID,
-				MsgID:     flows.MsgID(1),
+				MsgID:     flows.MsgID(20001),
 				MsgUUID:   flows.MsgUUID(uuids.New()),
 				URN:       tc.URN,
 				URNID:     tc.URNID,
