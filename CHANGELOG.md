@@ -1,3 +1,9 @@
+v6.3.12
+----------
+ * Update to latest goflow (legacy_extra is no longer an issue)
+ * Make Msg.next_attempt nullable
+ * Add web endpoint for msg resends so they can be a synchronous operation
+
 v6.3.11
 ----------
  * Expose open tickets as @contact.tickets
