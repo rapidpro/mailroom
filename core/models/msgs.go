@@ -108,7 +108,7 @@ type Msg struct {
 		MsgType              MsgType            `db:"msg_type"`
 		MsgCount             int                `db:"msg_count"       json:"tps_cost"`
 		ErrorCount           int                `db:"error_count"     json:"error_count"`
-		NextAttempt          time.Time          `db:"next_attempt"    json:"next_attempt"`
+		NextAttempt          *time.Time         `db:"next_attempt"    json:"next_attempt"`
 		ExternalID           null.String        `db:"external_id"     json:"external_id"`
 		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
@@ -153,7 +153,7 @@ func (m *Msg) Status() MsgStatus                { return m.m.Status }
 func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
 func (m *Msg) MsgType() MsgType                 { return m.m.MsgType }
 func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
-func (m *Msg) NextAttempt() time.Time           { return m.m.NextAttempt }
+func (m *Msg) NextAttempt() *time.Time          { return m.m.NextAttempt }
 func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
 func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
 func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
