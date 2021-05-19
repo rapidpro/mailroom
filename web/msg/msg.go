@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
@@ -53,5 +54,10 @@ func handleResend(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	msgio.SendMessages(ctx, s.DB, s.RP, nil, msgs)
 
-	return nil, http.StatusOK, nil
+	// response is the ids of the messages that were actually resent
+	resentMsgIDs := make([]flows.MsgID, len(msgs))
+	for i, m := range msgs {
+		resentMsgIDs[i] = m.ID()
+	}
+	return map[string]interface{}{"msg_ids": resentMsgIDs}, http.StatusOK, nil
 }

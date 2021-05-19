@@ -22,5 +22,31 @@
         "response": {
             "error": "unable to load org assets: error loading environment for org 1234: no org with id: 1234"
         }
+    },
+    {
+        "label": "response is the ids of the messages that were actually resent",
+        "method": "POST",
+        "path": "/mr/msg/resend",
+        "body": {
+            "org_id": 1,
+            "msg_ids": [
+                10000,
+                10001,
+                10002
+            ]
+        },
+        "status": 200,
+        "response": {
+            "msg_ids": [
+                10001,
+                10002
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM msgs_msg WHERE status = 'P'",
+                "count": 2
+            }
+        ]
     }
 ]
