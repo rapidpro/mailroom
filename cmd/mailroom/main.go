@@ -23,7 +23,6 @@ import (
 	_ "github.com/nyaruka/mailroom/core/tasks/groups"
 	_ "github.com/nyaruka/mailroom/core/tasks/interrupts"
 	_ "github.com/nyaruka/mailroom/core/tasks/ivr"
-	_ "github.com/nyaruka/mailroom/core/tasks/msgs"
 	_ "github.com/nyaruka/mailroom/core/tasks/schedules"
 	_ "github.com/nyaruka/mailroom/core/tasks/starts"
 	_ "github.com/nyaruka/mailroom/core/tasks/stats"
