@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
@@ -45,7 +46,7 @@ func TestTicketOpened(t *testing.T) {
 	}))
 
 	// an existing ticket
-	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), models.Org1, models.CathyID, models.MailgunID, "748363", "Old Question", "Who?", nil)
+	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, models.CathyID, models.MailgunID, "748363", "Old Question", "Who?", nil)
 	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyTicket})
 	require.NoError(t, err)
 

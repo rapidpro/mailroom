@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/campaigns"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,7 +44,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 
 	// schedule first event...
 	task := &campaigns.ScheduleCampaignEventTask{CampaignEventID: models.RemindersEvent1ID}
-	err := task.Perform(ctx, mr, models.Org1)
+	err := task.Perform(ctx, mr, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	// cathy has no value for joined and alexandia has a value too far in past, but bob and george will have values...
@@ -54,7 +55,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 
 	// schedule second event...
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: models.RemindersEvent2ID}
-	err = task.Perform(ctx, mr, models.Org1)
+	err = task.Perform(ctx, mr, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	assertContactFires(t, models.RemindersEvent2ID, map[models.ContactID]time.Time{
@@ -78,7 +79,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	event3 := insertCampaignEvent(t, models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID, 5, "M")
 
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event3}
-	err = task.Perform(ctx, mr, models.Org1)
+	err = task.Perform(ctx, mr, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	// only cathy is in the group and new enough to have a fire
@@ -93,7 +94,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, models.BobID)
 
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event4}
-	err = task.Perform(ctx, mr, models.Org1)
+	err = task.Perform(ctx, mr, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	assertContactFires(t, event4, map[models.ContactID]time.Time{

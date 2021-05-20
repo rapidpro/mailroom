@@ -58,13 +58,13 @@ func TestPopulateTask(t *testing.T) {
 		}
 	}`, models.CathyID)
 
-	groupID := testdata.InsertContactGroup(t, db, models.Org1, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
+	groupID := testdata.InsertContactGroup(t, db, testdata.Org1.ID, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
 
 	task := &groups.PopulateDynamicGroupTask{
 		GroupID: groupID,
 		Query:   "gender = F",
 	}
-	err = task.Perform(ctx, mr, models.Org1)
+	err = task.Perform(ctx, mr, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, []interface{}{groupID}, 1)

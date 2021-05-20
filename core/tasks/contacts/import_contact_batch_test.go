@@ -6,7 +6,6 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/contacts"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -20,7 +19,7 @@ func TestImportContactBatch(t *testing.T) {
 
 	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: nil}
 
-	importID := testdata.InsertContactImport(t, db, models.Org1)
+	importID := testdata.InsertContactImport(t, db, testdata.Org1.ID)
 	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
@@ -28,7 +27,7 @@ func TestImportContactBatch(t *testing.T) {
 
 	task := &contacts.ImportContactBatchTask{ContactImportBatchID: batchID}
 
-	err := task.Perform(ctx, mr, models.Org1)
+	err := task.Perform(ctx, mr, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Norbert' AND language = 'eng'`, nil, 1)

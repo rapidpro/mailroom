@@ -1,9 +1,11 @@
-package models
+package models_test
 
 import (
 	"testing"
 
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -21,19 +23,19 @@ func TestTopups(t *testing.T) {
 	                                    VALUES(TRUE, 1000000, 1),(TRUE, 99000, 2),(TRUE, 998, 2)`)
 
 	tcs := []struct {
-		OrgID     OrgID
-		TopupID   TopupID
+		OrgID     models.OrgID
+		TopupID   models.TopupID
 		Remaining int
 	}{
-		{Org1, NilTopupID, 0},
-		{Org2, TopupID(2), 2},
+		{testdata.Org1.ID, models.NilTopupID, 0},
+		{testdata.Org2.ID, models.TopupID(2), 2},
 	}
 
 	for _, tc := range tcs {
-		topup, err := calculateActiveTopup(ctx, tx, tc.OrgID)
+		topup, err := models.CalculateActiveTopup(ctx, tx, tc.OrgID)
 		assert.NoError(t, err)
 
-		if tc.TopupID == NilTopupID {
+		if tc.TopupID == models.NilTopupID {
 			assert.Nil(t, topup)
 		} else {
 			assert.NotNil(t, topup)
@@ -43,29 +45,29 @@ func TestTopups(t *testing.T) {
 	}
 
 	tc2s := []struct {
-		OrgID   OrgID
-		TopupID TopupID
+		OrgID   models.OrgID
+		TopupID models.TopupID
 	}{
-		{Org1, NilTopupID},
-		{Org2, TopupID(2)},
-		{Org2, TopupID(2)},
-		{Org2, NilTopupID},
+		{testdata.Org1.ID, models.NilTopupID},
+		{testdata.Org2.ID, models.TopupID(2)},
+		{testdata.Org2.ID, models.TopupID(2)},
+		{testdata.Org2.ID, models.NilTopupID},
 	}
 
 	for _, tc := range tc2s {
-		org, err := loadOrg(ctx, tx, tc.OrgID)
+		org, err := models.LoadOrg(ctx, tx, tc.OrgID)
 		assert.NoError(t, err)
 
-		topup, err := AllocateTopups(ctx, tx, rp, org, 1)
+		topup, err := models.AllocateTopups(ctx, tx, rp, org, 1)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.TopupID, topup)
 		tx.MustExec(`INSERT INTO orgs_topupcredits(is_squashed, used, topup_id) VALUES(TRUE, 1, $1)`, tc.OrgID)
 	}
 
 	// topups can be disabled for orgs
-	tx.MustExec(`UPDATE orgs_org SET uses_topups = FALSE WHERE id = $1`, Org1)
-	org, err := loadOrg(ctx, tx, Org1)
-	topup, err := AllocateTopups(ctx, tx, rp, org, 1)
+	tx.MustExec(`UPDATE orgs_org SET uses_topups = FALSE WHERE id = $1`, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, tx, testdata.Org1.ID)
+	topup, err := models.AllocateTopups(ctx, tx, rp, org, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, NilTopupID, topup)
+	assert.Equal(t, models.NilTopupID, topup)
 }

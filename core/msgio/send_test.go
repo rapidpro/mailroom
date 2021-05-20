@@ -30,8 +30,8 @@ func (m *msgSpec) createMsg(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) *mo
 	// However the channels have to be fetched from the same org assets thus why this uses its
 	// own org assets instance.
 	ctx := testsuite.CTX()
-	db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, models.Org1)
-	oaOrg, _ := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
+	db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, testdata.Org1.ID)
+	oaOrg, _ := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 
 	var channel *models.Channel
 	var channelRef *assets.ChannelReference
@@ -65,11 +65,11 @@ func TestSendMessages(t *testing.T) {
 	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Andoid channels
-	androidChannel1ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID1"})
-	androidChannel2ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
-	testdata.InsertChannel(t, db, models.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
+	androidChannel1ID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID1"})
+	androidChannel2ID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
+	testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
 
 	tests := []struct {

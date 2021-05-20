@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestServiceCalled(t *testing.T) {
@@ -41,7 +42,7 @@ func TestServiceCalled(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND is_error = FALSE AND classifier_id = $2 AND url = 'https://api.wit.ai/message?v=20200513&q=book+me+a+flight'`,
-					Args:  []interface{}{models.Org1, models.WitID},
+					Args:  []interface{}{testdata.Org1.ID, models.WitID},
 					Count: 1,
 				},
 			},

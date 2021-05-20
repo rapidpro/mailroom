@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/buger/jsonparser"
@@ -103,7 +104,7 @@ func TestSurveyor(t *testing.T) {
 
 	args := &AssertionArgs{
 		FlowID:         models.SurveyorFlowID,
-		OrgID:          models.Org1,
+		OrgID:          testdata.Org1.ID,
 		AgeFieldUUID:   models.AgeFieldUUID,
 		TestersGroupID: models.TestersGroupID,
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -43,7 +44,7 @@ func TestResponseForSprint(t *testing.T) {
 	config.Mailroom.AttachmentDomain = "mailroom.io"
 	defer func() { config.Mailroom.AttachmentDomain = "" }()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	channel := oa.ChannelByUUID(models.VonageChannelUUID)

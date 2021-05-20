@@ -66,37 +66,37 @@ func TestMsgEvents(t *testing.T) {
 		ChannelID models.ChannelID
 		OrgID     models.OrgID
 	}{
-		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "noop", "", models.TwitterChannelID, models.Org1},
-		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "start other", "", models.TwitterChannelID, models.Org1},
-		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, models.Org1},
-		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "purple", "I don't know that color. Try again.", models.TwitterChannelID, models.Org1},
-		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "blue", "Good choice, I like Blue too! What is your favorite beer?", models.TwitterChannelID, models.Org1},
-		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", models.TwitterChannelID, models.Org1},
-		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "Cathy", "Thanks Cathy, we are all done!", models.TwitterChannelID, models.Org1},
-		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "noop", "", models.TwitterChannelID, models.Org1},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "noop", "", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "start other", "", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "purple", "I don't know that color. Try again.", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "blue", "Good choice, I like Blue too! What is your favorite beer?", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "Cathy", "Thanks Cathy, we are all done!", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, models.CathyID, models.CathyURN, models.CathyURNID, "noop", "", models.TwitterChannelID, testdata.Org1.ID},
 
-		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "other", "Hey, how are you?", models.Org2ChannelID, models.Org2},
-		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
-		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "green", "Good choice, I like Green too! What is your favorite beer?", models.Org2ChannelID, models.Org2},
-		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", models.Org2ChannelID, models.Org2},
-		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "george", "Thanks george, we are all done!", models.Org2ChannelID, models.Org2},
-		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "blargh", "Hey, how are you?", models.Org2ChannelID, models.Org2},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "other", "Hey, how are you?", models.Org2ChannelID, testdata.Org2.ID},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, testdata.Org2.ID},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "green", "Good choice, I like Green too! What is your favorite beer?", models.Org2ChannelID, testdata.Org2.ID},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", models.Org2ChannelID, testdata.Org2.ID},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "george", "Thanks george, we are all done!", models.Org2ChannelID, testdata.Org2.ID},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "blargh", "Hey, how are you?", models.Org2ChannelID, testdata.Org2.ID},
 
-		{nil, models.BobID, models.BobURN, models.BobURNID, "ivr", "", models.TwitterChannelID, models.Org1},
+		{nil, models.BobID, models.BobURN, models.BobURNID, "ivr", "", models.TwitterChannelID, testdata.Org1.ID},
 
 		// no URN on contact but handle event, session gets started but no message created
-		{nil, models.AlexandriaID, models.AlexandriaURN, models.AlexandriaURNID, "start", "", models.TwilioChannelID, models.Org1},
+		{nil, models.AlexandriaID, models.AlexandriaURN, models.AlexandriaURNID, "start", "", models.TwilioChannelID, testdata.Org1.ID},
 
 		// start Fred back in our favorite flow, then make it inactive, will be handled by catch-all
-		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
+		{nil, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, testdata.Org2.ID},
 		{func() {
 			db.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, models.Org2FavoritesFlowID)
-		}, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red", "Hey, how are you?", models.Org2ChannelID, models.Org2},
+		}, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red", "Hey, how are you?", models.Org2ChannelID, testdata.Org2.ID},
 
 		// start Fred back in our favorites flow to test retries
 		{func() {
 			db.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, models.Org2FavoritesFlowID)
-		}, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, models.Org2},
+		}, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start", "What is your favorite color?", models.Org2ChannelID, testdata.Org2.ID},
 	}
 
 	makeMsgTask := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *queue.Task {
@@ -171,7 +171,7 @@ func TestMsgEvents(t *testing.T) {
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, models.Org2FredID)
-	task = makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
+	task = makeMsgTask(testdata.Org2.ID, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
 	AddHandleTask(rc, models.Org2FredID, task)
 
 	// should get requeued three times automatically
@@ -192,7 +192,7 @@ func TestMsgEvents(t *testing.T) {
 	models.FlushCache()
 
 	// try to resume now
-	task = makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
+	task = makeMsgTask(testdata.Org2.ID, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "red")
 	AddHandleTask(rc, models.Org2FredID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
@@ -212,7 +212,7 @@ func TestMsgEvents(t *testing.T) {
 	)
 
 	// trigger should also not start a new session
-	task = makeMsgTask(models.Org2, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start")
+	task = makeMsgTask(testdata.Org2.ID, models.Org2ChannelID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "start")
 	AddHandleTask(rc, models.Org2FredID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 	err = handleContactEvent(ctx, db, rp, task)
@@ -248,7 +248,7 @@ func TestChannelEvents(t *testing.T) {
 		models.PickNumberFlowID, models.VonageChannelID)
 
 	// add a URN for cathy so we can test twitter URNs
-	testdata.InsertContactURN(t, db, models.Org1, models.BobID, urns.URN("twitterid:123456"), 10)
+	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.BobID, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
 		EventType      models.ChannelEventType
@@ -260,11 +260,11 @@ func TestChannelEvents(t *testing.T) {
 		Response       string
 		UpdateLastSeen bool
 	}{
-		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "What is your favorite color?", true},
-		{NewConversationEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "", true},
-		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "", false},
-		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.TwitterChannelID, nil, "", true},
-		{ReferralEventType, models.CathyID, models.CathyURNID, models.Org1, models.VonageChannelID, nil, "Pick a number between 1-10.", true},
+		{NewConversationEventType, models.CathyID, models.CathyURNID, testdata.Org1.ID, models.TwitterChannelID, nil, "What is your favorite color?", true},
+		{NewConversationEventType, models.CathyID, models.CathyURNID, testdata.Org1.ID, models.VonageChannelID, nil, "", true},
+		{WelcomeMessageEventType, models.CathyID, models.CathyURNID, testdata.Org1.ID, models.VonageChannelID, nil, "", false},
+		{ReferralEventType, models.CathyID, models.CathyURNID, testdata.Org1.ID, models.TwitterChannelID, nil, "", true},
+		{ReferralEventType, models.CathyID, models.CathyURNID, testdata.Org1.ID, models.VonageChannelID, nil, "Pick a number between 1-10.", true},
 	}
 
 	models.FlushCache()
@@ -324,11 +324,11 @@ func TestStopEvent(t *testing.T) {
 	// and george to doctors group, cathy is already part of it
 	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, models.DoctorsGroupID, models.GeorgeID)
 
-	event := &StopEvent{OrgID: models.Org1, ContactID: models.CathyID}
+	event := &StopEvent{OrgID: testdata.Org1.ID, ContactID: models.CathyID}
 	eventJSON, err := json.Marshal(event)
 	task := &queue.Task{
 		Type:  StopEventType,
-		OrgID: int(models.Org1),
+		OrgID: int(testdata.Org1.ID),
 		Task:  eventJSON,
 	}
 
@@ -385,34 +385,34 @@ func TestTimedEvents(t *testing.T) {
 		OrgID     models.OrgID
 	}{
 		// start the flow
-		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, models.Org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, testdata.Org1.ID},
 
 		// this expiration does nothing because the times don't match
-		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "bad", "", models.TwitterChannelID, models.Org1},
+		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "bad", "", models.TwitterChannelID, testdata.Org1.ID},
 
 		// this checks that the flow wasn't expired
-		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "red", "Good choice, I like Red too! What is your favorite beer?", models.TwitterChannelID, models.Org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "red", "Good choice, I like Red too! What is your favorite beer?", models.TwitterChannelID, testdata.Org1.ID},
 
 		// this expiration will actually take
-		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "good", "", models.TwitterChannelID, models.Org1},
+		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "good", "", models.TwitterChannelID, testdata.Org1.ID},
 
 		// we won't get a response as we will be out of the flow
-		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "mutzig", "", models.TwitterChannelID, models.Org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "mutzig", "", models.TwitterChannelID, testdata.Org1.ID},
 
 		// start the parent expiration flow
-		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "parent", "Child", models.TwitterChannelID, models.Org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "parent", "Child", models.TwitterChannelID, testdata.Org1.ID},
 
 		// respond, should bring us out
-		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "hi", "Completed", models.TwitterChannelID, models.Org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "hi", "Completed", models.TwitterChannelID, testdata.Org1.ID},
 
 		// expiring our child should be a no op
-		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "child", "", models.TwitterChannelID, models.Org1},
+		{ExpirationEventType, models.CathyID, models.CathyURN, models.CathyURNID, "child", "", models.TwitterChannelID, testdata.Org1.ID},
 
 		// respond one last time, should be done
-		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "done", "Ended", models.TwitterChannelID, models.Org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "done", "Ended", models.TwitterChannelID, testdata.Org1.ID},
 
 		// start our favorite flow again
-		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, models.Org1},
+		{MsgEventType, models.CathyID, models.CathyURN, models.CathyURNID, "start", "What is your favorite color?", models.TwitterChannelID, testdata.Org1.ID},
 	}
 
 	last := time.Now()
@@ -511,7 +511,7 @@ func TestTimedEvents(t *testing.T) {
 	// try to expire the run
 	task := newTimedTask(
 		ExpirationEventType,
-		models.Org1,
+		testdata.Org1.ID,
 		models.CathyID,
 		sessionID,
 		runID,

@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ func TestCloneForSimulation(t *testing.T) {
 	db := testsuite.DB()
 	models.FlushCache()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	newFavoritesDef := `{

@@ -95,9 +95,9 @@ func TestOutgoingMsgs(t *testing.T) {
 		tx, err := db.BeginTxx(ctx, nil)
 		require.NoError(t, err)
 
-		db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, tc.SuspendedOrg, models.Org1)
+		db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, tc.SuspendedOrg, testdata.Org1.ID)
 
-		oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
+		oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 		require.NoError(t, err)
 
 		channel := oa.ChannelByUUID(tc.ChannelUUID)
@@ -140,7 +140,7 @@ func TestOutgoingMsgs(t *testing.T) {
 func TestGetMessageIDFromUUID(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	msgIn := testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi there")
+	msgIn := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "hi there")
 
 	msgID, err := models.GetMessageIDFromUUID(ctx, db, msgIn.UUID())
 
@@ -151,15 +151,15 @@ func TestGetMessageIDFromUUID(t *testing.T) {
 func TestLoadMessages(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	msgIn1 := testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "in 1")
-	msgOut1 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
-	msgOut2 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "out 2", nil)
-	msgOut3 := testdata.InsertOutgoingMsg(t, db, models.Org2, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "out 3", nil)
-	testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi 3", nil)
+	msgIn1 := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "in 1")
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 2", nil)
+	msgOut3 := testdata.InsertOutgoingMsg(t, db, testdata.Org2.ID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "out 3", nil)
+	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "hi 3", nil)
 
 	ids := []models.MsgID{models.MsgID(msgIn1.ID()), models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID()), models.MsgID(msgOut3.ID())}
 
-	msgs, err := models.LoadMessages(ctx, db, models.Org1, models.DirectionOut, ids)
+	msgs, err := models.LoadMessages(ctx, db, testdata.Org1.ID, models.DirectionOut, ids)
 
 	// should only return the outgoing messages for this org
 	require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestLoadMessages(t *testing.T) {
 	assert.Equal(t, []utils.Attachment{"image/jpeg:hi.jpg"}, msgs[0].Attachments())
 	assert.Equal(t, "out 2", msgs[1].Text())
 
-	msgs, err = models.LoadMessages(ctx, db, models.Org1, models.DirectionIn, ids)
+	msgs, err = models.LoadMessages(ctx, db, testdata.Org1.ID, models.DirectionIn, ids)
 
 	// should only return the incoming message for this org
 	require.NoError(t, err)
@@ -183,12 +183,12 @@ func TestResendMessages(t *testing.T) {
 
 	db.MustExec(`DELETE FROM msgs_msg`)
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgOut1 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", nil)
-	msgOut2 := testdata.InsertOutgoingMsg(t, db, models.Org1, models.BobID, models.BobURN, models.BobURNID, "out 2", nil)
-	testdata.InsertOutgoingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "out 3", nil)
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", nil)
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.BobID, models.BobURN, models.BobURNID, "out 2", nil)
+	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 3", nil)
 
 	// make them look like failed messages
 	db.MustExec(`UPDATE msgs_msg SET status = 'F', sent_on = NOW(), error_count = 3`)
@@ -196,7 +196,7 @@ func TestResendMessages(t *testing.T) {
 	// give Bob's URN an affinity for the Vonage channel
 	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, models.VonageChannelID, models.BobURNID)
 
-	msgs, err := models.LoadMessages(ctx, db, models.Org1, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
+	msgs, err := models.LoadMessages(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
 	require.NoError(t, err)
 
 	now := dates.Now()
@@ -240,7 +240,7 @@ func TestMarkMessages(t *testing.T) {
 	ctx, db, _ := testsuite.Reset()
 	defer testsuite.Reset()
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 
 	channel := oa.ChannelByUUID(models.TwilioChannelUUID)

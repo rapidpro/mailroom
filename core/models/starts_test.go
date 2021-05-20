@@ -18,7 +18,7 @@ func TestStarts(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	startID := testdata.InsertFlowStart(t, db, models.Org1, models.SingleMessageFlowID, []models.ContactID{models.CathyID, models.BobID})
+	startID := testdata.InsertFlowStart(t, db, testdata.Org1.ID, models.SingleMessageFlowID, []models.ContactID{models.CathyID, models.BobID})
 
 	startJSON := []byte(fmt.Sprintf(`{
 		"start_id": %d,
@@ -36,14 +36,14 @@ func TestStarts(t *testing.T) {
 		"parent_summary": {"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"},
 		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1},
 		"extra": {"foo": "bar"}
-	}`, startID, models.Org1, models.SingleMessageFlowID, models.CathyID, models.BobID))
+	}`, startID, testdata.Org1.ID, models.SingleMessageFlowID, models.CathyID, models.BobID))
 
 	start := &models.FlowStart{}
 	err := json.Unmarshal(startJSON, start)
 
 	require.NoError(t, err)
 	assert.Equal(t, startID, start.ID())
-	assert.Equal(t, models.Org1, start.OrgID())
+	assert.Equal(t, testdata.Org1.ID, start.OrgID())
 	assert.Equal(t, models.SingleMessageFlowID, start.FlowID())
 	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
 	assert.Equal(t, "", start.Query())

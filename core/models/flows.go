@@ -106,7 +106,7 @@ func (f *Flow) cloneWithNewDefinition(def []byte) *Flow {
 	return &c
 }
 
-func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
+func FlowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
 	// first try to look up in our assets
 	flow, _ := oa.Flow(flowUUID)
 	if flow != nil {
@@ -119,11 +119,11 @@ func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID ass
 	return flowID, err
 }
 
-func loadFlowByUUID(ctx context.Context, db Queryer, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
+func LoadFlowByUUID(ctx context.Context, db Queryer, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
 	return loadFlow(ctx, db, selectFlowByUUIDSQL, orgID, flowUUID)
 }
 
-func loadFlowByID(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID) (*Flow, error) {
+func LoadFlowByID(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID) (*Flow, error) {
 	return loadFlow(ctx, db, selectFlowByIDSQL, orgID, flowID)
 }
 

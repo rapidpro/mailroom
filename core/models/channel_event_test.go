@@ -1,11 +1,14 @@
-package models
+package models_test
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +19,7 @@ func TestChannelEvents(t *testing.T) {
 	start := time.Now()
 
 	// no extra
-	e := NewChannelEvent(MOMissEventType, Org1, TwilioChannelID, CathyID, CathyURNID, nil, false)
+	e := models.NewChannelEvent(models.MOMissEventType, testdata.Org1.ID, models.TwilioChannelID, models.CathyID, models.CathyURNID, nil, false)
 	err := e.Insert(ctx, db)
 	assert.NoError(t, err)
 	assert.NotZero(t, e.ID())
@@ -24,7 +27,7 @@ func TestChannelEvents(t *testing.T) {
 	assert.True(t, e.OccurredOn().After(start))
 
 	// with extra
-	e2 := NewChannelEvent(MOMissEventType, Org1, TwilioChannelID, CathyID, CathyURNID, map[string]interface{}{"referral_id": "foobar"}, false)
+	e2 := models.NewChannelEvent(models.MOMissEventType, testdata.Org1.ID, models.TwilioChannelID, models.CathyID, models.CathyURNID, map[string]interface{}{"referral_id": "foobar"}, false)
 	err = e2.Insert(ctx, db)
 	assert.NoError(t, err)
 	assert.NotZero(t, e2.ID())
@@ -33,7 +36,7 @@ func TestChannelEvents(t *testing.T) {
 	asJSON, err := json.Marshal(e2)
 	assert.NoError(t, err)
 
-	e3 := &ChannelEvent{}
+	e3 := &models.ChannelEvent{}
 	err = json.Unmarshal(asJSON, e3)
 	assert.NoError(t, err)
 	assert.Equal(t, e2.Extra(), e3.Extra())

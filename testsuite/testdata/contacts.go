@@ -30,7 +30,7 @@ func InsertContactGroup(t *testing.T, db *sqlx.DB, orgID models.OrgID, uuid asse
 	var id models.GroupID
 	err := db.Get(&id,
 		`INSERT INTO contacts_contactgroup(uuid, org_id, group_type, name, query, status, is_active, created_by_id, created_on, modified_by_id, modified_on) 
-		 VALUES($1, $2, 'U', $3, $4, 'R', TRUE, 1, NOW(), 1, NOW()) RETURNING id`, uuid, models.Org1, name, null.String(query),
+		 VALUES($1, $2, 'U', $3, $4, 'R', TRUE, 1, NOW(), 1, NOW()) RETURNING id`, uuid, Org1.ID, name, null.String(query),
 	)
 	require.NoError(t, err)
 	return id

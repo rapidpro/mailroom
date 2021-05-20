@@ -1,4 +1,4 @@
-package models
+package models_test
 
 import (
 	"os"
@@ -7,7 +7,9 @@ import (
 
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,8 +23,8 @@ func TestOrgs(t *testing.T) {
 	assert.NoError(t, err)
 	defer tx.Rollback()
 
-	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", TwitterChannelID)
-	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", TwilioChannelID, VonageChannelID)
+	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", models.TwitterChannelID)
+	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", models.TwilioChannelID, models.VonageChannelID)
 	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
 									VALUES(TRUE, NOW(), NOW(), 'French', 'fra', 1, 1, 2);`)
 	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
@@ -30,10 +32,10 @@ func TestOrgs(t *testing.T) {
 
 	tx.MustExec("UPDATE orgs_org SET primary_language_id = 2 WHERE id = 2;")
 
-	org, err := loadOrg(ctx, tx, 1)
+	org, err := models.LoadOrg(ctx, tx, testdata.Org1.ID)
 	assert.NoError(t, err)
 
-	assert.Equal(t, OrgID(1), org.ID())
+	assert.Equal(t, models.OrgID(1), org.ID())
 	assert.False(t, org.Suspended())
 	assert.True(t, org.UsesTopups())
 	assert.Equal(t, envs.DateFormatDayMonthYear, org.DateFormat())
@@ -47,13 +49,13 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, envs.Language(""), org.DefaultLanguage())
 	assert.Equal(t, "", org.DefaultLocale().ToBCP47())
 
-	org, err = loadOrg(ctx, tx, 2)
+	org, err = models.LoadOrg(ctx, tx, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, []envs.Language{"eng", "fra"}, org.AllowedLanguages())
 	assert.Equal(t, envs.Language("eng"), org.DefaultLanguage())
 	assert.Equal(t, "en", org.DefaultLocale().ToBCP47())
 
-	_, err = loadOrg(ctx, tx, 99)
+	_, err = models.LoadOrg(ctx, tx, 99)
 	assert.Error(t, err)
 }
 
@@ -67,7 +69,7 @@ func TestStoreAttachment(t *testing.T) {
 	image, err := os.Open("testdata/test.jpg")
 	require.NoError(t, err)
 
-	org, err := loadOrg(ctx, db, Org1)
+	org, err := models.LoadOrg(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	attachment, err := org.StoreAttachment(store, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)
