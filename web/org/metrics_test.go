@@ -1,4 +1,4 @@
-package org
+package org_test
 
 import (
 	"fmt"
@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,10 +20,10 @@ func TestMetrics(t *testing.T) {
 	ctx, db, rp := testsuite.Reset()
 
 	promToken := "2d26a50841ff48237238bbdd021150f6a33a4196"
-	db.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 12, 1);`, models.Org1, promToken)
+	db.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 12, 1);`, testdata.Org1.ID, promToken)
 
 	adminToken := "5c26a50841ff48237238bbdd021150f6a33a4199"
-	db.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 8, 1);`, models.Org1, adminToken)
+	db.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 8, 1);`, testdata.Org1.ID, adminToken)
 
 	wg := &sync.WaitGroup{}
 	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
@@ -42,42 +43,42 @@ func TestMetrics(t *testing.T) {
 	}{
 		{
 			Label:    "no username",
-			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", testdata.Org1.UUID),
 			Username: "",
 			Password: "",
 			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			Label:    "invalid password",
-			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", testdata.Org1.UUID),
 			Username: "metrics",
 			Password: "invalid",
 			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			Label:    "invalid username",
-			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", testdata.Org1.UUID),
 			Username: "invalid",
 			Password: promToken,
 			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			Label:    "valid login, wrong org",
-			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org2UUID),
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", testdata.Org2.UUID),
 			Username: "metrics",
 			Password: promToken,
 			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			Label:    "valid login, invalid user",
-			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", testdata.Org1.UUID),
 			Username: "metrics",
 			Password: adminToken,
 			Response: `{"error": "invalid authentication"}`,
 		},
 		{
 			Label:    "valid",
-			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", models.Org1UUID),
+			URL:      fmt.Sprintf("http://localhost:8090/mr/org/%s/metrics", testdata.Org1.UUID),
 			Username: "metrics",
 			Password: promToken,
 			Contains: []string{

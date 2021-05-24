@@ -343,7 +343,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 
 		// if this run is waiting, save it as the current flow
 		if r.Status() == flows.RunStatusWaiting {
-			flowID, err := flowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
+			flowID, err := FlowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error loading current flow for UUID: %s", r.FlowReference().UUID)
 			}
@@ -501,7 +501,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	for _, r := range fs.Runs() {
 		// if this run is waiting, save it as the current flow
 		if r.Status() == flows.RunStatusWaiting {
-			flowID, err := flowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
+			flowID, err := FlowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
 			if err != nil {
 				return errors.Wrapf(err, "error loading flow: %s", r.FlowReference().UUID)
 			}
@@ -769,7 +769,7 @@ func newRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session, 
 		return nil, err
 	}
 
-	flowID, err := flowIDForUUID(ctx, tx, org, fr.FlowReference().UUID)
+	flowID, err := FlowIDForUUID(ctx, tx, org, fr.FlowReference().UUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load flow with uuid: %s", fr.FlowReference().UUID)
 	}

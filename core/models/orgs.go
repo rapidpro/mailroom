@@ -229,8 +229,8 @@ func orgFromSession(session flows.Session) *Org {
 	return session.Assets().Source().(*OrgAssets).Org()
 }
 
-// loadOrg loads the org for the passed in id, returning any error encountered
-func loadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
+// LoadOrg loads the org for the passed in id, returning any error encountered
+func LoadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	start := time.Now()
 
 	org := &Org{}

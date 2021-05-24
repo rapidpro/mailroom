@@ -48,7 +48,7 @@ func AllocateTopups(ctx context.Context, db Queryer, rp *redis.Pool, org *Org, a
 	}
 
 	// no active topup found, lets calculate it
-	topup, err := calculateActiveTopup(ctx, db, org.ID())
+	topup, err := CalculateActiveTopup(ctx, db, org.ID())
 	if err != nil {
 		return NilTopupID, err
 	}
@@ -99,8 +99,8 @@ end
 return {activeTopup, remaining}
 `)
 
-// calculateActiveTopup loads the active topup for the passed in org
-func calculateActiveTopup(ctx context.Context, db Queryer, orgID OrgID) (*Topup, error) {
+// CalculateActiveTopup loads the active topup for the passed in org
+func CalculateActiveTopup(ctx context.Context, db Queryer, orgID OrgID) (*Topup, error) {
 	topup := &Topup{}
 	rows, err := db.QueryxContext(ctx, selectActiveTopup, orgID)
 	if err != nil {

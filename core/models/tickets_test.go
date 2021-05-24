@@ -9,6 +9,7 @@ import (
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/null"
 
 	"github.com/stretchr/testify/assert"
@@ -29,7 +30,7 @@ func TestTicketers(t *testing.T) {
 	assert.Equal(t, "523562", ticketer.Config("push_token"))
 
 	// org through org assets
-	org1, err := models.GetOrgAssets(ctx, db, models.Org1)
+	org1, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	ticketer = org1.TicketerByID(models.ZendeskID)
@@ -45,7 +46,7 @@ func TestTicketers(t *testing.T) {
 	ticketer.UpdateConfig(ctx, db, map[string]string{"new-key": "foo"}, map[string]bool{"push_id": true})
 	models.FlushCache()
 
-	org1, _ = models.GetOrgAssets(ctx, db, models.Org1)
+	org1, _ = models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	ticketer = org1.TicketerByID(models.ZendeskID)
 
 	assert.Equal(t, "foo", ticketer.Config("new-key"))       // new config value added
@@ -70,7 +71,7 @@ func TestTickets(t *testing.T) {
 
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
-		models.Org1,
+		testdata.Org1.ID,
 		models.CathyID,
 		models.MailgunID,
 		"EX12345",
@@ -82,7 +83,7 @@ func TestTickets(t *testing.T) {
 	)
 	ticket2 := models.NewTicket(
 		"64f81be1-00ff-48ef-9e51-97d6f924c1a4",
-		models.Org1,
+		testdata.Org1.ID,
 		models.BobID,
 		models.ZendeskID,
 		"EX7869",
@@ -92,7 +93,7 @@ func TestTickets(t *testing.T) {
 	)
 	ticket3 := models.NewTicket(
 		"28ef8ddc-b221-42f3-aeae-ee406fc9d716",
-		models.Org2,
+		testdata.Org2.ID,
 		models.AlexandriaID,
 		models.ZendeskID,
 		"EX6677",
@@ -102,7 +103,7 @@ func TestTickets(t *testing.T) {
 	)
 
 	assert.Equal(t, flows.TicketUUID("2ef57efc-d85f-4291-b330-e4afe68af5fe"), ticket1.UUID())
-	assert.Equal(t, models.Org1, ticket1.OrgID())
+	assert.Equal(t, testdata.Org1.ID, ticket1.OrgID())
 	assert.Equal(t, models.CathyID, ticket1.ContactID())
 	assert.Equal(t, models.MailgunID, ticket1.TicketerID())
 	assert.Equal(t, null.String("EX12345"), ticket1.ExternalID())
@@ -127,7 +128,7 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, "New Zen Ticket", tk2.Subject())
 
 	// can lookup open tickets by contact
-	org1, _ := models.GetOrgAssets(ctx, db, models.Org1)
+	org1, _ := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	cathy, err := models.LoadContact(ctx, db, org1, models.CathyID)
 	require.NoError(t, err)
 
@@ -140,7 +141,7 @@ func TestTickets(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check ticket remains open and config was updated
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND config='{"contact-display": "Cathy", "last-message-id": "2352"}'::jsonb AND closed_on IS NULL`, []interface{}{models.Org1}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND config='{"contact-display": "Cathy", "last-message-id": "2352"}'::jsonb AND closed_on IS NULL`, []interface{}{testdata.Org1.ID}, 1)
 
 	logger := &models.HTTPLogger{}
 
@@ -148,11 +149,11 @@ func TestTickets(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check ticket is now closed
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'C' AND closed_on IS NOT NULL`, []interface{}{models.Org1}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'C' AND closed_on IS NOT NULL`, []interface{}{testdata.Org1.ID}, 1)
 
 	err = models.UpdateAndKeepOpenTicket(ctx, db, ticket1, map[string]string{"last-message-id": "6754"})
 	assert.NoError(t, err)
 
 	// check ticket is open again
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND closed_on IS NULL`, []interface{}{models.Org1}, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND closed_on IS NULL`, []interface{}{testdata.Org1.ID}, 2)
 }

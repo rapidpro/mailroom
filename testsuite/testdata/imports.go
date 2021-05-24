@@ -16,7 +16,7 @@ import (
 func InsertContactImport(t *testing.T, db *sqlx.DB, orgID models.OrgID) models.ContactImportID {
 	var importID models.ContactImportID
 	err := db.Get(&importID, `INSERT INTO contacts_contactimport(org_id, file, original_filename, headers, mappings, num_records, group_id, started_on, created_on, created_by_id, modified_on, modified_by_id, is_active)
-					          VALUES($1, 'contact_imports/1234.xlsx', 'contacts.xlsx', '{"Name", "URN:Tel"}', '{}', 30, NULL, $2, $2, 1, $2, 1, TRUE) RETURNING id`, models.Org1, dates.Now())
+					          VALUES($1, 'contact_imports/1234.xlsx', 'contacts.xlsx', '{"Name", "URN:Tel"}', '{}', 30, NULL, $2, $2, 1, $2, 1, TRUE) RETURNING id`, Org1.ID, dates.Now())
 	require.NoError(t, err)
 	return importID
 }

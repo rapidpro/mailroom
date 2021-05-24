@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web/contact"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ func TestSpecToCreation(t *testing.T) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	sa := oa.SessionAssets()

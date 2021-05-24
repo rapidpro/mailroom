@@ -2,24 +2,11 @@ package models
 
 import (
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 )
 
-// Constants used in tests, these are tied to the DB created by the
-// RapidPro `mailroom_db` management command. These need to live in the master /models
-// dir because we are using typed values and otherwire we'd have a circular dependency.
-//
-// Solution there would be to create a new package for ID types which would let us put
-// these in testsuite or the like.
-//
-// Note that integer ids MAY be fragile depending on how clumsy people are adding things
-// to the mailroom_db command (hint, add things to the end). If this turns into an issue
-// we could start deriving these instead from the UUIDs.
-
-var Org1 = OrgID(1)
-var Org1UUID = uuids.UUID("bf0514a5-9407-44c9-b0f9-3f36f9c18414")
+// TODO move these to testsuite/testdata/db.go
 
 var TwilioChannelID = ChannelID(10000)
 var TwilioChannelUUID = assets.ChannelUUID("74729f45-7f29-4868-9dc4-90e491e3c7d8")
@@ -132,9 +119,6 @@ var InternalID = TicketerID(4)
 var InternalUUID = assets.TicketerUUID("8bd48029-6ca1-46a8-aa14-68f7213b82b3")
 
 // constants for org 2, just a few here
-
-var Org2 = OrgID(2)
-var Org2UUID = uuids.UUID("3ae7cdeb-fd96-46e5-abc4-a4622f349921")
 
 var Org2ChannelID = ChannelID(20000)
 var Org2ChannelUUID = assets.ChannelUUID("a89bc872-3763-4b95-91d9-31d4e56c6651")

@@ -1,11 +1,13 @@
-package models
+package models_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -16,10 +18,10 @@ func TestAirtimeTransfers(t *testing.T) {
 	db := testsuite.DB()
 
 	// insert a transfer
-	transfer := NewAirtimeTransfer(
-		Org1,
-		AirtimeTransferStatusSuccess,
-		CathyID,
+	transfer := models.NewAirtimeTransfer(
+		testdata.Org1.ID,
+		models.AirtimeTransferStatusSuccess,
+		models.CathyID,
 		urns.URN("tel:+250700000001"),
 		urns.URN("tel:+250700000002"),
 		"RWF",
@@ -27,18 +29,18 @@ func TestAirtimeTransfers(t *testing.T) {
 		decimal.RequireFromString(`1000`),
 		time.Now(),
 	)
-	err := InsertAirtimeTransfers(ctx, db, []*AirtimeTransfer{transfer})
+	err := models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`,
-		[]interface{}{Org1, AirtimeTransferStatusSuccess}, 1)
+		[]interface{}{testdata.Org1.ID, models.AirtimeTransferStatusSuccess}, 1)
 
 	// insert a failed transfer with nil sender, empty currency
-	transfer = NewAirtimeTransfer(
-		Org1,
-		AirtimeTransferStatusFailed,
-		CathyID,
+	transfer = models.NewAirtimeTransfer(
+		testdata.Org1.ID,
+		models.AirtimeTransferStatusFailed,
+		models.CathyID,
 		urns.NilURN,
 		urns.URN("tel:+250700000002"),
 		"",
@@ -46,10 +48,10 @@ func TestAirtimeTransfers(t *testing.T) {
 		decimal.Zero,
 		time.Now(),
 	)
-	err = InsertAirtimeTransfers(ctx, db, []*AirtimeTransfer{transfer})
+	err = models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`,
-		[]interface{}{Org1, AirtimeTransferStatusFailed}, 1)
+		[]interface{}{testdata.Org1.ID, models.AirtimeTransferStatusFailed}, 1)
 }

@@ -22,9 +22,9 @@ func TestQueueCourierMessages(t *testing.T) {
 	defer rc.Close()
 
 	// create an Andoid channel
-	androidChannelID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
+	androidChannelID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg|models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg|models.RefreshChannels)
 	require.NoError(t, err)
 
 	tests := []struct {

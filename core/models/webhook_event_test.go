@@ -1,10 +1,13 @@
-package models
+package models_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,20 +16,20 @@ func TestWebhookEvents(t *testing.T) {
 	db := testsuite.DB()
 
 	// create a resthook to insert against
-	var resthookID ResthookID
+	var resthookID models.ResthookID
 	db.Get(&resthookID, `INSERT INTO api_resthook(is_active, slug, org_id, created_on, modified_on, created_by_id, modified_by_id) VALUES(TRUE, 'foo', 1, NOW(), NOW(), 1, 1) RETURNING id;`)
 
 	tcs := []struct {
-		OrgID      OrgID
-		ResthookID ResthookID
+		OrgID      models.OrgID
+		ResthookID models.ResthookID
 		Data       string
 	}{
-		{Org1, resthookID, `{"foo":"bar"}`},
+		{testdata.Org1.ID, resthookID, `{"foo":"bar"}`},
 	}
 
 	for _, tc := range tcs {
-		e := NewWebhookEvent(tc.OrgID, tc.ResthookID, tc.Data, time.Now())
-		err := InsertWebhookEvents(ctx, db, []*WebhookEvent{e})
+		e := models.NewWebhookEvent(tc.OrgID, tc.ResthookID, tc.Data, time.Now())
+		err := models.InsertWebhookEvents(ctx, db, []*models.WebhookEvent{e})
 		assert.NoError(t, err)
 		assert.NotZero(t, e.ID())
 

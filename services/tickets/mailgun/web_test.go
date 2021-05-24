@@ -16,7 +16,7 @@ func TestReceive(t *testing.T) {
 	db.MustExec(`DELETE FROM msgs_msg`)
 
 	// create a mailgun ticket for Cathy
-	testdata.InsertOpenTicket(t, db, models.Org1, models.CathyID, models.MailgunID, "c69f103c-db64-4481-815b-1112890419ef", "Need help", "Have you seen my cookies?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, models.MailgunID, "c69f103c-db64-4481-815b-1112890419ef", "Need help", "Have you seen my cookies?", "")
 
 	web.RunWebTests(t, "testdata/receive.json")
 }

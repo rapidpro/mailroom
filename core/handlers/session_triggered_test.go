@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -25,7 +26,7 @@ func TestSessionTriggered(t *testing.T) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	simpleFlow, err := oa.FlowByID(models.SingleMessageFlowID)
@@ -100,7 +101,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	favoriteFlow, err := oa.FlowByID(models.FavoritesFlowID)

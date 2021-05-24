@@ -9,6 +9,7 @@ import (
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -83,18 +84,18 @@ func TestInterrupts(t *testing.T) {
 		db.MustExec(`UPDATE flows_flowsession SET status='C', ended_on=NOW() WHERE status = 'W';`)
 
 		// twilio connection
-		twilioConnectionID := insertConnection(models.Org1, models.TwilioChannelID, models.AlexandriaID, models.AlexandriaURNID)
+		twilioConnectionID := insertConnection(testdata.Org1.ID, models.TwilioChannelID, models.AlexandriaID, models.AlexandriaURNID)
 
 		sessionIDs := make([]models.SessionID, 5)
 
 		// insert our dummy contact sessions
-		sessionIDs[0] = insertSession(models.Org1, models.CathyID, models.NilConnectionID, models.FavoritesFlowID)
-		sessionIDs[1] = insertSession(models.Org1, models.GeorgeID, models.NilConnectionID, models.FavoritesFlowID)
-		sessionIDs[2] = insertSession(models.Org1, models.AlexandriaID, twilioConnectionID, models.FavoritesFlowID)
-		sessionIDs[3] = insertSession(models.Org1, models.BobID, models.NilConnectionID, models.PickNumberFlowID)
+		sessionIDs[0] = insertSession(testdata.Org1.ID, models.CathyID, models.NilConnectionID, models.FavoritesFlowID)
+		sessionIDs[1] = insertSession(testdata.Org1.ID, models.GeorgeID, models.NilConnectionID, models.FavoritesFlowID)
+		sessionIDs[2] = insertSession(testdata.Org1.ID, models.AlexandriaID, twilioConnectionID, models.FavoritesFlowID)
+		sessionIDs[3] = insertSession(testdata.Org1.ID, models.BobID, models.NilConnectionID, models.PickNumberFlowID)
 
 		// a session we always end explicitly
-		sessionIDs[4] = insertSession(models.Org1, models.BobID, models.NilConnectionID, models.FavoritesFlowID)
+		sessionIDs[4] = insertSession(testdata.Org1.ID, models.BobID, models.NilConnectionID, models.FavoritesFlowID)
 
 		// create our task
 		task := &InterruptSessionsTask{
@@ -105,7 +106,7 @@ func TestInterrupts(t *testing.T) {
 		}
 
 		// execute it
-		err := task.Perform(ctx, mr, models.Org1)
+		err := task.Perform(ctx, mr, testdata.Org1.ID)
 		assert.NoError(t, err)
 
 		// check session statuses are as expected

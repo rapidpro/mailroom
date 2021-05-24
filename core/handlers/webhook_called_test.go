@@ -6,6 +6,7 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
@@ -82,7 +83,7 @@ func TestWebhookCalled(t *testing.T) {
 				},
 				{
 					SQL:   "select count(*) from api_webhookevent where org_id = $1",
-					Args:  []interface{}{models.Org1},
+					Args:  []interface{}{testdata.Org1.ID},
 					Count: 2,
 				},
 			},

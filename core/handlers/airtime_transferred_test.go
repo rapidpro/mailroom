@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/shopspring/decimal"
 )
@@ -361,7 +362,7 @@ func TestAirtimeTransferred(t *testing.T) {
 		},
 	}))
 
-	testsuite.DB().MustExec(`UPDATE orgs_org SET config = '{"dtone_key": "key123", "dtone_secret": "sesame"}'::jsonb WHERE id = $1`, models.Org1)
+	testsuite.DB().MustExec(`UPDATE orgs_org SET config = '{"dtone_key": "key123", "dtone_secret": "sesame"}'::jsonb WHERE id = $1`, testdata.Org1.ID)
 
 	tcs := []handlers.TestCase{
 		{
@@ -373,12 +374,12 @@ func TestAirtimeTransferred(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'S'`,
-					Args:  []interface{}{models.Org1, models.CathyID},
+					Args:  []interface{}{testdata.Org1.ID, models.CathyID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = FALSE AND url LIKE 'https://dvs-api.dtone.com/v1/%'`,
-					Args:  []interface{}{models.Org1},
+					Args:  []interface{}{testdata.Org1.ID},
 					Count: 3,
 				},
 			},
@@ -392,12 +393,12 @@ func TestAirtimeTransferred(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'F'`,
-					Args:  []interface{}{models.Org1, models.GeorgeID},
+					Args:  []interface{}{testdata.Org1.ID, models.GeorgeID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND airtime_transfer_id IS NOT NULL AND is_error = TRUE AND url LIKE 'https://dvs-api.dtone.com/v1/%'`,
-					Args:  []interface{}{models.Org1},
+					Args:  []interface{}{testdata.Org1.ID},
 					Count: 1,
 				},
 			},

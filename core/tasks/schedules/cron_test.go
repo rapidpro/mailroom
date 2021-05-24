@@ -6,6 +6,8 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +26,7 @@ func TestCheckSchedules(t *testing.T) {
 		&s1,
 		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
 			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '1 DAY', 1, 1, $1) RETURNING id`,
-		models.Org1,
+		testdata.Org1.ID,
 	)
 	assert.NoError(t, err)
 	var b1 models.BroadcastID
@@ -32,7 +34,7 @@ func TestCheckSchedules(t *testing.T) {
 		&b1,
 		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id, schedule_id)
 			VALUES('P', hstore(ARRAY['eng','Test message', 'fra', 'Un Message']), 'eng', TRUE, NOW(), NOW(), TRUE, 1, 1, $1, $2) RETURNING id`,
-		models.Org1, s1,
+		testdata.Org1.ID, s1,
 	)
 	assert.NoError(t, err)
 
@@ -51,7 +53,7 @@ func TestCheckSchedules(t *testing.T) {
 		&s2,
 		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
 			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '2 DAY', 1, 1, $1) RETURNING id`,
-		models.Org1,
+		testdata.Org1.ID,
 	)
 	assert.NoError(t, err)
 	var t1 models.TriggerID
@@ -59,7 +61,7 @@ func TestCheckSchedules(t *testing.T) {
 		&t1,
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, is_archived, trigger_type, created_by_id, modified_by_id, org_id, flow_id, schedule_id)
 			VALUES(TRUE, NOW(), NOW(), FALSE, 'S', 1, 1, $1, $2, $3) RETURNING id`,
-		models.Org1, models.FavoritesFlowID, s2,
+		testdata.Org1.ID, models.FavoritesFlowID, s2,
 	)
 	assert.NoError(t, err)
 
@@ -74,7 +76,7 @@ func TestCheckSchedules(t *testing.T) {
 		&s3,
 		`INSERT INTO schedules_schedule(is_active, repeat_period, created_on, modified_on, next_fire, created_by_id, modified_by_id, org_id)
 			VALUES(TRUE, 'O', NOW(), NOW(), NOW()- INTERVAL '3 DAY', 1, 1, $1) RETURNING id`,
-		models.Org1,
+		testdata.Org1.ID,
 	)
 	assert.NoError(t, err)
 
@@ -95,7 +97,7 @@ func TestCheckSchedules(t *testing.T) {
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 AND parent_id = $2 AND text = hstore(ARRAY['eng','Test message', 'fra', 'Un Message'])
 		AND status = 'Q' AND base_language = 'eng';`,
-		[]interface{}{models.Org1, b1}, 1)
+		[]interface{}{testdata.Org1.ID, b1}, 1)
 
 	// with the right count of groups, contacts, urns
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from msgs_broadcast_urns WHERE broadcast_id = 2`, nil, 1)

@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/lib/pq"
 	"github.com/olivere/elastic/v7"
@@ -77,7 +78,7 @@ func TestDynamicGroups(t *testing.T) {
 
 	// clear our org cache so we reload org campaigns and events
 	models.FlushCache()
-	org, err := models.GetOrgAssets(ctx, db, models.Org1)
+	org, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	esServer := testsuite.NewMockElasticServer()

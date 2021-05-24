@@ -10,6 +10,8 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +29,7 @@ func TestRetries(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy
-	start := models.NewFlowStart(models.Org1, models.StartTypeTrigger, models.FlowTypeVoice, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
 		WithContactIDs([]models.ContactID{models.CathyID})
 
 	// call our master starter

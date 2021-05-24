@@ -67,10 +67,24 @@ type Schedule struct {
 	}
 }
 
-func (s *Schedule) ID() ScheduleID        { return s.s.ID }
-func (s *Schedule) OrgID() OrgID          { return s.s.OrgID }
-func (s *Schedule) Broadcast() *Broadcast { return s.s.Broadcast }
-func (s *Schedule) FlowStart() *FlowStart { return s.s.FlowStart }
+func NewSchedule(period RepeatPeriod, hourOfDay, minuteOfHour, dayOfMonth *int, daysOfWeek string) *Schedule {
+	sched := &Schedule{}
+	s := &sched.s
+	s.RepeatPeriod = period
+	s.HourOfDay = hourOfDay
+	s.MinuteOfHour = minuteOfHour
+	s.DayOfMonth = dayOfMonth
+	s.DaysOfWeek = null.String(daysOfWeek)
+	return sched
+}
+
+func (s *Schedule) ID() ScheduleID             { return s.s.ID }
+func (s *Schedule) OrgID() OrgID               { return s.s.OrgID }
+func (s *Schedule) Broadcast() *Broadcast      { return s.s.Broadcast }
+func (s *Schedule) FlowStart() *FlowStart      { return s.s.FlowStart }
+func (s *Schedule) RepeatPeriod() RepeatPeriod { return s.s.RepeatPeriod }
+func (s *Schedule) NextFire() *time.Time       { return s.s.NextFire }
+func (s *Schedule) LastFire() *time.Time       { return s.s.LastFire }
 func (s *Schedule) Timezone() (*time.Location, error) {
 	return time.LoadLocation(s.s.Timezone)
 }

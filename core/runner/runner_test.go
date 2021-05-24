@@ -31,10 +31,10 @@ func TestCampaignStarts(t *testing.T) {
 	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, models.CathyID, models.BobID, models.AlexandriaID)
 
 	// create an active session for Alexandria to test skipping
-	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), models.Org1, models.AlexandriaID, models.PickNumberFlowID)
+	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, models.AlexandriaID, models.PickNumberFlowID)
 
 	// create an active voice call for Cathy to make sure it doesn't get interrupted or cause skipping
-	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'V', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), models.Org1, models.CathyID, models.IVRFlowID)
+	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'V', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, models.CathyID, models.IVRFlowID)
 
 	// set our event to skip
 	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)
@@ -60,7 +60,7 @@ func TestCampaignStarts(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, models.Org1, fires, models.CampaignFlowUUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
+	sessions, err := FireCampaignEvents(ctx, db, rp, testdata.Org1.ID, fires, models.CampaignFlowUUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
 
@@ -105,7 +105,7 @@ func TestBatchStart(t *testing.T) {
 	rp := testsuite.RP()
 
 	// create a start object
-	testdata.InsertFlowStart(t, db, models.Org1, models.SingleMessageFlowID, nil)
+	testdata.InsertFlowStart(t, db, testdata.Org1.ID, models.SingleMessageFlowID, nil)
 
 	// and our batch object
 	contactIDs := []models.ContactID{models.CathyID, models.BobID}
@@ -177,7 +177,7 @@ func TestContactRuns(t *testing.T) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	flow, err := oa.FlowByID(models.FavoritesFlowID)

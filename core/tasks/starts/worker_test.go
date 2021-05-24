@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
@@ -253,7 +254,7 @@ func TestStarts(t *testing.T) {
 		mes.NextResponse = tc.queryResponse
 
 		// handle our start task
-		start := models.NewFlowStart(models.Org1, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID, tc.restartParticipants, tc.includeActive).
+		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID, tc.restartParticipants, tc.includeActive).
 			WithGroupIDs(tc.groupIDs).
 			WithContactIDs(tc.contactIDs).
 			WithQuery(tc.query).

@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +16,7 @@ func TestReadModifiers(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	// can read empty list

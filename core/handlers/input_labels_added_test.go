@@ -19,8 +19,8 @@ func TestInputLabelsAdded(t *testing.T) {
 	reporting := assets.NewLabelReference(assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"), "Reporting")
 	testing := assets.NewLabelReference(assets.LabelUUID("a6338cdc-7938-4437-8b05-2d5d785e3a08"), "Testing")
 
-	msg1 := testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start")
-	msg2 := testdata.InsertIncomingMsg(t, db, models.Org1, models.BobID, models.BobURN, models.BobURNID, "start")
+	msg1 := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "start")
+	msg2 := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, models.BobID, models.BobURN, models.BobURNID, "start")
 
 	tcs := []handlers.TestCase{
 		{

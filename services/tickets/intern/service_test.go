@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	intern "github.com/nyaruka/mailroom/services/tickets/intern"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "", ticket.ExternalID)
 	assert.Equal(t, 0, len(logger.Logs))
 
-	dbTicket := models.NewTicket(ticket.UUID, models.Org1, models.CathyID, models.InternalID, "", "Need help", "Where are my cookies?", nil)
+	dbTicket := models.NewTicket(ticket.UUID, testdata.Org1.ID, models.CathyID, models.InternalID, "", "Need help", "Where are my cookies?", nil)
 
 	logger = &flows.HTTPLogger{}
 	err = svc.Forward(
@@ -70,8 +71,8 @@ func TestCloseAndReopen(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", models.Org1, models.CathyID, models.InternalID, "12", "New ticket", "Where my cookies?", nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", models.Org1, models.BobID, models.InternalID, "14", "Second ticket", "Where my shoes?", nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, models.CathyID, models.InternalID, "12", "New ticket", "Where my cookies?", nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, models.BobID, models.InternalID, "14", "Second ticket", "Where my shoes?", nil)
 
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 

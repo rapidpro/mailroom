@@ -125,7 +125,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	var err error
 
 	if prev == nil || refresh&RefreshOrg > 0 {
-		oa.org, err = loadOrg(ctx, db, orgID)
+		oa.org, err = LoadOrg(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading environment for org %d", orgID)
 		}
@@ -482,7 +482,7 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 		return flow, nil
 	}
 
-	dbFlow, err := loadFlowByUUID(ctx, a.db, a.orgID, flowUUID)
+	dbFlow, err := LoadFlowByUUID(ctx, a.db, a.orgID, flowUUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %s", flowUUID)
 	}
@@ -512,7 +512,7 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 		return flow.(*Flow), nil
 	}
 
-	dbFlow, err := loadFlowByID(ctx, a.db, a.orgID, flowID)
+	dbFlow, err := LoadFlowByID(ctx, a.db, a.orgID, flowID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %d", flowID)
 	}

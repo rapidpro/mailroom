@@ -31,7 +31,7 @@ func TestMsgReceived(t *testing.T) {
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
-				models.CathyID: testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "start"),
+				models.CathyID: testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "start"),
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
