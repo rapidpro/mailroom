@@ -21,10 +21,10 @@ func TestTicketers(t *testing.T) {
 	db := testsuite.DB()
 
 	// can load directly by UUID
-	ticketer, err := models.LookupTicketerByUUID(ctx, db, models.ZendeskUUID)
+	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Zendesk.UUID)
 	assert.NoError(t, err)
-	assert.Equal(t, models.ZendeskID, ticketer.ID())
-	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	assert.Equal(t, testdata.Zendesk.ID, ticketer.ID())
+	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Equal(t, "Zendesk (Nyaruka)", ticketer.Name())
 	assert.Equal(t, "1234-abcd", ticketer.Config("push_id"))
 	assert.Equal(t, "523562", ticketer.Config("push_token"))
@@ -33,13 +33,13 @@ func TestTicketers(t *testing.T) {
 	org1, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
-	ticketer = org1.TicketerByID(models.ZendeskID)
-	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	ticketer = org1.TicketerByID(testdata.Zendesk.ID)
+	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Equal(t, "Zendesk (Nyaruka)", ticketer.Name())
 	assert.Equal(t, "1234-abcd", ticketer.Config("push_id"))
 
-	ticketer = org1.TicketerByUUID(models.ZendeskUUID)
-	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	ticketer = org1.TicketerByUUID(testdata.Zendesk.UUID)
+	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Equal(t, "Zendesk (Nyaruka)", ticketer.Name())
 	assert.Equal(t, "1234-abcd", ticketer.Config("push_id"))
 
@@ -47,7 +47,7 @@ func TestTicketers(t *testing.T) {
 	models.FlushCache()
 
 	org1, _ = models.GetOrgAssets(ctx, db, testdata.Org1.ID)
-	ticketer = org1.TicketerByID(models.ZendeskID)
+	ticketer = org1.TicketerByID(testdata.Zendesk.ID)
 
 	assert.Equal(t, "foo", ticketer.Config("new-key"))       // new config value added
 	assert.Equal(t, "", ticketer.Config("push_id"))          // existing config value removed
@@ -72,8 +72,8 @@ func TestTickets(t *testing.T) {
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
 		testdata.Org1.ID,
-		models.CathyID,
-		models.MailgunID,
+		testdata.Cathy.ID,
+		testdata.Mailgun.ID,
 		"EX12345",
 		"New Ticket",
 		"Where are my cookies?",
@@ -84,8 +84,8 @@ func TestTickets(t *testing.T) {
 	ticket2 := models.NewTicket(
 		"64f81be1-00ff-48ef-9e51-97d6f924c1a4",
 		testdata.Org1.ID,
-		models.BobID,
-		models.ZendeskID,
+		testdata.Bob.ID,
+		testdata.Zendesk.ID,
 		"EX7869",
 		"New Zen Ticket",
 		"Where are my trousers?",
@@ -94,8 +94,8 @@ func TestTickets(t *testing.T) {
 	ticket3 := models.NewTicket(
 		"28ef8ddc-b221-42f3-aeae-ee406fc9d716",
 		testdata.Org2.ID,
-		models.AlexandriaID,
-		models.ZendeskID,
+		testdata.Alexandria.ID,
+		testdata.Zendesk.ID,
 		"EX6677",
 		"Other Org Ticket",
 		"Where are my pants?",
@@ -104,8 +104,8 @@ func TestTickets(t *testing.T) {
 
 	assert.Equal(t, flows.TicketUUID("2ef57efc-d85f-4291-b330-e4afe68af5fe"), ticket1.UUID())
 	assert.Equal(t, testdata.Org1.ID, ticket1.OrgID())
-	assert.Equal(t, models.CathyID, ticket1.ContactID())
-	assert.Equal(t, models.MailgunID, ticket1.TicketerID())
+	assert.Equal(t, testdata.Cathy.ID, ticket1.ContactID())
+	assert.Equal(t, testdata.Mailgun.ID, ticket1.TicketerID())
 	assert.Equal(t, null.String("EX12345"), ticket1.ExternalID())
 	assert.Equal(t, "New Ticket", ticket1.Subject())
 	assert.Equal(t, "Cathy", ticket1.Config("contact-display"))
@@ -123,13 +123,13 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, "New Ticket", tk1.Subject())
 
 	// can lookup a ticket by external ID and ticketer
-	tk2, err := models.LookupTicketByExternalID(ctx, db, models.ZendeskID, "EX7869")
+	tk2, err := models.LookupTicketByExternalID(ctx, db, testdata.Zendesk.ID, "EX7869")
 	assert.NoError(t, err)
 	assert.Equal(t, "New Zen Ticket", tk2.Subject())
 
 	// can lookup open tickets by contact
 	org1, _ := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
-	cathy, err := models.LoadContact(ctx, db, org1, models.CathyID)
+	cathy, err := models.LoadContact(ctx, db, org1, testdata.Cathy.ID)
 	require.NoError(t, err)
 
 	tks, err := models.LoadOpenTicketsForContact(ctx, db, cathy)

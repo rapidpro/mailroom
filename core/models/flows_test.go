@@ -16,7 +16,7 @@ func TestFlows(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, models.IVRFlowID)
+	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, testdata.IVRFlow.ID)
 
 	tcs := []struct {
 		OrgID    models.OrgID
@@ -26,8 +26,8 @@ func TestFlows(t *testing.T) {
 		IVRRetry time.Duration
 		Found    bool
 	}{
-		{testdata.Org1.ID, models.FavoritesFlowID, models.FavoritesFlowUUID, "Favorites", 60 * time.Minute, true},
-		{testdata.Org1.ID, models.IVRFlowID, models.IVRFlowUUID, "IVR Flow", 30 * time.Minute, true},
+		{testdata.Org1.ID, testdata.Favorites.ID, testdata.Favorites.UUID, "Favorites", 60 * time.Minute, true},
+		{testdata.Org1.ID, testdata.IVRFlow.ID, testdata.IVRFlow.UUID, "IVR Flow", 30 * time.Minute, true},
 		{testdata.Org2.ID, models.FlowID(0), assets.FlowUUID("51e3c67d-8483-449c-abf7-25e50686f0db"), "", 0, false},
 	}
 
@@ -68,12 +68,12 @@ func TestFlowIDForUUID(t *testing.T) {
 	tx, err := db.BeginTxx(ctx, nil)
 	assert.NoError(t, err)
 
-	id, err := models.FlowIDForUUID(ctx, tx, org, models.FavoritesFlowUUID)
+	id, err := models.FlowIDForUUID(ctx, tx, org, testdata.Favorites.UUID)
 	assert.NoError(t, err)
-	assert.Equal(t, models.FavoritesFlowID, id)
+	assert.Equal(t, testdata.Favorites.ID, id)
 
 	// make favorite inactive
-	tx.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, models.FavoritesFlowID)
+	tx.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Favorites.ID)
 	tx.Commit()
 
 	tx, err = db.BeginTxx(ctx, nil)
@@ -84,7 +84,7 @@ func TestFlowIDForUUID(t *testing.T) {
 	models.FlushCache()
 	org, _ = models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 
-	id, err = models.FlowIDForUUID(ctx, tx, org, models.FavoritesFlowUUID)
+	id, err = models.FlowIDForUUID(ctx, tx, org, testdata.Favorites.UUID)
 	assert.NoError(t, err)
-	assert.Equal(t, models.FavoritesFlowID, id)
+	assert.Equal(t, testdata.Favorites.ID, id)
 }

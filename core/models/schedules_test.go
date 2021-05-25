@@ -36,13 +36,13 @@ func TestGetExpired(t *testing.T) {
 	assert.NoError(t, err)
 
 	// add a few contacts to the broadcast
-	db.MustExec(`INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES($1, $2),($1, $3)`, b1, models.CathyID, models.GeorgeID)
+	db.MustExec(`INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES($1, $2),($1, $3)`, b1, testdata.Cathy.ID, testdata.George.ID)
 
 	// and a group
 	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, models.DoctorsGroupID)
 
 	// and a URN
-	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, models.CathyURNID)
+	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, testdata.Cathy.URNID)
 
 	// add another and tie a trigger to it
 	var s2 models.ScheduleID
@@ -58,12 +58,12 @@ func TestGetExpired(t *testing.T) {
 		&t1,
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, is_archived, trigger_type, created_by_id, modified_by_id, org_id, flow_id, schedule_id)
 			VALUES(TRUE, NOW(), NOW(), FALSE, 'S', 1, 1, $1, $2, $3) RETURNING id`,
-		testdata.Org1.ID, models.FavoritesFlowID, s2,
+		testdata.Org1.ID, testdata.Favorites.ID, s2,
 	)
 	assert.NoError(t, err)
 
 	// add a few contacts to the trigger
-	db.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2),($1, $3)`, t1, models.CathyID, models.GeorgeID)
+	db.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2),($1, $3)`, t1, testdata.Cathy.ID, testdata.George.ID)
 
 	// and a group
 	db.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, models.DoctorsGroupID)
@@ -93,7 +93,7 @@ func TestGetExpired(t *testing.T) {
 	start := schedules[1].FlowStart()
 	assert.NotNil(t, start)
 	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
-	assert.Equal(t, models.FavoritesFlowID, start.FlowID())
+	assert.Equal(t, testdata.Favorites.ID, start.FlowID())
 	assert.Equal(t, testdata.Org1.ID, start.OrgID())
 	assert.Equal(t, []models.ContactID{models.CathyID, models.GeorgeID}, start.ContactIDs())
 	assert.Equal(t, []models.GroupID{models.DoctorsGroupID}, start.GroupIDs())

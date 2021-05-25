@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -167,7 +168,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 	assert.NoError(t, err)
 
 	// reuse id from one of our real flows
-	flowUUID := models.FavoritesFlowUUID
+	flowUUID := testdata.Favorites.UUID
 
 	for i, tc := range tcs {
 		// build our flow for this test case
@@ -199,7 +200,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Msg(msg).Build()
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, oa, flow.(*models.Flow), []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
+		_, err = runner.StartFlow(ctx, db, rp, oa, flow.(*models.Flow), []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID}, options)
 		assert.NoError(t, err)
 
 		results := make(map[models.ContactID]modifyResult)

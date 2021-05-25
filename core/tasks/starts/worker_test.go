@@ -41,13 +41,13 @@ func TestStarts(t *testing.T) {
 	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: rp, ElasticClient: es}
 
 	// convert our single message flow to an actual background flow that shouldn't interrupt
-	db.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, models.SingleMessageFlowID)
+	db.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
 
 	// insert a flow run for one of our contacts
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
 	db.MustExec(
 		`INSERT INTO flows_flowrun(uuid, status, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id)
-		                    VALUES($1, 'W', TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), models.GeorgeID, models.FavoritesFlowID)
+		                    VALUES($1, 'W', TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), models.GeorgeID, testdata.Favorites.ID)
 
 	tcs := []struct {
 		label                string
@@ -68,28 +68,28 @@ func TestStarts(t *testing.T) {
 	}{
 		{
 			label:                "Empty flow start",
-			flowID:               models.FavoritesFlowID,
+			flowID:               testdata.Favorites.ID,
 			queue:                queue.BatchQueue,
 			expectedContactCount: 0,
 			expectedBatchCount:   0,
 			expectedTotalCount:   0,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 1, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 1, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Single group",
-			flowID:               models.FavoritesFlowID,
+			flowID:               testdata.Favorites.ID,
 			groupIDs:             []models.GroupID{models.DoctorsGroupID},
 			queue:                queue.BatchQueue,
 			expectedContactCount: 121,
 			expectedBatchCount:   2,
 			expectedTotalCount:   121,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 122, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 122, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Group and Contact (but all already active)",
-			flowID:               models.FavoritesFlowID,
+			flowID:               testdata.Favorites.ID,
 			groupIDs:             []models.GroupID{models.DoctorsGroupID},
 			contactIDs:           []models.ContactID{models.CathyID},
 			queue:                queue.BatchQueue,
@@ -97,11 +97,11 @@ func TestStarts(t *testing.T) {
 			expectedBatchCount:   2,
 			expectedTotalCount:   0,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 122, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 122, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Contact restart",
-			flowID:               models.FavoritesFlowID,
+			flowID:               testdata.Favorites.ID,
 			contactIDs:           []models.ContactID{models.CathyID},
 			restartParticipants:  true,
 			includeActive:        true,
@@ -110,11 +110,11 @@ func TestStarts(t *testing.T) {
 			expectedBatchCount:   1,
 			expectedTotalCount:   1,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 122, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 122, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Previous group and one new contact",
-			flowID:               models.FavoritesFlowID,
+			flowID:               testdata.Favorites.ID,
 			groupIDs:             []models.GroupID{models.DoctorsGroupID},
 			contactIDs:           []models.ContactID{models.BobID},
 			queue:                queue.BatchQueue,
@@ -122,35 +122,35 @@ func TestStarts(t *testing.T) {
 			expectedBatchCount:   2,
 			expectedTotalCount:   1,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Single contact, no restart",
-			flowID:               models.FavoritesFlowID,
-			contactIDs:           []models.ContactID{models.BobID},
+			flowID:               testdata.Favorites.ID,
+			contactIDs:           []models.ContactID{testdata.Bob.ID},
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
 			expectedTotalCount:   0,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Single contact, include active, but no restart",
-			flowID:               models.FavoritesFlowID,
-			contactIDs:           []models.ContactID{models.BobID},
+			flowID:               testdata.Favorites.ID,
+			contactIDs:           []models.ContactID{testdata.Bob.ID},
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
 			expectedTotalCount:   0,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Single contact, include active and restart",
-			flowID:               models.FavoritesFlowID,
-			contactIDs:           []models.ContactID{models.BobID},
+			flowID:               testdata.Favorites.ID,
+			contactIDs:           []models.ContactID{testdata.Bob.ID},
 			restartParticipants:  true,
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
@@ -158,11 +158,11 @@ func TestStarts(t *testing.T) {
 			expectedBatchCount:   1,
 			expectedTotalCount:   1,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:  "Query start",
-			flowID: models.FavoritesFlowID,
+			flowID: testdata.Favorites.ID,
 			query:  "bob",
 			queryResponse: fmt.Sprintf(`{
 			"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
@@ -198,11 +198,11 @@ func TestStarts(t *testing.T) {
 			expectedBatchCount:   1,
 			expectedTotalCount:   1,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Query start with invalid query",
-			flowID:               models.FavoritesFlowID,
+			flowID:               testdata.Favorites.ID,
 			query:                "xyz = 45",
 			restartParticipants:  true,
 			includeActive:        true,
@@ -211,22 +211,22 @@ func TestStarts(t *testing.T) {
 			expectedBatchCount:   0,
 			expectedTotalCount:   0,
 			expectedStatus:       models.StartStatusFailed,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "New Contact",
-			flowID:               models.FavoritesFlowID,
+			flowID:               testdata.Favorites.ID,
 			createContact:        true,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
 			expectedTotalCount:   1,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 124, models.PickNumberFlowID: 0, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 124, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Other messaging flow",
-			flowID:               models.PickNumberFlowID,
+			flowID:               testdata.PickANumber.ID,
 			contactIDs:           []models.ContactID{models.BobID},
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
@@ -234,11 +234,11 @@ func TestStarts(t *testing.T) {
 			expectedBatchCount:   1,
 			expectedTotalCount:   1,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 1, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 1, testdata.SingleMessage.ID: 0},
 		},
 		{
 			label:                "Background flow",
-			flowID:               models.SingleMessageFlowID,
+			flowID:               testdata.SingleMessage.ID,
 			contactIDs:           []models.ContactID{models.BobID},
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
@@ -246,7 +246,7 @@ func TestStarts(t *testing.T) {
 			expectedBatchCount:   1,
 			expectedTotalCount:   1,
 			expectedStatus:       models.StartStatusComplete,
-			expectedActiveRuns:   map[models.FlowID]int{models.FavoritesFlowID: 123, models.PickNumberFlowID: 1, models.SingleMessageFlowID: 0},
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 1, testdata.SingleMessage.ID: 0},
 		},
 	}
 

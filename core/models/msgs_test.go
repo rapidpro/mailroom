@@ -42,7 +42,7 @@ func TestOutgoingMsgs(t *testing.T) {
 		{
 			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 			Text:             "missing urn id",
-			ContactID:        models.CathyID,
+			ContactID:        testdata.Cathy.ID,
 			URN:              urns.URN("tel:+250700000001"),
 			URNID:            models.URNID(0),
 			ExpectedStatus:   models.MsgStatusQueued,
@@ -53,9 +53,9 @@ func TestOutgoingMsgs(t *testing.T) {
 		{
 			ChannelUUID:    "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 			Text:           "test outgoing",
-			ContactID:      models.CathyID,
-			URN:            urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-			URNID:          models.CathyURNID,
+			ContactID:      testdata.Cathy.ID,
+			URN:            urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
+			URNID:          testdata.Cathy.URNID,
 			QuickReplies:   []string{"yes", "no"},
 			Topic:          flows.MsgTopicPurchase,
 			ExpectedStatus: models.MsgStatusQueued,
@@ -68,9 +68,9 @@ func TestOutgoingMsgs(t *testing.T) {
 		{
 			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 			Text:             "test outgoing",
-			ContactID:        models.CathyID,
-			URN:              urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-			URNID:            models.CathyURNID,
+			ContactID:        testdata.Cathy.ID,
+			URN:              urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
+			URNID:            testdata.Cathy.URNID,
 			Attachments:      []utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
 			ExpectedStatus:   models.MsgStatusQueued,
 			ExpectedMetadata: map[string]interface{}{},
@@ -79,9 +79,9 @@ func TestOutgoingMsgs(t *testing.T) {
 		{
 			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 			Text:             "suspended org",
-			ContactID:        models.CathyID,
-			URN:              urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID)),
-			URNID:            models.CathyURNID,
+			ContactID:        testdata.Cathy.ID,
+			URN:              urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
+			URNID:            testdata.Cathy.URNID,
 			SuspendedOrg:     true,
 			ExpectedStatus:   models.MsgStatusFailed,
 			ExpectedMetadata: map[string]interface{}{},
@@ -154,7 +154,7 @@ func TestLoadMessages(t *testing.T) {
 	msgIn1 := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "in 1")
 	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
 	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 2", nil)
-	msgOut3 := testdata.InsertOutgoingMsg(t, db, testdata.Org2.ID, models.Org2FredID, models.Org2FredURN, models.Org2FredURNID, "out 3", nil)
+	msgOut3 := testdata.InsertOutgoingMsg(t, db, testdata.Org2.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "out 3", nil)
 	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "hi 3", nil)
 
 	ids := []models.MsgID{models.MsgID(msgIn1.ID()), models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID()), models.MsgID(msgOut3.ID())}

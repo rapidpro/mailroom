@@ -61,7 +61,7 @@ func TestCheckSchedules(t *testing.T) {
 		&t1,
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, is_archived, trigger_type, created_by_id, modified_by_id, org_id, flow_id, schedule_id)
 			VALUES(TRUE, NOW(), NOW(), FALSE, 'S', 1, 1, $1, $2, $3) RETURNING id`,
-		testdata.Org1.ID, models.FavoritesFlowID, s2,
+		testdata.Org1.ID, testdata.Favorites.ID, s2,
 	)
 	assert.NoError(t, err)
 
@@ -87,7 +87,7 @@ func TestCheckSchedules(t *testing.T) {
 	// should have one flow start added to our DB ready to go
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowstart WHERE flow_id = $1 AND start_type = 'T' AND status = 'P';`,
-		[]interface{}{models.FavoritesFlowID}, 1)
+		[]interface{}{testdata.Favorites.ID}, 1)
 
 	// with the right count of groups and contacts
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowstart_contacts WHERE flowstart_id = 1`, nil, 2)

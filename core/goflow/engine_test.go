@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -59,7 +60,7 @@ func TestSimulatorTicket(t *testing.T) {
 	db := testsuite.DB()
 	testsuite.ResetDB()
 
-	ticketer, err := models.LookupTicketerByUUID(ctx, db, models.MailgunUUID)
+	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Mailgun.UUID)
 	require.NoError(t, err)
 
 	svc, err := goflow.Simulator().Services().Ticket(nil, flows.NewTicketer(ticketer))
@@ -67,7 +68,7 @@ func TestSimulatorTicket(t *testing.T) {
 
 	ticket, err := svc.Open(nil, "New ticket", "Where are my cookies?", nil)
 	assert.NoError(t, err)
-	assert.Equal(t, models.MailgunUUID, ticket.Ticketer.UUID())
+	assert.Equal(t, testdata.Mailgun.UUID, ticket.Ticketer.UUID())
 	assert.Equal(t, "New ticket", ticket.Subject)
 	assert.Equal(t, "Where are my cookies?", ticket.Body)
 }

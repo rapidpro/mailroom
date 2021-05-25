@@ -46,7 +46,7 @@ func TestTicketOpened(t *testing.T) {
 	}))
 
 	// an existing ticket
-	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, models.CathyID, models.MailgunID, "748363", "Old Question", "Who?", nil)
+	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, models.CathyID, testdata.Mailgun.ID, "748363", "Old Question", "Who?", nil)
 	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyTicket})
 	require.NoError(t, err)
 
@@ -54,41 +54,41 @@ func TestTicketOpened(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(models.MailgunUUID, "Mailgun (IT Support)"), "Need help", "Where are my cookies?", "Email Ticket"),
+					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(testdata.Mailgun.UUID, "Mailgun (IT Support)"), "Need help", "Where are my cookies?", "Email Ticket"),
 				},
 				models.BobID: []flows.Action{
-					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(models.ZendeskUUID, "Zendesk (Nyaruka)"), "Interesting", "I've found some cookies", "Zen Ticket"),
+					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(testdata.Zendesk.UUID, "Zendesk (Nyaruka)"), "Interesting", "I've found some cookies", "Zen Ticket"),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{ // cathy's old ticket will still be open and cathy's new ticket will have been created
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
-					Args:  []interface{}{models.CathyID, models.MailgunID},
+					Args:  []interface{}{models.CathyID, testdata.Mailgun.ID},
 					Count: 2,
 				},
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
-					Args:  []interface{}{models.MailgunID},
+					Args:  []interface{}{testdata.Mailgun.ID},
 					Count: 1,
 				},
 				{ // which doesn't include our API token
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%sesame%'",
-					Args:  []interface{}{models.MailgunID},
+					Args:  []interface{}{testdata.Mailgun.ID},
 					Count: 0,
 				},
 				{ // bob's ticket will have been created too
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
-					Args:  []interface{}{models.BobID, models.ZendeskID},
+					Args:  []interface{}{models.BobID, testdata.Zendesk.ID},
 					Count: 1,
 				},
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
-					Args:  []interface{}{models.ZendeskID},
+					Args:  []interface{}{testdata.Zendesk.ID},
 					Count: 1,
 				},
 				{ // which doesn't include our API token
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%523562%'",
-					Args:  []interface{}{models.ZendeskID},
+					Args:  []interface{}{testdata.Zendesk.ID},
 					Count: 0,
 				},
 			},

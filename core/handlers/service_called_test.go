@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
@@ -30,19 +29,19 @@ func TestServiceCalled(t *testing.T) {
 		},
 	}))
 
-	wit := assets.NewClassifierReference(models.WitUUID, "Wit Classifier")
+	wit := assets.NewClassifierReference(testdata.Wit.UUID, "Wit Classifier")
 
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy.ID: []flows.Action{
 					actions.NewCallClassifier(handlers.NewActionUUID(), wit, "book me a flight", "flight"),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from request_logs_httplog where org_id = $1 AND is_error = FALSE AND classifier_id = $2 AND url = 'https://api.wit.ai/message?v=20200513&q=book+me+a+flight'`,
-					Args:  []interface{}{testdata.Org1.ID, models.WitID},
+					Args:  []interface{}{testdata.Org1.ID, testdata.Wit.ID},
 					Count: 1,
 				},
 			},

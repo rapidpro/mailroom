@@ -71,8 +71,8 @@ func TestTwilioIVR(t *testing.T) {
 	// create a flow start for cathy and george
 	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+16055741111?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
 
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
-		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
 		WithParentSummary(parentSummary)
 
 	err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
@@ -406,8 +406,8 @@ func TestVonageIVR(t *testing.T) {
 
 	// create a flow start for cathy and george
 	extra := json.RawMessage(`{"ref_id":"123"}`)
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
-		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
 		WithExtra(extra)
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
@@ -428,12 +428,12 @@ func TestVonageIVR(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.CathyID, models.ConnectionStatusWired, "Call1"},
+		[]interface{}{testdata.Cathy.ID, models.ConnectionStatusWired, "Call1"},
 		1,
 	)
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.GeorgeID, models.ConnectionStatusWired, "Call2"},
+		[]interface{}{testdata.George.ID, models.ConnectionStatusWired, "Call2"},
 		1,
 	)
 
@@ -653,31 +653,31 @@ func TestVonageIVR(t *testing.T) {
 	// check our final state of sessions, runs, msgs, connections
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		9,
 	)
 
@@ -689,7 +689,7 @@ func TestVonageIVR(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		5,
 	)
 
@@ -701,13 +701,13 @@ func TestVonageIVR(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`,
-		[]interface{}{models.GeorgeID},
+		[]interface{}{testdata.George.ID},
 		3,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`,
-		[]interface{}{models.GeorgeID},
+		[]interface{}{testdata.George.ID},
 		1,
 	)
 

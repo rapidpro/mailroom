@@ -7,7 +7,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -367,14 +366,14 @@ func TestAirtimeTransferred(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy.ID: []flows.Action{
 					actions.NewTransferAirtime(handlers.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`3.50`)}, "Transfer"),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'S'`,
-					Args:  []interface{}{testdata.Org1.ID, models.CathyID},
+					Args:  []interface{}{testdata.Org1.ID, testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
@@ -386,14 +385,14 @@ func TestAirtimeTransferred(t *testing.T) {
 		},
 		{
 			Actions: handlers.ContactActionMap{
-				models.GeorgeID: []flows.Action{
+				testdata.George.ID: []flows.Action{
 					actions.NewTransferAirtime(handlers.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`3.50`)}, "Transfer"),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from airtime_airtimetransfer where org_id = $1 AND contact_id = $2 AND status = 'F'`,
-					Args:  []interface{}{testdata.Org1.ID, models.GeorgeID},
+					Args:  []interface{}{testdata.Org1.ID, testdata.George.ID},
 					Count: 1,
 				},
 				{
