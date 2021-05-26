@@ -95,12 +95,12 @@ func TestTwilioIVR(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.CathyID, models.ConnectionStatusWired, "Call1"},
+		[]interface{}{testdata.Cathy.ID, models.ConnectionStatusWired, "Call1"},
 		1,
 	)
 	testsuite.AssertQueryCount(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.GeorgeID, models.ConnectionStatusWired, "Call2"},
+		[]interface{}{testdata.George.ID, models.ConnectionStatusWired, "Call2"},
 		1,
 	)
 
@@ -286,31 +286,31 @@ func TestTwilioIVR(t *testing.T) {
 	// check our final state of sessions, runs, msgs, connections
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		1,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		8,
 	)
 
@@ -322,7 +322,7 @@ func TestTwilioIVR(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`,
-		[]interface{}{models.CathyID},
+		[]interface{}{testdata.Cathy.ID},
 		5,
 	)
 
@@ -334,13 +334,13 @@ func TestTwilioIVR(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`,
-		[]interface{}{models.GeorgeID},
+		[]interface{}{testdata.George.ID},
 		2,
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`,
-		[]interface{}{models.GeorgeID},
+		[]interface{}{testdata.George.ID},
 		1,
 	)
 

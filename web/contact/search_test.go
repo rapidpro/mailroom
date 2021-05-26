@@ -74,7 +74,7 @@ func TestSearch(t *testing.T) {
 			}
 		  ]
 		}
-	}`, models.CathyID)
+	}`, testdata.Cathy.ID)
 
 	tcs := []struct {
 		URL               string

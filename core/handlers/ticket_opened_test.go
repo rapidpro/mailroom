@@ -46,24 +46,24 @@ func TestTicketOpened(t *testing.T) {
 	}))
 
 	// an existing ticket
-	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, models.CathyID, testdata.Mailgun.ID, "748363", "Old Question", "Who?", nil)
+	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, "748363", "Old Question", "Who?", nil)
 	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyTicket})
 	require.NoError(t, err)
 
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy.ID: []flows.Action{
 					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(testdata.Mailgun.UUID, "Mailgun (IT Support)"), "Need help", "Where are my cookies?", "Email Ticket"),
 				},
-				models.BobID: []flows.Action{
+				testdata.Bob.ID: []flows.Action{
 					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(testdata.Zendesk.UUID, "Zendesk (Nyaruka)"), "Interesting", "I've found some cookies", "Zen Ticket"),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{ // cathy's old ticket will still be open and cathy's new ticket will have been created
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
-					Args:  []interface{}{models.CathyID, testdata.Mailgun.ID},
+					Args:  []interface{}{testdata.Cathy.ID, testdata.Mailgun.ID},
 					Count: 2,
 				},
 				{ // and there's an HTTP log for that
@@ -78,7 +78,7 @@ func TestTicketOpened(t *testing.T) {
 				},
 				{ // bob's ticket will have been created too
 					SQL:   "select count(*) from tickets_ticket where contact_id = $1 AND status = 'O' AND ticketer_id = $2",
-					Args:  []interface{}{models.BobID, testdata.Zendesk.ID},
+					Args:  []interface{}{testdata.Bob.ID, testdata.Zendesk.ID},
 					Count: 1,
 				},
 				{ // and there's an HTTP log for that

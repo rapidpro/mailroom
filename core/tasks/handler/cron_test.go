@@ -42,7 +42,7 @@ func TestRetryMsgs(t *testing.T) {
 		db.MustExec(
 			`INSERT INTO msgs_msg(uuid, org_id, channel_id, contact_id, contact_urn_id, text, direction, status, created_on, visibility, msg_count, error_count, next_attempt) 
 						   VALUES($1,   $2,     $3,         $4,         $5,             $6,   $7,        $8,     $9,         'V',        1,         0,           NOW())`,
-			uuids.New(), testdata.Org1.ID, models.TwilioChannelID, models.CathyID, models.CathyURNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
+			uuids.New(), testdata.Org1.ID, models.TwilioChannelID, testdata.Cathy.ID, testdata.Cathy.URNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
 	}
 
 	err = retryPendingMsgs(ctx, db, rp, "test", "test")

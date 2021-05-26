@@ -140,7 +140,7 @@ func TestOutgoingMsgs(t *testing.T) {
 func TestGetMessageIDFromUUID(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	msgIn := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "hi there")
+	msgIn := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi there")
 
 	msgID, err := models.GetMessageIDFromUUID(ctx, db, msgIn.UUID())
 
@@ -151,11 +151,11 @@ func TestGetMessageIDFromUUID(t *testing.T) {
 func TestLoadMessages(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	msgIn1 := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "in 1")
-	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
-	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 2", nil)
+	msgIn1 := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "in 1")
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 2", nil)
 	msgOut3 := testdata.InsertOutgoingMsg(t, db, testdata.Org2.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "out 3", nil)
-	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "hi 3", nil)
+	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi 3", nil)
 
 	ids := []models.MsgID{models.MsgID(msgIn1.ID()), models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID()), models.MsgID(msgOut3.ID())}
 
@@ -186,15 +186,15 @@ func TestResendMessages(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 1", nil)
-	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.BobID, models.BobURN, models.BobURNID, "out 2", nil)
-	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, models.CathyID, models.CathyURN, models.CathyURNID, "out 3", nil)
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", nil)
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Bob.ID, testdata.Bob.URN, testdata.Bob.URNID, "out 2", nil)
+	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 3", nil)
 
 	// make them look like failed messages
 	db.MustExec(`UPDATE msgs_msg SET status = 'F', sent_on = NOW(), error_count = 3`)
 
 	// give Bob's URN an affinity for the Vonage channel
-	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, models.VonageChannelID, models.BobURNID)
+	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, models.VonageChannelID, testdata.Bob.URNID)
 
 	msgs, err := models.LoadMessages(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
 	require.NoError(t, err)
@@ -246,9 +246,9 @@ func TestMarkMessages(t *testing.T) {
 	channel := oa.ChannelByUUID(models.TwilioChannelUUID)
 
 	insertMsg := func(text string) *models.Msg {
-		urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID))
+		urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
 		flowMsg := flows.NewMsgOut(urn, channel.ChannelReference(), text, nil, nil, nil, flows.NilMsgTopic)
-		msg, err := models.NewOutgoingMsg(oa.Org(), channel, models.CathyID, flowMsg, time.Now())
+		msg, err := models.NewOutgoingMsg(oa.Org(), channel, testdata.Cathy.ID, flowMsg, time.Now())
 		require.NoError(t, err)
 
 		err = models.InsertMessages(ctx, db, []*models.Msg{msg})

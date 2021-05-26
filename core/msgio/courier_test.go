@@ -37,13 +37,13 @@ func TestQueueCourierMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					ChannelID: models.TwilioChannelID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 				},
 				{
 					ChannelID: models.TwilioChannelID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 				},
 			},
 			QueueSizes: map[string][]int{
@@ -55,14 +55,14 @@ func TestQueueCourierMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					ChannelID: models.TwilioChannelID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 					Failed:    true,
 				},
 				{
 					ChannelID: models.TwilioChannelID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 				},
 			},
 			QueueSizes: map[string][]int{
@@ -94,10 +94,10 @@ func TestQueueCourierMessages(t *testing.T) {
 	assert.Panics(t, func() {
 		ms := msgSpec{
 			ChannelID: androidChannelID,
-			ContactID: models.CathyID,
-			URNID:     models.CathyURNID,
+			ContactID: testdata.Cathy.ID,
+			URNID:     testdata.Cathy.URNID,
 		}
-		msgio.QueueCourierMessages(rc, models.CathyID, []*models.Msg{ms.createMsg(t, db, oa)})
+		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, db, oa)})
 	})
 
 	testsuite.Reset()

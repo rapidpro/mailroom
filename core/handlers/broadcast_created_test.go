@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -25,14 +26,14 @@ func TestBroadcastCreated(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy.ID: []flows.Action{
 					actions.NewSendBroadcast(handlers.NewActionUUID(), "hello world", nil, nil, []urns.URN{urns.URN("tel:+12065551212")}, nil, nil, nil),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
-					Args:  []interface{}{models.CathyID},
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
 				},
 			},

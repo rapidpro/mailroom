@@ -49,8 +49,8 @@ func TestScheduleCampaignEvent(t *testing.T) {
 
 	// cathy has no value for joined and alexandia has a value too far in past, but bob and george will have values...
 	assertContactFires(t, models.RemindersEvent1ID, map[models.ContactID]time.Time{
-		models.BobID:    time.Date(2030, 1, 5, 20, 0, 0, 0, time.UTC),  // 12:00 in PST
-		models.GeorgeID: time.Date(2030, 8, 23, 19, 0, 0, 0, time.UTC), // 12:00 in PST with DST
+		testdata.Bob.ID:    time.Date(2030, 1, 5, 20, 0, 0, 0, time.UTC),  // 12:00 in PST
+		testdata.George.ID: time.Date(2030, 8, 23, 19, 0, 0, 0, time.UTC), // 12:00 in PST with DST
 	})
 
 	// schedule second event...
@@ -59,14 +59,14 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	assertContactFires(t, models.RemindersEvent2ID, map[models.ContactID]time.Time{
-		models.BobID:    time.Date(2030, 1, 1, 0, 10, 0, 0, time.UTC),
-		models.GeorgeID: time.Date(2030, 8, 18, 11, 42, 0, 0, time.UTC),
+		testdata.Bob.ID:    time.Date(2030, 1, 1, 0, 10, 0, 0, time.UTC),
+		testdata.George.ID: time.Date(2030, 8, 18, 11, 42, 0, 0, time.UTC),
 	})
 
 	// fires for first event unaffected
 	assertContactFires(t, models.RemindersEvent1ID, map[models.ContactID]time.Time{
-		models.BobID:    time.Date(2030, 1, 5, 20, 0, 0, 0, time.UTC),
-		models.GeorgeID: time.Date(2030, 8, 23, 19, 0, 0, 0, time.UTC),
+		testdata.Bob.ID:    time.Date(2030, 1, 5, 20, 0, 0, 0, time.UTC),
+		testdata.George.ID: time.Date(2030, 8, 23, 19, 0, 0, 0, time.UTC),
 	})
 
 	// remove alexandria from campaign group
@@ -91,14 +91,14 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	event4 := insertCampaignEvent(t, models.DoctorRemindersCampaignID, testdata.Favorites.ID, models.LastSeenOnFieldID, 1, "D")
 
 	// bump last_seen_on for bob
-	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, models.BobID)
+	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, testdata.Bob.ID)
 
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event4}
 	err = task.Perform(ctx, mr, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	assertContactFires(t, event4, map[models.ContactID]time.Time{
-		models.BobID: time.Date(2040, 1, 2, 0, 0, 0, 0, time.UTC),
+		testdata.Bob.ID: time.Date(2040, 1, 2, 0, 0, 0, 0, time.UTC),
 	})
 }
 

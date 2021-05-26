@@ -32,6 +32,11 @@ type Flow struct {
 	UUID assets.FlowUUID
 }
 
+type Field struct {
+	ID   models.FieldID
+	UUID assets.FieldUUID
+}
+
 type Ticketer struct {
 	ID   models.TicketerID
 	UUID assets.TicketerUUID
@@ -57,6 +62,8 @@ var SurveyorFlow = Flow{10005, "ed8cf8d4-a42c-4ce1-a7e3-44a2918e3cec"}
 var IncomingExtraFlow = Flow{10006, "376d3de6-7f0e-408c-80d6-b1919738bc80"}
 var ParentTimeoutFlow = Flow{10007, "81c0f323-7e06-4e0c-a960-19c20f17117c"}
 var CampaignFlow = Flow{10009, "3a92a964-3a8d-420b-9206-2cd9d884ac30"}
+
+var JoinedField = Field{8, "d83aae24-4bbf-49d0-ab85-6bfd201eac6d"}
 
 var Mailgun = Ticketer{1, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
 var Zendesk = Ticketer{2, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}

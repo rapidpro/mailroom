@@ -84,18 +84,18 @@ func TestSendMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					ChannelID: models.TwilioChannelID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 				},
 				{
 					ChannelID: androidChannel1ID,
-					ContactID: models.BobID,
-					URNID:     models.BobURNID,
+					ContactID: testdata.Bob.ID,
+					URNID:     testdata.Bob.URNID,
 				},
 				{
 					ChannelID: models.TwilioChannelID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 				},
 			},
 			QueueSizes: map[string][]int{
@@ -109,18 +109,18 @@ func TestSendMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					ChannelID: androidChannel1ID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 				},
 				{
 					ChannelID: androidChannel2ID,
-					ContactID: models.BobID,
-					URNID:     models.BobURNID,
+					ContactID: testdata.Bob.ID,
+					URNID:     testdata.Bob.URNID,
 				},
 				{
 					ChannelID: androidChannel1ID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 				},
 			},
 			QueueSizes:      map[string][]int{},
@@ -132,8 +132,8 @@ func TestSendMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					ChannelID: models.NilChannelID,
-					ContactID: models.CathyID,
-					URNID:     models.CathyURNID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
 				},
 			},
 			QueueSizes:      map[string][]int{},

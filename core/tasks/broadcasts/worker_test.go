@@ -42,17 +42,17 @@ func TestBroadcastEvents(t *testing.T) {
 	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
 	doctorsOnly := []*assets.GroupReference{doctors}
 
-	cathy := flows.NewContactReference(models.CathyUUID, "Cathy")
+	cathy := flows.NewContactReference(testdata.Cathy.UUID, "Cathy")
 	cathyOnly := []*flows.ContactReference{cathy}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.CathyID, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Cathy.ID, urns.URN("tel:+12065551212"), 1001)
 
 	// change george's URN to an invalid twitter URN so it can't be sent
 	db.MustExec(
-		`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, models.GeorgeURNID,
+		`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, testdata.George.URNID,
 	)
-	george := flows.NewContactReference(models.GeorgeUUID, "George")
+	george := flows.NewContactReference(testdata.George.UUID, "George")
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
@@ -165,10 +165,10 @@ func TestBroadcastTask(t *testing.T) {
 	}
 
 	doctorsOnly := []models.GroupID{models.DoctorsGroupID}
-	cathyOnly := []models.ContactID{models.CathyID}
+	cathyOnly := []models.ContactID{testdata.Cathy.ID}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.CathyID, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Cathy.ID, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
 		BroadcastID   models.BroadcastID

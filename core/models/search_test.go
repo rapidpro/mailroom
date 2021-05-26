@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
@@ -113,13 +114,13 @@ func TestContactIDsForQueryPage(t *testing.T) {
 					}
 				  ]
 				}
-			}`, models.GeorgeID),
-			ExpectedContacts: []models.ContactID{models.GeorgeID},
+			}`, testdata.George.ID),
+			ExpectedContacts: []models.ContactID{testdata.George.ID},
 			ExpectedTotal:    1,
 		},
 		{
 			Group:      models.BlockedContactsGroupUUID,
-			ExcludeIDs: []models.ContactID{models.BobID, models.CathyID},
+			ExcludeIDs: []models.ContactID{testdata.Bob.ID, testdata.Cathy.ID},
 			Query:      "age > 32",
 			Sort:       "-age",
 			ExpectedESRequest: `{
@@ -225,8 +226,8 @@ func TestContactIDsForQueryPage(t *testing.T) {
 					}
 				  ]
 				}
-			}`, models.GeorgeID),
-			ExpectedContacts: []models.ContactID{models.GeorgeID},
+			}`, testdata.George.ID),
+			ExpectedContacts: []models.ContactID{testdata.George.ID},
 			ExpectedTotal:    1,
 		},
 		{
@@ -337,8 +338,8 @@ func TestContactIDsForQuery(t *testing.T) {
 					}
 				  ]
 				}
-			}`, models.GeorgeID),
-			ExpectedContacts: []models.ContactID{models.GeorgeID},
+			}`, testdata.George.ID),
+			ExpectedContacts: []models.ContactID{testdata.George.ID},
 		}, {
 			Query: "nobody",
 			ExpectedESRequest: `{

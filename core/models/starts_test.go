@@ -18,7 +18,7 @@ func TestStarts(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	startID := testdata.InsertFlowStart(t, db, testdata.Org1.ID, testdata.SingleMessage.ID, []models.ContactID{models.CathyID, models.BobID})
+	startID := testdata.InsertFlowStart(t, db, testdata.Org1.ID, testdata.SingleMessage.ID, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})
 
 	startJSON := []byte(fmt.Sprintf(`{
 		"start_id": %d,
@@ -36,7 +36,7 @@ func TestStarts(t *testing.T) {
 		"parent_summary": {"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"},
 		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1},
 		"extra": {"foo": "bar"}
-	}`, startID, testdata.Org1.ID, testdata.SingleMessage.ID, models.CathyID, models.BobID))
+	}`, startID, testdata.Org1.ID, testdata.SingleMessage.ID, testdata.Cathy.ID, testdata.Bob.ID))
 
 	start := &models.FlowStart{}
 	err := json.Unmarshal(startJSON, start)

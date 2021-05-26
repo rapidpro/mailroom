@@ -6,7 +6,6 @@ import (
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/groups"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -56,7 +55,7 @@ func TestPopulateTask(t *testing.T) {
 			}
 			]
 		}
-	}`, models.CathyID)
+	}`, testdata.Cathy.ID)
 
 	groupID := testdata.InsertContactGroup(t, db, testdata.Org1.ID, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
 

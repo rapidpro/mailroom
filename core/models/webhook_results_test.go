@@ -25,8 +25,8 @@ func TestWebhookResults(t *testing.T) {
 		Duration    time.Duration
 		RequestTime int
 	}{
-		{testdata.Org1.ID, models.CathyID, "http://foo.bar", "GET http://foo.bar", 200, "hello world", time.Millisecond * 1501, 1501},
-		{testdata.Org1.ID, models.BobID, "http://foo.bar", "GET http://foo.bar", 200, "hello world", time.Millisecond * 1502, 1502},
+		{testdata.Org1.ID, testdata.Cathy.ID, "http://foo.bar", "GET http://foo.bar", 200, "hello world", time.Millisecond * 1501, 1501},
+		{testdata.Org1.ID, testdata.Bob.ID, "http://foo.bar", "GET http://foo.bar", 200, "hello world", time.Millisecond * 1502, 1502},
 	}
 
 	for _, tc := range tcs {

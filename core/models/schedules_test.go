@@ -95,7 +95,7 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
 	assert.Equal(t, testdata.Favorites.ID, start.FlowID())
 	assert.Equal(t, testdata.Org1.ID, start.OrgID())
-	assert.Equal(t, []models.ContactID{models.CathyID, models.GeorgeID}, start.ContactIDs())
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, start.ContactIDs())
 	assert.Equal(t, []models.GroupID{models.DoctorsGroupID}, start.GroupIDs())
 
 	assert.Equal(t, s1, schedules[2].ID())
@@ -106,7 +106,7 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, "Test message", bcast.Translations()["eng"].Text)
 	assert.Equal(t, "Un Message", bcast.Translations()["fra"].Text)
 	assert.Equal(t, testdata.Org1.ID, bcast.OrgID())
-	assert.Equal(t, []models.ContactID{models.CathyID, models.GeorgeID}, bcast.ContactIDs())
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, bcast.ContactIDs())
 	assert.Equal(t, []models.GroupID{models.DoctorsGroupID}, bcast.GroupIDs())
 	assert.Equal(t, []urns.URN{urns.URN("tel:+16055741111?id=10000")}, bcast.URNs())
 }

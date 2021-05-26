@@ -63,18 +63,18 @@ func TestDynamicGroups(t *testing.T) {
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I') RETURNING id`,
-		uuids.New(), models.DoctorRemindersCampaignID, testdata.Favorites.ID, models.JoinedFieldID)
+		uuids.New(), models.DoctorRemindersCampaignID, testdata.Favorites.ID, testdata.JoinedField.ID)
 
 	// clear Cathy's value
 	testsuite.DB().MustExec(
 		`update contacts_contact set fields = fields - $2
-		WHERE id = $1`, testdata.Cathy.ID, models.JoinedFieldUUID)
+		WHERE id = $1`, testdata.Cathy.ID, testdata.JoinedField.UUID)
 
 	// and populate Bob's
 	testsuite.DB().MustExec(
 		fmt.Sprintf(`update contacts_contact set fields = fields ||
 		'{"%s": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
-		WHERE id = $1`, models.JoinedFieldUUID), testdata.Bob.ID)
+		WHERE id = $1`, testdata.JoinedField.UUID), testdata.Bob.ID)
 
 	// clear our org cache so we reload org campaigns and events
 	models.FlushCache()
@@ -119,8 +119,8 @@ func TestDynamicGroups(t *testing.T) {
 		}
 	}`
 
-	cathyHit := fmt.Sprintf(contactHit, models.CathyID)
-	bobHit := fmt.Sprintf(contactHit, models.BobID)
+	cathyHit := fmt.Sprintf(contactHit, testdata.Cathy.ID)
+	bobHit := fmt.Sprintf(contactHit, testdata.Bob.ID)
 
 	tcs := []struct {
 		Query           string
@@ -131,20 +131,20 @@ func TestDynamicGroups(t *testing.T) {
 		{
 			"cathy",
 			cathyHit,
-			[]models.ContactID{models.CathyID},
+			[]models.ContactID{testdata.Cathy.ID},
 			[]models.ContactID{},
 		},
 		{
 			"bob",
 			bobHit,
-			[]models.ContactID{models.BobID},
-			[]models.ContactID{models.BobID},
+			[]models.ContactID{testdata.Bob.ID},
+			[]models.ContactID{testdata.Bob.ID},
 		},
 		{
 			"unchanged",
 			bobHit,
-			[]models.ContactID{models.BobID},
-			[]models.ContactID{models.BobID},
+			[]models.ContactID{testdata.Bob.ID},
+			[]models.ContactID{testdata.Bob.ID},
 		},
 	}
 
@@ -160,6 +160,7 @@ func TestDynamicGroups(t *testing.T) {
 
 		// assert the current group membership
 		contactIDs, err := models.ContactIDsForGroupIDs(ctx, db, []models.GroupID{models.DoctorsGroupID})
+		assert.NoError(t, err)
 		assert.Equal(t, tc.ContactIDs, contactIDs)
 
 		testsuite.AssertQueryCount(t, db,

@@ -246,7 +246,7 @@ func TestChannelEvents(t *testing.T) {
 		testdata.PickANumber.ID, models.VonageChannelID)
 
 	// add a URN for cathy so we can test twitter URNs
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.BobID, urns.URN("twitterid:123456"), 10)
+	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Bob.ID, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
 		EventType      models.ChannelEventType
@@ -317,10 +317,10 @@ func TestStopEvent(t *testing.T) {
 	defer rc.Close()
 
 	// schedule an event for cathy and george
-	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, testdata.Cathy.ID, models.GeorgeID, models.RemindersEvent1ID)
+	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, testdata.Cathy.ID, testdata.George.ID, models.RemindersEvent1ID)
 
 	// and george to doctors group, cathy is already part of it
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, models.DoctorsGroupID, models.GeorgeID)
+	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, models.DoctorsGroupID, testdata.George.ID)
 
 	event := &StopEvent{OrgID: testdata.Org1.ID, ContactID: testdata.Cathy.ID}
 	eventJSON, err := json.Marshal(event)
@@ -341,14 +341,14 @@ func TestStopEvent(t *testing.T) {
 
 	// check that only george is in our group
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, testdata.Cathy.ID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, models.GeorgeID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, testdata.George.ID}, 1)
 
 	// that cathy is stopped
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{testdata.Cathy.ID}, 1)
 
 	// and has no upcoming events
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{testdata.Cathy.ID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{models.GeorgeID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{testdata.George.ID}, 1)
 }
 
 func TestTimedEvents(t *testing.T) {

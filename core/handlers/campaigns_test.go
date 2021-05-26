@@ -36,12 +36,12 @@ func TestCampaigns(t *testing.T) {
 	// init their values
 	testsuite.DB().MustExec(
 		`update contacts_contact set fields = fields - '8c1c1256-78d6-4a5b-9f1c-1761d5728251'
-		WHERE id = $1`, models.CathyID)
+		WHERE id = $1`, testdata.Cathy.ID)
 
 	testsuite.DB().MustExec(
 		`update contacts_contact set fields = fields ||
 		'{"8c1c1256-78d6-4a5b-9f1c-1761d5728251": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
-		WHERE id = $1`, models.BobID)
+		WHERE id = $1`, testdata.Bob.ID)
 
 	tcs := []handlers.TestCase{
 		{

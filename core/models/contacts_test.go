@@ -82,7 +82,7 @@ func TestContacts(t *testing.T) {
 
 	// change bob to have a preferred URN and channel of our telephone
 	channel := org.ChannelByID(models.TwilioChannelID)
-	err = modelContacts[1].UpdatePreferredURN(ctx, db, org, models.BobURNID, channel)
+	err = modelContacts[1].UpdatePreferredURN(ctx, db, org, testdata.Bob.URNID, channel)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[1].FlowContact(org)
@@ -91,10 +91,10 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())
 
 	// add another tel urn to bob
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.BobID, urns.URN("tel:+250788373373"), 10)
+	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Bob.ID, urns.URN("tel:+250788373373"), 10)
 
 	// reload the contact
-	modelContacts, err = models.LoadContacts(ctx, db, org, []models.ContactID{models.BobID})
+	modelContacts, err = models.LoadContacts(ctx, db, org, []models.ContactID{testdata.Bob.ID})
 	assert.NoError(t, err)
 
 	// set our preferred channel again
@@ -218,8 +218,8 @@ func TestGetOrCreateContact(t *testing.T) {
 	}{
 		{
 			testdata.Org1.ID,
-			[]urns.URN{models.CathyURN},
-			models.CathyID,
+			[]urns.URN{testdata.Cathy.URN},
+			testdata.Cathy.ID,
 			false,
 			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
 			models.NilChannelID,
@@ -227,8 +227,8 @@ func TestGetOrCreateContact(t *testing.T) {
 		},
 		{
 			testdata.Org1.ID,
-			[]urns.URN{urns.URN(models.CathyURN.String() + "?foo=bar")},
-			models.CathyID, // only URN identity is considered
+			[]urns.URN{urns.URN(testdata.Cathy.URN.String() + "?foo=bar")},
+			testdata.Cathy.ID, // only URN identity is considered
 			false,
 			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
 			models.NilChannelID,
@@ -368,19 +368,19 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	}{
 		{
 			testdata.Org1.ID,
-			[]urns.URN{models.CathyURN},
-			map[urns.URN]models.ContactID{models.CathyURN: models.CathyID},
+			[]urns.URN{testdata.Cathy.URN},
+			map[urns.URN]models.ContactID{testdata.Cathy.URN: testdata.Cathy.ID},
 		},
 		{
 			testdata.Org1.ID,
-			[]urns.URN{urns.URN(models.CathyURN.String() + "?foo=bar")},
-			map[urns.URN]models.ContactID{urns.URN(models.CathyURN.String() + "?foo=bar"): models.CathyID},
+			[]urns.URN{urns.URN(testdata.Cathy.URN.String() + "?foo=bar")},
+			map[urns.URN]models.ContactID{urns.URN(testdata.Cathy.URN.String() + "?foo=bar"): testdata.Cathy.ID},
 		},
 		{
 			testdata.Org1.ID,
-			[]urns.URN{models.CathyURN, urns.URN("telegram:100001")},
+			[]urns.URN{testdata.Cathy.URN, urns.URN("telegram:100001")},
 			map[urns.URN]models.ContactID{
-				models.CathyURN:             models.CathyID,
+				testdata.Cathy.URN:          testdata.Cathy.ID,
 				urns.URN("telegram:100001"): newContact(),
 			},
 		},
@@ -439,11 +439,11 @@ func TestGetContactIDsFromReferences(t *testing.T) {
 	db := testsuite.DB()
 
 	ids, err := models.GetContactIDsFromReferences(ctx, db, testdata.Org1.ID, []*flows.ContactReference{
-		flows.NewContactReference(models.CathyUUID, "Cathy"),
-		flows.NewContactReference(models.BobUUID, "Bob"),
+		flows.NewContactReference(testdata.Cathy.UUID, "Cathy"),
+		flows.NewContactReference(testdata.Bob.UUID, "Bob"),
 	})
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []models.ContactID{models.CathyID, models.BobID}, ids)
+	assert.ElementsMatch(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, ids)
 }
 
 func TestStopContact(t *testing.T) {
@@ -451,14 +451,14 @@ func TestStopContact(t *testing.T) {
 	db := testsuite.DB()
 
 	// stop kathy
-	err := models.StopContact(ctx, db, testdata.Org1.ID, models.CathyID)
+	err := models.StopContact(ctx, db, testdata.Org1.ID, testdata.Cathy.ID)
 	assert.NoError(t, err)
 
 	// verify she's only in the stopped group
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, []interface{}{models.CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, []interface{}{testdata.Cathy.ID}, 1)
 
 	// verify she's stopped
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S' AND is_active = TRUE`, []interface{}{models.CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S' AND is_active = TRUE`, []interface{}{testdata.Cathy.ID}, 1)
 }
 
 func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
@@ -471,7 +471,7 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 
 	t0 := time.Now()
 
-	err = models.UpdateContactModifiedOn(ctx, db, []models.ContactID{models.CathyID})
+	err = models.UpdateContactModifiedOn(ctx, db, []models.ContactID{testdata.Cathy.ID})
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, []interface{}{t0}, 1)
@@ -479,12 +479,12 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	t1 := time.Now().Truncate(time.Millisecond)
 	time.Sleep(time.Millisecond * 5)
 
-	err = models.UpdateContactLastSeenOn(ctx, db, models.CathyID, t1)
+	err = models.UpdateContactLastSeenOn(ctx, db, testdata.Cathy.ID, t1)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on = $1`, []interface{}{t1}, 1)
 
-	cathy, err := models.LoadContact(ctx, db, oa, models.CathyID)
+	cathy, err := models.LoadContact(ctx, db, oa, testdata.Cathy.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, cathy.LastSeenOn())
 	assert.True(t, t1.Equal(*cathy.LastSeenOn()))
@@ -499,7 +499,7 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
 
 	// and that also updates the database
-	cathy, err = models.LoadContact(ctx, db, oa, models.CathyID)
+	cathy, err = models.LoadContact(ctx, db, oa, testdata.Cathy.ID)
 	require.NoError(t, err)
 	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
 	assert.True(t, cathy.ModifiedOn().After(t2))
@@ -513,17 +513,17 @@ func TestUpdateContactModifiedBy(t *testing.T) {
 	err := models.UpdateContactModifiedBy(ctx, db, []models.ContactID{}, models.UserID(0))
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{models.CathyID, models.UserID(0)}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{testdata.Cathy.ID, models.UserID(0)}, 0)
 
-	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{models.CathyID}, models.UserID(0))
+	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{testdata.Cathy.ID}, models.UserID(0))
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{models.CathyID, models.UserID(0)}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{testdata.Cathy.ID, models.UserID(0)}, 0)
 
-	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{models.CathyID}, models.UserID(1))
+	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{testdata.Cathy.ID}, models.UserID(1))
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{models.CathyID, models.UserID(1)}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = $2`, []interface{}{testdata.Cathy.ID, models.UserID(1)}, 1)
 }
 
 func TestUpdateContactStatus(t *testing.T) {
@@ -534,24 +534,26 @@ func TestUpdateContactStatus(t *testing.T) {
 	err := models.UpdateContactStatus(ctx, db, []*models.ContactStatusChange{})
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{models.CathyID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{models.CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{testdata.Cathy.ID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{testdata.Cathy.ID}, 0)
 
 	changes := make([]*models.ContactStatusChange, 0, 1)
-	changes = append(changes, &models.ContactStatusChange{models.CathyID, flows.ContactStatusBlocked})
+	changes = append(changes, &models.ContactStatusChange{testdata.Cathy.ID, flows.ContactStatusBlocked})
 
 	err = models.UpdateContactStatus(ctx, db, changes)
+	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{models.CathyID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{models.CathyID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{testdata.Cathy.ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{testdata.Cathy.ID}, 0)
 
 	changes = make([]*models.ContactStatusChange, 0, 1)
-	changes = append(changes, &models.ContactStatusChange{models.CathyID, flows.ContactStatusStopped})
+	changes = append(changes, &models.ContactStatusChange{testdata.Cathy.ID, flows.ContactStatusStopped})
 
 	err = models.UpdateContactStatus(ctx, db, changes)
+	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{models.CathyID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{models.CathyID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, []interface{}{testdata.Cathy.ID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{testdata.Cathy.ID}, 1)
 
 }
 
@@ -574,52 +576,52 @@ func TestUpdateContactURNs(t *testing.T) {
 		assert.Equal(t, expected, actual, "URNs mismatch for contact %d", contactID)
 	}
 
-	assertContactURNs(models.CathyID, []string{"tel:+16055741111"})
-	assertContactURNs(models.BobID, []string{"tel:+16055742222"})
-	assertContactURNs(models.GeorgeID, []string{"tel:+16055743333"})
+	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055741111"})
+	assertContactURNs(testdata.Bob.ID, []string{"tel:+16055742222"})
+	assertContactURNs(testdata.George.ID, []string{"tel:+16055743333"})
 
-	cathyURN := urns.URN(fmt.Sprintf("tel:+16055741111?id=%d", models.CathyURNID))
-	bobURN := urns.URN(fmt.Sprintf("tel:+16055742222?id=%d", models.BobURNID))
+	cathyURN := urns.URN(fmt.Sprintf("tel:+16055741111?id=%d", testdata.Cathy.URNID))
+	bobURN := urns.URN(fmt.Sprintf("tel:+16055742222?id=%d", testdata.Bob.URNID))
 
 	// give Cathy a new higher priority URN
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{models.CathyID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", cathyURN}}})
+	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", cathyURN}}})
 	assert.NoError(t, err)
 
-	assertContactURNs(models.CathyID, []string{"tel:+16055700001", "tel:+16055741111"})
+	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055700001", "tel:+16055741111"})
 
 	// give Bob a new lower priority URN
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{models.BobID, testdata.Org1.ID, []urns.URN{bobURN, "tel:+16055700002"}}})
+	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Bob.ID, testdata.Org1.ID, []urns.URN{bobURN, "tel:+16055700002"}}})
 	assert.NoError(t, err)
 
-	assertContactURNs(models.BobID, []string{"tel:+16055742222", "tel:+16055700002"})
+	assertContactURNs(testdata.Bob.ID, []string{"tel:+16055742222", "tel:+16055700002"})
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`, nil, 0) // shouldn't be any orphan URNs
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn`, nil, numInitialURNs+2)           // but 2 new URNs
 
 	// remove a URN from Cathy
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{models.CathyID, testdata.Org1.ID, []urns.URN{"tel:+16055700001"}}})
+	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001"}}})
 	assert.NoError(t, err)
 
-	assertContactURNs(models.CathyID, []string{"tel:+16055700001"})
+	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055700001"})
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`, nil, 1) // now orphaned
 
 	// steal a URN from Bob
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{models.CathyID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", "tel:+16055700002"}}})
+	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", "tel:+16055700002"}}})
 	assert.NoError(t, err)
 
-	assertContactURNs(models.CathyID, []string{"tel:+16055700001", "tel:+16055700002"})
-	assertContactURNs(models.BobID, []string{"tel:+16055742222"})
+	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055700001", "tel:+16055700002"})
+	assertContactURNs(testdata.Bob.ID, []string{"tel:+16055742222"})
 
 	// steal the URN back from Cathy whilst simulataneously adding new URN to Cathy and not-changing anything for George
 	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{
-		{models.BobID, testdata.Org1.ID, []urns.URN{"tel:+16055742222", "tel:+16055700002"}},
-		{models.CathyID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", "tel:+16055700003"}},
-		{models.GeorgeID, testdata.Org1.ID, []urns.URN{"tel:+16055743333"}},
+		{testdata.Bob.ID, testdata.Org1.ID, []urns.URN{"tel:+16055742222", "tel:+16055700002"}},
+		{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", "tel:+16055700003"}},
+		{testdata.George.ID, testdata.Org1.ID, []urns.URN{"tel:+16055743333"}},
 	})
 	assert.NoError(t, err)
 
-	assertContactURNs(models.CathyID, []string{"tel:+16055700001", "tel:+16055700003"})
-	assertContactURNs(models.BobID, []string{"tel:+16055742222", "tel:+16055700002"})
-	assertContactURNs(models.GeorgeID, []string{"tel:+16055743333"})
+	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055700001", "tel:+16055700003"})
+	assertContactURNs(testdata.Bob.ID, []string{"tel:+16055742222", "tel:+16055700002"})
+	assertContactURNs(testdata.George.ID, []string{"tel:+16055743333"})
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contacturn`, nil, numInitialURNs+3)
 }

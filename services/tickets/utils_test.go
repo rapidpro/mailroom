@@ -26,7 +26,7 @@ func TestGetContactDisplay(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	contact, err := models.LoadContact(ctx, db, oa, models.CathyID)
+	contact, err := models.LoadContact(ctx, db, oa, testdata.Cathy.ID)
 	require.NoError(t, err)
 
 	flowContact, err := contact.FlowContact(oa)
@@ -54,8 +54,8 @@ func TestFromTicketUUID(t *testing.T) {
 	ticket2UUID := flows.TicketUUID("44b7d9b5-6ddd-4a6a-a1c0-8b70ecd06339")
 
 	// create some tickets
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, testdata.Mailgun.ID, ticket1UUID, "Need help", "Have you seen my cookies?", "")
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, testdata.Zendesk.ID, ticket2UUID, "Need help", "Have you seen my shoes?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, ticket1UUID, "Need help", "Have you seen my cookies?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, ticket2UUID, "Need help", "Have you seen my shoes?", "")
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
@@ -133,7 +133,7 @@ func TestSendReply(t *testing.T) {
 	ticketUUID := flows.TicketUUID("f7358870-c3dd-450d-b5ae-db2eb50216ba")
 
 	// create a ticket
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, testdata.Mailgun.ID, ticketUUID, "Need help", "Have you seen my cookies?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, ticketUUID, "Need help", "Have you seen my cookies?", "")
 
 	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestSendReply(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
-	assert.Equal(t, models.CathyID, msg.ContactID())
+	assert.Equal(t, testdata.Cathy.ID, msg.ContactID())
 	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg"}, msg.Attachments())
 	assert.FileExists(t, "_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg")
 

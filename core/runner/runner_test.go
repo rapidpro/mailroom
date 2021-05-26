@@ -28,7 +28,7 @@ func TestCampaignStarts(t *testing.T) {
 
 	// create our event fires
 	now := time.Now()
-	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, testdata.Cathy.ID, models.BobID, testdata.Alexandria.ID)
+	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID)
 
 	// create an active session for Alexandria to test skipping
 	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, testdata.Alexandria.ID, testdata.PickANumber.ID)
@@ -39,7 +39,7 @@ func TestCampaignStarts(t *testing.T) {
 	// set our event to skip
 	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)
 
-	contacts := []models.ContactID{models.CathyID, models.BobID}
+	contacts := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
 	fires := []*models.EventFire{
 		{
 			FireID:    1,
@@ -108,7 +108,7 @@ func TestBatchStart(t *testing.T) {
 	testdata.InsertFlowStart(t, db, testdata.Org1.ID, testdata.SingleMessage.ID, nil)
 
 	// and our batch object
-	contactIDs := []models.ContactID{models.CathyID, models.BobID}
+	contactIDs := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
 
 	tcs := []struct {
 		Flow          models.FlowID
@@ -184,7 +184,7 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{models.CathyID})
+	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{testdata.Cathy.ID})
 	assert.NoError(t, err)
 
 	contact, err := contacts[0].FlowContact(oa)
@@ -228,7 +228,7 @@ func TestContactRuns(t *testing.T) {
 	session := sessions[0]
 	for i, tc := range tcs {
 		// answer our first question
-		msg := flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, tc.Message, nil)
+		msg := flows.NewMsgIn(flows.MsgUUID(uuids.New()), testdata.Cathy.URN, nil, tc.Message, nil)
 		msg.SetID(10)
 		resume := resumes.NewMsg(oa.Env(), contact, msg)
 

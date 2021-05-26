@@ -164,7 +164,7 @@ func TestNewURN(t *testing.T) {
 				},
 
 				// Bob is stealing a URN previously assigned to George
-				models.BobID: []flows.Action{
+				testdata.Bob.ID: []flows.Action{
 					actions.NewAddContactURN(handlers.NewActionUUID(), "telegram", "67890"),
 					actions.NewSetContactChannel(handlers.NewActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
 					actions.NewSendMsg(handlers.NewActionUUID(), "Bob Message", nil, nil, false),

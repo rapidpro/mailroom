@@ -33,7 +33,7 @@ func TestSessionTriggered(t *testing.T) {
 	assert.NoError(t, err)
 
 	contactRef := &flows.ContactReference{
-		UUID: models.GeorgeUUID,
+		UUID: testdata.George.UUID,
 	}
 
 	groupRef := &assets.GroupReference{
@@ -46,7 +46,7 @@ func TestSessionTriggered(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy.ID: []flows.Action{
 					actions.NewStartSession(handlers.NewActionUUID(), simpleFlow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
 				},
 			},
@@ -81,7 +81,7 @@ func TestSessionTriggered(t *testing.T) {
 					err = json.Unmarshal(task.Task, &start)
 					assert.NoError(t, err)
 					assert.True(t, start.CreateContact())
-					assert.Equal(t, []models.ContactID{models.GeorgeID}, start.ContactIDs())
+					assert.Equal(t, []models.ContactID{testdata.George.ID}, start.ContactIDs())
 					assert.Equal(t, []models.GroupID{models.TestersGroupID}, start.GroupIDs())
 					assert.Equal(t, simpleFlow.ID(), start.FlowID())
 					assert.JSONEq(t, `{"parent_uuid":"39a9f95e-3641-4d19-95e0-ed866f27c829", "ancestors":1, "ancestors_since_input":1}`, string(start.SessionHistory()))
@@ -113,7 +113,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{sessionAction},
+				testdata.Cathy.ID: []flows.Action{sessionAction},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{

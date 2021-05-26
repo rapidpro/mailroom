@@ -47,7 +47,7 @@ func TestStarts(t *testing.T) {
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
 	db.MustExec(
 		`INSERT INTO flows_flowrun(uuid, status, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id)
-		                    VALUES($1, 'W', TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), models.GeorgeID, testdata.Favorites.ID)
+		                    VALUES($1, 'W', TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), testdata.George.ID, testdata.Favorites.ID)
 
 	tcs := []struct {
 		label                string
@@ -91,7 +91,7 @@ func TestStarts(t *testing.T) {
 			label:                "Group and Contact (but all already active)",
 			flowID:               testdata.Favorites.ID,
 			groupIDs:             []models.GroupID{models.DoctorsGroupID},
-			contactIDs:           []models.ContactID{models.CathyID},
+			contactIDs:           []models.ContactID{testdata.Cathy.ID},
 			queue:                queue.BatchQueue,
 			expectedContactCount: 121,
 			expectedBatchCount:   2,
@@ -102,7 +102,7 @@ func TestStarts(t *testing.T) {
 		{
 			label:                "Contact restart",
 			flowID:               testdata.Favorites.ID,
-			contactIDs:           []models.ContactID{models.CathyID},
+			contactIDs:           []models.ContactID{testdata.Cathy.ID},
 			restartParticipants:  true,
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
@@ -116,7 +116,7 @@ func TestStarts(t *testing.T) {
 			label:                "Previous group and one new contact",
 			flowID:               testdata.Favorites.ID,
 			groupIDs:             []models.GroupID{models.DoctorsGroupID},
-			contactIDs:           []models.ContactID{models.BobID},
+			contactIDs:           []models.ContactID{testdata.Bob.ID},
 			queue:                queue.BatchQueue,
 			expectedContactCount: 122,
 			expectedBatchCount:   2,
@@ -190,7 +190,7 @@ func TestStarts(t *testing.T) {
 				}
 			  ]
 			}
-			}`, models.BobID),
+			}`, testdata.Bob.ID),
 			restartParticipants:  true,
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
@@ -227,7 +227,7 @@ func TestStarts(t *testing.T) {
 		{
 			label:                "Other messaging flow",
 			flowID:               testdata.PickANumber.ID,
-			contactIDs:           []models.ContactID{models.BobID},
+			contactIDs:           []models.ContactID{testdata.Bob.ID},
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
@@ -239,7 +239,7 @@ func TestStarts(t *testing.T) {
 		{
 			label:                "Background flow",
 			flowID:               testdata.SingleMessage.ID,
-			contactIDs:           []models.ContactID{models.BobID},
+			contactIDs:           []models.ContactID{testdata.Bob.ID},
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,

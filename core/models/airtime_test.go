@@ -21,7 +21,7 @@ func TestAirtimeTransfers(t *testing.T) {
 	transfer := models.NewAirtimeTransfer(
 		testdata.Org1.ID,
 		models.AirtimeTransferStatusSuccess,
-		models.CathyID,
+		testdata.Cathy.ID,
 		urns.URN("tel:+250700000001"),
 		urns.URN("tel:+250700000002"),
 		"RWF",
@@ -40,7 +40,7 @@ func TestAirtimeTransfers(t *testing.T) {
 	transfer = models.NewAirtimeTransfer(
 		testdata.Org1.ID,
 		models.AirtimeTransferStatusFailed,
-		models.CathyID,
+		testdata.Cathy.ID,
 		urns.NilURN,
 		urns.URN("tel:+250700000002"),
 		"",
