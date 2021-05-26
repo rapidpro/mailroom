@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,7 @@ func TestWithHTTPLogs(t *testing.T) {
 	}))
 
 	handler := func(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
-		ticketer, _ := models.LookupTicketerByUUID(ctx, s.DB, models.MailgunUUID)
+		ticketer, _ := models.LookupTicketerByUUID(ctx, s.DB, testdata.Mailgun.UUID)
 
 		logger := l.Ticketer(ticketer)
 
@@ -57,5 +58,5 @@ func TestWithHTTPLogs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check HTTP logs were created
-	testsuite.AssertQueryCount(t, testsuite.DB(), `select count(*) from request_logs_httplog where ticketer_id = $1;`, []interface{}{models.MailgunID}, 2)
+	testsuite.AssertQueryCount(t, testsuite.DB(), `select count(*) from request_logs_httplog where ticketer_id = $1;`, []interface{}{testdata.Mailgun.ID}, 2)
 }

@@ -29,7 +29,7 @@ func TestSessionTriggered(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
-	simpleFlow, err := oa.FlowByID(models.SingleMessageFlowID)
+	simpleFlow, err := oa.FlowByID(testdata.SingleMessage.ID)
 	assert.NoError(t, err)
 
 	contactRef := &flows.ContactReference{
@@ -53,17 +53,17 @@ func TestSessionTriggered(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
-					Args:  []interface{}{models.CathyID},
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart where org_id = 1 AND start_type = 'F' AND flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL AND session_history IS NOT NULL;",
-					Args:  []interface{}{models.SingleMessageFlowID},
+					Args:  []interface{}{testdata.SingleMessage.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart_contacts where id = 1 AND contact_id = $1",
-					Args:  []interface{}{models.GeorgeID},
+					Args:  []interface{}{testdata.George.ID},
 					Count: 1,
 				},
 				{
@@ -104,7 +104,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
-	favoriteFlow, err := oa.FlowByID(models.FavoritesFlowID)
+	favoriteFlow, err := oa.FlowByID(testdata.Favorites.ID)
 	assert.NoError(t, err)
 
 	sessionAction := actions.NewStartSession(handlers.NewActionUUID(), favoriteFlow.FlowReference(), nil, nil, nil, nil, true)
@@ -118,7 +118,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from flows_flowstart where flow_id = $1 AND start_type = 'F' AND status = 'P' AND query = 'name ~ "Cathy"' AND parent_summary IS NOT NULL;`,
-					Args:  []interface{}{models.FavoritesFlowID},
+					Args:  []interface{}{testdata.Favorites.ID},
 					Count: 1,
 				},
 			},

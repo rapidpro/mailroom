@@ -54,11 +54,11 @@ func TestFromTicketUUID(t *testing.T) {
 	ticket2UUID := flows.TicketUUID("44b7d9b5-6ddd-4a6a-a1c0-8b70ecd06339")
 
 	// create some tickets
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, models.MailgunID, ticket1UUID, "Need help", "Have you seen my cookies?", "")
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, models.ZendeskID, ticket2UUID, "Need help", "Have you seen my shoes?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, testdata.Mailgun.ID, ticket1UUID, "Need help", "Have you seen my cookies?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, testdata.Zendesk.ID, ticket2UUID, "Need help", "Have you seen my shoes?", "")
 
 	// break mailgun configuration
-	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, models.MailgunID)
+	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
 
 	models.FlushCache()
 
@@ -78,7 +78,7 @@ func TestFromTicketUUID(t *testing.T) {
 	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, ticket2UUID, "zendesk")
 
 	assert.Equal(t, ticket2UUID, ticket.UUID())
-	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
 
 	testsuite.ResetDB()
@@ -91,24 +91,24 @@ func TestFromTicketerUUID(t *testing.T) {
 	db := testsuite.DB()
 
 	// break mailgun configuration
-	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, models.MailgunID)
+	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
 
 	// err if no ticketer with UUID
 	_, _, err := tickets.FromTicketerUUID(ctx, db, "33c54d0c-bd49-4edf-87a9-c391a75a630c", "mailgun")
 	assert.EqualError(t, err, "error looking up ticketer 33c54d0c-bd49-4edf-87a9-c391a75a630c")
 
 	// err if no ticketer type doesn't match
-	_, _, err = tickets.FromTicketerUUID(ctx, db, models.MailgunUUID, "zendesk")
+	_, _, err = tickets.FromTicketerUUID(ctx, db, testdata.Mailgun.UUID, "zendesk")
 	assert.EqualError(t, err, "error looking up ticketer f9c9447f-a291-4f3c-8c79-c089bbd4e713")
 
 	// err if ticketer isn't configured correctly and can't be loaded as a service
-	_, _, err = tickets.FromTicketerUUID(ctx, db, models.MailgunUUID, "mailgun")
+	_, _, err = tickets.FromTicketerUUID(ctx, db, testdata.Mailgun.UUID, "mailgun")
 	assert.EqualError(t, err, "error loading ticketer service: missing domain or api_key or to_address or url_base in mailgun config")
 
 	// if all is correct, returns the ticketer asset and ticket service
-	ticketer, svc, err := tickets.FromTicketerUUID(ctx, db, models.ZendeskUUID, "zendesk")
+	ticketer, svc, err := tickets.FromTicketerUUID(ctx, db, testdata.Zendesk.UUID, "zendesk")
 
-	assert.Equal(t, models.ZendeskUUID, ticketer.UUID())
+	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
 
 	testsuite.ResetDB()
@@ -133,7 +133,7 @@ func TestSendReply(t *testing.T) {
 	ticketUUID := flows.TicketUUID("f7358870-c3dd-450d-b5ae-db2eb50216ba")
 
 	// create a ticket
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, models.MailgunID, ticketUUID, "Need help", "Have you seen my cookies?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, models.CathyID, testdata.Mailgun.ID, ticketUUID, "Need help", "Have you seen my cookies?", "")
 
 	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
 	require.NoError(t, err)

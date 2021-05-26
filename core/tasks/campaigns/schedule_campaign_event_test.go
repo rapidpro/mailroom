@@ -25,16 +25,16 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	models.FlushCache()
 
 	// add bob, george and alexandria to doctors group which campaign is based on
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, models.BobID, models.DoctorsGroupID)
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, models.GeorgeID, models.DoctorsGroupID)
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, models.AlexandriaID, models.DoctorsGroupID)
+	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.Bob.ID, models.DoctorsGroupID)
+	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.George.ID, models.DoctorsGroupID)
+	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.Alexandria.ID, models.DoctorsGroupID)
 
 	// give bob and george values for joined in the future
-	db.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2030-01-01T00:00:00Z"}}' WHERE id = $1`, models.BobID)
-	db.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2030-08-18T11:31:30Z"}}' WHERE id = $1`, models.GeorgeID)
+	db.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2030-01-01T00:00:00Z"}}' WHERE id = $1`, testdata.Bob.ID)
+	db.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2030-08-18T11:31:30Z"}}' WHERE id = $1`, testdata.George.ID)
 
 	// give alexandria a value in the past
-	db.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2015-01-01T00:00:00Z"}}' WHERE id = $1`, models.AlexandriaID)
+	db.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2015-01-01T00:00:00Z"}}' WHERE id = $1`, testdata.Alexandria.ID)
 
 	db.MustExec(`DELETE FROM campaigns_eventfire`)
 
@@ -70,13 +70,13 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	})
 
 	// remove alexandria from campaign group
-	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, models.AlexandriaID)
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, testdata.Alexandria.ID)
 
 	// bump created_on for cathy and alexandria
-	db.MustExec(`UPDATE contacts_contact SET created_on = '2035-01-01T00:00:00Z' WHERE id = $1 OR id = $2`, models.CathyID, models.AlexandriaID)
+	db.MustExec(`UPDATE contacts_contact SET created_on = '2035-01-01T00:00:00Z' WHERE id = $1 OR id = $2`, testdata.Cathy.ID, testdata.Alexandria.ID)
 
 	// create new campaign event based on created_on + 5 minutes
-	event3 := insertCampaignEvent(t, models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID, 5, "M")
+	event3 := insertCampaignEvent(t, models.DoctorRemindersCampaignID, testdata.Favorites.ID, models.CreatedOnFieldID, 5, "M")
 
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event3}
 	err = task.Perform(ctx, mr, testdata.Org1.ID)
@@ -84,11 +84,11 @@ func TestScheduleCampaignEvent(t *testing.T) {
 
 	// only cathy is in the group and new enough to have a fire
 	assertContactFires(t, event3, map[models.ContactID]time.Time{
-		models.CathyID: time.Date(2035, 1, 1, 0, 5, 0, 0, time.UTC),
+		testdata.Cathy.ID: time.Date(2035, 1, 1, 0, 5, 0, 0, time.UTC),
 	})
 
 	// create new campaign event based on last_seen_on + 1 day
-	event4 := insertCampaignEvent(t, models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.LastSeenOnFieldID, 1, "D")
+	event4 := insertCampaignEvent(t, models.DoctorRemindersCampaignID, testdata.Favorites.ID, models.LastSeenOnFieldID, 1, "D")
 
 	// bump last_seen_on for bob
 	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, models.BobID)

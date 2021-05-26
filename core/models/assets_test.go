@@ -29,7 +29,7 @@ func TestCloneForSimulation(t *testing.T) {
 	}`
 
 	newDefs := map[assets.FlowUUID]json.RawMessage{
-		models.FavoritesFlowUUID: []byte(newFavoritesDef),
+		testdata.Favorites.UUID: []byte(newFavoritesDef),
 	}
 
 	testChannels := []assets.Channel{
@@ -41,7 +41,7 @@ func TestCloneForSimulation(t *testing.T) {
 	require.NoError(t, err)
 
 	// should get new definition
-	flow, err := clone.Flow(models.FavoritesFlowUUID)
+	flow, err := clone.Flow(testdata.Favorites.UUID)
 	require.NoError(t, err)
 	assert.Equal(t, newFavoritesDef, string(flow.Definition()))
 
@@ -56,7 +56,7 @@ func TestCloneForSimulation(t *testing.T) {
 	assert.Equal(t, "Vonage", vonage.Name())
 
 	// original assets still has original flow definition
-	flow, err = oa.Flow(models.FavoritesFlowUUID)
+	flow, err = oa.Flow(testdata.Favorites.UUID)
 	require.NoError(t, err)
 	assert.Equal(t, "{\"_ui\": {\"nodes\": {\"10c9c241-777f-4010-a841-6e87abed8520\": {\"typ", string(flow.Definition())[:64])
 

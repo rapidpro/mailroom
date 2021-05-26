@@ -28,13 +28,13 @@ func TestCampaignStarts(t *testing.T) {
 
 	// create our event fires
 	now := time.Now()
-	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, models.CathyID, models.BobID, models.AlexandriaID)
+	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, testdata.Cathy.ID, models.BobID, testdata.Alexandria.ID)
 
 	// create an active session for Alexandria to test skipping
-	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, models.AlexandriaID, models.PickNumberFlowID)
+	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, testdata.Alexandria.ID, testdata.PickANumber.ID)
 
 	// create an active voice call for Cathy to make sure it doesn't get interrupted or cause skipping
-	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'V', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, models.CathyID, models.IVRFlowID)
+	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'V', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, testdata.Cathy.ID, testdata.IVRFlow.ID)
 
 	// set our event to skip
 	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)
@@ -44,23 +44,23 @@ func TestCampaignStarts(t *testing.T) {
 		{
 			FireID:    1,
 			EventID:   models.RemindersEvent2ID,
-			ContactID: models.CathyID,
+			ContactID: testdata.Cathy.ID,
 			Scheduled: now,
 		},
 		{
 			FireID:    2,
 			EventID:   models.RemindersEvent2ID,
-			ContactID: models.BobID,
+			ContactID: testdata.Bob.ID,
 			Scheduled: now,
 		},
 		{
 			FireID:    3,
 			EventID:   models.RemindersEvent2ID,
-			ContactID: models.AlexandriaID,
+			ContactID: testdata.Alexandria.ID,
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, testdata.Org1.ID, fires, models.CampaignFlowUUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
+	sessions, err := FireCampaignEvents(ctx, db, rp, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
 
@@ -75,7 +75,7 @@ func TestCampaignStarts(t *testing.T) {
 		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND session_id IS NOT NULL`,
-		[]interface{}{pq.Array(contacts), models.CampaignFlowID}, 2, "expected only two runs to be created",
+		[]interface{}{pq.Array(contacts), testdata.CampaignFlow.ID}, 2, "expected only two runs to be created",
 	)
 
 	testsuite.AssertQueryCount(t, db,
@@ -89,13 +89,13 @@ func TestCampaignStarts(t *testing.T) {
 		`SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`, nil, 0, "expected all events to be fired")
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, []interface{}{models.CathyID, models.BobID, models.RemindersEvent2ID}, 2, "expected bob and cathy to have their event sent to fired")
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, []interface{}{testdata.Cathy.ID, testdata.Bob.ID, models.RemindersEvent2ID}, 2, "expected bob and cathy to have their event sent to fired")
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{models.AlexandriaID, models.RemindersEvent2ID}, 1, "expected alexandria to have her event set to skipped")
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{testdata.Alexandria.ID, models.RemindersEvent2ID}, 1, "expected alexandria to have her event set to skipped")
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, []interface{}{models.CathyID}, 1)
+		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, []interface{}{testdata.Cathy.ID}, 1)
 }
 
 func TestBatchStart(t *testing.T) {
@@ -105,7 +105,7 @@ func TestBatchStart(t *testing.T) {
 	rp := testsuite.RP()
 
 	// create a start object
-	testdata.InsertFlowStart(t, db, testdata.Org1.ID, models.SingleMessageFlowID, nil)
+	testdata.InsertFlowStart(t, db, testdata.Org1.ID, testdata.SingleMessage.ID, nil)
 
 	// and our batch object
 	contactIDs := []models.ContactID{models.CathyID, models.BobID}
@@ -119,12 +119,12 @@ func TestBatchStart(t *testing.T) {
 		Count         int
 		TotalCount    int
 	}{
-		{models.SingleMessageFlowID, true, true, nil, "Hey, how are you?", 2, 2},
-		{models.SingleMessageFlowID, false, true, nil, "Hey, how are you?", 0, 2},
-		{models.SingleMessageFlowID, false, false, nil, "Hey, how are you?", 0, 2},
-		{models.SingleMessageFlowID, true, false, nil, "Hey, how are you?", 2, 4},
+		{testdata.SingleMessage.ID, true, true, nil, "Hey, how are you?", 2, 2},
+		{testdata.SingleMessage.ID, false, true, nil, "Hey, how are you?", 0, 2},
+		{testdata.SingleMessage.ID, false, false, nil, "Hey, how are you?", 0, 2},
+		{testdata.SingleMessage.ID, true, false, nil, "Hey, how are you?", 2, 4},
 		{
-			Flow:          models.IncomingExtraFlowID,
+			Flow:          testdata.IncomingExtraFlow.ID,
 			Restart:       true,
 			IncludeActive: false,
 			Extra:         json.RawMessage([]byte(`{"name":"Fred", "age":33}`)),
@@ -180,7 +180,7 @@ func TestContactRuns(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
-	flow, err := oa.FlowByID(models.FavoritesFlowID)
+	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	assert.NoError(t, err)
 
 	// load our contact

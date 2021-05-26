@@ -12,9 +12,10 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -269,7 +270,7 @@ func TestServer(t *testing.T) {
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
 		VALUES(TRUE, now(), now(), 'trigger', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`,
-		models.CampaignFlowID,
+		testdata.CampaignFlow.ID,
 	)
 
 	// also add a catch all
@@ -277,7 +278,7 @@ func TestServer(t *testing.T) {
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'C', NULL, 1, 1, 1) RETURNING id`,
-		models.CampaignFlowID,
+		testdata.CampaignFlow.ID,
 	)
 
 	tcs := []struct {

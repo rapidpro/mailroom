@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestCampaigns(t *testing.T) {
@@ -23,14 +24,14 @@ func TestCampaigns(t *testing.T) {
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
-		uuids.New(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.CreatedOnFieldID)
+		uuids.New(), models.DoctorRemindersCampaignID, testdata.Favorites.ID, models.CreatedOnFieldID)
 
 	// insert an event on our campaign that is based on last_seen_on
 	testsuite.DB().MustExec(
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 2, 'D', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
-		uuids.New(), models.DoctorRemindersCampaignID, models.FavoritesFlowID, models.LastSeenOnFieldID)
+		uuids.New(), models.DoctorRemindersCampaignID, testdata.Favorites.ID, models.LastSeenOnFieldID)
 
 	// init their values
 	testsuite.DB().MustExec(
@@ -45,21 +46,21 @@ func TestCampaigns(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Msgs: handlers.ContactMsgMap{
-				models.CathyID: flows.NewMsgIn(flows.MsgUUID(uuids.New()), models.CathyURN, nil, "Hi there", nil),
+				testdata.Cathy.ID: flows.NewMsgIn(flows.MsgUUID(uuids.New()), testdata.Cathy.URN, nil, "Hi there", nil),
 			},
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy.ID: []flows.Action{
 					actions.NewRemoveContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}, false),
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, ""),
 				},
-				models.BobID: []flows.Action{
+				testdata.Bob.ID: []flows.Action{
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 				},
-				models.GeorgeID: []flows.Action{
+				testdata.George.ID: []flows.Action{
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewRemoveContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}, false),
@@ -68,17 +69,17 @@ func TestCampaigns(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
-					Args:  []interface{}{models.CathyID},
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 2,
 				},
 				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
-					Args:  []interface{}{models.BobID},
+					Args:  []interface{}{testdata.Bob.ID},
 					Count: 3,
 				},
 				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
-					Args:  []interface{}{models.GeorgeID},
+					Args:  []interface{}{testdata.George.ID},
 					Count: 0,
 				},
 			},

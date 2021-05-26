@@ -18,7 +18,7 @@ func TestStarts(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	startID := testdata.InsertFlowStart(t, db, testdata.Org1.ID, models.SingleMessageFlowID, []models.ContactID{models.CathyID, models.BobID})
+	startID := testdata.InsertFlowStart(t, db, testdata.Org1.ID, testdata.SingleMessage.ID, []models.ContactID{models.CathyID, models.BobID})
 
 	startJSON := []byte(fmt.Sprintf(`{
 		"start_id": %d,
@@ -36,7 +36,7 @@ func TestStarts(t *testing.T) {
 		"parent_summary": {"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"},
 		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1},
 		"extra": {"foo": "bar"}
-	}`, startID, testdata.Org1.ID, models.SingleMessageFlowID, models.CathyID, models.BobID))
+	}`, startID, testdata.Org1.ID, testdata.SingleMessage.ID, models.CathyID, models.BobID))
 
 	start := &models.FlowStart{}
 	err := json.Unmarshal(startJSON, start)
@@ -44,7 +44,7 @@ func TestStarts(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, startID, start.ID())
 	assert.Equal(t, testdata.Org1.ID, start.OrgID())
-	assert.Equal(t, models.SingleMessageFlowID, start.FlowID())
+	assert.Equal(t, testdata.SingleMessage.ID, start.FlowID())
 	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
 	assert.Equal(t, "", start.Query())
 	assert.Equal(t, models.DoRestartParticipants, start.RestartParticipants())
@@ -54,17 +54,17 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, json.RawMessage(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory())
 	assert.Equal(t, json.RawMessage(`{"foo": "bar"}`), start.Extra())
 
-	err = models.MarkStartStarted(ctx, db, startID, 2, []models.ContactID{models.GeorgeID})
+	err = models.MarkStartStarted(ctx, db, startID, 2, []models.ContactID{testdata.George.ID})
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'S' AND contact_count = 2`, []interface{}{startID}, 1)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart_contacts WHERE flowstart_id = $1`, []interface{}{startID}, 3)
 
-	batch := start.CreateBatch([]models.ContactID{models.CathyID, models.BobID}, false, 3)
+	batch := start.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, false, 3)
 	assert.Equal(t, startID, batch.StartID())
 	assert.Equal(t, models.StartTypeManual, batch.StartType())
-	assert.Equal(t, models.SingleMessageFlowID, batch.FlowID())
-	assert.Equal(t, []models.ContactID{models.CathyID, models.BobID}, batch.ContactIDs())
+	assert.Equal(t, testdata.SingleMessage.ID, batch.FlowID())
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, batch.ContactIDs())
 	assert.Equal(t, models.DoRestartParticipants, batch.RestartParticipants())
 	assert.Equal(t, models.DoIncludeActive, batch.IncludeActive())
 	assert.Equal(t, "rowan@nyaruka.com", batch.CreatedBy())

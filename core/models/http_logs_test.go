@@ -20,22 +20,22 @@ func TestHTTPLogs(t *testing.T) {
 	db := testsuite.DB()
 
 	// insert a log
-	log := models.NewClassifierCalledLog(testdata.Org1.ID, models.WitID, "http://foo.bar", "GET /", "STATUS 200", false, time.Second, time.Now())
+	log := models.NewClassifierCalledLog(testdata.Org1.ID, testdata.Wit.ID, "http://foo.bar", "GET /", "STATUS 200", false, time.Second, time.Now())
 	err := models.InsertHTTPLogs(ctx, db, []*models.HTTPLog{log})
 	assert.Nil(t, err)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND classifier_id = $2 AND is_error = FALSE`,
-		[]interface{}{testdata.Org1.ID, models.WitID}, 1)
+		[]interface{}{testdata.Org1.ID, testdata.Wit.ID}, 1)
 
 	// insert a log with nil response
-	log = models.NewClassifierCalledLog(testdata.Org1.ID, models.WitID, "http://foo.bar", "GET /", "", true, time.Second, time.Now())
+	log = models.NewClassifierCalledLog(testdata.Org1.ID, testdata.Wit.ID, "http://foo.bar", "GET /", "", true, time.Second, time.Now())
 	err = models.InsertHTTPLogs(ctx, db, []*models.HTTPLog{log})
 	assert.Nil(t, err)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND classifier_id = $2 AND is_error = TRUE AND response IS NULL`,
-		[]interface{}{testdata.Org1.ID, models.WitID}, 1)
+		[]interface{}{testdata.Org1.ID, testdata.Wit.ID}, 1)
 }
 
 func TestHTTPLogger(t *testing.T) {
@@ -50,7 +50,7 @@ func TestHTTPLogger(t *testing.T) {
 		},
 	}))
 
-	mailgun, err := models.LookupTicketerByUUID(ctx, db, models.MailgunUUID)
+	mailgun, err := models.LookupTicketerByUUID(ctx, db, testdata.Mailgun.UUID)
 	require.NoError(t, err)
 
 	logger := &models.HTTPLogger{}
@@ -74,5 +74,5 @@ func TestHTTPLogger(t *testing.T) {
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND ticketer_id = $2`,
-		[]interface{}{testdata.Org1.ID, models.MailgunID}, 2)
+		[]interface{}{testdata.Org1.ID, testdata.Mailgun.ID}, 2)
 }

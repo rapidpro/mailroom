@@ -58,11 +58,11 @@ func TestInterrupts(t *testing.T) {
 			[5]string{"W", "W", "W", "W", "I"},
 		},
 		{
-			[]models.ContactID{models.CathyID}, nil, nil,
+			[]models.ContactID{testdata.Cathy.ID}, nil, nil,
 			[5]string{"I", "W", "W", "W", "I"},
 		},
 		{
-			[]models.ContactID{models.CathyID, models.GeorgeID}, nil, nil,
+			[]models.ContactID{testdata.Cathy.ID, testdata.George.ID}, nil, nil,
 			[5]string{"I", "I", "W", "W", "I"},
 		},
 		{
@@ -70,11 +70,11 @@ func TestInterrupts(t *testing.T) {
 			[5]string{"W", "W", "I", "W", "I"},
 		},
 		{
-			nil, nil, []models.FlowID{models.PickNumberFlowID},
+			nil, nil, []models.FlowID{testdata.PickANumber.ID},
 			[5]string{"W", "W", "W", "I", "I"},
 		},
 		{
-			[]models.ContactID{models.CathyID, models.GeorgeID}, []models.ChannelID{models.TwilioChannelID}, []models.FlowID{models.PickNumberFlowID},
+			[]models.ContactID{testdata.Cathy.ID, testdata.George.ID}, []models.ChannelID{models.TwilioChannelID}, []models.FlowID{testdata.PickANumber.ID},
 			[5]string{"I", "I", "I", "I", "I"},
 		},
 	}
@@ -84,18 +84,18 @@ func TestInterrupts(t *testing.T) {
 		db.MustExec(`UPDATE flows_flowsession SET status='C', ended_on=NOW() WHERE status = 'W';`)
 
 		// twilio connection
-		twilioConnectionID := insertConnection(testdata.Org1.ID, models.TwilioChannelID, models.AlexandriaID, models.AlexandriaURNID)
+		twilioConnectionID := insertConnection(testdata.Org1.ID, models.TwilioChannelID, testdata.Alexandria.ID, testdata.Alexandria.URNID)
 
 		sessionIDs := make([]models.SessionID, 5)
 
 		// insert our dummy contact sessions
-		sessionIDs[0] = insertSession(testdata.Org1.ID, models.CathyID, models.NilConnectionID, models.FavoritesFlowID)
-		sessionIDs[1] = insertSession(testdata.Org1.ID, models.GeorgeID, models.NilConnectionID, models.FavoritesFlowID)
-		sessionIDs[2] = insertSession(testdata.Org1.ID, models.AlexandriaID, twilioConnectionID, models.FavoritesFlowID)
-		sessionIDs[3] = insertSession(testdata.Org1.ID, models.BobID, models.NilConnectionID, models.PickNumberFlowID)
+		sessionIDs[0] = insertSession(testdata.Org1.ID, testdata.Cathy.ID, models.NilConnectionID, testdata.Favorites.ID)
+		sessionIDs[1] = insertSession(testdata.Org1.ID, testdata.George.ID, models.NilConnectionID, testdata.Favorites.ID)
+		sessionIDs[2] = insertSession(testdata.Org1.ID, testdata.Alexandria.ID, twilioConnectionID, testdata.Favorites.ID)
+		sessionIDs[3] = insertSession(testdata.Org1.ID, testdata.Bob.ID, models.NilConnectionID, testdata.PickANumber.ID)
 
 		// a session we always end explicitly
-		sessionIDs[4] = insertSession(testdata.Org1.ID, models.BobID, models.NilConnectionID, models.FavoritesFlowID)
+		sessionIDs[4] = insertSession(testdata.Org1.ID, testdata.Bob.ID, models.NilConnectionID, testdata.Favorites.ID)
 
 		// create our task
 		task := &InterruptSessionsTask{

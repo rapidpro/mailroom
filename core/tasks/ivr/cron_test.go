@@ -29,8 +29,8 @@ func TestRetries(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, models.TwilioChannelID)
 
 	// create a flow start for cathy
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
-		WithContactIDs([]models.ContactID{models.CathyID})
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID})
 
 	// call our master starter
 	err := starts.CreateFlowBatches(ctx, db, rp, nil, start)
@@ -47,7 +47,7 @@ func TestRetries(t *testing.T) {
 	client.callID = ivr.CallID("call1")
 	err = HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, []interface{}{models.CathyID, models.ConnectionStatusWired, "call1"}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, []interface{}{testdata.Cathy.ID, models.ConnectionStatusWired, "call1"}, 1)
 
 	// change our call to be errored instead of wired
 	db.MustExec(`UPDATE channels_channelconnection SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
@@ -57,7 +57,7 @@ func TestRetries(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should now be in wired state
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, []interface{}{models.CathyID, models.ConnectionStatusWired, "call1"}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, []interface{}{testdata.Cathy.ID, models.ConnectionStatusWired, "call1"}, 1)
 
 	// back to retry and make the channel inactive
 	db.MustExec(`UPDATE channels_channelconnection SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
@@ -68,5 +68,5 @@ func TestRetries(t *testing.T) {
 	assert.NoError(t, err)
 
 	// this time should be failed
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, []interface{}{models.CathyID, models.ConnectionStatusFailed, "call1"}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, []interface{}{testdata.Cathy.ID, models.ConnectionStatusFailed, "call1"}, 1)
 }
