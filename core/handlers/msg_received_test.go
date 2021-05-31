@@ -22,15 +22,15 @@ func TestMsgReceived(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, nil, false),
 				},
-				testdata.George.ID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewSendMsg(handlers.NewActionUUID(), "Hello world", nil, nil, false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
-				testdata.Cathy.ID: testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start"),
+				testdata.Cathy: testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start"),
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
@@ -48,12 +48,12 @@ func TestMsgReceived(t *testing.T) {
 		{
 			FlowType: flows.FlowTypeMessagingOffline,
 			Actions: handlers.ContactActionMap{
-				testdata.Bob.ID: []flows.Action{
+				testdata.Bob: []flows.Action{
 					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, nil, false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
-				testdata.Bob.ID: flows.NewMsgIn(flows.MsgUUID(uuids.New()), urns.NilURN, nil, "Hi offline", nil),
+				testdata.Bob: flows.NewMsgIn(flows.MsgUUID(uuids.New()), urns.NilURN, nil, "Hi offline", nil),
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{

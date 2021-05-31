@@ -46,7 +46,7 @@ func TestSessionTriggered(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewStartSession(handlers.NewActionUUID(), simpleFlow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
 				},
 			},
@@ -113,7 +113,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{sessionAction},
+				testdata.Cathy: []flows.Action{sessionAction},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{

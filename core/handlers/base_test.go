@@ -26,9 +26,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type ContactActionMap map[models.ContactID][]flows.Action
-type ContactMsgMap map[models.ContactID]*flows.MsgIn
-type ContactModifierMap map[models.ContactID][]flows.Modifier
+type ContactActionMap map[*testdata.Contact][]flows.Action
+type ContactMsgMap map[*testdata.Contact]*flows.MsgIn
+type ContactModifierMap map[*testdata.Contact][]flows.Modifier
 
 type modifyResult struct {
 	Contact *flows.Contact `json:"contact"`
@@ -83,11 +83,11 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 	exits := make([]flows.Exit, len(tc.Actions))
 	exitNodes := make([]flows.Node, len(tc.Actions))
 	i = 0
-	for cid, actions := range tc.Actions {
+	for contact, actions := range tc.Actions {
 		cases[i] = routers.NewCase(
 			uuids.New(),
 			"has_any_word",
-			[]string{fmt.Sprintf("%d", cid)},
+			[]string{fmt.Sprintf("%d", contact.ID)},
 			categoryUUIDs[i],
 		)
 
@@ -100,7 +100,7 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 
 		categories[i] = routers.NewCategory(
 			categoryUUIDs[i],
-			fmt.Sprintf("Contact %d", cid),
+			fmt.Sprintf("Contact %d", contact.ID),
 			exitUUIDs[i],
 		)
 
@@ -171,6 +171,11 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 	flowUUID := testdata.Favorites.UUID
 
 	for i, tc := range tcs {
+		msgsByContactID := make(map[models.ContactID]*flows.MsgIn)
+		for contact, msg := range tc.Msgs {
+			msgsByContactID[contact.ID] = msg
+		}
+
 		// build our flow for this test case
 		testFlow := createTestFlow(t, flowUUID, tc)
 		flowDef, err := json.Marshal(testFlow)
@@ -185,7 +190,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		options := runner.NewStartOptions()
 		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, session []*models.Session) error {
 			for _, s := range session {
-				msg := tc.Msgs[s.ContactID()]
+				msg := msgsByContactID[s.ContactID()]
 				if msg != nil {
 					s.SetIncomingMsg(msg.ID(), "")
 				}
@@ -193,7 +198,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			return nil
 		}
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
-			msg := tc.Msgs[models.ContactID(contact.ID())]
+			msg := msgsByContactID[models.ContactID(contact.ID())]
 			if msg == nil {
 				return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Manual().Build()
 			}
@@ -207,9 +212,8 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 
 		// create scenes for our contacts
 		scenes := make([]*models.Scene, 0, len(tc.Modifiers))
-		for contactID, mods := range tc.Modifiers {
-
-			contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{contactID})
+		for contact, mods := range tc.Modifiers {
+			contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{contact.ID})
 			assert.NoError(t, err)
 
 			contact := contacts[0]

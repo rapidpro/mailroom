@@ -24,20 +24,20 @@ func TestInputLabelsAdded(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewAddInputLabels(handlers.NewActionUUID(), []*assets.LabelReference{reporting}),
 					actions.NewAddInputLabels(handlers.NewActionUUID(), []*assets.LabelReference{testing}),
 					actions.NewAddInputLabels(handlers.NewActionUUID(), []*assets.LabelReference{reporting}),
 				},
-				testdata.Bob.ID: []flows.Action{},
-				testdata.George.ID: []flows.Action{
+				testdata.Bob: []flows.Action{},
+				testdata.George: []flows.Action{
 					actions.NewAddInputLabels(handlers.NewActionUUID(), []*assets.LabelReference{testing}),
 					actions.NewAddInputLabels(handlers.NewActionUUID(), []*assets.LabelReference{reporting}),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
-				testdata.Cathy.ID: msg1,
-				testdata.Bob.ID:   msg2,
+				testdata.Cathy: msg1,
+				testdata.Bob:   msg2,
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{

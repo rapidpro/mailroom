@@ -72,10 +72,10 @@ var TwilioChannel = Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8"}
 var VonageChannel = Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49"}
 var TwitterChannel = Channel{10002, "0f661e8b-ea9d-4bd3-9953-d368340acf91"}
 
-var Cathy = Contact{10000, "6393abc0-283d-4c9b-a1b3-641a035c34bf", "tel:+16055741111", 10000}
-var Bob = Contact{10001, "b699a406-7e44-49be-9f01-1a82893e8a10", "tel:+16055742222", 10001}
-var George = Contact{10002, "8d024bcd-f473-4719-a00a-bd0bb1190135", "tel:+16055743333", 10002}
-var Alexandria = Contact{10003, "9709c157-4606-4d41-9df3-9e9c9b4ae2d4", "tel:+16055744444", 10003}
+var Cathy = &Contact{10000, "6393abc0-283d-4c9b-a1b3-641a035c34bf", "tel:+16055741111", 10000}
+var Bob = &Contact{10001, "b699a406-7e44-49be-9f01-1a82893e8a10", "tel:+16055742222", 10001}
+var George = &Contact{10002, "8d024bcd-f473-4719-a00a-bd0bb1190135", "tel:+16055743333", 10002}
+var Alexandria = &Contact{10003, "9709c157-4606-4d41-9df3-9e9c9b4ae2d4", "tel:+16055744444", 10003}
 
 var Favorites = Flow{10000, "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"}
 var PickANumber = Flow{10001, "5890fe3a-f204-4661-b74d-025be4ee019c"}
@@ -116,6 +116,6 @@ var RemindersEvent2 = CampaignEvent{10001}
 // secondary org.. only a few things
 var Org2 = Org{2, "3ae7cdeb-fd96-46e5-abc4-a4622f349921"}
 var Org2Channel = Channel{20000, "a89bc872-3763-4b95-91d9-31d4e56c6651"}
-var Org2Contact = Contact{20000, "26d20b72-f7d8-44dc-87f2-aae046dbff95", "tel:+250700000005", 20000}
+var Org2Contact = &Contact{20000, "26d20b72-f7d8-44dc-87f2-aae046dbff95", "tel:+250700000005", 20000}
 var Org2Favorites = Flow{20000, "f161bd16-3c60-40bd-8c92-228ce815b9cd"}
 var Org2SingleMessage = Flow{20001, "5277916d-6011-41ac-a4a4-f6ac6a4f1dd9"}

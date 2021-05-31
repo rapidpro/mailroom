@@ -23,22 +23,22 @@ func TestContactFieldChanged(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewSetContactField(handlers.NewActionUUID(), gender, "Male"),
 					actions.NewSetContactField(handlers.NewActionUUID(), gender, "Female"),
 					actions.NewSetContactField(handlers.NewActionUUID(), age, ""),
 				},
-				testdata.George.ID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewSetContactField(handlers.NewActionUUID(), gender, "Male"),
 					actions.NewSetContactField(handlers.NewActionUUID(), gender, ""),
 					actions.NewSetContactField(handlers.NewActionUUID(), age, "40"),
 				},
-				testdata.Bob.ID: []flows.Action{
+				testdata.Bob: []flows.Action{
 					actions.NewSetContactField(handlers.NewActionUUID(), gender, ""),
 					actions.NewSetContactField(handlers.NewActionUUID(), gender, "Male"),
 					actions.NewSetContactField(handlers.NewActionUUID(), age, "Old"),
 				},
-				testdata.Alexandria.ID: []flows.Action{
+				testdata.Alexandria: []flows.Action{
 					actions.NewSetContactField(handlers.NewActionUUID(), age, ""),
 					actions.NewSetContactField(handlers.NewActionUUID(), gender, ""),
 				},

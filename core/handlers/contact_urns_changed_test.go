@@ -23,13 +23,13 @@ func TestContactURNsChanged(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewAddContactURN(handlers.NewActionUUID(), "tel", "12065551212"),
 					actions.NewAddContactURN(handlers.NewActionUUID(), "tel", "12065551212"),
 					actions.NewAddContactURN(handlers.NewActionUUID(), "telegram", "11551"),
 					actions.NewAddContactURN(handlers.NewActionUUID(), "tel", "+16055741111"),
 				},
-				testdata.George.ID: []flows.Action{},
+				testdata.George: []flows.Action{},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{

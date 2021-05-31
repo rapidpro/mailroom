@@ -58,7 +58,7 @@ func TestMsgEvents(t *testing.T) {
 
 	tcs := []struct {
 		Hook      func()
-		Contact   testdata.Contact
+		Contact   *testdata.Contact
 		Message   string
 		Response  string
 		ChannelID models.ChannelID

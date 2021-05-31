@@ -20,7 +20,7 @@ func TestContactStatusChanged(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Modifiers: handlers.ContactModifierMap{
-				testdata.Cathy.ID: []flows.Modifier{modifiers.NewStatus(flows.ContactStatusBlocked)},
+				testdata.Cathy: []flows.Modifier{modifiers.NewStatus(flows.ContactStatusBlocked)},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
@@ -32,7 +32,7 @@ func TestContactStatusChanged(t *testing.T) {
 		},
 		{
 			Modifiers: handlers.ContactModifierMap{
-				testdata.Cathy.ID: []flows.Modifier{modifiers.NewStatus(flows.ContactStatusStopped)},
+				testdata.Cathy: []flows.Modifier{modifiers.NewStatus(flows.ContactStatusStopped)},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
@@ -44,7 +44,7 @@ func TestContactStatusChanged(t *testing.T) {
 		},
 		{
 			Modifiers: handlers.ContactModifierMap{
-				testdata.Cathy.ID: []flows.Modifier{modifiers.NewStatus(flows.ContactStatusActive)},
+				testdata.Cathy: []flows.Modifier{modifiers.NewStatus(flows.ContactStatusActive)},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{

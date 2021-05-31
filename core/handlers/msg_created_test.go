@@ -48,21 +48,21 @@ func TestMsgCreated(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
 				},
-				testdata.George.ID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewSendMsg(handlers.NewActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
 				},
-				testdata.Bob.ID: []flows.Action{
+				testdata.Bob: []flows.Action{
 					actions.NewSendMsg(handlers.NewActionUUID(), "No URNs", nil, nil, false),
 				},
-				testdata.Alexandria.ID: []flows.Action{
+				testdata.Alexandria: []flows.Action{
 					templateAction,
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
-				testdata.Cathy.ID: msg1,
+				testdata.Cathy: msg1,
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
@@ -120,7 +120,7 @@ func TestNoTopup(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewSendMsg(handlers.NewActionUUID(), "No Topup", nil, nil, false),
 				},
 			},
@@ -156,14 +156,14 @@ func TestNewURN(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				// brand new URN on Cathy
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewAddContactURN(handlers.NewActionUUID(), "telegram", "12345"),
 					actions.NewSetContactChannel(handlers.NewActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
 					actions.NewSendMsg(handlers.NewActionUUID(), "Cathy Message", nil, nil, false),
 				},
 
 				// Bob is stealing a URN previously assigned to George
-				testdata.Bob.ID: []flows.Action{
+				testdata.Bob: []flows.Action{
 					actions.NewAddContactURN(handlers.NewActionUUID(), "telegram", "67890"),
 					actions.NewSetContactChannel(handlers.NewActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
 					actions.NewSendMsg(handlers.NewActionUUID(), "Bob Message", nil, nil, false),

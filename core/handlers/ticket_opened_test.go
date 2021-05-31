@@ -53,10 +53,10 @@ func TestTicketOpened(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(testdata.Mailgun.UUID, "Mailgun (IT Support)"), "Need help", "Where are my cookies?", "Email Ticket"),
 				},
-				testdata.Bob.ID: []flows.Action{
+				testdata.Bob: []flows.Action{
 					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(testdata.Zendesk.UUID, "Zendesk (Nyaruka)"), "Interesting", "I've found some cookies", "Zen Ticket"),
 				},
 			},

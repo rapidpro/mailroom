@@ -34,7 +34,7 @@ func TestServiceCalled(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewCallClassifier(handlers.NewActionUUID(), wit, "book me a flight", "flight"),
 				},
 			},

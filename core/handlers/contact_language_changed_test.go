@@ -13,14 +13,14 @@ func TestContactLanguageChanged(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewSetContactLanguage(handlers.NewActionUUID(), "fra"),
 					actions.NewSetContactLanguage(handlers.NewActionUUID(), "eng"),
 				},
-				testdata.George.ID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewSetContactLanguage(handlers.NewActionUUID(), "spa"),
 				},
-				testdata.Alexandria.ID: []flows.Action{
+				testdata.Alexandria: []flows.Action{
 					actions.NewSetContactLanguage(handlers.NewActionUUID(), ""),
 				},
 			},

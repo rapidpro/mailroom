@@ -17,13 +17,13 @@ func TestContactGroupsChanged(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewRemoveContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}, false),
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{testers}),
 				},
-				testdata.George.ID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewRemoveContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}, false),
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{testers}),
 				},

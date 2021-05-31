@@ -45,21 +45,21 @@ func TestCampaigns(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Msgs: handlers.ContactMsgMap{
-				testdata.Cathy.ID: flows.NewMsgIn(flows.MsgUUID(uuids.New()), testdata.Cathy.URN, nil, "Hi there", nil),
+				testdata.Cathy: flows.NewMsgIn(flows.MsgUUID(uuids.New()), testdata.Cathy.URN, nil, "Hi there", nil),
 			},
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewRemoveContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}, false),
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, ""),
 				},
-				testdata.Bob.ID: []flows.Action{
+				testdata.Bob: []flows.Action{
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 				},
-				testdata.George.ID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewSetContactField(handlers.NewActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 					actions.NewRemoveContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}, false),

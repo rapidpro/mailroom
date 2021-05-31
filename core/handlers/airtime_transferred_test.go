@@ -366,7 +366,7 @@ func TestAirtimeTransferred(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewTransferAirtime(handlers.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`3.50`)}, "Transfer"),
 				},
 			},
@@ -385,7 +385,7 @@ func TestAirtimeTransferred(t *testing.T) {
 		},
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.George.ID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewTransferAirtime(handlers.NewActionUUID(), map[string]decimal.Decimal{"USD": decimal.RequireFromString(`3.50`)}, "Transfer"),
 				},
 			},

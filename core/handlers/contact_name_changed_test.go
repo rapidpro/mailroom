@@ -13,17 +13,17 @@ func TestContactNameChanged(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				testdata.Cathy.ID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewSetContactName(handlers.NewActionUUID(), "Fred"),
 					actions.NewSetContactName(handlers.NewActionUUID(), "Tarzan"),
 				},
-				testdata.George.ID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewSetContactName(handlers.NewActionUUID(), "Geoff Newman"),
 				},
-				testdata.Bob.ID: []flows.Action{
+				testdata.Bob: []flows.Action{
 					actions.NewSetContactName(handlers.NewActionUUID(), ""),
 				},
-				testdata.Alexandria.ID: []flows.Action{
+				testdata.Alexandria: []flows.Action{
 					actions.NewSetContactName(handlers.NewActionUUID(), "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 				},
 			},
