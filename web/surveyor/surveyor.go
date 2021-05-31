@@ -121,9 +121,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	fs.SetContact(flowContact)
 
 	// append our session events to our modifiers events, the union will be used to update the db/contact
-	for _, e := range sessionEvents {
-		modifierEvents = append(modifierEvents, e)
-	}
+	modifierEvents = append(modifierEvents, sessionEvents...)
 
 	// create our sprint
 	sprint := engine.NewSprint(mods, modifierEvents)

@@ -79,7 +79,7 @@ func TestStarts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, flows.SessionUUID("532a3899-492f-4ffe-aed7-e75ad524efab"), history.ParentUUID)
 
-	history, err = models.ReadSessionHistory([]byte(`{`))
+	_, err = models.ReadSessionHistory([]byte(`{`))
 	assert.EqualError(t, err, "unexpected end of JSON input")
 
 	err = models.MarkStartComplete(ctx, db, startID)

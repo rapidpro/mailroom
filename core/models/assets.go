@@ -439,6 +439,9 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
 	clone, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows)
+	if err != nil {
+		return nil, err
+	}
 
 	for flowUUID, newDef := range newDefs {
 		// get the original flow
@@ -455,10 +458,7 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs
 		clone.flowByID[cf.ID()] = cf
 	}
 
-	for _, channel := range testChannels {
-		// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
-		clone.channels = append(clone.channels, channel)
-	}
+	clone.channels = append(clone.channels, testChannels...)
 
 	// rebuild our session assets with our new items
 	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig())

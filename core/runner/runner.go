@@ -506,9 +506,7 @@ func StartFlow(
 		}
 
 		// append all the sessions that were started
-		for _, s := range ss {
-			sessions = append(sessions, s)
-		}
+		sessions = append(sessions, ss...)
 
 		// release all our locks
 		for i := range locked {

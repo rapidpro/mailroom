@@ -27,10 +27,10 @@ func TestLoadGroups(t *testing.T) {
 		return nil
 	})
 
-	groups, err := models.LoadGroups(ctx, db, 1)
+	_, err := models.LoadGroups(ctx, db, testdata.Org1.ID)
 	require.EqualError(t, err, "error querying groups for org: 1: boom")
 
-	groups, err = models.LoadGroups(ctx, db, 1)
+	groups, err := models.LoadGroups(ctx, db, 1)
 	require.NoError(t, err)
 
 	tcs := []struct {

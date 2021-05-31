@@ -48,7 +48,7 @@ func TestReadModifiers(t *testing.T) {
 	assert.Equal(t, "language", mods[1].Type())
 
 	// modifier with missing asset or an error if allowMissing is false
-	mods, err = goflow.ReadModifiers(oa.SessionAssets(), []json.RawMessage{
+	_, err = goflow.ReadModifiers(oa.SessionAssets(), []json.RawMessage{
 		[]byte(`{"type": "name", "name": "Bob"}`),
 		[]byte(`{"type": "field", "field": {"key": "blood_type", "name": "Blood Type"}, "value": "O"}`),
 		[]byte(`{"type": "language", "language": "spa"}`),
@@ -56,7 +56,7 @@ func TestReadModifiers(t *testing.T) {
 	assert.EqualError(t, err, `error reading modifier: {"type": "field", "field": {"key": "blood_type", "name": "Blood Type"}, "value": "O"}: no modifier to return because of missing assets`)
 
 	// error if any modifier structurally invalid
-	mods, err = goflow.ReadModifiers(oa.SessionAssets(), []json.RawMessage{
+	_, err = goflow.ReadModifiers(oa.SessionAssets(), []json.RawMessage{
 		[]byte(`{"type": "field", "value": "O"}`),
 		[]byte(`{"type": "language", "language": "spa"}`),
 	}, goflow.ErrorOnMissing)

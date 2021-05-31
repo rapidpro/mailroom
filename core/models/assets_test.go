@@ -65,6 +65,6 @@ func TestCloneForSimulation(t *testing.T) {
 	assert.Nil(t, testChannel1)
 
 	// can't override definition for a non-existent flow
-	oa, err = oa.CloneForSimulation(ctx, db, map[assets.FlowUUID]json.RawMessage{"a121f1af-7dfa-47af-9d22-9726372e2daa": []byte(newFavoritesDef)}, nil)
+	_, err = oa.CloneForSimulation(ctx, db, map[assets.FlowUUID]json.RawMessage{"a121f1af-7dfa-47af-9d22-9726372e2daa": []byte(newFavoritesDef)}, nil)
 	assert.EqualError(t, err, "unable to find flow with UUID 'a121f1af-7dfa-47af-9d22-9726372e2daa': not found")
 }

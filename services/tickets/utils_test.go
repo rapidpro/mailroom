@@ -77,6 +77,7 @@ func TestFromTicketUUID(t *testing.T) {
 	// if all is correct, returns the ticket, ticketer asset, and ticket service
 	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, ticket2UUID, "zendesk")
 
+	assert.NoError(t, err)
 	assert.Equal(t, ticket2UUID, ticket.UUID())
 	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
@@ -108,6 +109,7 @@ func TestFromTicketerUUID(t *testing.T) {
 	// if all is correct, returns the ticketer asset and ticket service
 	ticketer, svc, err := tickets.FromTicketerUUID(ctx, db, testdata.Zendesk.UUID, "zendesk")
 
+	assert.NoError(t, err)
 	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
 

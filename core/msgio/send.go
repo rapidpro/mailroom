@@ -53,9 +53,7 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fc
 
 				// in the case of errors we do want to change the messages back to pending however so they
 				// get queued later. (for the common case messages are only inserted and queued, without a status update)
-				for _, msg := range contactMsgs {
-					pending = append(pending, msg)
-				}
+				pending = append(pending, contactMsgs...)
 			}
 		}
 	}

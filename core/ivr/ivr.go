@@ -35,9 +35,6 @@ const (
 	NilCallID     = CallID("")
 	NilAttachment = utils.Attachment("")
 
-	// Our user agent
-	userAgent = "Mailroom/"
-
 	// ErrorMessage that is spoken to an IVR user if an error occurs
 	ErrorMessage = "An error has occurred, please try again later."
 )
@@ -592,7 +589,7 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *model
 		// no associated start? this is a permanent failure
 		if conn.StartID() == models.NilStartID {
 			conn.MarkFailed(ctx, db, time.Now())
-			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: F"))
+			return client.WriteEmptyResponse(w, "status updated: F")
 		}
 
 		// on errors we need to look up the flow to know how long to wait before retrying

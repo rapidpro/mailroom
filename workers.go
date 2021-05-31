@@ -68,7 +68,7 @@ func (f *Foreman) Assign() {
 
 	lastSleep := false
 
-	for true {
+	for {
 		select {
 		// return if we have been told to stop
 		case <-f.quit:
@@ -109,7 +109,6 @@ type Worker struct {
 	id      int
 	foreman *Foreman
 	job     chan *queue.Task
-	log     *logrus.Entry
 }
 
 // NewWorker creates a new worker responsible for working on events
@@ -124,14 +123,15 @@ func NewWorker(foreman *Foreman, id int) *Worker {
 
 // Start starts our Worker's goroutine and has it start waiting for tasks from the foreman
 func (w *Worker) Start() {
+	w.foreman.mr.WaitGroup.Add(1)
+
 	go func() {
-		w.foreman.mr.WaitGroup.Add(1)
 		defer w.foreman.mr.WaitGroup.Done()
 
 		log := logrus.WithField("queue", w.foreman.queue).WithField("worker_id", w.id)
 		log.Debug("started")
 
-		for true {
+		for {
 			// list ourselves as available for work
 			w.foreman.availableWorkers <- w
 
