@@ -7,13 +7,12 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestContactGroupsChanged(t *testing.T) {
-	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
-	testers := assets.NewGroupReference(models.TestersGroupUUID, "Testers")
+	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
+	testers := assets.NewGroupReference(testdata.TestersGroup.UUID, "Testers")
 
 	tcs := []handlers.TestCase{
 		{
@@ -32,22 +31,22 @@ func TestContactGroupsChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{testdata.Cathy.ID, models.DoctorsGroupID},
+					Args:  []interface{}{testdata.Cathy.ID, testdata.DoctorsGroup.ID},
 					Count: 0,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{testdata.Cathy.ID, models.TestersGroupID},
+					Args:  []interface{}{testdata.Cathy.ID, testdata.TestersGroup.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{testdata.George.ID, models.TestersGroupID},
+					Args:  []interface{}{testdata.George.ID, testdata.TestersGroup.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{testdata.Bob.ID, models.TestersGroupID},
+					Args:  []interface{}{testdata.Bob.ID, testdata.TestersGroup.ID},
 					Count: 0,
 				},
 			},

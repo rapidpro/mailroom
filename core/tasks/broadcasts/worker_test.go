@@ -39,7 +39,7 @@ func TestBroadcastEvents(t *testing.T) {
 		},
 	}
 
-	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
+	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
 	doctorsOnly := []*assets.GroupReference{doctors}
 
 	cathy := flows.NewContactReference(testdata.Cathy.UUID, "Cathy")
@@ -164,7 +164,7 @@ func TestBroadcastTask(t *testing.T) {
 		},
 	}
 
-	doctorsOnly := []models.GroupID{models.DoctorsGroupID}
+	doctorsOnly := []models.GroupID{testdata.DoctorsGroup.ID}
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}
 
 	// add an extra URN fo cathy

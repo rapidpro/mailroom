@@ -89,28 +89,28 @@ func TestAddEventFires(t *testing.T) {
 	scheduled1 := time.Date(2020, 9, 8, 14, 38, 30, 123456789, time.UTC)
 
 	err := models.AddEventFires(ctx, db, []*models.FireAdd{
-		{ContactID: testdata.Cathy.ID, EventID: models.RemindersEvent1ID, Scheduled: scheduled1},
-		{ContactID: testdata.Bob.ID, EventID: models.RemindersEvent1ID, Scheduled: scheduled1},
-		{ContactID: testdata.Bob.ID, EventID: models.RemindersEvent2ID, Scheduled: scheduled1},
+		{ContactID: testdata.Cathy.ID, EventID: testdata.RemindersEvent1.ID, Scheduled: scheduled1},
+		{ContactID: testdata.Bob.ID, EventID: testdata.RemindersEvent1.ID, Scheduled: scheduled1},
+		{ContactID: testdata.Bob.ID, EventID: testdata.RemindersEvent2.ID, Scheduled: scheduled1},
 	})
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire`, nil, 3)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{testdata.Cathy.ID, models.RemindersEvent1ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{testdata.Bob.ID, models.RemindersEvent1ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{testdata.Bob.ID, models.RemindersEvent2ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{testdata.Cathy.ID, testdata.RemindersEvent1.ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{testdata.Bob.ID, testdata.RemindersEvent1.ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{testdata.Bob.ID, testdata.RemindersEvent2.ID}, 1)
 
 	db.MustExec(`UPDATE campaigns_eventfire SET fired = NOW() WHERE contact_id = $1`, testdata.Cathy.ID)
 
 	scheduled2 := time.Date(2020, 9, 8, 14, 38, 30, 123456789, time.UTC)
 
 	err = models.AddEventFires(ctx, db, []*models.FireAdd{
-		{ContactID: testdata.Cathy.ID, EventID: models.RemindersEvent1ID, Scheduled: scheduled2}, // fine because previous one now has non-null fired
-		{ContactID: testdata.Bob.ID, EventID: models.RemindersEvent1ID, Scheduled: scheduled2},   // won't be added due to conflict
+		{ContactID: testdata.Cathy.ID, EventID: testdata.RemindersEvent1.ID, Scheduled: scheduled2}, // fine because previous one now has non-null fired
+		{ContactID: testdata.Bob.ID, EventID: testdata.RemindersEvent1.ID, Scheduled: scheduled2},   // won't be added due to conflict
 	})
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire`, nil, 4)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{testdata.Cathy.ID, models.RemindersEvent1ID}, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{testdata.Cathy.ID, testdata.RemindersEvent1.ID}, 2)
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{testdata.Bob.ID}, 2)
 }

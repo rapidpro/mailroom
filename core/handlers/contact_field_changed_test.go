@@ -7,7 +7,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
@@ -47,32 +46,32 @@ func TestContactFieldChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Female"}'::jsonb`,
-					Args:  []interface{}{testdata.Cathy.ID, models.GenderFieldUUID},
+					Args:  []interface{}{testdata.Cathy.ID, testdata.GenderField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
-					Args:  []interface{}{testdata.Cathy.ID, models.AgeFieldUUID},
+					Args:  []interface{}{testdata.Cathy.ID, testdata.AgeField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND NOT fields?$2`,
-					Args:  []interface{}{testdata.George.ID, models.GenderFieldUUID},
+					Args:  []interface{}{testdata.George.ID, testdata.GenderField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"40", "number": 40}'::jsonb`,
-					Args:  []interface{}{testdata.George.ID, models.AgeFieldUUID},
+					Args:  []interface{}{testdata.George.ID, testdata.AgeField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Male"}'::jsonb`,
-					Args:  []interface{}{testdata.Bob.ID, models.GenderFieldUUID},
+					Args:  []interface{}{testdata.Bob.ID, testdata.GenderField.UUID},
 					Count: 1,
 				},
 				{
 					SQL:   `select count(*) from contacts_contact where id = $1 AND fields->$2 = '{"text":"Old"}'::jsonb`,
-					Args:  []interface{}{testdata.Bob.ID, models.AgeFieldUUID},
+					Args:  []interface{}{testdata.Bob.ID, testdata.AgeField.UUID},
 					Count: 1,
 				},
 				{

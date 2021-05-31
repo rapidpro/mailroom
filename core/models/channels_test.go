@@ -1,11 +1,15 @@
-package models
+package models_test
 
 import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestChannels(t *testing.T) {
@@ -13,16 +17,19 @@ func TestChannels(t *testing.T) {
 	db := testsuite.DB()
 
 	// add some tel specific config to channel 2
-	db.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"], "allow_international": true}' WHERE id = $1`, VonageChannelID)
+	db.MustExec(`UPDATE channels_channel SET config = '{"matching_prefixes": ["250", "251"], "allow_international": true}' WHERE id = $1`, testdata.VonageChannel.ID)
 
 	// make twitter channel have a parent of twilio channel
-	db.MustExec(`UPDATE channels_channel SET parent_id = $1 WHERE id = $2`, TwilioChannelID, TwitterChannelID)
+	db.MustExec(`UPDATE channels_channel SET parent_id = $1 WHERE id = $2`, testdata.TwilioChannel.ID, testdata.TwitterChannel.ID)
 
-	channels, err := loadChannels(ctx, db, 1)
-	assert.NoError(t, err)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, 1, models.RefreshChannels)
+	require.NoError(t, err)
+
+	channels, err := oa.Channels()
+	require.NoError(t, err)
 
 	tcs := []struct {
-		ID                 ChannelID
+		ID                 models.ChannelID
 		UUID               assets.ChannelUUID
 		Name               string
 		Address            string
@@ -33,8 +40,8 @@ func TestChannels(t *testing.T) {
 		Parent             *assets.ChannelReference
 	}{
 		{
-			TwilioChannelID,
-			TwilioChannelUUID,
+			testdata.TwilioChannel.ID,
+			testdata.TwilioChannel.UUID,
 			"Twilio",
 			"+13605551212",
 			[]string{"tel"},
@@ -44,8 +51,8 @@ func TestChannels(t *testing.T) {
 			nil,
 		},
 		{
-			VonageChannelID,
-			VonageChannelUUID,
+			testdata.VonageChannel.ID,
+			testdata.VonageChannel.UUID,
 			"Vonage",
 			"5789",
 			[]string{"tel"},
@@ -55,21 +62,21 @@ func TestChannels(t *testing.T) {
 			nil,
 		},
 		{
-			TwitterChannelID,
-			TwitterChannelUUID,
+			testdata.TwitterChannel.ID,
+			testdata.TwitterChannel.UUID,
 			"Twitter",
 			"ureport",
 			[]string{"twitter"},
 			[]assets.ChannelRole{"send", "receive"},
 			nil,
 			false,
-			assets.NewChannelReference(TwilioChannelUUID, "Twilio"),
+			assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"),
 		},
 	}
 
 	assert.Equal(t, len(tcs), len(channels))
 	for i, tc := range tcs {
-		channel := channels[i].(*Channel)
+		channel := channels[i].(*models.Channel)
 		assert.Equal(t, tc.UUID, channel.UUID())
 		assert.Equal(t, tc.ID, channel.ID())
 		assert.Equal(t, tc.Name, channel.Name())

@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
@@ -16,7 +15,7 @@ import (
 func TestCampaigns(t *testing.T) {
 	testsuite.Reset()
 
-	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
+	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
 	joined := assets.NewFieldReference("joined", "Joined")
 
 	// insert an event on our campaign that is based on created_on
@@ -24,14 +23,14 @@ func TestCampaigns(t *testing.T) {
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
-		uuids.New(), models.DoctorRemindersCampaignID, testdata.Favorites.ID, models.CreatedOnFieldID)
+		uuids.New(), testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.CreatedOnField.ID)
 
 	// insert an event on our campaign that is based on last_seen_on
 	testsuite.DB().MustExec(
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 2, 'D', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
-		uuids.New(), models.DoctorRemindersCampaignID, testdata.Favorites.ID, models.LastSeenOnFieldID)
+		uuids.New(), testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.LastSeenOnField.ID)
 
 	// init their values
 	testsuite.DB().MustExec(

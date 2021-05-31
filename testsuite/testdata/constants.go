@@ -37,6 +37,16 @@ type Field struct {
 	UUID assets.FieldUUID
 }
 
+type Group struct {
+	ID   models.GroupID
+	UUID assets.GroupUUID
+}
+
+type Label struct {
+	ID   models.LabelID
+	UUID assets.LabelUUID
+}
+
 type Ticketer struct {
 	ID   models.TicketerID
 	UUID assets.TicketerUUID
@@ -47,7 +57,20 @@ type Classifier struct {
 	UUID assets.ClassifierUUID
 }
 
+type Campaign struct {
+	ID   models.CampaignID
+	UUID models.CampaignUUID
+}
+
+type CampaignEvent struct {
+	ID models.CampaignEventID
+}
+
 var Org1 = Org{1, "bf0514a5-9407-44c9-b0f9-3f36f9c18414"}
+
+var TwilioChannel = Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8"}
+var VonageChannel = Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49"}
+var TwitterChannel = Channel{10002, "0f661e8b-ea9d-4bd3-9953-d368340acf91"}
 
 var Cathy = Contact{10000, "6393abc0-283d-4c9b-a1b3-641a035c34bf", "tel:+16055741111", 10000}
 var Bob = Contact{10001, "b699a406-7e44-49be-9f01-1a82893e8a10", "tel:+16055742222", 10001}
@@ -63,7 +86,19 @@ var IncomingExtraFlow = Flow{10006, "376d3de6-7f0e-408c-80d6-b1919738bc80"}
 var ParentTimeoutFlow = Flow{10007, "81c0f323-7e06-4e0c-a960-19c20f17117c"}
 var CampaignFlow = Flow{10009, "3a92a964-3a8d-420b-9206-2cd9d884ac30"}
 
+var CreatedOnField = Field{3, ""}
+var LastSeenOnField = Field{5, ""}
+var GenderField = Field{6, "3a5891e4-756e-4dc9-8e12-b7a766168824"}
+var AgeField = Field{7, "903f51da-2717-47c7-a0d3-f2f32877013d"}
 var JoinedField = Field{8, "d83aae24-4bbf-49d0-ab85-6bfd201eac6d"}
+
+var AllContactsGroup = Group{1, "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"}
+var BlockedContactsGroup = Group{2, "9295ebab-5c2d-4eb1-86f9-7c15ed2f3219"}
+var DoctorsGroup = Group{10000, "c153e265-f7c9-4539-9dbc-9b358714b638"}
+var TestersGroup = Group{10001, "5e9d8fab-5e7e-4f51-b533-261af5dea70d"}
+
+var ReportingLabel = Label{10000, "ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"}
+var TestingLabel = Label{10001, "a6338cdc-7938-4437-8b05-2d5d785e3a08"}
 
 var Mailgun = Ticketer{1, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
 var Zendesk = Ticketer{2, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}
@@ -73,6 +108,10 @@ var Internal = Ticketer{4, "8bd48029-6ca1-46a8-aa14-68f7213b82b3"}
 var Luis = Classifier{1, "097e026c-ae79-4740-af67-656dbedf0263"}
 var Wit = Classifier{2, "ff2a817c-040a-4eb2-8404-7d92e8b79dd0"}
 var Bothub = Classifier{3, "859b436d-3005-4e43-9ad5-3de5f26ede4c"}
+
+var RemindersCampaign = Campaign{10000, "72aa12c5-cc11-4bc7-9406-044047845c70"}
+var RemindersEvent1 = CampaignEvent{10000}
+var RemindersEvent2 = CampaignEvent{10001}
 
 // secondary org.. only a few things
 var Org2 = Org{2, "3ae7cdeb-fd96-46e5-abc4-a4622f349921"}

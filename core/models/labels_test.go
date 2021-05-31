@@ -1,30 +1,37 @@
-package models
+package models_test
 
 import (
 	"testing"
 
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLabels(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	labels, err := loadLabels(ctx, db, 1)
-	assert.NoError(t, err)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshLabels)
+	require.NoError(t, err)
+
+	labels, err := oa.Labels()
+	require.NoError(t, err)
 
 	tcs := []struct {
-		ID   LabelID
+		ID   models.LabelID
 		Name string
 	}{
-		{ReportingLabelID, "Reporting"},
-		{TestingLabelID, "Testing"},
+		{testdata.ReportingLabel.ID, "Reporting"},
+		{testdata.TestingLabel.ID, "Testing"},
 	}
 
 	assert.Equal(t, 3, len(labels))
 	for i, tc := range tcs {
-		label := labels[i].(*Label)
+		label := labels[i].(*models.Label)
 		assert.Equal(t, tc.ID, label.ID())
 		assert.Equal(t, tc.Name, label.Name())
 	}

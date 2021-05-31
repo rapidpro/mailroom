@@ -194,7 +194,7 @@ func TestResendMessages(t *testing.T) {
 	db.MustExec(`UPDATE msgs_msg SET status = 'F', sent_on = NOW(), error_count = 3`)
 
 	// give Bob's URN an affinity for the Vonage channel
-	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, models.VonageChannelID, testdata.Bob.URNID)
+	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, testdata.VonageChannel.ID, testdata.Bob.URNID)
 
 	msgs, err := models.LoadMessages(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
 	require.NoError(t, err)
@@ -207,10 +207,10 @@ func TestResendMessages(t *testing.T) {
 
 	// both messages should now have a channel, a topup and be marked for resending
 	assert.True(t, msgs[0].IsResend())
-	assert.Equal(t, models.TwilioChannelID, msgs[0].ChannelID())
+	assert.Equal(t, testdata.TwilioChannel.ID, msgs[0].ChannelID())
 	assert.Equal(t, models.TopupID(1), msgs[0].TopupID())
 	assert.True(t, msgs[1].IsResend())
-	assert.Equal(t, models.VonageChannelID, msgs[1].ChannelID())
+	assert.Equal(t, testdata.VonageChannel.ID, msgs[1].ChannelID())
 	assert.Equal(t, models.TopupID(1), msgs[1].TopupID())
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, []interface{}{now}, 2)
@@ -243,7 +243,7 @@ func TestMarkMessages(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 
-	channel := oa.ChannelByUUID(models.TwilioChannelUUID)
+	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
 
 	insertMsg := func(text string) *models.Msg {
 		urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))

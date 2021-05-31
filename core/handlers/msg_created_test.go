@@ -11,7 +11,6 @@ import (
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -87,7 +86,7 @@ func TestMsgCreated(t *testing.T) {
 						testdata.Alexandria.ID,
 						`Hi Alexandia, are you still experiencing problems with tooth?`,
 						`{"templating":{"template":{"uuid":"9c22b594-fcab-4b29-9bcb-ce4404894a80","name":"revive_issue"},"language":"eng","country":"US","variables":["Alexandia","tooth"],"namespace":"2d40b45c_25cd_4965_9019_f05d0124c5fa"}}`,
-						models.TwitterChannelID,
+						testdata.TwitterChannel.ID,
 					},
 					Count: 1,
 				},
@@ -101,12 +100,12 @@ func TestMsgCreated(t *testing.T) {
 	defer rc.Close()
 
 	// Cathy should have 1 batch of queued messages at high priority
-	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", models.TwilioChannelUUID)))
+	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	// One bulk for George
-	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", models.TwilioChannelUUID)))
+	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -143,8 +142,8 @@ func TestNewURN(t *testing.T) {
 	db := testsuite.DB()
 
 	// switch our twitter channel to telegram
-	telegramUUID := models.TwitterChannelUUID
-	telegramID := models.TwitterChannelID
+	telegramUUID := testdata.TwitterChannel.UUID
+	telegramID := testdata.TwitterChannel.ID
 	db.MustExec(
 		`UPDATE channels_channel SET channel_type = 'TG', name = 'Telegram', schemes = ARRAY['telegram'] WHERE uuid = $1`,
 		telegramUUID,

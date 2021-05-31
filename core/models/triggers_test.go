@@ -41,9 +41,9 @@ func TestChannelTriggers(t *testing.T) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
-	fooID := insertTrigger(t, db, true, testdata.Favorites.ID, models.ReferralTriggerType, "", models.MatchFirst, nil, nil, "foo", models.TwitterChannelID)
+	fooID := insertTrigger(t, db, true, testdata.Favorites.ID, models.ReferralTriggerType, "", models.MatchFirst, nil, nil, "foo", testdata.TwitterChannel.ID)
 	barID := insertTrigger(t, db, true, testdata.Favorites.ID, models.ReferralTriggerType, "", models.MatchFirst, nil, nil, "bar", models.NilChannelID)
-	bazID := insertTrigger(t, db, true, testdata.Favorites.ID, models.ReferralTriggerType, "", models.MatchFirst, nil, nil, "", models.TwitterChannelID)
+	bazID := insertTrigger(t, db, true, testdata.Favorites.ID, models.ReferralTriggerType, "", models.MatchFirst, nil, nil, "", testdata.TwitterChannel.ID)
 
 	models.FlushCache()
 
@@ -55,14 +55,14 @@ func TestChannelTriggers(t *testing.T) {
 		Channel    models.ChannelID
 		TriggerID  models.TriggerID
 	}{
-		{"", models.TwilioChannelID, models.NilTriggerID},
-		{"foo", models.TwilioChannelID, models.NilTriggerID},
-		{"foo", models.TwitterChannelID, fooID},
-		{"FOO", models.TwitterChannelID, fooID},
-		{"bar", models.TwilioChannelID, barID},
-		{"bar", models.TwitterChannelID, barID},
-		{"zap", models.TwilioChannelID, models.NilTriggerID},
-		{"zap", models.TwitterChannelID, bazID},
+		{"", testdata.TwilioChannel.ID, models.NilTriggerID},
+		{"foo", testdata.TwilioChannel.ID, models.NilTriggerID},
+		{"foo", testdata.TwitterChannel.ID, fooID},
+		{"FOO", testdata.TwitterChannel.ID, fooID},
+		{"bar", testdata.TwilioChannel.ID, barID},
+		{"bar", testdata.TwitterChannel.ID, barID},
+		{"zap", testdata.TwilioChannel.ID, models.NilTriggerID},
+		{"zap", testdata.TwitterChannel.ID, bazID},
 	}
 
 	for i, tc := range tcs {
@@ -84,8 +84,8 @@ func TestTriggers(t *testing.T) {
 
 	joinID := insertTrigger(t, db, true, testdata.Favorites.ID, models.KeywordTriggerType, "join", models.MatchFirst, nil, nil, "", models.NilChannelID)
 	resistID := insertTrigger(t, db, true, testdata.SingleMessage.ID, models.KeywordTriggerType, "resist", models.MatchOnly, nil, nil, "", models.NilChannelID)
-	farmersID := insertTrigger(t, db, true, testdata.SingleMessage.ID, models.KeywordTriggerType, "resist", models.MatchOnly, []models.GroupID{models.DoctorsGroupID}, nil, "", models.NilChannelID)
-	farmersAllID := insertTrigger(t, db, true, testdata.SingleMessage.ID, models.CatchallTriggerType, "", models.MatchOnly, []models.GroupID{models.DoctorsGroupID}, nil, "", models.NilChannelID)
+	farmersID := insertTrigger(t, db, true, testdata.SingleMessage.ID, models.KeywordTriggerType, "resist", models.MatchOnly, []models.GroupID{testdata.DoctorsGroup.ID}, nil, "", models.NilChannelID)
+	farmersAllID := insertTrigger(t, db, true, testdata.SingleMessage.ID, models.CatchallTriggerType, "", models.MatchOnly, []models.GroupID{testdata.DoctorsGroup.ID}, nil, "", models.NilChannelID)
 	othersAllID := insertTrigger(t, db, true, testdata.SingleMessage.ID, models.CatchallTriggerType, "", models.MatchOnly, nil, nil, "", models.NilChannelID)
 
 	models.FlushCache()
@@ -141,7 +141,7 @@ func TestArchiveContactTriggers(t *testing.T) {
 	cathyOnly1ID := insertTrigger(t, db, true, testdata.Favorites.ID, models.KeywordTriggerType, "join", models.MatchFirst, nil, []models.ContactID{testdata.Cathy.ID}, "", models.NilChannelID)
 	cathyOnly2ID := insertTrigger(t, db, true, testdata.Favorites.ID, models.KeywordTriggerType, "this", models.MatchOnly, nil, []models.ContactID{testdata.Cathy.ID}, "", models.NilChannelID)
 	cathyAndGeorgeID := insertTrigger(t, db, true, testdata.Favorites.ID, models.KeywordTriggerType, "join", models.MatchFirst, nil, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, "", models.NilChannelID)
-	cathyAndGroupID := insertTrigger(t, db, true, testdata.Favorites.ID, models.KeywordTriggerType, "join", models.MatchFirst, []models.GroupID{models.DoctorsGroupID}, []models.ContactID{testdata.Cathy.ID}, "", models.NilChannelID)
+	cathyAndGroupID := insertTrigger(t, db, true, testdata.Favorites.ID, models.KeywordTriggerType, "join", models.MatchFirst, []models.GroupID{testdata.DoctorsGroup.ID}, []models.ContactID{testdata.Cathy.ID}, "", models.NilChannelID)
 	georgeOnlyID := insertTrigger(t, db, true, testdata.Favorites.ID, models.KeywordTriggerType, "join", models.MatchFirst, nil, []models.ContactID{testdata.George.ID}, "", models.NilChannelID)
 
 	err := models.ArchiveContactTriggers(ctx, db, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})

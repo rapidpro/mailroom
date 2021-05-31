@@ -39,8 +39,8 @@ func TestLoadGroups(t *testing.T) {
 		Name  string
 		Query string
 	}{
-		{models.DoctorsGroupID, models.DoctorsGroupUUID, "Doctors", ""},
-		{models.TestersGroupID, models.TestersGroupUUID, "Testers", ""},
+		{testdata.DoctorsGroup.ID, testdata.DoctorsGroup.UUID, "Doctors", ""},
+		{testdata.TestersGroup.ID, testdata.TestersGroup.UUID, "Testers", ""},
 	}
 
 	assert.Equal(t, 2, len(groups))
@@ -63,7 +63,7 @@ func TestDynamicGroups(t *testing.T) {
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I') RETURNING id`,
-		uuids.New(), models.DoctorRemindersCampaignID, testdata.Favorites.ID, testdata.JoinedField.ID)
+		uuids.New(), testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.JoinedField.ID)
 
 	// clear Cathy's value
 	testsuite.DB().MustExec(
@@ -149,23 +149,23 @@ func TestDynamicGroups(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		err := models.UpdateGroupStatus(ctx, db, models.DoctorsGroupID, models.GroupStatusInitializing)
+		err := models.UpdateGroupStatus(ctx, db, testdata.DoctorsGroup.ID, models.GroupStatusInitializing)
 		assert.NoError(t, err)
 
 		esServer.NextResponse = tc.ESResponse
-		count, err := models.PopulateDynamicGroup(ctx, db, es, org, models.DoctorsGroupID, tc.Query)
+		count, err := models.PopulateDynamicGroup(ctx, db, es, org, testdata.DoctorsGroup.ID, tc.Query)
 		assert.NoError(t, err, "error populating dynamic group for: %s", tc.Query)
 
 		assert.Equal(t, count, len(tc.ContactIDs))
 
 		// assert the current group membership
-		contactIDs, err := models.ContactIDsForGroupIDs(ctx, db, []models.GroupID{models.DoctorsGroupID})
+		contactIDs, err := models.ContactIDsForGroupIDs(ctx, db, []models.GroupID{testdata.DoctorsGroup.ID})
 		assert.NoError(t, err)
 		assert.Equal(t, tc.ContactIDs, contactIDs)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) from contacts_contactgroup WHERE id = $1 AND status = 'R'`,
-			[]interface{}{models.DoctorsGroupID}, 1, "wrong number of contacts in group for query: %s", tc.Query)
+			[]interface{}{testdata.DoctorsGroup.ID}, 1, "wrong number of contacts in group for query: %s", tc.Query)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) from campaigns_eventfire WHERE event_id = $1`,

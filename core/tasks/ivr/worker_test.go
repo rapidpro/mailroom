@@ -33,7 +33,7 @@ func TestIVR(t *testing.T) {
 	ivr.RegisterClientType(models.ChannelType("ZZ"), newMockClient)
 
 	// update our twilio channel to be of type 'ZZ' and set max_concurrent_events to 1
-	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, models.TwilioChannelID)
+	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// create a flow start for cathy
 	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, models.DoRestartParticipants, models.DoIncludeActive).

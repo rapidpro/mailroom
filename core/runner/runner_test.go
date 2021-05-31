@@ -24,11 +24,11 @@ func TestCampaignStarts(t *testing.T) {
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
 
-	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(models.DoctorRemindersCampaignUUID), "Doctor Reminders")
+	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(testdata.RemindersCampaign.UUID), "Doctor Reminders")
 
 	// create our event fires
 	now := time.Now()
-	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, models.RemindersEvent2ID, now, testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID)
+	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, testdata.RemindersEvent2.ID, now, testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID)
 
 	// create an active session for Alexandria to test skipping
 	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, testdata.Alexandria.ID, testdata.PickANumber.ID)
@@ -37,25 +37,25 @@ func TestCampaignStarts(t *testing.T) {
 	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'V', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, testdata.Cathy.ID, testdata.IVRFlow.ID)
 
 	// set our event to skip
-	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, models.RemindersEvent2ID)
+	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, testdata.RemindersEvent2.ID)
 
 	contacts := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
 	fires := []*models.EventFire{
 		{
 			FireID:    1,
-			EventID:   models.RemindersEvent2ID,
+			EventID:   testdata.RemindersEvent2.ID,
 			ContactID: testdata.Cathy.ID,
 			Scheduled: now,
 		},
 		{
 			FireID:    2,
-			EventID:   models.RemindersEvent2ID,
+			EventID:   testdata.RemindersEvent2.ID,
 			ContactID: testdata.Bob.ID,
 			Scheduled: now,
 		},
 		{
 			FireID:    3,
-			EventID:   models.RemindersEvent2ID,
+			EventID:   testdata.RemindersEvent2.ID,
 			ContactID: testdata.Alexandria.ID,
 			Scheduled: now,
 		},
@@ -82,17 +82,17 @@ func TestCampaignStarts(t *testing.T) {
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
 		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
 		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $2`,
-		[]interface{}{pq.Array(contacts), models.TwilioChannelID}, 2, "expected only two messages to be sent",
+		[]interface{}{pq.Array(contacts), testdata.TwilioChannel.ID}, 2, "expected only two messages to be sent",
 	)
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`, nil, 0, "expected all events to be fired")
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, []interface{}{testdata.Cathy.ID, testdata.Bob.ID, models.RemindersEvent2ID}, 2, "expected bob and cathy to have their event sent to fired")
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, []interface{}{testdata.Cathy.ID, testdata.Bob.ID, testdata.RemindersEvent2.ID}, 2, "expected bob and cathy to have their event sent to fired")
 
 	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{testdata.Alexandria.ID, models.RemindersEvent2ID}, 1, "expected alexandria to have her event set to skipped")
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{testdata.Alexandria.ID, testdata.RemindersEvent2.ID}, 1, "expected alexandria to have her event set to skipped")
 
 	testsuite.AssertQueryCount(t, db,
 		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, []interface{}{testdata.Cathy.ID}, 1)
@@ -164,7 +164,7 @@ func TestBatchStart(t *testing.T) {
 			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
 			AND text = $2 AND org_id = 1 AND status = 'Q' 
 			AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $3`,
-			[]interface{}{pq.Array(contactIDs), tc.Msg, models.TwilioChannelID}, tc.TotalCount, "%d: unexpected number of messages", i,
+			[]interface{}{pq.Array(contactIDs), tc.Msg, testdata.TwilioChannel.ID}, tc.TotalCount, "%d: unexpected number of messages", i,
 		)
 
 		last = time.Now()

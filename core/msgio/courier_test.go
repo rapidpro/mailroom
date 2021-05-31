@@ -36,12 +36,12 @@ func TestQueueCourierMessages(t *testing.T) {
 			Description: "2 queueable messages",
 			Msgs: []msgSpec{
 				{
-					ChannelID: models.TwilioChannelID,
+					ChannelID: testdata.TwilioChannel.ID,
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 				},
 				{
-					ChannelID: models.TwilioChannelID,
+					ChannelID: testdata.TwilioChannel.ID,
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 				},
@@ -54,13 +54,13 @@ func TestQueueCourierMessages(t *testing.T) {
 			Description: "1 queueable message and 1 failed",
 			Msgs: []msgSpec{
 				{
-					ChannelID: models.TwilioChannelID,
+					ChannelID: testdata.TwilioChannel.ID,
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 					Failed:    true,
 				},
 				{
-					ChannelID: models.TwilioChannelID,
+					ChannelID: testdata.TwilioChannel.ID,
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 				},

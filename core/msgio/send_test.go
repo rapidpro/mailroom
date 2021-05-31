@@ -83,7 +83,7 @@ func TestSendMessages(t *testing.T) {
 			Description: "2 messages for Courier, and 1 Android",
 			Msgs: []msgSpec{
 				{
-					ChannelID: models.TwilioChannelID,
+					ChannelID: testdata.TwilioChannel.ID,
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 				},
@@ -93,7 +93,7 @@ func TestSendMessages(t *testing.T) {
 					URNID:     testdata.Bob.URNID,
 				},
 				{
-					ChannelID: models.TwilioChannelID,
+					ChannelID: testdata.TwilioChannel.ID,
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 				},

@@ -64,14 +64,14 @@ func TestMsgEvents(t *testing.T) {
 		ChannelID models.ChannelID
 		OrgID     models.OrgID
 	}{
-		{nil, testdata.Cathy, "noop", "", models.TwitterChannelID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "start other", "", models.TwitterChannelID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "start", "What is your favorite color?", models.TwitterChannelID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "purple", "I don't know that color. Try again.", models.TwitterChannelID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "blue", "Good choice, I like Blue too! What is your favorite beer?", models.TwitterChannelID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", models.TwitterChannelID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "Cathy", "Thanks Cathy, we are all done!", models.TwitterChannelID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "noop", "", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, testdata.Cathy, "noop", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Cathy, "start other", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Cathy, "purple", "I don't know that color. Try again.", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Cathy, "blue", "Good choice, I like Blue too! What is your favorite beer?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Cathy, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Cathy, "Cathy", "Thanks Cathy, we are all done!", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Cathy, "noop", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		{nil, testdata.Org2Contact, "other", "Hey, how are you?", testdata.Org2Channel.ID, testdata.Org2.ID},
 		{nil, testdata.Org2Contact, "start", "What is your favorite color?", testdata.Org2Channel.ID, testdata.Org2.ID},
@@ -80,10 +80,10 @@ func TestMsgEvents(t *testing.T) {
 		{nil, testdata.Org2Contact, "george", "Thanks george, we are all done!", testdata.Org2Channel.ID, testdata.Org2.ID},
 		{nil, testdata.Org2Contact, "blargh", "Hey, how are you?", testdata.Org2Channel.ID, testdata.Org2.ID},
 
-		{nil, testdata.Bob, "ivr", "", models.TwitterChannelID, testdata.Org1.ID},
+		{nil, testdata.Bob, "ivr", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// no URN on contact but handle event, session gets started but no message created
-		{nil, testdata.Alexandria, "start", "", models.TwilioChannelID, testdata.Org1.ID},
+		{nil, testdata.Alexandria, "start", "", testdata.TwilioChannel.ID, testdata.Org1.ID},
 
 		// start Fred back in our favorite flow, then make it inactive, will be handled by catch-all
 		{nil, testdata.Org2Contact, "start", "What is your favorite color?", testdata.Org2Channel.ID, testdata.Org2.ID},
@@ -236,14 +236,14 @@ func TestChannelEvents(t *testing.T) {
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'N', NULL, 1, 1, 1, $2) RETURNING id`,
-		testdata.Favorites.ID, models.TwitterChannelID)
+		testdata.Favorites.ID, testdata.TwitterChannel.ID)
 
 	// trigger on our vonage channel for referral and number flow
 	db.MustExec(
 		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
 									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
 		VALUES(TRUE, now(), now(), NULL, false, $1, 'R', NULL, 1, 1, 1, $2) RETURNING id`,
-		testdata.PickANumber.ID, models.VonageChannelID)
+		testdata.PickANumber.ID, testdata.VonageChannel.ID)
 
 	// add a URN for cathy so we can test twitter URNs
 	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Bob.ID, urns.URN("twitterid:123456"), 10)
@@ -258,11 +258,11 @@ func TestChannelEvents(t *testing.T) {
 		Response       string
 		UpdateLastSeen bool
 	}{
-		{NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, models.TwitterChannelID, nil, "What is your favorite color?", true},
-		{NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, models.VonageChannelID, nil, "", true},
-		{WelcomeMessageEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, models.VonageChannelID, nil, "", false},
-		{ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, models.TwitterChannelID, nil, "", true},
-		{ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, models.VonageChannelID, nil, "Pick a number between 1-10.", true},
+		{NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
+		{NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
+		{WelcomeMessageEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
+		{ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
+		{ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
 	}
 
 	models.FlushCache()
@@ -317,10 +317,10 @@ func TestStopEvent(t *testing.T) {
 	defer rc.Close()
 
 	// schedule an event for cathy and george
-	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, testdata.Cathy.ID, testdata.George.ID, models.RemindersEvent1ID)
+	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, testdata.Cathy.ID, testdata.George.ID, testdata.RemindersEvent1.ID)
 
 	// and george to doctors group, cathy is already part of it
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, models.DoctorsGroupID, testdata.George.ID)
+	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, testdata.DoctorsGroup.ID, testdata.George.ID)
 
 	event := &StopEvent{OrgID: testdata.Org1.ID, ContactID: testdata.Cathy.ID}
 	eventJSON, err := json.Marshal(event)
@@ -340,8 +340,8 @@ func TestStopEvent(t *testing.T) {
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, testdata.Cathy.ID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{models.DoctorsGroupID, testdata.George.ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{testdata.DoctorsGroup.ID, testdata.Cathy.ID}, 0)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{testdata.DoctorsGroup.ID, testdata.George.ID}, 1)
 
 	// that cathy is stopped
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{testdata.Cathy.ID}, 1)
@@ -383,34 +383,34 @@ func TestTimedEvents(t *testing.T) {
 		OrgID     models.OrgID
 	}{
 		// start the flow
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", models.TwitterChannelID, testdata.Org1.ID},
+		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// this expiration does nothing because the times don't match
-		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "bad", "", models.TwitterChannelID, testdata.Org1.ID},
+		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "bad", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// this checks that the flow wasn't expired
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "red", "Good choice, I like Red too! What is your favorite beer?", models.TwitterChannelID, testdata.Org1.ID},
+		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// this expiration will actually take
-		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "good", "", models.TwitterChannelID, testdata.Org1.ID},
+		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "good", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// we won't get a response as we will be out of the flow
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "mutzig", "", models.TwitterChannelID, testdata.Org1.ID},
+		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "mutzig", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// start the parent expiration flow
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "parent", "Child", models.TwitterChannelID, testdata.Org1.ID},
+		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "parent", "Child", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// respond, should bring us out
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi", "Completed", models.TwitterChannelID, testdata.Org1.ID},
+		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi", "Completed", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// expiring our child should be a no op
-		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "child", "", models.TwitterChannelID, testdata.Org1.ID},
+		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "child", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// respond one last time, should be done
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "done", "Ended", models.TwitterChannelID, testdata.Org1.ID},
+		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "done", "Ended", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// start our favorite flow again
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", models.TwitterChannelID, testdata.Org1.ID},
+		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 	}
 
 	last := time.Now()

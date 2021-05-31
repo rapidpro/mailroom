@@ -105,8 +105,8 @@ func TestSurveyor(t *testing.T) {
 	args := &AssertionArgs{
 		FlowID:         testdata.SurveyorFlow.ID,
 		OrgID:          testdata.Org1.ID,
-		AgeFieldUUID:   models.AgeFieldUUID,
-		TestersGroupID: models.TestersGroupID,
+		AgeFieldUUID:   testdata.AgeField.UUID,
+		TestersGroupID: testdata.TestersGroup.ID,
 	}
 
 	for i, tc := range tcs {

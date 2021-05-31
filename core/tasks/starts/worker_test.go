@@ -79,7 +79,7 @@ func TestStarts(t *testing.T) {
 		{
 			label:                "Single group",
 			flowID:               testdata.Favorites.ID,
-			groupIDs:             []models.GroupID{models.DoctorsGroupID},
+			groupIDs:             []models.GroupID{testdata.DoctorsGroup.ID},
 			queue:                queue.BatchQueue,
 			expectedContactCount: 121,
 			expectedBatchCount:   2,
@@ -90,7 +90,7 @@ func TestStarts(t *testing.T) {
 		{
 			label:                "Group and Contact (but all already active)",
 			flowID:               testdata.Favorites.ID,
-			groupIDs:             []models.GroupID{models.DoctorsGroupID},
+			groupIDs:             []models.GroupID{testdata.DoctorsGroup.ID},
 			contactIDs:           []models.ContactID{testdata.Cathy.ID},
 			queue:                queue.BatchQueue,
 			expectedContactCount: 121,
@@ -115,7 +115,7 @@ func TestStarts(t *testing.T) {
 		{
 			label:                "Previous group and one new contact",
 			flowID:               testdata.Favorites.ID,
-			groupIDs:             []models.GroupID{models.DoctorsGroupID},
+			groupIDs:             []models.GroupID{testdata.DoctorsGroup.ID},
 			contactIDs:           []models.ContactID{testdata.Bob.ID},
 			queue:                queue.BatchQueue,
 			expectedContactCount: 122,

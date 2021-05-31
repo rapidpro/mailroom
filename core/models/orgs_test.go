@@ -23,8 +23,8 @@ func TestOrgs(t *testing.T) {
 	assert.NoError(t, err)
 	defer tx.Rollback()
 
-	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", models.TwitterChannelID)
-	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", models.TwilioChannelID, models.VonageChannelID)
+	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", testdata.TwitterChannel.ID)
+	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", testdata.TwilioChannel.ID, testdata.VonageChannel.ID)
 	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
 									VALUES(TRUE, NOW(), NOW(), 'French', 'fra', 1, 1, 2);`)
 	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 

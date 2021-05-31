@@ -45,7 +45,7 @@ func TestContactIDsForQueryPage(t *testing.T) {
 		ExpectedError     string
 	}{
 		{
-			Group: models.AllContactsGroupUUID,
+			Group: testdata.AllContactsGroup.UUID,
 			Query: "george",
 			ExpectedESRequest: `{
 				"_source": false,
@@ -119,7 +119,7 @@ func TestContactIDsForQueryPage(t *testing.T) {
 			ExpectedTotal:    1,
 		},
 		{
-			Group:      models.BlockedContactsGroupUUID,
+			Group:      testdata.BlockedContactsGroup.UUID,
 			ExcludeIDs: []models.ContactID{testdata.Bob.ID, testdata.Cathy.ID},
 			Query:      "age > 32",
 			Sort:       "-age",

@@ -14,7 +14,7 @@ func TestChannelConnections(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	conn, err := models.InsertIVRConnection(ctx, db, testdata.Org1.ID, models.TwilioChannelID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.ConnectionDirectionOut, models.ConnectionStatusPending, "")
+	conn, err := models.InsertIVRConnection(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.ConnectionDirectionOut, models.ConnectionStatusPending, "")
 	assert.NoError(t, err)
 
 	assert.NotEqual(t, models.ConnectionID(0), conn.ID())

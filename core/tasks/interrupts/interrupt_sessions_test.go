@@ -66,7 +66,7 @@ func TestInterrupts(t *testing.T) {
 			[5]string{"I", "I", "W", "W", "I"},
 		},
 		{
-			nil, []models.ChannelID{models.TwilioChannelID}, nil,
+			nil, []models.ChannelID{testdata.TwilioChannel.ID}, nil,
 			[5]string{"W", "W", "I", "W", "I"},
 		},
 		{
@@ -74,7 +74,7 @@ func TestInterrupts(t *testing.T) {
 			[5]string{"W", "W", "W", "I", "I"},
 		},
 		{
-			[]models.ContactID{testdata.Cathy.ID, testdata.George.ID}, []models.ChannelID{models.TwilioChannelID}, []models.FlowID{testdata.PickANumber.ID},
+			[]models.ContactID{testdata.Cathy.ID, testdata.George.ID}, []models.ChannelID{testdata.TwilioChannel.ID}, []models.FlowID{testdata.PickANumber.ID},
 			[5]string{"I", "I", "I", "I", "I"},
 		},
 	}
@@ -84,7 +84,7 @@ func TestInterrupts(t *testing.T) {
 		db.MustExec(`UPDATE flows_flowsession SET status='C', ended_on=NOW() WHERE status = 'W';`)
 
 		// twilio connection
-		twilioConnectionID := insertConnection(testdata.Org1.ID, models.TwilioChannelID, testdata.Alexandria.ID, testdata.Alexandria.URNID)
+		twilioConnectionID := insertConnection(testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Alexandria.ID, testdata.Alexandria.URNID)
 
 		sessionIDs := make([]models.SessionID, 5)
 

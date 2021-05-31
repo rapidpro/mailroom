@@ -42,7 +42,7 @@ func TestCheckSchedules(t *testing.T) {
 	db.MustExec(`INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES($1, $2),($1, $3)`, b1, testdata.Cathy.ID, testdata.George.ID)
 
 	// and a group
-	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, models.DoctorsGroupID)
+	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, testdata.DoctorsGroup.ID)
 
 	// and a URN
 	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, testdata.Cathy.URNID)
@@ -69,7 +69,7 @@ func TestCheckSchedules(t *testing.T) {
 	db.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2),($1, $3)`, t1, testdata.Cathy.ID, testdata.George.ID)
 
 	// and a group
-	db.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, models.DoctorsGroupID)
+	db.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, testdata.DoctorsGroup.ID)
 
 	var s3 models.ScheduleID
 	err = db.Get(

@@ -81,7 +81,7 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, 0, george.Tickets().Count())
 
 	// change bob to have a preferred URN and channel of our telephone
-	channel := org.ChannelByID(models.TwilioChannelID)
+	channel := org.ChannelByID(testdata.TwilioChannel.ID)
 	err = modelContacts[1].UpdatePreferredURN(ctx, db, org, testdata.Bob.URNID, channel)
 	assert.NoError(t, err)
 
@@ -223,7 +223,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			false,
 			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{models.DoctorsGroupUUID},
+			[]assets.GroupUUID{testdata.DoctorsGroup.UUID},
 		},
 		{
 			testdata.Org1.ID,
@@ -232,7 +232,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			false,
 			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{models.DoctorsGroupUUID},
+			[]assets.GroupUUID{testdata.DoctorsGroup.UUID},
 		},
 		{
 			testdata.Org1.ID,
@@ -240,7 +240,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			newContact(), // creates new contact
 			true,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
-			models.TwilioChannelID,
+			testdata.TwilioChannel.ID,
 			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
 		},
 		{

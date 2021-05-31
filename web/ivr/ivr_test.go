@@ -66,7 +66,7 @@ func TestTwilioIVR(t *testing.T) {
 	defer server.Stop()
 
 	// add auth tokens
-	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, models.TwilioChannelID)
+	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// create a flow start for cathy and george
 	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+16055741111?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
@@ -114,7 +114,7 @@ func TestTwilioIVR(t *testing.T) {
 	}{
 		{
 			Action:       "start",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form:         nil,
 			StatusCode:   200,
@@ -122,7 +122,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -134,7 +134,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -146,7 +146,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -158,7 +158,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -170,7 +170,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -186,7 +186,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus":     []string{"in-progress"},
@@ -201,7 +201,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "status",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallSid":      []string{"Call1"},
@@ -213,7 +213,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "start",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Form:         nil,
 			StatusCode:   200,
@@ -221,7 +221,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Form: url.Values{
 				"CallStatus": []string{"completed"},
@@ -233,7 +233,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "incoming",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(3),
 			Form: url.Values{
 				"CallSid":    []string{"Call2"},
@@ -245,7 +245,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "status",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(3),
 			Form: url.Values{
 				"CallSid":      []string{"Call2"},
@@ -354,10 +354,10 @@ func TestVonageIVR(t *testing.T) {
 	models.FlushCache()
 
 	// deactivate our twilio channel
-	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, models.TwilioChannelID)
+	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// add auth tokens
-	db.MustExec(`UPDATE channels_channel SET config = '{"nexmo_app_id": "app_id", "nexmo_app_private_key": "-----BEGIN PRIVATE KEY-----\nMIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAKNwapOQ6rQJHetP\nHRlJBIh1OsOsUBiXb3rXXE3xpWAxAha0MH+UPRblOko+5T2JqIb+xKf9Vi3oTM3t\nKvffaOPtzKXZauscjq6NGzA3LgeiMy6q19pvkUUOlGYK6+Xfl+B7Xw6+hBMkQuGE\nnUS8nkpR5mK4ne7djIyfHFfMu4ptAgMBAAECgYA+s0PPtMq1osG9oi4xoxeAGikf\nJB3eMUptP+2DYW7mRibc+ueYKhB9lhcUoKhlQUhL8bUUFVZYakP8xD21thmQqnC4\nf63asad0ycteJMLb3r+z26LHuCyOdPg1pyLk3oQ32lVQHBCYathRMcVznxOG16VK\nI8BFfstJTaJu0lK/wQJBANYFGusBiZsJQ3utrQMVPpKmloO2++4q1v6ZR4puDQHx\nTjLjAIgrkYfwTJBLBRZxec0E7TmuVQ9uJ+wMu/+7zaUCQQDDf2xMnQqYknJoKGq+\noAnyC66UqWC5xAnQS32mlnJ632JXA0pf9pb1SXAYExB1p9Dfqd3VAwQDwBsDDgP6\nHD8pAkEA0lscNQZC2TaGtKZk2hXkdcH1SKru/g3vWTkRHxfCAznJUaza1fx0wzdG\nGcES1Bdez0tbW4llI5By/skZc2eE3QJAFl6fOskBbGHde3Oce0F+wdZ6XIJhEgCP\niukIcKZoZQzoiMJUoVRrA5gqnmaYDI5uRRl/y57zt6YksR3KcLUIuQJAd242M/WF\n6YAZat3q/wEeETeQq1wrooew+8lHl05/Nt0cCpV48RGEhJ83pzBm3mnwHf8lTBJH\nx6XroMXsmbnsEw==\n-----END PRIVATE KEY-----", "callback_domain": "localhost:8090"}', role='SRCA' WHERE id = $1`, models.VonageChannelID)
+	db.MustExec(`UPDATE channels_channel SET config = '{"nexmo_app_id": "app_id", "nexmo_app_private_key": "-----BEGIN PRIVATE KEY-----\nMIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAKNwapOQ6rQJHetP\nHRlJBIh1OsOsUBiXb3rXXE3xpWAxAha0MH+UPRblOko+5T2JqIb+xKf9Vi3oTM3t\nKvffaOPtzKXZauscjq6NGzA3LgeiMy6q19pvkUUOlGYK6+Xfl+B7Xw6+hBMkQuGE\nnUS8nkpR5mK4ne7djIyfHFfMu4ptAgMBAAECgYA+s0PPtMq1osG9oi4xoxeAGikf\nJB3eMUptP+2DYW7mRibc+ueYKhB9lhcUoKhlQUhL8bUUFVZYakP8xD21thmQqnC4\nf63asad0ycteJMLb3r+z26LHuCyOdPg1pyLk3oQ32lVQHBCYathRMcVznxOG16VK\nI8BFfstJTaJu0lK/wQJBANYFGusBiZsJQ3utrQMVPpKmloO2++4q1v6ZR4puDQHx\nTjLjAIgrkYfwTJBLBRZxec0E7TmuVQ9uJ+wMu/+7zaUCQQDDf2xMnQqYknJoKGq+\noAnyC66UqWC5xAnQS32mlnJ632JXA0pf9pb1SXAYExB1p9Dfqd3VAwQDwBsDDgP6\nHD8pAkEA0lscNQZC2TaGtKZk2hXkdcH1SKru/g3vWTkRHxfCAznJUaza1fx0wzdG\nGcES1Bdez0tbW4llI5By/skZc2eE3QJAFl6fOskBbGHde3Oce0F+wdZ6XIJhEgCP\niukIcKZoZQzoiMJUoVRrA5gqnmaYDI5uRRl/y57zt6YksR3KcLUIuQJAd242M/WF\n6YAZat3q/wEeETeQq1wrooew+8lHl05/Nt0cCpV48RGEhJ83pzBm3mnwHf8lTBJH\nx6XroMXsmbnsEw==\n-----END PRIVATE KEY-----", "callback_domain": "localhost:8090"}', role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -450,7 +450,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "start and prompt",
 			Action:       "start",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -459,7 +459,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "invalid dtmf",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -471,7 +471,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "dtmf 1",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -483,7 +483,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "dtmf too large",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -495,7 +495,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "dtmf 56",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -507,7 +507,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "recording callback",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":      []string{"recording_url"},
@@ -520,7 +520,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "resume with recording",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":      []string{"record"},
@@ -533,7 +533,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "transfer answered",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"uuid": "Call3", "status": "answered"}`,
 			StatusCode:   200,
@@ -542,7 +542,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "transfer completed",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"uuid": "Call3", "duration": "25", "status": "completed"}`,
 			StatusCode:   200,
@@ -551,7 +551,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "transfer callback",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":     []string{"dial"},
@@ -564,7 +564,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "call complete",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
@@ -573,7 +573,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "new call",
 			Action:       "start",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -582,7 +582,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "new call dtmf 1",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -594,7 +594,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "new call ended",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call2","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
@@ -603,7 +603,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "incoming call",
 			Action:       "incoming",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(3),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call4","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -612,7 +612,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "failed call",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(3),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call4","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,

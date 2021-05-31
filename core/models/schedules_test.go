@@ -39,7 +39,7 @@ func TestGetExpired(t *testing.T) {
 	db.MustExec(`INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES($1, $2),($1, $3)`, b1, testdata.Cathy.ID, testdata.George.ID)
 
 	// and a group
-	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, models.DoctorsGroupID)
+	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, testdata.DoctorsGroup.ID)
 
 	// and a URN
 	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, testdata.Cathy.URNID)
@@ -66,7 +66,7 @@ func TestGetExpired(t *testing.T) {
 	db.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2),($1, $3)`, t1, testdata.Cathy.ID, testdata.George.ID)
 
 	// and a group
-	db.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, models.DoctorsGroupID)
+	db.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, t1, testdata.DoctorsGroup.ID)
 
 	var s3 models.ScheduleID
 	err = db.Get(
@@ -96,7 +96,7 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, testdata.Favorites.ID, start.FlowID())
 	assert.Equal(t, testdata.Org1.ID, start.OrgID())
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, start.ContactIDs())
-	assert.Equal(t, []models.GroupID{models.DoctorsGroupID}, start.GroupIDs())
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs())
 
 	assert.Equal(t, s1, schedules[2].ID())
 	bcast := schedules[2].Broadcast()
@@ -107,7 +107,7 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, "Un Message", bcast.Translations()["fra"].Text)
 	assert.Equal(t, testdata.Org1.ID, bcast.OrgID())
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, bcast.ContactIDs())
-	assert.Equal(t, []models.GroupID{models.DoctorsGroupID}, bcast.GroupIDs())
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs())
 	assert.Equal(t, []urns.URN{urns.URN("tel:+16055741111?id=10000")}, bcast.URNs())
 }
 

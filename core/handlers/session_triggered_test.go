@@ -37,7 +37,7 @@ func TestSessionTriggered(t *testing.T) {
 	}
 
 	groupRef := &assets.GroupReference{
-		UUID: models.TestersGroupUUID,
+		UUID: testdata.TestersGroup.UUID,
 	}
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(1234567))
@@ -68,7 +68,7 @@ func TestSessionTriggered(t *testing.T) {
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart_groups where id = 1 AND contactgroup_id = $1",
-					Args:  []interface{}{models.TestersGroupID},
+					Args:  []interface{}{testdata.TestersGroup.ID},
 					Count: 1,
 				},
 			},
@@ -82,7 +82,7 @@ func TestSessionTriggered(t *testing.T) {
 					assert.NoError(t, err)
 					assert.True(t, start.CreateContact())
 					assert.Equal(t, []models.ContactID{testdata.George.ID}, start.ContactIDs())
-					assert.Equal(t, []models.GroupID{models.TestersGroupID}, start.GroupIDs())
+					assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.GroupIDs())
 					assert.Equal(t, simpleFlow.ID(), start.FlowID())
 					assert.JSONEq(t, `{"parent_uuid":"39a9f95e-3641-4d19-95e0-ed866f27c829", "ancestors":1, "ancestors_since_input":1}`, string(start.SessionHistory()))
 					return nil
