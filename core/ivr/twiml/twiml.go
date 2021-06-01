@@ -67,13 +67,6 @@ const (
 
 	sendURLConfig = "send_url"
 	baseURLConfig = "base_url"
-
-	errorBody = `<?xml version="1.0" encoding="UTF-8"?>
-	<Response>
-		<Say>An error was encountered. Goodbye.</Say>
-		<Hangup></Hangup>
-	</Response>
-	`
 )
 
 var validLanguageCodes = map[string]bool{

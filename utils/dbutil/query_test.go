@@ -24,11 +24,11 @@ func TestBulkSQL(t *testing.T) {
 	sql := `INSERT INTO contacts_contact (id, name) VALUES(:id, :name)`
 
 	// try with zero structs
-	query, args, err := dbutil.BulkSQL(db, sql, []interface{}{})
+	_, _, err = dbutil.BulkSQL(db, sql, []interface{}{})
 	assert.EqualError(t, err, "can't generate bulk sql with zero structs")
 
 	// try with one struct
-	query, args, err = dbutil.BulkSQL(db, sql, []interface{}{contact{ID: 1, Name: "Bob"}})
+	query, args, err := dbutil.BulkSQL(db, sql, []interface{}{contact{ID: 1, Name: "Bob"}})
 	assert.NoError(t, err)
 	assert.Equal(t, `INSERT INTO contacts_contact (id, name) VALUES($1, $2)`, query)
 	assert.Equal(t, []interface{}{1, "Bob"}, args)

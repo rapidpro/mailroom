@@ -62,13 +62,6 @@ const (
 	appIDConfig      = "nexmo_app_id"
 	privateKeyConfig = "nexmo_app_private_key"
 
-	errorBody = `<?xml version="1.0" encoding="UTF-8"?>
-	<Response>
-		<Say>An error was encountered. Goodbye.</Say>
-		<Hangup></Hangup>
-	</Response>
-	`
-
 	statusFailed = "failed"
 )
 
@@ -192,7 +185,7 @@ func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Po
 	}
 
 	if nxType == "transfer" {
-		return c.MakeEmptyResponseBody(fmt.Sprintf("ignoring conversation callback")), nil
+		return c.MakeEmptyResponseBody("ignoring conversation callback"), nil
 	}
 
 	// grab our uuid out
@@ -284,7 +277,7 @@ func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Po
 		return c.MakeEmptyResponseBody(fmt.Sprintf("updated status for call: %s to: %s", callUUID, status)), nil
 	}
 
-	return c.MakeEmptyResponseBody(fmt.Sprintf("ignoring non final status for tranfer leg")), nil
+	return c.MakeEmptyResponseBody("ignoring non final status for tranfer leg"), nil
 }
 
 func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
@@ -961,9 +954,7 @@ func (c *client) responseForSprint(ctx context.Context, rp *redis.Pool, channel 
 		}
 	}
 
-	for _, w := range waitActions {
-		actions = append(actions, w)
-	}
+	actions = append(actions, waitActions...)
 
 	var body []byte
 	var err error

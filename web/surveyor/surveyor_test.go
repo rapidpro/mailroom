@@ -115,7 +115,7 @@ func TestSurveyor(t *testing.T) {
 		submission, err := ioutil.ReadFile(path)
 		assert.NoError(t, err)
 
-		url := fmt.Sprintf("http://localhost:8090/mr/surveyor/submit")
+		url := "http://localhost:8090/mr/surveyor/submit"
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(submission))
 		assert.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
@@ -125,6 +125,7 @@ func TestSurveyor(t *testing.T) {
 		}
 
 		resp, err := http.DefaultClient.Do(req)
+		assert.NoError(t, err)
 		assert.Equal(t, tc.StatusCode, resp.StatusCode, "unexpected status code for %s", testID)
 
 		body, _ := ioutil.ReadAll(resp.Body)

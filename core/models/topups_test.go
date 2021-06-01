@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTopups(t *testing.T) {
@@ -67,6 +68,8 @@ func TestTopups(t *testing.T) {
 	// topups can be disabled for orgs
 	tx.MustExec(`UPDATE orgs_org SET uses_topups = FALSE WHERE id = $1`, testdata.Org1.ID)
 	org, err := models.LoadOrg(ctx, tx, testdata.Org1.ID)
+	require.NoError(t, err)
+
 	topup, err := models.AllocateTopups(ctx, tx, rp, org, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, models.NilTopupID, topup)

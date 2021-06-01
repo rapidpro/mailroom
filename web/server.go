@@ -160,7 +160,6 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 		w.WriteHeader(http.StatusInternalServerError)
 		serialized, _ := json.Marshal(NewErrorResponse(err))
 		w.Write(serialized)
-		return
 	}
 }
 

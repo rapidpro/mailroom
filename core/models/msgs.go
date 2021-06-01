@@ -816,10 +816,8 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 				repeatedContacts[id] = true
 			}
 		}
-	}
 
-	// if we have URN we need to send to, add those contacts as well if not already repeated
-	if broadcastURNs != nil {
+		// if we have URN we need to send to, add those contacts as well if not already repeated
 		for id := range broadcastURNs {
 			if !repeatedContacts[id] {
 				contactIDs = append(contactIDs, id)
