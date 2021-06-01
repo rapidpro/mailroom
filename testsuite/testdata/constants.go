@@ -1,11 +1,17 @@
 package testdata
 
 import (
+	"testing"
+
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/testsuite"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/require"
 )
 
 // Constants used in tests, these are tied to the DB created by the RapidPro `mailroom_db` management command.
@@ -27,6 +33,17 @@ type Contact struct {
 	URNID models.URNID
 }
 
+func (c *Contact) Load(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) (*models.Contact, *flows.Contact) {
+	contacts, err := models.LoadContacts(testsuite.CTX(), db, oa, []models.ContactID{c.ID})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(contacts))
+
+	flowContact, err := contacts[0].FlowContact(oa)
+	require.NoError(t, err)
+
+	return contacts[0], flowContact
+}
+
 type Flow struct {
 	ID   models.FlowID
 	UUID assets.FlowUUID
@@ -40,6 +57,12 @@ type Field struct {
 type Group struct {
 	ID   models.GroupID
 	UUID assets.GroupUUID
+}
+
+func (g *Group) Add(db *sqlx.DB, contactIDs ...models.ContactID) {
+	for _, cid := range contactIDs {
+		db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2)`, g.ID, cid)
+	}
 }
 
 type Label struct {

@@ -25,9 +25,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	models.FlushCache()
 
 	// add bob, george and alexandria to doctors group which campaign is based on
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.Bob.ID, testdata.DoctorsGroup.ID)
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.George.ID, testdata.DoctorsGroup.ID)
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.Alexandria.ID, testdata.DoctorsGroup.ID)
+	testdata.DoctorsGroup.Add(db, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID)
 
 	// give bob and george values for joined in the future
 	db.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2030-01-01T00:00:00Z"}}' WHERE id = $1`, testdata.Bob.ID)

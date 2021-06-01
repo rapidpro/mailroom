@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,14 +32,14 @@ const (
 	MissedCallTriggerType      = TriggerType("M")
 	NewConversationTriggerType = TriggerType("N")
 	ReferralTriggerType        = TriggerType("R")
-	CallTriggerType            = TriggerType("V")
+	IncomingCallTriggerType    = TriggerType("V")
 	ScheduleTriggerType        = TriggerType("S")
 )
 
 // match type constants
 const (
-	MatchFirst = "F"
-	MatchOnly  = "O"
+	MatchFirst MatchType = "F"
+	MatchOnly  MatchType = "O"
 )
 
 // NilTriggerID is the nil value for trigger IDs
@@ -47,29 +48,31 @@ const NilTriggerID = TriggerID(0)
 // Trigger represents a trigger in an organization
 type Trigger struct {
 	t struct {
-		ID          TriggerID   `json:"id"`
-		FlowID      FlowID      `json:"flow_id"`
-		TriggerType TriggerType `json:"trigger_type"`
-		Keyword     string      `json:"keyword"`
-		MatchType   MatchType   `json:"match_type"`
-		ChannelID   ChannelID   `json:"channel_id"`
-		ReferrerID  string      `json:"referrer_id"`
-		GroupIDs    []GroupID   `json:"group_ids"`
-		ContactIDs  []ContactID `json:"contact_ids,omitempty"`
+		ID              TriggerID   `json:"id"`
+		FlowID          FlowID      `json:"flow_id"`
+		TriggerType     TriggerType `json:"trigger_type"`
+		Keyword         string      `json:"keyword"`
+		MatchType       MatchType   `json:"match_type"`
+		ChannelID       ChannelID   `json:"channel_id"`
+		ReferrerID      string      `json:"referrer_id"`
+		IncludeGroupIDs []GroupID   `json:"include_group_ids"`
+		ExcludeGroupIDs []GroupID   `json:"exclude_group_ids"`
+		ContactIDs      []ContactID `json:"contact_ids,omitempty"`
 	}
 }
 
 // ID returns the id of this trigger
 func (t *Trigger) ID() TriggerID { return t.t.ID }
 
-func (t *Trigger) FlowID() FlowID           { return t.t.FlowID }
-func (t *Trigger) TriggerType() TriggerType { return t.t.TriggerType }
-func (t *Trigger) Keyword() string          { return t.t.Keyword }
-func (t *Trigger) MatchType() MatchType     { return t.t.MatchType }
-func (t *Trigger) ChannelID() ChannelID     { return t.t.ChannelID }
-func (t *Trigger) ReferrerID() string       { return t.t.ReferrerID }
-func (t *Trigger) GroupIDs() []GroupID      { return t.t.GroupIDs }
-func (t *Trigger) ContactIDs() []ContactID  { return t.t.ContactIDs }
+func (t *Trigger) FlowID() FlowID             { return t.t.FlowID }
+func (t *Trigger) TriggerType() TriggerType   { return t.t.TriggerType }
+func (t *Trigger) Keyword() string            { return t.t.Keyword }
+func (t *Trigger) MatchType() MatchType       { return t.t.MatchType }
+func (t *Trigger) ChannelID() ChannelID       { return t.t.ChannelID }
+func (t *Trigger) ReferrerID() string         { return t.t.ReferrerID }
+func (t *Trigger) IncludeGroupIDs() []GroupID { return t.t.IncludeGroupIDs }
+func (t *Trigger) ExcludeGroupIDs() []GroupID { return t.t.ExcludeGroupIDs }
+func (t *Trigger) ContactIDs() []ContactID    { return t.t.ContactIDs }
 func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 	if t.t.MatchType == MatchFirst {
 		return triggers.KeywordMatchTypeFirstWord
@@ -86,6 +89,60 @@ func (t *Trigger) Match() *triggers.KeywordMatch {
 		}
 	}
 	return nil
+}
+
+type triggerMatch struct {
+	trigger        *Trigger
+	typeScore      int // e.g. keyword (2) vs catchall (1)
+	qualifierScore int // e.g. group inclusion (2) or channel match (4)
+}
+
+func (m *triggerMatch) score() int {
+	return m.typeScore*10 + m.qualifierScore
+}
+
+const triggerScoreByChannel = 4
+const triggerScoreByInclusion = 2
+const triggerScoreByExclusion = 1
+
+// matches against the qualifiers (inclusion groups, exclusion groups, channel) on this trigger and returns a score
+func (t *Trigger) MatchQualifiers(channel *Channel, contactGroups map[GroupID]bool) (bool, int) {
+	score := 0
+
+	if channel != nil && t.t.ChannelID != NilChannelID {
+		if t.ChannelID() == channel.ID() {
+			score += triggerScoreByChannel
+		} else {
+			return false, 0
+		}
+	}
+
+	if len(t.t.IncludeGroupIDs) > 0 {
+		inGroup := false
+		// if contact is in any of the groups to include that's a match by inclusion
+		for _, g := range t.t.IncludeGroupIDs {
+			if contactGroups[g] {
+				inGroup = true
+				score += triggerScoreByInclusion
+				break
+			}
+		}
+		if !inGroup {
+			return false, 0
+		}
+	}
+
+	if len(t.t.ExcludeGroupIDs) > 0 {
+		// if contact is in none of the groups to exclude that's a match by exclusion
+		for _, g := range t.t.ExcludeGroupIDs {
+			if contactGroups[g] {
+				return false, 0
+			}
+		}
+		score += triggerScoreByExclusion
+	}
+
+	return true, score
 }
 
 // loadTriggers loads all non-schedule triggers for the passed in org
@@ -105,6 +162,7 @@ func loadTriggers(ctx context.Context, db Queryer, orgID OrgID) ([]*Trigger, err
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning label row")
 		}
+
 		triggers = append(triggers, trigger)
 	}
 
@@ -113,68 +171,105 @@ func loadTriggers(ctx context.Context, db Queryer, orgID OrgID) ([]*Trigger, err
 	return triggers, nil
 }
 
-// FindMatchingNewConversationTrigger returns the matching trigger for the passed in trigger type
-func FindMatchingNewConversationTrigger(org *OrgAssets, channel *Channel) *Trigger {
-	var match *Trigger
+// FindMatchingMsgTrigger returns the matching trigger (if any) for the given message text and contact
+func FindMatchingMsgTrigger(org *OrgAssets, contact *flows.Contact, text string) *Trigger {
+	// build a set of the groups this contact is in
+	groupIDs := make(map[GroupID]bool, 10)
+	for _, g := range contact.Groups().All() {
+		groupIDs[g.Asset().(*Group).ID()] = true
+	}
+
+	// determine our message keyword
+	words := utils.TokenizeString(text)
+	keyword := ""
+	only := false
+	if len(words) > 0 {
+		// our keyword is our first word
+		keyword = strings.ToLower(words[0])
+		only = len(words) == 1
+	}
+
+	matches := make([]*triggerMatch, 0, 10)
+
 	for _, t := range org.Triggers() {
-		if t.TriggerType() == NewConversationTriggerType {
-			// exact match? return right away
-			if t.ChannelID() == channel.ID() {
-				return t
+		if t.TriggerType() == KeywordTriggerType {
+			// does this match based on the rules of the trigger?
+			matched := (t.Keyword() == keyword && (t.MatchType() == MatchFirst || (t.MatchType() == MatchOnly && only)))
+			score := 0
+
+			// no match? move on
+			if !matched {
+				continue
 			}
 
-			// trigger has no channel filter, record this as match
-			if t.ChannelID() == NilChannelID && match == nil {
-				match = t
+			matched, score = t.MatchQualifiers(nil, groupIDs)
+			if matched {
+				matches = append(matches, &triggerMatch{t, 2, score})
+			}
+		} else if t.TriggerType() == CatchallTriggerType {
+			matched, score := t.MatchQualifiers(nil, groupIDs)
+			if matched {
+				matches = append(matches, &triggerMatch{t, 1, score})
 			}
 		}
 	}
 
-	return match
-}
-
-// FindMatchingMissedCallTrigger finds any trigger set up for incoming calls (these would be IVR flows)
-func FindMatchingMissedCallTrigger(org *OrgAssets) *Trigger {
-	for _, t := range org.Triggers() {
-		if t.TriggerType() == MissedCallTriggerType {
-			return t
-		}
-	}
-
-	return nil
+	return triggerMatchByScore(matches)
 }
 
 // FindMatchingMOCallTrigger finds any trigger set up for incoming calls (these would be IVR flows)
 // Contact is needed as this trigger can be filtered by contact group
-func FindMatchingMOCallTrigger(org *OrgAssets, contact *Contact) *Trigger {
+func FindMatchingIncomingCallTrigger(org *OrgAssets, contact *Contact) *Trigger {
 	// build a set of the groups this contact is in
 	groupIDs := make(map[GroupID]bool, 10)
 	for _, g := range contact.Groups() {
 		groupIDs[g.ID()] = true
 	}
 
-	var match *Trigger
-	for _, t := range org.Triggers() {
-		if t.TriggerType() == CallTriggerType {
-			// this trigger has no groups, it's a match!
-			if len(t.GroupIDs()) == 0 {
-				if match == nil {
-					match = t
-				}
-				continue
-			}
+	matches := make([]*triggerMatch, 0, 10)
 
-			// test whether we are part of this trigger's group
-			for _, g := range t.GroupIDs() {
-				if groupIDs[g] {
-					// group keyword matches always take precedence, can return right away
-					return t
-				}
+	for _, t := range org.Triggers() {
+		if t.TriggerType() == IncomingCallTriggerType {
+			matched, score := t.MatchQualifiers(nil, groupIDs)
+			if matched {
+				matches = append(matches, &triggerMatch{t, 1, score})
 			}
 		}
 	}
 
-	return match
+	return triggerMatchByScore(matches)
+}
+
+// FindMatchingMissedCallTrigger finds any trigger set up for incoming calls (these would be IVR flows)
+func FindMatchingMissedCallTrigger(org *OrgAssets) *Trigger {
+	matches := make([]*triggerMatch, 0, 10)
+
+	for _, t := range org.Triggers() {
+		if t.TriggerType() == MissedCallTriggerType {
+			matched, score := t.MatchQualifiers(nil, nil)
+			if matched {
+				matches = append(matches, &triggerMatch{t, 1, score})
+			}
+		}
+	}
+
+	return triggerMatchByScore(matches)
+}
+
+// FindMatchingNewConversationTrigger returns the matching trigger for the passed in trigger type
+func FindMatchingNewConversationTrigger(org *OrgAssets, channel *Channel) *Trigger {
+	matches := make([]*triggerMatch, 0, 10)
+
+	for _, t := range org.Triggers() {
+		if t.TriggerType() == NewConversationTriggerType {
+			matched, score := t.MatchQualifiers(channel, nil)
+			if matched {
+				matches = append(matches, &triggerMatch{t, 1, score})
+			}
+		}
+	}
+
+	return triggerMatchByScore(matches)
 }
 
 // FindMatchingReferralTrigger returns the matching trigger for the passed in trigger type
@@ -204,85 +299,15 @@ func FindMatchingReferralTrigger(org *OrgAssets, channel *Channel, referrerID st
 	return match
 }
 
-// FindMatchingMsgTrigger returns the matching trigger (if any) for the passed in text and channel id
-// TODO: with a different structure this could probably be a lot faster.. IE, we could have a map
-// of list of triggers by keyword that is built when we load the triggers, then just evaluate against that.
-func FindMatchingMsgTrigger(org *OrgAssets, contact *flows.Contact, text string) *Trigger {
-	// build a set of the groups this contact is in
-	groupIDs := make(map[GroupID]bool, 10)
-	for _, g := range contact.Groups().All() {
-		groupIDs[g.Asset().(*Group).ID()] = true
+func triggerMatchByScore(matches []*triggerMatch) *Trigger {
+	if len(matches) == 0 {
+		return nil
 	}
 
-	// determine our message keyword
-	words := utils.TokenizeString(text)
-	keyword := ""
-	only := false
-	if len(words) > 0 {
-		// our keyword is our first word
-		keyword = strings.ToLower(words[0])
-		only = len(words) == 1
-	}
+	// sort the matches to get them in descending order of precedence
+	sort.SliceStable(matches, func(i, j int) bool { return matches[i].score() > matches[j].score() })
 
-	var match, catchAll, groupCatchAll *Trigger
-	for _, t := range org.Triggers() {
-		if t.TriggerType() == KeywordTriggerType {
-			// does this match based on the rules of the trigger?
-			matched := (t.Keyword() == keyword && (t.MatchType() == MatchFirst || (t.MatchType() == MatchOnly && only)))
-
-			// no match? move on
-			if !matched {
-				continue
-			}
-
-			// this trigger has no groups, it's a match!
-			if len(t.GroupIDs()) == 0 {
-				if match == nil {
-					match = t
-				}
-				continue
-			}
-
-			// test whether we are part of this trigger's group
-			for _, g := range t.GroupIDs() {
-				if groupIDs[g] {
-					// group keyword matches always take precedence, can return right away
-					return t
-				}
-			}
-		} else if t.TriggerType() == CatchallTriggerType {
-			// if this catch all is on no groups, save it as our catch all
-			if len(t.GroupIDs()) == 0 {
-				if catchAll == nil {
-					catchAll = t
-				}
-				continue
-			}
-
-			// otherwise see if this catchall matches our group
-			if groupCatchAll == nil {
-				for _, g := range t.GroupIDs() {
-					if groupIDs[g] {
-						groupCatchAll = t
-						break
-					}
-				}
-			}
-		}
-	}
-
-	// have a normal match? return that
-	if match != nil {
-		return match
-	}
-
-	// otherwise return our group catch all if we found one
-	if groupCatchAll != nil {
-		return groupCatchAll
-	}
-
-	// or our global catchall
-	return catchAll
+	return matches[0].trigger
 }
 
 const selectTriggersSQL = `
@@ -294,16 +319,20 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.match_type as match_type,
 	t.channel_id as channel_id,
 	COALESCE(t.referrer_id, '') as referrer_id,
-	ARRAY_REMOVE(ARRAY_AGG(g.contactgroup_id), NULL) as group_ids
+	ARRAY_REMOVE(ARRAY_AGG(DISTINCT ig.contactgroup_id), NULL) as include_group_ids,
+	ARRAY_REMOVE(ARRAY_AGG(DISTINCT eg.contactgroup_id), NULL) as exclude_group_ids
 FROM 
 	triggers_trigger t
-	LEFT OUTER JOIN triggers_trigger_groups g ON t.id = g.trigger_id
+	LEFT OUTER JOIN triggers_trigger_groups ig ON t.id = ig.trigger_id
+	LEFT OUTER JOIN triggers_trigger_exclude_groups eg ON t.id = eg.trigger_id
 WHERE 
 	t.org_id = $1 AND 
 	t.is_active = TRUE AND
 	t.is_archived = FALSE AND
 	t.trigger_type != 'S'
 GROUP BY 
+	t.id
+ORDER BY
 	t.id
 ) r;
 `
@@ -335,7 +364,8 @@ SET
 WHERE
 	id = ANY($1) AND
 	NOT EXISTS (SELECT * FROM triggers_trigger_contacts WHERE trigger_id = triggers_trigger.id) AND
-	NOT EXISTS (SELECT * FROM triggers_trigger_groups WHERE trigger_id = triggers_trigger.id)
+	NOT EXISTS (SELECT * FROM triggers_trigger_groups WHERE trigger_id = triggers_trigger.id) AND
+	NOT EXISTS (SELECT * FROM triggers_trigger_exclude_groups WHERE trigger_id = triggers_trigger.id)
 `
 
 // ArchiveContactTriggers removes the given contacts from any triggers and archives any triggers
