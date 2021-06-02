@@ -118,6 +118,8 @@ func TestFindMatchingMsgTrigger(t *testing.T) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 
+	db.MustExec(`DELETE FROM triggers_trigger`)
+
 	joinID := testdata.InsertKeywordTrigger(t, db, testdata.Favorites.ID, "join", models.MatchFirst, nil, nil)
 	resistID := testdata.InsertKeywordTrigger(t, db, testdata.SingleMessage.ID, "resist", models.MatchOnly, nil, nil)
 	farmersID := testdata.InsertKeywordTrigger(t, db, testdata.SingleMessage.ID, "resist", models.MatchOnly, []models.GroupID{testdata.DoctorsGroup.ID}, nil)
@@ -192,6 +194,29 @@ func TestFindMatchingIncomingCallTrigger(t *testing.T) {
 	}
 }
 
+func TestFindMatchingMissedCallTrigger(t *testing.T) {
+	testsuite.Reset()
+	db := testsuite.DB()
+	ctx := testsuite.CTX()
+
+	testdata.InsertCatchallTrigger(t, db, testdata.SingleMessage.ID, nil, nil)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	// no missed call trigger yet
+	trigger := models.FindMatchingMissedCallTrigger(oa)
+	assert.Nil(t, trigger)
+
+	triggerID := testdata.InsertMissedCallTrigger(t, db, testdata.Favorites.ID)
+
+	oa, err = models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	trigger = models.FindMatchingMissedCallTrigger(oa)
+	assertTrigger(t, triggerID, trigger)
+}
+
 func TestFindMatchingNewConversationTrigger(t *testing.T) {
 	testsuite.Reset()
 	db := testsuite.DB()
@@ -227,6 +252,8 @@ func TestFindMatchingReferralTrigger(t *testing.T) {
 	fooID := testdata.InsertReferralTrigger(t, db, testdata.Favorites.ID, "foo", testdata.TwitterChannel.ID)
 	barID := testdata.InsertReferralTrigger(t, db, testdata.Favorites.ID, "bar", models.NilChannelID)
 	bazID := testdata.InsertReferralTrigger(t, db, testdata.Favorites.ID, "", testdata.TwitterChannel.ID)
+
+	fmt.Printf("foo=%d bar=%d baz=%d\n", fooID, barID, bazID)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
