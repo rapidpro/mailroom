@@ -9,35 +9,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func InsertKeywordTrigger(t *testing.T, db *sqlx.DB, org Org, flow Flow, keyword string, matchType models.MatchType, includeGroups []Group, excludeGroups []Group) models.TriggerID {
+func InsertKeywordTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow, keyword string, matchType models.MatchType, includeGroups []*Group, excludeGroups []*Group) models.TriggerID {
 	return insertTrigger(t, db, org, models.KeywordTriggerType, flow, keyword, matchType, includeGroups, excludeGroups, nil, "", nil)
 }
 
-func InsertIncomingCallTrigger(t *testing.T, db *sqlx.DB, org Org, flow Flow, includeGroups []Group, excludeGroups []Group) models.TriggerID {
+func InsertIncomingCallTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow, includeGroups, excludeGroups []*Group) models.TriggerID {
 	return insertTrigger(t, db, org, models.IncomingCallTriggerType, flow, "", "", includeGroups, excludeGroups, nil, "", nil)
 }
 
-func InsertMissedCallTrigger(t *testing.T, db *sqlx.DB, org Org, flow Flow) models.TriggerID {
+func InsertMissedCallTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow) models.TriggerID {
 	return insertTrigger(t, db, org, models.MissedCallTriggerType, flow, "", "", nil, nil, nil, "", nil)
 }
 
-func InsertNewConversationTrigger(t *testing.T, db *sqlx.DB, org Org, flow Flow, channel *Channel) models.TriggerID {
+func InsertNewConversationTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow, channel *Channel) models.TriggerID {
 	return insertTrigger(t, db, org, models.NewConversationTriggerType, flow, "", "", nil, nil, nil, "", channel)
 }
 
-func InsertReferralTrigger(t *testing.T, db *sqlx.DB, org Org, flow Flow, referrerID string, channel *Channel) models.TriggerID {
+func InsertReferralTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow, referrerID string, channel *Channel) models.TriggerID {
 	return insertTrigger(t, db, org, models.ReferralTriggerType, flow, "", "", nil, nil, nil, referrerID, channel)
 }
 
-func InsertCatchallTrigger(t *testing.T, db *sqlx.DB, org Org, flow Flow, includeGroups []Group, excludeGroups []Group) models.TriggerID {
+func InsertCatchallTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow, includeGroups, excludeGroups []*Group) models.TriggerID {
 	return insertTrigger(t, db, org, models.CatchallTriggerType, flow, "", "", includeGroups, excludeGroups, nil, "", nil)
 }
 
-func InsertScheduledTrigger(t *testing.T, db *sqlx.DB, org Org, flow Flow, includeGroups []Group, excludeGroups []Group, includeContacts []*Contact) models.TriggerID {
+func InsertScheduledTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow, includeGroups, excludeGroups []*Group, includeContacts []*Contact) models.TriggerID {
 	return insertTrigger(t, db, org, models.ScheduleTriggerType, flow, "", "", includeGroups, excludeGroups, includeContacts, "", nil)
 }
 
-func insertTrigger(t *testing.T, db *sqlx.DB, org Org, triggerType models.TriggerType, flow Flow, keyword string, matchType models.MatchType, includeGroups, excludeGroups []Group, contactIDs []*Contact, referrerID string, channel *Channel) models.TriggerID {
+func insertTrigger(t *testing.T, db *sqlx.DB, org *Org, triggerType models.TriggerType, flow *Flow, keyword string, matchType models.MatchType, includeGroups, excludeGroups []*Group, contactIDs []*Contact, referrerID string, channel *Channel) models.TriggerID {
 	channelID := models.NilChannelID
 	if channel != nil {
 		channelID = channel.ID

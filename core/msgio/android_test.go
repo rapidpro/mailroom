@@ -73,16 +73,16 @@ func TestSyncAndroidChannels(t *testing.T) {
 	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Android channels
-	channel1ID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": ""})       // no FCM ID
-	channel2ID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"}) // invalid FCM ID
-	channel3ID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"}) // valid FCM ID
+	testChannel1 := testdata.InsertChannel(t, db, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": ""})       // no FCM ID
+	testChannel2 := testdata.InsertChannel(t, db, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"}) // invalid FCM ID
+	testChannel3 := testdata.InsertChannel(t, db, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"}) // valid FCM ID
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
 
-	channel1 := oa.ChannelByID(channel1ID)
-	channel2 := oa.ChannelByID(channel2ID)
-	channel3 := oa.ChannelByID(channel3ID)
+	channel1 := oa.ChannelByID(testChannel1.ID)
+	channel2 := oa.ChannelByID(testChannel2.ID)
+	channel3 := oa.ChannelByID(testChannel3.ID)
 
 	msgio.SyncAndroidChannels(fc, []*models.Channel{channel1, channel2, channel3})
 

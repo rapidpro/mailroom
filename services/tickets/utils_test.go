@@ -54,8 +54,8 @@ func TestFromTicketUUID(t *testing.T) {
 	ticket2UUID := flows.TicketUUID("44b7d9b5-6ddd-4a6a-a1c0-8b70ecd06339")
 
 	// create some tickets
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, ticket1UUID, "Need help", "Have you seen my cookies?", "")
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, ticket2UUID, "Need help", "Have you seen my shoes?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, ticket1UUID, "Need help", "Have you seen my cookies?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, ticket2UUID, "Need help", "Have you seen my shoes?", "")
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
@@ -135,7 +135,7 @@ func TestSendReply(t *testing.T) {
 	ticketUUID := flows.TicketUUID("f7358870-c3dd-450d-b5ae-db2eb50216ba")
 
 	// create a ticket
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, ticketUUID, "Need help", "Have you seen my cookies?", "")
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, ticketUUID, "Need help", "Have you seen my cookies?", "")
 
 	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
 	require.NoError(t, err)

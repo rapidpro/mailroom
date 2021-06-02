@@ -18,7 +18,7 @@ func TestStarts(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	startID := testdata.InsertFlowStart(t, db, testdata.Org1.ID, testdata.SingleMessage.ID, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})
+	startID := testdata.InsertFlowStart(t, db, testdata.Org1, testdata.SingleMessage, []*testdata.Contact{testdata.Cathy, testdata.Bob})
 
 	startJSON := []byte(fmt.Sprintf(`{
 		"start_id": %d,

@@ -36,10 +36,10 @@ func TestContactImports(t *testing.T) {
 	testdata.DeleteContactsAndURNs(t, db)
 
 	// add contact in other org to make sure we can't update it
-	testdata.InsertContact(t, db, testdata.Org2.ID, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa")
+	testdata.InsertContact(t, db, testdata.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa")
 
 	// add dynamic group to test imported contacts are added to it
-	testdata.InsertContactGroup(t, db, testdata.Org1.ID, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
+	testdata.InsertContactGroup(t, db, testdata.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
 
 	// give our org a country by setting country on a channel
 	db.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, testdata.TwilioChannel.ID)
@@ -66,7 +66,7 @@ func TestContactImports(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	for i, tc := range tcs {
-		importID := testdata.InsertContactImport(t, db, testdata.Org1.ID)
+		importID := testdata.InsertContactImport(t, db, testdata.Org1)
 		batchID := testdata.InsertContactImportBatch(t, db, importID, tc.Specs)
 
 		batch, err := models.LoadContactImportBatch(ctx, db, batchID)
@@ -148,7 +148,7 @@ func TestContactImportBatch(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	importID := testdata.InsertContactImport(t, db, testdata.Org1.ID)
+	importID := testdata.InsertContactImport(t, db, testdata.Org1)
 	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}

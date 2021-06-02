@@ -46,7 +46,7 @@ func TestBroadcastEvents(t *testing.T) {
 	cathyOnly := []*flows.ContactReference{cathy}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Cathy.ID, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	// change george's URN to an invalid twitter URN so it can't be sent
 	db.MustExec(
@@ -168,7 +168,7 @@ func TestBroadcastTask(t *testing.T) {
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Cathy.ID, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
 		BroadcastID   models.BroadcastID
