@@ -22,7 +22,7 @@ func TestQueueCourierMessages(t *testing.T) {
 	defer rc.Close()
 
 	// create an Andoid channel
-	androidChannelID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
+	androidChannel := testdata.InsertChannel(t, db, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg|models.RefreshChannels)
 	require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestQueueCourierMessages(t *testing.T) {
 	// check that trying to queue a courier message will panic
 	assert.Panics(t, func() {
 		ms := msgSpec{
-			ChannelID: androidChannelID,
+			ChannelID: androidChannel.ID,
 			ContactID: testdata.Cathy.ID,
 			URNID:     testdata.Cathy.URNID,
 		}

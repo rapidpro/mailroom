@@ -140,7 +140,7 @@ func TestOutgoingMsgs(t *testing.T) {
 func TestGetMessageIDFromUUID(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	msgIn := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi there")
+	msgIn := testdata.InsertIncomingMsg(t, db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi there")
 
 	msgID, err := models.GetMessageIDFromUUID(ctx, db, msgIn.UUID())
 
@@ -151,11 +151,11 @@ func TestGetMessageIDFromUUID(t *testing.T) {
 func TestLoadMessages(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	msgIn1 := testdata.InsertIncomingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "in 1")
-	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
-	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 2", nil)
-	msgOut3 := testdata.InsertOutgoingMsg(t, db, testdata.Org2.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "out 3", nil)
-	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi 3", nil)
+	msgIn1 := testdata.InsertIncomingMsg(t, db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "in 1")
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 2", nil)
+	msgOut3 := testdata.InsertOutgoingMsg(t, db, testdata.Org2, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "out 3", nil)
+	testdata.InsertOutgoingMsg(t, db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi 3", nil)
 
 	ids := []models.MsgID{models.MsgID(msgIn1.ID()), models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID()), models.MsgID(msgOut3.ID())}
 
@@ -186,9 +186,9 @@ func TestResendMessages(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", nil)
-	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Bob.ID, testdata.Bob.URN, testdata.Bob.URNID, "out 2", nil)
-	testdata.InsertOutgoingMsg(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 3", nil)
+	msgOut1 := testdata.InsertOutgoingMsg(t, db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", nil)
+	msgOut2 := testdata.InsertOutgoingMsg(t, db, testdata.Org1, testdata.Bob.ID, testdata.Bob.URN, testdata.Bob.URNID, "out 2", nil)
+	testdata.InsertOutgoingMsg(t, db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 3", nil)
 
 	// make them look like failed messages
 	db.MustExec(`UPDATE msgs_msg SET status = 'F', sent_on = NOW(), error_count = 3`)

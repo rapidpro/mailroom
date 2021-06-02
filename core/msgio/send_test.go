@@ -65,9 +65,9 @@ func TestSendMessages(t *testing.T) {
 	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Andoid channels
-	androidChannel1ID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID1"})
-	androidChannel2ID := testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
-	testdata.InsertChannel(t, db, testdata.Org1.ID, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
+	androidChannel1 := testdata.InsertChannel(t, db, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID1"})
+	androidChannel2 := testdata.InsertChannel(t, db, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
+	testdata.InsertChannel(t, db, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestSendMessages(t *testing.T) {
 					URNID:     testdata.Cathy.URNID,
 				},
 				{
-					ChannelID: androidChannel1ID,
+					ChannelID: androidChannel1.ID,
 					ContactID: testdata.Bob.ID,
 					URNID:     testdata.Bob.URNID,
 				},
@@ -108,17 +108,17 @@ func TestSendMessages(t *testing.T) {
 			Description: "each Android channel synced once",
 			Msgs: []msgSpec{
 				{
-					ChannelID: androidChannel1ID,
+					ChannelID: androidChannel1.ID,
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 				},
 				{
-					ChannelID: androidChannel2ID,
+					ChannelID: androidChannel2.ID,
 					ContactID: testdata.Bob.ID,
 					URNID:     testdata.Bob.URNID,
 				},
 				{
-					ChannelID: androidChannel1ID,
+					ChannelID: androidChannel1.ID,
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 				},
