@@ -105,7 +105,7 @@ func TestBatchStart(t *testing.T) {
 	rp := testsuite.RP()
 
 	// create a start object
-	testdata.InsertFlowStart(t, db, testdata.Org1.ID, testdata.SingleMessage.ID, nil)
+	testdata.InsertFlowStart(t, db, testdata.Org1, testdata.SingleMessage, nil)
 
 	// and our batch object
 	contactIDs := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}

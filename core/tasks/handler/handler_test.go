@@ -246,7 +246,7 @@ func TestChannelEvents(t *testing.T) {
 		testdata.PickANumber.ID, testdata.VonageChannel.ID)
 
 	// add a URN for cathy so we can test twitter URNs
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Bob.ID, urns.URN("twitterid:123456"), 10)
+	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
 		EventType      models.ChannelEventType

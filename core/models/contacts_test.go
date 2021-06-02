@@ -27,13 +27,13 @@ func TestContacts(t *testing.T) {
 	org, err := models.GetOrgAssets(ctx, db, 1)
 	assert.NoError(t, err)
 
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Bob.ID, urns.URN("whatsapp:250788373373"), 999)
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID,
-		flows.TicketUUID("f808c16d-10ed-4dfd-a6d4-6331c0d618f8"), "Problem!", "Where are my shoes?", "1234")
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID,
-		flows.TicketUUID("ddf9aa25-73d8-4c5a-bf63-f4e9525bbb3e"), "Another Problem!", "Where are my pants?", "2345")
-	testdata.InsertOpenTicket(t, db, testdata.Org1.ID, testdata.Bob.ID, testdata.Mailgun.ID,
-		flows.TicketUUID("e86d6cc3-6acc-49d0-9a50-287e4794e415"), "Urgent", "His name is Bob", "")
+	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun,
+		"f808c16d-10ed-4dfd-a6d4-6331c0d618f8", "Problem!", "Where are my shoes?", "1234")
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk,
+		"ddf9aa25-73d8-4c5a-bf63-f4e9525bbb3e", "Another Problem!", "Where are my pants?", "2345")
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun,
+		"e86d6cc3-6acc-49d0-9a50-287e4794e415", "Urgent", "His name is Bob", "")
 
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.George.ID)
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, testdata.George.ID)
@@ -91,7 +91,7 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())
 
 	// add another tel urn to bob
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.Bob.ID, urns.URN("tel:+250788373373"), 10)
+	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, urns.URN("tel:+250788373373"), 10)
 
 	// reload the contact
 	modelContacts, err = models.LoadContacts(ctx, db, org, []models.ContactID{testdata.Bob.ID})
@@ -134,10 +134,10 @@ func TestCreateContact(t *testing.T) {
 	testsuite.Reset()
 	models.FlushCache()
 
-	testdata.InsertContactGroup(t, db, testdata.Org1.ID, "d636c966-79c1-4417-9f1c-82ad629773a2", "Kinyarwanda", "language = kin")
+	testdata.InsertContactGroup(t, db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Kinyarwanda", "language = kin")
 
 	// add an orphaned URN
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.NilContactID, urns.URN("telegram:200002"), 100)
+	testdata.InsertContactURN(t, db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -192,11 +192,11 @@ func TestGetOrCreateContact(t *testing.T) {
 	db := testsuite.DB()
 	testsuite.Reset()
 
-	testdata.InsertContactGroup(t, db, testdata.Org1.ID, "d636c966-79c1-4417-9f1c-82ad629773a2", "Telegrammer", `telegram = 100001`)
+	testdata.InsertContactGroup(t, db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Telegrammer", `telegram = 100001`)
 
 	// add some orphaned URNs
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.NilContactID, urns.URN("telegram:200001"), 100)
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.NilContactID, urns.URN("telegram:200002"), 100)
+	testdata.InsertContactURN(t, db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
+	testdata.InsertContactURN(t, db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
 
 	var maxContactID models.ContactID
 	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
@@ -350,7 +350,7 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	testsuite.Reset()
 
 	// add an orphaned URN
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, models.NilContactID, urns.URN("telegram:200001"), 100)
+	testdata.InsertContactURN(t, db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
 
 	var maxContactID models.ContactID
 	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)

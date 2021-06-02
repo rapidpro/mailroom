@@ -16,7 +16,7 @@ func TestContactURNsChanged(t *testing.T) {
 	db := testsuite.DB()
 
 	// add a URN to george that cathy will steal
-	testdata.InsertContactURN(t, db, testdata.Org1.ID, testdata.George.ID, urns.URN("tel:+12065551212"), 100)
+	testdata.InsertContactURN(t, db, testdata.Org1, testdata.George, urns.URN("tel:+12065551212"), 100)
 
 	now := time.Now()
 
