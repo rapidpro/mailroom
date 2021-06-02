@@ -59,9 +59,9 @@ type Group struct {
 	UUID assets.GroupUUID
 }
 
-func (g *Group) Add(db *sqlx.DB, contactIDs ...models.ContactID) {
-	for _, cid := range contactIDs {
-		db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2)`, g.ID, cid)
+func (g *Group) Add(db *sqlx.DB, contacts ...*Contact) {
+	for _, c := range contacts {
+		db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2)`, g.ID, c.ID)
 	}
 }
 
@@ -91,9 +91,9 @@ type CampaignEvent struct {
 
 var Org1 = Org{1, "bf0514a5-9407-44c9-b0f9-3f36f9c18414"}
 
-var TwilioChannel = Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8"}
-var VonageChannel = Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49"}
-var TwitterChannel = Channel{10002, "0f661e8b-ea9d-4bd3-9953-d368340acf91"}
+var TwilioChannel = &Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8"}
+var VonageChannel = &Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49"}
+var TwitterChannel = &Channel{10002, "0f661e8b-ea9d-4bd3-9953-d368340acf91"}
 
 var Cathy = &Contact{10000, "6393abc0-283d-4c9b-a1b3-641a035c34bf", "tel:+16055741111", 10000}
 var Bob = &Contact{10001, "b699a406-7e44-49be-9f01-1a82893e8a10", "tel:+16055742222", 10001}
