@@ -215,6 +215,17 @@ type triggerMatch struct {
 	score   int
 }
 
+// matching triggers are given a score based on how they matched, and this score is used to select the most
+// specific match:
+//
+// channel (4) + include (2) + exclude (1) = 7
+// channel (4) + include (2) = 6
+// channel (4) + exclude (1) = 5
+// channel (4) = 4
+// include (2) + exclude (1) = 3
+// include (2) = 2
+// exclude (1) = 1
+//
 const triggerScoreByChannel = 4
 const triggerScoreByInclusion = 2
 const triggerScoreByExclusion = 1
@@ -300,8 +311,6 @@ WHERE
 	t.is_archived = FALSE AND
 	t.trigger_type != 'S'
 GROUP BY 
-	t.id
-ORDER BY
 	t.id
 ) r;
 `
