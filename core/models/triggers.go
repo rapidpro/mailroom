@@ -140,14 +140,14 @@ func FindMatchingMsgTrigger(oa *OrgAssets, contact *flows.Contact, text string) 
 	}
 
 	// if we have a matching keyword trigger return that, otherwise we move on to catchall triggers..
-	byKeyword := findBestTriggerMatch(candidates, nil, groupIDs, "")
+	byKeyword := findBestTriggerMatch(candidates, nil, groupIDs)
 	if byKeyword != nil {
 		return byKeyword
 	}
 
 	candidates = findTriggerCandidates(oa, CatchallTriggerType, nil)
 
-	return findBestTriggerMatch(candidates, nil, groupIDs, "")
+	return findBestTriggerMatch(candidates, nil, groupIDs)
 }
 
 // FindMatchingIncomingCallTrigger finds the best match trigger for incoming calls
@@ -160,29 +160,41 @@ func FindMatchingIncomingCallTrigger(oa *OrgAssets, contact *Contact) *Trigger {
 		groupIDs[g.ID()] = true
 	}
 
-	return findBestTriggerMatch(candidates, nil, groupIDs, "")
+	return findBestTriggerMatch(candidates, nil, groupIDs)
 }
 
 // FindMatchingMissedCallTrigger finds the best match trigger for missed incoming calls
 func FindMatchingMissedCallTrigger(oa *OrgAssets) *Trigger {
 	candidates := findTriggerCandidates(oa, MissedCallTriggerType, nil)
 
-	return findBestTriggerMatch(candidates, nil, nil, "")
+	return findBestTriggerMatch(candidates, nil, nil)
 }
 
 // FindMatchingNewConversationTrigger finds the best match trigger for new conversation channel events
 func FindMatchingNewConversationTrigger(oa *OrgAssets, channel *Channel) *Trigger {
 	candidates := findTriggerCandidates(oa, NewConversationTriggerType, nil)
 
-	return findBestTriggerMatch(candidates, channel, nil, "")
+	return findBestTriggerMatch(candidates, channel, nil)
 }
 
-// FindMatchingReferralTrigger returns the matching trigger for the passed in trigger type
-// Matches are based on referrer_id first (if present), then channel, then any referrer trigger
+// FindMatchingReferralTrigger finds the best match trigger for referral click channel events
 func FindMatchingReferralTrigger(oa *OrgAssets, channel *Channel, referrerID string) *Trigger {
-	candidates := findTriggerCandidates(oa, ReferralTriggerType, nil)
+	// first try to find matching referrer ID
+	candidates := findTriggerCandidates(oa, ReferralTriggerType, func(t *Trigger) bool {
+		return strings.EqualFold(t.ReferrerID(), referrerID)
+	})
 
-	return findBestTriggerMatch(candidates, channel, nil, referrerID)
+	match := findBestTriggerMatch(candidates, channel, nil)
+	if match != nil {
+		return match
+	}
+
+	// if that didn't work look for an empty referrer ID
+	candidates = findTriggerCandidates(oa, ReferralTriggerType, func(t *Trigger) bool {
+		return t.ReferrerID() == ""
+	})
+
+	return findBestTriggerMatch(candidates, channel, nil)
 }
 
 // finds trigger candidates based on type and optional filter
@@ -203,16 +215,15 @@ type triggerMatch struct {
 	score   int
 }
 
-const triggerScoreByReferrer = 8
 const triggerScoreByChannel = 4
 const triggerScoreByInclusion = 2
 const triggerScoreByExclusion = 1
 
-func findBestTriggerMatch(candidates []*Trigger, channel *Channel, contactGroups map[GroupID]bool, referrerID string) *Trigger {
+func findBestTriggerMatch(candidates []*Trigger, channel *Channel, contactGroups map[GroupID]bool) *Trigger {
 	matches := make([]*triggerMatch, 0, len(candidates))
 
 	for _, t := range candidates {
-		matched, score := triggerMatchQualifiers(t, channel, contactGroups, referrerID)
+		matched, score := triggerMatchQualifiers(t, channel, contactGroups)
 		if matched {
 			matches = append(matches, &triggerMatch{t, score})
 		}
@@ -229,16 +240,8 @@ func findBestTriggerMatch(candidates []*Trigger, channel *Channel, contactGroups
 }
 
 // matches against the qualifiers (inclusion groups, exclusion groups, channel) on this trigger and returns a score
-func triggerMatchQualifiers(t *Trigger, channel *Channel, contactGroups map[GroupID]bool, referrerID string) (bool, int) {
+func triggerMatchQualifiers(t *Trigger, channel *Channel, contactGroups map[GroupID]bool) (bool, int) {
 	score := 0
-
-	if t.ReferrerID() != "" {
-		if strings.EqualFold(t.ReferrerID(), referrerID) {
-			score += triggerScoreByReferrer
-		} else {
-			return false, 0
-		}
-	}
 
 	if channel != nil && t.ChannelID() != NilChannelID {
 		if t.ChannelID() == channel.ID() {
