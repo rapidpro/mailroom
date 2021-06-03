@@ -1,7 +1,6 @@
 package models_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/nyaruka/gocommon/uuids"
@@ -263,8 +262,6 @@ func TestFindMatchingReferralTrigger(t *testing.T) {
 	fooID := testdata.InsertReferralTrigger(t, db, testdata.Org1, testdata.Favorites, "foo", testdata.TwitterChannel)
 	barID := testdata.InsertReferralTrigger(t, db, testdata.Org1, testdata.Favorites, "bar", nil)
 	bazID := testdata.InsertReferralTrigger(t, db, testdata.Org1, testdata.Favorites, "", testdata.TwitterChannel)
-
-	fmt.Printf("foo=%d bar=%d baz=%d\n", fooID, barID, bazID)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
