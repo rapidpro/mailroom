@@ -68,6 +68,8 @@ const (
 	configSMTPServer  = "smtp_server"
 	configDTOneKey    = "dtone_key"
 	configDTOneSecret = "dtone_secret"
+
+	configStorageSessions = "use_storage_sessions"
 )
 
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
@@ -89,6 +91,11 @@ func (o *Org) Suspended() bool { return o.o.Suspended }
 
 // UsesTopups returns whether the org uses topups
 func (o *Org) UsesTopups() bool { return o.o.UsesTopups }
+
+func (o *Org) UsesStorageSessions() bool {
+	// true is true, everything else is false
+	return o.ConfigValue(configStorageSessions, "false") == "true"
+}
 
 // DateFormat returns the date format for this org
 func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
@@ -175,7 +182,7 @@ func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryCo
 }
 
 // StoreAttachment saves an attachment to storage
-func (o *Org) StoreAttachment(s storage.Storage, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
+func (o *Org) StoreAttachment(ctx context.Context, s storage.Storage, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
 	prefix := config.Mailroom.S3MediaPrefix
 
 	// read the content
@@ -192,7 +199,7 @@ func (o *Org) StoreAttachment(s storage.Storage, filename string, contentType st
 
 	path := o.attachmentPath(prefix, filename)
 
-	url, err := s.Put(path, contentType, contentBytes)
+	url, err := s.Put(ctx, path, contentType, contentBytes)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to store attachment content")
 	}

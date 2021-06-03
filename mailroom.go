@@ -171,13 +171,15 @@ func (mr *Mailroom) Start() error {
 		if err != nil {
 			return err
 		}
-		mr.Storage = storage.NewS3(s3Client, mr.Config.S3MediaBucket)
+		mr.Storage = storage.NewS3(s3Client, mr.Config.S3MediaBucket, 32)
 	} else {
 		mr.Storage = storage.NewFS("_storage")
 	}
 
 	// test our storage
-	err = mr.Storage.Test()
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+	err = mr.Storage.Test(ctx)
+	cancel()
 	if err != nil {
 		log.WithError(err).Error(mr.Storage.Name() + " storage not available")
 	} else {

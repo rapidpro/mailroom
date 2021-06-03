@@ -92,7 +92,7 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 	for i, file := range files {
 		filename := string(uuids.New()) + filepath.Ext(file.URL)
 
-		attachments[i], err = oa.Org().StoreAttachment(store, filename, file.ContentType, file.Body)
+		attachments[i], err = oa.Org().StoreAttachment(ctx, store, filename, file.ContentType, file.Body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error storing attachment %s for ticket reply", file.URL)
 		}

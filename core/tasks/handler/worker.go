@@ -8,6 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -86,12 +87,12 @@ func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, 
 }
 
 func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	return handleContactEvent(ctx, mr.DB, mr.RP, task)
+	return handleContactEvent(ctx, mr.DB, mr.RP, mr.Storage, task)
 }
 
 // handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
 // a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
+func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, st storage.Storage, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -176,7 +177,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
 			}
-			err = handleMsgEvent(ctx, db, rp, msg)
+			err = handleMsgEvent(ctx, db, rp, st, msg)
 
 		case TimeoutEventType, ExpirationEventType:
 			evt := &TimedEvent{}
@@ -184,7 +185,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling timeout event: %s", event)
 			}
-			err = handleTimedEvent(ctx, db, rp, contactEvent.Type, evt)
+			err = handleTimedEvent(ctx, db, rp, st, contactEvent.Type, evt)
 
 		default:
 			return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
@@ -223,7 +224,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 }
 
 // handleTimedEvent is called for timeout events
-func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType string, event *TimedEvent) error {
+func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, st storage.Storage, eventType string, event *TimedEvent) error {
 	start := time.Now()
 	log := logrus.WithFields(logrus.Fields{
 		"event_type": eventType,
@@ -313,7 +314,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 		return errors.Errorf("unknown event type: %s", eventType)
 	}
 
-	_, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, nil)
+	_, err = runner.ResumeFlow(ctx, db, rp, st, oa, session, resume, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming flow for timeout")
 	}
@@ -507,7 +508,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 }
 
 // handleMsgEvent is called when a new message arrives from a contact
-func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *MsgEvent) error {
+func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, st storage.Storage, event *MsgEvent) error {
 	oa, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -669,7 +670,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	// if there is a session, resume it
 	if session != nil && flow != nil {
 		resume := resumes.NewMsg(oa.Env(), contact, msgIn)
-		_, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, hook)
+		_, err = runner.ResumeFlow(ctx, db, rp, st, oa, session, resume, hook)
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
 		}

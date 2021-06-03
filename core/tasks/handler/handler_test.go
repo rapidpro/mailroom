@@ -25,6 +25,7 @@ func TestMsgEvents(t *testing.T) {
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
+	st := testsuite.Storage()
 
 	rc := rp.Get()
 	defer rc.Close()
@@ -139,7 +140,7 @@ func TestMsgEvents(t *testing.T) {
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handleContactEvent(ctx, db, rp, task)
+		err = handleContactEvent(ctx, db, rp, st, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
@@ -176,7 +177,7 @@ func TestMsgEvents(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NotNil(t, task)
-		err := handleContactEvent(ctx, db, rp, task)
+		err := handleContactEvent(ctx, db, rp, st, task)
 		assert.NoError(t, err)
 	}
 
@@ -194,7 +195,7 @@ func TestMsgEvents(t *testing.T) {
 	AddHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handleContactEvent(ctx, db, rp, st, task)
 	assert.NoError(t, err)
 
 	// should get our catch all trigger
@@ -213,7 +214,7 @@ func TestMsgEvents(t *testing.T) {
 	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "start")
 	AddHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handleContactEvent(ctx, db, rp, st, task)
 	assert.NoError(t, err)
 
 	db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2 ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID, previous)
@@ -225,6 +226,7 @@ func TestChannelEvents(t *testing.T) {
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
+	st := testsuite.Storage()
 
 	rc := rp.Get()
 	defer rc.Close()
@@ -287,7 +289,7 @@ func TestChannelEvents(t *testing.T) {
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handleContactEvent(ctx, db, rp, task)
+		err = handleContactEvent(ctx, db, rp, st, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
@@ -312,6 +314,7 @@ func TestStopEvent(t *testing.T) {
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
+	st := testsuite.Storage()
 
 	rc := rp.Get()
 	defer rc.Close()
@@ -336,7 +339,7 @@ func TestStopEvent(t *testing.T) {
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err, "error popping next task")
 
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handleContactEvent(ctx, db, rp, st, task)
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
@@ -356,6 +359,7 @@ func TestTimedEvents(t *testing.T) {
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
+	st := testsuite.Storage()
 
 	rc := rp.Get()
 	defer rc.Close()
@@ -472,7 +476,7 @@ func TestTimedEvents(t *testing.T) {
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handleContactEvent(ctx, db, rp, task)
+		err = handleContactEvent(ctx, db, rp, st, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		var text string
@@ -522,7 +526,7 @@ func TestTimedEvents(t *testing.T) {
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handleContactEvent(ctx, db, rp, st, task)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, []interface{}{runID}, 1)

@@ -20,6 +20,7 @@ func TestRetryMsgs(t *testing.T) {
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
+	st := testsuite.Storage()
 
 	rc := rp.Get()
 	defer rc.Close()
@@ -51,7 +52,7 @@ func TestRetryMsgs(t *testing.T) {
 	// should have one message requeued
 	task, _ := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handleContactEvent(ctx, db, rp, st, task)
 	assert.NoError(t, err)
 
 	// message should be handled now

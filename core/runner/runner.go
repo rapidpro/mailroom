@@ -6,6 +6,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -62,7 +63,7 @@ type StartOptions struct {
 type TriggerBuilder func(contact *flows.Contact) flows.Trigger
 
 // ResumeFlow resumes the passed in session using the passed in session
-func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
+func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, st storage.Storage, oa *models.OrgAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
 	start := time.Now()
 	sa := oa.SessionAssets()
 
@@ -103,7 +104,7 @@ func ResumeFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.Org
 	}
 
 	// write our updated session and runs
-	err = session.WriteUpdatedSession(txCTX, tx, rp, oa, fs, sprint, hook)
+	err = session.WriteUpdatedSession(txCTX, tx, rp, st, oa, fs, sprint, hook)
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")

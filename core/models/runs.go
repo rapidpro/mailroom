@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -102,6 +104,7 @@ type Session struct {
 		Status        SessionStatus     `db:"status"`
 		Responded     bool              `db:"responded"`
 		Output        string            `db:"output"`
+		OutputURL     null.String       `db:"output_url"`
 		ContactID     ContactID         `db:"contact_id"`
 		OrgID         OrgID             `db:"org_id"`
 		CreatedOn     time.Time         `db:"created_on"`
@@ -142,6 +145,7 @@ func (s *Session) SessionType() FlowType              { return s.s.SessionType }
 func (s *Session) Status() SessionStatus              { return s.s.Status }
 func (s *Session) Responded() bool                    { return s.s.Responded }
 func (s *Session) Output() string                     { return s.s.Output }
+func (s *Session) OutputURL() string                  { return string(s.s.OutputURL) }
 func (s *Session) ContactID() ContactID               { return s.s.ContactID }
 func (s *Session) OrgID() OrgID                       { return s.s.OrgID }
 func (s *Session) CreatedOn() time.Time               { return s.s.CreatedOn }
@@ -154,6 +158,42 @@ func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID 
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
 func (s *Session) IncomingMsgExternalID() null.String { return s.incomingExternalID }
 func (s *Session) Scene() *Scene                      { return s.scene }
+
+// WriteSessionsToStorage writes the outputs of the passed in sessions to our storage (S3), updating the
+// output_url for each on success. Failure of any will cause all to fail.
+func WriteSessionOutputsToStorage(ctx context.Context, st storage.Storage, sessions []*Session) error {
+	uploads := make([]*storage.Upload, len(sessions))
+	for i, s := range sessions {
+		uploads[i] = &storage.Upload{
+			Path:        s.StoragePath(),
+			Body:        []byte(s.Output()),
+			ContentType: "application/json",
+			ACL:         s3.ObjectCannedACLPrivate,
+		}
+	}
+
+	err := st.BatchPut(ctx, uploads)
+	if err != nil {
+		return errors.Wrapf(err, "error writing sessions to storage")
+	}
+
+	for i, s := range sessions {
+		s.s.OutputURL = null.String(uploads[i].URL)
+	}
+
+	return nil
+}
+
+const storageTSFormat = "2006_01_02T15_04_05_999999999Z"
+
+// StoragePath returns the path for the session
+func (s *Session) StoragePath() string {
+	ts := s.CreatedOn().UTC().Format(storageTSFormat)
+
+	// example output: /orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/session_2006_01_02T15_04_05_999999999Z_51df83ac21d3cf136d8341f0b11cb1a7.json"
+	return fmt.Sprintf("/orgs/%d/c/%s/%s/session_%s_%s_%s.json",
+		s.OrgID(), s.ContactUUID()[:4], s.ContactUUID(), ts, s.UUID(), s.OutputMD5())
+}
 
 // ContactUUID returns the UUID of our contact
 func (s *Session) ContactUUID() flows.ContactUUID {
@@ -391,6 +431,7 @@ SELECT
 	status,
 	responded,
 	output,
+	output_url,
 	contact_id,
 	org_id,
 	created_on,
@@ -412,15 +453,15 @@ LIMIT 1
 
 const insertCompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded, output, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
-               VALUES(:uuid,:session_type,:status,:responded,:output,:contact_id,:org_id, NOW(),      NOW(),    NULL,           :connection_id)
+	flows_flowsession( uuid, session_type, status, responded, output, output_url, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
+               VALUES(:uuid,:session_type,:status,:responded,:output,:output_url,:contact_id,:org_id, NOW(),      NOW(),    NULL,           :connection_id)
 RETURNING id
 `
 
 const insertIncompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded, output, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
-               VALUES(:uuid,:session_type,:status,:responded,:output,:contact_id,:org_id, NOW(),     :current_flow_id,:timeout_on,:wait_started_on,:connection_id)
+	flows_flowsession( uuid, session_type, status, responded, output, output_url, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
+               VALUES(:uuid,:session_type,:status,:responded,:output,:output_url,:contact_id,:org_id, NOW(),     :current_flow_id,:timeout_on,:wait_started_on,:connection_id)
 RETURNING id
 `
 
@@ -460,7 +501,7 @@ func (s *Session) calculateTimeout(fs flows.Session, sprint flows.Sprint) {
 }
 
 // WriteUpdatedSession updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
-func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
+func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.Storage, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
 	// make sure we have our seen runs
 	if s.seenRuns == nil {
 		return errors.Errorf("missing seen runs, cannot update session")
@@ -525,6 +566,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 		err := ApplyPreWriteEvent(ctx, tx, rp, org, s.scene, e)
 		if err != nil {
 			return errors.Wrapf(err, "error applying event: %v", e)
+		}
+	}
+
+	// if writing to S3, do so
+	if org.Org().UsesStorageSessions() {
+		err := WriteSessionOutputsToStorage(ctx, st, []*Session{s})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -603,6 +652,7 @@ UPDATE
 	flows_flowsession
 SET 
 	output = :output, 
+	output_url = :output_url,
 	status = :status, 
 	ended_on = CASE WHEN :status = 'W' THEN NULL ELSE NOW() END,
 	responded = :responded,

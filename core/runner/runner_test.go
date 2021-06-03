@@ -176,6 +176,10 @@ func TestContactRuns(t *testing.T) {
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
 	rp := testsuite.RP()
+	st := testsuite.Storage()
+	defer testsuite.ResetStorage()
+
+	db.MustExec(`UPDATE orgs_org set config = '{"use_storage_sessions": "true"}' WHERE id=1;`)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
@@ -232,27 +236,27 @@ func TestContactRuns(t *testing.T) {
 		msg.SetID(10)
 		resume := resumes.NewMsg(oa.Env(), contact, msg)
 
-		session, err = ResumeFlow(ctx, db, rp, oa, session, resume, nil)
+		session, err = ResumeFlow(ctx, db, rp, st, oa, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND output_url IS NOT NULL`,
 			[]interface{}{contact.ID(), flow.ID(), tc.SessionStatus}, 1, "%d: didn't find expected session", i,
 		)
 
 		runIsActive := tc.RunStatus == models.RunStatusActive || tc.RunStatus == models.RunStatusWaiting
 
 		runQuery := `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-		AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
-		AND json_array_length(path::json) = $5 AND json_array_length(events::json) = $6
-		AND session_id IS NOT NULL `
+		 AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
+		 AND json_array_length(path::json) = $5 AND json_array_length(events::json) = $6 
+		 AND session_id IS NOT NULL`
 
 		if runIsActive {
-			runQuery += `AND expires_on IS NOT NULL`
+			runQuery += ` AND expires_on IS NOT NULL`
 		} else {
-			runQuery += `AND expires_on IS NULL`
+			runQuery += ` AND expires_on IS NULL`
 		}
 
 		testsuite.AssertQueryCount(t, db,

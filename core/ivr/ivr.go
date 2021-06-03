@@ -481,7 +481,7 @@ func ResumeIVRFlow(
 		return client.WriteErrorResponse(w, fmt.Errorf("no resume found, ending call"))
 	}
 
-	session, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, db, rp, store, oa, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}
@@ -544,7 +544,7 @@ func buildMsgResume(
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(resume.Attachment.URL())
 
-		resume.Attachment, err = oa.Org().StoreAttachment(store, filename, resume.Attachment.ContentType(), resp.Body)
+		resume.Attachment, err = oa.Org().StoreAttachment(ctx, store, filename, resume.Attachment.ContentType(), resp.Body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to download and store attachment, ending call"), nil
 		}
