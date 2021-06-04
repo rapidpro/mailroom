@@ -22,6 +22,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type TicketEventType string
+
+const TicketClosedEventType TicketEventType = "ticket_closed"
+
+type TicketEvent struct {
+	EventType TicketEventType
+	ContactID ContactID `json:"contact_id"`
+	OrgID     OrgID     `json:"org_id"`
+	TicketID  TicketID  `json:"ticket_id"`
+}
+
 type TicketID int
 type TicketerID null.Int
 type TicketStatus string
