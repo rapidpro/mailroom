@@ -170,7 +170,7 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 	assert.Equal(t, expected, actual, errMsg...)
 }
 
-func Runtime() *runtime.Runtime {
+func RT() *runtime.Runtime {
 	return &runtime.Runtime{
 		RP:      RP(),
 		DB:      DB(),
