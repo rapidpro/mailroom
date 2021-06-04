@@ -372,7 +372,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		trigger = models.FindMatchingMissedCallTrigger(oa)
 
 	case models.MOCallEventType:
-		trigger = models.FindMatchingMOCallTrigger(oa, modelContact)
+		trigger = models.FindMatchingIncomingCallTrigger(oa, modelContact)
 
 	case models.WelcomeMessageEventType:
 		trigger = nil
