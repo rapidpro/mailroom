@@ -56,7 +56,7 @@ func TestTicketers(t *testing.T) {
 
 func TestTickets(t *testing.T) {
 	ctx := testsuite.CTX()
-	rt := testsuite.Runtime()
+	rt := testsuite.RT()
 	db := rt.DB
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)

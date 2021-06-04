@@ -19,7 +19,7 @@ func TestCampaigns(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
 
-	rt := testsuite.Runtime()
+	rt := testsuite.RT()
 	rc := testsuite.RC()
 	defer rc.Close()
 
@@ -52,7 +52,7 @@ func TestCampaigns(t *testing.T) {
 func TestIVRCampaigns(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
-	rt := testsuite.Runtime()
+	rt := testsuite.RT()
 	db := rt.DB
 	rc := testsuite.RC()
 	defer rc.Close()

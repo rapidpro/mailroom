@@ -120,7 +120,7 @@ func TestFromTicketerUUID(t *testing.T) {
 func TestSendReply(t *testing.T) {
 	testsuite.ResetDB()
 	ctx := testsuite.CTX()
-	rt := testsuite.Runtime()
+	rt := testsuite.RT()
 	db := rt.DB
 	defer testsuite.ResetStorage()
 

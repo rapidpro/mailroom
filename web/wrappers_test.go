@@ -50,7 +50,7 @@ func TestWithHTTPLogs(t *testing.T) {
 
 	// simulate handler being invoked by server
 	wrapped := web.WithHTTPLogs(handler)
-	response, status, err := wrapped(testsuite.CTX(), testsuite.Runtime(), nil)
+	response, status, err := wrapped(testsuite.CTX(), testsuite.RT(), nil)
 
 	// check response from handler
 	assert.Equal(t, map[string]string{"status": "OK"}, response)

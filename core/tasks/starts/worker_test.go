@@ -21,7 +21,7 @@ import (
 func TestStarts(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
-	rt := testsuite.Runtime()
+	rt := testsuite.RT()
 	rp := rt.RP
 	db := rt.DB
 	rc := testsuite.RC()

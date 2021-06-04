@@ -13,7 +13,7 @@ import (
 
 func TestImportContactBatch(t *testing.T) {
 	ctx := testsuite.CTX()
-	rt := testsuite.Runtime()
+	rt := testsuite.RT()
 	db := rt.DB
 
 	importID := testdata.InsertContactImport(t, db, testdata.Org1)

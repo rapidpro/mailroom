@@ -15,7 +15,7 @@ import (
 func TestPopulateTask(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
-	rt := testsuite.Runtime()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 
 	mes := testsuite.NewMockElasticServer()
