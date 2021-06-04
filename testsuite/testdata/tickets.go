@@ -3,11 +3,11 @@ package testdata
 import (
 	"testing"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
 

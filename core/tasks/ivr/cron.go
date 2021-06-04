@@ -2,6 +2,7 @@ package ivr
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/nyaruka/goflow/flows"
@@ -9,6 +10,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 
 	"github.com/gomodule/redigo/redis"
@@ -27,20 +29,20 @@ func init() {
 }
 
 // StartIVRCron starts our cron job of retrying errored calls
-func StartIVRCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, retryIVRLock, time.Minute,
+func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+	cron.StartCron(quit, rt.RP, retryIVRLock, time.Minute,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return retryCalls(ctx, mr.Config, mr.DB, mr.RP, retryIVRLock, lockValue)
+			return retryCalls(ctx, rt.Config, rt.DB, rt.RP, retryIVRLock, lockValue)
 		},
 	)
 
-	cron.StartCron(mr.Quit, mr.RP, expireIVRLock, time.Minute,
+	cron.StartCron(quit, rt.RP, expireIVRLock, time.Minute,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return expireCalls(ctx, mr.Config, mr.DB, mr.RP, expireIVRLock, lockValue)
+			return expireCalls(ctx, rt.Config, rt.DB, rt.RP, expireIVRLock, lockValue)
 		},
 	)
 

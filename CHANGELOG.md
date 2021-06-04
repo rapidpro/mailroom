@@ -1,3 +1,12 @@
+v6.3.13
+----------
+ * Introduce runtime.Runtime
+ * Simplify testdata functions
+ * Various fixes from linter
+ * Simplify use of test contacts in handler tests
+ * Move test constants out of models package
+ * Remove reduntant resend_msgs task
+
 v6.3.12
 ----------
  * Update to latest goflow (legacy_extra is no longer an issue)

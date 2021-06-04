@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/i18n"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/go-chi/chi/middleware"
@@ -38,13 +39,13 @@ type exportRequest struct {
 	ExcludeArguments bool            `json:"exclude_arguments"`
 }
 
-func handleExport(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
+func handleExport(ctx context.Context, rt *runtime.Runtime, r *http.Request, rawW http.ResponseWriter) error {
 	request := &exportRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation")
 	}
 
-	flows, err := loadFlows(ctx, s.DB, request.OrgID, request.FlowIDs)
+	flows, err := loadFlows(ctx, rt.DB, request.OrgID, request.FlowIDs)
 	if err != nil {
 		return err
 	}
@@ -80,7 +81,7 @@ type importForm struct {
 	Language envs.Language   `form:"language" validate:"required"`
 }
 
-func handleImport(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	form := &importForm{}
 	if err := web.DecodeAndValidateForm(form, r); err != nil {
 		return err, http.StatusBadRequest, nil
@@ -96,7 +97,7 @@ func handleImport(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return errors.Wrapf(err, "invalid po file"), http.StatusBadRequest, nil
 	}
 
-	flows, err := loadFlows(ctx, s.DB, form.OrgID, form.FlowIDs)
+	flows, err := loadFlows(ctx, rt.DB, form.OrgID, form.FlowIDs)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

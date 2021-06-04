@@ -2,11 +2,13 @@ package stats
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/sirupsen/logrus"
 
@@ -23,12 +25,12 @@ func init() {
 }
 
 // StartStatsCron starts our cron job of posting stats every minute
-func StartStatsCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, expirationLock, time.Second*60,
+func StartStatsCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+	cron.StartCron(quit, rt.RP, expirationLock, time.Second*60,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return dumpStats(ctx, mr.DB, mr.RP, lockName, lockValue)
+			return dumpStats(ctx, rt.DB, rt.RP, lockName, lockValue)
 		},
 	)
 	return nil

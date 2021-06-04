@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -49,7 +50,7 @@ type submitResponse struct {
 }
 
 // handles a surveyor request
-func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &submitRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
@@ -57,7 +58,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 	// grab our org assets
 	orgID := ctx.Value(web.OrgIDKey).(models.OrgID)
-	oa, err := models.GetOrgAssets(s.CTX, s.DB, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -96,12 +97,12 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		// create / fetch our contact based on the highest priority URN
 		urn := fs.Contact().URNs()[0].URN()
 
-		_, flowContact, _, err = models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{urn}, models.NilChannelID)
+		_, flowContact, _, err = models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, models.NilChannelID)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 		}
 	} else {
-		_, flowContact, err = models.CreateContact(ctx, s.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
+		_, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to create contact")
 		}
@@ -127,11 +128,11 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	sprint := engine.NewSprint(mods, modifierEvents)
 
 	// write our session out
-	tx, err := s.DB.BeginTxx(ctx, nil)
+	tx, err := rt.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for session write")
 	}
-	sessions, err := models.WriteSessions(ctx, tx, s.RP, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
+	sessions, err := models.WriteSessions(ctx, tx, rt.RP, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
 	if err == nil && len(sessions) == 0 {
 		err = errors.Errorf("no sessions written")
 	}
@@ -144,13 +145,13 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error committing sessions")
 	}
 
-	tx, err = s.DB.BeginTxx(ctx, nil)
+	tx, err = rt.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for post commit hooks")
 	}
 
 	// write our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, s.RP, oa, []*models.Scene{sessions[0].Scene()})
+	err = models.ApplyEventPostCommitHooks(ctx, tx, rt.RP, oa, []*models.Scene{sessions[0].Scene()})
 	if err != nil {
 		tx.Rollback()
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying post commit hooks")

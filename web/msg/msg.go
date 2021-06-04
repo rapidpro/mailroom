@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -30,29 +31,29 @@ type resendRequest struct {
 }
 
 // handles a request to resend the given messages
-func handleResend(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &resendRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// grab our org
-	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	msgs, err := models.LoadMessages(ctx, s.DB, request.OrgID, models.DirectionOut, request.MsgIDs)
+	msgs, err := models.LoadMessages(ctx, rt.DB, request.OrgID, models.DirectionOut, request.MsgIDs)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error loading messages to resend")
 	}
 
-	err = models.ResendMessages(ctx, s.DB, s.RP, oa, msgs)
+	err = models.ResendMessages(ctx, rt.DB, rt.RP, oa, msgs)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error resending messages")
 	}
 
-	msgio.SendMessages(ctx, s.DB, s.RP, nil, msgs)
+	msgio.SendMessages(ctx, rt.DB, rt.RP, nil, msgs)
 
 	// response is the ids of the messages that were actually resent
 	resentMsgIDs := make([]flows.MsgID, len(msgs))

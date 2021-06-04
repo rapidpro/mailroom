@@ -3,6 +3,7 @@ package campaigns
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
@@ -10,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/utils/marker"
 
@@ -30,12 +32,12 @@ func init() {
 }
 
 // StartCampaignCron starts our cron job of firing expired campaign events
-func StartCampaignCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, campaignsLock, time.Second*60,
+func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+	cron.StartCron(quit, rt.RP, campaignsLock, time.Second*60,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return fireCampaignEvents(ctx, mr.DB, mr.RP, lockName, lockValue)
+			return fireCampaignEvents(ctx, rt.DB, rt.RP, lockName, lockValue)
 		},
 	)
 

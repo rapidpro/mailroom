@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 )
@@ -114,20 +115,20 @@ func handleSimulationEvents(ctx context.Context, db models.Queryer, oa *models.O
 }
 
 // handles a request to /start
-func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &startRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// create clone of assets for simulation
-	oa, err = oa.CloneForSimulation(s.CTX, s.DB, request.flows(), request.channels())
+	oa, err = oa.CloneForSimulation(ctx, rt.DB, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to clone org")
 	}
@@ -138,7 +139,7 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
 
-	return triggerFlow(ctx, s.DB, oa, trigger)
+	return triggerFlow(ctx, rt.DB, oa, trigger)
 }
 
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
@@ -177,20 +178,20 @@ type resumeRequest struct {
 	Resume  json.RawMessage `json:"resume" validate:"required"`
 }
 
-func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &resumeRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// create clone of assets for simulation
-	oa, err = oa.CloneForSimulation(s.CTX, s.DB, request.flows(), request.channels())
+	oa, err = oa.CloneForSimulation(ctx, rt.DB, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -231,7 +232,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 
 				if triggeredFlow != nil {
 					trigger := triggers.NewBuilder(oa.Env(), triggeredFlow.FlowReference(), resume.Contact()).Msg(msgResume.Msg()).WithMatch(trigger.Match()).Build()
-					return triggerFlow(ctx, s.DB, oa, trigger)
+					return triggerFlow(ctx, rt.DB, oa, trigger)
 				}
 			}
 		}
@@ -248,7 +249,7 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, err
 	}
 
-	err = handleSimulationEvents(ctx, s.DB, oa, sprint.Events())
+	err = handleSimulationEvents(ctx, rt.DB, oa, sprint.Events())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
