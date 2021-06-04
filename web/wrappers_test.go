@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
@@ -26,8 +27,8 @@ func TestWithHTTPLogs(t *testing.T) {
 		},
 	}))
 
-	handler := func(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
-		ticketer, _ := models.LookupTicketerByUUID(ctx, s.DB, testdata.Mailgun.UUID)
+	handler := func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+		ticketer, _ := models.LookupTicketerByUUID(ctx, rt.DB, testdata.Mailgun.UUID)
 
 		logger := l.Ticketer(ticketer)
 
@@ -48,9 +49,8 @@ func TestWithHTTPLogs(t *testing.T) {
 	}
 
 	// simulate handler being invoked by server
-	server := &web.Server{DB: testsuite.DB()}
 	wrapped := web.WithHTTPLogs(handler)
-	response, status, err := wrapped(testsuite.CTX(), server, nil)
+	response, status, err := wrapped(testsuite.CTX(), testsuite.Runtime(), nil)
 
 	// check response from handler
 	assert.Equal(t, map[string]string{"status": "OK"}, response)
