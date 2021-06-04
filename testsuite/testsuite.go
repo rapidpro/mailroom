@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/storage"
+	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -166,4 +168,14 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 	}
 
 	assert.Equal(t, expected, actual, errMsg...)
+}
+
+func RT() *runtime.Runtime {
+	return &runtime.Runtime{
+		RP:      RP(),
+		DB:      DB(),
+		ES:      nil,
+		Storage: Storage(),
+		Config:  config.NewMailroomConfig(),
+	}
 }

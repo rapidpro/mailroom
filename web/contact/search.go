@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -65,7 +66,7 @@ type searchResponse struct {
 }
 
 // handles a contact search request
-func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &searchRequest{
 		Offset:   0,
 		PageSize: 50,
@@ -76,13 +77,13 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, oa,
+	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, rt.ES, oa,
 		request.GroupUUID, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
@@ -161,14 +162,14 @@ type parseResponse struct {
 }
 
 // handles a query parsing request
-func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &parseRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}

@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -17,9 +15,8 @@ import (
 func TestInterrupts(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
-	db := testsuite.DB()
-
-	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: nil}
+	rt := testsuite.RT()
+	db := rt.DB
 
 	insertConnection := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urnID models.URNID) models.ConnectionID {
 		var connectionID models.ConnectionID
@@ -106,7 +103,7 @@ func TestInterrupts(t *testing.T) {
 		}
 
 		// execute it
-		err := task.Perform(ctx, mr, testdata.Org1.ID)
+		err := task.Perform(ctx, rt, testdata.Org1.ID)
 		assert.NoError(t, err)
 
 		// check session statuses are as expected

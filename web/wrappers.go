@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/pkg/errors"
 )
 
 // RequireUserToken wraps a JSON handler to require passing of an API token via the authorization header
 func RequireUserToken(handler JSONHandler) JSONHandler {
-	return func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
+	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 		token := r.Header.Get("authorization")
 		if !strings.HasPrefix(token, "Token ") {
 			return errors.New("missing authorization header"), http.StatusUnauthorized, nil
@@ -23,7 +24,7 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 		token = token[6:]
 
 		// try to look it up
-		rows, err := s.DB.QueryContext(s.CTX, `
+		rows, err := rt.DB.QueryContext(ctx, `
 		SELECT 
 			user_id, 
 			org_id
@@ -58,34 +59,34 @@ func RequireUserToken(handler JSONHandler) JSONHandler {
 		// we are authenticated set our user id ang org id on our context and call our sub handler
 		ctx = context.WithValue(ctx, UserIDKey, userID)
 		ctx = context.WithValue(ctx, OrgIDKey, orgID)
-		return handler(ctx, s, r)
+		return handler(ctx, rt, r)
 	}
 }
 
 // RequireAuthToken wraps a handler to require that our request to have our global authorization header
 func RequireAuthToken(handler JSONHandler) JSONHandler {
-	return func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
+	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 		auth := r.Header.Get("authorization")
-		if s.Config.AuthToken != "" && fmt.Sprintf("Token %s", s.Config.AuthToken) != auth {
+		if rt.Config.AuthToken != "" && fmt.Sprintf("Token %s", rt.Config.AuthToken) != auth {
 			return fmt.Errorf("invalid or missing authorization header, denying"), http.StatusUnauthorized, nil
 		}
 
 		// we are authenticated, call our chain
-		return handler(ctx, s, r)
+		return handler(ctx, rt, r)
 	}
 }
 
 // LoggingJSONHandler is a JSON web handler which logs HTTP logs
-type LoggingJSONHandler func(ctx context.Context, s *Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error)
+type LoggingJSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error)
 
 // WithHTTPLogs wraps a handler to create a handler which can record and save HTTP logs
 func WithHTTPLogs(handler LoggingJSONHandler) JSONHandler {
-	return func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
+	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 		logger := &models.HTTPLogger{}
 
-		response, status, err := handler(ctx, s, r, logger)
+		response, status, err := handler(ctx, rt, r, logger)
 
-		if err := logger.Insert(ctx, s.DB); err != nil {
+		if err := logger.Insert(ctx, rt.DB); err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrap(err, "error writing HTTP logs")
 		}
 
