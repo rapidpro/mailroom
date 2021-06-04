@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -26,7 +27,7 @@ func init() {
 }
 
 // handleSendBroadcast creates all the batches of contacts that need to be sent to
-func handleSendBroadcast(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+func handleSendBroadcast(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*60)
 	defer cancel()
 
@@ -40,7 +41,7 @@ func handleSendBroadcast(ctx context.Context, mr *mailroom.Mailroom, task *queue
 		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
 	}
 
-	return CreateBroadcastBatches(ctx, mr.DB, mr.RP, broadcast)
+	return CreateBroadcastBatches(ctx, rt.DB, rt.RP, broadcast)
 }
 
 // CreateBroadcastBatches takes our master broadcast and creates batches of broadcast sends for all the unique contacts
@@ -130,7 +131,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 }
 
 // handleSendBroadcastBatch sends our messages
-func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+func handleSendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*60)
 	defer cancel()
 
@@ -145,7 +146,7 @@ func handleSendBroadcastBatch(ctx context.Context, mr *mailroom.Mailroom, task *
 	}
 
 	// try to send the batch
-	return SendBroadcastBatch(ctx, mr.DB, mr.RP, broadcast)
+	return SendBroadcastBatch(ctx, rt.DB, rt.RP, broadcast)
 }
 
 // SendBroadcastBatch sends the passed in broadcast batch

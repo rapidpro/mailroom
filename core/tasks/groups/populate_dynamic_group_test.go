@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/tasks/groups"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -17,19 +15,18 @@ import (
 func TestPopulateTask(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
+	rt := testsuite.Runtime()
 	db := testsuite.DB()
 
 	mes := testsuite.NewMockElasticServer()
 	defer mes.Close()
-
 	es, err := elastic.NewClient(
 		elastic.SetURL(mes.URL()),
 		elastic.SetHealthcheck(false),
 		elastic.SetSniff(false),
 	)
 	require.NoError(t, err)
-
-	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: es}
+	rt.ES = es
 
 	mes.NextResponse = fmt.Sprintf(`{
 		"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
@@ -63,7 +60,7 @@ func TestPopulateTask(t *testing.T) {
 		GroupID: group.ID,
 		Query:   "gender = F",
 	}
-	err = task.Perform(ctx, mr, testdata.Org1.ID)
+	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, []interface{}{group.ID}, 1)

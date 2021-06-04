@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 )
 
@@ -28,13 +28,13 @@ func (t *ImportContactBatchTask) Timeout() time.Duration {
 }
 
 // Perform figures out the membership for a query based group then repopulates it
-func (t *ImportContactBatchTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
-	batch, err := models.LoadContactImportBatch(ctx, mr.DB, t.ContactImportBatchID)
+func (t *ImportContactBatchTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	batch, err := models.LoadContactImportBatch(ctx, rt.DB, t.ContactImportBatchID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load contact import batch with id %d", t.ContactImportBatchID)
 	}
 
-	if err := batch.Import(ctx, mr.DB, orgID); err != nil {
+	if err := batch.Import(ctx, rt.DB, orgID); err != nil {
 		return errors.Wrapf(err, "unable to import contact import batch %d", t.ContactImportBatchID)
 	}
 

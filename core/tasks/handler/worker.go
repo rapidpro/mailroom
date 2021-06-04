@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -85,8 +86,8 @@ func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, 
 	return addContactTask(rc, models.OrgID(task.OrgID), contactID)
 }
 
-func handleEvent(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
-	return handleContactEvent(ctx, mr.DB, mr.RP, task)
+func handleEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
+	return handleContactEvent(ctx, rt.DB, rt.RP, task)
 }
 
 // handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into

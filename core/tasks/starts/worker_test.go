@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -23,8 +21,9 @@ import (
 func TestStarts(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-	db := testsuite.DB()
+	rt := testsuite.Runtime()
+	rp := rt.RP
+	db := rt.DB
 	rc := testsuite.RC()
 	defer rc.Close()
 
@@ -37,8 +36,7 @@ func TestStarts(t *testing.T) {
 		elastic.SetSniff(false),
 	)
 	require.NoError(t, err)
-
-	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: rp, ElasticClient: es}
+	rt.ES = es
 
 	// convert our single message flow to an actual background flow that shouldn't interrupt
 	db.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
@@ -266,7 +264,7 @@ func TestStarts(t *testing.T) {
 		startJSON, err := json.Marshal(start)
 		require.NoError(t, err)
 
-		err = handleFlowStart(ctx, mr, &queue.Task{Type: queue.StartFlow, Task: startJSON})
+		err = handleFlowStart(ctx, rt, &queue.Task{Type: queue.StartFlow, Task: startJSON})
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
