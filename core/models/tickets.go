@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -22,15 +23,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type TicketEventType string
-
-const TicketClosedEventType TicketEventType = "ticket_closed"
+const TicketEventType = "ticket"
 
 type TicketEvent struct {
-	EventType TicketEventType
-	ContactID ContactID `json:"contact_id"`
-	OrgID     OrgID     `json:"org_id"`
-	TicketID  TicketID  `json:"ticket_id"`
+	EventType triggers.TicketEventType `json:"event_type"`
+	ContactID ContactID                `json:"contact_id"`
+	OrgID     OrgID                    `json:"org_id"`
+	TicketID  TicketID                 `json:"ticket_id"`
 }
 
 type TicketID int
@@ -95,6 +94,17 @@ func (t *Ticket) Subject() string         { return t.t.Subject }
 func (t *Ticket) Body() string            { return t.t.Body }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
+}
+
+func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.TicketReference, error) {
+	ticketer := oa.TicketerByID(t.TicketerID())
+	if ticketer == nil {
+		return nil, errors.New("unable to load ticketer with id %d")
+	}
+
+	ticket := flows.NewTicketReference(t.UUID(), ticketer.Reference(), t.Subject(), t.Body(), string(t.ExternalID()))
+
+	return ticket, nil
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
@@ -163,13 +173,12 @@ FROM
   tickets_ticket t
 WHERE
   t.org_id = $1 AND
-  t.id = ANY($2) AND
-  t.status = $3
+  t.id = ANY($2)
 `
 
 // LoadTickets loads all of the tickets with the given ids
-func LoadTickets(ctx context.Context, db Queryer, orgID OrgID, ids []TicketID, status TicketStatus) ([]*Ticket, error) {
-	return loadTickets(ctx, db, selectTicketsByIDSQL, orgID, pq.Array(ids), status)
+func LoadTickets(ctx context.Context, db Queryer, orgID OrgID, ids []TicketID) ([]*Ticket, error) {
+	return loadTickets(ctx, db, selectTicketsByIDSQL, orgID, pq.Array(ids))
 }
 
 func loadTickets(ctx context.Context, db Queryer, query string, params ...interface{}) ([]*Ticket, error) {
@@ -340,17 +349,22 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
+func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) ([]*Ticket, error) {
+	updated := make([]*Ticket, 0, len(tickets))
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
 	for i, ticket := range tickets {
-		byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
-		ids[i] = ticket.ID()
-		t := &ticket.t
-		t.Status = TicketStatusClosed
-		t.ModifiedOn = now
-		t.ClosedOn = &now
+		if ticket.Status() != TicketStatusClosed {
+			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
+			ids[i] = ticket.ID()
+			t := &ticket.t
+			t.Status = TicketStatusClosed
+			t.ModifiedOn = now
+			t.ClosedOn = &now
+
+			updated = append(updated, ticket)
+		}
 	}
 
 	if externally {
@@ -359,18 +373,18 @@ func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ti
 			if ticketer != nil {
 				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	return Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	return updated, Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
 }
 
 const reopenTicketSQL = `
@@ -385,17 +399,22 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) ([]*Ticket, error) {
+	updated := make([]*Ticket, 0, len(tickets))
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, len(tickets))
 	now := dates.Now()
 	for i, ticket := range tickets {
-		byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
-		ids[i] = ticket.ID()
-		t := &ticket.t
-		t.Status = TicketStatusOpen
-		t.ModifiedOn = now
-		t.ClosedOn = nil
+		if ticket.Status() != TicketStatusOpen {
+			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
+			ids[i] = ticket.ID()
+			t := &ticket.t
+			t.Status = TicketStatusOpen
+			t.ModifiedOn = now
+			t.ClosedOn = nil
+
+			updated = append(updated, ticket)
+		}
 	}
 
 	if externally {
@@ -404,18 +423,18 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 			if ticketer != nil {
 				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	return Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	return updated, Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
 }
 
 // Ticketer is our type for a ticketer asset

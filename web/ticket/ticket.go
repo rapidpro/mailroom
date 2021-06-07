@@ -53,17 +53,17 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, request.OrgID, request.TicketIDs, models.TicketStatusOpen)
+	tickets, err := models.LoadTickets(ctx, rt.DB, request.OrgID, request.TicketIDs)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	err = models.CloseTickets(ctx, rt.DB, oa, tickets, true, l)
+	updated, err := models.CloseTickets(ctx, rt.DB, oa, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error closing tickets for org: %d", request.OrgID)
 	}
 
-	return newBulkResponse(tickets), http.StatusOK, nil
+	return newBulkResponse(updated), http.StatusOK, nil
 }
 
 // Reopens any closed tickets with the given ids
@@ -85,15 +85,15 @@ func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, request.OrgID, request.TicketIDs, models.TicketStatusClosed)
+	tickets, err := models.LoadTickets(ctx, rt.DB, request.OrgID, request.TicketIDs)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	err = models.ReopenTickets(ctx, rt.DB, oa, tickets, true, l)
+	updated, err := models.ReopenTickets(ctx, rt.DB, oa, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
 	}
 
-	return newBulkResponse(tickets), http.StatusOK, nil
+	return newBulkResponse(updated), http.StatusOK, nil
 }

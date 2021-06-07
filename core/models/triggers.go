@@ -34,6 +34,7 @@ const (
 	ReferralTriggerType        = TriggerType("R")
 	IncomingCallTriggerType    = TriggerType("V")
 	ScheduleTriggerType        = TriggerType("S")
+	TicketClosedTriggerType    = TriggerType("T")
 )
 
 // match type constants
@@ -133,34 +134,22 @@ func FindMatchingMsgTrigger(oa *OrgAssets, contact *flows.Contact, text string) 
 		return t.Keyword() == keyword && (t.MatchType() == MatchFirst || (t.MatchType() == MatchOnly && only))
 	})
 
-	// build a set of the groups this contact is in
-	groupIDs := make(map[GroupID]bool, 10)
-	for _, g := range contact.Groups().All() {
-		groupIDs[g.Asset().(*Group).ID()] = true
-	}
-
 	// if we have a matching keyword trigger return that, otherwise we move on to catchall triggers..
-	byKeyword := findBestTriggerMatch(candidates, nil, groupIDs)
+	byKeyword := findBestTriggerMatch(candidates, nil, contact)
 	if byKeyword != nil {
 		return byKeyword
 	}
 
 	candidates = findTriggerCandidates(oa, CatchallTriggerType, nil)
 
-	return findBestTriggerMatch(candidates, nil, groupIDs)
+	return findBestTriggerMatch(candidates, nil, contact)
 }
 
 // FindMatchingIncomingCallTrigger finds the best match trigger for incoming calls
-func FindMatchingIncomingCallTrigger(oa *OrgAssets, contact *Contact) *Trigger {
+func FindMatchingIncomingCallTrigger(oa *OrgAssets, contact *flows.Contact) *Trigger {
 	candidates := findTriggerCandidates(oa, IncomingCallTriggerType, nil)
 
-	// build a set of the groups this contact is in
-	groupIDs := make(map[GroupID]bool, 10)
-	for _, g := range contact.Groups() {
-		groupIDs[g.ID()] = true
-	}
-
-	return findBestTriggerMatch(candidates, nil, groupIDs)
+	return findBestTriggerMatch(candidates, nil, contact)
 }
 
 // FindMatchingMissedCallTrigger finds the best match trigger for missed incoming calls
@@ -197,6 +186,13 @@ func FindMatchingReferralTrigger(oa *OrgAssets, channel *Channel, referrerID str
 	return findBestTriggerMatch(candidates, channel, nil)
 }
 
+// FindMatchingTicketClosedTrigger finds the best match trigger for ticket closed events
+func FindMatchingTicketClosedTrigger(oa *OrgAssets, contact *flows.Contact) *Trigger {
+	candidates := findTriggerCandidates(oa, TicketClosedTriggerType, nil)
+
+	return findBestTriggerMatch(candidates, nil, contact)
+}
+
 // finds trigger candidates based on type and optional filter
 func findTriggerCandidates(oa *OrgAssets, type_ TriggerType, filter func(*Trigger) bool) []*Trigger {
 	candidates := make([]*Trigger, 0, 10)
@@ -230,11 +226,21 @@ const triggerScoreByChannel = 4
 const triggerScoreByInclusion = 2
 const triggerScoreByExclusion = 1
 
-func findBestTriggerMatch(candidates []*Trigger, channel *Channel, contactGroups map[GroupID]bool) *Trigger {
+func findBestTriggerMatch(candidates []*Trigger, channel *Channel, contact *flows.Contact) *Trigger {
 	matches := make([]*triggerMatch, 0, len(candidates))
 
+	var groupIDs map[GroupID]bool
+
+	if contact != nil {
+		// build a set of the groups this contact is in
+		groupIDs = make(map[GroupID]bool, 10)
+		for _, g := range contact.Groups().All() {
+			groupIDs[g.Asset().(*Group).ID()] = true
+		}
+	}
+
 	for _, t := range candidates {
-		matched, score := triggerMatchQualifiers(t, channel, contactGroups)
+		matched, score := triggerMatchQualifiers(t, channel, groupIDs)
 		if matched {
 			matches = append(matches, &triggerMatch{t, score})
 		}

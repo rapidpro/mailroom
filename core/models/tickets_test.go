@@ -146,7 +146,7 @@ func TestTickets(t *testing.T) {
 
 	logger := &models.HTTPLogger{}
 
-	err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, true, logger)
+	_, err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, true, logger)
 	assert.NoError(t, err)
 
 	// check ticket is now closed

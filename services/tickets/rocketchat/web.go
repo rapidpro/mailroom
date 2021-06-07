@@ -93,7 +93,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files)
 
 	case "close-room":
-		err = models.CloseTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
+		_, err = models.CloseTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
 
 	default:
 		err = errors.New("invalid event type")

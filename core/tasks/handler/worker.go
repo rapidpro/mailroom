@@ -36,7 +36,7 @@ const (
 	MsgEventType             = "msg_event"
 	ExpirationEventType      = "expiration_event"
 	TimeoutEventType         = "timeout_event"
-	TicketClosedEventType    = string(models.TicketClosedEventType)
+	TicketEventType          = "ticket"
 )
 
 func init() {
@@ -180,13 +180,13 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			}
 			err = handleMsgEvent(ctx, db, rp, msg)
 
-		case TicketClosedEventType:
+		case TicketEventType:
 			evt := &models.TicketEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling ticket event: %s", event)
 			}
-			err = handleTicketEvent(ctx, db, rp, models.ChannelEventType(contactEvent.Type), evt)
+			err = handleTicketEvent(ctx, db, rp, evt)
 
 		case TimeoutEventType, ExpirationEventType:
 			evt := &TimedEvent{}
@@ -366,6 +366,18 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		}
 	}
 
+	// make sure this URN is our highest priority (this is usually a noop)
+	err = modelContact.UpdatePreferredURN(ctx, db, oa, event.URNID(), channel)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error changing primary URN")
+	}
+
+	// build our flow contact
+	contact, err := modelContact.FlowContact(oa)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating flow contact")
+	}
+
 	// do we have associated trigger?
 	var trigger *models.Trigger
 
@@ -381,25 +393,13 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		trigger = models.FindMatchingMissedCallTrigger(oa)
 
 	case models.MOCallEventType:
-		trigger = models.FindMatchingIncomingCallTrigger(oa, modelContact)
+		trigger = models.FindMatchingIncomingCallTrigger(oa, contact)
 
 	case models.WelcomeMessageEventType:
 		trigger = nil
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
-	}
-
-	// make sure this URN is our highest priority (this is usually a noop)
-	err = modelContact.UpdatePreferredURN(ctx, db, oa, event.URNID(), channel)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error changing primary URN")
-	}
-
-	// build our flow contact
-	contact, err := modelContact.FlowContact(oa)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error creating flow contact")
 	}
 
 	if event.IsNewContact() {
@@ -694,7 +694,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	return nil
 }
 
-func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType models.TicketEventType, event *models.TicketEvent) error {
+func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *models.TicketEvent) error {
 	oa, err := models.GetOrgAssets(ctx, db, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -713,26 +713,26 @@ func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTy
 
 	modelContact := contacts[0]
 
-	// do we have associated trigger?
-	var trigger *models.Trigger
-
-	switch eventType {
-	case models.TicketClosedEventType:
-		trigger = models.FindMatchingNewConversationTrigger(oa, channel)
-	default:
-		return errors.Errorf("unknown ticket event type: %s", eventType)
-	}
-
-	// no trigger, noop, move on
-	if trigger == nil {
-		logrus.WithField("ticket_id", event.TicketID).WithField("event_type", eventType).Info("ignoring ticket event, no trigger found")
-		return nil
-	}
-
 	// build our flow contact
 	contact, err := modelContact.FlowContact(oa)
 	if err != nil {
 		return errors.Wrapf(err, "error creating flow contact")
+	}
+
+	// do we have associated trigger?
+	var trigger *models.Trigger
+
+	switch event.EventType {
+	case triggers.TicketEventTypeClosed:
+		trigger = models.FindMatchingTicketClosedTrigger(oa, contact)
+	default:
+		return errors.Errorf("unknown ticket event type: %s", event.EventType)
+	}
+
+	// no trigger, noop, move on
+	if trigger == nil {
+		logrus.WithField("ticket_id", event.TicketID).WithField("event_type", event.EventType).Info("ignoring ticket event, no trigger found")
+		return nil
 	}
 
 	// load our flow
@@ -753,16 +753,28 @@ func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTy
 		return nil
 	}
 
+	// load our ticket
+	tickets, err := models.LoadTickets(ctx, db, oa.OrgID(), []models.TicketID{event.TicketID})
+	if err != nil {
+		return errors.Wrapf(err, "error loading ticket")
+	}
+
+	// build our flow ticket
+	ticket, err := tickets[0].FlowTicket(oa)
+	if err != nil {
+		return errors.Wrapf(err, "error creating flow contact")
+	}
+
 	// build our flow trigger
 	var flowTrigger flows.Trigger
 
-	switch eventType {
-	case models.TicketClosedEventType:
+	switch event.EventType {
+	case triggers.TicketEventTypeClosed:
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
-			Ticket(ticket.Reference(), triggers.TicketEventType(eventType)).
+			Ticket(ticket, triggers.TicketEventTypeClosed).
 			Build()
 	default:
-		return errors.Errorf("unknown ticket event type: %s", eventType)
+		return errors.Errorf("unknown ticket event type: %s", event.EventType)
 	}
 
 	_, err = runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{flowTrigger}, nil, true)
