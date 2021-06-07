@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -42,14 +43,14 @@ type createRequest struct {
 }
 
 // handles a request to create the given contact
-func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &createRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// grab our org
-	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -59,13 +60,13 @@ func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return err, http.StatusBadRequest, nil
 	}
 
-	_, contact, err := models.CreateContact(ctx, s.DB, oa, request.UserID, c.Name, c.Language, c.URNs)
+	_, contact, err := models.CreateContact(ctx, rt.DB, oa, request.UserID, c.Name, c.Language, c.URNs)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
-	_, err = models.ApplyModifiers(ctx, s.DB, s.RP, oa, modifiersByContact)
+	_, err = models.ApplyModifiers(ctx, rt.DB, rt.RP, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
 	}
@@ -118,14 +119,14 @@ type modifyResult struct {
 }
 
 // handles a request to apply the passed in actions
-func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &modifyRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -137,7 +138,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// load our contacts
-	contacts, err := models.LoadContacts(ctx, s.DB, oa, request.ContactIDs)
+	contacts, err := models.LoadContacts(ctx, rt.DB, oa, request.ContactIDs)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load contact")
 	}
@@ -153,7 +154,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		modifiersByContact[flowContact] = mods
 	}
 
-	eventsByContact, err := models.ApplyModifiers(ctx, s.DB, s.RP, oa, modifiersByContact)
+	eventsByContact, err := models.ApplyModifiers(ctx, rt.DB, rt.RP, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -185,19 +186,19 @@ type resolveRequest struct {
 }
 
 // handles a request to resolve a contact
-func handleResolve(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &resolveRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// grab our org
-	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	_, contact, created, err := models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{request.URN}, request.ChannelID)
+	_, contact, created, err := models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{request.URN}, request.ChannelID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error getting or creating contact")
 	}

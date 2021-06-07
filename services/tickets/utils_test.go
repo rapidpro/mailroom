@@ -120,8 +120,8 @@ func TestFromTicketerUUID(t *testing.T) {
 func TestSendReply(t *testing.T) {
 	testsuite.ResetDB()
 	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	rt := testsuite.RT()
+	db := rt.DB
 	defer testsuite.ResetStorage()
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
@@ -140,7 +140,7 @@ func TestSendReply(t *testing.T) {
 	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
 	require.NoError(t, err)
 
-	msg, err := tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []*tickets.File{image})
+	msg, err := tickets.SendReply(ctx, rt, ticket, "I'll get back to you", []*tickets.File{image})
 	require.NoError(t, err)
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
@@ -149,6 +149,6 @@ func TestSendReply(t *testing.T) {
 	assert.FileExists(t, "_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg")
 
 	// try with file that can't be read (i.e. same file again which is already closed)
-	_, err = tickets.SendReply(ctx, db, rp, testsuite.Storage(), ticket, "I'll get back to you", []*tickets.File{image})
+	_, err = tickets.SendReply(ctx, rt, ticket, "I'll get back to you", []*tickets.File{image})
 	assert.EqualError(t, err, "error storing attachment http://coolfiles.com/a.jpg for ticket reply: unable to read attachment content: read ../../core/models/testdata/test.jpg: file already closed")
 }

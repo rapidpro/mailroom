@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -19,9 +19,8 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -80,9 +79,9 @@ func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
-func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, ticket *models.Ticket, text string, files []*File) (*models.Msg, error) {
+func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, text string, files []*File) (*models.Msg, error) {
 	// look up our assets
-	oa, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
@@ -92,7 +91,7 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 	for i, file := range files {
 		filename := string(uuids.New()) + filepath.Ext(file.URL)
 
-		attachments[i], err = oa.Org().StoreAttachment(ctx, store, filename, file.ContentType, file.Body)
+		attachments[i], err = oa.Org().StoreAttachment(ctx, rt.Storage, filename, file.ContentType, file.Body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error storing attachment %s for ticket reply", file.URL)
 		}
@@ -105,12 +104,12 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 	// we'll use a broadcast to send this message
 	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil)
 	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
-	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, oa, batch)
+	msgs, err := models.CreateBroadcastMessages(ctx, rt.DB, rt.RP, oa, batch)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
 
-	msgio.SendMessages(ctx, db, rp, nil, msgs)
+	msgio.SendMessages(ctx, rt.DB, rt.RP, nil, msgs)
 	return msgs[0], nil
 }
 

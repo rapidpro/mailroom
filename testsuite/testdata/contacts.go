@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -21,9 +22,26 @@ type Contact struct {
 	URNID models.URNID
 }
 
+func (c *Contact) Load(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) (*models.Contact, *flows.Contact) {
+	contacts, err := models.LoadContacts(testsuite.CTX(), db, oa, []models.ContactID{c.ID})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(contacts))
+
+	flowContact, err := contacts[0].FlowContact(oa)
+	require.NoError(t, err)
+
+	return contacts[0], flowContact
+}
+
 type Group struct {
 	ID   models.GroupID
 	UUID assets.GroupUUID
+}
+
+func (g *Group) Add(db *sqlx.DB, contacts ...*Contact) {
+	for _, c := range contacts {
+		db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2)`, g.ID, c.ID)
+	}
 }
 
 type Field struct {

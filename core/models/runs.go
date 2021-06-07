@@ -162,6 +162,8 @@ func (s *Session) Scene() *Scene                      { return s.scene }
 // WriteSessionsToStorage writes the outputs of the passed in sessions to our storage (S3), updating the
 // output_url for each on success. Failure of any will cause all to fail.
 func WriteSessionOutputsToStorage(ctx context.Context, st storage.Storage, sessions []*Session) error {
+	start := time.Now()
+
 	uploads := make([]*storage.Upload, len(sessions))
 	for i, s := range sessions {
 		uploads[i] = &storage.Upload{
@@ -180,6 +182,8 @@ func WriteSessionOutputsToStorage(ctx context.Context, st storage.Storage, sessi
 	for i, s := range sessions {
 		s.s.OutputURL = null.String(uploads[i].URL)
 	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("count", len(sessions)).Debug("wrote sessions to s3")
 
 	return nil
 }

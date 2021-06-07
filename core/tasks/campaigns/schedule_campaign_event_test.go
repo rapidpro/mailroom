@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/uuids"
-	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/campaigns"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -19,15 +17,13 @@ import (
 func TestScheduleCampaignEvent(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: nil}
+	rt := testsuite.RT()
+	db := rt.DB
 
 	models.FlushCache()
 
 	// add bob, george and alexandria to doctors group which campaign is based on
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.Bob.ID, testdata.DoctorsGroup.ID)
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.George.ID, testdata.DoctorsGroup.ID)
-	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contact_id, contactgroup_id) VALUES($1, $2)`, testdata.Alexandria.ID, testdata.DoctorsGroup.ID)
+	testdata.DoctorsGroup.Add(db, testdata.Bob, testdata.George, testdata.Alexandria)
 
 	// give bob and george values for joined in the future
 	db.MustExec(`UPDATE contacts_contact SET fields = '{"d83aae24-4bbf-49d0-ab85-6bfd201eac6d": {"datetime": "2030-01-01T00:00:00Z"}}' WHERE id = $1`, testdata.Bob.ID)
@@ -44,7 +40,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 
 	// schedule first event...
 	task := &campaigns.ScheduleCampaignEventTask{CampaignEventID: testdata.RemindersEvent1.ID}
-	err := task.Perform(ctx, mr, testdata.Org1.ID)
+	err := task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	// cathy has no value for joined and alexandia has a value too far in past, but bob and george will have values...
@@ -55,7 +51,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 
 	// schedule second event...
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: testdata.RemindersEvent2.ID}
-	err = task.Perform(ctx, mr, testdata.Org1.ID)
+	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	assertContactFires(t, testdata.RemindersEvent2.ID, map[models.ContactID]time.Time{
@@ -79,7 +75,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	event3 := insertCampaignEvent(t, testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.CreatedOnField.ID, 5, "M")
 
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event3}
-	err = task.Perform(ctx, mr, testdata.Org1.ID)
+	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	// only cathy is in the group and new enough to have a fire
@@ -94,7 +90,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, testdata.Bob.ID)
 
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event4}
-	err = task.Perform(ctx, mr, testdata.Org1.ID)
+	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	assertContactFires(t, event4, map[models.ContactID]time.Time{

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/locker"
 
 	"github.com/pkg/errors"
@@ -33,9 +33,9 @@ func (t *ScheduleCampaignEventTask) Timeout() time.Duration {
 }
 
 // Perform creates the actual event fires to schedule the given campaign event
-func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
-	db := mr.DB
-	rp := mr.RP
+func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	db := rt.DB
+	rp := rt.RP
 	lockKey := fmt.Sprintf(scheduleLockKey, t.CampaignEventID)
 
 	lock, err := locker.GrabLock(rp, lockKey, time.Hour, time.Minute*5)

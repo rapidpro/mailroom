@@ -3,12 +3,14 @@ package expirations
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/utils/marker"
 
@@ -29,12 +31,12 @@ func init() {
 }
 
 // StartExpirationCron starts our cron job of expiring runs every minute
-func StartExpirationCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, expirationLock, time.Second*60,
+func StartExpirationCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+	cron.StartCron(quit, rt.RP, expirationLock, time.Second*60,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return expireRuns(ctx, mr.DB, mr.RP, lockName, lockValue)
+			return expireRuns(ctx, rt.DB, rt.RP, lockName, lockValue)
 		},
 	)
 	return nil

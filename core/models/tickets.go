@@ -203,7 +203,7 @@ WHERE
 `
 
 // LookupTicketByUUID looks up the ticket with the passed in UUID
-func LookupTicketByUUID(ctx context.Context, db Queryer, uuid flows.TicketUUID) (*Ticket, error) {
+func LookupTicketByUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID) (*Ticket, error) {
 	return lookupTicket(ctx, db, selectTicketByUUIDSQL, uuid)
 }
 

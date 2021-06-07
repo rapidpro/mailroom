@@ -7,10 +7,10 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/marker"
 
 	"github.com/pkg/errors"
@@ -47,9 +47,9 @@ func (t *FireCampaignEventTask) Timeout() time.Duration {
 //   - creates the trigger for that event
 //   - runs the flow that is to be started through our engine
 //   - saves the flow run and session resulting from our run
-func (t *FireCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
-	db := mr.DB
-	rp := mr.RP
+func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	db := rt.DB
+	rp := rt.RP
 	log := logrus.WithField("comp", "campaign_worker").WithField("event_id", t.EventID)
 
 	// grab all the fires for this event
