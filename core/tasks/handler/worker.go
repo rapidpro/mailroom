@@ -169,7 +169,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling channel event: %s", event)
 			}
-			_, err = HandleChannelEvent(ctx, rt.DB, rt.RP, models.ChannelEventType(contactEvent.Type), evt, nil)
+			_, err = HandleChannelEvent(ctx, rt, models.ChannelEventType(contactEvent.Type), evt, nil)
 
 		case MsgEventType:
 			msg := &MsgEvent{}
@@ -314,7 +314,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		return errors.Errorf("unknown event type: %s", eventType)
 	}
 
-	_, err = runner.ResumeFlow(ctx, rt.DB, rt.RP, rt.Storage, oa, session, resume, nil)
+	_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming flow for timeout")
 	}
@@ -324,8 +324,8 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 }
 
 // HandleChannelEvent is called for channel events
-func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
-	oa, err := models.GetOrgAssets(ctx, db, event.OrgID())
+func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
+	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
 	}
@@ -338,7 +338,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{event.ContactID()})
+	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID()})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contact")
 	}
@@ -351,7 +351,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	modelContact := contacts[0]
 
 	if models.ContactSeenEvents[eventType] {
-		err = modelContact.UpdateLastSeenOn(ctx, db, event.OccurredOn())
+		err = modelContact.UpdateLastSeenOn(ctx, rt.DB, event.OccurredOn())
 		if err != nil {
 			return nil, errors.Wrap(err, "error updating contact last_seen_on")
 		}
@@ -382,7 +382,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// make sure this URN is our highest priority (this is usually a noop)
-	err = modelContact.UpdatePreferredURN(ctx, db, oa, event.URNID(), channel)
+	err = modelContact.UpdatePreferredURN(ctx, rt.DB, oa, event.URNID(), channel)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error changing primary URN")
 	}
@@ -394,7 +394,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	if event.IsNewContact() {
-		err = models.CalculateDynamicGroups(ctx, db, oa, contact)
+		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, contact)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to initialize new contact")
 		}
@@ -418,7 +418,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 	if flow.FlowType() == models.FlowTypeVoice && conn == nil {
-		err = runner.TriggerIVRFlow(ctx, db, rp, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
+		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error while triggering ivr flow")
 		}
@@ -471,7 +471,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{flowTrigger}, hook, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -648,7 +648,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		if flow != nil {
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 			if flow.FlowType() == models.FlowTypeVoice {
-				err = runner.TriggerIVRFlow(ctx, rt.DB, rt.RP, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, func(ctx context.Context, tx *sqlx.Tx) error {
+				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, func(ctx context.Context, tx *sqlx.Tx) error {
 					return models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeFlow, topupID)
 				})
 				if err != nil {
@@ -659,7 +659,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 			// otherwise build the trigger and start the flow directly
 			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
-			_, err = runner.StartFlowForContacts(ctx, rt.DB, rt.RP, oa, flow, []flows.Trigger{trigger}, hook, true)
+			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, hook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -670,7 +670,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// if there is a session, resume it
 	if session != nil && flow != nil {
 		resume := resumes.NewMsg(oa.Env(), contact, msgIn)
-		_, err = runner.ResumeFlow(ctx, rt.DB, rt.RP, rt.Storage, oa, session, resume, hook)
+		_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, hook)
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
 		}

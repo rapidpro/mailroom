@@ -20,9 +20,9 @@ import (
 
 func TestCampaignStarts(t *testing.T) {
 	testsuite.Reset()
-	db := testsuite.DB()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
+	rt := testsuite.RT()
+	db := rt.DB
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(testdata.RemindersCampaign.UUID), "Doctor Reminders")
 
@@ -60,7 +60,7 @@ func TestCampaignStarts(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
+	sessions, err := FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
 
@@ -100,9 +100,9 @@ func TestCampaignStarts(t *testing.T) {
 
 func TestBatchStart(t *testing.T) {
 	testsuite.Reset()
-	db := testsuite.DB()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
+	rt := testsuite.RT()
+	db := rt.DB
 
 	// create a start object
 	testdata.InsertFlowStart(t, db, testdata.Org1, testdata.SingleMessage, nil)
@@ -142,7 +142,7 @@ func TestBatchStart(t *testing.T) {
 			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
-		sessions, err := StartFlowBatch(ctx, db, rp, batch)
+		sessions, err := StartFlowBatch(ctx, rt, batch)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
@@ -173,10 +173,9 @@ func TestBatchStart(t *testing.T) {
 
 func TestContactRuns(t *testing.T) {
 	testsuite.Reset()
-	db := testsuite.DB()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-	st := testsuite.Storage()
+	rt := testsuite.RT()
+	db := rt.DB
 	defer testsuite.ResetStorage()
 
 	db.MustExec(`UPDATE orgs_org set config = '{"use_storage_sessions": "true"}' WHERE id=1;`)
@@ -195,7 +194,7 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
-	sessions, err := StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, nil, true)
+	sessions, err := StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
@@ -236,7 +235,7 @@ func TestContactRuns(t *testing.T) {
 		msg.SetID(10)
 		resume := resumes.NewMsg(oa.Env(), contact, msg)
 
-		session, err = ResumeFlow(ctx, db, rp, st, oa, session, resume, nil)
+		session, err = ResumeFlow(ctx, rt, oa, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 
