@@ -288,36 +288,28 @@ func TestTicketEvents(t *testing.T) {
 	testsuite.Reset()
 	rt := testsuite.RT()
 	ctx := testsuite.CTX()
-	db := testsuite.DB()
 
 	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// add a ticket closed trigger
-	testdata.InsertTicketClosedTrigger(t, db, testdata.Org1, testdata.Favorites)
+	testdata.InsertTicketClosedTrigger(t, rt.DB, testdata.Org1, testdata.Favorites)
 
-	ticketID := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "")
+	ticketID := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "")
 
-	event := models.NewTicketEvent(testdata.Org1.ID, ticketID, models.TicketEventTypeClosed)
-	eventJSON, err := json.Marshal(event)
+	tickets, err := models.LoadTickets(ctx, rt.DB, testdata.Org1.ID, []models.TicketID{ticketID})
 	require.NoError(t, err)
 
-	task := &queue.Task{
-		Type:  handler.TicketClosedEventType,
-		OrgID: int(testdata.Org1.ID),
-		Task:  eventJSON,
-	}
-
-	err = handler.QueueHandleTask(rc, testdata.Cathy.ID, task)
+	err = handler.QueueTicketClosedEvent(rc, tickets[0])
 	require.NoError(t, err)
 
-	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 	require.NoError(t, err)
 
 	err = handler.HandleEvent(ctx, rt, task)
 	require.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, []interface{}{testdata.Cathy.ID}, 1)
+	testsuite.AssertQueryCount(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, []interface{}{testdata.Cathy.ID}, 1)
 }
 
 func TestStopEvent(t *testing.T) {

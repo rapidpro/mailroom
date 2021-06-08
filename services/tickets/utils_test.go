@@ -3,7 +3,9 @@ package tickets_test
 import (
 	"os"
 	"testing"
+	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
@@ -160,7 +162,10 @@ func TestCloseTicket(t *testing.T) {
 	rt := testsuite.RT()
 	db := rt.DB
 
+	defer dates.SetNowSource(dates.DefaultNowSource)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2021, 6, 8, 16, 40, 30, 0, time.UTC)))
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
@@ -198,5 +203,5 @@ func TestCloseTicket(t *testing.T) {
 	err = tickets.CloseTicket(ctx, rt, oa, ticket1, true, logger)
 	require.NoError(t, err)
 
-	testsuite.AssertContactTasks(t, 1, int(testdata.Cathy.ID), []string{`{"type":"ticket_closed","org_id":1,"task":{"id": 0,"org_id":1,"ticket_id":1,"event_type":"C"},"queued_on":""}`})
+	testsuite.AssertContactTasks(t, 1, int(testdata.Cathy.ID), []string{`{"type":"ticket_closed","org_id":1,"task":{"id":0,"org_id":1,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:33Z"},"queued_on":"2021-06-08T16:40:34Z"}`})
 }
