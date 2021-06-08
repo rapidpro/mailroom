@@ -1,4 +1,4 @@
-package handler
+package handler_test
 
 import (
 	"encoding/json"
@@ -12,6 +12,7 @@ import (
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -22,6 +23,7 @@ import (
 
 func TestMsgEvents(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -98,7 +100,7 @@ func TestMsgEvents(t *testing.T) {
 	}
 
 	makeMsgTask := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *queue.Task {
-		event := &MsgEvent{
+		event := &handler.MsgEvent{
 			ContactID: contactID,
 			OrgID:     orgID,
 			ChannelID: channelID,
@@ -113,7 +115,7 @@ func TestMsgEvents(t *testing.T) {
 		assert.NoError(t, err)
 
 		task := &queue.Task{
-			Type:  MsgEventType,
+			Type:  handler.MsgEventType,
 			OrgID: int(orgID),
 			Task:  eventJSON,
 		}
@@ -133,13 +135,13 @@ func TestMsgEvents(t *testing.T) {
 
 		task := makeMsgTask(tc.OrgID, tc.ChannelID, tc.Contact.ID, tc.Contact.URN, tc.Contact.URNID, tc.Message)
 
-		err := AddHandleTask(rc, tc.Contact.ID, task)
+		err := handler.QueueHandleTask(rc, tc.Contact.ID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handleContactEvent(ctx, db, rp, task)
+		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
@@ -170,13 +172,13 @@ func TestMsgEvents(t *testing.T) {
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, testdata.Org2Contact.ID)
 	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "red")
-	AddHandleTask(rc, testdata.Org2Contact.ID, task)
+	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 
 	// should get requeued three times automatically
 	for i := 0; i < 3; i++ {
 		task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NotNil(t, task)
-		err := handleContactEvent(ctx, db, rp, task)
+		err := handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err)
 	}
 
@@ -191,10 +193,10 @@ func TestMsgEvents(t *testing.T) {
 
 	// try to resume now
 	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "red")
-	AddHandleTask(rc, testdata.Org2Contact.ID, task)
+	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
 	// should get our catch all trigger
@@ -211,9 +213,9 @@ func TestMsgEvents(t *testing.T) {
 
 	// trigger should also not start a new session
 	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "start")
-	AddHandleTask(rc, testdata.Org2Contact.ID, task)
+	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
 	db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2 ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID, previous)
@@ -222,6 +224,7 @@ func TestMsgEvents(t *testing.T) {
 
 func TestChannelEvents(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -258,11 +261,11 @@ func TestChannelEvents(t *testing.T) {
 		Response       string
 		UpdateLastSeen bool
 	}{
-		{NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
-		{NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
-		{WelcomeMessageEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
-		{ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
-		{ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
+		{handler.NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "What is your favorite color?", true},
+		{handler.NewConversationEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", true},
+		{handler.WelcomeMessageEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "", false},
+		{handler.ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.TwitterChannel.ID, nil, "", true},
+		{handler.ReferralEventType, testdata.Cathy.ID, testdata.Cathy.URNID, testdata.Org1.ID, testdata.VonageChannel.ID, nil, "Pick a number between 1-10.", true},
 	}
 
 	models.FlushCache()
@@ -281,13 +284,13 @@ func TestChannelEvents(t *testing.T) {
 			Task:  eventJSON,
 		}
 
-		err = AddHandleTask(rc, tc.ContactID, task)
+		err = handler.QueueHandleTask(rc, tc.ContactID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handleContactEvent(ctx, db, rp, task)
+		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
@@ -309,6 +312,7 @@ func TestChannelEvents(t *testing.T) {
 
 func TestStopEvent(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -322,21 +326,21 @@ func TestStopEvent(t *testing.T) {
 	// and george to doctors group, cathy is already part of it
 	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, testdata.DoctorsGroup.ID, testdata.George.ID)
 
-	event := &StopEvent{OrgID: testdata.Org1.ID, ContactID: testdata.Cathy.ID}
+	event := &handler.StopEvent{OrgID: testdata.Org1.ID, ContactID: testdata.Cathy.ID}
 	eventJSON, err := json.Marshal(event)
 	task := &queue.Task{
-		Type:  StopEventType,
+		Type:  handler.StopEventType,
 		OrgID: int(testdata.Org1.ID),
 		Task:  eventJSON,
 	}
 
-	err = AddHandleTask(rc, testdata.Cathy.ID, task)
+	err = handler.QueueHandleTask(rc, testdata.Cathy.ID, task)
 	assert.NoError(t, err, "error adding task")
 
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err, "error popping next task")
 
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
@@ -353,6 +357,7 @@ func TestStopEvent(t *testing.T) {
 
 func TestTimedEvents(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -383,34 +388,34 @@ func TestTimedEvents(t *testing.T) {
 		OrgID     models.OrgID
 	}{
 		// start the flow
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// this expiration does nothing because the times don't match
-		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "bad", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "bad", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// this checks that the flow wasn't expired
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// this expiration will actually take
-		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "good", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "good", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// we won't get a response as we will be out of the flow
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "mutzig", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "mutzig", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// start the parent expiration flow
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "parent", "Child", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "parent", "Child", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// respond, should bring us out
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi", "Completed", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi", "Completed", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// expiring our child should be a no op
-		{ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "child", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "child", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// respond one last time, should be done
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "done", "Ended", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "done", "Ended", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
 		// start our favorite flow again
-		{MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 	}
 
 	last := time.Now()
@@ -422,8 +427,8 @@ func TestTimedEvents(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		var task *queue.Task
-		if tc.EventType == MsgEventType {
-			event := &MsgEvent{
+		if tc.EventType == handler.MsgEventType {
+			event := &handler.MsgEvent{
 				ContactID: tc.ContactID,
 				OrgID:     tc.OrgID,
 				ChannelID: tc.ChannelID,
@@ -442,7 +447,7 @@ func TestTimedEvents(t *testing.T) {
 				OrgID: int(tc.OrgID),
 				Task:  eventJSON,
 			}
-		} else if tc.EventType == ExpirationEventType {
+		} else if tc.EventType == handler.ExpirationEventType {
 			var expiration time.Time
 			if tc.Message == "bad" {
 				expiration = time.Now()
@@ -456,8 +461,7 @@ func TestTimedEvents(t *testing.T) {
 				expiration = time.Now().Add(time.Hour * 24)
 			}
 
-			task = newTimedTask(
-				ExpirationEventType,
+			task = handler.NewExpirationTask(
 				tc.OrgID,
 				tc.ContactID,
 				sessionID,
@@ -466,13 +470,13 @@ func TestTimedEvents(t *testing.T) {
 			)
 		}
 
-		err := AddHandleTask(rc, tc.ContactID, task)
+		err := handler.QueueHandleTask(rc, tc.ContactID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handleContactEvent(ctx, db, rp, task)
+		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		var text string
@@ -507,8 +511,7 @@ func TestTimedEvents(t *testing.T) {
 	db.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_path_change`)
 
 	// try to expire the run
-	task := newTimedTask(
-		ExpirationEventType,
+	task := handler.NewExpirationTask(
 		testdata.Org1.ID,
 		testdata.Cathy.ID,
 		sessionID,
@@ -516,13 +519,13 @@ func TestTimedEvents(t *testing.T) {
 		expiration,
 	)
 
-	err = AddHandleTask(rc, testdata.Cathy.ID, task)
+	err = handler.QueueHandleTask(rc, testdata.Cathy.ID, task)
 	assert.NoError(t, err)
 
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, []interface{}{runID}, 1)

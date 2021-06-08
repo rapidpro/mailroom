@@ -1,4 +1,4 @@
-package handler
+package handler_test
 
 import (
 	"testing"
@@ -9,6 +9,7 @@ import (
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -17,6 +18,7 @@ import (
 
 func TestRetryMsgs(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -25,7 +27,7 @@ func TestRetryMsgs(t *testing.T) {
 	defer rc.Close()
 
 	// noop does nothing
-	err := retryPendingMsgs(ctx, db, rp, "test", "test")
+	err := handler.RetryPendingMsgs(ctx, db, rp, "test", "test")
 	assert.NoError(t, err)
 
 	testMsgs := []struct {
@@ -45,13 +47,13 @@ func TestRetryMsgs(t *testing.T) {
 			uuids.New(), testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
 	}
 
-	err = retryPendingMsgs(ctx, db, rp, "test", "test")
+	err = handler.RetryPendingMsgs(ctx, db, rp, "test", "test")
 	assert.NoError(t, err)
 
 	// should have one message requeued
 	task, _ := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
-	err = handleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
 	// message should be handled now

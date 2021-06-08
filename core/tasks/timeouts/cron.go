@@ -79,7 +79,7 @@ func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName 
 
 		// ok, queue this task
 		task := handler.NewTimeoutTask(timeout.OrgID, timeout.ContactID, timeout.SessionID, timeout.TimeoutOn)
-		err = handler.AddHandleTask(rc, timeout.ContactID, task)
+		err = handler.QueueHandleTask(rc, timeout.ContactID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error adding new handle task")
 		}
