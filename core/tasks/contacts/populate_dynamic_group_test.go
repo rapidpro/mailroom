@@ -1,10 +1,10 @@
-package groups_test
+package contacts_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/mailroom/core/tasks/groups"
+	"github.com/nyaruka/mailroom/core/tasks/contacts"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -56,7 +56,7 @@ func TestPopulateTask(t *testing.T) {
 
 	group := testdata.InsertContactGroup(t, db, testdata.Org1, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
 
-	task := &groups.PopulateDynamicGroupTask{
+	task := &contacts.PopulateDynamicGroupTask{
 		GroupID: group.ID,
 		Query:   "gender = F",
 	}

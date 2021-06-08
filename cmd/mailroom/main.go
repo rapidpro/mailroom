@@ -20,7 +20,6 @@ import (
 	_ "github.com/nyaruka/mailroom/core/tasks/campaigns"
 	_ "github.com/nyaruka/mailroom/core/tasks/contacts"
 	_ "github.com/nyaruka/mailroom/core/tasks/expirations"
-	_ "github.com/nyaruka/mailroom/core/tasks/groups"
 	_ "github.com/nyaruka/mailroom/core/tasks/interrupts"
 	_ "github.com/nyaruka/mailroom/core/tasks/ivr"
 	_ "github.com/nyaruka/mailroom/core/tasks/schedules"
