@@ -5,7 +5,7 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
-	"github.com/nyaruka/mailroom/core/tasks/groups"
+	"github.com/nyaruka/mailroom/core/tasks/contacts"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ func TestReadTask(t *testing.T) {
 	}`))
 	require.NoError(t, err)
 
-	typedTask := task.(*groups.PopulateDynamicGroupTask)
+	typedTask := task.(*contacts.PopulateDynamicGroupTask)
 	assert.Equal(t, models.GroupID(23), typedTask.GroupID)
 	assert.Equal(t, "gender = F", typedTask.Query)
 }
