@@ -1,4 +1,4 @@
-package runner
+package runner_test
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -60,7 +61,7 @@ func TestCampaignStarts(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	sessions, err := FireCampaignEvents(ctx, db, rp, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
+	sessions, err := runner.FireCampaignEvents(ctx, db, rp, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
 
@@ -142,7 +143,7 @@ func TestBatchStart(t *testing.T) {
 			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
-		sessions, err := StartFlowBatch(ctx, db, rp, batch)
+		sessions, err := runner.StartFlowBatch(ctx, db, rp, batch)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
@@ -191,7 +192,7 @@ func TestContactRuns(t *testing.T) {
 	assert.NoError(t, err)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
-	sessions, err := StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, nil, true)
+	sessions, err := runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
@@ -232,7 +233,7 @@ func TestContactRuns(t *testing.T) {
 		msg.SetID(10)
 		resume := resumes.NewMsg(oa.Env(), contact, msg)
 
-		session, err = ResumeFlow(ctx, db, rp, oa, session, resume, nil)
+		session, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 

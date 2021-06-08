@@ -43,57 +43,13 @@ func init() {
 	mailroom.AddTaskFunction(queue.HandleContactEvent, handleEvent)
 }
 
-// AddHandleTask adds a single task for the passed in contact.
-func AddHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task) error {
-	return addHandleTask(rc, contactID, task, false)
-}
-
-// addContactTask pushes a single contact task on our queue. Note this does not push the actual content of the task
-// only that a task exists for the contact, addHandleTask should be used if the task has already been pushed
-// off the contact specific queue.
-func addContactTask(rc redis.Conn, orgID models.OrgID, contactID models.ContactID) error {
-	// create our contact event
-	contactTask := &HandleEventTask{ContactID: contactID}
-
-	// then add a handle task for that contact on our global handler queue
-	err := queue.AddTask(rc, queue.HandlerQueue, queue.HandleContactEvent, int(orgID), contactTask, queue.DefaultPriority)
-	if err != nil {
-		return errors.Wrapf(err, "error adding handle event task")
-	}
-	return nil
-}
-
-// addHandleTask adds a single task for the passed in contact. `front` specifies whether the task
-// should be inserted in front of all other tasks for that contact
-func addHandleTask(rc redis.Conn, contactID models.ContactID, task *queue.Task, front bool) error {
-	// marshal our task
-	taskJSON, err := json.Marshal(task)
-	if err != nil {
-		return errors.Wrapf(err, "error marshalling contact task")
-	}
-
-	// first push the event on our contact queue
-	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, contactID)
-	if front {
-		_, err = redis.Int64(rc.Do("lpush", contactQ, string(taskJSON)))
-
-	} else {
-		_, err = redis.Int64(rc.Do("rpush", contactQ, string(taskJSON)))
-	}
-	if err != nil {
-		return errors.Wrapf(err, "error adding contact event")
-	}
-
-	return addContactTask(rc, models.OrgID(task.OrgID), contactID)
-}
-
 func handleEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	return handleContactEvent(ctx, rt.DB, rt.RP, task)
+	return HandleContactEvent(ctx, rt.DB, rt.RP, task)
 }
 
-// handleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
+// HandleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
 // a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
+func HandleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -700,8 +656,20 @@ func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *
 		return errors.Wrapf(err, "error loading org")
 	}
 
+	// load our ticket
+	tickets, err := models.LoadTickets(ctx, db, oa.OrgID(), []models.TicketID{event.TicketID})
+	if err != nil {
+		return errors.Wrapf(err, "error loading ticket")
+	}
+	// ticket has been deleted ignore this event
+	if len(tickets) == 0 {
+		return nil
+	}
+
+	modelTicket := tickets[0]
+
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{event.ContactID})
+	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{modelTicket.ContactID()})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
@@ -751,12 +719,6 @@ func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *
 			return errors.Wrapf(err, "error while triggering ivr flow")
 		}
 		return nil
-	}
-
-	// load our ticket
-	tickets, err := models.LoadTickets(ctx, db, oa.OrgID(), []models.TicketID{event.TicketID})
-	if err != nil {
-		return errors.Wrapf(err, "error loading ticket")
 	}
 
 	// build our flow ticket

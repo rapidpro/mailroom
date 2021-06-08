@@ -4,8 +4,10 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
@@ -60,7 +62,17 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 
 	updated, err := models.CloseTickets(ctx, rt.DB, oa, tickets, true, l)
 	if err != nil {
-		return nil, http.StatusBadRequest, errors.Wrapf(err, "error closing tickets for org: %d", request.OrgID)
+		return nil, http.StatusInternalServerError, errors.Wrap(err, "error closing tickets")
+	}
+
+	rc := rt.RP.Get()
+	defer rc.Close()
+
+	for _, t := range updated {
+		err = handler.QueueTicketEvent(rc, t, triggers.TicketEventTypeClosed)
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error queueing ticket event for ticket %d", t.ID())
+		}
 	}
 
 	return newBulkResponse(updated), http.StatusOK, nil

@@ -23,15 +23,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const TicketEventType = "ticket"
-
-type TicketEvent struct {
-	EventType triggers.TicketEventType `json:"event_type"`
-	ContactID ContactID                `json:"contact_id"`
-	OrgID     OrgID                    `json:"org_id"`
-	TicketID  TicketID                 `json:"ticket_id"`
-}
-
 type TicketID int
 type TicketerID null.Int
 type TicketStatus string
@@ -628,4 +619,16 @@ func (i TicketerID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *TicketerID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
+}
+
+const TicketEventType = "ticket"
+
+type TicketEvent struct {
+	OrgID     OrgID                    `json:"org_id"`
+	TicketID  TicketID                 `json:"ticket_id"`
+	EventType triggers.TicketEventType `json:"event_type"`
+}
+
+func NewTicketEvent(orgID OrgID, ticketID TicketID, eventType triggers.TicketEventType) *TicketEvent {
+	return &TicketEvent{OrgID: orgID, TicketID: ticketID, EventType: eventType}
 }

@@ -276,7 +276,7 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 	if request.Event == "status_changed" {
 		switch strings.ToLower(request.Status) {
 		case statusSolved, statusClosed:
-			_, err = models.CloseTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
+			err = tickets.CloseTicket(ctx, rt, nil, ticket, false, l)
 		case statusOpen:
 			_, err = models.ReopenTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
 		}

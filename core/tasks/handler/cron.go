@@ -36,14 +36,14 @@ func StartRetryCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) err
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return retryPendingMsgs(ctx, rt.DB, rt.RP, lockName, lockValue)
+			return RetryPendingMsgs(ctx, rt.DB, rt.RP, lockName, lockValue)
 		},
 	)
 	return nil
 }
 
-// retryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
-func retryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+// RetryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
+func RetryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	if !config.Mailroom.RetryPendingMessages {
 		return nil
 	}

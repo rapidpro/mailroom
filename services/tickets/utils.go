@@ -16,9 +16,11 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/pkg/errors"
@@ -137,4 +139,24 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 	contentType, _, _ := mime.ParseMediaType(trace.Response.Header.Get("Content-Type"))
 
 	return &File{URL: url, ContentType: contentType, Body: ioutil.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
+}
+
+// CloseTicket closes the given ticket and creates a closed event
+func CloseTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
+	updated, err := models.CloseTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
+	if err != nil {
+		return errors.Wrap(err, "error closing ticket")
+	}
+
+	if len(updated) == 1 {
+		rc := rt.RP.Get()
+		defer rc.Close()
+
+		err = handler.QueueTicketEvent(rc, ticket, triggers.TicketEventTypeClosed)
+		if err != nil {
+			return errors.Wrapf(err, "error queueing ticket closed event")
+		}
+	}
+
+	return nil
 }
