@@ -49,7 +49,9 @@ jobs:
 
     - name: Upload coverage
       if: success()
-      run: bash <(curl -s https://codecov.io/bash)
+      uses: codecov/codecov-action@v1
+      with:
+        fail_ci_if_error: false
   
   release:
     name: Release
