@@ -577,7 +577,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	if org.Org().UsesStorageSessions() {
 		err := WriteSessionOutputsToStorage(ctx, st, []*Session{s})
 		if err != nil {
-			return err
+			logrus.WithError(err).Error("error writing session to s3")
 		}
 	}
 
@@ -734,6 +734,15 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.
 		err := hook(ctx, tx, rp, org, sessions)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error calling commit hook: %v", hook)
+		}
+	}
+
+	// if writing our sessions to S3, do so
+	if org.Org().UsesStorageSessions() {
+		err := WriteSessionOutputsToStorage(ctx, st, sessions)
+		if err != nil {
+			// for now, continue on for errors, we are still reading from the DB
+			logrus.WithError(err).Error("error writing sessions to s3")
 		}
 	}
 

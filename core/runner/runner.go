@@ -104,7 +104,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	}
 
 	// write our updated session and runs
-	err = session.WriteUpdatedSession(txCTX, tx, rt.RP, rt.Storage, oa, fs, sprint, hook)
+	err = session.WriteUpdatedSession(txCTX, tx, rt.RP, rt.SessionStorage, oa, fs, sprint, hook)
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
@@ -587,7 +587,7 @@ func StartFlowForContacts(
 	}
 
 	// write our session to the db
-	dbSessions, err := models.WriteSessions(txCTX, tx, rt.RP, rt.Storage, oa, sessions, sprints, hook)
+	dbSessions, err := models.WriteSessions(txCTX, tx, rt.RP, rt.SessionStorage, oa, sessions, sprints, hook)
 	if err == nil {
 		// commit it at once
 		commitStart := time.Now()
@@ -627,7 +627,7 @@ func StartFlowForContacts(
 				}
 			}
 
-			dbSession, err := models.WriteSessions(txCTX, tx, rt.RP, rt.Storage, oa, []flows.Session{session}, []flows.Sprint{sprint}, hook)
+			dbSession, err := models.WriteSessions(txCTX, tx, rt.RP, rt.SessionStorage, oa, []flows.Session{session}, []flows.Sprint{sprint}, hook)
 			if err != nil {
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")
