@@ -463,7 +463,7 @@ func ResumeIVRFlow(
 	var clientErr error
 	switch res := ivrResume.(type) {
 	case InputResume:
-		resume, clientErr, err = buildMsgResume(ctx, rt.Config, rt.DB, rt.RP, rt.Storage, client, channel, contact, urn, conn, oa, r, res)
+		resume, clientErr, err = buildMsgResume(ctx, rt.Config, rt.DB, rt.RP, rt.MediaStorage, client, channel, contact, urn, conn, oa, r, res)
 
 	case DialResume:
 		resume, clientErr, err = buildDialResume(oa, contact, res)
