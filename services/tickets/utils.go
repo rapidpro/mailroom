@@ -143,7 +143,7 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 
 // CloseTicket closes the given ticket and creates a closed event
 func CloseTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
-	updated, err := models.CloseTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
+	updated, err := models.CloseTickets(ctx, rt.DB, oa, []*models.Ticket{ticket}, externally, l)
 	if err != nil {
 		return errors.Wrap(err, "error closing ticket")
 	}
@@ -159,4 +159,10 @@ func CloseTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 	}
 
 	return nil
+}
+
+// ReopenTicket reopens the given ticket
+func ReopenTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
+	_, err := models.ReopenTickets(ctx, rt.DB, oa, []*models.Ticket{ticket}, externally, l)
+	return err
 }

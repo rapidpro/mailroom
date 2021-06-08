@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -61,9 +62,10 @@ func QueueTicketEvent(rc redis.Conn, ticket *models.Ticket, eventType triggers.T
 	eventJSON, _ := json.Marshal(event)
 
 	task := &queue.Task{
-		Type:  models.TicketEventType,
-		OrgID: int(ticket.OrgID()),
-		Task:  eventJSON,
+		Type:     models.TicketEventType,
+		OrgID:    int(ticket.OrgID()),
+		Task:     eventJSON,
+		QueuedOn: dates.Now(),
 	}
 
 	return queueHandleTask(rc, ticket.ContactID(), task, false)

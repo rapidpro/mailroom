@@ -152,3 +152,38 @@ func TestSendReply(t *testing.T) {
 	_, err = tickets.SendReply(ctx, rt, ticket, "I'll get back to you", []*tickets.File{image})
 	assert.EqualError(t, err, "error storing attachment http://coolfiles.com/a.jpg for ticket reply: unable to read attachment content: read ../../core/models/testdata/test.jpg: file already closed")
 }
+
+func TestCloseTicket(t *testing.T) {
+	testsuite.ResetDB()
+	ctx := testsuite.CTX()
+	rt := testsuite.RT()
+	db := rt.DB
+
+	// create an open ticket
+	ticket1 := models.NewTicket(
+		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.Mailgun.ID,
+		"EX12345",
+		"New Ticket",
+		"Where are my cookies?",
+		map[string]interface{}{
+			"contact-display": "Cathy",
+		},
+	)
+	err := models.InsertTickets(ctx, db, []*models.Ticket{ticket1})
+	require.NoError(t, err)
+
+	// create a close ticket trigger
+	testdata.InsertTicketClosedTrigger(t, db, testdata.Org1, testdata.Favorites)
+
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	logger := &models.HTTPLogger{}
+
+	tickets.CloseTicket(ctx, rt, oa, ticket1, true, logger)
+
+	testsuite.AssertContactTasks(t, 1, int(testdata.Cathy.ID), []string{`{"type":"ticket","org_id":1,"task":{"org_id":1,"ticket_id":1,"event_type":"closed"},"queued_on":"0001-01-01T00:00:00Z"}`})
+}

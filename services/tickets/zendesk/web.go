@@ -278,7 +278,7 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 		case statusSolved, statusClosed:
 			err = tickets.CloseTicket(ctx, rt, nil, ticket, false, l)
 		case statusOpen:
-			_, err = models.ReopenTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
+			err = tickets.ReopenTicket(ctx, rt, nil, ticket, false, l)
 		}
 
 		if err != nil {
