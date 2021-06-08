@@ -33,25 +33,11 @@ func TestMsgEvents(t *testing.T) {
 
 	db.MustExec(`DELETE FROM msgs_msg`)
 
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`, testdata.Favorites.ID)
+	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
 
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 2) RETURNING id`, testdata.Org2Favorites.ID)
-
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), '', false, $1, 'C', 'O', 1, 1, 2) RETURNING id`, testdata.Org2SingleMessage.ID)
-
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'ivr', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`, testdata.IVRFlow.ID)
+	testdata.InsertKeywordTrigger(t, db, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertCatchallTrigger(t, db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
 	// clear all of Alexandria's URNs
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Alexandria.ID)
@@ -234,19 +220,9 @@ func TestChannelEvents(t *testing.T) {
 
 	logrus.Info("starting channel test")
 
-	// trigger on our twitter channel for new conversations and favorites flow
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
-		VALUES(TRUE, now(), now(), NULL, false, $1, 'N', NULL, 1, 1, 1, $2) RETURNING id`,
-		testdata.Favorites.ID, testdata.TwitterChannel.ID)
-
-	// trigger on our vonage channel for referral and number flow
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
-		VALUES(TRUE, now(), now(), NULL, false, $1, 'R', NULL, 1, 1, 1, $2) RETURNING id`,
-		testdata.PickANumber.ID, testdata.VonageChannel.ID)
+	// add some channel event triggers
+	testdata.InsertNewConversationTrigger(t, db, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
+	testdata.InsertReferralTrigger(t, db, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
 
 	// add a URN for cathy so we can test twitter URNs
 	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
@@ -368,12 +344,7 @@ func TestTimedEvents(t *testing.T) {
 	db.MustExec(`DELETE FROM msgs_msg`)
 
 	// start to start our favorites flow
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`,
-		testdata.Favorites.ID,
-	)
+	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
 
 	models.FlushCache()
 
