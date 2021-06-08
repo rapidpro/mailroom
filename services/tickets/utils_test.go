@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
@@ -154,10 +155,21 @@ func TestSendReply(t *testing.T) {
 }
 
 func TestCloseTicket(t *testing.T) {
-	testsuite.ResetDB()
+	testsuite.Reset()
 	ctx := testsuite.CTX()
 	rt := testsuite.RT()
 	db := rt.DB
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
+			httpx.NewMockResponse(200, nil, `{
+				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
+				"message": "Queued. Thank you."
+			}`),
+		},
+	}))
 
 	// create an open ticket
 	ticket1 := models.NewTicket(
@@ -183,7 +195,8 @@ func TestCloseTicket(t *testing.T) {
 
 	logger := &models.HTTPLogger{}
 
-	tickets.CloseTicket(ctx, rt, oa, ticket1, true, logger)
+	err = tickets.CloseTicket(ctx, rt, oa, ticket1, true, logger)
+	require.NoError(t, err)
 
-	testsuite.AssertContactTasks(t, 1, int(testdata.Cathy.ID), []string{`{"type":"ticket","org_id":1,"task":{"org_id":1,"ticket_id":1,"event_type":"closed"},"queued_on":"0001-01-01T00:00:00Z"}`})
+	testsuite.AssertContactTasks(t, 1, int(testdata.Cathy.ID), []string{`{"type":"ticket_closed","org_id":1,"task":{"id": 0,"org_id":1,"ticket_id":1,"event_type":"C"},"queued_on":""}`})
 }

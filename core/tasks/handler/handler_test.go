@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/triggers"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -299,12 +298,12 @@ func TestTicketEvents(t *testing.T) {
 
 	ticketID := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "")
 
-	event := models.NewTicketEvent(testdata.Org1.ID, ticketID, triggers.TicketEventTypeClosed)
+	event := models.NewTicketEvent(testdata.Org1.ID, ticketID, models.TicketEventTypeClosed)
 	eventJSON, err := json.Marshal(event)
 	require.NoError(t, err)
 
 	task := &queue.Task{
-		Type:  models.TicketEventType,
+		Type:  handler.TicketClosedEventType,
 		OrgID: int(testdata.Org1.ID),
 		Task:  eventJSON,
 	}

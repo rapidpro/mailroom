@@ -16,7 +16,6 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
@@ -152,7 +151,7 @@ func CloseTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 		rc := rt.RP.Get()
 		defer rc.Close()
 
-		err = handler.QueueTicketEvent(rc, ticket, triggers.TicketEventTypeClosed)
+		err = handler.QueueTicketClosedEvent(rc, ticket)
 		if err != nil {
 			return errors.Wrapf(err, "error queueing ticket closed event")
 		}

@@ -36,7 +36,7 @@ const (
 	MsgEventType             = "msg_event"
 	ExpirationEventType      = "expiration_event"
 	TimeoutEventType         = "timeout_event"
-	TicketEventType          = "ticket"
+	TicketClosedEventType    = "ticket_closed"
 )
 
 func init() {
@@ -136,7 +136,7 @@ func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			}
 			err = handleMsgEvent(ctx, db, rp, msg)
 
-		case TicketEventType:
+		case TicketClosedEventType:
 			evt := &models.TicketEvent{}
 			err = json.Unmarshal(contactEvent.Task, evt)
 			if err != nil {
@@ -651,13 +651,13 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 }
 
 func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *models.TicketEvent) error {
-	oa, err := models.GetOrgAssets(ctx, db, event.OrgID)
+	oa, err := models.GetOrgAssets(ctx, db, event.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
 
 	// load our ticket
-	tickets, err := models.LoadTickets(ctx, db, oa.OrgID(), []models.TicketID{event.TicketID})
+	tickets, err := models.LoadTickets(ctx, db, oa.OrgID(), []models.TicketID{event.TicketID()})
 	if err != nil {
 		return errors.Wrapf(err, "error loading ticket")
 	}
@@ -690,16 +690,16 @@ func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *
 	// do we have associated trigger?
 	var trigger *models.Trigger
 
-	switch event.EventType {
-	case triggers.TicketEventTypeClosed:
+	switch event.EventType() {
+	case models.TicketEventTypeClosed:
 		trigger = models.FindMatchingTicketClosedTrigger(oa, contact)
 	default:
-		return errors.Errorf("unknown ticket event type: %s", event.EventType)
+		return errors.Errorf("unknown ticket event type: %s", event.EventType())
 	}
 
 	// no trigger, noop, move on
 	if trigger == nil {
-		logrus.WithField("ticket_id", event.TicketID).WithField("event_type", event.EventType).Info("ignoring ticket event, no trigger found")
+		logrus.WithField("ticket_id", event.TicketID).WithField("event_type", event.EventType()).Info("ignoring ticket event, no trigger found")
 		return nil
 	}
 
@@ -730,13 +730,13 @@ func handleTicketEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *
 	// build our flow trigger
 	var flowTrigger flows.Trigger
 
-	switch event.EventType {
-	case triggers.TicketEventTypeClosed:
+	switch event.EventType() {
+	case models.TicketEventTypeClosed:
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
 			Ticket(ticket, triggers.TicketEventTypeClosed).
 			Build()
 	default:
-		return errors.Errorf("unknown ticket event type: %s", event.EventType)
+		return errors.Errorf("unknown ticket event type: %s", event.EventType())
 	}
 
 	_, err = runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{flowTrigger}, nil, true)

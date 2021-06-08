@@ -6,7 +6,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/pkg/errors"
@@ -56,13 +55,13 @@ func queueContactTask(rc redis.Conn, orgID models.OrgID, contactID models.Contac
 	return nil
 }
 
-// QueueTicketEvent queues an event to be handled for the given ticket
-func QueueTicketEvent(rc redis.Conn, ticket *models.Ticket, eventType triggers.TicketEventType) error {
-	event := models.NewTicketEvent(ticket.OrgID(), ticket.ID(), eventType)
+// QueueTicketClosedEvent queues a closed event to be handled for the given ticket
+func QueueTicketClosedEvent(rc redis.Conn, ticket *models.Ticket) error {
+	event := models.NewTicketEvent(ticket.OrgID(), ticket.ID(), models.TicketEventTypeClosed)
 	eventJSON, _ := json.Marshal(event)
 
 	task := &queue.Task{
-		Type:     models.TicketEventType,
+		Type:     TicketClosedEventType,
 		OrgID:    int(ticket.OrgID()),
 		Task:     eventJSON,
 		QueuedOn: dates.Now(),
