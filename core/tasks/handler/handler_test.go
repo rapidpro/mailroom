@@ -24,6 +24,7 @@ import (
 
 func TestMsgEvents(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -33,25 +34,11 @@ func TestMsgEvents(t *testing.T) {
 
 	db.MustExec(`DELETE FROM msgs_msg`)
 
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`, testdata.Favorites.ID)
+	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
 
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 2) RETURNING id`, testdata.Org2Favorites.ID)
-
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), '', false, $1, 'C', 'O', 1, 1, 2) RETURNING id`, testdata.Org2SingleMessage.ID)
-
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'ivr', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`, testdata.IVRFlow.ID)
+	testdata.InsertKeywordTrigger(t, db, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertCatchallTrigger(t, db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
 	// clear all of Alexandria's URNs
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Alexandria.ID)
@@ -135,13 +122,13 @@ func TestMsgEvents(t *testing.T) {
 
 		task := makeMsgTask(tc.OrgID, tc.ChannelID, tc.Contact.ID, tc.Contact.URN, tc.Contact.URNID, tc.Message)
 
-		err := handler.AddHandleTask(rc, tc.Contact.ID, task)
+		err := handler.QueueHandleTask(rc, tc.Contact.ID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handler.HandleContactEvent(ctx, db, rp, task)
+		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
@@ -172,13 +159,13 @@ func TestMsgEvents(t *testing.T) {
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, testdata.Org2Contact.ID)
 	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "red")
-	handler.AddHandleTask(rc, testdata.Org2Contact.ID, task)
+	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 
 	// should get requeued three times automatically
 	for i := 0; i < 3; i++ {
 		task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NotNil(t, task)
-		err := handler.HandleContactEvent(ctx, db, rp, task)
+		err := handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err)
 	}
 
@@ -193,10 +180,10 @@ func TestMsgEvents(t *testing.T) {
 
 	// try to resume now
 	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "red")
-	handler.AddHandleTask(rc, testdata.Org2Contact.ID, task)
+	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
-	err = handler.HandleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
 	// should get our catch all trigger
@@ -213,9 +200,9 @@ func TestMsgEvents(t *testing.T) {
 
 	// trigger should also not start a new session
 	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "start")
-	handler.AddHandleTask(rc, testdata.Org2Contact.ID, task)
+	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
-	err = handler.HandleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
 	db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2 ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID, previous)
@@ -224,6 +211,7 @@ func TestMsgEvents(t *testing.T) {
 
 func TestChannelEvents(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -271,13 +259,13 @@ func TestChannelEvents(t *testing.T) {
 			Task:  eventJSON,
 		}
 
-		err = handler.AddHandleTask(rc, tc.ContactID, task)
+		err = handler.QueueHandleTask(rc, tc.ContactID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handler.HandleContactEvent(ctx, db, rp, task)
+		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
@@ -299,11 +287,11 @@ func TestChannelEvents(t *testing.T) {
 
 func TestTicketEvents(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
-	rp := testsuite.RP()
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// add a ticket closed trigger
@@ -321,13 +309,13 @@ func TestTicketEvents(t *testing.T) {
 		Task:  eventJSON,
 	}
 
-	err = handler.AddHandleTask(rc, testdata.Cathy.ID, task)
+	err = handler.QueueHandleTask(rc, testdata.Cathy.ID, task)
 	require.NoError(t, err)
 
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	require.NoError(t, err)
 
-	err = handler.HandleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, []interface{}{testdata.Cathy.ID}, 1)
@@ -335,6 +323,7 @@ func TestTicketEvents(t *testing.T) {
 
 func TestStopEvent(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -356,13 +345,13 @@ func TestStopEvent(t *testing.T) {
 		Task:  eventJSON,
 	}
 
-	err = handler.AddHandleTask(rc, testdata.Cathy.ID, task)
+	err = handler.QueueHandleTask(rc, testdata.Cathy.ID, task)
 	assert.NoError(t, err, "error adding task")
 
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err, "error popping next task")
 
-	err = handler.HandleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
@@ -379,6 +368,7 @@ func TestStopEvent(t *testing.T) {
 
 func TestTimedEvents(t *testing.T) {
 	testsuite.Reset()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 	ctx := testsuite.CTX()
@@ -389,12 +379,7 @@ func TestTimedEvents(t *testing.T) {
 	db.MustExec(`DELETE FROM msgs_msg`)
 
 	// start to start our favorites flow
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'start', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`,
-		testdata.Favorites.ID,
-	)
+	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
 
 	models.FlushCache()
 
@@ -491,13 +476,13 @@ func TestTimedEvents(t *testing.T) {
 			)
 		}
 
-		err := handler.AddHandleTask(rc, tc.ContactID, task)
+		err := handler.QueueHandleTask(rc, tc.ContactID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handler.HandleContactEvent(ctx, db, rp, task)
+		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		var text string
@@ -540,13 +525,13 @@ func TestTimedEvents(t *testing.T) {
 		expiration,
 	)
 
-	err = handler.AddHandleTask(rc, testdata.Cathy.ID, task)
+	err = handler.QueueHandleTask(rc, testdata.Cathy.ID, task)
 	assert.NoError(t, err)
 
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 
-	err = handler.HandleContactEvent(ctx, db, rp, task)
+	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, []interface{}{runID}, 1)

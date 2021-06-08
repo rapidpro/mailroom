@@ -106,7 +106,7 @@ func RetryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName
 		}
 
 		// queue this event up for handling
-		err = AddHandleTask(rc, contactID, task)
+		err = QueueHandleTask(rc, contactID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error queuing retry for task")
 		}

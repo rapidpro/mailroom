@@ -17,6 +17,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCampaignStarts(t *testing.T) {
@@ -144,7 +145,7 @@ func TestBatchStart(t *testing.T) {
 		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
 		sessions, err := runner.StartFlowBatch(ctx, db, rp, batch)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
 		testsuite.AssertQueryCount(t, db,
@@ -179,14 +180,14 @@ func TestContactRuns(t *testing.T) {
 	rp := testsuite.RP()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// load our contact
 	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{testdata.Cathy.ID})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	contact, err := contacts[0].FlowContact(oa)
 	assert.NoError(t, err)

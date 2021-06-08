@@ -40,16 +40,16 @@ const (
 )
 
 func init() {
-	mailroom.AddTaskFunction(queue.HandleContactEvent, handleEvent)
+	mailroom.AddTaskFunction(queue.HandleContactEvent, HandleEvent)
 }
 
-func handleEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	return HandleContactEvent(ctx, rt.DB, rt.RP, task)
+func HandleEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
+	return handleContactEvent(ctx, rt.DB, rt.RP, task)
 }
 
-// HandleContactEvent is called when an event comes in for a contact.  to make sure we don't get into
-// a situation of being off by one, this task ingests and handles all the events for a contact, one by one
-func HandleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
+// Called when an event comes in for a contact. To make sure we don't get into a situation of being off by one,
+// this task ingests and handles all the events for a contact, one by one.
+func handleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *queue.Task) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -70,7 +70,7 @@ func HandleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 	if lock == "" {
 		rc := rp.Get()
 		defer rc.Close()
-		err = addContactTask(rc, models.OrgID(task.OrgID), eventTask.ContactID)
+		err = queueContactTask(rc, models.OrgID(task.OrgID), eventTask.ContactID)
 		if err != nil {
 			return errors.Wrapf(err, "error re-adding contact task after failing to get lock")
 		}
@@ -173,7 +173,7 @@ func HandleContactEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, task *
 			contactEvent.ErrorCount++
 			if contactEvent.ErrorCount < 3 {
 				rc := rp.Get()
-				retryErr := addHandleTask(rc, eventTask.ContactID, contactEvent, true)
+				retryErr := queueHandleTask(rc, eventTask.ContactID, contactEvent, true)
 				if retryErr != nil {
 					logrus.WithError(retryErr).Error("error requeuing errored contact event")
 				}
@@ -797,7 +797,7 @@ type StopEvent struct {
 	OccurredOn time.Time        `json:"occurred_on"`
 }
 
-// NewTimeoutEvent creates a new event task for the passed in timeout event
+// creates a new event task for the passed in timeout event
 func newTimedTask(eventType string, orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, eventTime time.Time) *queue.Task {
 	event := &TimedEvent{
 		OrgID:     orgID,
