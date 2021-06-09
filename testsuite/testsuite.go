@@ -189,7 +189,7 @@ func RT() *runtime.Runtime {
 		DB:             DB(),
 		ES:             nil,
 		MediaStorage:   MediaStorage(),
-		SessionStorage: MediaStorage(),
+		SessionStorage: SessionStorage(),
 		Config:         config.NewMailroomConfig(),
 	}
 }
