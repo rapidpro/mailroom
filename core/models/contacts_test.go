@@ -61,8 +61,8 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, cathy.URNs()[0].String(), "tel:+16055741111?id=10000&priority=1000")
 	assert.Equal(t, 1, cathy.Groups().Count())
 	assert.Equal(t, 2, cathy.Tickets().Count())
-	assert.Equal(t, "Problem!", cathy.Tickets().All()[0].Subject)
-	assert.Equal(t, "Another Problem!", cathy.Tickets().All()[1].Subject)
+	assert.Equal(t, "Problem!", cathy.Tickets().All()[0].Subject())
+	assert.Equal(t, "Another Problem!", cathy.Tickets().All()[1].Subject())
 
 	assert.Equal(t, "Yobe", cathy.Fields()["state"].QueryValue())
 	assert.Equal(t, "Dokshi", cathy.Fields()["ward"].QueryValue())
@@ -76,7 +76,7 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())
 	assert.Equal(t, 0, bob.Groups().Count())
 	assert.Equal(t, 1, bob.Tickets().Count())
-	assert.Equal(t, "Urgent", bob.Tickets().All()[0].Subject)
+	assert.Equal(t, "Urgent", bob.Tickets().All()[0].Subject())
 
 	assert.Equal(t, "George", george.Name())
 	assert.Equal(t, decimal.RequireFromString("30"), george.Fields()["age"].QueryValue())

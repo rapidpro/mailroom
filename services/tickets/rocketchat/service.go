@@ -51,7 +51,7 @@ type VisitorToken models.ContactID
 
 // Open opens a ticket which for RocketChat means open a room associated to a visitor user
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	ticket := flows.NewTicket(s.ticketer, subject, body)
+	ticket := flows.OpenTicket(s.ticketer, subject, body)
 	contact := session.Contact()
 	email := ""
 	phone := ""
@@ -77,7 +77,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 			Email:       email,
 			Phone:       phone,
 		},
-		TicketID: string(ticket.UUID),
+		TicketID: string(ticket.UUID()),
 	}
 
 	roomID, trace, err := s.client.CreateRoom(room)
@@ -88,7 +88,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		return nil, errors.Wrap(err, "error calling RocketChat")
 	}
 
-	ticket.ExternalID = roomID
+	ticket.SetExternalID(roomID)
 	return ticket, nil
 }
 
