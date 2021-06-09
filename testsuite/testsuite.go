@@ -184,7 +184,8 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 	assert.Equal(t, expected, actual, errMsg...)
 }
 
-func AssertContactTasks(t *testing.T, orgID, contactID int, expected []string, msgAndArgs ...interface{}) {
+// AssertContactTasks asserts that the given contact has the given tasks queued for them
+func AssertContactTasks(t *testing.T, orgID models.OrgID, contactID models.ContactID, expected []string, msgAndArgs ...interface{}) {
 	rc := RC()
 	defer rc.Close()
 
