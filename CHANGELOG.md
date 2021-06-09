@@ -1,3 +1,8 @@
+v6.3.15
+----------
+ * Fix test which modifies org
+ * Update to latest goflow as last release was broken
+
 v6.3.14
 ----------
  * Update to latest goflow
