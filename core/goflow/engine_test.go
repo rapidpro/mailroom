@@ -68,9 +68,9 @@ func TestSimulatorTicket(t *testing.T) {
 
 	ticket, err := svc.Open(nil, "New ticket", "Where are my cookies?", nil)
 	assert.NoError(t, err)
-	assert.Equal(t, testdata.Mailgun.UUID, ticket.Ticketer.UUID())
-	assert.Equal(t, "New ticket", ticket.Subject)
-	assert.Equal(t, "Where are my cookies?", ticket.Body)
+	assert.Equal(t, testdata.Mailgun.UUID, ticket.Ticketer().UUID())
+	assert.Equal(t, "New ticket", ticket.Subject())
+	assert.Equal(t, "Where are my cookies?", ticket.Body())
 }
 
 func TestSimulatorWebhook(t *testing.T) {

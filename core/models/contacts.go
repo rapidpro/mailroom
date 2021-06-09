@@ -80,7 +80,7 @@ type Contact struct {
 	fields     map[string]*flows.Value
 	groups     []*Group
 	urns       []urns.URN
-	tickets    []*flows.TicketReference
+	tickets    []*Ticket
 	createdOn  time.Time
 	modifiedOn time.Time
 	lastSeenOn *time.Time
@@ -192,28 +192,38 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, db Queryer, org *OrgAs
 }
 
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
-func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
+func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 	// convert our groups to a list of references
 	groups := make([]*assets.GroupReference, len(c.groups))
 	for i, g := range c.groups {
 		groups[i] = assets.NewGroupReference(g.UUID(), g.Name())
 	}
 
+	// convert our tickets to flow tickets
+	tickets := make([]*flows.Ticket, len(c.tickets))
+	var err error
+	for i, t := range c.tickets {
+		tickets[i], err = t.FlowTicket(oa)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating flow ticket")
+		}
+	}
+
 	// create our flow contact
 	contact, err := flows.NewContact(
-		org.SessionAssets(),
+		oa.SessionAssets(),
 		c.uuid,
 		flows.ContactID(c.id),
 		c.name,
 		c.language,
 		contactToFlowStatus[c.Status()],
-		org.Env().Timezone(),
+		oa.Env().Timezone(),
 		c.createdOn,
 		c.lastSeenOn,
 		c.urns,
 		groups,
 		c.fields,
-		c.tickets,
+		tickets,
 		assets.IgnoreMissing,
 	)
 	if err != nil {
@@ -308,18 +318,10 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 		contact.urns = contactURNs
 
 		// initialize our tickets
-		tickets := make([]*flows.TicketReference, 0, len(e.Tickets))
+		tickets := make([]*Ticket, 0, len(e.Tickets))
 		for _, t := range e.Tickets {
 			ticketer := org.TicketerByID(t.TicketerID)
-			if ticketer != nil {
-				tickets = append(tickets, flows.NewTicketReference(
-					t.UUID,
-					ticketer.Reference(),
-					t.Subject,
-					t.Body,
-					string(t.ExternalID),
-				))
-			}
+			tickets = append(tickets, NewTicket(t.UUID, org.OrgID(), contact.ID(), ticketer.ID(), t.ExternalID, t.Subject, t.Body, nil))
 		}
 		contact.tickets = tickets
 
