@@ -1,3 +1,9 @@
+v6.3.14
+----------
+ * Update to latest goflow
+ * Write sessions to s3 on resumes (optionally)
+ * Add support for exclusion groups on triggers and generalize trigger matching
+
 v6.3.13
 ----------
  * Introduce runtime.Runtime
