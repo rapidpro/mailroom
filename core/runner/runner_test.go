@@ -182,19 +182,15 @@ func TestResume(t *testing.T) {
 
 	// write sessions to storage as well
 	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3_write"}' WHERE id = 1`)
+	defer testsuite.ResetDB()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	require.NoError(t, err)
 
-	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{testdata.Cathy.ID})
-	require.NoError(t, err)
-
-	contact, err := contacts[0].FlowContact(oa)
-	require.NoError(t, err)
+	_, contact := testdata.Cathy.Load(t, db, oa)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
 	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, nil, true)
