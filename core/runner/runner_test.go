@@ -180,7 +180,7 @@ func TestContactRuns(t *testing.T) {
 	db := rt.DB
 	defer testsuite.ResetStorage()
 
-	db.MustExec(`UPDATE orgs_org set config = '{"use_storage_sessions": "true"}' WHERE id=1;`)
+	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3"}' WHERE id=1;`)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
