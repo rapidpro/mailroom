@@ -88,14 +88,14 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
 	assert.NoError(t, err)
-	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID)
-	assert.Equal(t, "Need help", ticket.Subject)
-	assert.Equal(t, "Where are my cookies?", ticket.Body)
-	assert.Equal(t, "", ticket.ExternalID)
+	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
+	assert.Equal(t, "Need help", ticket.Subject())
+	assert.Equal(t, "Where are my cookies?", ticket.Body())
+	assert.Equal(t, "", ticket.ExternalID())
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID, testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "", "Need help", "Where are my cookies?", map[string]interface{}{
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "", "Need help", "Where are my cookies?", map[string]interface{}{
 		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})

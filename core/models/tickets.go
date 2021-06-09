@@ -86,15 +86,19 @@ func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
 }
 
-func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.TicketReference, error) {
-	ticketer := oa.TicketerByID(t.TicketerID())
-	if ticketer == nil {
+func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
+	modelTicketer := oa.TicketerByID(t.TicketerID())
+	if modelTicketer == nil {
 		return nil, errors.New("unable to load ticketer with id %d")
 	}
 
-	ticket := flows.NewTicketReference(t.UUID(), ticketer.Reference(), t.Subject(), t.Body(), string(t.ExternalID()))
-
-	return ticket, nil
+	return flows.NewTicket(
+		t.UUID(),
+		oa.SessionAssets().Ticketers().Get(modelTicketer.UUID()),
+		t.Subject(),
+		t.Body(),
+		string(t.ExternalID()),
+	), nil
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket

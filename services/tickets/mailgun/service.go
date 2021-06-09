@@ -107,10 +107,10 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 
 // Open opens a ticket which for mailgun means just sending an initial email
 func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	ticket := flows.NewTicket(s.ticketer, subject, body)
+	ticket := flows.OpenTicket(s.ticketer, subject, body)
 	contactDisplay := tickets.GetContactDisplay(session.Environment(), session.Contact())
 
-	from := s.ticketAddress(contactDisplay, ticket.UUID)
+	from := s.ticketAddress(contactDisplay, ticket.UUID())
 	context := s.templateContext(subject, body, "", string(session.Contact().UUID()), contactDisplay)
 	fullBody := evaluateTemplate(openBodyTemplate, context)
 
@@ -122,7 +122,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 		return nil, errors.Wrap(err, "error calling mailgun API")
 	}
 
-	ticket.ExternalID = msgID
+	ticket.SetExternalID(msgID)
 	return ticket, nil
 }
 
