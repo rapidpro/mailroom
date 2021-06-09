@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -50,4 +51,22 @@ func (e *TicketEvent) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON is our custom marshaller so that our inner struct get output
 func (e *TicketEvent) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, &e.e)
+}
+
+const insertTicketEventsSQL = `
+INSERT INTO
+	tickets_ticketevent(org_id, ticket_id, event_type, created_on)
+	VALUES(:org_id, :ticket_id, :event_type, :created_on)
+RETURNING
+	id
+`
+
+func InsertTicketEvents(ctx context.Context, db Queryer, evts []*TicketEvent) error {
+	// convert to interface arrray
+	is := make([]interface{}, len(evts))
+	for i := range evts {
+		is[i] = &evts[i].e
+	}
+
+	return BulkQuery(ctx, "inserting ticket events", db, insertTicketEventsSQL, is)
 }

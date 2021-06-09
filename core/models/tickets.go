@@ -346,18 +346,23 @@ WHERE
 func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) ([]*Ticket, error) {
 	updated := make([]*Ticket, 0, len(tickets))
 	byTicketer := make(map[TicketerID][]*Ticket)
-	ids := make([]TicketID, len(tickets))
+	ids := make([]TicketID, 0, len(tickets))
+	closedEvents := make([]*TicketEvent, 0, len(tickets))
 	now := dates.Now()
-	for i, ticket := range tickets {
+
+	for _, ticket := range tickets {
 		if ticket.Status() != TicketStatusClosed {
 			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
-			ids[i] = ticket.ID()
+			ids = append(ids, ticket.ID())
 			t := &ticket.t
 			t.Status = TicketStatusClosed
 			t.ModifiedOn = now
 			t.ClosedOn = &now
 
+			event := NewTicketEvent(ticket.OrgID(), ticket.ID(), TicketEventTypeClosed)
+
 			updated = append(updated, ticket)
+			closedEvents = append(closedEvents, event)
 		}
 	}
 
@@ -378,7 +383,18 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, tickets []*Tic
 		}
 	}
 
-	return updated, Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	// mark the tickets as closed in the db
+	err := Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	err = InsertTicketEvents(ctx, db, closedEvents)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return updated, nil
 }
 
 const reopenTicketSQL = `
@@ -396,12 +412,13 @@ WHERE
 func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) ([]*Ticket, error) {
 	updated := make([]*Ticket, 0, len(tickets))
 	byTicketer := make(map[TicketerID][]*Ticket)
-	ids := make([]TicketID, len(tickets))
+	ids := make([]TicketID, 0, len(tickets))
 	now := dates.Now()
-	for i, ticket := range tickets {
+
+	for _, ticket := range tickets {
 		if ticket.Status() != TicketStatusOpen {
 			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
-			ids[i] = ticket.ID()
+			ids = append(ids, ticket.ID())
 			t := &ticket.t
 			t.Status = TicketStatusOpen
 			t.ModifiedOn = now

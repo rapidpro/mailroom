@@ -54,6 +54,7 @@ func TestTicketers(t *testing.T) {
 }
 
 func TestTickets(t *testing.T) {
+	testsuite.Reset()
 	ctx := testsuite.CTX()
 	rt := testsuite.RT()
 	db := rt.DB
@@ -150,6 +151,9 @@ func TestTickets(t *testing.T) {
 
 	// check ticket is now closed
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'C' AND closed_on IS NOT NULL`, []interface{}{testdata.Org1.ID}, 1)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'C'`,
+		[]interface{}{testdata.Org1.ID, ticket1.ID()}, 1)
 
 	err = models.UpdateAndKeepOpenTicket(ctx, db, ticket1, map[string]string{"last-message-id": "6754"})
 	assert.NoError(t, err)
