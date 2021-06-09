@@ -66,11 +66,11 @@ func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redi
 	s := &Server{
 		ctx: ctx,
 		rt: &runtime.Runtime{
-			RP:      rp,
-			DB:      db,
-			ES:      es,
-			Storage: store,
-			Config:  config,
+			RP:           rp,
+			DB:           db,
+			ES:           es,
+			MediaStorage: store,
+			Config:       config,
 		},
 
 		wg: wg,

@@ -170,17 +170,32 @@ func (mr *Mailroom) Start() error {
 		if err != nil {
 			return err
 		}
-		mr.rt.Storage = storage.NewS3(s3Client, c.S3MediaBucket)
+		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, 32)
+		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, 32)
 	} else {
-		mr.rt.Storage = storage.NewFS("_storage")
+		mr.rt.MediaStorage = storage.NewFS("_storage")
+		mr.rt.SessionStorage = storage.NewFS("_storage")
 	}
 
-	// test our storage
-	err = mr.rt.Storage.Test()
+	// test our media storage
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+	err = mr.rt.MediaStorage.Test(ctx)
+	cancel()
+
 	if err != nil {
-		log.WithError(err).Error(mr.rt.Storage.Name() + " storage not available")
+		log.WithError(err).Error(mr.rt.MediaStorage.Name() + " media storage not available")
 	} else {
-		log.Info(mr.rt.Storage.Name() + " storage ok")
+		log.Info(mr.rt.MediaStorage.Name() + " media storage ok")
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+	err = mr.rt.SessionStorage.Test(ctx)
+	cancel()
+
+	if err != nil {
+		log.WithError(err).Error(mr.rt.SessionStorage.Name() + " session storage not available")
+	} else {
+		log.Info(mr.rt.SessionStorage.Name() + " session storage ok")
 	}
 
 	// initialize our elastic client
@@ -212,7 +227,7 @@ func (mr *Mailroom) Start() error {
 	mr.handlerForeman.Start()
 
 	// start our web server
-	mr.webserver = web.NewServer(mr.ctx, c, mr.rt.DB, mr.rt.RP, mr.rt.Storage, mr.rt.ES, mr.wg)
+	mr.webserver = web.NewServer(mr.ctx, c, mr.rt.DB, mr.rt.RP, mr.rt.MediaStorage, mr.rt.ES, mr.wg)
 	mr.webserver.Start()
 
 	logrus.Info("mailroom started")

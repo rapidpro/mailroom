@@ -145,8 +145,8 @@ func TestSendReply(t *testing.T) {
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
 	assert.Equal(t, testdata.Cathy.ID, msg.ContactID())
-	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg"}, msg.Attachments())
-	assert.FileExists(t, "_test_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg")
+	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_media_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg"}, msg.Attachments())
+	assert.FileExists(t, "_test_media_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg")
 
 	// try with file that can't be read (i.e. same file again which is already closed)
 	_, err = tickets.SendReply(ctx, rt, ticket, "I'll get back to you", []*tickets.File{image})

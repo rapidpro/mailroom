@@ -143,7 +143,7 @@ func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	}
 
 	// try to handle this event
-	session, err := handler.HandleChannelEvent(ctx, rt.DB, rt.RP, models.MOCallEventType, event, conn)
+	session, err := handler.HandleChannelEvent(ctx, rt, models.MOCallEventType, event, conn)
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error handling incoming call")
 
@@ -173,7 +173,7 @@ func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	}
 
 	// try to handle it, this time looking for a missed call event
-	session, err = handler.HandleChannelEvent(ctx, rt.DB, rt.RP, models.MOMissEventType, event, nil)
+	session, err = handler.HandleChannelEvent(ctx, rt, models.MOMissEventType, event, nil)
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error handling missed call")
 		return channel, conn, client.WriteErrorResponse(w, errors.Wrapf(err, "error handling missed call"))
@@ -297,21 +297,21 @@ func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w htt
 	switch request.Action {
 	case actionStart:
 		err = ivr.StartIVRFlow(
-			ctx, rt.DB, rt.RP, client, resumeURL,
+			ctx, rt, client, resumeURL,
 			oa, channel, conn, contacts[0], urn, conn.StartID(),
 			r, w,
 		)
 
 	case actionResume:
 		err = ivr.ResumeIVRFlow(
-			ctx, rt.Config, rt.DB, rt.RP, rt.Storage, resumeURL, client,
+			ctx, rt, resumeURL, client,
 			oa, channel, conn, contacts[0], urn,
 			r, w,
 		)
 
 	case actionStatus:
 		err = ivr.HandleIVRStatus(
-			ctx, rt.DB, rt.RP, oa, client, conn,
+			ctx, rt, oa, client, conn,
 			r, w,
 		)
 
@@ -392,7 +392,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request, w h
 		return channel, nil, client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load channel connection with id: %s", externalID))
 	}
 
-	err = ivr.HandleIVRStatus(ctx, rt.DB, rt.RP, oa, client, conn, r, w)
+	err = ivr.HandleIVRStatus(ctx, rt, oa, client, conn, r, w)
 
 	// had an error? mark our connection as errored and log it
 	if err != nil {

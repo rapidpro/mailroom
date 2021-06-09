@@ -24,8 +24,8 @@ import (
 func TestMsgEvents(t *testing.T) {
 	testsuite.Reset()
 	rt := testsuite.RT()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	db := rt.DB
+	rp := rt.RP
 	ctx := testsuite.CTX()
 
 	rc := rp.Get()
@@ -211,8 +211,8 @@ func TestMsgEvents(t *testing.T) {
 func TestChannelEvents(t *testing.T) {
 	testsuite.Reset()
 	rt := testsuite.RT()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	db := rt.DB
+	rp := rt.RP
 	ctx := testsuite.CTX()
 
 	rc := rp.Get()
@@ -289,8 +289,8 @@ func TestChannelEvents(t *testing.T) {
 func TestStopEvent(t *testing.T) {
 	testsuite.Reset()
 	rt := testsuite.RT()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	db := rt.DB
+	rp := rt.RP
 	ctx := testsuite.CTX()
 
 	rc := rp.Get()
@@ -334,8 +334,9 @@ func TestStopEvent(t *testing.T) {
 func TestTimedEvents(t *testing.T) {
 	testsuite.Reset()
 	rt := testsuite.RT()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	db := rt.DB
+	rp := rt.RP
+
 	ctx := testsuite.CTX()
 
 	rc := rp.Get()

@@ -159,10 +159,10 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 
 func RunTestCases(t *testing.T, tcs []TestCase) {
 	models.FlushCache()
-
-	db := testsuite.DB()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
+	rt := testsuite.RT()
+	db := rt.DB
+	rp := rt.RP
 
 	oa, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
 	assert.NoError(t, err)
@@ -205,7 +205,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Msg(msg).Build()
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, oa, flow.(*models.Flow), []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID}, options)
+		_, err = runner.StartFlow(ctx, rt, oa, flow.(*models.Flow), []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID}, options)
 		assert.NoError(t, err)
 
 		results := make(map[models.ContactID]modifyResult)

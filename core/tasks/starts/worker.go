@@ -201,7 +201,7 @@ func handleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, task *queue.
 	}
 
 	// start these contacts in our flow
-	_, err = runner.StartFlowBatch(ctx, rt.DB, rt.RP, startBatch)
+	_, err = runner.StartFlowBatch(ctx, rt, startBatch)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow batch: %s", string(task.Task))
 	}
