@@ -11,22 +11,20 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSessionTriggered(t *testing.T) {
 	testsuite.Reset()
-	testsuite.ResetRP()
 	models.FlushCache()
-	db := testsuite.DB()
+	rt := testsuite.RT()
 	ctx := testsuite.CTX()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	simpleFlow, err := oa.FlowByID(testdata.SingleMessage.ID)
@@ -73,7 +71,10 @@ func TestSessionTriggered(t *testing.T) {
 				},
 			},
 			Assertions: []handlers.Assertion{
-				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
+				func(t *testing.T, rt *runtime.Runtime) error {
+					rc := rt.RP.Get()
+					defer rc.Close()
+
 					task, err := queue.PopNextTask(rc, queue.BatchQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)
@@ -96,7 +97,6 @@ func TestSessionTriggered(t *testing.T) {
 
 func TestQuerySessionTriggered(t *testing.T) {
 	testsuite.Reset()
-	testsuite.ResetRP()
 	models.FlushCache()
 	db := testsuite.DB()
 	ctx := testsuite.CTX()
@@ -123,7 +123,10 @@ func TestQuerySessionTriggered(t *testing.T) {
 				},
 			},
 			Assertions: []handlers.Assertion{
-				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
+				func(t *testing.T, rt *runtime.Runtime) error {
+					rc := rt.RP.Get()
+					defer rc.Close()
+
 					task, err := queue.PopNextTask(rc, queue.BatchQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)

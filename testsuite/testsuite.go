@@ -22,7 +22,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const storageDir = "_test_storage"
+const MediaStorageDir = "_test_media_storage"
+const SessionStorageDir = "_test_session_storage"
 
 // Reset clears out both our database and redis DB
 func Reset() (context.Context, *sqlx.DB, *redis.Pool) {
@@ -106,14 +107,23 @@ func CTX() context.Context {
 	return context.Background()
 }
 
-// Storage returns our storage for tests
-func Storage() storage.Storage {
-	return storage.NewFS(storageDir)
+// MediaStorage returns our media storage for tests
+func MediaStorage() storage.Storage {
+	return storage.NewFS(MediaStorageDir)
+}
+
+// SessionStorage returns our session storage for tests
+func SessionStorage() storage.Storage {
+	return storage.NewFS(SessionStorageDir)
 }
 
 // ResetStorage clears our storage for tests
 func ResetStorage() {
-	if err := os.RemoveAll(storageDir); err != nil {
+	if err := os.RemoveAll(MediaStorageDir); err != nil {
+		panic(err)
+	}
+
+	if err := os.RemoveAll(SessionStorageDir); err != nil {
 		panic(err)
 	}
 }
@@ -186,10 +196,11 @@ func AssertContactTasks(t *testing.T, orgID, contactID int, expected []string, m
 
 func RT() *runtime.Runtime {
 	return &runtime.Runtime{
-		RP:      RP(),
-		DB:      DB(),
-		ES:      nil,
-		Storage: Storage(),
-		Config:  config.NewMailroomConfig(),
+		RP:             RP(),
+		DB:             DB(),
+		ES:             nil,
+		MediaStorage:   MediaStorage(),
+		SessionStorage: MediaStorage(),
+		Config:         config.NewMailroomConfig(),
 	}
 }

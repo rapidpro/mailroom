@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -44,7 +45,7 @@ type TestCase struct {
 	SQLAssertions []SQLAssertion
 }
 
-type Assertion func(t *testing.T, db *sqlx.DB, rc redis.Conn) error
+type Assertion func(t *testing.T, rt *runtime.Runtime) error
 
 type SQLAssertion struct {
 	SQL   string
@@ -159,10 +160,9 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 
 func RunTestCases(t *testing.T, tcs []TestCase) {
 	models.FlushCache()
-
-	db := testsuite.DB()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
+	rt := testsuite.RT()
+	db := rt.DB
 
 	oa, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
 	assert.NoError(t, err)
@@ -205,8 +205,10 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Msg(msg).Build()
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, oa, flow.(*models.Flow), []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID}, options)
-		assert.NoError(t, err)
+		for _, c := range []*testdata.Contact{testdata.Cathy, testdata.Bob, testdata.George, testdata.Alexandria} {
+			_, err := runner.StartFlow(ctx, rt, oa, flow.(*models.Flow), []models.ContactID{c.ID}, options)
+			require.NoError(t, err)
+		}
 
 		results := make(map[models.ContactID]modifyResult)
 
@@ -241,11 +243,11 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		assert.NoError(t, err)
 
 		for _, scene := range scenes {
-			err := models.HandleEvents(ctx, tx, rp, oa, scene, results[scene.ContactID()].Events)
+			err := models.HandleEvents(ctx, tx, rt.RP, oa, scene, results[scene.ContactID()].Events)
 			assert.NoError(t, err)
 		}
 
-		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, oa, scenes)
+		err = models.ApplyEventPreCommitHooks(ctx, tx, rt.RP, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -254,7 +256,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		tx, err = db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
+		err = models.ApplyEventPostCommitHooks(ctx, tx, rt.RP, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -266,11 +268,9 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			testsuite.AssertQueryCount(t, db, a.SQL, a.Args, a.Count, "%d:%d: mismatch in expected count for query: %s", i, ii, a.SQL)
 		}
 
-		rc := rp.Get()
 		for ii, a := range tc.Assertions {
-			err := a(t, db, rc)
+			err := a(t, rt)
 			assert.NoError(t, err, "%d: %d error checking assertion", i, ii)
 		}
-		rc.Close()
 	}
 }

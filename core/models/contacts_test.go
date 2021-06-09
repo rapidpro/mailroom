@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func TestContacts(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	org, err := models.GetOrgAssets(ctx, db, 1)
+	org, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
@@ -39,9 +40,12 @@ func TestContacts(t *testing.T) {
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, testdata.George.ID)
 	db.MustExec(`UPDATE contacts_contact SET is_active = FALSE WHERE id = $1`, testdata.Alexandria.ID)
 
-	modelContacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{testdata.Cathy.ID, testdata.George.ID, testdata.Bob.ID, testdata.Alexandria.ID})
+	modelContacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID})
 	require.NoError(t, err)
 	require.Equal(t, 3, len(modelContacts))
+
+	// LoadContacts doesn't guarantee returned order of contacts
+	sort.Slice(modelContacts, func(i, j int) bool { return modelContacts[i].ID() < modelContacts[j].ID() })
 
 	// convert to goflow contacts
 	contacts := make([]*flows.Contact, len(modelContacts))

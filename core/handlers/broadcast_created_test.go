@@ -10,11 +10,10 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,7 +37,10 @@ func TestBroadcastCreated(t *testing.T) {
 				},
 			},
 			Assertions: []handlers.Assertion{
-				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
+				func(t *testing.T, rt *runtime.Runtime) error {
+					rc := rt.RP.Get()
+					defer rc.Close()
+
 					task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)

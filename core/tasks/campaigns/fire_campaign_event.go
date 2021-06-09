@@ -82,7 +82,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(t.CampaignUUID), t.CampaignName)
 
-	started, err := runner.FireCampaignEvents(ctx, db, rp, orgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
+	started, err := runner.FireCampaignEvents(ctx, rt, orgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
 
 	// remove all the contacts that were started
 	for _, contactID := range started {

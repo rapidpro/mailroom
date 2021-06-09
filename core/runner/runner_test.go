@@ -22,9 +22,9 @@ import (
 
 func TestCampaignStarts(t *testing.T) {
 	testsuite.Reset()
-	db := testsuite.DB()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
+	rt := testsuite.RT()
+	db := rt.DB
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(testdata.RemindersCampaign.UUID), "Doctor Reminders")
 
@@ -62,7 +62,7 @@ func TestCampaignStarts(t *testing.T) {
 			Scheduled: now,
 		},
 	}
-	sessions, err := runner.FireCampaignEvents(ctx, db, rp, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
+	sessions, err := runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
 
@@ -102,9 +102,9 @@ func TestCampaignStarts(t *testing.T) {
 
 func TestBatchStart(t *testing.T) {
 	testsuite.Reset()
-	db := testsuite.DB()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
+	rt := testsuite.RT()
+	db := rt.DB
 
 	// create a start object
 	testdata.InsertFlowStart(t, db, testdata.Org1, testdata.SingleMessage, nil)
@@ -144,7 +144,7 @@ func TestBatchStart(t *testing.T) {
 			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
-		sessions, err := runner.StartFlowBatch(ctx, db, rp, batch)
+		sessions, err := runner.StartFlowBatch(ctx, rt, batch)
 		require.NoError(t, err)
 		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
@@ -173,27 +173,27 @@ func TestBatchStart(t *testing.T) {
 	}
 }
 
-func TestContactRuns(t *testing.T) {
+func TestResume(t *testing.T) {
 	testsuite.Reset()
-	db := testsuite.DB()
 	ctx := testsuite.CTX()
-	rp := testsuite.RP()
+	rt := testsuite.RT()
+	db := rt.DB
+	defer testsuite.ResetStorage()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	// write sessions to storage as well
+	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3_write"}' WHERE id = 1`)
+	defer testsuite.ResetDB()
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	require.NoError(t, err)
 
-	// load our contact
-	contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{testdata.Cathy.ID})
-	require.NoError(t, err)
-
-	contact, err := contacts[0].FlowContact(oa)
-	assert.NoError(t, err)
+	_, contact := testdata.Cathy.Load(t, db, oa)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, nil, true)
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
@@ -234,27 +234,27 @@ func TestContactRuns(t *testing.T) {
 		msg.SetID(10)
 		resume := resumes.NewMsg(oa.Env(), contact, msg)
 
-		session, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, nil)
+		session, err = runner.ResumeFlow(ctx, rt, oa, session, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 
 		testsuite.AssertQueryCount(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
+			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND output_url IS NOT NULL`,
 			[]interface{}{contact.ID(), flow.ID(), tc.SessionStatus}, 1, "%d: didn't find expected session", i,
 		)
 
 		runIsActive := tc.RunStatus == models.RunStatusActive || tc.RunStatus == models.RunStatusWaiting
 
 		runQuery := `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-		AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
-		AND json_array_length(path::json) = $5 AND json_array_length(events::json) = $6
-		AND session_id IS NOT NULL `
+		 AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
+		 AND json_array_length(path::json) = $5 AND json_array_length(events::json) = $6 
+		 AND session_id IS NOT NULL`
 
 		if runIsActive {
-			runQuery += `AND expires_on IS NOT NULL`
+			runQuery += ` AND expires_on IS NOT NULL`
 		} else {
-			runQuery += `AND expires_on IS NULL`
+			runQuery += ` AND expires_on IS NULL`
 		}
 
 		testsuite.AssertQueryCount(t, db,
