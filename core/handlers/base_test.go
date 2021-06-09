@@ -205,8 +205,10 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Msg(msg).Build()
 		}
 
-		_, err = runner.StartFlow(ctx, rt, oa, flow.(*models.Flow), []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID, testdata.Alexandria.ID}, options)
-		assert.NoError(t, err)
+		for _, c := range []*testdata.Contact{testdata.Cathy, testdata.Bob, testdata.George, testdata.Alexandria} {
+			_, err := runner.StartFlow(ctx, rt, oa, flow.(*models.Flow), []models.ContactID{c.ID}, options)
+			require.NoError(t, err)
+		}
 
 		results := make(map[models.ContactID]modifyResult)
 
