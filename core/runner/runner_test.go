@@ -173,14 +173,15 @@ func TestBatchStart(t *testing.T) {
 	}
 }
 
-func TestContactRuns(t *testing.T) {
+func TestResume(t *testing.T) {
 	testsuite.Reset()
 	ctx := testsuite.CTX()
 	rt := testsuite.RT()
 	db := rt.DB
 	defer testsuite.ResetStorage()
 
-	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3"}' WHERE id=1;`)
+	// write sessions to storage as well
+	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3_write"}' WHERE id = 1`)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -193,7 +194,7 @@ func TestContactRuns(t *testing.T) {
 	require.NoError(t, err)
 
 	contact, err := contacts[0].FlowContact(oa)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
 	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, nil, true)
