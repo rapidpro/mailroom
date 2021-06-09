@@ -136,7 +136,6 @@ func TestCreateContact(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 	testsuite.Reset()
-	models.FlushCache()
 
 	testdata.InsertContactGroup(t, db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Kinyarwanda", "language = kin")
 
@@ -207,7 +206,6 @@ func TestGetOrCreateContact(t *testing.T) {
 	newContact := func() models.ContactID { maxContactID++; return maxContactID }
 	prevContact := func() models.ContactID { return maxContactID }
 
-	models.FlushCache()
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
@@ -361,7 +359,6 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	newContact := func() models.ContactID { maxContactID++; return maxContactID }
 	prevContact := func() models.ContactID { return maxContactID }
 
-	models.FlushCache()
 	org, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 

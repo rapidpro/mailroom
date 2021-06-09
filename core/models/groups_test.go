@@ -76,9 +76,7 @@ func TestDynamicGroups(t *testing.T) {
 		'{"%s": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
 		WHERE id = $1`, testdata.JoinedField.UUID), testdata.Bob.ID)
 
-	// clear our org cache so we reload org campaigns and events
-	models.FlushCache()
-	org, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
 	assert.NoError(t, err)
 
 	esServer := testsuite.NewMockElasticServer()
@@ -153,7 +151,7 @@ func TestDynamicGroups(t *testing.T) {
 		assert.NoError(t, err)
 
 		esServer.NextResponse = tc.ESResponse
-		count, err := models.PopulateDynamicGroup(ctx, db, es, org, testdata.DoctorsGroup.ID, tc.Query)
+		count, err := models.PopulateDynamicGroup(ctx, db, es, oa, testdata.DoctorsGroup.ID, tc.Query)
 		assert.NoError(t, err, "error populating dynamic group for: %s", tc.Query)
 
 		assert.Equal(t, count, len(tc.ContactIDs))
