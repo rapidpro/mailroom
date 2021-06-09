@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/gomodule/redigo/redis"
@@ -30,6 +31,8 @@ func Reset() (context.Context, *sqlx.DB, *redis.Pool) {
 	logrus.SetLevel(logrus.DebugLevel)
 	ResetDB()
 	ResetRP()
+
+	models.FlushCache()
 
 	return CTX(), DB(), RP()
 }

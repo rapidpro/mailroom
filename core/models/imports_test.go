@@ -31,8 +31,6 @@ func TestContactImports(t *testing.T) {
 	testsuite.Reset()
 	defer testsuite.Reset()
 
-	models.FlushCache()
-
 	testdata.DeleteContactsAndURNs(t, db)
 
 	// add contact in other org to make sure we can't update it

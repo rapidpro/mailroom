@@ -44,9 +44,8 @@ func TestTicketers(t *testing.T) {
 	assert.Equal(t, "1234-abcd", ticketer.Config("push_id"))
 
 	ticketer.UpdateConfig(ctx, db, map[string]string{"new-key": "foo"}, map[string]bool{"push_id": true})
-	models.FlushCache()
 
-	org1, _ = models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org1, _ = models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	ticketer = org1.TicketerByID(testdata.Zendesk.ID)
 
 	assert.Equal(t, "foo", ticketer.Config("new-key"))       // new config value added
