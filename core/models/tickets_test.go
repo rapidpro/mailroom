@@ -146,8 +146,10 @@ func TestTickets(t *testing.T) {
 
 	logger := &models.HTTPLogger{}
 
-	_, err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, true, logger)
+	evts, err := models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, true, logger)
 	assert.NoError(t, err)
+	assert.Equal(t, 1, len(evts))
+	assert.Equal(t, models.TicketEventTypeClosed, evts[ticket1].EventType())
 
 	// check ticket is now closed
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'C' AND closed_on IS NOT NULL`, []interface{}{testdata.Org1.ID}, 1)

@@ -27,10 +27,10 @@ type bulkTicketResponse struct {
 	ChangedIDs []models.TicketID `json:"changed_ids"`
 }
 
-func newBulkResponse(changed []*models.Ticket) *bulkTicketResponse {
-	ids := make([]models.TicketID, len(changed))
-	for i := range changed {
-		ids[i] = changed[i].ID()
+func newBulkResponse(changed map[*models.Ticket]*models.TicketEvent) *bulkTicketResponse {
+	ids := make([]models.TicketID, 0, len(changed))
+	for t := range changed {
+		ids = append(ids, t.ID())
 	}
 	return &bulkTicketResponse{ChangedIDs: ids}
 }
@@ -59,7 +59,7 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	updated, err := models.CloseTickets(ctx, rt.DB, oa, tickets, true, l)
+	evts, err := models.CloseTickets(ctx, rt.DB, oa, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error closing tickets")
 	}
@@ -67,14 +67,14 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	for _, t := range updated {
-		err = handler.QueueTicketClosedEvent(rc, t)
+	for t, e := range evts {
+		err = handler.QueueTicketEvent(rc, t.ContactID(), e)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "error queueing ticket event for ticket %d", t.ID())
 		}
 	}
 
-	return newBulkResponse(updated), http.StatusOK, nil
+	return newBulkResponse(evts), http.StatusOK, nil
 }
 
 // Reopens any closed tickets with the given ids
@@ -101,10 +101,10 @@ func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	updated, err := models.ReopenTickets(ctx, rt.DB, oa, tickets, true, l)
+	evts, err := models.ReopenTickets(ctx, rt.DB, oa, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
 	}
 
-	return newBulkResponse(updated), http.StatusOK, nil
+	return newBulkResponse(evts), http.StatusOK, nil
 }

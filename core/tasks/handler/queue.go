@@ -55,17 +55,20 @@ func queueContactTask(rc redis.Conn, orgID models.OrgID, contactID models.Contac
 	return nil
 }
 
-// QueueTicketClosedEvent queues a closed event to be handled for the given ticket
-func QueueTicketClosedEvent(rc redis.Conn, ticket *models.Ticket) error {
-	event := models.NewTicketEvent(ticket.OrgID(), ticket.ID(), models.TicketEventTypeClosed)
-	eventJSON, _ := json.Marshal(event)
+// QueueTicketEvent queues a ticket event to be handled
+func QueueTicketEvent(rc redis.Conn, contactID models.ContactID, evt *models.TicketEvent) error {
+	eventJSON, _ := json.Marshal(evt)
+	var task *queue.Task
 
-	task := &queue.Task{
-		Type:     TicketClosedEventType,
-		OrgID:    int(ticket.OrgID()),
-		Task:     eventJSON,
-		QueuedOn: dates.Now(),
+	switch evt.EventType() {
+	case models.TicketEventTypeClosed:
+		task = &queue.Task{
+			Type:     TicketClosedEventType,
+			OrgID:    int(evt.OrgID()),
+			Task:     eventJSON,
+			QueuedOn: dates.Now(),
+		}
 	}
 
-	return queueHandleTask(rc, ticket.ContactID(), task, false)
+	return queueHandleTask(rc, contactID, task, false)
 }

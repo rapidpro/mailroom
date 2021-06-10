@@ -140,18 +140,18 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 	return &File{URL: url, ContentType: contentType, Body: ioutil.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
 }
 
-// CloseTicket closes the given ticket and creates a closed event
+// CloseTicket closes the given ticket, and creates and queues a closed event
 func CloseTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
-	updated, err := models.CloseTickets(ctx, rt.DB, oa, []*models.Ticket{ticket}, externally, l)
+	events, err := models.CloseTickets(ctx, rt.DB, oa, []*models.Ticket{ticket}, externally, l)
 	if err != nil {
 		return errors.Wrap(err, "error closing ticket")
 	}
 
-	if len(updated) == 1 {
+	if len(events) == 1 {
 		rc := rt.RP.Get()
 		defer rc.Close()
 
-		err = handler.QueueTicketClosedEvent(rc, ticket)
+		err = handler.QueueTicketEvent(rc, ticket.ContactID(), events[ticket])
 		if err != nil {
 			return errors.Wrapf(err, "error queueing ticket closed event")
 		}

@@ -343,11 +343,11 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) ([]*Ticket, error) {
-	updated := make([]*Ticket, 0, len(tickets))
+func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
-	closedEvents := make([]*TicketEvent, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
 
 	for _, ticket := range tickets {
@@ -359,10 +359,9 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, tickets []*Tic
 			t.ModifiedOn = now
 			t.ClosedOn = &now
 
-			event := NewTicketEvent(ticket.OrgID(), ticket.ID(), TicketEventTypeClosed)
-
-			updated = append(updated, ticket)
-			closedEvents = append(closedEvents, event)
+			e := NewTicketEvent(ticket.OrgID(), ticket.ID(), TicketEventTypeClosed)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
 		}
 	}
 
@@ -389,12 +388,12 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, tickets []*Tic
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
 
-	err = InsertTicketEvents(ctx, db, closedEvents)
+	err = InsertTicketEvents(ctx, db, events)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting ticket events")
 	}
 
-	return updated, nil
+	return eventsByTicket, nil
 }
 
 const reopenTicketSQL = `
@@ -409,10 +408,11 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) ([]*Ticket, error) {
-	updated := make([]*Ticket, 0, len(tickets))
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
 
 	for _, ticket := range tickets {
@@ -424,7 +424,9 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 			t.ModifiedOn = now
 			t.ClosedOn = nil
 
-			updated = append(updated, ticket)
+			e := NewTicketEvent(ticket.OrgID(), ticket.ID(), TicketEventTypeOpened)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
 		}
 	}
 
@@ -445,7 +447,18 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 		}
 	}
 
-	return updated, Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	// mark the tickets as opened in the db
+	err := Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
 }
 
 // Ticketer is our type for a ticketer asset
