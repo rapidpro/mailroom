@@ -55,18 +55,12 @@ func init() {
 // OrgID is our type for orgs ids
 type OrgID int
 
-// UserID is our type for user ids used by modified_by, which can be null
-type UserID null.Int
-
 // SessionStorageMode is our type for how we persist our sessions
 type SessionStorageMode string
 
 const (
 	// NilOrgID is the id 0 considered as nil org id
 	NilOrgID = OrgID(0)
-
-	// NilUserID si the id 0 considered as nil user id
-	NilUserID = UserID(0)
 
 	configSMTPServer  = "smtp_server"
 	configDTOneKey    = "dtone_key"

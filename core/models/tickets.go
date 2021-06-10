@@ -166,13 +166,12 @@ SELECT
 FROM
   tickets_ticket t
 WHERE
-  t.org_id = $1 AND
-  t.id = ANY($2)
+  t.id = ANY($1)
 `
 
 // LoadTickets loads all of the tickets with the given ids
-func LoadTickets(ctx context.Context, db Queryer, orgID OrgID, ids []TicketID) ([]*Ticket, error) {
-	return loadTickets(ctx, db, selectTicketsByIDSQL, orgID, pq.Array(ids))
+func LoadTickets(ctx context.Context, db Queryer, ids []TicketID) ([]*Ticket, error) {
+	return loadTickets(ctx, db, selectTicketsByIDSQL, pq.Array(ids))
 }
 
 func loadTickets(ctx context.Context, db Queryer, query string, params ...interface{}) ([]*Ticket, error) {
@@ -343,7 +342,7 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
@@ -359,7 +358,7 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, tickets []*Tic
 			t.ModifiedOn = now
 			t.ClosedOn = &now
 
-			e := NewTicketEvent(ticket.OrgID(), ticket.ID(), TicketEventTypeClosed)
+			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ID(), TicketEventTypeClosed)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}
@@ -408,7 +407,7 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
@@ -424,7 +423,7 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 			t.ModifiedOn = now
 			t.ClosedOn = nil
 
-			e := NewTicketEvent(ticket.OrgID(), ticket.ID(), TicketEventTypeOpened)
+			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ID(), TicketEventTypeReopened)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}

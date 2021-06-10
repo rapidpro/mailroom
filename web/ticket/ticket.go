@@ -20,6 +20,7 @@ func init() {
 
 type bulkTicketRequest struct {
 	OrgID     models.OrgID      `json:"org_id"      validate:"required"`
+	UserID    models.UserID     `json:"user_id"      validate:"required"`
 	TicketIDs []models.TicketID `json:"ticket_ids"`
 }
 
@@ -39,6 +40,7 @@ func newBulkResponse(changed map[*models.Ticket]*models.TicketEvent) *bulkTicket
 //
 //   {
 //     "org_id": 123,
+//     "user_id": 234,
 //     "ticket_ids": [1234, 2345]
 //   }
 //
@@ -54,12 +56,12 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, request.OrgID, request.TicketIDs)
+	tickets, err := models.LoadTickets(ctx, rt.DB, request.TicketIDs)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	evts, err := models.CloseTickets(ctx, rt.DB, oa, tickets, true, l)
+	evts, err := models.CloseTickets(ctx, rt.DB, oa, request.UserID, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error closing tickets")
 	}
@@ -81,6 +83,7 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 //
 //   {
 //     "org_id": 123,
+//     "user_id": 234,
 //     "ticket_ids": [1234, 2345]
 //   }
 //
@@ -96,12 +99,12 @@ func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, request.OrgID, request.TicketIDs)
+	tickets, err := models.LoadTickets(ctx, rt.DB, request.TicketIDs)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	evts, err := models.ReopenTickets(ctx, rt.DB, oa, tickets, true, l)
+	evts, err := models.ReopenTickets(ctx, rt.DB, oa, request.UserID, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
 	}

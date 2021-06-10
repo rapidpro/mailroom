@@ -297,10 +297,10 @@ func TestTicketEvents(t *testing.T) {
 
 	ticketID := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "")
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, testdata.Org1.ID, []models.TicketID{ticketID})
+	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{ticketID})
 	require.NoError(t, err)
 
-	event := models.NewTicketEvent(testdata.Org1.ID, tickets[0].ID(), models.TicketEventTypeClosed)
+	event := models.NewTicketEvent(testdata.Org1.ID, testdata.Admin.ID, tickets[0].ID(), models.TicketEventTypeClosed)
 
 	err = handler.QueueTicketEvent(rc, testdata.Cathy.ID, event)
 	require.NoError(t, err)

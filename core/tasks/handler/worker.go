@@ -657,7 +657,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 	}
 
 	// load our ticket
-	tickets, err := models.LoadTickets(ctx, rt.DB, oa.OrgID(), []models.TicketID{event.TicketID()})
+	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{event.TicketID()})
 	if err != nil {
 		return errors.Wrapf(err, "error loading ticket")
 	}

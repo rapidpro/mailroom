@@ -12,8 +12,11 @@ type TicketEventID int
 type TicketEventType string
 
 const (
-	TicketEventTypeOpened TicketEventType = "O"
-	TicketEventTypeClosed TicketEventType = "C"
+	TicketEventTypeOpened   TicketEventType = "O"
+	TicketEventTypeAssigned TicketEventType = "A"
+	TicketEventTypeNote     TicketEventType = "N"
+	TicketEventTypeClosed   TicketEventType = "C"
+	TicketEventTypeReopened TicketEventType = "R"
 )
 
 type TicketEvent struct {
@@ -27,7 +30,7 @@ type TicketEvent struct {
 	}
 }
 
-func NewTicketEvent(orgID OrgID, ticketID TicketID, eventType TicketEventType) *TicketEvent {
+func NewTicketEvent(orgID OrgID, userID UserID, ticketID TicketID, eventType TicketEventType) *TicketEvent {
 	event := &TicketEvent{}
 	e := &event.e
 
@@ -35,6 +38,7 @@ func NewTicketEvent(orgID OrgID, ticketID TicketID, eventType TicketEventType) *
 	e.TicketID = ticketID
 	e.EventType = eventType
 	e.CreatedOn = dates.Now()
+	e.CreatedByID = userID
 	return event
 }
 
@@ -55,8 +59,8 @@ func (e *TicketEvent) UnmarshalJSON(b []byte) error {
 
 const insertTicketEventsSQL = `
 INSERT INTO
-	tickets_ticketevent(org_id, ticket_id, event_type, created_on)
-	VALUES(:org_id, :ticket_id, :event_type, :created_on)
+	tickets_ticketevent(org_id, ticket_id, event_type, created_on, created_by_id)
+	VALUES(:org_id, :ticket_id, :event_type, :created_on, :created_by_id)
 RETURNING
 	id
 `
