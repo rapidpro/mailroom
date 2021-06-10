@@ -72,9 +72,17 @@ func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request
 		return errors.New("ticketer secret mismatch"), http.StatusUnauthorized, nil
 	}
 
-	err = models.UpdateAndKeepOpenTicket(ctx, rt.DB, ticket, nil)
-	if err != nil {
-		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusBadRequest, nil
+	// reopen ticket if necessary
+	if ticket.Status() != models.TicketStatusOpen {
+		oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+		if err != nil {
+			return err, http.StatusBadRequest, nil
+		}
+
+		err = tickets.ReopenTicket(ctx, rt, oa, ticket, false, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error reopening ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
+		}
 	}
 
 	// fetch files

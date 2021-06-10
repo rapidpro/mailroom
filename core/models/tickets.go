@@ -305,29 +305,14 @@ func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, ext
 	return Exec(ctx, "update ticket external ID", db, updateTicketExternalIDSQL, t.ID, t.ExternalID)
 }
 
-const updateTicketAndKeepOpenSQL = `
-UPDATE
-  tickets_ticket
-SET
-  status = $2,
-  config = $3,
-  modified_on = $4,
-  closed_on = NULL
-WHERE
-  id = $1
-`
-
-// UpdateAndKeepOpenTicket updates the passed in ticket to ensure it's open and updates the config with any passed in values
-func UpdateAndKeepOpenTicket(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
-	now := dates.Now()
+// UpdateTicketConfig updates the passed in ticket's config with any passed in values
+func UpdateTicketConfig(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
 	t := &ticket.t
-	t.Status = TicketStatusOpen
-	t.ModifiedOn = now
 	for key, value := range config {
 		t.Config.Map()[key] = value
 	}
 
-	return Exec(ctx, "update ticket", db, updateTicketAndKeepOpenSQL, t.ID, t.Status, t.Config, t.ModifiedOn)
+	return Exec(ctx, "update ticket config", db, `UPDATE tickets_ticket SET config = $2 WHERE id = $1`, t.ID, t.Config)
 }
 
 const closeTicketSQL = `

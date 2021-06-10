@@ -59,17 +59,6 @@ func TestTickets(t *testing.T) {
 	rt := testsuite.RT()
 	db := rt.DB
 
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
-
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
-			httpx.NewMockResponse(200, nil, `{
-				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
-				"message": "Queued. Thank you."
-			}`),
-		},
-	}))
-
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
 		testdata.Org1.ID,
@@ -137,26 +126,28 @@ func TestTickets(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tks))
 	assert.Equal(t, "New Ticket", tks[0].Subject())
+}
 
-	err = models.UpdateAndKeepOpenTicket(ctx, db, ticket1, map[string]string{"last-message-id": "2352"})
-	assert.NoError(t, err)
+func TestUpdateTicketConfig(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	rt := testsuite.RT()
+	db := rt.DB
 
-	// check ticket remains open and config was updated
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND config='{"contact-display": "Cathy", "last-message-id": "2352"}'::jsonb AND closed_on IS NULL`, []interface{}{testdata.Org1.ID}, 1)
+	ticketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "ba847748-cfb4-4d79-8906-02bc854e0361", "Problem", "Where my shoes", "123")
+	ticket := loadTicket(t, db, ticketID)
 
-	logger := &models.HTTPLogger{}
+	// empty configs are null
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config IS NULL AND id = $1`, []interface{}{ticketID}, 1)
 
-	_, err = models.CloseTickets(ctx, db, org1, testdata.Admin.ID, []*models.Ticket{ticket1}, true, logger)
-	assert.NoError(t, err)
+	models.UpdateTicketConfig(ctx, db, ticket, map[string]string{"foo": "2352", "bar": "abc"})
 
-	// check ticket is now closed
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'C' AND closed_on IS NOT NULL`, []interface{}{testdata.Org1.ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "2352", "bar": "abc"}'::jsonb AND id = $1`, []interface{}{ticketID}, 1)
 
-	err = models.UpdateAndKeepOpenTicket(ctx, db, ticket1, map[string]string{"last-message-id": "6754"})
-	assert.NoError(t, err)
+	// updates are additive
+	models.UpdateTicketConfig(ctx, db, ticket, map[string]string{"foo": "6547", "zed": "xyz"})
 
-	// check ticket is open again
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND closed_on IS NULL`, []interface{}{testdata.Org1.ID}, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "6547", "bar": "abc", "zed": "xyz"}'::jsonb AND id = $1`, []interface{}{ticketID}, 1)
 }
 
 func TestCloseTickets(t *testing.T) {
