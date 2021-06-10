@@ -91,6 +91,10 @@ func TestTicketOpened(t *testing.T) {
 					Args:  []interface{}{testdata.Zendesk.ID},
 					Count: 0,
 				},
+				{ // and we have 2 ticket opened events for the 2 tickets opened
+					SQL:   "select count(*) from tickets_ticketevent where event_type = 'O'",
+					Count: 2,
+				},
 			},
 		},
 	}
