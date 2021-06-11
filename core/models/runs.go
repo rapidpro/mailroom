@@ -430,10 +430,15 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, st storage.Storag
 		_, output, err := st.Get(ctx, session.OutputURL())
 		if err != nil {
 			logrus.WithField("output_url", session.OutputURL()).WithField("org_id", org.OrgID()).WithField("session_uuid", session.UUID()).WithError(err).Error("error reading in session output from storage")
+
+			// we'll throw an error up only if we don't have a DB backdown
+			if session.Output() == "" {
+				return nil, errors.Wrapf(err, "error reading session from storage: %s", session.OutputURL())
+			}
 		} else {
 			session.s.Output = null.String(output)
+			logrus.WithField("elapsed", time.Since(start)).WithField("output_url", session.OutputURL()).Debug("loaded session from storage")
 		}
-		logrus.WithField("elapsed", time.Since(start)).Debug("loaded session from storage")
 	}
 
 	return session, nil
