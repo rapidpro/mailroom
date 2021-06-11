@@ -103,7 +103,7 @@ type Session struct {
 		SessionType   FlowType          `db:"session_type"`
 		Status        SessionStatus     `db:"status"`
 		Responded     bool              `db:"responded"`
-		Output        string            `db:"output"`
+		Output        null.String       `db:"output"`
 		OutputURL     null.String       `db:"output_url"`
 		ContactID     ContactID         `db:"contact_id"`
 		OrgID         OrgID             `db:"org_id"`
@@ -144,7 +144,7 @@ func (s *Session) UUID() flows.SessionUUID            { return flows.SessionUUID
 func (s *Session) SessionType() FlowType              { return s.s.SessionType }
 func (s *Session) Status() SessionStatus              { return s.s.Status }
 func (s *Session) Responded() bool                    { return s.s.Responded }
-func (s *Session) Output() string                     { return s.s.Output }
+func (s *Session) Output() string                     { return string(s.s.Output) }
 func (s *Session) OutputURL() string                  { return string(s.s.OutputURL) }
 func (s *Session) ContactID() ContactID               { return s.s.ContactID }
 func (s *Session) OrgID() OrgID                       { return s.s.OrgID }
@@ -364,7 +364,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	s.Status = sessionStatus
 	s.SessionType = sessionType
 	s.Responded = false
-	s.Output = string(output)
+	s.Output = null.String(output)
 	s.ContactID = ContactID(fs.Contact().ID())
 	s.OrgID = org.OrgID()
 	s.CreatedOn = fs.Runs()[0].CreatedOn()
@@ -402,7 +402,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 }
 
 // ActiveSessionForContact returns the active session for the passed in contact, if any
-func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, sessionType FlowType, contact *flows.Contact) (*Session, error) {
+func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, st storage.Storage, org *OrgAssets, sessionType FlowType, contact *flows.Contact) (*Session, error) {
 	rows, err := db.QueryxContext(ctx, selectLastSessionSQL, sessionType, contact.ID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting active session")
@@ -422,6 +422,18 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 	err = rows.StructScan(&session.s)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error scanning session")
+	}
+
+	// load our output if necessary
+	if org.Org().SessionStorageMode() == S3Sessions && session.OutputURL() != "" {
+		start := time.Now()
+		_, output, err := st.Get(ctx, session.OutputURL())
+		if err != nil {
+			logrus.WithField("output_url", session.OutputURL()).WithField("org_id", org.OrgID()).WithField("session_uuid", session.UUID()).WithError(err).Error("error reading in session output from storage")
+		} else {
+			session.s.Output = null.String(output)
+		}
+		logrus.WithField("elapsed", time.Since(start)).Debug("loaded session from storage")
 	}
 
 	return session, nil
@@ -515,7 +527,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	if err != nil {
 		return errors.Wrapf(err, "error marshalling flow session")
 	}
-	s.s.Output = string(output)
+	s.s.Output = null.String(output)
 
 	// map our status over
 	status, found := sessionStatusMap[fs.Status()]
