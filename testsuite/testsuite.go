@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/storage"
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -181,6 +182,20 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 	}
 
 	assert.Equal(t, expected, actual, errMsg...)
+}
+
+// AssertContactTasks asserts that the given contact has the given tasks queued for them
+func AssertContactTasks(t *testing.T, orgID models.OrgID, contactID models.ContactID, expected []string, msgAndArgs ...interface{}) {
+	rc := RC()
+	defer rc.Close()
+
+	tasks, err := redis.Strings(rc.Do("LRANGE", fmt.Sprintf("c:%d:%d", orgID, contactID), 0, -1))
+	require.NoError(t, err)
+
+	expectedJSON, _ := json.Marshal(expected)
+	actualJSON, _ := json.Marshal(tasks)
+
+	test.AssertEqualJSON(t, expectedJSON, actualJSON, "")
 }
 
 func RT() *runtime.Runtime {

@@ -17,8 +17,8 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMsgEvents(t *testing.T) {
@@ -218,8 +218,6 @@ func TestChannelEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	logrus.Info("starting channel test")
-
 	// add some channel event triggers
 	testdata.InsertNewConversationTrigger(t, db, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
 	testdata.InsertReferralTrigger(t, db, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
@@ -284,6 +282,36 @@ func TestChannelEvents(t *testing.T) {
 			assert.True(t, lastSeen.Equal(start) || lastSeen.After(start), "%d: expected last seen to be updated", i)
 		}
 	}
+}
+
+func TestTicketEvents(t *testing.T) {
+	testsuite.Reset()
+	rt := testsuite.RT()
+	ctx := testsuite.CTX()
+
+	rc := rt.RP.Get()
+	defer rc.Close()
+
+	// add a ticket closed trigger
+	testdata.InsertTicketClosedTrigger(t, rt.DB, testdata.Org1, testdata.Favorites)
+
+	ticketID := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "")
+
+	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{ticketID})
+	require.NoError(t, err)
+
+	event := models.NewTicketEvent(testdata.Org1.ID, testdata.Admin.ID, tickets[0].ID(), models.TicketEventTypeClosed)
+
+	err = handler.QueueTicketEvent(rc, testdata.Cathy.ID, event)
+	require.NoError(t, err)
+
+	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err)
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, []interface{}{testdata.Cathy.ID}, 1)
 }
 
 func TestStopEvent(t *testing.T) {

@@ -37,6 +37,10 @@ func InsertScheduledTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow, inc
 	return insertTrigger(t, db, org, models.ScheduleTriggerType, flow, "", "", includeGroups, excludeGroups, includeContacts, "", nil)
 }
 
+func InsertTicketClosedTrigger(t *testing.T, db *sqlx.DB, org *Org, flow *Flow) models.TriggerID {
+	return insertTrigger(t, db, org, models.TicketClosedTriggerType, flow, "", "", nil, nil, nil, "", nil)
+}
+
 func insertTrigger(t *testing.T, db *sqlx.DB, org *Org, triggerType models.TriggerType, flow *Flow, keyword string, matchType models.MatchType, includeGroups, excludeGroups []*Group, contactIDs []*Contact, referrerID string, channel *Channel) models.TriggerID {
 	channelID := models.NilChannelID
 	if channel != nil {

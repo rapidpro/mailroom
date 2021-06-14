@@ -72,9 +72,17 @@ func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request
 		return errors.New("ticketer secret mismatch"), http.StatusUnauthorized, nil
 	}
 
-	err = models.UpdateAndKeepOpenTicket(ctx, rt.DB, ticket, nil)
-	if err != nil {
-		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusBadRequest, nil
+	// reopen ticket if necessary
+	if ticket.Status() != models.TicketStatusOpen {
+		oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+		if err != nil {
+			return err, http.StatusBadRequest, nil
+		}
+
+		err = tickets.ReopenTicket(ctx, rt, oa, ticket, false, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error reopening ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
+		}
 	}
 
 	// fetch files
@@ -276,9 +284,9 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 	if request.Event == "status_changed" {
 		switch strings.ToLower(request.Status) {
 		case statusSolved, statusClosed:
-			err = models.CloseTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
+			err = tickets.CloseTicket(ctx, rt, nil, ticket, false, l)
 		case statusOpen:
-			err = models.ReopenTickets(ctx, rt.DB, nil, []*models.Ticket{ticket}, false, l)
+			err = tickets.ReopenTicket(ctx, rt, nil, ticket, false, l)
 		}
 
 		if err != nil {

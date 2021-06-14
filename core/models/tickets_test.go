@@ -54,20 +54,10 @@ func TestTicketers(t *testing.T) {
 }
 
 func TestTickets(t *testing.T) {
+	testsuite.Reset()
 	ctx := testsuite.CTX()
 	rt := testsuite.RT()
 	db := rt.DB
-
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
-
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
-			httpx.NewMockResponse(200, nil, `{
-				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
-				"message": "Queued. Thank you."
-			}`),
-		},
-	}))
 
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
@@ -136,24 +126,140 @@ func TestTickets(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tks))
 	assert.Equal(t, "New Ticket", tks[0].Subject())
+}
 
-	err = models.UpdateAndKeepOpenTicket(ctx, db, ticket1, map[string]string{"last-message-id": "2352"})
-	assert.NoError(t, err)
+func TestUpdateTicketConfig(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	rt := testsuite.RT()
+	db := rt.DB
 
-	// check ticket remains open and config was updated
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND config='{"contact-display": "Cathy", "last-message-id": "2352"}'::jsonb AND closed_on IS NULL`, []interface{}{testdata.Org1.ID}, 1)
+	ticketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "ba847748-cfb4-4d79-8906-02bc854e0361", "Problem", "Where my shoes", "123")
+	ticket := loadTicket(t, db, ticketID)
+
+	// empty configs are null
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config IS NULL AND id = $1`, []interface{}{ticketID}, 1)
+
+	models.UpdateTicketConfig(ctx, db, ticket, map[string]string{"foo": "2352", "bar": "abc"})
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "2352", "bar": "abc"}'::jsonb AND id = $1`, []interface{}{ticketID}, 1)
+
+	// updates are additive
+	models.UpdateTicketConfig(ctx, db, ticket, map[string]string{"foo": "6547", "zed": "xyz"})
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "6547", "bar": "abc", "zed": "xyz"}'::jsonb AND id = $1`, []interface{}{ticketID}, 1)
+}
+
+func TestCloseTickets(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	rt := testsuite.RT()
+	db := rt.DB
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
+			httpx.NewMockResponse(200, nil, `{
+				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
+				"message": "Queued. Thank you."
+			}`),
+		},
+	}))
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	require.NoError(t, err)
+
+	ticket1ID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "e5f79dca-5625-4ec6-9a4f-e30764fb5cfa", "Problem", "Where my shoes", "123")
+	ticket1 := loadTicket(t, db, ticket1ID)
+
+	ticket2ID := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "4d507510-77ce-4cc0-8ee7-c3f1ead7a284", "Old Problem", "Where my pants", "234")
+	ticket2 := loadTicket(t, db, ticket2ID)
 
 	logger := &models.HTTPLogger{}
+	evts, err := models.CloseTickets(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{ticket1, ticket2}, true, logger)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(evts))
+	assert.Equal(t, models.TicketEventTypeClosed, evts[ticket1].EventType())
 
-	err = models.CloseTickets(ctx, db, org1, []*models.Ticket{ticket1}, true, logger)
-	assert.NoError(t, err)
+	// check ticket #1 is now closed
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'C' AND closed_on IS NOT NULL`, []interface{}{ticket1ID}, 1)
 
-	// check ticket is now closed
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'C' AND closed_on IS NOT NULL`, []interface{}{testdata.Org1.ID}, 1)
+	// and there's closed event for it
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'C'`,
+		[]interface{}{testdata.Org1.ID, ticket1.ID()}, 1)
 
-	err = models.UpdateAndKeepOpenTicket(ctx, db, ticket1, map[string]string{"last-message-id": "6754"})
-	assert.NoError(t, err)
+	// and the logger has an http log it can insert for that ticketer
+	require.NoError(t, logger.Insert(ctx, db))
 
-	// check ticket is open again
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE org_id = $1 AND status = 'O' AND closed_on IS NULL`, []interface{}{testdata.Org1.ID}, 2)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, []interface{}{testdata.Mailgun.ID}, 1)
+
+	// but no events for ticket #2 which waas already closed
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, []interface{}{ticket2.ID()}, 0)
+
+	// can close tickets without a user
+	ticket3ID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "94a94641-ac10-414d-8d22-959be6a6792e", "Problem", "Where my shoes", "123")
+	ticket3 := loadTicket(t, db, ticket3ID)
+
+	evts, err = models.CloseTickets(ctx, db, oa, models.NilUserID, []*models.Ticket{ticket3}, false, logger)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(evts))
+	assert.Equal(t, models.TicketEventTypeClosed, evts[ticket3].EventType())
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C' AND created_by_id IS NULL`, []interface{}{ticket3.ID()}, 1)
+}
+
+func TestReopenTickets(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	rt := testsuite.RT()
+	db := rt.DB
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
+			httpx.NewMockResponse(200, nil, `{
+				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
+				"message": "Queued. Thank you."
+			}`),
+		},
+	}))
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	require.NoError(t, err)
+
+	ticket1ID := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "e5f79dca-5625-4ec6-9a4f-e30764fb5cfa", "Problem", "Where my shoes", "123")
+	ticket1 := loadTicket(t, db, ticket1ID)
+
+	ticket2ID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "4d507510-77ce-4cc0-8ee7-c3f1ead7a284", "Old Problem", "Where my pants", "234")
+	ticket2 := loadTicket(t, db, ticket2ID)
+
+	logger := &models.HTTPLogger{}
+	evts, err := models.ReopenTickets(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{ticket1, ticket2}, true, logger)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(evts))
+	assert.Equal(t, models.TicketEventTypeReopened, evts[ticket1].EventType())
+
+	// check ticket #1 is now closed
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'O' AND closed_on IS NULL`, []interface{}{ticket1ID}, 1)
+
+	// and there's reopened event for it
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'R'`,
+		[]interface{}{testdata.Org1.ID, ticket1.ID()}, 1)
+
+	// and the logger has an http log it can insert for that ticketer
+	require.NoError(t, logger.Insert(ctx, db))
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, []interface{}{testdata.Mailgun.ID}, 1)
+
+	// but no events for ticket #2 which waas already open
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, []interface{}{ticket2.ID()}, 0)
+}
+
+func loadTicket(t *testing.T, db models.Queryer, ticketID models.TicketID) *models.Ticket {
+	tickets, err := models.LoadTickets(testsuite.CTX(), db, []models.TicketID{ticketID})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(tickets))
+	return tickets[0]
 }

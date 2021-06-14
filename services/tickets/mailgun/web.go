@@ -104,10 +104,14 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 		return &receiveResponse{Action: "rejected", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}
 
+	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	if err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		org, _ := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
-		err = models.CloseTickets(ctx, rt.DB, org, []*models.Ticket{ticket}, true, l)
+		err = tickets.CloseTicket(ctx, rt, oa, ticket, true, l)
 		if err != nil {
 			return errors.Wrapf(err, "error closing ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 		}
@@ -115,13 +119,18 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 		return &receiveResponse{Action: "closed", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}
 
-	// update our ticket
-	config := map[string]string{
-		ticketConfigLastMessageID: request.MessageID,
-	}
-	err = models.UpdateAndKeepOpenTicket(ctx, rt.DB, ticket, config)
+	// update our ticket config
+	err = models.UpdateTicketConfig(ctx, rt.DB, ticket, map[string]string{ticketConfigLastMessageID: request.MessageID})
 	if err != nil {
 		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
+	}
+
+	// reopen ticket if necessary
+	if ticket.Status() != models.TicketStatusOpen {
+		err = tickets.ReopenTicket(ctx, rt, oa, ticket, false, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error reopening ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
+		}
 	}
 
 	msg, err := tickets.SendReply(ctx, rt, ticket, request.StrippedText, files)

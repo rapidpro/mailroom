@@ -36,6 +36,7 @@ const (
 	MsgEventType             = "msg_event"
 	ExpirationEventType      = "expiration_event"
 	TimeoutEventType         = "timeout_event"
+	TicketClosedEventType    = "ticket_closed"
 )
 
 func init() {
@@ -134,6 +135,14 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
 			}
 			err = handleMsgEvent(ctx, rt, msg)
+
+		case TicketClosedEventType:
+			evt := &models.TicketEvent{}
+			err = json.Unmarshal(contactEvent.Task, evt)
+			if err != nil {
+				return errors.Wrapf(err, "error unmarshalling ticket event: %s", event)
+			}
+			err = handleTicketEvent(ctx, rt, evt)
 
 		case TimeoutEventType, ExpirationEventType:
 			evt := &TimedEvent{}
@@ -313,6 +322,18 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		}
 	}
 
+	// make sure this URN is our highest priority (this is usually a noop)
+	err = modelContact.UpdatePreferredURN(ctx, rt.DB, oa, event.URNID(), channel)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error changing primary URN")
+	}
+
+	// build our flow contact
+	contact, err := modelContact.FlowContact(oa)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating flow contact")
+	}
+
 	// do we have associated trigger?
 	var trigger *models.Trigger
 
@@ -328,25 +349,13 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		trigger = models.FindMatchingMissedCallTrigger(oa)
 
 	case models.MOCallEventType:
-		trigger = models.FindMatchingIncomingCallTrigger(oa, modelContact)
+		trigger = models.FindMatchingIncomingCallTrigger(oa, contact)
 
 	case models.WelcomeMessageEventType:
 		trigger = nil
 
 	default:
 		return nil, errors.Errorf("unknown channel event type: %s", eventType)
-	}
-
-	// make sure this URN is our highest priority (this is usually a noop)
-	err = modelContact.UpdatePreferredURN(ctx, rt.DB, oa, event.URNID(), channel)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error changing primary URN")
-	}
-
-	// build our flow contact
-	contact, err := modelContact.FlowContact(oa)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error creating flow contact")
 	}
 
 	if event.IsNewContact() {
@@ -637,6 +646,102 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	err = handleAsInbox(ctx, rt.DB, rt.RP, oa, contact, msgIn, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
+	}
+	return nil
+}
+
+func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.TicketEvent) error {
+	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID())
+	if err != nil {
+		return errors.Wrapf(err, "error loading org")
+	}
+
+	// load our ticket
+	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{event.TicketID()})
+	if err != nil {
+		return errors.Wrapf(err, "error loading ticket")
+	}
+	// ticket has been deleted ignore this event
+	if len(tickets) == 0 {
+		return nil
+	}
+
+	modelTicket := tickets[0]
+
+	// load our contact
+	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{modelTicket.ContactID()})
+	if err != nil {
+		return errors.Wrapf(err, "error loading contact")
+	}
+
+	// contact has been deleted ignore this event
+	if len(contacts) == 0 {
+		return nil
+	}
+
+	modelContact := contacts[0]
+
+	// build our flow contact
+	contact, err := modelContact.FlowContact(oa)
+	if err != nil {
+		return errors.Wrapf(err, "error creating flow contact")
+	}
+
+	// do we have associated trigger?
+	var trigger *models.Trigger
+
+	switch event.EventType() {
+	case models.TicketEventTypeClosed:
+		trigger = models.FindMatchingTicketClosedTrigger(oa, contact)
+	default:
+		return errors.Errorf("unknown ticket event type: %s", event.EventType())
+	}
+
+	// no trigger, noop, move on
+	if trigger == nil {
+		logrus.WithField("ticket_id", event.TicketID).WithField("event_type", event.EventType()).Info("ignoring ticket event, no trigger found")
+		return nil
+	}
+
+	// load our flow
+	flow, err := oa.FlowByID(trigger.FlowID())
+	if err == models.ErrNotFound {
+		return nil
+	}
+	if err != nil {
+		return errors.Wrapf(err, "error loading flow for trigger")
+	}
+
+	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
+	if flow.FlowType() == models.FlowTypeVoice {
+		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error while triggering ivr flow")
+		}
+		return nil
+	}
+
+	// build our flow ticket
+	ticket, err := tickets[0].FlowTicket(oa)
+	if err != nil {
+		return errors.Wrapf(err, "error creating flow contact")
+	}
+
+	// build our flow trigger
+	var flowTrigger flows.Trigger
+
+	switch event.EventType() {
+	case models.TicketEventTypeClosed:
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+			Ticket(ticket, triggers.TicketEventTypeClosed).
+			Build()
+	default:
+		return errors.Errorf("unknown ticket event type: %s", event.EventType())
+	}
+
+	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{flowTrigger}, nil, true)
+	if err != nil {
+		return errors.Wrapf(err, "error starting flow for contact")
 	}
 	return nil
 }

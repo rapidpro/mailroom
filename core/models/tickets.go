@@ -166,14 +166,12 @@ SELECT
 FROM
   tickets_ticket t
 WHERE
-  t.org_id = $1 AND
-  t.id = ANY($2) AND
-  t.status = $3
+  t.id = ANY($1)
 `
 
 // LoadTickets loads all of the tickets with the given ids
-func LoadTickets(ctx context.Context, db Queryer, orgID OrgID, ids []TicketID, status TicketStatus) ([]*Ticket, error) {
-	return loadTickets(ctx, db, selectTicketsByIDSQL, orgID, pq.Array(ids), status)
+func LoadTickets(ctx context.Context, db Queryer, ids []TicketID) ([]*Ticket, error) {
+	return loadTickets(ctx, db, selectTicketsByIDSQL, pq.Array(ids))
 }
 
 func loadTickets(ctx context.Context, db Queryer, query string, params ...interface{}) ([]*Ticket, error) {
@@ -307,29 +305,14 @@ func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, ext
 	return Exec(ctx, "update ticket external ID", db, updateTicketExternalIDSQL, t.ID, t.ExternalID)
 }
 
-const updateTicketAndKeepOpenSQL = `
-UPDATE
-  tickets_ticket
-SET
-  status = $2,
-  config = $3,
-  modified_on = $4,
-  closed_on = NULL
-WHERE
-  id = $1
-`
-
-// UpdateAndKeepOpenTicket updates the passed in ticket to ensure it's open and updates the config with any passed in values
-func UpdateAndKeepOpenTicket(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
-	now := dates.Now()
+// UpdateTicketConfig updates the passed in ticket's config with any passed in values
+func UpdateTicketConfig(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
 	t := &ticket.t
-	t.Status = TicketStatusOpen
-	t.ModifiedOn = now
 	for key, value := range config {
 		t.Config.Map()[key] = value
 	}
 
-	return Exec(ctx, "update ticket", db, updateTicketAndKeepOpenSQL, t.ID, t.Status, t.Config, t.ModifiedOn)
+	return Exec(ctx, "update ticket config", db, `UPDATE tickets_ticket SET config = $2 WHERE id = $1`, t.ID, t.Config)
 }
 
 const closeTicketSQL = `
@@ -344,37 +327,57 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
+func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
-	ids := make([]TicketID, len(tickets))
+	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
-	for i, ticket := range tickets {
-		byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
-		ids[i] = ticket.ID()
-		t := &ticket.t
-		t.Status = TicketStatusClosed
-		t.ModifiedOn = now
-		t.ClosedOn = &now
+
+	for _, ticket := range tickets {
+		if ticket.Status() != TicketStatusClosed {
+			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.Status = TicketStatusClosed
+			t.ModifiedOn = now
+			t.ClosedOn = &now
+
+			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ID(), TicketEventTypeClosed)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
+		}
 	}
 
 	if externally {
 		for ticketerID, ticketerTickets := range byTicketer {
-			ticketer := org.TicketerByID(ticketerID)
+			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
 				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	return Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	// mark the tickets as closed in the db
+	err := Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
 }
 
 const reopenTicketSQL = `
@@ -389,17 +392,26 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
-	ids := make([]TicketID, len(tickets))
+	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
-	for i, ticket := range tickets {
-		byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
-		ids[i] = ticket.ID()
-		t := &ticket.t
-		t.Status = TicketStatusOpen
-		t.ModifiedOn = now
-		t.ClosedOn = nil
+
+	for _, ticket := range tickets {
+		if ticket.Status() != TicketStatusOpen {
+			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.Status = TicketStatusOpen
+			t.ModifiedOn = now
+			t.ClosedOn = nil
+
+			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ID(), TicketEventTypeReopened)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
+		}
 	}
 
 	if externally {
@@ -408,18 +420,29 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*T
 			if ticketer != nil {
 				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	return Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	// mark the tickets as opened in the db
+	err := Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
 }
 
 // Ticketer is our type for a ticketer asset

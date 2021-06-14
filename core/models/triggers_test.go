@@ -182,13 +182,13 @@ func TestFindMatchingIncomingCallTrigger(t *testing.T) {
 	testdata.DoctorsGroup.Add(db, testdata.Bob)
 	testdata.TestersGroup.Add(db, testdata.Bob, testdata.Alexandria)
 
-	cathy, _ := testdata.Cathy.Load(t, db, oa)
-	bob, _ := testdata.Bob.Load(t, db, oa)
-	george, _ := testdata.George.Load(t, db, oa)
-	alexa, _ := testdata.Alexandria.Load(t, db, oa)
+	_, cathy := testdata.Cathy.Load(t, db, oa)
+	_, bob := testdata.Bob.Load(t, db, oa)
+	_, george := testdata.George.Load(t, db, oa)
+	_, alexa := testdata.Alexandria.Load(t, db, oa)
 
 	tcs := []struct {
-		contact           *models.Contact
+		contact           *flows.Contact
 		expectedTriggerID models.TriggerID
 	}{
 		{cathy, doctorsAndNotTestersTriggerID}, // they're in doctors and not in testers

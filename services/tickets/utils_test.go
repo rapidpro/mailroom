@@ -3,7 +3,10 @@ package tickets_test
 import (
 	"os"
 	"testing"
+	"time"
 
+	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
@@ -151,4 +154,54 @@ func TestSendReply(t *testing.T) {
 	// try with file that can't be read (i.e. same file again which is already closed)
 	_, err = tickets.SendReply(ctx, rt, ticket, "I'll get back to you", []*tickets.File{image})
 	assert.EqualError(t, err, "error storing attachment http://coolfiles.com/a.jpg for ticket reply: unable to read attachment content: read ../../core/models/testdata/test.jpg: file already closed")
+}
+
+func TestCloseTicket(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	rt := testsuite.RT()
+	db := rt.DB
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2021, 6, 8, 16, 40, 30, 0, time.UTC)))
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
+			httpx.NewMockResponse(200, nil, `{
+				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
+				"message": "Queued. Thank you."
+			}`),
+		},
+	}))
+
+	// create an open ticket
+	ticket1 := models.NewTicket(
+		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.Mailgun.ID,
+		"EX12345",
+		"New Ticket",
+		"Where are my cookies?",
+		map[string]interface{}{
+			"contact-display": "Cathy",
+		},
+	)
+	err := models.InsertTickets(ctx, db, []*models.Ticket{ticket1})
+	require.NoError(t, err)
+
+	// create a close ticket trigger
+	testdata.InsertTicketClosedTrigger(t, db, testdata.Org1, testdata.Favorites)
+
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	logger := &models.HTTPLogger{}
+
+	err = tickets.CloseTicket(ctx, rt, oa, ticket1, true, logger)
+	require.NoError(t, err)
+
+	testsuite.AssertContactTasks(t, 1, testdata.Cathy.ID, []string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:31Z"},"queued_on":"2021-06-08T16:40:34Z"}`})
 }

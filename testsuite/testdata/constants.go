@@ -13,6 +13,11 @@ type Org struct {
 	UUID uuids.UUID
 }
 
+type User struct {
+	ID    models.UserID
+	Email string
+}
+
 type Classifier struct {
 	ID   models.ClassifierID
 	UUID assets.ClassifierUUID
@@ -28,6 +33,9 @@ type CampaignEvent struct {
 }
 
 var Org1 = &Org{1, "bf0514a5-9407-44c9-b0f9-3f36f9c18414"}
+var Admin = &User{3, "admin1@nyaruka.com"}
+var Editor = &User{4, "editor1@nyaruka.com"}
+var Viewer = &User{5, "viewer1@nyaruka.com"}
 
 var TwilioChannel = &Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8"}
 var VonageChannel = &Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49"}
@@ -47,8 +55,8 @@ var IncomingExtraFlow = &Flow{10006, "376d3de6-7f0e-408c-80d6-b1919738bc80"}
 var ParentTimeoutFlow = &Flow{10007, "81c0f323-7e06-4e0c-a960-19c20f17117c"}
 var CampaignFlow = &Flow{10009, "3a92a964-3a8d-420b-9206-2cd9d884ac30"}
 
-var CreatedOnField = &Field{3, "f5f84543-0ba9-41a2-bbdf-52a0dfd7a042"}
-var LastSeenOnField = &Field{5, "60c1939d-c0b9-4519-92c5-540d91d8c2ab"}
+var CreatedOnField = &Field{3, "f3bb7c36-8924-4a63-a42b-dfd83d754f2d"}
+var LastSeenOnField = &Field{5, "a15456d9-fb4c-4014-bbd8-831d93ccae22"}
 var GenderField = &Field{6, "3a5891e4-756e-4dc9-8e12-b7a766168824"}
 var AgeField = &Field{7, "903f51da-2717-47c7-a0d3-f2f32877013d"}
 var JoinedField = &Field{8, "d83aae24-4bbf-49d0-ab85-6bfd201eac6d"}
@@ -76,6 +84,7 @@ var RemindersEvent2 = &CampaignEvent{10001}
 
 // secondary org.. only a few things
 var Org2 = &Org{2, "3ae7cdeb-fd96-46e5-abc4-a4622f349921"}
+var Org2Admin = &User{6, "admin2@nyaruka.com"}
 var Org2Channel = &Channel{20000, "a89bc872-3763-4b95-91d9-31d4e56c6651"}
 var Org2Contact = &Contact{20000, "26d20b72-f7d8-44dc-87f2-aae046dbff95", "tel:+250700000005", 20000}
 var Org2Favorites = &Flow{20000, "f161bd16-3c60-40bd-8c92-228ce815b9cd"}

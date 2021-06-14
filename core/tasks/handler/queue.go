@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/pkg/errors"
@@ -52,4 +53,22 @@ func queueContactTask(rc redis.Conn, orgID models.OrgID, contactID models.Contac
 		return errors.Wrapf(err, "error adding handle event task")
 	}
 	return nil
+}
+
+// QueueTicketEvent queues a ticket event to be handled
+func QueueTicketEvent(rc redis.Conn, contactID models.ContactID, evt *models.TicketEvent) error {
+	eventJSON, _ := json.Marshal(evt)
+	var task *queue.Task
+
+	switch evt.EventType() {
+	case models.TicketEventTypeClosed:
+		task = &queue.Task{
+			Type:     TicketClosedEventType,
+			OrgID:    int(evt.OrgID()),
+			Task:     eventJSON,
+			QueuedOn: dates.Now(),
+		}
+	}
+
+	return queueHandleTask(rc, contactID, task, false)
 }
