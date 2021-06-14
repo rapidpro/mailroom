@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -15,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/null"
 
@@ -195,8 +197,14 @@ func (s *Session) StoragePath() string {
 	ts := s.CreatedOn().UTC().Format(storageTSFormat)
 
 	// example output: /orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/session_20060102T150405.123Z_8a7fc501-177b-4567-a0aa-81c48e6de1c5_51df83ac21d3cf136d8341f0b11cb1a7.json"
-	return fmt.Sprintf("/orgs/%d/c/%s/%s/session_%s_%s_%s.json",
-		s.OrgID(), s.ContactUUID()[:4], s.ContactUUID(), ts, s.UUID(), s.OutputMD5())
+	return path.Join(
+		config.Mailroom.S3SessionPrefix,
+		"orgs",
+		fmt.Sprintf("%d", s.OrgID()),
+		"c",
+		string(s.ContactUUID()[:4]),
+		fmt.Sprintf("session_%s_%s_%s.json", ts, s.UUID(), s.OutputMD5()),
+	)
 }
 
 // ContactUUID returns the UUID of our contact

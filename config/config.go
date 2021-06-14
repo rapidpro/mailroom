@@ -99,7 +99,7 @@ func NewMailroomConfig() *Config {
 		S3MediaBucket:      "mailroom-media",
 		S3MediaPrefix:      "/media/",
 		S3SessionBucket:    "mailroom-sessions",
-		S3SessionPrefix:    "/sessions/",
+		S3SessionPrefix:    "/",
 		S3DisableSSL:       false,
 		S3ForcePathStyle:   false,
 		AWSAccessKeyID:     "",
