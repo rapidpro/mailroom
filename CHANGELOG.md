@@ -1,3 +1,8 @@
+v6.3.16
+----------
+ * Add ticket closed triggers and use to handle close ticket events
+ * Add ticket events and insert when opening/closing/reopening tickets
+
 v6.3.15
 ----------
  * Fix test which modifies org
