@@ -1,3 +1,7 @@
+v6.3.17
+----------
+ * Ignore contact tickets on ticketers which have been deleted
+
 v6.3.16
 ----------
  * Add ticket closed triggers and use to handle close ticket events
