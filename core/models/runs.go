@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -15,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/null"
 
@@ -103,7 +105,7 @@ type Session struct {
 		SessionType   FlowType          `db:"session_type"`
 		Status        SessionStatus     `db:"status"`
 		Responded     bool              `db:"responded"`
-		Output        string            `db:"output"`
+		Output        null.String       `db:"output"`
 		OutputURL     null.String       `db:"output_url"`
 		ContactID     ContactID         `db:"contact_id"`
 		OrgID         OrgID             `db:"org_id"`
@@ -144,7 +146,7 @@ func (s *Session) UUID() flows.SessionUUID            { return flows.SessionUUID
 func (s *Session) SessionType() FlowType              { return s.s.SessionType }
 func (s *Session) Status() SessionStatus              { return s.s.Status }
 func (s *Session) Responded() bool                    { return s.s.Responded }
-func (s *Session) Output() string                     { return s.s.Output }
+func (s *Session) Output() string                     { return string(s.s.Output) }
 func (s *Session) OutputURL() string                  { return string(s.s.OutputURL) }
 func (s *Session) ContactID() ContactID               { return s.s.ContactID }
 func (s *Session) OrgID() OrgID                       { return s.s.OrgID }
@@ -195,8 +197,14 @@ func (s *Session) StoragePath() string {
 	ts := s.CreatedOn().UTC().Format(storageTSFormat)
 
 	// example output: /orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/session_20060102T150405.123Z_8a7fc501-177b-4567-a0aa-81c48e6de1c5_51df83ac21d3cf136d8341f0b11cb1a7.json"
-	return fmt.Sprintf("/orgs/%d/c/%s/%s/session_%s_%s_%s.json",
-		s.OrgID(), s.ContactUUID()[:4], s.ContactUUID(), ts, s.UUID(), s.OutputMD5())
+	return path.Join(
+		config.Mailroom.S3SessionPrefix,
+		"orgs",
+		fmt.Sprintf("%d", s.OrgID()),
+		"c",
+		string(s.ContactUUID()[:4]),
+		fmt.Sprintf("session_%s_%s_%s.json", ts, s.UUID(), s.OutputMD5()),
+	)
 }
 
 // ContactUUID returns the UUID of our contact
@@ -364,7 +372,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	s.Status = sessionStatus
 	s.SessionType = sessionType
 	s.Responded = false
-	s.Output = string(output)
+	s.Output = null.String(output)
 	s.ContactID = ContactID(fs.Contact().ID())
 	s.OrgID = org.OrgID()
 	s.CreatedOn = fs.Runs()[0].CreatedOn()
@@ -402,7 +410,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 }
 
 // ActiveSessionForContact returns the active session for the passed in contact, if any
-func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, sessionType FlowType, contact *flows.Contact) (*Session, error) {
+func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, st storage.Storage, org *OrgAssets, sessionType FlowType, contact *flows.Contact) (*Session, error) {
 	rows, err := db.QueryxContext(ctx, selectLastSessionSQL, sessionType, contact.ID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting active session")
@@ -422,6 +430,23 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, s
 	err = rows.StructScan(&session.s)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error scanning session")
+	}
+
+	// load our output if necessary
+	if org.Org().SessionStorageMode() == S3Sessions && session.OutputURL() != "" {
+		start := time.Now()
+		_, output, err := st.Get(ctx, session.OutputURL())
+		if err != nil {
+			logrus.WithField("output_url", session.OutputURL()).WithField("org_id", org.OrgID()).WithField("session_uuid", session.UUID()).WithError(err).Error("error reading in session output from storage")
+
+			// we'll throw an error up only if we don't have a DB backdown
+			if session.Output() == "" {
+				return nil, errors.Wrapf(err, "error reading session from storage: %s", session.OutputURL())
+			}
+		} else {
+			session.s.Output = null.String(output)
+			logrus.WithField("elapsed", time.Since(start)).WithField("output_url", session.OutputURL()).Debug("loaded session from storage")
+		}
 	}
 
 	return session, nil
@@ -515,7 +540,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	if err != nil {
 		return errors.Wrapf(err, "error marshalling flow session")
 	}
-	s.s.Output = string(output)
+	s.s.Output = null.String(output)
 
 	// map our status over
 	status, found := sessionStatusMap[fs.Status()]
