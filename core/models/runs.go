@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"path"
 	"time"
 
@@ -203,6 +204,7 @@ func (s *Session) StoragePath() string {
 		fmt.Sprintf("%d", s.OrgID()),
 		"c",
 		string(s.ContactUUID()[:4]),
+		string(s.ContactUUID()),
 		fmt.Sprintf("session_%s_%s_%s.json", ts, s.UUID(), s.OutputMD5()),
 	)
 }
@@ -435,7 +437,15 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, st storage.Storag
 	// load our output if necessary
 	if org.Org().SessionStorageMode() == S3Sessions && session.OutputURL() != "" {
 		start := time.Now()
-		_, output, err := st.Get(ctx, session.OutputURL())
+
+		// strip just the path out of our output URL
+		u, err := url.Parse(session.OutputURL())
+		if err != nil {
+			return nil, errors.Wrapf(err, "error parsing output URL: %s", session.OutputURL())
+		}
+
+		// get our session from storage
+		_, output, err := st.Get(ctx, u.Path)
 		if err != nil {
 			logrus.WithField("output_url", session.OutputURL()).WithField("org_id", org.OrgID()).WithField("session_uuid", session.UUID()).WithError(err).Error("error reading in session output from storage")
 
