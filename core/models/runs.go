@@ -205,7 +205,7 @@ func (s *Session) StoragePath() string {
 		"c",
 		string(s.ContactUUID()[:4]),
 		string(s.ContactUUID()),
-		fmt.Sprintf("session_%s_%s_%s.json", ts, s.UUID(), s.OutputMD5()),
+		fmt.Sprintf("%s_session_%s_%s.json", ts, s.UUID(), s.OutputMD5()),
 	)
 }
 
