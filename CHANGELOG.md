@@ -1,3 +1,9 @@
+v6.3.18
+----------
+ * Use s3 session prefix when building s3 paths, default to /
+ * Throw error upwards if we have no DB backdown
+ * Read session files from storage when org configured to do so
+
 v6.3.17
 ----------
  * Ignore contact tickets on ticketers which have been deleted
