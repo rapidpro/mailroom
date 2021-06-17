@@ -151,12 +151,12 @@ type FlowStart struct {
 		FlowID    FlowID     `json:"flow_id"    db:"flow_id"`
 		FlowType  FlowType   `json:"flow_type"`
 
-		GroupIDs   []GroupID   `json:"group_ids,omitempty"`
-		ContactIDs []ContactID `json:"contact_ids,omitempty"`
-		URNs       []urns.URN  `json:"urns,omitempty"`
-		Query      null.String `json:"query,omitempty"        db:"query"`
-
-		CreateContact bool `json:"create_contact"`
+		URNs            []urns.URN  `json:"urns,omitempty"`
+		ContactIDs      []ContactID `json:"contact_ids,omitempty"`
+		GroupIDs        []GroupID   `json:"group_ids,omitempty"`
+		ExcludeGroupIDs []GroupID   `json:"exclude_group_ids,omitempty"` // used when loading scheduled triggers as flow starts
+		Query           null.String `json:"query,omitempty"        db:"query"`
+		CreateContact   bool        `json:"create_contact"`
 
 		RestartParticipants RestartParticipants `json:"restart_participants" db:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"       db:"include_active"`
@@ -177,6 +177,11 @@ func (s *FlowStart) FlowType() FlowType { return s.s.FlowType }
 func (s *FlowStart) GroupIDs() []GroupID { return s.s.GroupIDs }
 func (s *FlowStart) WithGroupIDs(groupIDs []GroupID) *FlowStart {
 	s.s.GroupIDs = groupIDs
+	return s
+}
+func (s *FlowStart) ExcludeGroupIDs() []GroupID { return s.s.ExcludeGroupIDs }
+func (s *FlowStart) WithExcludeGroupIDs(groupIDs []GroupID) *FlowStart {
+	s.s.ExcludeGroupIDs = groupIDs
 	return s
 }
 

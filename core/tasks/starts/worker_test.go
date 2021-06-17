@@ -50,6 +50,7 @@ func TestStarts(t *testing.T) {
 		label                string
 		flowID               models.FlowID
 		groupIDs             []models.GroupID
+		excludeGroupIDs      []models.GroupID
 		contactIDs           []models.ContactID
 		createContact        bool
 		query                string
@@ -245,6 +246,20 @@ func TestStarts(t *testing.T) {
 			expectedStatus:       models.StartStatusComplete,
 			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 1, testdata.SingleMessage.ID: 0},
 		},
+		{
+			label:                "Exclude group",
+			flowID:               testdata.Favorites.ID,
+			contactIDs:           []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID},
+			excludeGroupIDs:      []models.GroupID{testdata.DoctorsGroup.ID}, // should exclude Cathy
+			restartParticipants:  true,
+			includeActive:        true,
+			queue:                queue.HandlerQueue,
+			expectedContactCount: 1,
+			expectedBatchCount:   1,
+			expectedTotalCount:   1,
+			expectedStatus:       models.StartStatusComplete,
+			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 124, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
+		},
 	}
 
 	for _, tc := range tcs {
@@ -253,6 +268,7 @@ func TestStarts(t *testing.T) {
 		// handle our start task
 		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID, tc.restartParticipants, tc.includeActive).
 			WithGroupIDs(tc.groupIDs).
+			WithExcludeGroupIDs(tc.excludeGroupIDs).
 			WithContactIDs(tc.contactIDs).
 			WithQuery(tc.query).
 			WithCreateContact(tc.createContact)
