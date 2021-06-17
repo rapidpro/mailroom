@@ -39,6 +39,14 @@ func TestMsgEvents(t *testing.T) {
 	testdata.InsertKeywordTrigger(t, db, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
 	testdata.InsertCatchallTrigger(t, db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
+	// give Cathy an open ticket
+	cathyTicketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "aa906c81-7766-427c-9ffd-9a86e49bd657", "Hi there", "Ok", "")
+
+	// give Bob a closed ticket
+	bobTicketID := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "46faf0f3-5558-4865-bd8e-b3c83cdb5770", "Hi there", "Ok", "")
+
+	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z' WHERE id IN ($1, $2)`, cathyTicketID, bobTicketID)
+
 	// clear all of Alexandria's URNs
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Alexandria.ID)
 
@@ -148,6 +156,10 @@ func TestMsgEvents(t *testing.T) {
 	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.Org2Channel.UUID)))
 	assert.NoError(t, err)
 	assert.Equal(t, 9, count)
+
+	// Cathy's open ticket will have been updated but not Bob's closed ticket
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > '2021-01-01T00:00:00Z'`, []interface{}{cathyTicketID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = '2021-01-01T00:00:00Z'`, []interface{}{bobTicketID}, 1)
 
 	// Fred's sessions should not have a timeout because courier will set them
 	testsuite.AssertQueryCount(t, db,
