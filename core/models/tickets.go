@@ -42,19 +42,20 @@ func init() {
 
 type Ticket struct {
 	t struct {
-		ID         TicketID         `db:"id"`
-		UUID       flows.TicketUUID `db:"uuid"`
-		OrgID      OrgID            `db:"org_id"`
-		ContactID  ContactID        `db:"contact_id"`
-		TicketerID TicketerID       `db:"ticketer_id"`
-		ExternalID null.String      `db:"external_id"`
-		Status     TicketStatus     `db:"status"`
-		Subject    string           `db:"subject"`
-		Body       string           `db:"body"`
-		Config     null.Map         `db:"config"`
-		OpenedOn   time.Time        `db:"opened_on"`
-		ModifiedOn time.Time        `db:"modified_on"`
-		ClosedOn   *time.Time       `db:"closed_on"`
+		ID             TicketID         `db:"id"`
+		UUID           flows.TicketUUID `db:"uuid"`
+		OrgID          OrgID            `db:"org_id"`
+		ContactID      ContactID        `db:"contact_id"`
+		TicketerID     TicketerID       `db:"ticketer_id"`
+		ExternalID     null.String      `db:"external_id"`
+		Status         TicketStatus     `db:"status"`
+		Subject        string           `db:"subject"`
+		Body           string           `db:"body"`
+		Config         null.Map         `db:"config"`
+		OpenedOn       time.Time        `db:"opened_on"`
+		ModifiedOn     time.Time        `db:"modified_on"`
+		ClosedOn       *time.Time       `db:"closed_on"`
+		LastActivityOn time.Time        `db:"last_activity_on"`
 	}
 }
 
@@ -135,7 +136,8 @@ SELECT
   t.config AS config,
   t.opened_on AS opened_on,
   t.modified_on AS modified_on,
-  t.closed_on AS closed_on
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
   tickets_ticket t
 WHERE
@@ -162,7 +164,8 @@ SELECT
   t.config AS config,
   t.opened_on AS opened_on,
   t.modified_on AS modified_on,
-  t.closed_on AS closed_on
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
   tickets_ticket t
 WHERE
@@ -208,7 +211,8 @@ SELECT
   config,
   opened_on,
   modified_on,
-  closed_on
+  closed_on,
+  last_activity_on
 FROM
   tickets_ticket
 WHERE
@@ -234,7 +238,8 @@ SELECT
   config,
   opened_on,
   modified_on,
-  closed_on
+  closed_on,
+  last_activity_on
 FROM
   tickets_ticket
 WHERE
@@ -269,8 +274,8 @@ func lookupTicket(ctx context.Context, db Queryer, query string, params ...inter
 
 const insertTicketSQL = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on,  modified_on)
-  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, NOW(),      NOW()      )
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on, modified_on, last_activity_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, NOW(),     NOW()      , NOW())
 RETURNING
   id
 `
@@ -289,20 +294,11 @@ func InsertTickets(ctx context.Context, tx Queryer, tickets []*Ticket) error {
 	return BulkQuery(ctx, "inserted tickets", tx, insertTicketSQL, ts)
 }
 
-const updateTicketExternalIDSQL = `
-UPDATE
-  tickets_ticket
-SET
-  external_id = $2
-WHERE
-  id = $1
-`
-
 // UpdateTicketExternalID updates the external ID of the given ticket
 func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, externalID string) error {
 	t := &ticket.t
 	t.ExternalID = null.String(externalID)
-	return Exec(ctx, "update ticket external ID", db, updateTicketExternalIDSQL, t.ID, t.ExternalID)
+	return Exec(ctx, "update ticket external ID", db, `UPDATE tickets_ticket SET external_id = $2 WHERE id = $1`, t.ID, t.ExternalID)
 }
 
 // UpdateTicketConfig updates the passed in ticket's config with any passed in values
@@ -315,13 +311,25 @@ func UpdateTicketConfig(ctx context.Context, db Queryer, ticket *Ticket, config 
 	return Exec(ctx, "update ticket config", db, `UPDATE tickets_ticket SET config = $2 WHERE id = $1`, t.ID, t.Config)
 }
 
+// UpdateTicketLastActivity updates the last_activity_on of the given tickets to be now
+func UpdateTicketLastActivity(ctx context.Context, db Queryer, tickets []*Ticket) error {
+	now := dates.Now()
+	ids := make([]TicketID, len(tickets))
+	for i, t := range tickets {
+		t.t.LastActivityOn = now
+		ids[i] = t.ID()
+	}
+	return Exec(ctx, "update ticket last activity", db, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
+}
+
 const closeTicketSQL = `
 UPDATE
   tickets_ticket
 SET
   status = 'C',
   modified_on = $2,
-  closed_on = $2
+  closed_on = $2,
+  last_activity_on = $2
 WHERE
   id = ANY($1)
 `
@@ -342,8 +350,9 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 			t.Status = TicketStatusClosed
 			t.ModifiedOn = now
 			t.ClosedOn = &now
+			t.LastActivityOn = now
 
-			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ID(), TicketEventTypeClosed)
+			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ContactID(), ticket.ID(), TicketEventTypeClosed)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}
@@ -386,7 +395,8 @@ UPDATE
 SET
   status = 'O',
   modified_on = $2,
-  closed_on = NULL
+  closed_on = NULL,
+  last_activity_on = $2
 WHERE
   id = ANY($1)
 `
@@ -407,8 +417,9 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserI
 			t.Status = TicketStatusOpen
 			t.ModifiedOn = now
 			t.ClosedOn = nil
+			t.LastActivityOn = now
 
-			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ID(), TicketEventTypeReopened)
+			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ContactID(), ticket.ID(), TicketEventTypeReopened)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}
@@ -492,15 +503,6 @@ func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
 }
 
-const updateTicketerConfigSQL = `
-UPDATE 
-	tickets_ticketer
-SET
-	config = $2
-WHERE 
-	id = $1
-`
-
 // UpdateConfig updates the configuration of this ticketer with the given values
 func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]string, remove map[string]bool) error {
 	for key, value := range add {
@@ -516,7 +518,7 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]
 		dbMap[key] = value
 	}
 
-	return Exec(ctx, "update ticketer config", db, updateTicketerConfigSQL, t.t.ID, null.NewMap(dbMap))
+	return Exec(ctx, "update ticketer config", db, `UPDATE tickets_ticketer SET config = $2 WHERE id = $1`, t.t.ID, null.NewMap(dbMap))
 }
 
 // TicketService extends the engine's ticket service and adds support for forwarding new incoming messages

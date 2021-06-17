@@ -20,8 +20,8 @@ type Ticketer struct {
 func InsertOpenTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, uuid flows.TicketUUID, subject, body, externalID string) models.TicketID {
 	var id models.TicketID
 	err := db.Get(&id,
-		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on)
-		VALUES($1, $2, $3, $4, 'O', $5, $6, $7, NOW(), NOW()) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, subject, body, externalID,
+		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, last_activity_on)
+		VALUES($1, $2, $3, $4, 'O', $5, $6, $7, NOW(), NOW(), NOW()) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, subject, body, externalID,
 	)
 	require.NoError(t, err)
 	return id
@@ -31,8 +31,8 @@ func InsertOpenTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, tic
 func InsertClosedTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, uuid flows.TicketUUID, subject, body, externalID string) models.TicketID {
 	var id models.TicketID
 	err := db.Get(&id,
-		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, closed_on)
-		VALUES($1, $2, $3, $4, 'C', $5, $6, $7, NOW(), NOW(), NOW()) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, subject, body, externalID,
+		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, closed_on, last_activity_on)
+		VALUES($1, $2, $3, $4, 'C', $5, $6, $7, NOW(), NOW(), NOW(), NOW()) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, subject, body, externalID,
 	)
 	require.NoError(t, err)
 	return id

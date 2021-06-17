@@ -597,6 +597,14 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		if err != nil {
 			return errors.Wrapf(err, "error marking message as handled")
 		}
+
+		if len(tickets) > 0 {
+			err = models.UpdateTicketLastActivity(ctx, tx, tickets)
+			if err != nil {
+				return errors.Wrapf(err, "error updating last activity for open tickets")
+			}
+		}
+
 		return nil
 	}
 
@@ -613,9 +621,21 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		if flow != nil {
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 			if flow.FlowType() == models.FlowTypeVoice {
-				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, func(ctx context.Context, tx *sqlx.Tx) error {
-					return models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeFlow, topupID)
-				})
+				ivrHook := func(ctx context.Context, tx *sqlx.Tx) error {
+					err := models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeFlow, topupID)
+					if err != nil {
+						return errors.Wrapf(err, "error marking message as handled")
+					}
+
+					if len(tickets) > 0 {
+						err = models.UpdateTicketLastActivity(ctx, tx, tickets)
+						if err != nil {
+							return errors.Wrapf(err, "error updating last activity for open tickets")
+						}
+					}
+					return nil
+				}
+				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrHook)
 				if err != nil {
 					return errors.Wrapf(err, "error while triggering ivr flow")
 				}

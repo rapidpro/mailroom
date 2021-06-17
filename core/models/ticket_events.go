@@ -23,6 +23,7 @@ type TicketEvent struct {
 	e struct {
 		ID          TicketEventID   `json:"id"                      db:"id"`
 		OrgID       OrgID           `json:"org_id"                  db:"org_id"`
+		ContactID   ContactID       `json:"contact_id"              db:"contact_id"`
 		TicketID    TicketID        `json:"ticket_id"               db:"ticket_id"`
 		EventType   TicketEventType `json:"event_type"              db:"event_type"`
 		CreatedByID UserID          `json:"created_by_id,omitempty" db:"created_by_id"`
@@ -30,11 +31,12 @@ type TicketEvent struct {
 	}
 }
 
-func NewTicketEvent(orgID OrgID, userID UserID, ticketID TicketID, eventType TicketEventType) *TicketEvent {
+func NewTicketEvent(orgID OrgID, userID UserID, contactID ContactID, ticketID TicketID, eventType TicketEventType) *TicketEvent {
 	event := &TicketEvent{}
 	e := &event.e
 
 	e.OrgID = orgID
+	e.ContactID = contactID
 	e.TicketID = ticketID
 	e.EventType = eventType
 	e.CreatedOn = dates.Now()
@@ -44,6 +46,7 @@ func NewTicketEvent(orgID OrgID, userID UserID, ticketID TicketID, eventType Tic
 
 func (e *TicketEvent) ID() TicketEventID          { return e.e.ID }
 func (e *TicketEvent) OrgID() OrgID               { return e.e.OrgID }
+func (e *TicketEvent) ContactID() ContactID       { return e.e.ContactID }
 func (e *TicketEvent) TicketID() TicketID         { return e.e.TicketID }
 func (e *TicketEvent) EventType() TicketEventType { return e.e.EventType }
 
@@ -59,8 +62,8 @@ func (e *TicketEvent) UnmarshalJSON(b []byte) error {
 
 const insertTicketEventsSQL = `
 INSERT INTO
-	tickets_ticketevent(org_id, ticket_id, event_type, created_on, created_by_id)
-	VALUES(:org_id, :ticket_id, :event_type, :created_on, :created_by_id)
+	tickets_ticketevent(org_id, contact_id, ticket_id, event_type, created_on, created_by_id)
+	VALUES(:org_id, :contact_id, :ticket_id, :event_type, :created_on, :created_by_id)
 RETURNING
 	id
 `
