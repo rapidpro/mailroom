@@ -1,3 +1,12 @@
+v6.3.22
+----------
+ * Update ticket last_activity_on when opening/closing and for incoming messages
+ * Set contact_id when creating new tickets events
+
+v6.3.21
+----------
+ * Update to latest goflow and which no longer takes default_language
+
 v6.3.20
 ----------
  * Have our session filename lead with timestamp so other objects can exist in contact dirs
