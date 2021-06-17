@@ -1,3 +1,7 @@
+v6.3.21
+----------
+ * Update to latest goflow and which no longer takes default_language
+
 v6.3.20
 ----------
  * Have our session filename lead with timestamp so other objects can exist in contact dirs
