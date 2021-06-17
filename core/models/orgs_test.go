@@ -20,18 +20,17 @@ func TestOrgs(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
+	tz, _ := time.LoadLocation("America/Los_Angeles")
+
 	tx, err := db.BeginTxx(ctx, nil)
 	assert.NoError(t, err)
 	defer tx.Rollback()
 
 	tx.MustExec("UPDATE channels_channel SET country = 'FR' WHERE id = $1;", testdata.TwitterChannel.ID)
 	tx.MustExec("UPDATE channels_channel SET country = 'US' WHERE id IN ($1,$2);", testdata.TwilioChannel.ID, testdata.VonageChannel.ID)
-	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
-									VALUES(TRUE, NOW(), NOW(), 'French', 'fra', 1, 1, 2);`)
-	tx.MustExec(`INSERT INTO orgs_language(is_active, created_on, modified_on, name, iso_code, created_by_id, modified_by_id, org_id) 
-									VALUES(TRUE, NOW(), NOW(), 'English', 'eng', 1, 1, 2);`)
 
-	tx.MustExec("UPDATE orgs_org SET primary_language_id = 2 WHERE id = 2;")
+	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{"fra", "eng"}' WHERE id = $1`, testdata.Org1.ID)
+	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{}' WHERE id = $1`, testdata.Org2.ID)
 
 	org, err := models.LoadOrg(ctx, tx, testdata.Org1.ID)
 	assert.NoError(t, err)
@@ -44,17 +43,16 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, envs.RedactionPolicyNone, org.RedactionPolicy())
 	assert.Equal(t, 640, org.MaxValueLength())
 	assert.Equal(t, string(envs.Country("US")), string(org.DefaultCountry()))
-	tz, _ := time.LoadLocation("America/Los_Angeles")
 	assert.Equal(t, tz, org.Timezone())
-	assert.Equal(t, 0, len(org.AllowedLanguages()))
-	assert.Equal(t, envs.Language(""), org.DefaultLanguage())
-	assert.Equal(t, "", org.DefaultLocale().ToBCP47())
+	assert.Equal(t, []envs.Language{"fra", "eng"}, org.AllowedLanguages())
+	assert.Equal(t, envs.Language("fra"), org.DefaultLanguage())
+	assert.Equal(t, "fr-US", org.DefaultLocale().ToBCP47())
 
-	org, err = models.LoadOrg(ctx, tx, 2)
+	org, err = models.LoadOrg(ctx, tx, testdata.Org2.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, []envs.Language{"eng", "fra"}, org.AllowedLanguages())
-	assert.Equal(t, envs.Language("eng"), org.DefaultLanguage())
-	assert.Equal(t, "en", org.DefaultLocale().ToBCP47())
+	assert.Equal(t, []envs.Language{}, org.AllowedLanguages())
+	assert.Equal(t, envs.NilLanguage, org.DefaultLanguage())
+	assert.Equal(t, "", org.DefaultLocale().ToBCP47())
 
 	_, err = models.LoadOrg(ctx, tx, 99)
 	assert.Error(t, err)
