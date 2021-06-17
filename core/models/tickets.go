@@ -42,19 +42,20 @@ func init() {
 
 type Ticket struct {
 	t struct {
-		ID         TicketID         `db:"id"`
-		UUID       flows.TicketUUID `db:"uuid"`
-		OrgID      OrgID            `db:"org_id"`
-		ContactID  ContactID        `db:"contact_id"`
-		TicketerID TicketerID       `db:"ticketer_id"`
-		ExternalID null.String      `db:"external_id"`
-		Status     TicketStatus     `db:"status"`
-		Subject    string           `db:"subject"`
-		Body       string           `db:"body"`
-		Config     null.Map         `db:"config"`
-		OpenedOn   time.Time        `db:"opened_on"`
-		ModifiedOn time.Time        `db:"modified_on"`
-		ClosedOn   *time.Time       `db:"closed_on"`
+		ID             TicketID         `db:"id"`
+		UUID           flows.TicketUUID `db:"uuid"`
+		OrgID          OrgID            `db:"org_id"`
+		ContactID      ContactID        `db:"contact_id"`
+		TicketerID     TicketerID       `db:"ticketer_id"`
+		ExternalID     null.String      `db:"external_id"`
+		Status         TicketStatus     `db:"status"`
+		Subject        string           `db:"subject"`
+		Body           string           `db:"body"`
+		Config         null.Map         `db:"config"`
+		OpenedOn       time.Time        `db:"opened_on"`
+		ModifiedOn     time.Time        `db:"modified_on"`
+		ClosedOn       *time.Time       `db:"closed_on"`
+		LastActivityOn time.Time        `db:"last_activity_on"`
 	}
 }
 
@@ -135,7 +136,8 @@ SELECT
   t.config AS config,
   t.opened_on AS opened_on,
   t.modified_on AS modified_on,
-  t.closed_on AS closed_on
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
   tickets_ticket t
 WHERE
@@ -162,7 +164,8 @@ SELECT
   t.config AS config,
   t.opened_on AS opened_on,
   t.modified_on AS modified_on,
-  t.closed_on AS closed_on
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
   tickets_ticket t
 WHERE
@@ -208,7 +211,8 @@ SELECT
   config,
   opened_on,
   modified_on,
-  closed_on
+  closed_on,
+  last_activity_on
 FROM
   tickets_ticket
 WHERE
@@ -234,7 +238,8 @@ SELECT
   config,
   opened_on,
   modified_on,
-  closed_on
+  closed_on,
+  last_activity_on
 FROM
   tickets_ticket
 WHERE
@@ -269,8 +274,8 @@ func lookupTicket(ctx context.Context, db Queryer, query string, params ...inter
 
 const insertTicketSQL = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on,  modified_on)
-  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, NOW(),      NOW()      )
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on, modified_on, last_activity_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, NOW(),     NOW()      , NOW())
 RETURNING
   id
 `
@@ -321,7 +326,8 @@ UPDATE
 SET
   status = 'C',
   modified_on = $2,
-  closed_on = $2
+  closed_on = $2,
+  last_activity_on = $2
 WHERE
   id = ANY($1)
 `
@@ -342,8 +348,9 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 			t.Status = TicketStatusClosed
 			t.ModifiedOn = now
 			t.ClosedOn = &now
+			t.LastActivityOn = now
 
-			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ID(), TicketEventTypeClosed)
+			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ContactID(), ticket.ID(), TicketEventTypeClosed)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}
@@ -386,7 +393,8 @@ UPDATE
 SET
   status = 'O',
   modified_on = $2,
-  closed_on = NULL
+  closed_on = NULL,
+  last_activity_on = $2
 WHERE
   id = ANY($1)
 `
@@ -407,8 +415,9 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserI
 			t.Status = TicketStatusOpen
 			t.ModifiedOn = now
 			t.ClosedOn = nil
+			t.LastActivityOn = now
 
-			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ID(), TicketEventTypeReopened)
+			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ContactID(), ticket.ID(), TicketEventTypeReopened)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}

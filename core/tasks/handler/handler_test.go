@@ -300,7 +300,7 @@ func TestTicketEvents(t *testing.T) {
 	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{ticketID})
 	require.NoError(t, err)
 
-	event := models.NewTicketEvent(testdata.Org1.ID, testdata.Admin.ID, tickets[0].ID(), models.TicketEventTypeClosed)
+	event := models.NewTicketEvent(testdata.Org1.ID, testdata.Admin.ID, tickets[0].ContactID(), tickets[0].ID(), models.TicketEventTypeClosed)
 
 	err = handler.QueueTicketEvent(rc, testdata.Cathy.ID, event)
 	require.NoError(t, err)
