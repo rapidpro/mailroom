@@ -1,3 +1,11 @@
+v6.3.20
+----------
+ * Have our session filename lead with timestamp so other objects can exist in contact dirs
+
+v6.3.19
+----------
+ * Parse URL to get path out for sessions
+
 v6.3.18
 ----------
  * Use s3 session prefix when building s3 paths, default to /
