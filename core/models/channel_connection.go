@@ -353,15 +353,7 @@ func (c *ChannelConnection) MarkStarted(ctx context.Context, db Queryer, now tim
 func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now time.Time, wait time.Duration) error {
 	c.c.Status = ConnectionStatusErrored
 	c.c.EndedOn = &now
-
-	if c.c.RetryCount < ConnectionMaxRetries {
-		c.c.RetryCount++
-		next := now.Add(wait)
-		c.c.NextAttempt = &next
-	} else {
-		c.c.Status = ConnectionStatusFailed
-		c.c.NextAttempt = nil
-	}
+	c.c.NextAttempt = nil
 
 	_, err := db.ExecContext(ctx,
 		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, retry_count = $4, next_attempt = $5, modified_on = NOW() WHERE id = $1`,
