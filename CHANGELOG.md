@@ -1,3 +1,7 @@
+v6.3.23
+----------
+ * Add support for exclusion groups on scheduled triggers
+
 v6.3.22
 ----------
  * Update ticket last_activity_on when opening/closing and for incoming messages
