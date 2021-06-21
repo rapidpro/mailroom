@@ -267,7 +267,15 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 					triggers_trigger_groups tg
 				WHERE
 					tg.trigger_id = t.id
-			) tg) as group_ids
+			) tg) as group_ids,
+			(SELECT ARRAY_AGG(tg.contactgroup_id) FROM (
+				SELECT
+					tg.contactgroup_id
+				FROM
+					triggers_trigger_exclude_groups tg
+				WHERE
+					tg.trigger_id = t.id
+			) tg) as exclude_group_ids
 		FROM
 			triggers_trigger t JOIN
 			flows_flow f on t.flow_id = f.id

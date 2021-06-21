@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -28,7 +31,8 @@ func TestStarts(t *testing.T) {
 		"flow_id": %d,
 		"flow_type": "M",
 		"contact_ids": [%d, %d],
-		"group_ids": [6789],
+		"group_ids": [%d],
+		"exclude_group_ids": [%d],
 		"urns": ["tel:+12025550199"],
 		"query": null,
 		"restart_participants": true,
@@ -36,7 +40,7 @@ func TestStarts(t *testing.T) {
 		"parent_summary": {"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"},
 		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1},
 		"extra": {"foo": "bar"}
-	}`, startID, testdata.Org1.ID, testdata.SingleMessage.ID, testdata.Cathy.ID, testdata.Bob.ID))
+	}`, startID, testdata.Org1.ID, testdata.SingleMessage.ID, testdata.Cathy.ID, testdata.Bob.ID, testdata.DoctorsGroup.ID, testdata.TestersGroup.ID))
 
 	start := &models.FlowStart{}
 	err := json.Unmarshal(startJSON, start)
@@ -49,6 +53,9 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, "", start.Query())
 	assert.Equal(t, models.DoRestartParticipants, start.RestartParticipants())
 	assert.Equal(t, models.DoIncludeActive, start.IncludeActive())
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, start.ContactIDs())
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs())
+	assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.ExcludeGroupIDs())
 
 	assert.Equal(t, json.RawMessage(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), start.ParentSummary())
 	assert.Equal(t, json.RawMessage(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory())
@@ -86,4 +93,36 @@ func TestStarts(t *testing.T) {
 	require.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'C'`, []interface{}{startID}, 1)
+}
+
+func TestStartsBuilding(t *testing.T) {
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, testdata.Favorites.ID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithGroupIDs([]models.GroupID{testdata.DoctorsGroup.ID}).
+		WithExcludeGroupIDs([]models.GroupID{testdata.TestersGroup.ID}).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}).
+		WithQuery(`language != ""`).
+		WithCreateContact(true)
+
+	marshalled, err := jsonx.Marshal(start)
+	require.NoError(t, err)
+
+	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
+		"UUID": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+		"contact_ids": [%d, %d],
+		"create_contact": true,
+		"created_by": "",
+		"exclude_group_ids": [%d],
+		"flow_id": %d,
+		"flow_type": "M",
+		"group_ids": [%d],
+		"include_active": true,
+		"org_id": 1,
+		"query": "language != \"\"",
+		"restart_participants": true,
+		"start_id": null,
+		"start_type": "M"
+	}`, testdata.Cathy.ID, testdata.Bob.ID, testdata.TestersGroup.ID, testdata.Favorites.ID, testdata.DoctorsGroup.ID)), marshalled)
 }

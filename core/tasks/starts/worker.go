@@ -98,11 +98,11 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 		createdContactIDs = append(createdContactIDs, contact.ID())
 	}
 
-	// now add all the ids for our groups
+	// if we have inclusion groups, add all the contact ids from those groups
 	if len(start.GroupIDs()) > 0 {
 		rows, err := db.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.GroupIDs()))
 		if err != nil {
-			return errors.Wrapf(err, "error selecting contacts for groups")
+			return errors.Wrapf(err, "error querying contacts from inclusion groups")
 		}
 		defer rows.Close()
 
@@ -116,7 +116,7 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 		}
 	}
 
-	// finally, if we have a query, add the contacts that match that as well
+	// if we have a query, add the contacts that match that as well
 	if start.Query() != "" {
 		matches, err := models.ContactIDsForQuery(ctx, ec, oa, start.Query())
 		if err != nil {
@@ -125,6 +125,24 @@ func CreateFlowBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, ec *ela
 
 		for _, contactID := range matches {
 			contactIDs[contactID] = true
+		}
+	}
+
+	// finally, if we have exclusion groups, remove all the contact ids from those groups
+	if len(start.ExcludeGroupIDs()) > 0 {
+		rows, err := db.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.ExcludeGroupIDs()))
+		if err != nil {
+			return errors.Wrapf(err, "error querying contacts from exclusion groups")
+		}
+		defer rows.Close()
+
+		var contactID models.ContactID
+		for rows.Next() {
+			err := rows.Scan(&contactID)
+			if err != nil {
+				return errors.Wrapf(err, "error scanning contact id")
+			}
+			delete(contactIDs, contactID)
 		}
 	}
 
