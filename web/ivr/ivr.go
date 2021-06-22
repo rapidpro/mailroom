@@ -205,14 +205,13 @@ func writeClientError(w http.ResponseWriter, err error) error {
 }
 
 func buildResumeURL(channel *models.Channel, conn *models.ChannelConnection, urn urns.URN) string {
-	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, config.Mailroom.Domain)
 	form := url.Values{
 		"action":     []string{actionResume},
 		"connection": []string{fmt.Sprintf("%d", conn.ID())},
 		"urn":        []string{urn.String()},
 	}
 
-	return fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
+	return fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", config.Mailroom.Domain, channel.UUID(), form.Encode())
 }
 
 // handleFlow handles all incoming IVR requests related to a flow (status is handled elsewhere)

@@ -203,9 +203,6 @@ func RequestCallStart(ctx context.Context, config *config.Config, db *sqlx.DB, o
 }
 
 func RequestCallStartForConnection(ctx context.Context, config *config.Config, db *sqlx.DB, channel *models.Channel, telURN urns.URN, conn *models.ChannelConnection) error {
-	// the domain that will be used for callbacks, can be specific for channels due to white labeling
-	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, config.Domain)
-
 	// get max concurrent events if any
 	maxCalls := channel.ConfigValue(models.ChannelConfigMaxConcurrentEvents, "")
 	if maxCalls != "" {
@@ -238,8 +235,8 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 		"urn":        []string{telURN.String()},
 	}
 
-	resumeURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
-	statusURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/status", domain, channel.UUID())
+	resumeURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", config.Domain, channel.UUID(), form.Encode())
+	statusURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/status", config.Domain, channel.UUID())
 
 	// create the right client
 	c, err := GetClient(channel)
