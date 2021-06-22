@@ -22,7 +22,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type TicketID int
+type TicketID null.Int
+
+// NilTicketID is our constant for a nil ticket id
+const NilTicketID = TicketID(0)
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i TicketID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *TicketID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i TicketID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *TicketID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
+}
+
 type TicketerID null.Int
 type TicketStatus string
 
@@ -74,15 +98,16 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketer
 	return t
 }
 
-func (t *Ticket) ID() TicketID            { return t.t.ID }
-func (t *Ticket) UUID() flows.TicketUUID  { return t.t.UUID }
-func (t *Ticket) OrgID() OrgID            { return t.t.OrgID }
-func (t *Ticket) ContactID() ContactID    { return t.t.ContactID }
-func (t *Ticket) TicketerID() TicketerID  { return t.t.TicketerID }
-func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
-func (t *Ticket) Status() TicketStatus    { return t.t.Status }
-func (t *Ticket) Subject() string         { return t.t.Subject }
-func (t *Ticket) Body() string            { return t.t.Body }
+func (t *Ticket) ID() TicketID              { return t.t.ID }
+func (t *Ticket) UUID() flows.TicketUUID    { return t.t.UUID }
+func (t *Ticket) OrgID() OrgID              { return t.t.OrgID }
+func (t *Ticket) ContactID() ContactID      { return t.t.ContactID }
+func (t *Ticket) TicketerID() TicketerID    { return t.t.TicketerID }
+func (t *Ticket) ExternalID() null.String   { return t.t.ExternalID }
+func (t *Ticket) Status() TicketStatus      { return t.t.Status }
+func (t *Ticket) Subject() string           { return t.t.Subject }
+func (t *Ticket) Body() string              { return t.t.Body }
+func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
 }
@@ -319,6 +344,10 @@ func UpdateTicketLastActivity(ctx context.Context, db Queryer, tickets []*Ticket
 		t.t.LastActivityOn = now
 		ids[i] = t.ID()
 	}
+	return updateTicketLastActivity(ctx, db, ids, now)
+}
+
+func updateTicketLastActivity(ctx context.Context, db Queryer, ids []TicketID, now time.Time) error {
 	return Exec(ctx, "update ticket last activity", db, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
 }
 

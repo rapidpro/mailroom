@@ -103,7 +103,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("base"): base}
 
 	// we'll use a broadcast to send this message
-	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil)
+	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil, ticket.ID())
 	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
 	msgs, err := models.CreateBroadcastMessages(ctx, rt.DB, rt.RP, oa, batch)
 	if err != nil {

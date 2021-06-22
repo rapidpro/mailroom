@@ -2,7 +2,9 @@ package models_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -148,6 +150,28 @@ func TestUpdateTicketConfig(t *testing.T) {
 	models.UpdateTicketConfig(ctx, db, ticket, map[string]string{"foo": "6547", "zed": "xyz"})
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "6547", "bar": "abc", "zed": "xyz"}'::jsonb AND id = $1`, []interface{}{ticketID}, 1)
+}
+
+func TestUUpdateTicketLastActivity(t *testing.T) {
+	testsuite.Reset()
+	ctx := testsuite.CTX()
+	rt := testsuite.RT()
+	db := rt.DB
+
+	now := time.Date(2021, 6, 22, 15, 59, 30, 123456789, time.UTC)
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewFixedNowSource(now))
+
+	ticketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "c9c2c4e9-9b9f-47be-a4cf-d15d8602c413", "Problem", "Where my shoes", "123")
+	ticket := loadTicket(t, db, ticketID)
+
+	models.UpdateTicketLastActivity(ctx, db, []*models.Ticket{ticket})
+
+	assert.Equal(t, now, ticket.LastActivityOn())
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = $2`, []interface{}{ticketID, ticket.LastActivityOn()}, 1)
+
 }
 
 func TestCloseTickets(t *testing.T) {
