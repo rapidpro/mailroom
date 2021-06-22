@@ -98,15 +98,16 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketer
 	return t
 }
 
-func (t *Ticket) ID() TicketID            { return t.t.ID }
-func (t *Ticket) UUID() flows.TicketUUID  { return t.t.UUID }
-func (t *Ticket) OrgID() OrgID            { return t.t.OrgID }
-func (t *Ticket) ContactID() ContactID    { return t.t.ContactID }
-func (t *Ticket) TicketerID() TicketerID  { return t.t.TicketerID }
-func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
-func (t *Ticket) Status() TicketStatus    { return t.t.Status }
-func (t *Ticket) Subject() string         { return t.t.Subject }
-func (t *Ticket) Body() string            { return t.t.Body }
+func (t *Ticket) ID() TicketID              { return t.t.ID }
+func (t *Ticket) UUID() flows.TicketUUID    { return t.t.UUID }
+func (t *Ticket) OrgID() OrgID              { return t.t.OrgID }
+func (t *Ticket) ContactID() ContactID      { return t.t.ContactID }
+func (t *Ticket) TicketerID() TicketerID    { return t.t.TicketerID }
+func (t *Ticket) ExternalID() null.String   { return t.t.ExternalID }
+func (t *Ticket) Status() TicketStatus      { return t.t.Status }
+func (t *Ticket) Subject() string           { return t.t.Subject }
+func (t *Ticket) Body() string              { return t.t.Body }
+func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
 }

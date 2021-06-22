@@ -7,7 +7,9 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
@@ -278,4 +280,63 @@ func TestMarkMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 3)
+}
+
+func TestNonPersistentBroadcasts(t *testing.T) {
+	ctx, db, rp := testsuite.Reset()
+
+	db.MustExec(`DELETE FROM msgs_msg`)
+
+	ticketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, flows.TicketUUID(uuids.New()), "Problem", "", "")
+	var ticketLastActivityOn time.Time
+	err := db.Get(&ticketLastActivityOn, `SELECT last_activity_on FROM tickets_ticket WHERE id = $1`, ticketID)
+	require.NoError(t, err)
+
+	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("eng"): {Text: "Hi there"}}
+
+	// create a broadcast which doesn't actually exist in the DB
+	bcast := models.NewBroadcast(
+		testdata.Org1.ID,
+		models.NilBroadcastID,
+		translations,
+		models.TemplateStateUnevaluated,
+		envs.Language("eng"),
+		[]urns.URN{"tel:+593979012345"},
+		[]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID},
+		[]models.GroupID{testdata.DoctorsGroup.ID},
+		ticketID,
+	)
+
+	assert.Equal(t, models.NilBroadcastID, bcast.ID())
+	assert.Equal(t, testdata.Org1.ID, bcast.OrgID())
+	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage())
+	assert.Equal(t, translations, bcast.Translations())
+	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState())
+	assert.Equal(t, ticketID, bcast.TicketID())
+	assert.Equal(t, []urns.URN{"tel:+593979012345"}, bcast.URNs())
+	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID}, bcast.ContactIDs())
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs())
+
+	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID})
+
+	assert.Equal(t, models.NilBroadcastID, batch.BroadcastID())
+	assert.Equal(t, testdata.Org1.ID, batch.OrgID())
+	assert.Equal(t, envs.Language("eng"), batch.BaseLanguage())
+	assert.Equal(t, translations, batch.Translations())
+	assert.Equal(t, models.TemplateStateUnevaluated, batch.TemplateState())
+	assert.Equal(t, ticketID, batch.TicketID())
+	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs())
+
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, oa, batch)
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, len(msgs))
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`, nil, 2)
+
+	// test ticket was updated
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, []interface{}{ticketID, ticketLastActivityOn}, 1)
 }
