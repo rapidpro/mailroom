@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBroadcastEvents(t *testing.T) {
@@ -138,7 +139,12 @@ func TestBroadcastTask(t *testing.T) {
 	err = db.Get(&legacyID,
 		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id)
 							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, 1, 1, 1) RETURNING id`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
+	ticketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "bbaf0ea9-ac25-4221-87d1-aca1795c8bfe", "Problem", "", "")
+	var ticketLastActivityOn time.Time
+	err = db.Get(&ticketLastActivityOn, `SELECT last_activity_on FROM tickets_ticket WHERE id = $1`, ticketID)
+	require.NoError(t, err)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{
 		eng: {
@@ -178,14 +184,54 @@ func TestBroadcastTask(t *testing.T) {
 		GroupIDs      []models.GroupID
 		ContactIDs    []models.ContactID
 		URNs          []urns.URN
+		TicketID      models.TicketID
 		Queue         string
 		BatchCount    int
 		MsgCount      int
 		MsgText       string
 	}{
-		{models.NilBroadcastID, evaluated, models.TemplateStateEvaluated, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{legacyID, legacy, models.TemplateStateLegacy, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy legacy URN: +12065551212 Gender: F"},
-		{models.NilBroadcastID, template, models.TemplateStateUnevaluated, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy from Nyaruka goflow URN: tel:+12065551212 Gender: F"},
+		{
+			models.NilBroadcastID,
+			evaluated,
+			models.TemplateStateEvaluated,
+			eng,
+			doctorsOnly,
+			cathyOnly,
+			nil,
+			ticketID,
+			queue.BatchQueue,
+			2,
+			121,
+			"hello world",
+		},
+		{
+			legacyID,
+			legacy,
+			models.TemplateStateLegacy,
+			eng,
+			nil,
+			cathyOnly,
+			nil,
+			models.NilTicketID,
+			queue.HandlerQueue,
+			1,
+			1,
+			"hi Cathy legacy URN: +12065551212 Gender: F",
+		},
+		{
+			models.NilBroadcastID,
+			template,
+			models.TemplateStateUnevaluated,
+			eng,
+			nil,
+			cathyOnly,
+			nil,
+			models.NilTicketID,
+			queue.HandlerQueue,
+			1,
+			1,
+			"hi Cathy from Nyaruka goflow URN: tel:+12065551212 Gender: F",
+		},
 	}
 
 	lastNow := time.Now()
@@ -193,7 +239,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID)
 		err = CreateBroadcastBatches(ctx, db, rp, bcast)
 		assert.NoError(t, err)
 
@@ -230,6 +276,13 @@ func TestBroadcastTask(t *testing.T) {
 			testsuite.AssertQueryCount(t, db,
 				`SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`,
 				[]interface{}{tc.BroadcastID}, 1, "%d: broadcast not marked as sent", i)
+		}
+
+		// if we had a ticket, make sure its last_activity_on was updated
+		if tc.TicketID != models.NilTicketID {
+			testsuite.AssertQueryCount(t, db,
+				`SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`,
+				[]interface{}{tc.TicketID, ticketLastActivityOn}, 1, "%d: ticket last_activity_on not updated", i)
 		}
 
 		lastNow = time.Now()

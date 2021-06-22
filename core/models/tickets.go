@@ -22,7 +22,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type TicketID int
+type TicketID null.Int
+
+// NilTicketID is our constant for a nil ticket id
+const NilTicketID = TicketID(0)
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i TicketID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *TicketID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i TicketID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *TicketID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
+}
+
 type TicketerID null.Int
 type TicketStatus string
 
@@ -319,6 +343,10 @@ func UpdateTicketLastActivity(ctx context.Context, db Queryer, tickets []*Ticket
 		t.t.LastActivityOn = now
 		ids[i] = t.ID()
 	}
+	return updateTicketLastActivity(ctx, db, ids, now)
+}
+
+func updateTicketLastActivity(ctx context.Context, db Queryer, ids []TicketID, now time.Time) error {
 	return Exec(ctx, "update ticket last activity", db, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
 }
 
