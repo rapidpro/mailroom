@@ -287,10 +287,8 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	db.MustExec(`DELETE FROM msgs_msg`)
 
-	ticketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, flows.TicketUUID(uuids.New()), "Problem", "", "")
-	var ticketLastActivityOn time.Time
-	err := db.Get(&ticketLastActivityOn, `SELECT last_activity_on FROM tickets_ticket WHERE id = $1`, ticketID)
-	require.NoError(t, err)
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, flows.TicketUUID(uuids.New()), "Problem", "", "")
+	modelTicket := ticket.Load(t, db)
 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("eng"): {Text: "Hi there"}}
 
@@ -304,7 +302,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		[]urns.URN{"tel:+593979012345"},
 		[]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID},
 		[]models.GroupID{testdata.DoctorsGroup.ID},
-		ticketID,
+		ticket.ID,
 	)
 
 	assert.Equal(t, models.NilBroadcastID, bcast.ID())
@@ -312,7 +310,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage())
 	assert.Equal(t, translations, bcast.Translations())
 	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState())
-	assert.Equal(t, ticketID, bcast.TicketID())
+	assert.Equal(t, ticket.ID, bcast.TicketID())
 	assert.Equal(t, []urns.URN{"tel:+593979012345"}, bcast.URNs())
 	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID}, bcast.ContactIDs())
 	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs())
@@ -324,7 +322,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	assert.Equal(t, envs.Language("eng"), batch.BaseLanguage())
 	assert.Equal(t, translations, batch.Translations())
 	assert.Equal(t, models.TemplateStateUnevaluated, batch.TemplateState())
-	assert.Equal(t, ticketID, batch.TicketID())
+	assert.Equal(t, ticket.ID, batch.TicketID())
 	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs())
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
@@ -338,5 +336,5 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`, nil, 2)
 
 	// test ticket was updated
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, []interface{}{ticketID, ticketLastActivityOn}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, []interface{}{ticket.ID, modelTicket.LastActivityOn()}, 1)
 }

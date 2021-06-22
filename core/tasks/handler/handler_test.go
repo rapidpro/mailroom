@@ -40,12 +40,12 @@ func TestMsgEvents(t *testing.T) {
 	testdata.InsertCatchallTrigger(t, db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
 	// give Cathy an open ticket
-	cathyTicketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "aa906c81-7766-427c-9ffd-9a86e49bd657", "Hi there", "Ok", "")
+	cathyTicket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "aa906c81-7766-427c-9ffd-9a86e49bd657", "Hi there", "Ok", "")
 
 	// give Bob a closed ticket
-	bobTicketID := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "46faf0f3-5558-4865-bd8e-b3c83cdb5770", "Hi there", "Ok", "")
+	bobTicket := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "46faf0f3-5558-4865-bd8e-b3c83cdb5770", "Hi there", "Ok", "")
 
-	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z' WHERE id IN ($1, $2)`, cathyTicketID, bobTicketID)
+	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z' WHERE id IN ($1, $2)`, cathyTicket.ID, bobTicket.ID)
 
 	// clear all of Alexandria's URNs
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Alexandria.ID)
@@ -158,8 +158,8 @@ func TestMsgEvents(t *testing.T) {
 	assert.Equal(t, 9, count)
 
 	// Cathy's open ticket will have been updated but not Bob's closed ticket
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > '2021-01-01T00:00:00Z'`, []interface{}{cathyTicketID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = '2021-01-01T00:00:00Z'`, []interface{}{bobTicketID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > '2021-01-01T00:00:00Z'`, []interface{}{cathyTicket.ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = '2021-01-01T00:00:00Z'`, []interface{}{bobTicket.ID}, 1)
 
 	// Fred's sessions should not have a timeout because courier will set them
 	testsuite.AssertQueryCount(t, db,
@@ -307,9 +307,9 @@ func TestTicketEvents(t *testing.T) {
 	// add a ticket closed trigger
 	testdata.InsertTicketClosedTrigger(t, rt.DB, testdata.Org1, testdata.Favorites)
 
-	ticketID := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "")
+	ticket := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "")
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{ticketID})
+	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{ticket.ID})
 	require.NoError(t, err)
 
 	event := models.NewTicketEvent(testdata.Org1.ID, testdata.Admin.ID, tickets[0].ContactID(), tickets[0].ID(), models.TicketEventTypeClosed)

@@ -141,10 +141,8 @@ func TestBroadcastTask(t *testing.T) {
 							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, 1, 1, 1) RETURNING id`)
 	require.NoError(t, err)
 
-	ticketID := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "bbaf0ea9-ac25-4221-87d1-aca1795c8bfe", "Problem", "", "")
-	var ticketLastActivityOn time.Time
-	err = db.Get(&ticketLastActivityOn, `SELECT last_activity_on FROM tickets_ticket WHERE id = $1`, ticketID)
-	require.NoError(t, err)
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "bbaf0ea9-ac25-4221-87d1-aca1795c8bfe", "Problem", "", "")
+	modelTicket := ticket.Load(t, db)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{
 		eng: {
@@ -198,7 +196,7 @@ func TestBroadcastTask(t *testing.T) {
 			doctorsOnly,
 			cathyOnly,
 			nil,
-			ticketID,
+			ticket.ID,
 			queue.BatchQueue,
 			2,
 			121,
@@ -282,7 +280,7 @@ func TestBroadcastTask(t *testing.T) {
 		if tc.TicketID != models.NilTicketID {
 			testsuite.AssertQueryCount(t, db,
 				`SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`,
-				[]interface{}{tc.TicketID, ticketLastActivityOn}, 1, "%d: ticket last_activity_on not updated", i)
+				[]interface{}{tc.TicketID, modelTicket.LastActivityOn()}, 1, "%d: ticket last_activity_on not updated", i)
 		}
 
 		lastNow = time.Now()
