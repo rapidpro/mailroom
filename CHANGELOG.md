@@ -1,3 +1,9 @@
+v6.3.24
+----------
+ * Update to latest goflow
+ * Load org users as assets and use for ticket assignees and manual trigger users
+ * Add ticket to broadcasts and update last_activity_on after creating messages for a broadcast with a ticket
+
 v6.3.23
 ----------
  * Add support for exclusion groups on scheduled triggers
