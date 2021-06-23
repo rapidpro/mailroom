@@ -322,7 +322,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 		for _, t := range e.Tickets {
 			ticketer := org.TicketerByID(t.TicketerID)
 			if ticketer != nil {
-				tickets = append(tickets, NewTicket(t.UUID, org.OrgID(), contact.ID(), ticketer.ID(), t.ExternalID, t.Subject, t.Body, nil))
+				tickets = append(tickets, NewTicket(t.UUID, org.OrgID(), contact.ID(), ticketer.ID(), t.ExternalID, t.Subject, t.Body, t.AssigneeID, nil))
 			}
 		}
 		contact.tickets = tickets
@@ -468,6 +468,7 @@ type contactEnvelope struct {
 		ExternalID string           `json:"external_id"`
 		Subject    string           `json:"subject"`
 		Body       string           `json:"body"`
+		AssigneeID UserID           `json:"assignee_id"`
 	} `json:"tickets"`
 	CreatedOn  time.Time  `json:"created_on"`
 	ModifiedOn time.Time  `json:"modified_on"`
@@ -533,7 +534,8 @@ LEFT JOIN (
 				'subject', t.subject,
 				'body', t.body,
 				'external_id', t.external_id,
-				'ticketer_id', t.ticketer_id
+				'ticketer_id', t.ticketer_id,
+				'assignee_id', t.assignee_id
 			) ORDER BY t.opened_on ASC, t.id ASC
 		) as tickets
 	FROM

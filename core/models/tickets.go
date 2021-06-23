@@ -75,6 +75,7 @@ type Ticket struct {
 		Status         TicketStatus     `db:"status"`
 		Subject        string           `db:"subject"`
 		Body           string           `db:"body"`
+		AssigneeID     UserID           `db:"assignee_id"`
 		Config         null.Map         `db:"config"`
 		OpenedOn       time.Time        `db:"opened_on"`
 		ModifiedOn     time.Time        `db:"modified_on"`
@@ -84,7 +85,7 @@ type Ticket struct {
 }
 
 // NewTicket creates a new open ticket
-func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID, subject, body string, config map[string]interface{}) *Ticket {
+func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID, subject, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
 	t := &Ticket{}
 	t.t.UUID = uuid
 	t.t.OrgID = orgID
@@ -94,6 +95,7 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketer
 	t.t.Status = TicketStatusOpen
 	t.t.Subject = subject
 	t.t.Body = body
+	t.t.AssigneeID = assigneeID
 	t.t.Config = null.NewMap(config)
 	return t
 }
@@ -107,6 +109,7 @@ func (t *Ticket) ExternalID() null.String   { return t.t.ExternalID }
 func (t *Ticket) Status() TicketStatus      { return t.t.Status }
 func (t *Ticket) Subject() string           { return t.t.Subject }
 func (t *Ticket) Body() string              { return t.t.Body }
+func (t *Ticket) AssigneeID() UserID        { return t.t.AssigneeID }
 func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
@@ -118,12 +121,21 @@ func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
 		return nil, errors.New("unable to load ticketer with id %d")
 	}
 
+	var flowUser *flows.User
+	if t.AssigneeID() != NilUserID {
+		user := oa.UserByID(t.AssigneeID())
+		if user != nil {
+			flowUser = oa.SessionAssets().Users().Get(user.Email())
+		}
+	}
+
 	return flows.NewTicket(
 		t.UUID(),
 		oa.SessionAssets().Ticketers().Get(modelTicketer.UUID()),
 		t.Subject(),
 		t.Body(),
 		string(t.ExternalID()),
+		flowUser,
 	), nil
 }
 

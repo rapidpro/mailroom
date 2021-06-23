@@ -27,7 +27,7 @@ func TestStarts(t *testing.T) {
 		"start_id": %d,
 		"start_type": "M",
 		"org_id": %d,
-		"created_by": "rowan@nyaruka.com",
+		"created_by_id": %d,
 		"flow_id": %d,
 		"flow_type": "M",
 		"contact_ids": [%d, %d],
@@ -40,7 +40,7 @@ func TestStarts(t *testing.T) {
 		"parent_summary": {"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"},
 		"session_history": {"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1},
 		"extra": {"foo": "bar"}
-	}`, startID, testdata.Org1.ID, testdata.SingleMessage.ID, testdata.Cathy.ID, testdata.Bob.ID, testdata.DoctorsGroup.ID, testdata.TestersGroup.ID))
+	}`, startID, testdata.Org1.ID, testdata.Admin.ID, testdata.SingleMessage.ID, testdata.Cathy.ID, testdata.Bob.ID, testdata.DoctorsGroup.ID, testdata.TestersGroup.ID))
 
 	start := &models.FlowStart{}
 	err := json.Unmarshal(startJSON, start)
@@ -48,6 +48,7 @@ func TestStarts(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, startID, start.ID())
 	assert.Equal(t, testdata.Org1.ID, start.OrgID())
+	assert.Equal(t, testdata.Admin.ID, start.CreatedByID())
 	assert.Equal(t, testdata.SingleMessage.ID, start.FlowID())
 	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
 	assert.Equal(t, "", start.Query())
@@ -74,7 +75,7 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, batch.ContactIDs())
 	assert.Equal(t, models.DoRestartParticipants, batch.RestartParticipants())
 	assert.Equal(t, models.DoIncludeActive, batch.IncludeActive())
-	assert.Equal(t, "rowan@nyaruka.com", batch.CreatedBy())
+	assert.Equal(t, testdata.Admin.ID, batch.CreatedByID())
 	assert.False(t, batch.IsLast())
 	assert.Equal(t, 3, batch.TotalContacts())
 
@@ -114,6 +115,7 @@ func TestStartsBuilding(t *testing.T) {
 		"contact_ids": [%d, %d],
 		"create_contact": true,
 		"created_by": "",
+		"created_by_id": null,
 		"exclude_group_ids": [%d],
 		"flow_id": %d,
 		"flow_type": "M",

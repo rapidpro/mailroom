@@ -67,6 +67,9 @@ type OrgAssets struct {
 
 	locations        []assets.LocationHierarchy
 	locationsBuiltAt time.Time
+
+	users     []assets.User
+	usersByID map[UserID]*User
 }
 
 var ErrNotFound = errors.New("not found")
@@ -315,6 +318,20 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		oa.ticketersByUUID = prev.ticketersByUUID
 	}
 
+	if prev == nil || refresh&RefreshUsers > 0 {
+		oa.users, err = loadUsers(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading user assets for org %d", orgID)
+		}
+		oa.usersByID = make(map[UserID]*User)
+		for _, u := range oa.users {
+			oa.usersByID[u.(*User).ID()] = u.(*User)
+		}
+	} else {
+		oa.users = prev.users
+		oa.usersByID = prev.usersByID
+	}
+
 	// intialize our session assets
 	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig())
 	if err != nil {
@@ -345,6 +362,7 @@ const (
 	RefreshLabels      = Refresh(1 << 12)
 	RefreshFlows       = Refresh(1 << 13)
 	RefreshTicketers   = Refresh(1 << 14)
+	RefreshUsers       = Refresh(1 << 15)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -604,4 +622,12 @@ func (a *OrgAssets) TicketerByID(id TicketerID) *Ticketer {
 
 func (a *OrgAssets) TicketerByUUID(uuid assets.TicketerUUID) *Ticketer {
 	return a.ticketersByUUID[uuid]
+}
+
+func (a *OrgAssets) Users() ([]assets.User, error) {
+	return a.users, nil
+}
+
+func (a *OrgAssets) UserByID(id UserID) *User {
+	return a.usersByID[id]
 }

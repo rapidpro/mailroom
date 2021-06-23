@@ -46,7 +46,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "", ticket.ExternalID())
 	assert.Equal(t, 0, len(logger.Logs))
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "", "Need help", "Where are my cookies?", nil)
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "", "Need help", "Where are my cookies?", models.NilUserID, nil)
 
 	logger = &flows.HTTPLogger{}
 	err = svc.Forward(
@@ -71,8 +71,8 @@ func TestCloseAndReopen(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "12", "New ticket", "Where my cookies?", nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Internal.ID, "14", "Second ticket", "Where my shoes?", nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "12", "New ticket", "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Internal.ID, "14", "Second ticket", "Where my shoes?", models.NilUserID, nil)
 
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 
