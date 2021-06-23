@@ -36,6 +36,8 @@ var Org1 = &Org{1, "bf0514a5-9407-44c9-b0f9-3f36f9c18414"}
 var Admin = &User{3, "admin1@nyaruka.com"}
 var Editor = &User{4, "editor1@nyaruka.com"}
 var Viewer = &User{5, "viewer1@nyaruka.com"}
+var Agent = &User{6, "agent1@nyaruka.com"}
+var Surveyor = &User{7, "surveyor1@nyaruka.com"}
 
 var TwilioChannel = &Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8"}
 var VonageChannel = &Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49"}
@@ -84,7 +86,7 @@ var RemindersEvent2 = &CampaignEvent{10001}
 
 // secondary org.. only a few things
 var Org2 = &Org{2, "3ae7cdeb-fd96-46e5-abc4-a4622f349921"}
-var Org2Admin = &User{6, "admin2@nyaruka.com"}
+var Org2Admin = &User{8, "admin2@nyaruka.com"}
 var Org2Channel = &Channel{20000, "a89bc872-3763-4b95-91d9-31d4e56c6651"}
 var Org2Contact = &Contact{20000, "26d20b72-f7d8-44dc-87f2-aae046dbff95", "tel:+250700000005", 20000}
 var Org2Favorites = &Flow{20000, "f161bd16-3c60-40bd-8c92-228ce815b9cd"}

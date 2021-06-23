@@ -40,10 +40,10 @@ func TestMsgEvents(t *testing.T) {
 	testdata.InsertCatchallTrigger(t, db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
 	// give Cathy an open ticket
-	cathyTicket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "aa906c81-7766-427c-9ffd-9a86e49bd657", "Hi there", "Ok", "")
+	cathyTicket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "aa906c81-7766-427c-9ffd-9a86e49bd657", "Hi there", "Ok", "", nil)
 
 	// give Bob a closed ticket
-	bobTicket := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "46faf0f3-5558-4865-bd8e-b3c83cdb5770", "Hi there", "Ok", "")
+	bobTicket := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "46faf0f3-5558-4865-bd8e-b3c83cdb5770", "Hi there", "Ok", "", nil)
 
 	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z' WHERE id IN ($1, $2)`, cathyTicket.ID, bobTicket.ID)
 
@@ -307,7 +307,7 @@ func TestTicketEvents(t *testing.T) {
 	// add a ticket closed trigger
 	testdata.InsertTicketClosedTrigger(t, rt.DB, testdata.Org1, testdata.Favorites)
 
-	ticket := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "")
+	ticket := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "", nil)
 
 	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{ticket.ID})
 	require.NoError(t, err)

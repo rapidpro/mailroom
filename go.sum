@@ -135,8 +135,8 @@ github.com/nyaruka/ezconf v0.2.1/go.mod h1:ey182kYkw2MIi4XiWe1FR/mzI33WCmTWuceDY
 github.com/nyaruka/gocommon v1.9.1/go.mod h1:erbS4s2Rm1WdMILi2A1ye0nuU7FB4UOmSo4n0gETNsQ=
 github.com/nyaruka/gocommon v1.10.0 h1:V+UIyuuLAW/VqevctEbWFee4m6as/5ef3fg5fprnGTA=
 github.com/nyaruka/gocommon v1.10.0/go.mod h1:Jn7UIE8zwIr4JaviDf4PZrrQlN8r6QGVhOuaF/JoKus=
-github.com/nyaruka/goflow v0.123.0 h1:j1ABWt6kvt292BGl0jigulFX5O19rrt9URRDGdDdHSo=
-github.com/nyaruka/goflow v0.123.0/go.mod h1:ww5fDMDuYAkf1yuPmhP2gCRYREpyrHdM28uoTZGxWhw=
+github.com/nyaruka/goflow v0.124.0 h1:s2LtKDmHdF+9hp2x8LXDdkczLro0LemGg6ph3NZoWb0=
+github.com/nyaruka/goflow v0.124.0/go.mod h1:ww5fDMDuYAkf1yuPmhP2gCRYREpyrHdM28uoTZGxWhw=
 github.com/nyaruka/librato v1.0.0 h1:Vznj9WCeC1yZXbBYyYp40KnbmXLbEkjKmHesV/v2SR0=
 github.com/nyaruka/librato v1.0.0/go.mod h1:pkRNLFhFurOz0QqBz6/DuTFhHHxAubWxs4Jx+J7yUgg=
 github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d h1:hyp9u36KIwbTCo2JAJ+TuJcJBc+UZzEig7RI/S5Dvkc=

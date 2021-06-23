@@ -141,7 +141,7 @@ func TestBroadcastTask(t *testing.T) {
 							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, 1, 1, 1) RETURNING id`)
 	require.NoError(t, err)
 
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "bbaf0ea9-ac25-4221-87d1-aca1795c8bfe", "Problem", "", "")
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "bbaf0ea9-ac25-4221-87d1-aca1795c8bfe", "Problem", "", "", nil)
 	modelTicket := ticket.Load(t, db)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{

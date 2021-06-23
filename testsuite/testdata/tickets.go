@@ -31,22 +31,32 @@ type Ticketer struct {
 }
 
 // InsertOpenTicket inserts an open ticket
-func InsertOpenTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, uuid flows.TicketUUID, subject, body, externalID string) *Ticket {
+func InsertOpenTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, uuid flows.TicketUUID, subject, body, externalID string, assignee *User) *Ticket {
+	assigneeID := models.NilUserID
+	if assignee != nil {
+		assigneeID = assignee.ID
+	}
+
 	var id models.TicketID
 	err := db.Get(&id,
-		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, last_activity_on)
-		VALUES($1, $2, $3, $4, 'O', $5, $6, $7, NOW(), NOW(), NOW()) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, subject, body, externalID,
+		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, last_activity_on, assignee_id)
+		VALUES($1, $2, $3, $4, 'O', $5, $6, $7, NOW(), NOW(), NOW(), $8) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, subject, body, externalID, assigneeID,
 	)
 	require.NoError(t, err)
 	return &Ticket{id, uuid}
 }
 
 // InsertClosedTicket inserts a closed ticket
-func InsertClosedTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, uuid flows.TicketUUID, subject, body, externalID string) *Ticket {
+func InsertClosedTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, uuid flows.TicketUUID, subject, body, externalID string, assignee *User) *Ticket {
+	assigneeID := models.NilUserID
+	if assignee != nil {
+		assigneeID = assignee.ID
+	}
+
 	var id models.TicketID
 	err := db.Get(&id,
-		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, closed_on, last_activity_on)
-		VALUES($1, $2, $3, $4, 'C', $5, $6, $7, NOW(), NOW(), NOW(), NOW()) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, subject, body, externalID,
+		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, closed_on, last_activity_on, assignee_id)
+		VALUES($1, $2, $3, $4, 'C', $5, $6, $7, NOW(), NOW(), NOW(), NOW(), $8) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, subject, body, externalID, assigneeID,
 	)
 	require.NoError(t, err)
 	return &Ticket{id, uuid}

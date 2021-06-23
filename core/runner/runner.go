@@ -173,6 +173,15 @@ func StartFlowBatch(
 		return nil, errors.Wrapf(err, "error loading campaign flow: %d", batch.FlowID())
 	}
 
+	// get the user that created this flow start if there was one
+	var flowUser *flows.User
+	if batch.CreatedByID() != models.NilUserID {
+		user := oa.UserByID(batch.CreatedByID())
+		if user != nil {
+			flowUser = oa.SessionAssets().Users().Get(user.Email())
+		}
+	}
+
 	var params *types.XObject
 	if len(batch.Extra()) > 0 {
 		params, err = types.ReadXObject(batch.Extra())
@@ -209,7 +218,7 @@ func StartFlowBatch(
 		if batchStart {
 			tb = tb.AsBatch()
 		}
-		return tb.WithUser(batch.CreatedBy()).WithOrigin(startTypeToOrigin[batch.StartType()]).Build()
+		return tb.WithUser(flowUser).WithOrigin(startTypeToOrigin[batch.StartType()]).Build()
 	}
 
 	// before committing our runs we want to set the start they are associated with

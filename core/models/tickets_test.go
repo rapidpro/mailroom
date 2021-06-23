@@ -69,6 +69,7 @@ func TestTickets(t *testing.T) {
 		"EX12345",
 		"New Ticket",
 		"Where are my cookies?",
+		testdata.Admin.ID,
 		map[string]interface{}{
 			"contact-display": "Cathy",
 		},
@@ -81,6 +82,7 @@ func TestTickets(t *testing.T) {
 		"EX7869",
 		"New Zen Ticket",
 		"Where are my trousers?",
+		models.NilUserID,
 		nil,
 	)
 	ticket3 := models.NewTicket(
@@ -91,6 +93,7 @@ func TestTickets(t *testing.T) {
 		"EX6677",
 		"Other Org Ticket",
 		"Where are my pants?",
+		testdata.Org2Admin.ID,
 		nil,
 	)
 
@@ -101,6 +104,7 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, null.String("EX12345"), ticket1.ExternalID())
 	assert.Equal(t, "New Ticket", ticket1.Subject())
 	assert.Equal(t, "Cathy", ticket1.Config("contact-display"))
+	assert.Equal(t, testdata.Admin.ID, ticket1.AssigneeID())
 	assert.Equal(t, "", ticket1.Config("xyz"))
 
 	err := models.InsertTickets(ctx, db, []*models.Ticket{ticket1, ticket2, ticket3})
@@ -136,7 +140,7 @@ func TestUpdateTicketConfig(t *testing.T) {
 	rt := testsuite.RT()
 	db := rt.DB
 
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "ba847748-cfb4-4d79-8906-02bc854e0361", "Problem", "Where my shoes", "123")
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "ba847748-cfb4-4d79-8906-02bc854e0361", "Problem", "Where my shoes", "123", nil)
 	modelTicket := ticket.Load(t, db)
 
 	// empty configs are null
@@ -163,7 +167,7 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewFixedNowSource(now))
 
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "c9c2c4e9-9b9f-47be-a4cf-d15d8602c413", "Problem", "Where my shoes", "123")
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "c9c2c4e9-9b9f-47be-a4cf-d15d8602c413", "Problem", "Where my shoes", "123", nil)
 	modelTicket := ticket.Load(t, db)
 
 	models.UpdateTicketLastActivity(ctx, db, []*models.Ticket{modelTicket})
@@ -194,10 +198,10 @@ func TestCloseTickets(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
-	ticket1 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "e5f79dca-5625-4ec6-9a4f-e30764fb5cfa", "Problem", "Where my shoes", "123")
+	ticket1 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "e5f79dca-5625-4ec6-9a4f-e30764fb5cfa", "Problem", "Where my shoes", "123", nil)
 	modelTicket1 := ticket1.Load(t, db)
 
-	ticket2 := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "4d507510-77ce-4cc0-8ee7-c3f1ead7a284", "Old Problem", "Where my pants", "234")
+	ticket2 := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "4d507510-77ce-4cc0-8ee7-c3f1ead7a284", "Old Problem", "Where my pants", "234", nil)
 	modelTicket2 := ticket2.Load(t, db)
 
 	logger := &models.HTTPLogger{}
@@ -222,7 +226,7 @@ func TestCloseTickets(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, []interface{}{ticket2.ID}, 0)
 
 	// can close tickets without a user
-	ticket3 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "94a94641-ac10-414d-8d22-959be6a6792e", "Problem", "Where my shoes", "123")
+	ticket3 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "94a94641-ac10-414d-8d22-959be6a6792e", "Problem", "Where my shoes", "123", nil)
 	modelTicket3 := ticket3.Load(t, db)
 
 	evts, err = models.CloseTickets(ctx, db, oa, models.NilUserID, []*models.Ticket{modelTicket3}, false, logger)
@@ -253,10 +257,10 @@ func TestReopenTickets(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
-	ticket1 := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "e5f79dca-5625-4ec6-9a4f-e30764fb5cfa", "Problem", "Where my shoes", "123")
+	ticket1 := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "e5f79dca-5625-4ec6-9a4f-e30764fb5cfa", "Problem", "Where my shoes", "123", nil)
 	modelTicket1 := ticket1.Load(t, db)
 
-	ticket2 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "4d507510-77ce-4cc0-8ee7-c3f1ead7a284", "Old Problem", "Where my pants", "234")
+	ticket2 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "4d507510-77ce-4cc0-8ee7-c3f1ead7a284", "Old Problem", "Where my pants", "234", nil)
 	modelTicket2 := ticket2.Load(t, db)
 
 	logger := &models.HTTPLogger{}
