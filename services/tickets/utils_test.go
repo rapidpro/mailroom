@@ -53,8 +53,8 @@ func TestFromTicketUUID(t *testing.T) {
 	db := testsuite.DB()
 
 	// create some tickets
-	ticket1 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)
-	ticket2 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my shoes?", "", nil)
+	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my shoes?", "", nil)
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
@@ -132,8 +132,8 @@ func TestSendReply(t *testing.T) {
 	image := &tickets.File{URL: "http://coolfiles.com/a.jpg", ContentType: "image/jpeg", Body: imageBody}
 
 	// create a ticket
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)
-	modelTicket := ticket.Load(t, db)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)
+	modelTicket := ticket.Load(db)
 
 	msg, err := tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})
 	require.NoError(t, err)
@@ -186,7 +186,7 @@ func TestCloseTicket(t *testing.T) {
 	require.NoError(t, err)
 
 	// create a close ticket trigger
-	testdata.InsertTicketClosedTrigger(t, db, testdata.Org1, testdata.Favorites)
+	testdata.InsertTicketClosedTrigger(db, testdata.Org1, testdata.Favorites)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)

@@ -35,28 +35,28 @@ func TestExpirations(t *testing.T) {
 	db := testsuite.DB()
 
 	// create a few sessions
-	s1 := testdata.InsertFlowSession(t, db, testdata.Org1, testdata.Cathy, models.SessionStatusWaiting, nil)
-	s2 := testdata.InsertFlowSession(t, db, testdata.Org1, testdata.George, models.SessionStatusWaiting, nil)
-	s3 := testdata.InsertFlowSession(t, db, testdata.Org1, testdata.Bob, models.SessionStatusWaiting, nil)
+	s1 := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.SessionStatusWaiting, nil)
+	s2 := testdata.InsertFlowSession(db, testdata.Org1, testdata.George, models.SessionStatusWaiting, nil)
+	s3 := testdata.InsertFlowSession(db, testdata.Org1, testdata.Bob, models.SessionStatusWaiting, nil)
 
 	// simple run, no parent
 	r1ExpiresOn := time.Now()
-	testdata.InsertFlowRun(t, db, testdata.Org1, s1, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting, "", &r1ExpiresOn)
+	testdata.InsertFlowRun(db, testdata.Org1, s1, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting, "", &r1ExpiresOn)
 
 	// parent run
 	r2ExpiresOn := time.Now().Add(time.Hour * 24)
-	testdata.InsertFlowRun(t, db, testdata.Org1, s2, testdata.George, testdata.Favorites, models.RunStatusWaiting, "", &r2ExpiresOn)
+	testdata.InsertFlowRun(db, testdata.Org1, s2, testdata.George, testdata.Favorites, models.RunStatusWaiting, "", &r2ExpiresOn)
 
 	// child run
 	r3ExpiresOn := time.Now()
-	testdata.InsertFlowRun(t, db, testdata.Org1, s2, testdata.George, testdata.Favorites, models.RunStatusWaiting, "c4126b59-7a61-4ed5-a2da-c7857580355b", &r3ExpiresOn)
+	testdata.InsertFlowRun(db, testdata.Org1, s2, testdata.George, testdata.Favorites, models.RunStatusWaiting, "c4126b59-7a61-4ed5-a2da-c7857580355b", &r3ExpiresOn)
 
 	// run with no session
 	r4ExpiresOn := time.Now()
-	testdata.InsertFlowRun(t, db, testdata.Org1, models.SessionID(0), testdata.Cathy, testdata.Favorites, models.RunStatusWaiting, "", &r4ExpiresOn)
+	testdata.InsertFlowRun(db, testdata.Org1, models.SessionID(0), testdata.Cathy, testdata.Favorites, models.RunStatusWaiting, "", &r4ExpiresOn)
 
 	// run with no expires_on
-	testdata.InsertFlowRun(t, db, testdata.Org1, s3, testdata.Bob, testdata.Favorites, models.RunStatusWaiting, "", nil)
+	testdata.InsertFlowRun(db, testdata.Org1, s3, testdata.Bob, testdata.Favorites, models.RunStatusWaiting, "", nil)
 
 	time.Sleep(10 * time.Millisecond)
 

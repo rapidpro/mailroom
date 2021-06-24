@@ -33,17 +33,17 @@ func TestMsgEvents(t *testing.T) {
 
 	db.MustExec(`DELETE FROM msgs_msg`)
 
-	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
 
-	testdata.InsertKeywordTrigger(t, db, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
-	testdata.InsertCatchallTrigger(t, db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
+	testdata.InsertKeywordTrigger(db, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertCatchallTrigger(db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
 	// give Cathy an open ticket
-	cathyTicket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Hi there", "Ok", "", nil)
+	cathyTicket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Hi there", "Ok", "", nil)
 
 	// give Bob a closed ticket
-	bobTicket := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Hi there", "Ok", "", nil)
+	bobTicket := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Hi there", "Ok", "", nil)
 
 	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z' WHERE id IN ($1, $2)`, cathyTicket.ID, bobTicket.ID)
 
@@ -231,11 +231,11 @@ func TestChannelEvents(t *testing.T) {
 	defer rc.Close()
 
 	// add some channel event triggers
-	testdata.InsertNewConversationTrigger(t, db, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
-	testdata.InsertReferralTrigger(t, db, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
+	testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
+	testdata.InsertReferralTrigger(db, testdata.Org1, testdata.PickANumber, "", testdata.VonageChannel)
 
 	// add a URN for cathy so we can test twitter URNs
-	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, urns.URN("twitterid:123456"), 10)
 
 	tcs := []struct {
 		EventType      models.ChannelEventType
@@ -304,10 +304,10 @@ func TestTicketEvents(t *testing.T) {
 	defer rc.Close()
 
 	// add a ticket closed trigger
-	testdata.InsertTicketClosedTrigger(t, rt.DB, testdata.Org1, testdata.Favorites)
+	testdata.InsertTicketClosedTrigger(rt.DB, testdata.Org1, testdata.Favorites)
 
-	ticket := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where are my shoes?", "", nil)
-	modelTicket := ticket.Load(t, db)
+	ticket := testdata.InsertClosedTicket(rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where are my shoes?", "", nil)
+	modelTicket := ticket.Load(db)
 
 	event := models.NewTicketEvent(testdata.Org1.ID, testdata.Admin.ID, modelTicket.ContactID(), modelTicket.ID(), models.TicketEventTypeClosed)
 
@@ -382,7 +382,7 @@ func TestTimedEvents(t *testing.T) {
 	db.MustExec(`DELETE FROM msgs_msg`)
 
 	// start to start our favorites flow
-	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
 
 	models.FlushCache()
 

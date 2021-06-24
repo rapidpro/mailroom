@@ -15,7 +15,7 @@ func TestEventCallback(t *testing.T) {
 	db.MustExec(`DELETE FROM msgs_msg`)
 
 	// create a rocketchat ticket for Cathy
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.RocketChat, "Need help", "Have you seen my cookies?", "1234", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.RocketChat, "Need help", "Have you seen my cookies?", "1234", nil)
 
 	web.RunWebTests(t, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }

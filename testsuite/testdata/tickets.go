@@ -1,8 +1,9 @@
 package testdata
 
 import (
-	"testing"
+	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -10,19 +11,16 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/stretchr/testify/require"
 )
 
 type Ticket struct {
-	ID   models.TicketID  `db:"id"`
-	UUID flows.TicketUUID `db:"uuid"`
+	ID   models.TicketID
+	UUID flows.TicketUUID
 }
 
-func (k *Ticket) Load(t *testing.T, db *sqlx.DB) *models.Ticket {
+func (k *Ticket) Load(db *sqlx.DB) *models.Ticket {
 	tickets, err := models.LoadTickets(testsuite.CTX(), db, []models.TicketID{k.ID})
-	require.NoError(t, err)
-	require.Equal(t, 1, len(tickets))
-
+	must(err, len(tickets) == 1)
 	return tickets[0]
 }
 
@@ -32,33 +30,31 @@ type Ticketer struct {
 }
 
 // InsertOpenTicket inserts an open ticket
-func InsertOpenTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, subject, body, externalID string, assignee *User) *Ticket {
-	assigneeID := models.NilUserID
-	if assignee != nil {
-		assigneeID = assignee.ID
-	}
-
-	ticket := &Ticket{}
-	err := db.Get(ticket,
-		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, last_activity_on, assignee_id)
-		VALUES($1, $2, $3, $4, 'O', $5, $6, $7, NOW(), NOW(), NOW(), $8) RETURNING id, uuid`, uuids.New(), org.ID, contact.ID, ticketer.ID, subject, body, externalID, assigneeID,
-	)
-	require.NoError(t, err)
-	return ticket
+func InsertOpenTicket(db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, subject, body, externalID string, assignee *User) *Ticket {
+	return insertTicket(db, org, contact, ticketer, models.TicketStatusOpen, subject, body, externalID, assignee)
 }
 
 // InsertClosedTicket inserts a closed ticket
-func InsertClosedTicket(t *testing.T, db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, subject, body, externalID string, assignee *User) *Ticket {
+func InsertClosedTicket(db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, subject, body, externalID string, assignee *User) *Ticket {
+	return insertTicket(db, org, contact, ticketer, models.TicketStatusClosed, subject, body, externalID, assignee)
+}
+
+func insertTicket(db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, status models.TicketStatus, subject, body, externalID string, assignee *User) *Ticket {
+	uuid := flows.TicketUUID(uuids.New())
+	var closedOn *time.Time
+	if status == models.TicketStatusClosed {
+		t := dates.Now()
+		closedOn = &t
+	}
 	assigneeID := models.NilUserID
 	if assignee != nil {
 		assigneeID = assignee.ID
 	}
 
-	ticket := &Ticket{}
-	err := db.Get(ticket,
+	var id models.TicketID
+	must(db.Get(&id,
 		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, subject, body, external_id, opened_on, modified_on, closed_on, last_activity_on, assignee_id)
-		VALUES($1, $2, $3, $4, 'C', $5, $6, $7, NOW(), NOW(), NOW(), NOW(), $8) RETURNING id, uuid`, uuids.New(), org.ID, contact.ID, ticketer.ID, subject, body, externalID, assigneeID,
-	)
-	require.NoError(t, err)
-	return ticket
+		VALUES($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW(), $9, NOW(), $10) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, status, subject, body, externalID, closedOn, assigneeID,
+	))
+	return &Ticket{id, uuid}
 }

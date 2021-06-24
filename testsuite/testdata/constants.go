@@ -91,3 +91,14 @@ var Org2Channel = &Channel{20000, "a89bc872-3763-4b95-91d9-31d4e56c6651"}
 var Org2Contact = &Contact{20000, "26d20b72-f7d8-44dc-87f2-aae046dbff95", "tel:+250700000005", 20000}
 var Org2Favorites = &Flow{20000, "f161bd16-3c60-40bd-8c92-228ce815b9cd"}
 var Org2SingleMessage = &Flow{20001, "5277916d-6011-41ac-a4a4-f6ac6a4f1dd9"}
+
+func must(err error, checks ...bool) {
+	if err != nil {
+		panic(err)
+	}
+	for _, check := range checks {
+		if !check {
+			panic("check failed")
+		}
+	}
+}

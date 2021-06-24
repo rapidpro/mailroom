@@ -267,10 +267,10 @@ func TestServer(t *testing.T) {
 	session := ""
 
 	// add a trigger for our campaign flow with 'trigger'
-	testdata.InsertKeywordTrigger(t, db, testdata.Org1, testdata.CampaignFlow, "trigger", models.MatchOnly, nil, nil)
+	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.CampaignFlow, "trigger", models.MatchOnly, nil, nil)
 
 	// also add a catch all
-	testdata.InsertCatchallTrigger(t, db, testdata.Org1, testdata.CampaignFlow, nil, nil)
+	testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.CampaignFlow, nil, nil)
 
 	tcs := []struct {
 		URL      string

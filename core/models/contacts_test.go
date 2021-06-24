@@ -25,10 +25,10 @@ func TestContacts(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Problem!", "Where are my shoes?", "1234", testdata.Agent)
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Another Problem!", "Where are my pants?", "2345", nil)
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Urgent", "His name is Bob", "", testdata.Editor)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Problem!", "Where are my shoes?", "1234", testdata.Agent)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Another Problem!", "Where are my pants?", "2345", nil)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Urgent", "His name is Bob", "", testdata.Editor)
 
 	// delete mailgun ticketer
 	db.MustExec(`UPDATE tickets_ticketer SET is_active = false WHERE id = $1`, testdata.Mailgun.ID)
@@ -98,7 +98,7 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())
 
 	// add another tel urn to bob
-	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, urns.URN("tel:+250788373373"), 10)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, urns.URN("tel:+250788373373"), 10)
 
 	// reload the contact
 	modelContacts, err = models.LoadContacts(ctx, db, org, []models.ContactID{testdata.Bob.ID})
@@ -140,10 +140,10 @@ func TestCreateContact(t *testing.T) {
 	db := testsuite.DB()
 	testsuite.Reset()
 
-	testdata.InsertContactGroup(t, db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Kinyarwanda", "language = kin")
+	testdata.InsertContactGroup(db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Kinyarwanda", "language = kin")
 
 	// add an orphaned URN
-	testdata.InsertContactURN(t, db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
+	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -198,11 +198,11 @@ func TestGetOrCreateContact(t *testing.T) {
 	db := testsuite.DB()
 	testsuite.Reset()
 
-	testdata.InsertContactGroup(t, db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Telegrammer", `telegram = 100001`)
+	testdata.InsertContactGroup(db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Telegrammer", `telegram = 100001`)
 
 	// add some orphaned URNs
-	testdata.InsertContactURN(t, db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
-	testdata.InsertContactURN(t, db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
+	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
+	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
 
 	var maxContactID models.ContactID
 	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
@@ -355,7 +355,7 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	testsuite.Reset()
 
 	// add an orphaned URN
-	testdata.InsertContactURN(t, db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
+	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
 
 	var maxContactID models.ContactID
 	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)

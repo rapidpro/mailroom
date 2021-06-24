@@ -54,7 +54,7 @@ func TestPopulateTask(t *testing.T) {
 		}
 	}`, testdata.Cathy.ID)
 
-	group := testdata.InsertContactGroup(t, db, testdata.Org1, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
+	group := testdata.InsertContactGroup(db, testdata.Org1, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
 
 	task := &contacts.PopulateDynamicGroupTask{
 		GroupID: group.ID,

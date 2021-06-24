@@ -140,8 +140,8 @@ func TestUpdateTicketConfig(t *testing.T) {
 	rt := testsuite.RT()
 	db := rt.DB
 
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
-	modelTicket := ticket.Load(t, db)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
+	modelTicket := ticket.Load(db)
 
 	// empty configs are null
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config IS NULL AND id = $1`, []interface{}{ticket.ID}, 1)
@@ -167,8 +167,8 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewFixedNowSource(now))
 
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
-	modelTicket := ticket.Load(t, db)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
+	modelTicket := ticket.Load(db)
 
 	models.UpdateTicketLastActivity(ctx, db, []*models.Ticket{modelTicket})
 
@@ -198,11 +198,11 @@ func TestCloseTickets(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
-	ticket1 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
-	modelTicket1 := ticket1.Load(t, db)
+	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
+	modelTicket1 := ticket1.Load(db)
 
-	ticket2 := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Old Problem", "Where my pants", "234", nil)
-	modelTicket2 := ticket2.Load(t, db)
+	ticket2 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Old Problem", "Where my pants", "234", nil)
+	modelTicket2 := ticket2.Load(db)
 
 	logger := &models.HTTPLogger{}
 	evts, err := models.CloseTickets(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, logger)
@@ -226,8 +226,8 @@ func TestCloseTickets(t *testing.T) {
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, []interface{}{ticket2.ID}, 0)
 
 	// can close tickets without a user
-	ticket3 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
-	modelTicket3 := ticket3.Load(t, db)
+	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
+	modelTicket3 := ticket3.Load(db)
 
 	evts, err = models.CloseTickets(ctx, db, oa, models.NilUserID, []*models.Ticket{modelTicket3}, false, logger)
 	require.NoError(t, err)
@@ -257,11 +257,11 @@ func TestReopenTickets(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
-	ticket1 := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
-	modelTicket1 := ticket1.Load(t, db)
+	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
+	modelTicket1 := ticket1.Load(db)
 
-	ticket2 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Old Problem", "Where my pants", "234", nil)
-	modelTicket2 := ticket2.Load(t, db)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Old Problem", "Where my pants", "234", nil)
+	modelTicket2 := ticket2.Load(db)
 
 	logger := &models.HTTPLogger{}
 	evts, err := models.ReopenTickets(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, logger)

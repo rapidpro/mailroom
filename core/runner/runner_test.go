@@ -107,7 +107,7 @@ func TestBatchStart(t *testing.T) {
 	db := rt.DB
 
 	// create a start object
-	testdata.InsertFlowStart(t, db, testdata.Org1, testdata.SingleMessage, nil)
+	testdata.InsertFlowStart(db, testdata.Org1, testdata.SingleMessage, nil)
 
 	// and our batch object
 	contactIDs := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
@@ -190,7 +190,7 @@ func TestResume(t *testing.T) {
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	require.NoError(t, err)
 
-	_, contact := testdata.Cathy.Load(t, db, oa)
+	_, contact := testdata.Cathy.Load(db, oa)
 
 	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
 	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, nil, true)

@@ -47,7 +47,7 @@ func TestBroadcastEvents(t *testing.T) {
 	cathyOnly := []*flows.ContactReference{cathy}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	// change george's URN to an invalid twitter URN so it can't be sent
 	db.MustExec(
@@ -141,8 +141,8 @@ func TestBroadcastTask(t *testing.T) {
 							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, 1, 1, 1) RETURNING id`)
 	require.NoError(t, err)
 
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "", "", nil)
-	modelTicket := ticket.Load(t, db)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "", "", nil)
+	modelTicket := ticket.Load(db)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{
 		eng: {
@@ -172,7 +172,7 @@ func TestBroadcastTask(t *testing.T) {
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
 		BroadcastID   models.BroadcastID
