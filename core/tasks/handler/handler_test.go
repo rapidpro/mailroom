@@ -40,10 +40,10 @@ func TestMsgEvents(t *testing.T) {
 	testdata.InsertCatchallTrigger(t, db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
 	// give Cathy an open ticket
-	cathyTicket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "aa906c81-7766-427c-9ffd-9a86e49bd657", "Hi there", "Ok", "", nil)
+	cathyTicket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Hi there", "Ok", "", nil)
 
 	// give Bob a closed ticket
-	bobTicket := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "46faf0f3-5558-4865-bd8e-b3c83cdb5770", "Hi there", "Ok", "", nil)
+	bobTicket := testdata.InsertClosedTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Hi there", "Ok", "", nil)
 
 	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z' WHERE id IN ($1, $2)`, cathyTicket.ID, bobTicket.ID)
 
@@ -297,9 +297,8 @@ func TestChannelEvents(t *testing.T) {
 }
 
 func TestTicketEvents(t *testing.T) {
-	testsuite.Reset()
+	ctx, db, _ := testsuite.Reset()
 	rt := testsuite.RT()
-	ctx := testsuite.CTX()
 
 	rc := rt.RP.Get()
 	defer rc.Close()
@@ -307,14 +306,12 @@ func TestTicketEvents(t *testing.T) {
 	// add a ticket closed trigger
 	testdata.InsertTicketClosedTrigger(t, rt.DB, testdata.Org1, testdata.Favorites)
 
-	ticket := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "81db050c-e8c8-446d-9d15-60287a498842", "Problem", "Where are my shoes?", "", nil)
+	ticket := testdata.InsertClosedTicket(t, rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where are my shoes?", "", nil)
+	modelTicket := ticket.Load(t, db)
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, []models.TicketID{ticket.ID})
-	require.NoError(t, err)
+	event := models.NewTicketEvent(testdata.Org1.ID, testdata.Admin.ID, modelTicket.ContactID(), modelTicket.ID(), models.TicketEventTypeClosed)
 
-	event := models.NewTicketEvent(testdata.Org1.ID, testdata.Admin.ID, tickets[0].ContactID(), tickets[0].ID(), models.TicketEventTypeClosed)
-
-	err = handler.QueueTicketEvent(rc, testdata.Cathy.ID, event)
+	err := handler.QueueTicketEvent(rc, testdata.Cathy.ID, event)
 	require.NoError(t, err)
 
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)

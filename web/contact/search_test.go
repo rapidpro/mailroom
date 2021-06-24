@@ -242,5 +242,5 @@ func TestSearch(t *testing.T) {
 func TestParse(t *testing.T) {
 	testsuite.Reset()
 
-	web.RunWebTests(t, "testdata/parse_query.json")
+	web.RunWebTests(t, "testdata/parse_query.json", nil)
 }

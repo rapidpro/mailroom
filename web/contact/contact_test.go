@@ -21,7 +21,7 @@ func TestCreateContacts(t *testing.T) {
 
 	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
 
-	web.RunWebTests(t, "testdata/create.json")
+	web.RunWebTests(t, "testdata/create.json", nil)
 }
 
 func TestModifyContacts(t *testing.T) {
@@ -49,7 +49,7 @@ func TestModifyContacts(t *testing.T) {
 	// because we made changes to a group above, need to make sure we don't use stale org assets
 	models.FlushCache()
 
-	web.RunWebTests(t, "testdata/modify.json")
+	web.RunWebTests(t, "testdata/modify.json", nil)
 
 	models.FlushCache()
 }
@@ -63,5 +63,5 @@ func TestResolveContacts(t *testing.T) {
 
 	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
 
-	web.RunWebTests(t, "testdata/resolve.json")
+	web.RunWebTests(t, "testdata/resolve.json", nil)
 }

@@ -15,9 +15,9 @@ func TestChannelback(t *testing.T) {
 	db.MustExec(`DELETE FROM msgs_msg`)
 
 	// create a zendesk ticket for Cathy
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "c69f103c-db64-4481-815b-1112890419ef", "Need help", "Have you seen my cookies?", "1234", nil)
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)
 
-	web.RunWebTests(t, "testdata/channelback.json")
+	web.RunWebTests(t, "testdata/channelback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }
 
 func TestEventCallback(t *testing.T) {
@@ -25,9 +25,9 @@ func TestEventCallback(t *testing.T) {
 	db := testsuite.DB()
 
 	// create a zendesk ticket for Cathy
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "c69f103c-db64-4481-815b-1112890419ef", "Need help", "Have you seen my cookies?", "1234", nil)
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)
 
-	web.RunWebTests(t, "testdata/event_callback.json")
+	web.RunWebTests(t, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }
 
 func TestTarget(t *testing.T) {
@@ -35,7 +35,7 @@ func TestTarget(t *testing.T) {
 	db := testsuite.DB()
 
 	// create a zendesk ticket for Cathy
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "c69f103c-db64-4481-815b-1112890419ef", "Need help", "Have you seen my cookies?", "1234", nil)
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)
 
-	web.RunWebTests(t, "testdata/target.json")
+	web.RunWebTests(t, "testdata/target.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }

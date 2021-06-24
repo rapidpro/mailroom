@@ -26,12 +26,9 @@ func TestContacts(t *testing.T) {
 	db := testsuite.DB()
 
 	testdata.InsertContactURN(t, db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk,
-		"f808c16d-10ed-4dfd-a6d4-6331c0d618f8", "Problem!", "Where are my shoes?", "1234", testdata.Agent)
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk,
-		"ddf9aa25-73d8-4c5a-bf63-f4e9525bbb3e", "Another Problem!", "Where are my pants?", "2345", nil)
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun,
-		"e86d6cc3-6acc-49d0-9a50-287e4794e415", "Urgent", "His name is Bob", "", testdata.Editor)
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Problem!", "Where are my shoes?", "1234", testdata.Agent)
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Another Problem!", "Where are my pants?", "2345", nil)
+	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Urgent", "His name is Bob", "", testdata.Editor)
 
 	// delete mailgun ticketer
 	db.MustExec(`UPDATE tickets_ticketer SET is_active = false WHERE id = $1`, testdata.Mailgun.ID)

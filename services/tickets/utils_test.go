@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets"
@@ -53,12 +52,9 @@ func TestFromTicketUUID(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	ticket1UUID := flows.TicketUUID("f7358870-c3dd-450d-b5ae-db2eb50216ba")
-	ticket2UUID := flows.TicketUUID("44b7d9b5-6ddd-4a6a-a1c0-8b70ecd06339")
-
 	// create some tickets
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, ticket1UUID, "Need help", "Have you seen my cookies?", "", nil)
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, ticket2UUID, "Need help", "Have you seen my shoes?", "", nil)
+	ticket1 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)
+	ticket2 := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my shoes?", "", nil)
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
@@ -70,18 +66,18 @@ func TestFromTicketUUID(t *testing.T) {
 	assert.EqualError(t, err, "error looking up ticket 33c54d0c-bd49-4edf-87a9-c391a75a630c")
 
 	// err if no ticketer type doesn't match
-	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1UUID, "zendesk")
+	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1.UUID, "zendesk")
 	assert.EqualError(t, err, "error looking up ticketer #1")
 
 	// err if ticketer isn't configured correctly and can't be loaded as a service
-	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1UUID, "mailgun")
+	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1.UUID, "mailgun")
 	assert.EqualError(t, err, "error loading ticketer service: missing domain or api_key or to_address or url_base in mailgun config")
 
 	// if all is correct, returns the ticket, ticketer asset, and ticket service
-	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, ticket2UUID, "zendesk")
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, ticket2.UUID, "zendesk")
 
 	assert.NoError(t, err)
-	assert.Equal(t, ticket2UUID, ticket.UUID())
+	assert.Equal(t, ticket2.UUID, ticket.UUID())
 	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
 
@@ -135,24 +131,20 @@ func TestSendReply(t *testing.T) {
 
 	image := &tickets.File{URL: "http://coolfiles.com/a.jpg", ContentType: "image/jpeg", Body: imageBody}
 
-	ticketUUID := flows.TicketUUID("f7358870-c3dd-450d-b5ae-db2eb50216ba")
-
 	// create a ticket
-	testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, ticketUUID, "Need help", "Have you seen my cookies?", "", nil)
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)
+	modelTicket := ticket.Load(t, db)
 
-	ticket, err := models.LookupTicketByUUID(ctx, db, ticketUUID)
-	require.NoError(t, err)
-
-	msg, err := tickets.SendReply(ctx, rt, ticket, "I'll get back to you", []*tickets.File{image})
+	msg, err := tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})
 	require.NoError(t, err)
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
 	assert.Equal(t, testdata.Cathy.ID, msg.ContactID())
-	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_media_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg"}, msg.Attachments())
-	assert.FileExists(t, "_test_media_storage/media/1/1ae9/6956/1ae96956-4b34-433e-8d1a-f05fe6923d6d.jpg")
+	assert.Equal(t, []utils.Attachment{"image/jpeg:https:///_test_media_storage/media/1/e718/7099/e7187099-7d38-4f60-955c-325957214c42.jpg"}, msg.Attachments())
+	assert.FileExists(t, "_test_media_storage/media/1/e718/7099/e7187099-7d38-4f60-955c-325957214c42.jpg")
 
 	// try with file that can't be read (i.e. same file again which is already closed)
-	_, err = tickets.SendReply(ctx, rt, ticket, "I'll get back to you", []*tickets.File{image})
+	_, err = tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})
 	assert.EqualError(t, err, "error storing attachment http://coolfiles.com/a.jpg for ticket reply: unable to read attachment content: read ../../core/models/testdata/test.jpg: file already closed")
 }
 

@@ -7,7 +7,6 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
@@ -287,7 +286,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	db.MustExec(`DELETE FROM msgs_msg`)
 
-	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, flows.TicketUUID(uuids.New()), "Problem", "", "", nil)
+	ticket := testdata.InsertOpenTicket(t, db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Problem", "", "", nil)
 	modelTicket := ticket.Load(t, db)
 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("eng"): {Text: "Hi there"}}
