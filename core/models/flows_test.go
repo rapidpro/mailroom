@@ -15,6 +15,7 @@ import (
 func TestFlows(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
+	rt := testsuite.RT()
 
 	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, testdata.IVRFlow.ID)
 
@@ -41,7 +42,7 @@ func TestFlows(t *testing.T) {
 			assert.Equal(t, tc.FlowUUID, flow.UUID())
 			assert.Equal(t, tc.IVRRetry, flow.IVRRetryWait())
 
-			_, err := goflow.ReadFlow(flow.Definition())
+			_, err := goflow.ReadFlow(rt.Config, flow.Definition())
 			assert.NoError(t, err)
 		} else {
 			assert.Nil(t, flow)

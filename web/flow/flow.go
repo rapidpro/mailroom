@@ -44,13 +44,13 @@ func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 	}
 
 	// do a JSON to JSON migration of the definition
-	migrated, err := goflow.MigrateDefinition(request.Flow, request.ToVersion)
+	migrated, err := goflow.MigrateDefinition(rt.Config, request.Flow, request.ToVersion)
 	if err != nil {
 		return errors.Wrapf(err, "unable to migrate flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	// try to read result to check that it's valid
-	_, err = goflow.ReadFlow(migrated)
+	_, err = goflow.ReadFlow(rt.Config, migrated)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read migrated flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -78,7 +78,7 @@ func handleInspect(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	flow, err := goflow.ReadFlow(request.Flow)
+	flow, err := goflow.ReadFlow(rt.Config, request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -124,7 +124,7 @@ func handleClone(ctx context.Context, rt *runtime.Runtime, r *http.Request) (int
 	}
 
 	// read flow to check that cloning produced something valid
-	_, err = goflow.ReadFlow(cloneJSON)
+	_, err = goflow.ReadFlow(rt.Config, cloneJSON)
 	if err != nil {
 		return errors.Wrapf(err, "unable to clone flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -150,7 +150,7 @@ func handleChangeLanguage(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	flow, err := goflow.ReadFlow(request.Flow)
+	flow, err := goflow.ReadFlow(rt.Config, request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}

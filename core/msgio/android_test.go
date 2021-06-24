@@ -8,7 +8,6 @@ import (
 
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -97,11 +96,13 @@ func TestSyncAndroidChannels(t *testing.T) {
 }
 
 func TestCreateFCMClient(t *testing.T) {
-	config.Mailroom.FCMKey = "1234"
+	rt := testsuite.RT()
 
-	assert.NotNil(t, msgio.CreateFCMClient())
+	rt.Config.FCMKey = "1234"
 
-	config.Mailroom.FCMKey = ""
+	assert.NotNil(t, msgio.CreateFCMClient(rt.Config))
 
-	assert.Nil(t, msgio.CreateFCMClient())
+	rt.Config.FCMKey = ""
+
+	assert.Nil(t, msgio.CreateFCMClient(rt.Config))
 }

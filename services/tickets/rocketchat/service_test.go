@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,8 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
+	rt := testsuite.RT()
+
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
 
@@ -47,6 +50,7 @@ func TestOpenAndForward(t *testing.T) {
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
 
 	_, err = rocketchat.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -55,6 +59,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.EqualError(t, err, "missing base_url or secret config")
 
 	svc, err := rocketchat.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -100,6 +105,8 @@ func TestOpenAndForward(t *testing.T) {
 }
 
 func TestCloseAndReopen(t *testing.T) {
+	rt := testsuite.RT()
+
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
@@ -114,6 +121,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
 	svc, err := rocketchat.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,

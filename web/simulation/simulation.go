@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/excellent/tools"
@@ -139,18 +138,18 @@ func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (int
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to read trigger")
 	}
 
-	return triggerFlow(ctx, rt.DB, oa, trigger)
+	return triggerFlow(ctx, rt, oa, trigger)
 }
 
 // triggerFlow creates a new session with the passed in trigger, returning our standard response
-func triggerFlow(ctx context.Context, db *sqlx.DB, oa *models.OrgAssets, trigger flows.Trigger) (interface{}, int, error) {
+func triggerFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, trigger flows.Trigger) (interface{}, int, error) {
 	// start our flow session
-	session, sprint, err := goflow.Simulator().NewSession(oa.SessionAssets(), trigger)
+	session, sprint, err := goflow.Simulator(rt.Config).NewSession(oa.SessionAssets(), trigger)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting session")
 	}
 
-	err = handleSimulationEvents(ctx, db, oa, sprint.Events())
+	err = handleSimulationEvents(ctx, rt.DB, oa, sprint.Events())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error handling simulation events")
 	}
@@ -196,7 +195,7 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusBadRequest, err
 	}
 
-	session, err := goflow.Simulator().ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
+	session, err := goflow.Simulator(rt.Config).ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -232,7 +231,7 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 				if triggeredFlow != nil {
 					trigger := triggers.NewBuilder(oa.Env(), triggeredFlow.FlowReference(), resume.Contact()).Msg(msgResume.Msg()).WithMatch(trigger.Match()).Build()
-					return triggerFlow(ctx, rt.DB, oa, trigger)
+					return triggerFlow(ctx, rt, oa, trigger)
 				}
 			}
 		}

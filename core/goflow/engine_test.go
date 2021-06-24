@@ -18,7 +18,9 @@ import (
 )
 
 func TestEngineWebhook(t *testing.T) {
-	svc, err := goflow.Engine().Services().Webhook(nil)
+	rt := testsuite.RT()
+
+	svc, err := goflow.Engine(rt.Config).Services().Webhook(nil)
 	assert.NoError(t, err)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -38,7 +40,9 @@ func TestEngineWebhook(t *testing.T) {
 }
 
 func TestSimulatorAirtime(t *testing.T) {
-	svc, err := goflow.Simulator().Services().Airtime(nil)
+	rt := testsuite.RT()
+
+	svc, err := goflow.Simulator(rt.Config).Services().Airtime(nil)
 	assert.NoError(t, err)
 
 	amounts := map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.50`)}
@@ -56,14 +60,13 @@ func TestSimulatorAirtime(t *testing.T) {
 }
 
 func TestSimulatorTicket(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	testsuite.ResetDB()
+	ctx, db, _ := testsuite.Reset()
+	rt := testsuite.RT()
 
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Mailgun.UUID)
 	require.NoError(t, err)
 
-	svc, err := goflow.Simulator().Services().Ticket(nil, flows.NewTicketer(ticketer))
+	svc, err := goflow.Simulator(rt.Config).Services().Ticket(nil, flows.NewTicketer(ticketer))
 	assert.NoError(t, err)
 
 	ticket, err := svc.Open(nil, "New ticket", "Where are my cookies?", nil)
@@ -74,7 +77,9 @@ func TestSimulatorTicket(t *testing.T) {
 }
 
 func TestSimulatorWebhook(t *testing.T) {
-	svc, err := goflow.Simulator().Services().Webhook(nil)
+	rt := testsuite.RT()
+
+	svc, err := goflow.Simulator(rt.Config).Services().Webhook(nil)
 	assert.NoError(t, err)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)

@@ -69,7 +69,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Errorf("missing request user")
 	}
 
-	fs, err := goflow.Engine().ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
+	fs, err := goflow.Engine(rt.Config).ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reading session")
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
@@ -128,7 +129,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	var err error
 
 	if prev == nil || refresh&RefreshOrg > 0 {
-		oa.org, err = LoadOrg(ctx, db, orgID)
+		oa.org, err = LoadOrg(ctx, config.Mailroom, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading environment for org %d", orgID)
 		}
@@ -333,7 +334,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	}
 
 	// intialize our session assets
-	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig())
+	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(config.Mailroom))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", orgID)
 	}
@@ -479,7 +480,7 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs
 	clone.channels = append(clone.channels, testChannels...)
 
 	// rebuild our session assets with our new items
-	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig())
+	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig(config.Mailroom))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", clone.OrgID())
 	}

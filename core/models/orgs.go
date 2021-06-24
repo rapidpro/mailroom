@@ -237,11 +237,11 @@ func orgFromSession(session flows.Session) *Org {
 }
 
 // LoadOrg loads the org for the passed in id, returning any error encountered
-func LoadOrg(ctx context.Context, db sqlx.Queryer, orgID OrgID) (*Org, error) {
+func LoadOrg(ctx context.Context, cfg *config.Config, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	start := time.Now()
 
 	org := &Org{}
-	rows, err := db.Queryx(selectOrgByID, orgID, config.Mailroom.MaxValueLength)
+	rows, err := db.Queryx(selectOrgByID, orgID, cfg.MaxValueLength)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}

@@ -18,6 +18,7 @@ import (
 
 func TestOrgs(t *testing.T) {
 	ctx := testsuite.CTX()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 
 	tz, _ := time.LoadLocation("America/Los_Angeles")
@@ -32,7 +33,7 @@ func TestOrgs(t *testing.T) {
 	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{"fra", "eng"}' WHERE id = $1`, testdata.Org1.ID)
 	tx.MustExec(`UPDATE orgs_org SET flow_languages = '{}' WHERE id = $1`, testdata.Org2.ID)
 
-	org, err := models.LoadOrg(ctx, tx, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, tx, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	assert.Equal(t, models.OrgID(1), org.ID())
@@ -48,18 +49,19 @@ func TestOrgs(t *testing.T) {
 	assert.Equal(t, envs.Language("fra"), org.DefaultLanguage())
 	assert.Equal(t, "fr-US", org.DefaultLocale().ToBCP47())
 
-	org, err = models.LoadOrg(ctx, tx, testdata.Org2.ID)
+	org, err = models.LoadOrg(ctx, rt.Config, tx, testdata.Org2.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, []envs.Language{}, org.AllowedLanguages())
 	assert.Equal(t, envs.NilLanguage, org.DefaultLanguage())
 	assert.Equal(t, "", org.DefaultLocale().ToBCP47())
 
-	_, err = models.LoadOrg(ctx, tx, 99)
+	_, err = models.LoadOrg(ctx, rt.Config, tx, 99)
 	assert.Error(t, err)
 }
 
 func TestStoreAttachment(t *testing.T) {
 	ctx := testsuite.CTX()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 
 	store := testsuite.MediaStorage()
@@ -68,7 +70,7 @@ func TestStoreAttachment(t *testing.T) {
 	image, err := os.Open("testdata/test.jpg")
 	require.NoError(t, err)
 
-	org, err := models.LoadOrg(ctx, db, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	attachment, err := org.StoreAttachment(context.Background(), store, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)

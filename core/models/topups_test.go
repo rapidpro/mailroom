@@ -13,6 +13,7 @@ import (
 
 func TestTopups(t *testing.T) {
 	ctx := testsuite.CTX()
+	rt := testsuite.RT()
 	db := testsuite.DB()
 	rp := testsuite.RP()
 
@@ -56,7 +57,7 @@ func TestTopups(t *testing.T) {
 	}
 
 	for _, tc := range tc2s {
-		org, err := models.LoadOrg(ctx, tx, tc.OrgID)
+		org, err := models.LoadOrg(ctx, rt.Config, tx, tc.OrgID)
 		assert.NoError(t, err)
 
 		topup, err := models.AllocateTopups(ctx, tx, rp, org, 1)
@@ -67,7 +68,7 @@ func TestTopups(t *testing.T) {
 
 	// topups can be disabled for orgs
 	tx.MustExec(`UPDATE orgs_org SET uses_topups = FALSE WHERE id = $1`, testdata.Org1.ID)
-	org, err := models.LoadOrg(ctx, tx, testdata.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, tx, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	topup, err := models.AllocateTopups(ctx, tx, rp, org, 1)
