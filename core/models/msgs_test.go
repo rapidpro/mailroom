@@ -11,7 +11,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -218,8 +217,10 @@ func TestResendMessages(t *testing.T) {
 }
 
 func TestNormalizeAttachment(t *testing.T) {
-	config.Mailroom.AttachmentDomain = "foo.bar.com"
-	defer func() { config.Mailroom.AttachmentDomain = "" }()
+	rt := testsuite.RT()
+
+	rt.Config.AttachmentDomain = "foo.bar.com"
+	defer func() { rt.Config.AttachmentDomain = "" }()
 
 	tcs := []struct {
 		raw        string
@@ -233,7 +234,7 @@ func TestNormalizeAttachment(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assert.Equal(t, tc.normalized, string(models.NormalizeAttachment(utils.Attachment(tc.raw))))
+		assert.Equal(t, tc.normalized, string(models.NormalizeAttachment(rt.Config, utils.Attachment(tc.raw))))
 	}
 }
 

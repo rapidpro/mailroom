@@ -37,6 +37,7 @@ func init() {
 }
 
 type service struct {
+	rtConfig       *config.Config
 	restClient     *RESTClient
 	pushClient     *PushClient
 	ticketer       *flows.Ticketer
@@ -48,7 +49,7 @@ type service struct {
 }
 
 // NewService creates a new zendesk ticket service
-func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *config.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	subdomain := config[configSubdomain]
 	secret := config[configSecret]
 	oAuthToken := config[configOAuthToken]
@@ -59,6 +60,7 @@ func NewService(httpClient *http.Client, httpRetries *httpx.RetryConfig, tickete
 
 	if subdomain != "" && secret != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
 		return &service{
+			rtConfig:       rtCfg,
 			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
 			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
 			ticketer:       ticketer,
@@ -249,7 +251,7 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 // which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 //
 func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
-	prefix := config.Mailroom.S3MediaPrefix
+	prefix := s.rtConfig.S3MediaPrefix
 	if !strings.HasPrefix(prefix, "/") {
 		prefix = "/" + prefix
 	}

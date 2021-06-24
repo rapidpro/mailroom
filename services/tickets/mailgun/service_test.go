@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets/mailgun"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,8 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
+	rt := testsuite.RT()
+
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
 	require.NoError(t, err)
 
@@ -52,6 +55,7 @@ func TestOpenAndForward(t *testing.T) {
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
 
 	_, err = mailgun.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -60,6 +64,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.EqualError(t, err, "missing domain or api_key or to_address or url_base in mailgun config")
 
 	svc, err := mailgun.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -109,6 +114,8 @@ func TestOpenAndForward(t *testing.T) {
 }
 
 func TestCloseAndReopen(t *testing.T) {
+	rt := testsuite.RT()
+
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
@@ -132,6 +139,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
 	svc, err := mailgun.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,

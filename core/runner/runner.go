@@ -555,7 +555,7 @@ func StartFlowForContacts(
 		log := log.WithField("contact_uuid", trigger.Contact().UUID())
 		start := time.Now()
 
-		session, sprint, err := goflow.Engine().NewSession(sa, trigger)
+		session, sprint, err := goflow.Engine(rt.Config).NewSession(sa, trigger)
 		if err != nil {
 			log.WithError(err).Errorf("error starting flow")
 			continue

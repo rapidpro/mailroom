@@ -243,7 +243,7 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, creat
 
 	// add any attachments
 	for _, a := range in.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 	}
 
 	return msg
@@ -279,7 +279,7 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 
 	// if we have attachments, add them
 	for _, a := range out.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 	}
 
 	return msg, nil
@@ -324,7 +324,7 @@ func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
 		for _, a := range out.Attachments() {
-			m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+			m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 		}
 	}
 
@@ -379,7 +379,7 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 
 	// add any attachments
 	for _, a := range in.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 	}
 
 	return msg
@@ -441,7 +441,7 @@ func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, direction MsgDir
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
-func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
+func NormalizeAttachment(cfg *config.Config, attachment utils.Attachment) utils.Attachment {
 	// don't try to modify geo type attachments which are just coordinates
 	if attachment.ContentType() == "geo" {
 		return attachment
@@ -450,9 +450,9 @@ func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
 	url := attachment.URL()
 	if !strings.HasPrefix(url, "http") {
 		if strings.HasPrefix(url, "/") {
-			url = fmt.Sprintf("https://%s%s", config.Mailroom.AttachmentDomain, url)
+			url = fmt.Sprintf("https://%s%s", cfg.AttachmentDomain, url)
 		} else {
-			url = fmt.Sprintf("https://%s/%s", config.Mailroom.AttachmentDomain, url)
+			url = fmt.Sprintf("https://%s/%s", cfg.AttachmentDomain, url)
 		}
 	}
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))

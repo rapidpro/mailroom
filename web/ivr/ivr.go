@@ -153,7 +153,7 @@ func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	// we got a session back so we have an active call trigger
 	if session != nil {
 		// build our resume URL
-		resumeURL := buildResumeURL(channel, conn, urn)
+		resumeURL := buildResumeURL(rt.Config, channel, conn, urn)
 
 		// have our client output our session status
 		err = client.WriteSessionResponse(ctx, rt.RP, channel, conn, session, urn, resumeURL, r, w)
@@ -211,8 +211,8 @@ func writeClientError(w http.ResponseWriter, err error) error {
 	return errors.Wrapf(err, "error writing error")
 }
 
-func buildResumeURL(channel *models.Channel, conn *models.ChannelConnection, urn urns.URN) string {
-	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, config.Mailroom.Domain)
+func buildResumeURL(cfg *config.Config, channel *models.Channel, conn *models.ChannelConnection, urn urns.URN) string {
+	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, cfg.Domain)
 	form := url.Values{
 		"action":     []string{actionResume},
 		"connection": []string{fmt.Sprintf("%d", conn.ID())},
@@ -291,7 +291,7 @@ func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w htt
 		return channel, conn, client.WriteErrorResponse(w, errors.Errorf("unable to find URN: %s on contact: %d", urn, conn.ContactID()))
 	}
 
-	resumeURL := buildResumeURL(channel, conn, urn)
+	resumeURL := buildResumeURL(rt.Config, channel, conn, urn)
 
 	// if this a start, start our contact
 	switch request.Action {

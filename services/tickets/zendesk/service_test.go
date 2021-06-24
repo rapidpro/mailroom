@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets/zendesk"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,8 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
+	rt := testsuite.RT()
+
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
 	require.NoError(t, err)
 
@@ -57,6 +60,7 @@ func TestOpenAndForward(t *testing.T) {
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
 
 	_, err = zendesk.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -65,6 +69,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.EqualError(t, err, "missing subdomain or secret or oauth_token or push_id or push_token in zendesk config")
 
 	svc, err := zendesk.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -115,6 +120,8 @@ func TestOpenAndForward(t *testing.T) {
 }
 
 func TestCloseAndReopen(t *testing.T) {
+	rt := testsuite.RT()
+
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=12,14": {
@@ -139,6 +146,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
 	svc, err := zendesk.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,

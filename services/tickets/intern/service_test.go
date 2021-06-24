@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	intern "github.com/nyaruka/mailroom/services/tickets/intern"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,8 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
+	rt := testsuite.RT()
+
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
 	require.NoError(t, err)
 
@@ -29,6 +32,7 @@ func TestOpenAndForward(t *testing.T) {
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "internal"))
 
 	svc, err := intern.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -63,11 +67,13 @@ func TestOpenAndForward(t *testing.T) {
 }
 
 func TestCloseAndReopen(t *testing.T) {
+	rt := testsuite.RT()
+
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "internal"))
-	svc, err := intern.NewService(http.DefaultClient, nil, ticketer, nil)
+	svc, err := intern.NewService(rt.Config, http.DefaultClient, nil, ticketer, nil)
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}

@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
@@ -59,7 +60,7 @@ const (
 func init() {
 	goflow.RegisterTicketServiceFactory(
 		func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-			return ticketer.Asset().(*Ticketer).AsService(ticketer)
+			return ticketer.Asset().(*Ticketer).AsService(config.Mailroom, ticketer)
 		},
 	)
 }
@@ -146,7 +147,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
 	}
 
-	service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+	service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
 	if err != nil {
 		return err
 	}
@@ -403,7 +404,7 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 		for ticketerID, ticketerTickets := range byTicketer {
 			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
 				if err != nil {
 					return nil, err
 				}
@@ -470,7 +471,7 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserI
 		for ticketerID, ticketerTickets := range byTicketer {
 			ticketer := org.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
 				if err != nil {
 					return nil, err
 				}
@@ -533,12 +534,12 @@ func (t *Ticketer) Reference() *assets.TicketerReference {
 }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {
-	httpClient, httpRetries, _ := goflow.HTTP()
+func (t *Ticketer) AsService(cfg *config.Config, ticketer *flows.Ticketer) (TicketService, error) {
+	httpClient, httpRetries, _ := goflow.HTTP(cfg)
 
 	initFunc := ticketServices[t.Type()]
 	if initFunc != nil {
-		return initFunc(httpClient, httpRetries, ticketer, t.t.Config)
+		return initFunc(cfg, httpClient, httpRetries, ticketer, t.t.Config)
 	}
 
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
@@ -572,7 +573,7 @@ type TicketService interface {
 }
 
 // TicketServiceFunc is a func which creates a ticket service
-type TicketServiceFunc func(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (TicketService, error)
+type TicketServiceFunc func(*config.Config, *http.Client, *httpx.RetryConfig, *flows.Ticketer, map[string]string) (TicketService, error)
 
 var ticketServices = map[string]TicketServiceFunc{}
 

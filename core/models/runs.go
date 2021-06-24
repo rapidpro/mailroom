@@ -170,7 +170,7 @@ func WriteSessionOutputsToStorage(ctx context.Context, st storage.Storage, sessi
 	uploads := make([]*storage.Upload, len(sessions))
 	for i, s := range sessions {
 		uploads[i] = &storage.Upload{
-			Path:        s.StoragePath(),
+			Path:        s.StoragePath(config.Mailroom),
 			Body:        []byte(s.Output()),
 			ContentType: "application/json",
 			ACL:         s3.ObjectCannedACLPrivate,
@@ -194,12 +194,12 @@ func WriteSessionOutputsToStorage(ctx context.Context, st storage.Storage, sessi
 const storageTSFormat = "20060102T150405.999Z"
 
 // StoragePath returns the path for the session
-func (s *Session) StoragePath() string {
+func (s *Session) StoragePath(cfg *config.Config) string {
 	ts := s.CreatedOn().UTC().Format(storageTSFormat)
 
 	// example output: /orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/session_20060102T150405.123Z_8a7fc501-177b-4567-a0aa-81c48e6de1c5_51df83ac21d3cf136d8341f0b11cb1a7.json"
 	return path.Join(
-		config.Mailroom.S3SessionPrefix,
+		cfg.S3SessionPrefix,
 		"orgs",
 		fmt.Sprintf("%d", s.OrgID()),
 		"c",
@@ -506,7 +506,7 @@ RETURNING id
 
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
 func (s *Session) FlowSession(sa flows.SessionAssets, env envs.Environment) (flows.Session, error) {
-	session, err := goflow.Engine().ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
+	session, err := goflow.Engine(config.Mailroom).ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to unmarshal session")
 	}

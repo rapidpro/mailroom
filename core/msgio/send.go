@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/edganiukov/fcm"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/apex/log"
@@ -61,7 +62,7 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fc
 	// if we have any android messages, trigger syncs for the unique channels
 	if len(androidChannels) > 0 {
 		if fc == nil {
-			fc = CreateFCMClient()
+			fc = CreateFCMClient(config.Mailroom)
 		}
 		SyncAndroidChannels(fc, androidChannels)
 	}

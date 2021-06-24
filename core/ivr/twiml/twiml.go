@@ -23,6 +23,7 @@ import (
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 
@@ -502,7 +503,7 @@ func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait,
 				commands = append(commands, Say{Text: event.Msg.Text(), Language: languageCode})
 			} else {
 				for _, a := range event.Msg.Attachments() {
-					a = models.NormalizeAttachment(a)
+					a = models.NormalizeAttachment(config.Mailroom, a)
 					commands = append(commands, Play{URL: a.URL()})
 				}
 			}
