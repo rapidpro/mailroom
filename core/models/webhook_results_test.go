@@ -35,9 +35,8 @@ func TestWebhookResults(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotZero(t, r.ID())
 
-		testsuite.AssertQueryCount(t, db, `
-		SELECT count(*) FROM api_webhookresult WHERE org_id = $1 AND contact_id = $2 AND url = $3 AND request = $4 AND
-		status_code = $5 AND response = $6 AND request_time = $7
-		`, []interface{}{tc.OrgID, tc.ContactID, tc.URL, tc.Request, tc.StatusCode, tc.Response, tc.RequestTime}, 1)
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM api_webhookresult WHERE org_id = $1 AND contact_id = $2 AND url = $3 AND request = $4 AND status_code = $5 AND response = $6 AND request_time = $7`,
+			tc.OrgID, tc.ContactID, tc.URL, tc.Request, tc.StatusCode, tc.Response, tc.RequestTime).Returns(1)
 	}
 }

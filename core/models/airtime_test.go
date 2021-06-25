@@ -32,9 +32,7 @@ func TestAirtimeTransfers(t *testing.T) {
 	err := models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`,
-		[]interface{}{testdata.Org1.ID, models.AirtimeTransferStatusSuccess}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`, testdata.Org1.ID, models.AirtimeTransferStatusSuccess).Returns(1)
 
 	// insert a failed transfer with nil sender, empty currency
 	transfer = models.NewAirtimeTransfer(
@@ -51,7 +49,5 @@ func TestAirtimeTransfers(t *testing.T) {
 	err = models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`,
-		[]interface{}{testdata.Org1.ID, models.AirtimeTransferStatusFailed}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`, testdata.Org1.ID, models.AirtimeTransferStatusFailed).Returns(1)
 }

@@ -459,10 +459,10 @@ func TestStopContact(t *testing.T) {
 	assert.NoError(t, err)
 
 	// verify she's only in the stopped group
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, []interface{}{testdata.Cathy.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, testdata.Cathy.ID).Returns(1)
 
 	// verify she's stopped
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S' AND is_active = TRUE`, []interface{}{testdata.Cathy.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S' AND is_active = TRUE`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
@@ -478,7 +478,7 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	err = models.UpdateContactModifiedOn(ctx, db, []models.ContactID{testdata.Cathy.ID})
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, []interface{}{t0}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, t0).Returns(1)
 
 	t1 := time.Now().Truncate(time.Millisecond)
 	time.Sleep(time.Millisecond * 5)
@@ -486,7 +486,7 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	err = models.UpdateContactLastSeenOn(ctx, db, testdata.Cathy.ID, t1)
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on = $1`, []interface{}{t1}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on = $1`, t1).Returns(1)
 
 	cathy, err := models.LoadContact(ctx, db, oa, testdata.Cathy.ID)
 	require.NoError(t, err)

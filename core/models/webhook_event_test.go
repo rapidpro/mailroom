@@ -33,8 +33,6 @@ func TestWebhookEvents(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotZero(t, e.ID())
 
-		testsuite.AssertQueryCount(t, db, `
-		SELECT count(*) FROM api_webhookevent WHERE org_id = $1 AND resthook_id = $2 AND data = $3
-		`, []interface{}{tc.OrgID, tc.ResthookID, tc.Data}, 1)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM api_webhookevent WHERE org_id = $1 AND resthook_id = $2 AND data = $3`, tc.OrgID, tc.ResthookID, tc.Data).Returns(1)
 	}
 }
