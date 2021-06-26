@@ -82,9 +82,9 @@ func TestCampaignSchedule(t *testing.T) {
 }
 
 func TestAddEventFires(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer db.MustExec(`DELETE FROM campaigns_eventfire`)
 
 	scheduled1 := time.Date(2020, 9, 8, 14, 38, 30, 123456789, time.UTC)
 

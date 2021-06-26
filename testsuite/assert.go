@@ -78,7 +78,7 @@ func (q *Query) Returns(expected interface{}, msgAndArgs ...interface{}) {
 	actual := expected
 
 	err := q.db.Get(&actual, q.sql, q.args...)
-	require.NoError(q.t, err, msgAndArgs...)
+	assert.NoError(q.t, err, msgAndArgs...)
 
 	// not sure why but if you pass an int you get back an int64..
 	switch expected.(type) {
@@ -86,6 +86,14 @@ func (q *Query) Returns(expected interface{}, msgAndArgs ...interface{}) {
 		actual = int(actual.(int64))
 	}
 
+	assert.Equal(q.t, expected, actual, msgAndArgs...)
+}
+
+func (q *Query) Columns(expected map[string]interface{}, msgAndArgs ...interface{}) {
+	actual := make(map[string]interface{}, len(expected))
+
+	err := q.db.QueryRowx(q.sql, q.args...).MapScan(actual)
+	assert.NoError(q.t, err, msgAndArgs...)
 	assert.Equal(q.t, expected, actual, msgAndArgs...)
 }
 

@@ -15,8 +15,8 @@ import (
 )
 
 func TestCloneForSimulation(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
 	models.FlushCache()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)

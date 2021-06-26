@@ -11,8 +11,9 @@ import (
 )
 
 func TestChannelConnections(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer db.MustExec(`DELETE FROM channels_channelconnection`)
 
 	conn, err := models.InsertIVRConnection(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.ConnectionDirectionOut, models.ConnectionStatusPending, "")
 	assert.NoError(t, err)

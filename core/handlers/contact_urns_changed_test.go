@@ -13,7 +13,9 @@ import (
 )
 
 func TestContactURNsChanged(t *testing.T) {
-	db := testsuite.DB()
+	_, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	// add a URN to george that cathy will steal
 	testdata.InsertContactURN(db, testdata.Org1, testdata.George, urns.URN("tel:+12065551212"), 100)

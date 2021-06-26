@@ -21,10 +21,12 @@ import (
 )
 
 func TestResponseForSprint(t *testing.T) {
-	ctx, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
+
+	defer testsuite.Reset()
+
 	rc := rp.Get()
 	defer rc.Close()
-	models.FlushCache()
 
 	urn := urns.URN("tel:+12067799294")
 	channelRef := assets.NewChannelReference(testdata.VonageChannel.UUID, "Vonage Channel")

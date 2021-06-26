@@ -11,8 +11,9 @@ import (
 )
 
 func TestContactStatusChanged(t *testing.T) {
+	_, _, db, _ := testsuite.Get()
 
-	db := testsuite.DB()
+	defer testsuite.Reset()
 
 	// make sure cathyID contact is active
 	db.Exec(`UPDATE contacts_contact SET status = 'A' WHERE id = $1`, testdata.Cathy.ID)

@@ -13,8 +13,9 @@ import (
 )
 
 func TestChannelEvents(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer db.MustExec(`DELETE FROM channels_channelevent`)
 
 	start := time.Now()
 

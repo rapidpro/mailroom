@@ -18,7 +18,7 @@ import (
 )
 
 func TestEngineWebhook(t *testing.T) {
-	rt := testsuite.RT()
+	_, rt, _, _ := testsuite.Get()
 
 	svc, err := goflow.Engine(rt.Config).Services().Webhook(nil)
 	assert.NoError(t, err)
@@ -40,7 +40,7 @@ func TestEngineWebhook(t *testing.T) {
 }
 
 func TestSimulatorAirtime(t *testing.T) {
-	rt := testsuite.RT()
+	_, rt, _, _ := testsuite.Get()
 
 	svc, err := goflow.Simulator(rt.Config).Services().Airtime(nil)
 	assert.NoError(t, err)
@@ -60,8 +60,7 @@ func TestSimulatorAirtime(t *testing.T) {
 }
 
 func TestSimulatorTicket(t *testing.T) {
-	ctx, db, _ := testsuite.Reset()
-	rt := testsuite.RT()
+	ctx, rt, db, _ := testsuite.Get()
 
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Mailgun.UUID)
 	require.NoError(t, err)
@@ -77,7 +76,7 @@ func TestSimulatorTicket(t *testing.T) {
 }
 
 func TestSimulatorWebhook(t *testing.T) {
-	rt := testsuite.RT()
+	_, rt, _, _ := testsuite.Get()
 
 	svc, err := goflow.Simulator(rt.Config).Services().Webhook(nil)
 	assert.NoError(t, err)

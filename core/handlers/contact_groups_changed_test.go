@@ -7,10 +7,13 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestContactGroupsChanged(t *testing.T) {
+	defer testsuite.Reset()
+
 	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
 	testers := assets.NewGroupReference(testdata.TestersGroup.UUID, "Testers")
 

@@ -13,7 +13,9 @@ import (
 )
 
 func TestInputLabelsAdded(t *testing.T) {
-	db := testsuite.DB()
+	_, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	reporting := assets.NewLabelReference(assets.LabelUUID("ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"), "Reporting")
 	testing := assets.NewLabelReference(assets.LabelUUID("a6338cdc-7938-4437-8b05-2d5d785e3a08"), "Testing")

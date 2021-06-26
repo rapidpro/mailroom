@@ -13,8 +13,7 @@ import (
 )
 
 func TestReadModifiers(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)

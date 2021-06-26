@@ -19,12 +19,11 @@ import (
 )
 
 func TestSessionTriggered(t *testing.T) {
-	testsuite.Reset()
-	models.FlushCache()
-	rt := testsuite.RT()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Get()
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, testdata.Org1.ID)
+	defer testsuite.Reset()
+
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	simpleFlow, err := oa.FlowByID(testdata.SingleMessage.ID)

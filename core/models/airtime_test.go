@@ -14,8 +14,9 @@ import (
 )
 
 func TestAirtimeTransfers(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer db.MustExec(`DELETE FROM airtime_airtimetransfer`)
 
 	// insert a transfer
 	transfer := models.NewAirtimeTransfer(
@@ -32,7 +33,7 @@ func TestAirtimeTransfers(t *testing.T) {
 	err := models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`, testdata.Org1.ID, models.AirtimeTransferStatusSuccess).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT org_id, status from airtime_airtimetransfer`).Columns(map[string]interface{}{"org_id": int64(1), "status": "S"})
 
 	// insert a failed transfer with nil sender, empty currency
 	transfer = models.NewAirtimeTransfer(

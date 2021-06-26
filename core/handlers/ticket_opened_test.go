@@ -20,10 +20,9 @@ import (
 )
 
 func TestTicketOpened(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Get()
 
+	defer testsuite.Reset()
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{

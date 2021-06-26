@@ -12,13 +12,15 @@ import (
 )
 
 func TestContactFieldChanged(t *testing.T) {
+	_, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
+
 	gender := assets.NewFieldReference("gender", "Gender")
 	age := assets.NewFieldReference("age", "Age")
 
-	db := testsuite.DB()
-
 	// populate some field values on alexandria
-	db.Exec(`UPDATE contacts_contact SET fields = '{"903f51da-2717-47c7-a0d3-f2f32877013d": {"text":"34"}, "3a5891e4-756e-4dc9-8e12-b7a766168824": {"text":"female"}}' WHERE id = $1`, testdata.Alexandria.ID)
+	db.MustExec(`UPDATE contacts_contact SET fields = '{"903f51da-2717-47c7-a0d3-f2f32877013d": {"text":"34"}, "3a5891e4-756e-4dc9-8e12-b7a766168824": {"text":"female"}}' WHERE id = $1`, testdata.Alexandria.ID)
 
 	tcs := []handlers.TestCase{
 		{

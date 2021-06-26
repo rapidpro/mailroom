@@ -8,10 +8,12 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestServiceCalled(t *testing.T) {
+	defer testsuite.Reset()
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{

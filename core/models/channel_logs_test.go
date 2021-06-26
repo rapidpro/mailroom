@@ -13,10 +13,9 @@ import (
 )
 
 func TestChannelLogs(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
-	db.MustExec(`DELETE FROM channels_channellog;`)
+	defer db.MustExec(`DELETE FROM channels_channellog`)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
@@ -29,6 +28,7 @@ func TestChannelLogs(t *testing.T) {
 	require.NoError(t, err)
 
 	channel := oa.ChannelByID(testdata.TwilioChannel.ID)
+	require.NotNil(t, channel)
 
 	req1, _ := httpx.NewRequest("GET", "http://rapidpro.io", nil, nil)
 	trace1, err := httpx.DoTrace(http.DefaultClient, req1, nil, nil, -1)

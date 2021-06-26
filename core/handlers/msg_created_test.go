@@ -19,8 +19,9 @@ import (
 )
 
 func TestMsgCreated(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
+	_, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	config.Mailroom.AttachmentDomain = "foo.bar.com"
 	defer func() { config.Mailroom.AttachmentDomain = "" }()
