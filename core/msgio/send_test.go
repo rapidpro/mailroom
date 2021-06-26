@@ -42,7 +42,7 @@ func (m *msgSpec) createMsg(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) *mo
 	}
 	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", m.URNID))
 
-	flowMsg := flows.NewMsgOut(urn, channelRef, "Hello", nil, nil, nil, flows.NilMsgTopic)
+	flowMsg := flows.NewMsgOut(urn, channelRef, "Hello", nil, nil, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{})
 	msg, err := models.NewOutgoingMsg(oaOrg.Org(), channel, m.ContactID, flowMsg, time.Now())
 	require.NoError(t, err)
 

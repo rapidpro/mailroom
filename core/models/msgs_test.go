@@ -178,7 +178,7 @@ func TestMarkMessages(t *testing.T) {
 
 	insertMsg := func(text string) *models.Msg {
 		urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID))
-		flowMsg := flows.NewMsgOut(urn, channel.ChannelReference(), text, nil, nil, nil, flows.NilMsgTopic)
+		flowMsg := flows.NewMsgOut(urn, channel.ChannelReference(), text, nil, nil, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{})
 		msg, err := models.NewOutgoingMsg(oa.Org(), channel, models.CathyID, flowMsg, time.Now())
 		require.NoError(t, err)
 
