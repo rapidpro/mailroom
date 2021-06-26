@@ -265,7 +265,7 @@ func handleTimedEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventTyp
 	}
 
 	// get the active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, db, oa, models.MessagingFlow, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}
@@ -421,7 +421,7 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 	}
 
 	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
-	if flow.FlowType() == models.IVRFlow && conn == nil {
+	if flow.FlowType() == models.FlowTypeVoice && conn == nil {
 		err = runner.TriggerIVRFlow(ctx, db, rp, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error while triggering ivr flow")
@@ -599,7 +599,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 	trigger := models.FindMatchingMsgTrigger(oa, contact, event.Text)
 
 	// get any active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, db, oa, models.MessagingFlow, contact)
+	session, err := models.ActiveSessionForContact(ctx, db, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}
@@ -658,7 +658,7 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		// trigger flow is still active, start it
 		if flow != nil {
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
-			if flow.FlowType() == models.IVRFlow {
+			if flow.FlowType() == models.FlowTypeVoice {
 				err = runner.TriggerIVRFlow(ctx, db, rp, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, func(ctx context.Context, tx *sqlx.Tx) error {
 					return models.UpdateMessage(ctx, tx, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.TypeFlow, topupID)
 				})

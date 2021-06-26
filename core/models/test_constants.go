@@ -128,6 +128,9 @@ var ZendeskUUID = assets.TicketerUUID("4ee6d4f3-f92b-439b-9718-8da90c05490b")
 var RocketChatID = TicketerID(3)
 var RocketChatUUID = assets.TicketerUUID("6c50665f-b4ff-4e37-9625-bc464fe6a999")
 
+var InternalID = TicketerID(4)
+var InternalUUID = assets.TicketerUUID("8bd48029-6ca1-46a8-aa14-68f7213b82b3")
+
 // constants for org 2, just a few here
 
 var Org2 = OrgID(2)

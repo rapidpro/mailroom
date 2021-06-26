@@ -22,7 +22,7 @@ func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mod
 	event := e.(*events.MsgReceivedEvent)
 
 	// for surveyor sessions we need to actually create the message
-	if scene.Session() != nil && scene.Session().SessionType() == models.SurveyorFlow {
+	if scene.Session() != nil && scene.Session().SessionType() == models.FlowTypeSurveyor {
 		logrus.WithFields(logrus.Fields{
 			"contact_uuid": scene.ContactUUID(),
 			"session_id":   scene.SessionID(),

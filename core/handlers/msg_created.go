@@ -25,7 +25,7 @@ func handlePreMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 	event := e.(*events.MsgCreatedEvent)
 
 	// we only clear timeouts on messaging flows
-	if scene.Session().SessionType() != models.MessagingFlow {
+	if scene.Session().SessionType() != models.FlowTypeMessaging {
 		return nil
 	}
 
@@ -73,12 +73,12 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mode
 
 	// ignore events that don't have a channel or URN set
 	// TODO: maybe we should create these messages in a failed state?
-	if scene.Session().SessionType() == models.MessagingFlow && (event.Msg.URN() == urns.NilURN || event.Msg.Channel() == nil) {
+	if scene.Session().SessionType() == models.FlowTypeMessaging && (event.Msg.URN() == urns.NilURN || event.Msg.Channel() == nil) {
 		return nil
 	}
 
 	// messages in messaging flows must have urn id set on them, if not, go look it up
-	if scene.Session().SessionType() == models.MessagingFlow {
+	if scene.Session().SessionType() == models.FlowTypeMessaging {
 		urn := event.Msg.URN()
 		if models.GetURNInt(urn, "id") == 0 {
 			urn, err := models.GetOrCreateURN(ctx, tx, oa, scene.ContactID(), event.Msg.URN())
@@ -114,7 +114,7 @@ func handleMsgCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mode
 	scene.AppendToEventPreCommitHook(hooks.CommitMessagesHook, msg)
 
 	// don't send messages for surveyor flows
-	if scene.Session().SessionType() != models.SurveyorFlow {
+	if scene.Session().SessionType() != models.FlowTypeSurveyor {
 		scene.AppendToEventPostCommitHook(hooks.SendMessagesHook, msg)
 	}
 

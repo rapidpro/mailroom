@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,7 +84,8 @@ func TestContactIDsForQueryPage(t *testing.T) {
 							"order": "desc"
 						}
 					}
-				]
+				],
+				"track_total_hits": true
 			}`,
 			MockedESResponse: fmt.Sprintf(`{
 				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
@@ -195,7 +196,8 @@ func TestContactIDsForQueryPage(t *testing.T) {
 							"order": "desc"
 						}
 					}
-				]
+				],
+				"track_total_hits": true
 			}`,
 			MockedESResponse: fmt.Sprintf(`{
 				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",

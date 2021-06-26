@@ -11,7 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/lib/pq"
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

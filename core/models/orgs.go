@@ -267,7 +267,7 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
 	$2::int AS max_value_length,
 	(SELECT iso_code FROM orgs_language WHERE id = o.primary_language_id) AS default_language,
-	(SELECT ARRAY_AGG(iso_code) FROM orgs_language WHERE org_id = o.id) AS allowed_languages,
+	(SELECT ARRAY_AGG(iso_code ORDER BY iso_code ASC) FROM orgs_language WHERE org_id = o.id) AS allowed_languages,
 	(SELECT ARRAY_AGG(concat(uuid,':',destination)) FROM links_link WHERE org_id = o.id AND is_archived = false) links,
 	COALESCE(
 		(

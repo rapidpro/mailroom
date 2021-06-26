@@ -18,7 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -172,7 +172,8 @@ func TestSearch(t *testing.T) {
 							"order": "desc"
 						}
 					}
-				]
+				],
+				"track_total_hits": true
 			}`,
 		},
 		{

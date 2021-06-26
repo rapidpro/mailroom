@@ -12,6 +12,4 @@ archives:
     - LICENSE
     - README.md
     - docs/*
-    - docs/completion.json
-    - docs/functions.json
     - docs/**/*

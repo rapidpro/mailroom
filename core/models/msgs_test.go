@@ -166,3 +166,47 @@ func TestNormalizeAttachment(t *testing.T) {
 		assert.Equal(t, tc.normalized, string(models.NormalizeAttachment(utils.Attachment(tc.raw))))
 	}
 }
+
+func TestMarkMessages(t *testing.T) {
+	ctx, db, _ := testsuite.Reset()
+	defer testsuite.Reset()
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
+	require.NoError(t, err)
+
+	channel := oa.ChannelByUUID(models.TwilioChannelUUID)
+
+	insertMsg := func(text string) *models.Msg {
+		urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID))
+		flowMsg := flows.NewMsgOut(urn, channel.ChannelReference(), text, nil, nil, nil, flows.NilMsgTopic)
+		msg, err := models.NewOutgoingMsg(oa.Org(), channel, models.CathyID, flowMsg, time.Now())
+		require.NoError(t, err)
+
+		err = models.InsertMessages(ctx, db, []*models.Msg{msg})
+		require.NoError(t, err)
+
+		return msg
+	}
+
+	msg1 := insertMsg("Hello")
+	msg2 := insertMsg("Hola")
+	insertMsg("Howdy")
+
+	models.MarkMessagesPending(ctx, db, []*models.Msg{msg1, msg2})
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 2)
+
+	// try running on database with BIGINT message ids
+	db.MustExec(`ALTER TABLE "msgs_msg" ALTER COLUMN "id" TYPE bigint USING "id"::bigint;`)
+	db.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" AS bigint;`)
+	db.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" RESTART WITH 3000000000;`)
+	db = testsuite.DB() // need new connection after changes
+
+	msg4 := insertMsg("Big messages!")
+	assert.Equal(t, flows.MsgID(3000000000), msg4.ID())
+
+	err = models.MarkMessagesPending(ctx, db, []*models.Msg{msg4})
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 3)
+}

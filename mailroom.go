@@ -17,7 +17,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/librato"
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"github.com/sirupsen/logrus"
 )
 
@@ -190,6 +190,11 @@ func (mr *Mailroom) Start() error {
 		log.WithError(err).Error("unable to connect to elastic, check configuration")
 	} else {
 		log.Info("elastic ok")
+	}
+
+	// warn if we won't be doing FCM syncing
+	if config.Mailroom.FCMKey == "" {
+		logrus.Error("fcm not configured, no syncing of android channels")
 	}
 
 	for _, initFunc := range initFunctions {

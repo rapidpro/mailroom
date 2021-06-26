@@ -57,7 +57,7 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 	// filter out our list of contacts to only include those that should be started
 	if !batch.IncludeActive() {
 		// find all participants active in other sessions
-		active, err := models.FindActiveSessionOverlap(ctx, db, models.IVRFlow, batch.ContactIDs())
+		active, err := models.FindActiveSessionOverlap(ctx, db, models.FlowTypeVoice, batch.ContactIDs())
 		if err != nil {
 			return errors.Wrapf(err, "error finding other active sessions: %d", batch.FlowID())
 		}

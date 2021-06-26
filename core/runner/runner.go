@@ -226,7 +226,7 @@ func StartFlowBatch(
 	options := NewStartOptions()
 	options.RestartParticipants = batch.RestartParticipants()
 	options.IncludeActive = batch.IncludeActive()
-	options.Interrupt = true
+	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
 
@@ -315,7 +315,7 @@ func FireCampaignEvents(
 	}
 
 	// if this is an ivr flow, we need to create a task to perform the start there
-	if dbFlow.FlowType() == models.IVRFlow {
+	if dbFlow.FlowType() == models.FlowTypeVoice {
 		// Trigger our IVR flow start
 		err := TriggerIVRFlow(ctx, db, rp, oa.OrgID(), dbFlow.ID(), contactIDs, func(ctx context.Context, tx *sqlx.Tx) error {
 			return models.MarkEventsFired(ctx, tx, fires, time.Now(), models.FireResultFired)
@@ -714,7 +714,7 @@ func TriggerIVRFlow(ctx context.Context, db *sqlx.DB, rp *redis.Pool, orgID mode
 	tx, _ := db.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.IVRFlow, flowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID, models.DoRestartParticipants, models.DoIncludeActive).
 		WithContactIDs(contactIDs)
 
 	// insert it

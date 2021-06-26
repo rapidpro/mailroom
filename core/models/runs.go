@@ -861,6 +861,11 @@ WHERE
 
 // FindActiveSessionOverlap returns the list of contact ids which overlap with those passed in which are active in any other flows
 func FindActiveSessionOverlap(ctx context.Context, db *sqlx.DB, flowType FlowType, contacts []ContactID) ([]ContactID, error) {
+	// background flows should look at messaging flows when determing overlap (background flows can't be active by definition)
+	if flowType == FlowTypeBackground {
+		flowType = FlowTypeMessaging
+	}
+
 	var overlap []ContactID
 	err := db.SelectContext(ctx, &overlap, activeSessionOverlapSQL, flowType, pq.Array(contacts))
 	return overlap, err
