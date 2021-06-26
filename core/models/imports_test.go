@@ -164,7 +164,7 @@ func TestContactImportBatch(t *testing.T) {
 	err = batch.Import(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`, []interface{}{}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`).Returns(1)
 }
 
 func TestContactSpecUnmarshal(t *testing.T) {

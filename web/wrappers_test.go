@@ -58,5 +58,5 @@ func TestWithHTTPLogs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check HTTP logs were created
-	testsuite.AssertQueryCount(t, testsuite.DB(), `select count(*) from request_logs_httplog where ticketer_id = $1;`, []interface{}{testdata.Mailgun.ID}, 2)
+	testsuite.AssertQuery(t, testsuite.DB(), `select count(*) from request_logs_httplog where ticketer_id = $1;`, testdata.Mailgun.ID).Returns(2)
 }

@@ -161,16 +161,13 @@ func TestDynamicGroups(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, tc.ContactIDs, contactIDs)
 
-		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) from contacts_contactgroup WHERE id = $1 AND status = 'R'`,
-			[]interface{}{testdata.DoctorsGroup.ID}, 1, "wrong number of contacts in group for query: %s", tc.Query)
+		testsuite.AssertQuery(t, db, `SELECT count(*) from contacts_contactgroup WHERE id = $1 AND status = 'R'`, testdata.DoctorsGroup.ID).
+			Returns(1, "wrong number of contacts in group for query: %s", tc.Query)
 
-		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) from campaigns_eventfire WHERE event_id = $1`,
-			[]interface{}{eventID}, len(tc.EventContactIDs), "wrong number of contacts with events for query: %s", tc.Query)
+		testsuite.AssertQuery(t, db, `SELECT count(*) from campaigns_eventfire WHERE event_id = $1`, eventID).
+			Returns(len(tc.EventContactIDs), "wrong number of contacts with events for query: %s", tc.Query)
 
-		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) from campaigns_eventfire WHERE event_id = $1 AND contact_id = ANY($2)`,
-			[]interface{}{eventID, pq.Array(tc.EventContactIDs)}, len(tc.EventContactIDs), "wrong contacts with events for query: %s", tc.Query)
+		testsuite.AssertQuery(t, db, `SELECT count(*) from campaigns_eventfire WHERE event_id = $1 AND contact_id = ANY($2)`, eventID, pq.Array(tc.EventContactIDs)).
+			Returns(len(tc.EventContactIDs), "wrong contacts with events for query: %s", tc.Query)
 	}
 }

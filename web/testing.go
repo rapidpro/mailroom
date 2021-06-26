@@ -152,7 +152,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 			}
 
 			for _, dba := range tc.DBAssertions {
-				testsuite.AssertQueryCount(t, db, dba.Query, nil, dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
+				testsuite.AssertQuery(t, db, dba.Query).Returns(dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
 			}
 
 		} else {

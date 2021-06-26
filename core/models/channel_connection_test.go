@@ -22,7 +22,7 @@ func TestChannelConnections(t *testing.T) {
 	err = conn.UpdateExternalID(ctx, db, "test1")
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from channels_channelconnection where external_id = 'test1' AND id = $1`, []interface{}{conn.ID()}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from channels_channelconnection where external_id = 'test1' AND id = $1`, conn.ID()).Returns(1)
 
 	conn2, err := models.SelectChannelConnection(ctx, db, conn.ID())
 	assert.NoError(t, err)

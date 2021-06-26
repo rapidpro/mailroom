@@ -213,7 +213,7 @@ func TestResendMessages(t *testing.T) {
 	assert.Equal(t, testdata.VonageChannel.ID, msgs[1].ChannelID())
 	assert.Equal(t, models.TopupID(1), msgs[1].TopupID())
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, []interface{}{now}, 2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(2)
 }
 
 func TestNormalizeAttachment(t *testing.T) {
@@ -265,7 +265,7 @@ func TestMarkMessages(t *testing.T) {
 
 	models.MarkMessagesPending(ctx, db, []*models.Msg{msg1, msg2})
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
 
 	// try running on database with BIGINT message ids
 	db.MustExec(`ALTER TABLE "msgs_msg" ALTER COLUMN "id" TYPE bigint USING "id"::bigint;`)
@@ -279,7 +279,7 @@ func TestMarkMessages(t *testing.T) {
 	err = models.MarkMessagesPending(ctx, db, []*models.Msg{msg4})
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 3)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(3)
 }
 
 func TestNonPersistentBroadcasts(t *testing.T) {

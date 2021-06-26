@@ -24,18 +24,14 @@ func TestHTTPLogs(t *testing.T) {
 	err := models.InsertHTTPLogs(ctx, db, []*models.HTTPLog{log})
 	assert.Nil(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND classifier_id = $2 AND is_error = FALSE`,
-		[]interface{}{testdata.Org1.ID, testdata.Wit.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND classifier_id = $2 AND is_error = FALSE`, testdata.Org1.ID, testdata.Wit.ID).Returns(1)
 
 	// insert a log with nil response
 	log = models.NewClassifierCalledLog(testdata.Org1.ID, testdata.Wit.ID, "http://foo.bar", "GET /", "", true, time.Second, time.Now())
 	err = models.InsertHTTPLogs(ctx, db, []*models.HTTPLog{log})
 	assert.Nil(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND classifier_id = $2 AND is_error = TRUE AND response IS NULL`,
-		[]interface{}{testdata.Org1.ID, testdata.Wit.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND classifier_id = $2 AND is_error = TRUE AND response IS NULL`, testdata.Org1.ID, testdata.Wit.ID).Returns(1)
 }
 
 func TestHTTPLogger(t *testing.T) {
@@ -72,7 +68,5 @@ func TestHTTPLogger(t *testing.T) {
 	err = logger.Insert(ctx, db)
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND ticketer_id = $2`,
-		[]interface{}{testdata.Org1.ID, testdata.Mailgun.ID}, 2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND ticketer_id = $2`, testdata.Org1.ID, testdata.Mailgun.ID).Returns(2)
 }

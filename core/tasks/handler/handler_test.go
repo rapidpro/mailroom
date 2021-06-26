@@ -16,7 +16,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -152,20 +151,18 @@ func TestMsgEvents(t *testing.T) {
 	assert.NotNil(t, task)
 	assert.Equal(t, queue.StartIVRFlowBatch, task.Type)
 
-	// should have 7 queued priority messages
-	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.Org2Channel.UUID)))
-	assert.NoError(t, err)
-	assert.Equal(t, 9, count)
+	// check messages queued to courier
+	testsuite.AssertCourierQueues(t, map[string][]int{
+		fmt.Sprintf("msgs:%s|10/1", testdata.TwitterChannel.UUID): {1, 1, 1, 1, 1},
+		fmt.Sprintf("msgs:%s|10/1", testdata.Org2Channel.UUID):    {1, 1, 1, 1, 1, 1, 1, 1, 1},
+	})
 
 	// Cathy's open ticket will have been updated but not Bob's closed ticket
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > '2021-01-01T00:00:00Z'`, []interface{}{cathyTicket.ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = '2021-01-01T00:00:00Z'`, []interface{}{bobTicket.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > '2021-01-01T00:00:00Z'`, cathyTicket.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = '2021-01-01T00:00:00Z'`, bobTicket.ID).Returns(1)
 
 	// Fred's sessions should not have a timeout because courier will set them
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL AND wait_started_on IS NOT NULL`,
-		[]interface{}{testdata.Org2Contact.ID}, 2,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL AND wait_started_on IS NOT NULL`, testdata.Org2Contact.ID).Returns(2)
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, testdata.Org2Contact.ID)
@@ -198,16 +195,11 @@ func TestMsgEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should get our catch all trigger
-	text := ""
-	db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID)
-	assert.Equal(t, "Hey, how are you?", text)
+	testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID).Returns("Hey, how are you?")
 	previous := time.Now()
 
 	// and should have failed previous session
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F' and current_flow_id = $2`,
-		[]interface{}{testdata.Org2Contact.ID, testdata.Org2Favorites.ID}, 2,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F' and current_flow_id = $2`, testdata.Org2Contact.ID, testdata.Org2Favorites.ID).Returns(2)
 
 	// trigger should also not start a new session
 	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "start")
@@ -216,8 +208,7 @@ func TestMsgEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
-	db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2 ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID, previous)
-	assert.Equal(t, "Hey, how are you?", text)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
 }
 
 func TestChannelEvents(t *testing.T) {
@@ -281,10 +272,8 @@ func TestChannelEvents(t *testing.T) {
 
 		// if we are meant to have a response
 		if tc.Response != "" {
-			var text string
-			err = db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start)
-			assert.NoError(t, err)
-			assert.Equal(t, tc.Response, text, "%d: response: '%s' is not '%s'", i, text, tc.Response)
+			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
+				Returns(tc.Response, "%d: response mismatch", i)
 		}
 
 		if tc.UpdateLastSeen {
@@ -320,7 +309,7 @@ func TestTicketEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	require.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, []interface{}{testdata.Cathy.ID}, 1)
+	testsuite.AssertQuery(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestStopEvent(t *testing.T) {
@@ -341,6 +330,7 @@ func TestStopEvent(t *testing.T) {
 
 	event := &handler.StopEvent{OrgID: testdata.Org1.ID, ContactID: testdata.Cathy.ID}
 	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
 	task := &queue.Task{
 		Type:  handler.StopEventType,
 		OrgID: int(testdata.Org1.ID),
@@ -357,15 +347,15 @@ func TestStopEvent(t *testing.T) {
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{testdata.DoctorsGroup.ID, testdata.Cathy.ID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, []interface{}{testdata.DoctorsGroup.ID, testdata.George.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.Cathy.ID).Returns(0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.George.ID).Returns(1)
 
 	// that cathy is stopped
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, []interface{}{testdata.Cathy.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
 
 	// and has no upcoming events
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{testdata.Cathy.ID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{testdata.George.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Cathy.ID).Returns(0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.George.ID).Returns(1)
 }
 
 func TestTimedEvents(t *testing.T) {
@@ -488,9 +478,10 @@ func TestTimedEvents(t *testing.T) {
 		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
-		var text string
-		db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.ContactID, last)
-		assert.Equal(t, text, tc.Response, "%d: response: '%s' does not match '%s'", i, text, tc.Response)
+		if tc.Response != "" {
+			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.ContactID, last).
+				Returns(tc.Response, "%d: response: mismatch", i)
+		}
 
 		err = db.Get(&sessionID, `SELECT id FROM flows_flowsession WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.ContactID)
 		assert.NoError(t, err)
@@ -537,8 +528,8 @@ func TestTimedEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, []interface{}{runID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'F' AND id = $1`, []interface{}{sessionID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, runID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'F' AND id = $1`, sessionID).Returns(1)
 
 	testsuite.ResetDB()
 }

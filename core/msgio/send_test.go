@@ -163,6 +163,6 @@ func TestSendMessages(t *testing.T) {
 
 		assert.Equal(t, tc.FCMTokensSynced, actualTokens, "FCM tokens mismatch in '%s'", tc.Description)
 
-		testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, tc.PendingMsgs, `pending messages mismatch in '%s'`, tc.Description)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(tc.PendingMsgs, `pending messages mismatch in '%s'`, tc.Description)
 	}
 }

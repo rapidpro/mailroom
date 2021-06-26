@@ -262,15 +262,16 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		err = tx.Commit()
 		assert.NoError(t, err)
 
+		time.Sleep(500 * time.Millisecond)
+
 		// now check our assertions
-		time.Sleep(1 * time.Second)
-		for ii, a := range tc.SQLAssertions {
-			testsuite.AssertQueryCount(t, db, a.SQL, a.Args, a.Count, "%d:%d: mismatch in expected count for query: %s", i, ii, a.SQL)
+		for j, a := range tc.SQLAssertions {
+			testsuite.AssertQuery(t, db, a.SQL, a.Args...).Returns(a.Count, "%d:%d: mismatch in expected count for query: %s", i, j, a.SQL)
 		}
 
-		for ii, a := range tc.Assertions {
+		for j, a := range tc.Assertions {
 			err := a(t, rt)
-			assert.NoError(t, err, "%d: %d error checking assertion", i, ii)
+			assert.NoError(t, err, "%d:%d error checking assertion", i, j)
 		}
 	}
 }
