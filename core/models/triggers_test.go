@@ -15,9 +15,7 @@ import (
 )
 
 func TestLoadTriggers(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Reset()
 
 	db.MustExec(`DELETE FROM triggers_trigger`)
 	farmersGroup := testdata.InsertContactGroup(db, testdata.Org1, assets.GroupUUID(uuids.New()), "Farmers", "")
@@ -116,9 +114,7 @@ func TestLoadTriggers(t *testing.T) {
 }
 
 func TestFindMatchingMsgTrigger(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Reset()
 
 	db.MustExec(`DELETE FROM triggers_trigger`)
 
@@ -167,9 +163,7 @@ func TestFindMatchingMsgTrigger(t *testing.T) {
 }
 
 func TestFindMatchingIncomingCallTrigger(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Reset()
 
 	doctorsAndNotTestersTriggerID := testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, []*testdata.Group{testdata.DoctorsGroup}, []*testdata.Group{testdata.TestersGroup})
 	doctorsTriggerID := testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, []*testdata.Group{testdata.DoctorsGroup}, nil)
@@ -205,9 +199,7 @@ func TestFindMatchingIncomingCallTrigger(t *testing.T) {
 }
 
 func TestFindMatchingMissedCallTrigger(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Reset()
 
 	testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.SingleMessage, nil, nil)
 
@@ -228,9 +220,7 @@ func TestFindMatchingMissedCallTrigger(t *testing.T) {
 }
 
 func TestFindMatchingNewConversationTrigger(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Reset()
 
 	twilioTriggerID := testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwilioChannel)
 	noChTriggerID := testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, nil)
@@ -255,9 +245,7 @@ func TestFindMatchingNewConversationTrigger(t *testing.T) {
 }
 
 func TestFindMatchingReferralTrigger(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Reset()
 
 	fooID := testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "foo", testdata.TwitterChannel)
 	barID := testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "bar", nil)
@@ -290,9 +278,7 @@ func TestFindMatchingReferralTrigger(t *testing.T) {
 }
 
 func TestArchiveContactTriggers(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Reset()
 
 	everybodyID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "join", models.MatchFirst, nil, nil)
 	cathyOnly1ID := testdata.InsertScheduledTrigger(db, testdata.Org1, testdata.Favorites, nil, nil, []*testdata.Contact{testdata.Cathy})

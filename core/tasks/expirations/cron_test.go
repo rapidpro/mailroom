@@ -23,16 +23,12 @@ func TestMain(m *testing.M) {
 }
 
 func TestExpirations(t *testing.T) {
-	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-	rc := testsuite.RC()
+	ctx, _, db, rp := testsuite.Get()
+	rc := rp.Get()
 	defer rc.Close()
 
 	err := marker.ClearTasks(rc, expirationLock)
 	assert.NoError(t, err)
-
-	// need to create a session that has an expired timeout
-	db := testsuite.DB()
 
 	// create a few sessions
 	s1 := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.SessionStatusWaiting, nil)

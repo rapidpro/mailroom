@@ -20,8 +20,7 @@ import (
 )
 
 func TestOutgoingMsgs(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	tcs := []struct {
 		ChannelUUID  assets.ChannelUUID
@@ -138,8 +137,8 @@ func TestOutgoingMsgs(t *testing.T) {
 }
 
 func TestGetMessageIDFromUUID(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
 	msgIn := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi there")
 
 	msgID, err := models.GetMessageIDFromUUID(ctx, db, msgIn.UUID())
@@ -149,8 +148,8 @@ func TestGetMessageIDFromUUID(t *testing.T) {
 }
 
 func TestLoadMessages(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
 	msgIn1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "in 1")
 	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
 	msgOut2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 2", nil)
@@ -177,9 +176,7 @@ func TestLoadMessages(t *testing.T) {
 }
 
 func TestResendMessages(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	ctx, _, db, rp := testsuite.Get()
 
 	db.MustExec(`DELETE FROM msgs_msg`)
 
@@ -217,7 +214,7 @@ func TestResendMessages(t *testing.T) {
 }
 
 func TestNormalizeAttachment(t *testing.T) {
-	rt := testsuite.RT()
+	_, rt, _, _ := testsuite.Get()
 
 	rt.Config.AttachmentDomain = "foo.bar.com"
 	defer func() { rt.Config.AttachmentDomain = "" }()

@@ -12,8 +12,7 @@ import (
 )
 
 func TestWebhookResults(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	tcs := []struct {
 		OrgID       models.OrgID

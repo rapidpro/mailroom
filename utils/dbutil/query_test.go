@@ -41,8 +41,8 @@ func TestBulkSQL(t *testing.T) {
 }
 
 func TestBulkQuery(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
 	defer testsuite.Reset()
 
 	db.MustExec(`CREATE TABLE foo (id serial NOT NULL PRIMARY KEY, name TEXT, age INT)`)

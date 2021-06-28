@@ -24,7 +24,7 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
-	rt := testsuite.RT()
+	_, rt, _, _ := testsuite.Get()
 
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
 	require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestOpenAndForward(t *testing.T) {
 }
 
 func TestCloseAndReopen(t *testing.T) {
-	rt := testsuite.RT()
+	_, rt, _, _ := testsuite.Get()
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{

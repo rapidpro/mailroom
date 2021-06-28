@@ -13,10 +13,7 @@ import (
 )
 
 func TestPopulateTask(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := testsuite.DB()
+	ctx, rt, db, _ := testsuite.Reset()
 
 	mes := testsuite.NewMockElasticServer()
 	defer mes.Close()

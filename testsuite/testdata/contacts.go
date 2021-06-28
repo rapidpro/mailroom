@@ -1,12 +1,13 @@
 package testdata
 
 import (
+	"context"
+
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -20,7 +21,7 @@ type Contact struct {
 }
 
 func (c *Contact) Load(db *sqlx.DB, oa *models.OrgAssets) (*models.Contact, *flows.Contact) {
-	contacts, err := models.LoadContacts(testsuite.CTX(), db, oa, []models.ContactID{c.ID})
+	contacts, err := models.LoadContacts(context.Background(), db, oa, []models.ContactID{c.ID})
 	must(err, len(contacts) == 1)
 
 	flowContact, err := contacts[0].FlowContact(oa)

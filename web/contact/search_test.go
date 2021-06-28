@@ -24,10 +24,8 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	ctx, _, db, rp := testsuite.Reset()
+
 	wg := &sync.WaitGroup{}
 
 	es := testsuite.NewMockElasticServer()

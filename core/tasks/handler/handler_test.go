@@ -21,12 +21,7 @@ import (
 )
 
 func TestMsgEvents(t *testing.T) {
-	testsuite.Reset()
-	rt := testsuite.RT()
-	db := rt.DB
-	rp := rt.RP
-	ctx := testsuite.CTX()
-
+	ctx, rt, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -212,12 +207,7 @@ func TestMsgEvents(t *testing.T) {
 }
 
 func TestChannelEvents(t *testing.T) {
-	testsuite.Reset()
-	rt := testsuite.RT()
-	db := rt.DB
-	rp := rt.RP
-	ctx := testsuite.CTX()
-
+	ctx, rt, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -311,12 +301,7 @@ func TestTicketEvents(t *testing.T) {
 }
 
 func TestStopEvent(t *testing.T) {
-	testsuite.Reset()
-	rt := testsuite.RT()
-	db := rt.DB
-	rp := rt.RP
-	ctx := testsuite.CTX()
-
+	ctx, rt, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -357,13 +342,7 @@ func TestStopEvent(t *testing.T) {
 }
 
 func TestTimedEvents(t *testing.T) {
-	testsuite.Reset()
-	rt := testsuite.RT()
-	db := rt.DB
-	rp := rt.RP
-
-	ctx := testsuite.CTX()
-
+	ctx, rt, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
 

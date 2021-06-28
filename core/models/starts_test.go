@@ -18,8 +18,7 @@ import (
 )
 
 func TestStarts(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	startID := testdata.InsertFlowStart(db, testdata.Org1, testdata.SingleMessage, []*testdata.Contact{testdata.Cathy, testdata.Bob})
 

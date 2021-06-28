@@ -16,8 +16,7 @@ import (
 )
 
 func TestHTTPLogs(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	// insert a log
 	log := models.NewClassifierCalledLog(testdata.Org1.ID, testdata.Wit.ID, "http://foo.bar", "GET /", "STATUS 200", false, time.Second, time.Now())
@@ -35,8 +34,7 @@ func TestHTTPLogs(t *testing.T) {
 }
 
 func TestHTTPLogger(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{

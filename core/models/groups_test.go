@@ -18,8 +18,9 @@ import (
 )
 
 func TestLoadGroups(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.NewMockDB(testsuite.DB(), func(funcName string, call int) error {
+	ctx, _, db0, _ := testsuite.Get()
+
+	db := testsuite.NewMockDB(db0, func(funcName string, call int) error {
 		// fail first query for groups
 		if funcName == "QueryxContext" && call == 0 {
 			return errors.New("boom")
@@ -54,8 +55,7 @@ func TestLoadGroups(t *testing.T) {
 }
 
 func TestDynamicGroups(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	// insert an event on our campaign
 	var eventID models.CampaignEventID

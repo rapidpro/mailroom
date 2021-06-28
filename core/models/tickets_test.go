@@ -19,8 +19,7 @@ import (
 )
 
 func TestTicketers(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	// can load directly by UUID
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Zendesk.UUID)
@@ -56,10 +55,7 @@ func TestTicketers(t *testing.T) {
 }
 
 func TestTickets(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
+	ctx, _, db, _ := testsuite.Reset()
 
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
@@ -135,10 +131,7 @@ func TestTickets(t *testing.T) {
 }
 
 func TestUpdateTicketConfig(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
+	ctx, _, db, _ := testsuite.Reset()
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
 	modelTicket := ticket.Load(db)
@@ -157,10 +150,7 @@ func TestUpdateTicketConfig(t *testing.T) {
 }
 
 func TestUpdateTicketLastActivity(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
+	ctx, _, db, _ := testsuite.Reset()
 
 	now := time.Date(2021, 6, 22, 15, 59, 30, 123456789, time.UTC)
 
@@ -179,10 +169,7 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 }
 
 func TestCloseTickets(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
+	ctx, _, db, _ := testsuite.Reset()
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
@@ -238,10 +225,7 @@ func TestCloseTickets(t *testing.T) {
 }
 
 func TestReopenTickets(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
+	ctx, _, db, _ := testsuite.Reset()
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 

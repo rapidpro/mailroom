@@ -26,9 +26,8 @@ import (
 )
 
 func TestContactImports(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	testsuite.Reset()
+	ctx, _, db, _ := testsuite.Reset()
+
 	defer testsuite.Reset()
 
 	testdata.DeleteContactsAndURNs(db)
@@ -143,8 +142,7 @@ func TestContactImports(t *testing.T) {
 }
 
 func TestContactImportBatch(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	importID := testdata.InsertContactImport(db, testdata.Org1)
 	batchID := testdata.InsertContactImportBatch(db, importID, []byte(`[

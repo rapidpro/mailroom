@@ -1,6 +1,7 @@
 package msgio_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func (m *msgSpec) createMsg(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) *mo
 	// Only way to create a failed outgoing message is to suspend the org and reload the org.
 	// However the channels have to be fetched from the same org assets thus why this uses its
 	// own org assets instance.
-	ctx := testsuite.CTX()
+	ctx := context.Background()
 	db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, testdata.Org1.ID)
 	oaOrg, _ := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 
@@ -53,9 +54,7 @@ func (m *msgSpec) createMsg(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) *mo
 }
 
 func TestSendMessages(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 

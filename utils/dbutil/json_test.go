@@ -13,8 +13,7 @@ import (
 )
 
 func TestReadJSONRow(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	type group struct {
 		UUID string `json:"uuid"`

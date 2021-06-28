@@ -251,10 +251,8 @@ const (
 )
 
 func TestServer(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	ctx, _, db, rp := testsuite.Reset()
+
 	wg := &sync.WaitGroup{}
 
 	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)

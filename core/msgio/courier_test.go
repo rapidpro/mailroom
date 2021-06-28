@@ -13,12 +13,8 @@ import (
 )
 
 func TestQueueCourierMessages(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	rc := testsuite.RC()
-	testsuite.Reset()
-	models.FlushCache()
-
+	ctx, _, db, rp := testsuite.Reset()
+	rc := rp.Get()
 	defer rc.Close()
 
 	// create an Andoid channel

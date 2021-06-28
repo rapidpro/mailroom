@@ -15,9 +15,7 @@ import (
 )
 
 func TestSpecToCreation(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Get()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)

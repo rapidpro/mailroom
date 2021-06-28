@@ -16,9 +16,7 @@ import (
 )
 
 func TestContactIDsForQueryPage(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Reset()
 
 	es := testsuite.NewMockElasticServer()
 	defer es.Close()
@@ -254,9 +252,7 @@ func TestContactIDsForQueryPage(t *testing.T) {
 }
 
 func TestContactIDsForQuery(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Reset()
 
 	es := testsuite.NewMockElasticServer()
 	defer es.Close()

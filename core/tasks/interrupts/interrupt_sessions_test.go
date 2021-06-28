@@ -13,10 +13,7 @@ import (
 )
 
 func TestInterrupts(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
+	ctx, rt, db, _ := testsuite.Reset()
 
 	insertConnection := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urnID models.URNID) models.ConnectionID {
 		var connectionID models.ConnectionID

@@ -12,10 +12,7 @@ import (
 )
 
 func TestTopups(t *testing.T) {
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	ctx, rt, db, rp := testsuite.Get()
 
 	tx, err := db.BeginTxx(ctx, nil)
 	assert.NoError(t, err)

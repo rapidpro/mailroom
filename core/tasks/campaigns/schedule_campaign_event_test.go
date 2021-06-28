@@ -15,12 +15,7 @@ import (
 )
 
 func TestScheduleCampaignEvent(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
-
-	models.FlushCache()
+	ctx, rt, db, _ := testsuite.Reset()
 
 	// add bob, george and alexandria to doctors group which campaign is based on
 	testdata.DoctorsGroup.Add(db, testdata.Bob, testdata.George, testdata.Alexandria)

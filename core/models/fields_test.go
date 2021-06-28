@@ -12,8 +12,7 @@ import (
 )
 
 func TestFields(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshFields)
 	require.NoError(t, err)

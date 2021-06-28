@@ -12,8 +12,7 @@ import (
 )
 
 func TestWebhookEvents(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	// create a resthook to insert against
 	var resthookID models.ResthookID

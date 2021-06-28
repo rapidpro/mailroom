@@ -17,12 +17,7 @@ import (
 )
 
 func TestRetryMsgs(t *testing.T) {
-	testsuite.Reset()
-	rt := testsuite.RT()
-	db := rt.DB
-	rp := rt.RP
-	ctx := testsuite.CTX()
-
+	ctx, rt, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
 

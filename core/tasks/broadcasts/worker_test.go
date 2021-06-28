@@ -21,11 +21,8 @@ import (
 )
 
 func TestBroadcastEvents(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-	db := testsuite.DB()
-	rc := testsuite.RC()
+	ctx, _, db, rp := testsuite.Reset()
+	rc := rp.Get()
 	defer rc.Close()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
@@ -123,11 +120,8 @@ func TestBroadcastEvents(t *testing.T) {
 }
 
 func TestBroadcastTask(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-	db := testsuite.DB()
-	rc := testsuite.RC()
+	ctx, _, db, rp := testsuite.Reset()
+	rc := rp.Get()
 	defer rc.Close()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)

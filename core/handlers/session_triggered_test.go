@@ -95,10 +95,7 @@ func TestSessionTriggered(t *testing.T) {
 }
 
 func TestQuerySessionTriggered(t *testing.T) {
-	testsuite.Reset()
-	models.FlushCache()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, rp := testsuite.Reset()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
@@ -123,7 +120,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 			},
 			Assertions: []handlers.Assertion{
 				func(t *testing.T, rt *runtime.Runtime) error {
-					rc := rt.RP.Get()
+					rc := rp.Get()
 					defer rc.Close()
 
 					task, err := queue.PopNextTask(rc, queue.BatchQueue)

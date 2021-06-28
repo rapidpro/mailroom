@@ -1,6 +1,7 @@
 package testdata
 
 import (
+	"context"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
@@ -8,7 +9,6 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -19,7 +19,7 @@ type Ticket struct {
 }
 
 func (k *Ticket) Load(db *sqlx.DB) *models.Ticket {
-	tickets, err := models.LoadTickets(testsuite.CTX(), db, []models.TicketID{k.ID})
+	tickets, err := models.LoadTickets(context.Background(), db, []models.TicketID{k.ID})
 	must(err, len(tickets) == 1)
 	return tickets[0]
 }

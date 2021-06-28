@@ -159,10 +159,9 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 }
 
 func RunTestCases(t *testing.T, tcs []TestCase) {
+	ctx, rt, db, _ := testsuite.Get()
+
 	models.FlushCache()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
 
 	oa, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
 	assert.NoError(t, err)

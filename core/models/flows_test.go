@@ -13,9 +13,7 @@ import (
 )
 
 func TestFlows(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	rt := testsuite.RT()
+	ctx, rt, db, _ := testsuite.Get()
 
 	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, testdata.IVRFlow.ID)
 
@@ -62,8 +60,8 @@ func TestFlows(t *testing.T) {
 }
 
 func TestFlowIDForUUID(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
 	org, _ := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 
 	tx, err := db.BeginTxx(ctx, nil)

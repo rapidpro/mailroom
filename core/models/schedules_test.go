@@ -14,10 +14,9 @@ import (
 )
 
 func TestGetExpired(t *testing.T) {
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Get()
 
 	// add a schedule and tie a broadcast to it
-	db := testsuite.DB()
 	var s1 models.ScheduleID
 	err := db.Get(
 		&s1,

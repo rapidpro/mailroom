@@ -17,9 +17,7 @@ import (
 )
 
 func TestOrgs(t *testing.T) {
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := testsuite.DB()
+	ctx, rt, db, _ := testsuite.Get()
 
 	tz, _ := time.LoadLocation("America/Los_Angeles")
 
@@ -60,9 +58,7 @@ func TestOrgs(t *testing.T) {
 }
 
 func TestStoreAttachment(t *testing.T) {
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := testsuite.DB()
+	ctx, rt, db, _ := testsuite.Get()
 
 	store := testsuite.MediaStorage()
 	defer testsuite.ResetStorage()

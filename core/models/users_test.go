@@ -11,8 +11,7 @@ import (
 )
 
 func TestLoadUsers(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshUsers)
 	require.NoError(t, err)

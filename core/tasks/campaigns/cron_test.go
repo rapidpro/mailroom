@@ -16,11 +16,9 @@ import (
 )
 
 func TestCampaigns(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
+	ctx, rt, db, rp := testsuite.Reset()
 
-	rt := testsuite.RT()
-	rc := testsuite.RC()
+	rc := rp.Get()
 	defer rc.Close()
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
@@ -29,7 +27,7 @@ func TestCampaigns(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our campaign to be started
-	err := fireCampaignEvents(ctx, rt.DB, rt.RP, campaignsLock, "lock")
+	err := fireCampaignEvents(ctx, db, rp, campaignsLock, "lock")
 	assert.NoError(t, err)
 
 	// then actually work on the event
@@ -45,16 +43,13 @@ func TestCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should now have a flow run for that contact and flow
-	testsuite.AssertQueryCount(t, rt.DB, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, []interface{}{testdata.Cathy.ID, testdata.Favorites.ID}, 1)
-	testsuite.AssertQueryCount(t, rt.DB, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, []interface{}{testdata.George.ID, testdata.Favorites.ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, []interface{}{testdata.Cathy.ID, testdata.Favorites.ID}, 1)
+	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, []interface{}{testdata.George.ID, testdata.Favorites.ID}, 1)
 }
 
 func TestIVRCampaigns(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rt := testsuite.RT()
-	db := rt.DB
-	rc := testsuite.RC()
+	ctx, rt, db, rp := testsuite.Reset()
+	rc := rp.Get()
 	defer rc.Close()
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and

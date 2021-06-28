@@ -34,8 +34,17 @@ func Reset() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 
 // Get returns the various runtime things a test might need
 func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
-	rt := RT()
-	return CTX(), rt, rt.DB, rt.RP
+	db := DB()
+	rp := RP()
+	rt := &runtime.Runtime{
+		RP:             rp,
+		DB:             db,
+		ES:             nil,
+		MediaStorage:   MediaStorage(),
+		SessionStorage: SessionStorage(),
+		Config:         config.NewMailroomConfig(),
+	}
+	return context.Background(), rt, db, rp
 }
 
 // ResetDB resets our database to our base state from our RapidPro dump
@@ -106,11 +115,6 @@ func RC() redis.Conn {
 	return conn
 }
 
-// CTX returns our background testing context
-func CTX() context.Context {
-	return context.Background()
-}
-
 // MediaStorage returns our media storage for tests
 func MediaStorage() storage.Storage {
 	return storage.NewFS(MediaStorageDir)
@@ -138,16 +142,5 @@ func mustExec(command string, args ...string) {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		panic(fmt.Sprintf("error restoring database: %s: %s", err, string(output)))
-	}
-}
-
-func RT() *runtime.Runtime {
-	return &runtime.Runtime{
-		RP:             RP(),
-		DB:             DB(),
-		ES:             nil,
-		MediaStorage:   MediaStorage(),
-		SessionStorage: SessionStorage(),
-		Config:         config.NewMailroomConfig(),
 	}
 }

@@ -63,8 +63,7 @@ func newMockFCMEndpoint(tokens ...string) *MockFCMEndpoint {
 }
 
 func TestSyncAndroidChannels(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	mockFCM := newMockFCMEndpoint("FCMID3")
 	defer mockFCM.Stop()
@@ -96,7 +95,7 @@ func TestSyncAndroidChannels(t *testing.T) {
 }
 
 func TestCreateFCMClient(t *testing.T) {
-	rt := testsuite.RT()
+	_, rt, _, _ := testsuite.Get()
 
 	rt.Config.FCMKey = "1234"
 

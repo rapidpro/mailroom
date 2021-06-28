@@ -12,15 +12,11 @@ import (
 )
 
 func TestCheckSchedules(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-
+	ctx, _, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
 
 	// add a schedule and tie a broadcast to it
-	db := testsuite.DB()
 	var s1 models.ScheduleID
 	err := db.Get(
 		&s1,
