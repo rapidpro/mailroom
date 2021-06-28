@@ -12,7 +12,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
@@ -76,7 +76,16 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusBadRequest, nil
 	}
 
-	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, request.Message, request.FileURLs)
+	// fetch files
+	files := make([]*tickets.File, len(request.FileURLs))
+	for i, fileURL := range request.FileURLs {
+		files[i], err = tickets.FetchFile(fileURL, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error fetching ticket file '%s'", fileURL), http.StatusBadRequest, nil
+		}
+	}
+
+	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, request.Message, files)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

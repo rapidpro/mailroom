@@ -1,3 +1,234 @@
+v6.3.6
+----------
+ * Update to latest goflow
+
+v6.3.5
+----------
+ * Update to latest goflow
+
+v6.3.4
+----------
+ * Update to latest goflow
+ * Smarter loading for cache misses on org assets
+
+v6.3.3
+----------
+ * Update to latest goflow
+
+v6.3.2
+----------
+ * Simplify caching, keep orgs for 5s, reload everything
+
+v6.3.1
+----------
+ * Update to latest goflow
+
+v6.3.0
+----------
+ * Fail expirations that are no longer the active session
+
+v6.2.3
+----------
+ * Update to latest goflow with completed es and pt-BR translations
+
+v6.2.2
+----------
+ * Update to latest goflow
+
+v6.2.1
+----------
+ * use SaveRequest() so our ivr logs always have bodies
+
+v6.2.0
+----------
+ * 6.2.0 Release Candidate
+
+v6.2.0
+----------
+ * 6.2.0 Release Candidate
+
+v6.1.19 
+----------
+ * Fix campaign even firing for background flows
+ * IVR forwards for Nexmo and Twilio
+
+v6.1.18
+----------
+ * Update to latest goflow
+ * Rename tickets/internal package
+
+v6.1.17
+----------
+ * Should match referral trigger with case insensitive
+
+v6.1.16
+----------
+ * Update to latest goflow
+ * Add link local ips to default disallowed networks config
+
+v6.1.15
+----------
+ * Update phonenumbers lib
+ * Decrease locations cache timeout to 1 minute
+
+v6.1.14
+----------
+ * Support ElasticSearch 7.2 (backwards incompatible to Elastic 6.*)
+
+v6.1.13
+----------
+ * Update to latest goflow
+
+v6.1.12
+----------
+ * Update to latest goflow v0.110.0
+
+v6.1.11
+----------
+ * Update to latest goflow v0.109.4
+
+v6.1.10
+----------
+ * Simplify FCM client code
+ * Fix updating message status when id column is bigint
+ * Ensure courier messages are always queued for a single contact
+ * Fix not triggering FCM syncs for broadcasts and ticket reply messages
+
+v6.1.9
+----------
+ * Update to goflow v0.109.0
+
+v6.1.8
+----------
+ * Update to latest goflow 0.108.0
+
+v6.1.7
+----------
+ * Use background instead of passive
+
+v6.1.6
+----------
+ * Update to latest goflow v0.107.2
+ * Add support for passive flows
+
+v6.1.5
+----------
+ * Update to goflow v0.107.1
+
+v6.1.4
+----------
+ * Variable timeout for fire campaign task
+
+v6.1.3
+----------
+ * Fix misreporting created contacts as updated during imports
+
+v6.1.2
+----------
+ * Ensure field and group assets used for imports are fresh
+ * Add support for internal type ticketers
+
+v6.1.1
+----------
+ * Update to latest goflow v0.106.3
+
+v6.1.0
+----------
+ * Configure engine to disallow HTTP requests to private networks
+
+v6.0.3
+----------
+ * correct name for completion.json in release
+
+v6.0.2
+----------
+ * pin goreleaser, explicit inclusion of /docs/*, completions and functions
+
+v6.0.1
+----------
+ * add log when queuing to courier
+
+v6.0.0
+----------
+ * Update test database
+
+v5.7.44
+----------
+ * Add ticket service for Rocket.Chat
+
+v5.7.43
+----------
+ * Update to latest goflow v0.106.1
+
+v5.7.42
+----------
+ * Prevent importing invalid URNs during import
+
+v5.7.41
+----------
+ * Update to latest goflow v0.106.0
+ * Don't write to flows_flowrun.timeout_on so it can be dropped
+
+v5.7.40
+----------
+ * Update to goflow v0.105.5
+
+v5.7.39
+----------
+ * Fix input_labels_added event handling when session input ID isn't set
+
+v5.7.38
+----------
+ * Always request Mp3 files from Twilio IVR recordings
+
+v5.7.37
+----------
+ * Add support for outgoing mailgun ticket attachments
+
+v5.7.36
+----------
+ * Incoming attachments for mailgun ticketers
+
+v5.7.33
+----------
+ * Update to goflow v0.105.4
+ * Fix cloning of flows during simulation so that ignore keyword triggers is cloned too
+
+v5.7.32
+----------
+ * Update to goflow v0.105.3 to get support for arabic numerals in has_number tests
+
+v5.7.31
+----------
+ * Update to latest goflow to get for normalizing numbers from The Gambia
+ * Enable retrying on the elastic client
+
+v5.7.30
+----------
+ * Reorganization of core packages
+
+v5.7.29
+----------
+ * Fix race condition when bulk getting/creating contacts
+
+v5.7.28
+----------
+ * Add contact/resolve endpoint to assist with channel events still handled in RP
+
+v5.7.27
+----------
+ * If a flow start task creates new contacts, save those back to the start
+
+v5.7.26
+----------
+ * Add mockable DB to enable testing database errors
+ * CreateContact also should do lookup before trying to create new contact with URNs
+ * Imports 2.0
+
+v5.7.25
+----------
+ * Pass org from the base task to task structs to remove need for duplicating it in the task body
+
 v5.7.24
 ----------
  * Add SessionStatus to messages queued to courier

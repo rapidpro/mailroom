@@ -11,13 +11,13 @@ import (
 
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/queue"
+	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/librato"
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"github.com/sirupsen/logrus"
 )
 
@@ -185,14 +185,16 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// initialize our elastic client
-	mr.ElasticClient, err = elastic.NewClient(
-		elastic.SetURL(mr.Config.Elastic),
-		elastic.SetSniff(false),
-	)
+	mr.ElasticClient, err = newElasticClient(mr.Config.Elastic)
 	if err != nil {
 		log.WithError(err).Error("unable to connect to elastic, check configuration")
 	} else {
 		log.Info("elastic ok")
+	}
+
+	// warn if we won't be doing FCM syncing
+	if config.Mailroom.FCMKey == "" {
+		logrus.Error("fcm not configured, no syncing of android channels")
 	}
 
 	for _, initFunc := range initFunctions {
@@ -235,4 +237,17 @@ func (mr *Mailroom) Stop() error {
 	mr.ElasticClient.Stop()
 	logrus.Info("mailroom stopped")
 	return nil
+}
+
+func newElasticClient(url string) (*elastic.Client, error) {
+	// enable retrying
+	backoff := elastic.NewSimpleBackoff(500, 1000, 2000)
+	backoff.Jitter(true)
+	retrier := elastic.NewBackoffRetrier(backoff)
+
+	return elastic.NewClient(
+		elastic.SetURL(url),
+		elastic.SetSniff(false),
+		elastic.SetRetrier(retrier),
+	)
 }

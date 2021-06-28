@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/uuids"
-	_ "github.com/nyaruka/mailroom/hooks"
-	"github.com/nyaruka/mailroom/models"
+	_ "github.com/nyaruka/mailroom/core/handlers"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/web"
 )
@@ -51,4 +51,16 @@ func TestModifyContacts(t *testing.T) {
 	web.RunWebTests(t, "testdata/modify.json")
 
 	models.FlushCache()
+}
+
+func TestResolveContacts(t *testing.T) {
+	testsuite.Reset()
+	db := testsuite.DB()
+
+	// detach Cathy's tel URN
+	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, models.CathyID)
+
+	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
+
+	web.RunWebTests(t, "testdata/resolve.json")
 }

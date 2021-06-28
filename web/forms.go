@@ -1,6 +1,7 @@
 package web
 
 import (
+	"mime"
 	"net/http"
 
 	"github.com/gorilla/schema"
@@ -26,27 +27,17 @@ func Validate(form interface{}) error {
 	return validate.Struct(form)
 }
 
-// DecodeAndValidateForm takes the passed in form and attempts to parse and validate it from the
-// URL query parameters as well as any POST parameters of the passed in request
+// DecodeAndValidateForm takes the passed in request and attempts to decode it as either a URL encoded form or a multipart form
 func DecodeAndValidateForm(form interface{}, r *http.Request) error {
-	err := r.ParseForm()
-	if err != nil {
-		return err
+	var err error
+	contentType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+
+	if contentType == "multipart/form-data" {
+		err = r.ParseMultipartForm(maxMemory)
+	} else {
+		err = r.ParseForm()
 	}
 
-	err = decoder.Decode(form, r.Form)
-	if err != nil {
-		return err
-	}
-
-	// check our input is valid
-	return validate.Struct(form)
-}
-
-// DecodeAndValidateMultipartForm takes the passed in form and attempts to parse and validate it from the
-// multipart form data
-func DecodeAndValidateMultipartForm(form interface{}, r *http.Request) error {
-	err := r.ParseMultipartForm(maxMemory)
 	if err != nil {
 		return err
 	}

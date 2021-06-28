@@ -1,0 +1,96 @@
+[
+    {
+        "label": "error if URN not provided",
+        "method": "POST",
+        "path": "/mr/contact/resolve",
+        "body": {
+            "org_id": 1,
+            "channel_id": 10000
+        },
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'urn' is required"
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "fetches existing contact using normalized URN identity",
+        "method": "POST",
+        "path": "/mr/contact/resolve",
+        "body": {
+            "org_id": 1,
+            "channel_id": 10000,
+            "urn": "tel:+1-605-5742222?foo=bar"
+        },
+        "status": 200,
+        "response": {
+            "contact": {
+                "uuid": "b699a406-7e44-49be-9f01-1a82893e8a10",
+                "id": 10001,
+                "name": "Bob",
+                "status": "active",
+                "timezone": "America/Los_Angeles",
+                "created_on": "2021-04-09T14:51:56.517774Z",
+                "urns": [
+                    "tel:+16055742222?id=10001&priority=1000"
+                ],
+                "fields": {
+                    "joined": {
+                        "text": "2019-01-24T04:32:22Z",
+                        "datetime": "2019-01-24T04:32:22.000000Z"
+                    }
+                }
+            },
+            "created": false,
+            "urn": {
+                "id": 10001,
+                "identity": "tel:+16055742222"
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "count": 0
+            }
+        ]
+    },
+    {
+        "label": "creates new contact and sets channel affinity",
+        "method": "POST",
+        "path": "/mr/contact/resolve",
+        "body": {
+            "org_id": 1,
+            "channel_id": 10000,
+            "urn": "tel:+1-605-5747777"
+        },
+        "status": 200,
+        "response": {
+            "contact": {
+                "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5",
+                "id": 30000,
+                "status": "active",
+                "timezone": "America/Los_Angeles",
+                "created_on": "2018-07-06T12:30:00.123457Z",
+                "urns": [
+                    "tel:+16055747777?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20121&priority=1000"
+                ]
+            },
+            "created": true,
+            "urn": {
+                "id": 20121,
+                "identity": "tel:+16055747777"
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "count": 1
+            }
+        ]
+    }
+]

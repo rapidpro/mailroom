@@ -15,8 +15,8 @@ import (
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 )
@@ -37,6 +37,22 @@ type sessionRequest struct {
 	Assets struct {
 		Channels []*types.Channel `json:"channels"`
 	} `json:"assets"`
+}
+
+func (r *sessionRequest) flows() map[assets.FlowUUID]json.RawMessage {
+	flows := make(map[assets.FlowUUID]json.RawMessage, len(r.Flows))
+	for _, fd := range r.Flows {
+		flows[fd.UUID] = fd.Definition
+	}
+	return flows
+}
+
+func (r *sessionRequest) channels() []assets.Channel {
+	chs := make([]assets.Channel, len(r.Assets.Channels))
+	for i := range r.Assets.Channels {
+		chs[i] = r.Assets.Channels[i]
+	}
+	return chs
 }
 
 type simulationResponse struct {
@@ -109,24 +125,11 @@ func handleStart(ctx context.Context, s *web.Server, r *http.Request) (interface
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
-	// clone it since we will be modifying it
-	oa, err = oa.Clone(s.CTX, s.DB)
+
+	// create clone of assets for simulation
+	oa, err = oa.CloneForSimulation(s.CTX, s.DB, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to clone org")
-	}
-
-	// for each of our passed in definitions
-	for _, flow := range request.Flows {
-		// populate our flow in our org from our request
-		err = populateFlow(oa, flow.UUID, flow.Definition)
-		if err != nil {
-			return nil, http.StatusBadRequest, err
-		}
-	}
-
-	// populate any test channels
-	for _, channel := range request.Assets.Channels {
-		oa.AddTestChannel(channel)
 	}
 
 	// read our trigger
@@ -186,24 +189,10 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusBadRequest, err
 	}
 
-	// clone it as we will modify it
-	oa, err = oa.Clone(s.CTX, s.DB)
+	// create clone of assets for simulation
+	oa, err = oa.CloneForSimulation(s.CTX, s.DB, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, err
-	}
-
-	// for each of our passed in definitions
-	for _, flow := range request.Flows {
-		// populate our flow in our org from our request
-		err = populateFlow(oa, flow.UUID, flow.Definition)
-		if err != nil {
-			return nil, http.StatusBadRequest, err
-		}
-	}
-
-	// populate any test channels
-	for _, channel := range request.Assets.Channels {
-		oa.AddTestChannel(channel)
 	}
 
 	session, err := goflow.Simulator().ReadSession(oa.SessionAssets(), request.Session, assets.IgnoreMissing)
@@ -265,16 +254,4 @@ func handleResume(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	return newSimulationResponse(session, sprint), http.StatusOK, nil
-}
-
-// populateFlow takes care of setting the definition for the flow with the passed in UUID according to the passed in definitions
-func populateFlow(oa *models.OrgAssets, uuid assets.FlowUUID, flowDef json.RawMessage) error {
-	f, err := oa.Flow(uuid)
-	if err != nil {
-		return errors.Wrapf(err, "unable to find flow with uuid: %s", uuid)
-	}
-	flow := f.(*models.Flow)
-
-	oa.SetFlow(flow.ID(), flow.UUID(), flow.Name(), flowDef)
-	return nil
 }

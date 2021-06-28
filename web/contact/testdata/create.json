@@ -150,8 +150,8 @@
         "status": 200,
         "response": {
             "contact": {
-                "uuid": "c34b6c7d-fa06-4563-92a3-d648ab64bccb",
-                "id": 30003,
+                "uuid": "8720f157-ca1c-432f-9c0b-2014ddc77094",
+                "id": 30002,
                 "name": "María",
                 "status": "active",
                 "timezone": "America/Los_Angeles",

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"

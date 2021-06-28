@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -95,7 +96,7 @@ func handleSubmit(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		// create / fetch our contact based on the highest priority URN
 		urn := fs.Contact().URNs()[0].URN()
 
-		_, flowContact, err = models.GetOrCreateContact(ctx, s.DB, oa, urn)
+		_, flowContact, _, err = models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{urn}, models.NilChannelID)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 		}

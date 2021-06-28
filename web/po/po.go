@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/goflow/flows/translation"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/i18n"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/go-chi/chi/middleware"
@@ -82,7 +82,7 @@ type importForm struct {
 
 func handleImport(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	form := &importForm{}
-	if err := web.DecodeAndValidateMultipartForm(form, r); err != nil {
+	if err := web.DecodeAndValidateForm(form, r); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 

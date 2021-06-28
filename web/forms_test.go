@@ -49,28 +49,29 @@ func TestDecodeAndValidateForm(t *testing.T) {
 
 func TestDecodeAndValidateMultipartForm(t *testing.T) {
 	// make a request with valid form data
-	request, err := web.MakeMultipartRequest("POST", "http://temba.io", map[string][]string{
-		"foo": []string{"a", "b"},
-		"bar": []string{"x"},
-	}, map[string]string{
-		"file1": "hello world\n",
+	request, err := web.MakeMultipartRequest("POST", "http://temba.io", []web.MultiPartPart{
+		{Name: "foo", Data: "a"},
+		{Name: "foo", Data: "b"},
+		{Name: "bar", Data: "x"},
+		{Name: "file1", Filename: "test.txt", Data: "hello world\n"},
 	}, nil)
 	require.NoError(t, err)
 
 	form := &TestForm{}
-	err = web.DecodeAndValidateMultipartForm(form, request)
+	err = web.DecodeAndValidateForm(form, request)
 
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"a", "b"}, form.Foo)
 	assert.Equal(t, "x", form.Bar)
 
 	// make a request that's missing required data
-	request, err = web.MakeMultipartRequest("POST", "http://temba.io", map[string][]string{
-		"foo": []string{"a", "b"},
-	}, nil, nil)
+	request, err = web.MakeMultipartRequest("POST", "http://temba.io", []web.MultiPartPart{
+		{Name: "foo", Data: "a"},
+		{Name: "foo", Data: "b"},
+	}, nil)
 	require.NoError(t, err)
 
 	form = &TestForm{}
-	err = web.DecodeAndValidateMultipartForm(form, request)
+	err = web.DecodeAndValidateForm(form, request)
 	assert.Error(t, err)
 }

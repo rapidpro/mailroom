@@ -13,7 +13,8 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets/mailgun"
 
 	"github.com/stretchr/testify/assert"
@@ -41,6 +42,9 @@ func TestOpenAndForward(t *testing.T) {
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
 			}`),
+		},
+		"http://myfiles.com/media/0123/attachment1.jpg": {
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpg"}, `MYIMAGE`),
 		},
 	}))
 
@@ -94,7 +98,13 @@ func TestOpenAndForward(t *testing.T) {
 	})
 
 	logger = &flows.HTTPLogger{}
-	err = svc.Forward(dbTicket, flows.MsgUUID("ca5607f0-cba8-4c94-9cd5-c4fbc24aa767"), "It's urgent", nil, logger.Log)
+	err = svc.Forward(
+		dbTicket,
+		flows.MsgUUID("ca5607f0-cba8-4c94-9cd5-c4fbc24aa767"),
+		"It's urgent",
+		[]utils.Attachment{utils.Attachment("image/jpg:http://myfiles.com/media/0123/attachment1.jpg")},
+		logger.Log,
+	)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))

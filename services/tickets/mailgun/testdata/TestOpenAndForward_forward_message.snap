@@ -1,7 +1,7 @@
 POST /v3/tickets.rapidpro.io/messages HTTP/1.1
 Host: api.mailgun.net
 User-Agent: Go-http-client/1.1
-Content-Length: 1011
+Content-Length: 1159
 Authorization: Basic ****************
 Content-Type: multipart/form-data; boundary=13e96d5a-4e65-4f07-9189-9d6270c6f3c0
 Accept-Encoding: gzip
@@ -31,6 +31,11 @@ It's urgent
 * Close this ticket by replying with CLOSE
 * View this contact at http://app.rapidpro.io/contact/read/6393abc0-283d-4c9b-a1b3-641a035c34bf/
 
+--13e96d5a-4e65-4f07-9189-9d6270c6f3c0
+Content-Disposition: form-data; name="attachment"; filename="untitled"
+Content-Type: image/jpg
+
+MYIMAGE
 --13e96d5a-4e65-4f07-9189-9d6270c6f3c0
 Content-Disposition: form-data; name="h:In-Reply-To"
 

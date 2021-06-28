@@ -1,7 +1,11 @@
 package tickets
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"io/ioutil"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -13,8 +17,8 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/courier"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/msgio"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -76,26 +80,21 @@ func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
-func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, ticket *models.Ticket, text string, fileURLs []string) (*models.Msg, error) {
+func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.Storage, ticket *models.Ticket, text string, files []*File) (*models.Msg, error) {
 	// look up our assets
 	oa, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
 
-	// fetch and files and prepare as attachments
-	attachments := make([]utils.Attachment, len(fileURLs))
-	for i, fileURL := range fileURLs {
-		fileBody, err := fetchFile(fileURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error fetching file %s for ticket reply", fileURL)
-		}
+	// upload files to create message attachments
+	attachments := make([]utils.Attachment, len(files))
+	for i, file := range files {
+		filename := string(uuids.New()) + filepath.Ext(file.URL)
 
-		filename := string(uuids.New()) + filepath.Ext(fileURL)
-
-		attachments[i], err = oa.Org().StoreAttachment(store, filename, fileBody)
+		attachments[i], err = oa.Org().StoreAttachment(store, filename, file.ContentType, file.Body)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error storing attachment %s for ticket reply", fileURL)
+			return nil, errors.Wrapf(err, "error storing attachment %s for ticket reply", file.URL)
 		}
 	}
 
@@ -111,23 +110,24 @@ func SendReply(ctx context.Context, db *sqlx.DB, rp *redis.Pool, store storage.S
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
 
-	msg := msgs[0]
-
-	// queue our message
-	rc := rp.Get()
-	defer rc.Close()
-
-	err = courier.QueueMessages(rc, []*models.Msg{msg})
-	if err != nil {
-		return msg, errors.Wrapf(err, "error queuing ticket reply")
-	}
-	return msg, nil
+	msgio.SendMessages(ctx, db, rp, nil, msgs)
+	return msgs[0], nil
 }
 
-func fetchFile(url string) ([]byte, error) {
-	req, _ := httpx.NewRequest("GET", url, nil, nil)
+var retries = httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
-	trace, err := httpx.DoTrace(http.DefaultClient, req, httpx.NewFixedRetries(time.Second*5, time.Second*10), nil, 10*1024*1024)
+// File represents a file sent to us from a ticketing service
+type File struct {
+	URL         string
+	ContentType string
+	Body        io.ReadCloser
+}
+
+// FetchFile fetches a file from the given URL
+func FetchFile(url string, headers map[string]string) (*File, error) {
+	req, _ := httpx.NewRequest("GET", url, nil, headers)
+
+	trace, err := httpx.DoTrace(http.DefaultClient, req, retries, nil, 10*1024*1024)
 	if err != nil {
 		return nil, err
 	}
@@ -135,5 +135,7 @@ func fetchFile(url string) ([]byte, error) {
 		return nil, errors.New("fetch returned non-200 response")
 	}
 
-	return trace.ResponseBody, nil
+	contentType, _, _ := mime.ParseMediaType(trace.Response.Header.Get("Content-Type"))
+
+	return &File{URL: url, ContentType: contentType, Body: ioutil.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
 }

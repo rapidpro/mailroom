@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/goflow"
-	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -17,6 +18,7 @@ import (
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(handleCreate))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(handleResolve))
 }
 
 // Request to create a new contact.
@@ -34,12 +36,12 @@ func init() {
 //   }
 //
 type createRequest struct {
-	OrgID   models.OrgID  `json:"org_id"   validate:"required"`
-	UserID  models.UserID `json:"user_id"`
-	Contact *Spec         `json:"contact"  validate:"required"`
+	OrgID   models.OrgID        `json:"org_id"   validate:"required"`
+	UserID  models.UserID       `json:"user_id"`
+	Contact *models.ContactSpec `json:"contact"  validate:"required"`
 }
 
-// handles a request to create the given contacts
+// handles a request to create the given contact
 func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
 	request := &createRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
@@ -52,7 +54,7 @@ func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	c, err := request.Contact.Validate(oa.Env(), oa.SessionAssets())
+	c, err := SpecToCreation(request.Contact, oa.Env(), oa.SessionAssets())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -63,7 +65,7 @@ func handleCreate(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
-	_, err = ModifyContacts(ctx, s.DB, s.RP, oa, modifiersByContact)
+	_, err = models.ApplyModifiers(ctx, s.DB, s.RP, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
 	}
@@ -128,12 +130,6 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	// clone it as we will modify flows
-	oa, err = oa.Clone(s.CTX, s.DB)
-	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to clone orgs")
-	}
-
 	// read the modifiers from the request
 	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
 	if err != nil {
@@ -157,7 +153,7 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 		modifiersByContact[flowContact] = mods
 	}
 
-	eventsByContact, err := ModifyContacts(ctx, s.DB, s.RP, oa, modifiersByContact)
+	eventsByContact, err := models.ApplyModifiers(ctx, s.DB, s.RP, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -172,4 +168,55 @@ func handleModify(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	return results, http.StatusOK, nil
+}
+
+// Request to resolve a contact based on a channel and URN
+//
+//   {
+//     "org_id": 1,
+//     "channel_id": 234,
+//     "urn": "tel:+250788123123"
+//   }
+//
+type resolveRequest struct {
+	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
+	ChannelID models.ChannelID `json:"channel_id" validate:"required"`
+	URN       urns.URN         `json:"urn"        validate:"required"`
+}
+
+// handles a request to resolve a contact
+func handleResolve(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+	request := &resolveRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	// grab our org
+	oa, err := models.GetOrgAssets(s.CTX, s.DB, request.OrgID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
+	}
+
+	_, contact, created, err := models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{request.URN}, request.ChannelID)
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error getting or creating contact")
+	}
+
+	// find the URN on the contact
+	urn := request.URN.Normalize(string(oa.Env().DefaultCountry()))
+	for _, u := range contact.URNs() {
+		if urn.Identity() == u.URN().Identity() {
+			urn = u.URN()
+			break
+		}
+	}
+
+	return map[string]interface{}{
+		"contact": contact,
+		"urn": map[string]interface{}{
+			"id":       models.GetURNInt(urn, "id"),
+			"identity": urn.Identity(),
+		},
+		"created": created,
+	}, http.StatusOK, nil
 }
