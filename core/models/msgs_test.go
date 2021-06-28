@@ -239,7 +239,7 @@ func TestNormalizeAttachment(t *testing.T) {
 }
 
 func TestMarkMessages(t *testing.T) {
-	ctx, db, _ := testsuite.Reset()
+	ctx, _, db, _ := testsuite.Reset()
 	defer testsuite.Reset()
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
@@ -283,7 +283,7 @@ func TestMarkMessages(t *testing.T) {
 }
 
 func TestNonPersistentBroadcasts(t *testing.T) {
-	ctx, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Reset()
 
 	db.MustExec(`DELETE FROM msgs_msg`)
 

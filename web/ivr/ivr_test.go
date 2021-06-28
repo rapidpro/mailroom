@@ -30,9 +30,10 @@ import (
 )
 
 func TestTwilioIVR(t *testing.T) {
-	ctx, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
+
 	defer testsuite.ResetStorage()
 
 	// start test server
@@ -347,11 +348,11 @@ func TestTwilioIVR(t *testing.T) {
 }
 
 func TestVonageIVR(t *testing.T) {
-	ctx, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
+
 	defer testsuite.ResetStorage()
-	models.FlushCache()
 
 	// deactivate our twilio channel
 	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)

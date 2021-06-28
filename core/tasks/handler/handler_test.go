@@ -286,9 +286,7 @@ func TestChannelEvents(t *testing.T) {
 }
 
 func TestTicketEvents(t *testing.T) {
-	ctx, db, _ := testsuite.Reset()
-	rt := testsuite.RT()
-
+	ctx, rt, db, _ := testsuite.Reset()
 	rc := rt.RP.Get()
 	defer rc.Close()
 

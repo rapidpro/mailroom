@@ -22,18 +22,20 @@ const MediaStorageDir = "_test_media_storage"
 const SessionStorageDir = "_test_session_storage"
 
 // Reset clears out both our database and redis DB
-func Reset() (context.Context, *sqlx.DB, *redis.Pool) {
-	logrus.SetLevel(logrus.DebugLevel)
+func Reset() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 	ResetDB()
 	ResetRP()
 
 	models.FlushCache()
+	logrus.SetLevel(logrus.DebugLevel)
 
-	return CTX(), DB(), RP()
+	return Get()
 }
 
+// Get returns the various runtime things a test might need
 func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
-	return CTX(), RT(), DB(), RP()
+	rt := RT()
+	return CTX(), rt, rt.DB, rt.RP
 }
 
 // ResetDB resets our database to our base state from our RapidPro dump
@@ -46,6 +48,7 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 func ResetDB() {
 	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
 	defer db.Close()
+
 	db.MustExec("drop owned by mailroom_test cascade")
 	dir, _ := os.Getwd()
 
@@ -60,8 +63,7 @@ func ResetDB() {
 
 // DB returns an open test database pool
 func DB() *sqlx.DB {
-	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
-	return db
+	return sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
 }
 
 // ResetRP resets our redis database

@@ -23,7 +23,7 @@ import (
 )
 
 func TestSurveyor(t *testing.T) {
-	ctx, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
 

@@ -23,9 +23,7 @@ import (
 )
 
 func TestIVR(t *testing.T) {
-	ctx, db, rp := testsuite.Reset()
-	models.FlushCache()
-
+	ctx, _, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
 
