@@ -25,8 +25,6 @@ func TestMsgEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	db.MustExec(`DELETE FROM msgs_msg`)
-
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
 
@@ -92,7 +90,7 @@ func TestMsgEvents(t *testing.T) {
 			ContactID: contactID,
 			OrgID:     orgID,
 			ChannelID: channelID,
-			MsgID:     flows.MsgID(20001),
+			MsgID:     flows.MsgID(1),
 			MsgUUID:   flows.MsgUUID(uuids.New()),
 			URN:       urn,
 			URNID:     urnID,
@@ -346,52 +344,46 @@ func TestTimedEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	db.MustExec(`DELETE FROM msgs_msg`)
-
 	// start to start our favorites flow
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
 
-	models.FlushCache()
-
 	tcs := []struct {
 		EventType string
-		ContactID models.ContactID
-		URN       urns.URN
-		URNID     models.URNID
+		Contact   *testdata.Contact
 		Message   string
 		Response  string
 		ChannelID models.ChannelID
 		OrgID     models.OrgID
 	}{
-		// start the flow
-		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 0: start the flow
+		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// this expiration does nothing because the times don't match
-		{handler.ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "bad", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 1: this expiration does nothing because the times don't match
+		{handler.ExpirationEventType, testdata.Cathy, "bad", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// this checks that the flow wasn't expired
-		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 2: this checks that the flow wasn't expired
+		{handler.MsgEventType, testdata.Cathy, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// this expiration will actually take
-		{handler.ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "good", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 3: this expiration will actually take
+		{handler.ExpirationEventType, testdata.Cathy, "good", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// we won't get a response as we will be out of the flow
-		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "mutzig", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 4: we won't get a response as we will be out of the flow
+		{handler.MsgEventType, testdata.Cathy, "mutzig", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// start the parent expiration flow
-		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "parent", "Child", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 5: start the parent expiration flow
+		{handler.MsgEventType, testdata.Cathy, "parent", "Child", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// respond, should bring us out
-		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi", "Completed", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 6: respond, should bring us out
+		{handler.MsgEventType, testdata.Cathy, "hi", "Completed", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// expiring our child should be a no op
-		{handler.ExpirationEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "child", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 7: expiring our child should be a no op
+		{handler.ExpirationEventType, testdata.Cathy, "child", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// respond one last time, should be done
-		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "done", "Ended", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 8: respond one last time, should be done
+		{handler.MsgEventType, testdata.Cathy, "done", "Ended", testdata.TwitterChannel.ID, testdata.Org1.ID},
 
-		// start our favorite flow again
-		{handler.MsgEventType, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		// 9: start our favorite flow again
+		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
 	}
 
 	last := time.Now()
@@ -405,13 +397,13 @@ func TestTimedEvents(t *testing.T) {
 		var task *queue.Task
 		if tc.EventType == handler.MsgEventType {
 			event := &handler.MsgEvent{
-				ContactID: tc.ContactID,
+				ContactID: tc.Contact.ID,
 				OrgID:     tc.OrgID,
 				ChannelID: tc.ChannelID,
-				MsgID:     flows.MsgID(20001),
+				MsgID:     flows.MsgID(1),
 				MsgUUID:   flows.MsgUUID(uuids.New()),
-				URN:       tc.URN,
-				URNID:     tc.URNID,
+				URN:       tc.Contact.URN,
+				URNID:     tc.Contact.URNID,
 				Text:      tc.Message,
 			}
 
@@ -439,14 +431,14 @@ func TestTimedEvents(t *testing.T) {
 
 			task = handler.NewExpirationTask(
 				tc.OrgID,
-				tc.ContactID,
+				tc.Contact.ID,
 				sessionID,
 				runID,
 				expiration,
 			)
 		}
 
-		err := handler.QueueHandleTask(rc, tc.ContactID, task)
+		err := handler.QueueHandleTask(rc, tc.Contact.ID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
@@ -456,17 +448,17 @@ func TestTimedEvents(t *testing.T) {
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		if tc.Response != "" {
-			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.ContactID, last).
+			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
 				Returns(tc.Response, "%d: response: mismatch", i)
 		}
 
-		err = db.Get(&sessionID, `SELECT id FROM flows_flowsession WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.ContactID)
+		err = db.Get(&sessionID, `SELECT id FROM flows_flowsession WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
 		assert.NoError(t, err)
 
-		err = db.Get(&runID, `SELECT id FROM flows_flowrun WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.ContactID)
+		err = db.Get(&runID, `SELECT id FROM flows_flowrun WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
 		assert.NoError(t, err)
 
-		err = db.Get(&runExpiration, `SELECT expires_on FROM flows_flowrun WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.ContactID)
+		err = db.Get(&runExpiration, `SELECT expires_on FROM flows_flowrun WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
 		assert.NoError(t, err)
 
 		last = time.Now()

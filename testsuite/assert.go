@@ -74,6 +74,8 @@ type Query struct {
 }
 
 func (q *Query) Returns(expected interface{}, msgAndArgs ...interface{}) {
+	q.t.Helper()
+
 	// get a variable of same type to hold actual result
 	actual := expected
 
@@ -90,6 +92,8 @@ func (q *Query) Returns(expected interface{}, msgAndArgs ...interface{}) {
 }
 
 func (q *Query) Columns(expected map[string]interface{}, msgAndArgs ...interface{}) {
+	q.t.Helper()
+
 	actual := make(map[string]interface{}, len(expected))
 
 	err := q.db.QueryRowx(q.sql, q.args...).MapScan(actual)

@@ -139,7 +139,7 @@ func TestOutgoingMsgs(t *testing.T) {
 func TestGetMessageIDFromUUID(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	msgIn := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi there")
+	msgIn := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi there", models.MsgStatusHandled)
 
 	msgID, err := models.GetMessageIDFromUUID(ctx, db, msgIn.UUID())
 
@@ -150,11 +150,11 @@ func TestGetMessageIDFromUUID(t *testing.T) {
 func TestLoadMessages(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	msgIn1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "in 1")
-	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"})
-	msgOut2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 2", nil)
-	msgOut3 := testdata.InsertOutgoingMsg(db, testdata.Org2, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "out 3", nil)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "hi 3", nil)
+	msgIn1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "in 1", models.MsgStatusHandled)
+	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"}, models.MsgStatusSent)
+	msgOut2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 2", nil, models.MsgStatusSent)
+	msgOut3 := testdata.InsertOutgoingMsg(db, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "out 3", nil, models.MsgStatusSent)
+	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi 3", nil, models.MsgStatusSent)
 
 	ids := []models.MsgID{models.MsgID(msgIn1.ID()), models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID()), models.MsgID(msgOut3.ID())}
 
@@ -178,17 +178,14 @@ func TestLoadMessages(t *testing.T) {
 func TestResendMessages(t *testing.T) {
 	ctx, _, db, rp := testsuite.Get()
 
-	db.MustExec(`DELETE FROM msgs_msg`)
+	defer testsuite.Reset()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 1", nil)
-	msgOut2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.Bob.ID, testdata.Bob.URN, testdata.Bob.URNID, "out 2", nil)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.Cathy.ID, testdata.Cathy.URN, testdata.Cathy.URNID, "out 3", nil)
-
-	// make them look like failed messages
-	db.MustExec(`UPDATE msgs_msg SET status = 'F', sent_on = NOW(), error_count = 3`)
+	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", nil, models.MsgStatusFailed)
+	msgOut2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "out 2", nil, models.MsgStatusFailed)
+	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 3", nil, models.MsgStatusFailed)
 
 	// give Bob's URN an affinity for the Vonage channel
 	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, testdata.VonageChannel.ID, testdata.Bob.URNID)
@@ -282,7 +279,10 @@ func TestMarkMessages(t *testing.T) {
 func TestNonPersistentBroadcasts(t *testing.T) {
 	ctx, _, db, rp := testsuite.Reset()
 
-	db.MustExec(`DELETE FROM msgs_msg`)
+	defer func() {
+		db.MustExec(`DELETE FROM msgs_msg`)
+		db.MustExec(`DELETE FROM tickets_ticket`)
+	}()
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Problem", "", "", nil)
 	modelTicket := ticket.Load(db)

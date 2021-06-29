@@ -9,10 +9,7 @@ import (
 )
 
 func TestChannelback(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-
-	db.MustExec(`DELETE FROM msgs_msg`)
+	_, _, db, _ := testsuite.Reset()
 
 	// create a zendesk ticket for Cathy
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)
@@ -21,8 +18,7 @@ func TestChannelback(t *testing.T) {
 }
 
 func TestEventCallback(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
+	_, _, db, _ := testsuite.Reset()
 
 	// create a zendesk ticket for Cathy
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)
@@ -31,8 +27,7 @@ func TestEventCallback(t *testing.T) {
 }
 
 func TestTarget(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
+	_, _, db, _ := testsuite.Reset()
 
 	// create a zendesk ticket for Cathy
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)

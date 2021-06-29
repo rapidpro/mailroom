@@ -9,10 +9,13 @@ import (
 )
 
 func TestReceive(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
+	_, _, db, _ := testsuite.Reset()
 
-	db.MustExec(`DELETE FROM msgs_msg`)
+	defer func() {
+		db.MustExec(`DELETE FROM msgs_msg`)
+		db.MustExec(`DELETE FROM tickets_ticketevent`)
+		db.MustExec(`DELETE FROM tickets_ticket`)
+	}()
 
 	// create a mailgun ticket for Cathy
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)

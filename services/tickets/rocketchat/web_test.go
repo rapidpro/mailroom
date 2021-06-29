@@ -12,8 +12,6 @@ func TestEventCallback(t *testing.T) {
 	testsuite.Reset()
 	db := testsuite.DB()
 
-	db.MustExec(`DELETE FROM msgs_msg`)
-
 	// create a rocketchat ticket for Cathy
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.RocketChat, "Need help", "Have you seen my cookies?", "1234", nil)
 

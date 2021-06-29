@@ -36,7 +36,7 @@
         "body": "message=We%20can%20help&recipient_id=1234&thread_id=$cathy_ticket_uuid$&metadata=%7B%22ticketer%22%3A%224ee6d4f3-f92b-439b-9718-8da90c05490c%22%2C%22secret%22%3A%22sesame%22%7D",
         "status": 200,
         "response": {
-            "external_id": "20001",
+            "external_id": "1",
             "allow_channelback": true
         },
         "db_assertions": [
@@ -61,7 +61,7 @@
         },
         "status": 200,
         "response": {
-            "external_id": "20002",
+            "external_id": "2",
             "allow_channelback": true
         },
         "db_assertions": [
