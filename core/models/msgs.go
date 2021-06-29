@@ -710,8 +710,8 @@ type broadcastGroup struct {
 
 const insertBroadcastSQL = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, is_active, created_on, modified_on, status,  text,  base_language, send_all)
-			VALUES(:org_id, :parent_id, :ticket_id, TRUE,      NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
+	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all)
+			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
 RETURNING
 	id
 `
