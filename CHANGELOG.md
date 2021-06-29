@@ -1,3 +1,7 @@
+v6.3.26
+----------
+ * Stop writing broadcast.is_active which is now nullable
+
 v6.3.25
 ----------
  * Update to latest goflow
