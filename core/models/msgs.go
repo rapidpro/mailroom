@@ -54,10 +54,10 @@ const (
 type MsgType string
 
 const (
-	TypeInbox = MsgType("I")
-	TypeFlow  = MsgType("F")
-	TypeIVR   = MsgType("V")
-	TypeUSSD  = MsgType("U")
+	MsgTypeInbox = MsgType("I")
+	MsgTypeFlow  = MsgType("F")
+	MsgTypeIVR   = MsgType("V")
+	MsgTypeUSSD  = MsgType("U")
 )
 
 type MsgStatus string
@@ -226,7 +226,7 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, creat
 	m.Direction = DirectionIn
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
-	m.MsgType = TypeIVR
+	m.MsgType = MsgTypeIVR
 	m.ContactID = conn.ContactID()
 
 	urnID := conn.ContactURNID()
@@ -261,7 +261,7 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 	m.Direction = DirectionOut
 	m.Status = MsgStatusWired
 	m.Visibility = VisibilityVisible
-	m.MsgType = TypeIVR
+	m.MsgType = MsgTypeIVR
 	m.ContactID = conn.ContactID()
 
 	urnID := conn.ContactURNID()
@@ -302,7 +302,7 @@ func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.
 	m.Direction = DirectionOut
 	m.Status = status
 	m.Visibility = VisibilityVisible
-	m.MsgType = TypeFlow
+	m.MsgType = MsgTypeFlow
 	m.ContactID = contactID
 	m.OrgID = org.ID()
 	m.TopupID = NilTopupID
@@ -364,7 +364,7 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	m.Direction = DirectionIn
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
-	m.MsgType = TypeFlow
+	m.MsgType = MsgTypeFlow
 	m.ContactID = contactID
 
 	m.OrgID = orgID

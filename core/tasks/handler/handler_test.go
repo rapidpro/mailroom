@@ -31,69 +31,83 @@ func TestMsgEvents(t *testing.T) {
 	testdata.InsertKeywordTrigger(db, testdata.Org2, testdata.Org2Favorites, "start", models.MatchOnly, nil, nil)
 	testdata.InsertCatchallTrigger(db, testdata.Org2, testdata.Org2SingleMessage, nil, nil)
 
-	// give Cathy an open ticket
-	cathyTicket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Hi there", "Ok", "", nil)
+	// give Cathy and Bob some tickets...
+	openTickets := map[*testdata.Contact][]*testdata.Ticket{
+		testdata.Cathy: {
+			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Hi there", "Ok", "", nil),
+			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Hi again", "Ok", "", nil),
+		},
+	}
+	closedTickets := map[*testdata.Contact][]*testdata.Ticket{
+		testdata.Cathy: {
+			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Old", "", "", nil),
+		},
+		testdata.Bob: {
+			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Hi there", "Ok", "", nil),
+		},
+	}
 
-	// give Bob a closed ticket
-	bobTicket := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Hi there", "Ok", "", nil)
-
-	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z' WHERE id IN ($1, $2)`, cathyTicket.ID, bobTicket.ID)
+	db.MustExec(`UPDATE tickets_ticket SET last_activity_on = '2021-01-01T00:00:00Z'`)
 
 	// clear all of Alexandria's URNs
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Alexandria.ID)
 
 	models.FlushCache()
 
+	// insert a dummy message into the database that will get the updates from handling each message event which pretends to be it
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "", models.MsgStatusPending)
+
 	tcs := []struct {
-		Hook      func()
-		Contact   *testdata.Contact
-		Message   string
-		Response  string
-		ChannelID models.ChannelID
-		OrgID     models.OrgID
+		Hook          func()
+		Org           *testdata.Org
+		Channel       *testdata.Channel
+		Contact       *testdata.Contact
+		Text          string
+		ExpectedReply string
+		ExpectedType  models.MsgType
 	}{
-		{nil, testdata.Cathy, "noop", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "start other", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "purple", "I don't know that color. Try again.", testdata.TwitterChannel.ID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "blue", "Good choice, I like Blue too! What is your favorite beer?", testdata.TwitterChannel.ID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", testdata.TwitterChannel.ID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "Cathy", "Thanks Cathy, we are all done!", testdata.TwitterChannel.ID, testdata.Org1.ID},
-		{nil, testdata.Cathy, "noop", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "noop", "", models.MsgTypeInbox},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "start other", "", models.MsgTypeInbox},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "start", "What is your favorite color?", models.MsgTypeFlow},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "purple", "I don't know that color. Try again.", models.MsgTypeFlow},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "blue", "Good choice, I like Blue too! What is your favorite beer?", models.MsgTypeFlow},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", models.MsgTypeFlow},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "Cathy", "Thanks Cathy, we are all done!", models.MsgTypeFlow},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "noop", "", models.MsgTypeInbox},
 
-		{nil, testdata.Org2Contact, "other", "Hey, how are you?", testdata.Org2Channel.ID, testdata.Org2.ID},
-		{nil, testdata.Org2Contact, "start", "What is your favorite color?", testdata.Org2Channel.ID, testdata.Org2.ID},
-		{nil, testdata.Org2Contact, "green", "Good choice, I like Green too! What is your favorite beer?", testdata.Org2Channel.ID, testdata.Org2.ID},
-		{nil, testdata.Org2Contact, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", testdata.Org2Channel.ID, testdata.Org2.ID},
-		{nil, testdata.Org2Contact, "george", "Thanks george, we are all done!", testdata.Org2Channel.ID, testdata.Org2.ID},
-		{nil, testdata.Org2Contact, "blargh", "Hey, how are you?", testdata.Org2Channel.ID, testdata.Org2.ID},
+		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "other", "Hey, how are you?", models.MsgTypeFlow},
+		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start", "What is your favorite color?", models.MsgTypeFlow},
+		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "green", "Good choice, I like Green too! What is your favorite beer?", models.MsgTypeFlow},
+		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", models.MsgTypeFlow},
+		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "george", "Thanks george, we are all done!", models.MsgTypeFlow},
+		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "blargh", "Hey, how are you?", models.MsgTypeFlow},
 
-		{nil, testdata.Bob, "ivr", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Bob, "ivr", "", models.MsgTypeFlow},
 
 		// no URN on contact but handle event, session gets started but no message created
-		{nil, testdata.Alexandria, "start", "", testdata.TwilioChannel.ID, testdata.Org1.ID},
+		{nil, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria, "start", "", models.MsgTypeFlow},
 
 		// start Fred back in our favorite flow, then make it inactive, will be handled by catch-all
-		{nil, testdata.Org2Contact, "start", "What is your favorite color?", testdata.Org2Channel.ID, testdata.Org2.ID},
+		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start", "What is your favorite color?", models.MsgTypeFlow},
 		{func() {
 			db.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Org2Favorites.ID)
-		}, testdata.Org2Contact, "red", "Hey, how are you?", testdata.Org2Channel.ID, testdata.Org2.ID},
+		}, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "red", "Hey, how are you?", models.MsgTypeFlow},
 
 		// start Fred back in our favorites flow to test retries
 		{func() {
 			db.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, testdata.Org2Favorites.ID)
-		}, testdata.Org2Contact, "start", "What is your favorite color?", testdata.Org2Channel.ID, testdata.Org2.ID},
+		}, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start", "What is your favorite color?", models.MsgTypeFlow},
 	}
 
-	makeMsgTask := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urn urns.URN, urnID models.URNID, text string) *queue.Task {
+	makeMsgTask := func(org *testdata.Org, channel *testdata.Channel, contact *testdata.Contact, text string) *queue.Task {
 		event := &handler.MsgEvent{
-			ContactID: contactID,
-			OrgID:     orgID,
-			ChannelID: channelID,
-			MsgID:     flows.MsgID(1),
-			MsgUUID:   flows.MsgUUID(uuids.New()),
-			URN:       urn,
-			URNID:     urnID,
+			ContactID: contact.ID,
+			OrgID:     org.ID,
+			ChannelID: channel.ID,
+			MsgID:     dbMsg.ID(),
+			MsgUUID:   dbMsg.UUID(),
+			URN:       contact.URN,
+			URNID:     contact.URNID,
 			Text:      text,
 		}
 
@@ -102,7 +116,7 @@ func TestMsgEvents(t *testing.T) {
 
 		task := &queue.Task{
 			Type:  handler.MsgEventType,
-			OrgID: int(orgID),
+			OrgID: int(org.ID),
 			Task:  eventJSON,
 		}
 
@@ -114,12 +128,15 @@ func TestMsgEvents(t *testing.T) {
 	for i, tc := range tcs {
 		models.FlushCache()
 
+		// reset our dummy db message into an unhandled state
+		db.MustExec(`UPDATE msgs_msg SET status = 'P', msg_type = NULL WHERE id = $1`, dbMsg.ID())
+
 		// run our hook if we have one
 		if tc.Hook != nil {
 			tc.Hook()
 		}
 
-		task := makeMsgTask(tc.OrgID, tc.ChannelID, tc.Contact.ID, tc.Contact.URN, tc.Contact.URNID, tc.Message)
+		task := makeMsgTask(tc.Org, tc.Channel, tc.Contact, tc.Text)
 
 		err := handler.QueueHandleTask(rc, tc.Contact.ID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
@@ -130,10 +147,25 @@ func TestMsgEvents(t *testing.T) {
 		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
-		// if we are meant to have a response
-		var text string
-		db.Get(&text, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last)
-		assert.Equal(t, text, tc.Response, "%d: response: '%s' does not contain '%s'", i, text, tc.Response)
+		// check that message is marked as handled with expected type
+		testsuite.AssertQuery(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+			Columns(map[string]interface{}{"msg_type": string(tc.ExpectedType), "status": "H"}, "%d: msg state mismatch", i)
+
+		// if we are meant to have a reply, check it
+		if tc.ExpectedReply != "" {
+			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
+				Returns(tc.ExpectedReply, "%d: response mismatch", i)
+		}
+
+		// check any open tickets for this contact where updated
+		numOpenTickets := len(openTickets[tc.Contact])
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'O' AND last_activity_on > $2`, tc.Contact.ID, last).
+			Returns(numOpenTickets, "%d: updated open ticket mismatch", i)
+
+		// check any closed tickets are unchanged
+		numClosedTickets := len(closedTickets[tc.Contact])
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'C' AND last_activity_on = '2021-01-01T00:00:00Z'`, tc.Contact.ID).
+			Returns(numClosedTickets, "%d: unchanged closed ticket mismatch", i)
 
 		last = time.Now()
 	}
@@ -150,16 +182,12 @@ func TestMsgEvents(t *testing.T) {
 		fmt.Sprintf("msgs:%s|10/1", testdata.Org2Channel.UUID):    {1, 1, 1, 1, 1, 1, 1, 1, 1},
 	})
 
-	// Cathy's open ticket will have been updated but not Bob's closed ticket
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > '2021-01-01T00:00:00Z'`, cathyTicket.ID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = '2021-01-01T00:00:00Z'`, bobTicket.ID).Returns(1)
-
 	// Fred's sessions should not have a timeout because courier will set them
 	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL AND wait_started_on IS NOT NULL`, testdata.Org2Contact.ID).Returns(2)
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, testdata.Org2Contact.ID)
-	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "red")
+	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "red")
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 
 	// should get requeued three times automatically
@@ -180,7 +208,7 @@ func TestMsgEvents(t *testing.T) {
 	models.FlushCache()
 
 	// try to resume now
-	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "red")
+	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "red")
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
@@ -195,7 +223,7 @@ func TestMsgEvents(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F' and current_flow_id = $2`, testdata.Org2Contact.ID, testdata.Org2Favorites.ID).Returns(2)
 
 	// trigger should also not start a new session
-	task = makeMsgTask(testdata.Org2.ID, testdata.Org2Channel.ID, testdata.Org2Contact.ID, testdata.Org2Contact.URN, testdata.Org2Contact.URNID, "start")
+	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start")
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 	err = handler.HandleEvent(ctx, rt, task)
