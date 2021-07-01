@@ -1,3 +1,7 @@
+v6.3.27
+----------
+ * Fix handling of inbox messages to also update open tickets
+
 v6.3.26
 ----------
  * Stop writing broadcast.is_active which is now nullable
