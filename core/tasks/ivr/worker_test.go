@@ -51,20 +51,20 @@ func TestIVR(t *testing.T) {
 	client.callError = errors.Errorf("unable to create call")
 	err = HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`, []interface{}{testdata.Cathy.ID, models.ConnectionStatusFailed}, 1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.ConnectionStatusFailed).Returns(1)
 
 	client.callError = nil
 	client.callID = ivr.CallID("call1")
 	err = HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, []interface{}{testdata.Cathy.ID, models.ConnectionStatusWired, "call1"}, 1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.ConnectionStatusWired, "call1").Returns(1)
 
 	// trying again should put us in a throttled state (queued)
 	client.callError = nil
 	client.callID = ivr.CallID("call1")
 	err = HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, []interface{}{testdata.Cathy.ID, models.ConnectionStatusQueued}, 1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.ConnectionStatusQueued).Returns(1)
 }
 
 var client = &MockClient{}

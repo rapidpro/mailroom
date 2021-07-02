@@ -330,8 +330,8 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	assert.Equal(t, 2, len(msgs))
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`, nil, 2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`).Returns(2)
 
 	// test ticket was updated
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, []interface{}{ticket.ID, modelTicket.LastActivityOn()}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
 }

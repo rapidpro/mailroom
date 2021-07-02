@@ -52,7 +52,7 @@ func TestRetryMsgs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// message should be handled now
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from msgs_msg WHERE text = 'pending' AND status = 'H'`, []interface{}{}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from msgs_msg WHERE text = 'pending' AND status = 'H'`).Returns(1)
 
 	// only one message was queued
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)

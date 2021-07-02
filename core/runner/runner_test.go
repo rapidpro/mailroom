@@ -63,38 +63,36 @@ func TestCampaignStarts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
-		 AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
-		[]interface{}{pq.Array(contacts)}, 2, "expected only two sessions to be created",
-	)
+	testsuite.AssertQuery(t, db,
+		`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`, pq.Array(contacts)).
+		Returns(2, "expected only two sessions to be created")
 
-	testsuite.AssertQueryCount(t, db,
+	testsuite.AssertQuery(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
 		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND session_id IS NOT NULL`,
-		[]interface{}{pq.Array(contacts), testdata.CampaignFlow.ID}, 2, "expected only two runs to be created",
-	)
+		pq.Array(contacts), testdata.CampaignFlow.ID).Returns(2, "expected only two runs to be created")
 
-	testsuite.AssertQueryCount(t, db,
+	testsuite.AssertQuery(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
 		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
 		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $2`,
-		[]interface{}{pq.Array(contacts), testdata.TwilioChannel.ID}, 2, "expected only two messages to be sent",
-	)
+		pq.Array(contacts), testdata.TwilioChannel.ID).Returns(2, "expected only two messages to be sent")
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`, nil, 0, "expected all events to be fired")
+	testsuite.AssertQuery(t, db, `SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`).
+		Returns(0, "expected all events to be fired")
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, []interface{}{testdata.Cathy.ID, testdata.Bob.ID, testdata.RemindersEvent2.ID}, 2, "expected bob and cathy to have their event sent to fired")
+	testsuite.AssertQuery(t, db,
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, testdata.Cathy.ID, testdata.Bob.ID, testdata.RemindersEvent2.ID).
+		Returns(2, "expected bob and cathy to have their event sent to fired")
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, []interface{}{testdata.Alexandria.ID, testdata.RemindersEvent2.ID}, 1, "expected alexandria to have her event set to skipped")
+	testsuite.AssertQuery(t, db,
+		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, testdata.Alexandria.ID, testdata.RemindersEvent2.ID).
+		Returns(1, "expected alexandria to have her event set to skipped")
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, []interface{}{testdata.Cathy.ID}, 1)
+	testsuite.AssertQuery(t, db,
+		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestBatchStart(t *testing.T) {
@@ -142,26 +140,23 @@ func TestBatchStart(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
-		testsuite.AssertQueryCount(t, db,
+		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
-			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND created_on > $2`,
-			[]interface{}{pq.Array(contactIDs), last}, tc.Count, "%d: unexpected number of sessions", i,
-		)
+			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
+			Returns(tc.Count, "%d: unexpected number of sessions", i)
 
-		testsuite.AssertQueryCount(t, db,
+		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
 			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-			AND session_id IS NOT NULL`,
-			[]interface{}{pq.Array(contactIDs), tc.Flow}, tc.TotalCount, "%d: unexpected number of runs", i,
-		)
+			AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
+			Returns(tc.TotalCount, "%d: unexpected number of runs", i)
 
-		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
-			AND text = $2 AND org_id = 1 AND status = 'Q' 
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = $2 AND org_id = 1 AND status = 'Q' 
 			AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $3`,
-			[]interface{}{pq.Array(contactIDs), tc.Msg, testdata.TwilioChannel.ID}, tc.TotalCount, "%d: unexpected number of messages", i,
-		)
+			pq.Array(contactIDs), tc.Msg, testdata.TwilioChannel.ID).
+			Returns(tc.TotalCount, "%d: unexpected number of messages", i)
 
 		last = time.Now()
 	}
@@ -189,22 +184,15 @@ func TestResume(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
-	testsuite.AssertQueryCount(t, db,
+	testsuite.AssertQuery(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`,
-		[]interface{}{contact.ID(), flow.ID()}, 1,
-	)
+		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`, contact.ID(), flow.ID()).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
+	testsuite.AssertQuery(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-		 AND is_active = TRUE AND responded = FALSE AND org_id = 1`,
-		[]interface{}{contact.ID(), flow.ID()}, 1,
-	)
+		 AND is_active = TRUE AND responded = FALSE AND org_id = 1`, contact.ID(), flow.ID()).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`,
-		[]interface{}{contact.ID()}, 1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, contact.ID()).Returns(1)
 
 	tcs := []struct {
 		Message       string
@@ -230,11 +218,10 @@ func TestResume(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 
-		testsuite.AssertQueryCount(t, db,
+		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND output_url IS NOT NULL`,
-			[]interface{}{contact.ID(), flow.ID(), tc.SessionStatus}, 1, "%d: didn't find expected session", i,
-		)
+			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND output_url IS NOT NULL`, contact.ID(), flow.ID(), tc.SessionStatus).
+			Returns(1, "%d: didn't find expected session", i)
 
 		runIsActive := tc.RunStatus == models.RunStatusActive || tc.RunStatus == models.RunStatusWaiting
 
@@ -249,14 +236,10 @@ func TestResume(t *testing.T) {
 			runQuery += ` AND expires_on IS NULL`
 		}
 
-		testsuite.AssertQueryCount(t, db,
-			runQuery,
-			[]interface{}{contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength, tc.EventLength}, 1, "%d: didn't find expected run", i,
-		)
+		testsuite.AssertQuery(t, db, runQuery, contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength, tc.EventLength).
+			Returns(1, "%d: didn't find expected run", i)
 
-		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`,
-			[]interface{}{contact.ID(), tc.Substring}, 1, "%d: didn't find expected message", i,
-		)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, contact.ID(), tc.Substring).
+			Returns(1, "%d: didn't find expected message", i)
 	}
 }

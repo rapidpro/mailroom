@@ -107,7 +107,7 @@ func TestTickets(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check all tickets were created
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE status = 'O' AND closed_on IS NULL`, nil, 3)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE status = 'O' AND closed_on IS NULL`).Returns(3)
 
 	// can lookup a ticket by UUID
 	tk1, err := models.LookupTicketByUUID(ctx, db, "2ef57efc-d85f-4291-b330-e4afe68af5fe")
@@ -137,16 +137,16 @@ func TestUpdateTicketConfig(t *testing.T) {
 	modelTicket := ticket.Load(db)
 
 	// empty configs are null
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config IS NULL AND id = $1`, []interface{}{ticket.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE config IS NULL AND id = $1`, ticket.ID).Returns(1)
 
 	models.UpdateTicketConfig(ctx, db, modelTicket, map[string]string{"foo": "2352", "bar": "abc"})
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "2352", "bar": "abc"}'::jsonb AND id = $1`, []interface{}{ticket.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "2352", "bar": "abc"}'::jsonb AND id = $1`, ticket.ID).Returns(1)
 
 	// updates are additive
 	models.UpdateTicketConfig(ctx, db, modelTicket, map[string]string{"foo": "6547", "zed": "xyz"})
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "6547", "bar": "abc", "zed": "xyz"}'::jsonb AND id = $1`, []interface{}{ticket.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "6547", "bar": "abc", "zed": "xyz"}'::jsonb AND id = $1`, ticket.ID).Returns(1)
 }
 
 func TestUpdateTicketLastActivity(t *testing.T) {
@@ -164,7 +164,7 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 
 	assert.Equal(t, now, modelTicket.LastActivityOn())
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = $2`, []interface{}{ticket.ID, modelTicket.LastActivityOn()}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
 
 }
 
@@ -198,19 +198,19 @@ func TestCloseTickets(t *testing.T) {
 	assert.Equal(t, models.TicketEventTypeClosed, evts[modelTicket1].EventType())
 
 	// check ticket #1 is now closed
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'C' AND closed_on IS NOT NULL`, []interface{}{ticket1.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'C' AND closed_on IS NOT NULL`, ticket1.ID).Returns(1)
 
 	// and there's closed event for it
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'C'`,
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'C'`,
 		[]interface{}{testdata.Org1.ID, ticket1.ID}, 1)
 
 	// and the logger has an http log it can insert for that ticketer
 	require.NoError(t, logger.Insert(ctx, db))
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, []interface{}{testdata.Mailgun.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, testdata.Mailgun.ID).Returns(1)
 
 	// but no events for ticket #2 which waas already closed
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, []interface{}{ticket2.ID}, 0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, ticket2.ID).Returns(0)
 
 	// can close tickets without a user
 	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where my shoes", "123", nil)
@@ -221,7 +221,7 @@ func TestCloseTickets(t *testing.T) {
 	assert.Equal(t, 1, len(evts))
 	assert.Equal(t, models.TicketEventTypeClosed, evts[modelTicket3].EventType())
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C' AND created_by_id IS NULL`, []interface{}{ticket3.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C' AND created_by_id IS NULL`, ticket3.ID).Returns(1)
 }
 
 func TestReopenTickets(t *testing.T) {
@@ -254,17 +254,16 @@ func TestReopenTickets(t *testing.T) {
 	assert.Equal(t, models.TicketEventTypeReopened, evts[modelTicket1].EventType())
 
 	// check ticket #1 is now closed
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'O' AND closed_on IS NULL`, []interface{}{ticket1.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'O' AND closed_on IS NULL`, ticket1.ID).Returns(1)
 
 	// and there's reopened event for it
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'R'`,
-		[]interface{}{testdata.Org1.ID, ticket1.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'R'`, testdata.Org1.ID, ticket1.ID).Returns(1)
 
 	// and the logger has an http log it can insert for that ticketer
 	require.NoError(t, logger.Insert(ctx, db))
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, []interface{}{testdata.Mailgun.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, testdata.Mailgun.ID).Returns(1)
 
 	// but no events for ticket #2 which waas already open
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, []interface{}{ticket2.ID}, 0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, ticket2.ID).Returns(0)
 }

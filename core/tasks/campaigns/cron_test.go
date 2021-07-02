@@ -43,8 +43,8 @@ func TestCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should now have a flow run for that contact and flow
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, []interface{}{testdata.Cathy.ID, testdata.Favorites.ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, []interface{}{testdata.George.ID, testdata.Favorites.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, testdata.Cathy.ID, testdata.Favorites.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, testdata.George.ID, testdata.Favorites.ID).Returns(1)
 }
 
 func TestIVRCampaigns(t *testing.T) {
@@ -75,12 +75,12 @@ func TestIVRCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should now have a flow start created
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart WHERE flow_id = $1 AND start_type = 'T' AND status = 'P';`, []interface{}{testdata.IVRFlow.ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart_contacts WHERE contact_id = $1 AND flowstart_id = 1;`, []interface{}{testdata.Cathy.ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from flows_flowstart_contacts WHERE contact_id = $1 AND flowstart_id = 1;`, []interface{}{testdata.George.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) from flows_flowstart WHERE flow_id = $1 AND start_type = 'T' AND status = 'P';`, testdata.IVRFlow.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) from flows_flowstart_contacts WHERE contact_id = $1 AND flowstart_id = 1;`, testdata.Cathy.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) from flows_flowstart_contacts WHERE contact_id = $1 AND flowstart_id = 1;`, testdata.George.ID).Returns(1)
 
 	// event should be marked as fired
-	testsuite.AssertQueryCount(t, db, `SELECT COUNT(*) from campaigns_eventfire WHERE event_id = $1 AND fired IS NOT NULL;`, []interface{}{testdata.RemindersEvent1.ID}, 2)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) from campaigns_eventfire WHERE event_id = $1 AND fired IS NOT NULL;`, testdata.RemindersEvent1.ID).Returns(2)
 
 	// pop our next task, should be the start
 	task, err = queue.PopNextTask(rc, queue.BatchQueue)

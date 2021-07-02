@@ -22,6 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/ivr/twiml"
@@ -94,16 +95,12 @@ func TestTwilioIVR(t *testing.T) {
 	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db,
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.ConnectionStatusWired, "Call1").Returns(1)
+
+	testsuite.AssertQuery(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{testdata.Cathy.ID, models.ConnectionStatusWired, "Call1"},
-		1,
-	)
-	testsuite.AssertQueryCount(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{testdata.George.ID, models.ConnectionStatusWired, "Call2"},
-		1,
-	)
+		testdata.George.ID, models.ConnectionStatusWired, "Call2").Returns(1)
 
 	tcs := []struct {
 		Action       string
@@ -275,6 +272,7 @@ func TestTwilioIVR(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
 		assert.Equal(t, tc.StatusCode, resp.StatusCode)
 
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -285,66 +283,24 @@ func TestTwilioIVR(t *testing.T) {
 	}
 
 	// check our final state of sessions, runs, msgs, connections
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`,
-		[]interface{}{testdata.Cathy.ID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`,
-		[]interface{}{testdata.Cathy.ID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{testdata.Cathy.ID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{testdata.Cathy.ID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`, testdata.Cathy.ID).Returns(8)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
-		[]interface{}{testdata.Cathy.ID},
-		8,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`,
-		[]interface{}{},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`,
-		[]interface{}{testdata.Cathy.ID},
-		5,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`).Returns(9)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`,
-		[]interface{}{},
-		9,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 
+		AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.George.ID).Returns(2)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`,
-		[]interface{}{testdata.George.ID},
-		2,
-	)
-
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`,
-		[]interface{}{testdata.George.ID},
-		1,
-	)
-
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`, testdata.George.ID).Returns(1)
 }
 
 func TestVonageIVR(t *testing.T) {
@@ -427,16 +383,11 @@ func TestVonageIVR(t *testing.T) {
 	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{testdata.Cathy.ID, models.ConnectionStatusWired, "Call1"},
-		1,
-	)
-	testsuite.AssertQueryCount(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{testdata.George.ID, models.ConnectionStatusWired, "Call2"},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.ConnectionStatusWired, "Call1").Returns(1)
+
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.George.ID, models.ConnectionStatusWired, "Call2").Returns(1)
 
 	tcs := []struct {
 		Label        string
@@ -641,6 +592,7 @@ func TestVonageIVR(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
 		assert.Equal(t, tc.StatusCode, resp.StatusCode)
 
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -652,64 +604,24 @@ func TestVonageIVR(t *testing.T) {
 	}
 
 	// check our final state of sessions, runs, msgs, connections
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`,
-		[]interface{}{testdata.Cathy.ID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`,
-		[]interface{}{testdata.Cathy.ID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{testdata.Cathy.ID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{testdata.Cathy.ID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
+		AND connection_id = 1 AND status = 'W' AND direction = 'O'`, testdata.Cathy.ID).Returns(9)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
-		[]interface{}{testdata.Cathy.ID},
-		9,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`,
-		[]interface{}{},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
+		AND connection_id = 1 AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`,
-		[]interface{}{testdata.Cathy.ID},
-		5,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`).Returns(10)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`,
-		[]interface{}{},
-		10,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
+		AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.George.ID).Returns(3)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`,
-		[]interface{}{testdata.George.ID},
-		3,
-	)
-
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`,
-		[]interface{}{testdata.George.ID},
-		1,
-	)
-
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`, testdata.George.ID).Returns(1)
 }

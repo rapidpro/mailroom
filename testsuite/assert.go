@@ -100,8 +100,3 @@ func (q *Query) Columns(expected map[string]interface{}, msgAndArgs ...interface
 	assert.NoError(q.t, err, msgAndArgs...)
 	assert.Equal(q.t, expected, actual, msgAndArgs...)
 }
-
-// AssertQueryCount is deprecated in favor of AssertQuery
-func AssertQueryCount(t *testing.T, db *sqlx.DB, sql string, args []interface{}, count int, errMsg ...interface{}) {
-	AssertQuery(t, db, sql, args...).Returns(count, errMsg...)
-}

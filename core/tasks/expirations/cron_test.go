@@ -56,30 +56,30 @@ func TestExpirations(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{testdata.Cathy.ID}, 2)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{testdata.Cathy.ID}, 0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Cathy.ID).Returns(2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Cathy.ID).Returns(0)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{testdata.George.ID}, 2)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{testdata.George.ID}, 0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.George.ID).Returns(2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.George.ID).Returns(0)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{testdata.Bob.ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{testdata.Bob.ID}, 0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Bob.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
 
 	// expire our runs
 	err = expireRuns(ctx, db, rp, expirationLock, "foo")
 	assert.NoError(t, err)
 
 	// shouldn't have any active runs or sessions
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{testdata.Cathy.ID}, 0)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{testdata.Cathy.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Cathy.ID).Returns(0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Cathy.ID).Returns(1)
 
 	// should still have two active runs for George as it needs to continue
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{testdata.George.ID}, 2)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{testdata.George.ID}, 0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.George.ID).Returns(2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.George.ID).Returns(0)
 
 	// runs without expires_on won't be expired
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, []interface{}{testdata.Bob.ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, []interface{}{testdata.Bob.ID}, 0)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Bob.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
 
 	// should have created one task
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)

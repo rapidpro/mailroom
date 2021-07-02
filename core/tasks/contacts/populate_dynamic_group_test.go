@@ -60,5 +60,5 @@ func TestPopulateTask(t *testing.T) {
 	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, []interface{}{group.ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, group.ID).Returns(1)
 }
