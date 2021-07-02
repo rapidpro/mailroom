@@ -3,7 +3,6 @@ package web
 import (
 	"compress/flate"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -161,7 +160,7 @@ func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 
 		logrus.WithError(err).WithField("http_request", r).Error("error handling request")
 		w.WriteHeader(http.StatusInternalServerError)
-		serialized, _ := json.Marshal(NewErrorResponse(err))
+		serialized := jsonx.MustMarshal(NewErrorResponse(err))
 		w.Write(serialized)
 	}
 }

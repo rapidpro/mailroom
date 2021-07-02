@@ -124,8 +124,8 @@ func TestContactImports(t *testing.T) {
 
 			test.AssertEqualJSON(t, tc.Errors, actual.Errors, "errors mismatch in '%s'", tc.Description)
 
-			actualJSON, _ := jsonx.Marshal(actual.Contacts)
-			expectedJSON, _ := jsonx.Marshal(tc.Contacts)
+			actualJSON := jsonx.MustMarshal(actual.Contacts)
+			expectedJSON := jsonx.MustMarshal(tc.Contacts)
 			test.AssertEqualJSON(t, expectedJSON, actualJSON, "imported contacts mismatch in '%s'", tc.Description)
 		} else {
 			tcs[i] = actual

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/pkg/errors"
@@ -57,7 +58,7 @@ func queueContactTask(rc redis.Conn, orgID models.OrgID, contactID models.Contac
 
 // QueueTicketEvent queues a ticket event to be handled
 func QueueTicketEvent(rc redis.Conn, contactID models.ContactID, evt *models.TicketEvent) error {
-	eventJSON, _ := json.Marshal(evt)
+	eventJSON := jsonx.MustMarshal(evt)
 	var task *queue.Task
 
 	switch evt.EventType() {

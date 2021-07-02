@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -291,9 +292,7 @@ func TestServer(t *testing.T) {
 		var body io.Reader
 
 		// in the case of a resume, we have to sub in our session body from our start
-		if strings.Contains(tc.Body, "$$SESSION$$") {
-			tc.Body = strings.Replace(tc.Body, "$$SESSION$$", session, -1)
-		}
+		tc.Body = strings.Replace(tc.Body, "$$SESSION$$", session, -1)
 
 		if tc.Body != "" {
 			body = bytes.NewReader([]byte(tc.Body))
@@ -315,7 +314,7 @@ func TestServer(t *testing.T) {
 			// save the session for use in a resume
 			parsed := make(map[string]interface{})
 			json.Unmarshal(content, &parsed)
-			sessionJSON, _ := json.Marshal(parsed["session"])
+			sessionJSON := jsonx.MustMarshal(parsed["session"])
 			session = string(sessionJSON)
 
 			context, hasContext := parsed["context"]

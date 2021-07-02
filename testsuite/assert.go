@@ -7,6 +7,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/stretchr/testify/assert"
@@ -55,8 +56,8 @@ func AssertContactTasks(t *testing.T, orgID models.OrgID, contactID models.Conta
 	tasks, err := redis.Strings(rc.Do("LRANGE", fmt.Sprintf("c:%d:%d", orgID, contactID), 0, -1))
 	require.NoError(t, err)
 
-	expectedJSON, _ := json.Marshal(expected)
-	actualJSON, _ := json.Marshal(tasks)
+	expectedJSON := jsonx.MustMarshal(expected)
+	actualJSON := jsonx.MustMarshal(tasks)
 
 	test.AssertEqualJSON(t, expectedJSON, actualJSON, "")
 }
