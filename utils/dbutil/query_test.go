@@ -79,6 +79,6 @@ func TestBulkQuery(t *testing.T) {
 	// try with a struct that is invalid
 	foo4 := &foo{Name: "Jonny", Age: 34}
 	err = dbutil.BulkQuery(ctx, db, `INSERT INTO foo (name, age) VALUES(:name, :age)`, []interface{}{foo4})
-	assert.EqualError(t, err, "error making bulk query: INSERT INTO foo (name, age) VALUES($1, $2): pq: value too long for type character varying(3)")
+	assert.EqualError(t, err, "error making bulk query: INSERT INTO foo (name, age) VALUES($1, $2) args=[Jonny 34]: pq: value too long for type character varying(3)")
 	assert.Equal(t, 0, foo4.ID)
 }
