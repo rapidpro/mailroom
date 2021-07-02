@@ -1,3 +1,7 @@
+v6.3.29
+----------
+ * Include args in BulkQuery error output
+
 v6.3.28
 ----------
  * Return more SQL when BulkQuery errors
