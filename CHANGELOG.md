@@ -1,3 +1,8 @@
+v6.3.28
+----------
+ * Return more SQL when BulkQuery errors
+ * Update to latest goflow/gocommon
+
 v6.3.27
 ----------
  * Fix handling of inbox messages to also update open tickets
