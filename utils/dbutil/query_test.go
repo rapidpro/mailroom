@@ -45,7 +45,7 @@ func TestBulkQuery(t *testing.T) {
 
 	defer testsuite.Reset()
 
-	db.MustExec(`CREATE TABLE foo (id serial NOT NULL PRIMARY KEY, name TEXT, age INT)`)
+	db.MustExec(`CREATE TABLE foo (id serial NOT NULL PRIMARY KEY, name VARCHAR(3), age INT)`)
 
 	type foo struct {
 		ID   int    `db:"id"`
@@ -75,4 +75,10 @@ func TestBulkQuery(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, foo3.ID)
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo WHERE name = 'Jim' AND age = 54`).Returns(1)
+
+	// try with a struct that is invalid
+	foo4 := &foo{Name: "Jonny", Age: 34}
+	err = dbutil.BulkQuery(ctx, db, `INSERT INTO foo (name, age) VALUES(:name, :age)`, []interface{}{foo4})
+	assert.EqualError(t, err, "error making bulk query: INSERT INTO foo (name, age) VALUES($1, $2): pq: value too long for type character varying(3)")
+	assert.Equal(t, 0, foo4.ID)
 }
