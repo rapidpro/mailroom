@@ -171,6 +171,7 @@ SELECT
   t.status AS status,
   t.subject AS subject,
   t.body AS body,
+  t.assignee_id AS assignee_id,
   t.config AS config,
   t.opened_on AS opened_on,
   t.modified_on AS modified_on,
@@ -199,6 +200,7 @@ SELECT
   t.status AS status,
   t.subject AS subject,
   t.body AS body,
+  t.assignee_id AS assignee_id,
   t.config AS config,
   t.opened_on AS opened_on,
   t.modified_on AS modified_on,
@@ -237,24 +239,25 @@ func loadTickets(ctx context.Context, db Queryer, query string, params ...interf
 
 const selectTicketByUUIDSQL = `
 SELECT
-  id,
-  uuid,
-  org_id,
-  contact_id,
-  ticketer_id,
-  external_id,
-  status,
-  subject,
-  body,
-  config,
-  opened_on,
-  modified_on,
-  closed_on,
-  last_activity_on
+  t.id AS id,
+  t.uuid AS uuid,
+  t.org_id AS org_id,
+  t.contact_id AS contact_id,
+  t.ticketer_id AS ticketer_id,
+  t.external_id AS external_id,
+  t.status AS status,
+  t.subject AS subject,
+  t.body AS body,
+  t.assignee_id AS assignee_id,
+  t.config AS config,
+  t.opened_on AS opened_on,
+  t.modified_on AS modified_on,
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
-  tickets_ticket
+  tickets_ticket t
 WHERE
-  uuid = $1
+  t.uuid = $1
 `
 
 // LookupTicketByUUID looks up the ticket with the passed in UUID
@@ -264,25 +267,26 @@ func LookupTicketByUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID)
 
 const selectTicketByExternalIDSQL = `
 SELECT
-  id,
-  uuid,
-  org_id,
-  contact_id,
-  ticketer_id,
-  external_id,
-  status,
-  subject,
-  body,
-  config,
-  opened_on,
-  modified_on,
-  closed_on,
-  last_activity_on
+  t.id AS id,
+  t.uuid AS uuid,
+  t.org_id AS org_id,
+  t.contact_id AS contact_id,
+  t.ticketer_id AS ticketer_id,
+  t.external_id AS external_id,
+  t.status AS status,
+  t.subject AS subject,
+  t.body AS body,
+  t.assignee_id AS assignee_id,
+  t.config AS config,
+  t.opened_on AS opened_on,
+  t.modified_on AS modified_on,
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
-  tickets_ticket
+  tickets_ticket t
 WHERE
-  ticketer_id = $1 AND
-  external_id = $2
+  t.ticketer_id = $1 AND
+  t.external_id = $2
 `
 
 // LookupTicketByExternalID looks up the ticket with the passed in ticketer and external ID
@@ -364,6 +368,76 @@ func updateTicketLastActivity(ctx context.Context, db Queryer, ids []TicketID, n
 	return Exec(ctx, "update ticket last activity", db, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
 }
 
+const assignTicketSQL = `
+UPDATE
+  tickets_ticket
+SET
+  assignee_id = $2,
+  modified_on = $3,
+  last_activity_on = $3
+WHERE
+  id = ANY($1)
+`
+
+// AssignTickets assigns the passed in tickets
+func AssignTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID, note string) (map[*Ticket]*TicketEvent, error) {
+	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	now := dates.Now()
+
+	for _, ticket := range tickets {
+		if ticket.AssigneeID() != assigneeID {
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.AssigneeID = assigneeID
+			t.ModifiedOn = now
+			t.LastActivityOn = now
+
+			e := NewTicketAssignedEvent(ticket, userID, assigneeID, note)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
+		}
+	}
+
+	// mark the tickets as assigned in the db
+	err := Exec(ctx, "assign tickets", db, assignTicketSQL, pq.Array(ids), assigneeID, now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
+}
+
+// NoteTickets adds a note to the passed in tickets
+func NoteTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, note string) (map[*Ticket]*TicketEvent, error) {
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+
+	for _, ticket := range tickets {
+		e := NewTicketNoteEvent(ticket, userID, note)
+		events = append(events, e)
+		eventsByTicket[ticket] = e
+	}
+
+	err := UpdateTicketLastActivity(ctx, db, tickets)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating ticket activity")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
+}
+
 const closeTicketSQL = `
 UPDATE
   tickets_ticket
@@ -394,7 +468,7 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 			t.ClosedOn = &now
 			t.LastActivityOn = now
 
-			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ContactID(), ticket.ID(), TicketEventTypeClosed)
+			e := NewTicketClosedEvent(ticket, userID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}
@@ -461,7 +535,7 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserI
 			t.ClosedOn = nil
 			t.LastActivityOn = now
 
-			e := NewTicketEvent(ticket.OrgID(), userID, ticket.ContactID(), ticket.ID(), TicketEventTypeReopened)
+			e := NewTicketReopenedEvent(ticket, userID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 		}

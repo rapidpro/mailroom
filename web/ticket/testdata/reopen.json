@@ -33,6 +33,10 @@
             {
                 "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
                 "count": 2
+            },
+            {
+                "query": "SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'R' AND created_by_id = 3",
+                "count": 1
             }
         ]
     },
@@ -70,6 +74,10 @@
             {
                 "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
                 "count": 3
+            },
+            {
+                "query": "SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'R' AND created_by_id = 3",
+                "count": 2
             }
         ]
     }
