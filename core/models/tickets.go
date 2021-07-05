@@ -316,8 +316,8 @@ func lookupTicket(ctx context.Context, db Queryer, query string, params ...inter
 
 const insertTicketSQL = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on, modified_on, last_activity_on)
-  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, NOW(),     NOW()      , NOW())
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  assignee_id,  config,  opened_on, modified_on, last_activity_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :assignee_id, :config, NOW(),     NOW()      , NOW())
 RETURNING
   id
 `

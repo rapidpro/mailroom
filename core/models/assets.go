@@ -69,8 +69,9 @@ type OrgAssets struct {
 	locations        []assets.LocationHierarchy
 	locationsBuiltAt time.Time
 
-	users     []assets.User
-	usersByID map[UserID]*User
+	users        []assets.User
+	usersByID    map[UserID]*User
+	usersByEmail map[string]*User
 }
 
 var ErrNotFound = errors.New("not found")
@@ -325,12 +326,15 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 			return nil, errors.Wrapf(err, "error loading user assets for org %d", orgID)
 		}
 		oa.usersByID = make(map[UserID]*User)
+		oa.usersByEmail = make(map[string]*User)
 		for _, u := range oa.users {
 			oa.usersByID[u.(*User).ID()] = u.(*User)
+			oa.usersByEmail[u.Email()] = u.(*User)
 		}
 	} else {
 		oa.users = prev.users
 		oa.usersByID = prev.usersByID
+		oa.usersByEmail = prev.usersByEmail
 	}
 
 	// intialize our session assets
@@ -631,4 +635,8 @@ func (a *OrgAssets) Users() ([]assets.User, error) {
 
 func (a *OrgAssets) UserByID(id UserID) *User {
 	return a.usersByID[id]
+}
+
+func (a *OrgAssets) UserByEmail(email string) *User {
+	return a.usersByEmail[email]
 }
