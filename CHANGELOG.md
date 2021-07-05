@@ -1,3 +1,7 @@
+v6.3.30
+----------
+ * Update to latest goflow
+
 v6.3.29
 ----------
  * Include args in BulkQuery error output
