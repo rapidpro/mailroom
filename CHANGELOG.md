@@ -1,3 +1,8 @@
+v6.3.31
+----------
+ * Support ticket open events with assignees
+ * Add endpoints for ticket assignment and adding notes
+
 v6.3.30
 ----------
  * Update to latest goflow
