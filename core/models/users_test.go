@@ -43,5 +43,8 @@ func TestLoadUsers(t *testing.T) {
 		assert.Equal(t, expected.id, modelUser.ID())
 		assert.Equal(t, expected.email, modelUser.Email())
 		assert.Equal(t, expected.role, modelUser.Role())
+
+		assert.Equal(t, modelUser, oa.UserByID(expected.id))
+		assert.Equal(t, modelUser, oa.UserByEmail(expected.email))
 	}
 }

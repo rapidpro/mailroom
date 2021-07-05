@@ -35,7 +35,7 @@ func (h *insertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 	// generate opened events for each ticket
 	openEvents := make([]*models.TicketEvent, len(tickets))
 	for i, ticket := range tickets {
-		openEvents[i] = models.NewTicketOpenedEvent(ticket, models.NilUserID, models.NilUserID)
+		openEvents[i] = models.NewTicketOpenedEvent(ticket, models.NilUserID, ticket.AssigneeID())
 	}
 
 	// and insert those too
