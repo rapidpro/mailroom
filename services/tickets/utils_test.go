@@ -186,5 +186,6 @@ func TestCloseTicket(t *testing.T) {
 	err = tickets.CloseTicket(ctx, rt, oa, ticket1, true, logger)
 	require.NoError(t, err)
 
-	testsuite.AssertContactTasks(t, 1, testdata.Cathy.ID, []string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:31Z"},"queued_on":"2021-06-08T16:40:34Z"}`})
+	testsuite.AssertContactTasks(t, 1, testdata.Cathy.ID,
+		[]string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:31Z"},"queued_on":"2021-06-08T16:40:34Z"}`})
 }
