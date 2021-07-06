@@ -1,3 +1,7 @@
+v6.4.0
+----------
+ * move s3 session config error to a warning for the time being since not strictly required yet
+
 v6.3.31
 ----------
  * Support ticket open events with assignees
