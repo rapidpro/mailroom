@@ -193,7 +193,7 @@ func (mr *Mailroom) Start() error {
 	cancel()
 
 	if err != nil {
-		log.WithError(err).Error(mr.rt.SessionStorage.Name() + " session storage not available")
+		log.WithError(err).Warn(mr.rt.SessionStorage.Name() + " session storage not available")
 	} else {
 		log.Info(mr.rt.SessionStorage.Name() + " session storage ok")
 	}
