@@ -1,3 +1,8 @@
+v6.4.1
+----------
+ * Update to latest goflow to get fixes for nulls in webhook responses
+ * Add new error type for failed SQL queries
+
 v6.4.0
 ----------
  * move s3 session config error to a warning for the time being since not strictly required yet
