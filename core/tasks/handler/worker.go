@@ -21,6 +21,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -169,6 +170,10 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 				"contact_id": eventTask.ContactID,
 				"event":      event,
 			})
+
+			if qerr := dbutil.AsQueryError(err); qerr != nil {
+				log.WithFields(qerr.Fields())
+			}
 
 			contactEvent.ErrorCount++
 			if contactEvent.ErrorCount < 3 {
