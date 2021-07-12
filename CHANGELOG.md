@@ -1,3 +1,7 @@
+v6.4.2
+----------
+ * Latest goflow with latest localization
+
 v6.4.1
 ----------
  * Update to latest goflow to get fixes for nulls in webhook responses
