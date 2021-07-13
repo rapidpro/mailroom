@@ -1,3 +1,7 @@
+v6.4.3
+----------
+ * Fix triggering new IVR flow from a simulation resume so that it includes connection to test channel
+
 v6.4.2
 ----------
  * Latest goflow with latest localization
