@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/goflow/excellent/tools"
@@ -20,6 +21,9 @@ import (
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 )
+
+var testChannel = assets.NewChannelReference("440099cf-200c-4d45-a8e7-4a564f4a0e8b", "Test Channel")
+var testURN = urns.URN("tel:+12065551212")
 
 func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(handleStart))
@@ -230,8 +234,18 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 				}
 
 				if triggeredFlow != nil {
-					trigger := triggers.NewBuilder(oa.Env(), triggeredFlow.FlowReference(), resume.Contact()).Msg(msgResume.Msg()).WithMatch(trigger.Match()).Build()
-					return triggerFlow(ctx, rt, oa, trigger)
+					tb := triggers.NewBuilder(oa.Env(), triggeredFlow.FlowReference(), resume.Contact())
+
+					var sessionTrigger flows.Trigger
+					if triggeredFlow.FlowType() == models.FlowTypeVoice {
+						// TODO this should trigger a msg trigger with a connection but first we need to rework
+						// non-simulation IVR triggers to use that so that this is consistent.
+						sessionTrigger = tb.Manual().WithConnection(testChannel, testURN).Build()
+					} else {
+						sessionTrigger = tb.Msg(msgResume.Msg()).WithMatch(trigger.Match()).Build()
+					}
+
+					return triggerFlow(ctx, rt, oa, sessionTrigger)
 				}
 			}
 		}
