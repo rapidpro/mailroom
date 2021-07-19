@@ -93,7 +93,10 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 	if len(contactMap) > 0 {
 		rc := rp.Get()
 		for _, failed := range contactMap {
-			marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", failed.FireID))
+			rerr := marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", failed.FireID))
+			if rerr != nil {
+				log.WithError(rerr).WithField("fire_id", failed.FireID).Error("error unmarking campaign fire")
+			}
 		}
 		rc.Close()
 	}
