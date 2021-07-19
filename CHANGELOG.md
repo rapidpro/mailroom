@@ -1,3 +1,7 @@
+v6.5.0
+----------
+ * Update to latest goflow and gocommon
+
 v6.4.3
 ----------
  * Fix triggering new IVR flow from a simulation resume so that it includes connection to test channel
