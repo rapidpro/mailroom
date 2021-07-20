@@ -81,14 +81,22 @@ func (f *Flow) FlowType() FlowType { return f.f.FlowType }
 // Version returns the version this flow was authored in
 func (f *Flow) Version() string { return f.f.Version }
 
-// IVRRetryWait returns the wait before retrying a failed IVR call
-func (f *Flow) IVRRetryWait() time.Duration {
+// IVRRetryWait returns the wait before retrying a failed IVR call (nil means no retry)
+func (f *Flow) IVRRetryWait() *time.Duration {
+	wait := ConnectionRetryWait
+
 	value := f.f.Config.Get(flowConfigIVRRetryMinutes, nil)
 	fv, isFloat := value.(float64)
 	if isFloat {
-		return time.Minute * time.Duration(int(fv))
+		minutes := int(fv)
+		if minutes >= 0 {
+			wait = time.Minute * time.Duration(minutes)
+		} else {
+			return nil // ivr_retry -1 means no retry
+		}
 	}
-	return ConnectionRetryWait
+
+	return &wait
 }
 
 // IgnoreTriggers returns whether this flow ignores triggers
