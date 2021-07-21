@@ -275,6 +275,7 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
+	m.SentOn = createdOn
 	msg.SetChannelID(conn.ChannelID())
 
 	// if we have attachments, add them
