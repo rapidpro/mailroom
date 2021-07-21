@@ -353,13 +353,13 @@ func (c *ChannelConnection) MarkStarted(ctx context.Context, db Queryer, now tim
 }
 
 // MarkErrored updates the status for this connection to errored and schedules a retry if appropriate
-func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now time.Time, wait time.Duration) error {
+func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now time.Time, retryWait *time.Duration) error {
 	c.c.Status = ConnectionStatusErrored
 	c.c.EndedOn = &now
 
-	if c.c.RetryCount < ConnectionMaxRetries {
+	if c.c.RetryCount < ConnectionMaxRetries && retryWait != nil {
 		c.c.RetryCount++
-		next := now.Add(wait)
+		next := now.Add(*retryWait)
 		c.c.NextAttempt = &next
 	} else {
 		c.c.Status = ConnectionStatusFailed

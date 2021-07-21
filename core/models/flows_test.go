@@ -12,33 +12,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFlows(t *testing.T) {
+func TestLoadFlows(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, testdata.IVRFlow.ID)
+	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": -1}'::json WHERE id = $1`, testdata.SurveyorFlow.ID)
+
+	sixtyMinutes := 60 * time.Minute
+	thirtyMinutes := 30 * time.Minute
 
 	tcs := []struct {
-		OrgID    models.OrgID
-		FlowID   models.FlowID
-		FlowUUID assets.FlowUUID
-		Name     string
-		IVRRetry time.Duration
-		Found    bool
+		org              *testdata.Org
+		flowID           models.FlowID
+		flowUUID         assets.FlowUUID
+		expectedName     string
+		expectedIVRRetry *time.Duration
 	}{
-		{testdata.Org1.ID, testdata.Favorites.ID, testdata.Favorites.UUID, "Favorites", 60 * time.Minute, true},
-		{testdata.Org1.ID, testdata.IVRFlow.ID, testdata.IVRFlow.UUID, "IVR Flow", 30 * time.Minute, true},
-		{testdata.Org2.ID, models.FlowID(0), assets.FlowUUID("51e3c67d-8483-449c-abf7-25e50686f0db"), "", 0, false},
+		{testdata.Org1, testdata.Favorites.ID, testdata.Favorites.UUID, "Favorites", &sixtyMinutes},    // will use default IVR retry
+		{testdata.Org1, testdata.IVRFlow.ID, testdata.IVRFlow.UUID, "IVR Flow", &thirtyMinutes},        // will have explicit IVR retry
+		{testdata.Org1, testdata.SurveyorFlow.ID, testdata.SurveyorFlow.UUID, "Contact Surveyor", nil}, // will have no IVR retry
+		{testdata.Org2, models.FlowID(0), assets.FlowUUID("51e3c67d-8483-449c-abf7-25e50686f0db"), "", nil},
 	}
 
-	for _, tc := range tcs {
-		flow, err := models.LoadFlowByUUID(ctx, db, tc.OrgID, tc.FlowUUID)
+	for i, tc := range tcs {
+		// test loading by UUID
+		flow, err := models.LoadFlowByUUID(ctx, db, tc.org.ID, tc.flowUUID)
 		assert.NoError(t, err)
 
-		if tc.Found {
-			assert.Equal(t, tc.Name, flow.Name())
-			assert.Equal(t, tc.FlowID, flow.ID())
-			assert.Equal(t, tc.FlowUUID, flow.UUID())
-			assert.Equal(t, tc.IVRRetry, flow.IVRRetryWait())
+		if tc.expectedName != "" {
+			assert.Equal(t, tc.flowID, flow.ID())
+			assert.Equal(t, tc.flowUUID, flow.UUID())
+			assert.Equal(t, tc.expectedName, flow.Name(), "%d: name mismatch", i)
+			assert.Equal(t, tc.expectedIVRRetry, flow.IVRRetryWait(), "%d: IVR retry mismatch", i)
 
 			_, err := goflow.ReadFlow(rt.Config, flow.Definition())
 			assert.NoError(t, err)
@@ -46,13 +51,15 @@ func TestFlows(t *testing.T) {
 			assert.Nil(t, flow)
 		}
 
-		flow, err = models.LoadFlowByID(ctx, db, tc.OrgID, tc.FlowID)
+		// test loading by ID
+		flow, err = models.LoadFlowByID(ctx, db, tc.org.ID, tc.flowID)
 		assert.NoError(t, err)
 
-		if tc.Found {
-			assert.Equal(t, tc.Name, flow.Name())
-			assert.Equal(t, tc.FlowID, flow.ID())
-			assert.Equal(t, tc.FlowUUID, flow.UUID())
+		if tc.expectedName != "" {
+			assert.Equal(t, tc.flowID, flow.ID())
+			assert.Equal(t, tc.flowUUID, flow.UUID())
+			assert.Equal(t, tc.expectedName, flow.Name(), "%d: name mismatch", i)
+			assert.Equal(t, tc.expectedIVRRetry, flow.IVRRetryWait(), "%d: IVR retry mismatch", i)
 		} else {
 			assert.Nil(t, flow)
 		}
