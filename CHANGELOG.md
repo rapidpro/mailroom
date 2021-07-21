@@ -1,3 +1,7 @@
+v6.5.2
+----------
+ * Set sent_on for outgoing IVR messages
+
 v6.5.1
 ----------
  * Support flow config ivr_retry values of -1 meaning no retry
