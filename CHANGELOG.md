@@ -1,3 +1,8 @@
+v6.5.1
+----------
+ * Support flow config ivr_retry values of -1 meaning no retry
+ * Log error if marking event fire as fired fails
+
 v6.5.0
 ----------
  * Update to latest goflow and gocommon
