@@ -103,8 +103,7 @@ const updateContactFieldsSQL = `
 UPDATE 
 	contacts_contact c
 SET
-	fields = COALESCE(fields,'{}'::jsonb) || r.updates::jsonb,
-	modified_on = NOW()
+	fields = COALESCE(fields,'{}'::jsonb) || r.updates::jsonb
 FROM (
 	VALUES(:contact_id, :updates)
 ) AS
@@ -117,8 +116,7 @@ const deleteContactFieldsSQL = `
 UPDATE 
 	contacts_contact c
 SET
-	fields = fields - r.field_uuid,
-	modified_on = NOW()
+	fields = fields - r.field_uuid
 FROM (
 	VALUES(:contact_id, :field_uuid)
 ) AS

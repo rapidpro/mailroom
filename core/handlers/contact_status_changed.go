@@ -27,5 +27,7 @@ func handleContactStatusChanged(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool
 	}).Debug("updating contact status")
 
 	scene.AppendToEventPreCommitHook(hooks.CommitStatusChangesHook, event)
+	scene.AppendToEventPostCommitHook(hooks.ContactModifiedHook, event)
+
 	return nil
 }
