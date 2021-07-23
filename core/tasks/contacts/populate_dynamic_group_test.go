@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/mailroom/core/tasks/contacts"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -52,6 +53,7 @@ func TestPopulateTask(t *testing.T) {
 	}`, testdata.Cathy.ID)
 
 	group := testdata.InsertContactGroup(db, testdata.Org1, "e52fee05-2f95-4445-aef6-2fe7dac2fd56", "Women", "gender = F")
+	start := dates.Now()
 
 	task := &contacts.PopulateDynamicGroupTask{
 		GroupID: group.ID,
@@ -61,4 +63,6 @@ func TestPopulateTask(t *testing.T) {
 	require.NoError(t, err)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, group.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1`, group.ID).Returns(int64(testdata.Cathy.ID))
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_on > $2`, testdata.Cathy.ID, start).Returns(1)
 }
