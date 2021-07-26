@@ -335,3 +335,30 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	// test ticket was updated
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
 }
+
+func TestNewOutgoingIVR(t *testing.T) {
+	ctx, _, db, _ := testsuite.Get()
+
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	vonage := oa.ChannelByUUID(testdata.VonageChannel.UUID)
+	conn, err := models.InsertIVRConnection(ctx, db, testdata.Org1.ID, testdata.VonageChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.ConnectionDirectionOut, models.ConnectionStatusInProgress, "")
+	require.NoError(t, err)
+
+	createdOn := time.Date(2021, 7, 26, 12, 6, 30, 0, time.UTC)
+
+	flowMsg := flows.NewMsgOut(testdata.Cathy.URN, vonage.ChannelReference(), "Hello", []utils.Attachment{"audio/mp3:http://example.com/hi.mp3"}, nil, nil, flows.NilMsgTopic)
+	dbMsg := models.NewOutgoingIVR(testdata.Org1.ID, conn, flowMsg, createdOn)
+
+	assert.Equal(t, flowMsg.UUID(), dbMsg.UUID())
+	assert.Equal(t, "Hello", dbMsg.Text())
+	assert.Equal(t, []utils.Attachment{"audio/mp3:http://example.com/hi.mp3"}, dbMsg.Attachments())
+	assert.Equal(t, createdOn, dbMsg.CreatedOn())
+	assert.Equal(t, &createdOn, dbMsg.SentOn())
+
+	err = models.InsertMessages(ctx, db, []*models.Msg{dbMsg})
+	require.NoError(t, err)
+
+	testsuite.AssertQuery(t, db, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]interface{}{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
+}
