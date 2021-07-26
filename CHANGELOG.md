@@ -1,3 +1,7 @@
+v6.5.4
+----------
+ * Actually save IVR messages with sent_on set
+
 v6.5.3
 ----------
  * Update contact modified_on after populate dynamic group task
