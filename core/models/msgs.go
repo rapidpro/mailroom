@@ -100,7 +100,7 @@ type Msg struct {
 		HighPriority         bool               `db:"high_priority"   json:"high_priority"`
 		CreatedOn            time.Time          `db:"created_on"      json:"created_on"`
 		ModifiedOn           time.Time          `db:"modified_on"     json:"modified_on"`
-		SentOn               time.Time          `db:"sent_on"         json:"sent_on"`
+		SentOn               *time.Time         `db:"sent_on"         json:"sent_on"`
 		QueuedOn             time.Time          `db:"queued_on"       json:"queued_on"`
 		Direction            MsgDirection       `db:"direction"       json:"direction"`
 		Status               MsgStatus          `db:"status"          json:"status"`
@@ -146,7 +146,7 @@ func (m *Msg) Text() string                     { return m.m.Text }
 func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
 func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
 func (m *Msg) ModifiedOn() time.Time            { return m.m.ModifiedOn }
-func (m *Msg) SentOn() time.Time                { return m.m.SentOn }
+func (m *Msg) SentOn() *time.Time               { return m.m.SentOn }
 func (m *Msg) QueuedOn() time.Time              { return m.m.QueuedOn }
 func (m *Msg) Direction() MsgDirection          { return m.m.Direction }
 func (m *Msg) Status() MsgStatus                { return m.m.Status }
@@ -250,7 +250,7 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, creat
 }
 
 // NewOutgoingIVR creates a new IVR message for the passed in text with the optional attachment
-func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -275,7 +275,7 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
-	m.SentOn = createdOn
+	m.SentOn = &createdOn
 	msg.SetChannelID(conn.ChannelID())
 
 	// if we have attachments, add them
@@ -283,7 +283,7 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 	}
 
-	return msg, nil
+	return msg
 }
 
 // NewOutgoingMsg creates an outgoing message for the passed in flow message.
@@ -482,10 +482,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 
 const insertMsgSQL = `
 INSERT INTO
-msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, direction, status, attachments, metadata,
+msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, connection_id, response_to_id,
 		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id)
-  VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :direction, :status, :attachments, :metadata,
+  VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :connection_id, :response_to_id,
 		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id)
 RETURNING 
@@ -1078,7 +1078,7 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 		// mark message as being a resend so it will be queued to courier as such
 		msg.m.Status = MsgStatusPending
 		msg.m.QueuedOn = dates.Now()
-		msg.m.SentOn = dates.ZeroDateTime
+		msg.m.SentOn = nil
 		msg.m.ErrorCount = 0
 		msg.m.IsResend = true
 
