@@ -1,3 +1,8 @@
+v6.5.3
+----------
+ * Update contact modified_on after populate dynamic group task
+ * Update to latest goflow
+
 v6.5.2
 ----------
  * Set sent_on for outgoing IVR messages
