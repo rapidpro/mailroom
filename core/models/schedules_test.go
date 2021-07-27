@@ -25,22 +25,12 @@ func TestGetExpired(t *testing.T) {
 		testdata.Org1.ID,
 	)
 	assert.NoError(t, err)
-	var b1 models.BroadcastID
-	err = db.Get(
-		&b1,
-		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id, schedule_id)
-			VALUES('P', hstore(ARRAY['eng','Test message', 'fra', 'Un Message']), 'eng', TRUE, NOW(), NOW(), TRUE, 1, 1, $1, $2) RETURNING id`,
-		testdata.Org1.ID, s1,
+
+	b1 := testdata.InsertBroadcast(db, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
+		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup},
 	)
-	assert.NoError(t, err)
 
-	// add a few contacts to the broadcast
-	db.MustExec(`INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES($1, $2),($1, $3)`, b1, testdata.Cathy.ID, testdata.George.ID)
-
-	// and a group
-	db.MustExec(`INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES($1, $2)`, b1, testdata.DoctorsGroup.ID)
-
-	// and a URN
+	// add a URN
 	db.MustExec(`INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES($1, $2)`, b1, testdata.Cathy.URNID)
 
 	// add another and tie a trigger to it
