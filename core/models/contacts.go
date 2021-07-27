@@ -788,8 +788,8 @@ func insertContactAndURNs(ctx context.Context, db Queryer, orgID OrgID, userID U
 	// first insert our contact
 	var contactID ContactID
 	err := db.GetContext(ctx, &contactID,
-		`INSERT INTO contacts_contact (org_id, is_active, status, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
-		VALUES($1, TRUE, 'A', $2, $3, $4, $5, $5, $6, $6)
+		`INSERT INTO contacts_contact (org_id, is_active, status, uuid, name, language, ticket_count, created_on, modified_on, created_by_id, modified_by_id) 
+		VALUES($1, TRUE, 'A', $2, $3, $4, 0, $5, $5, $6, $6)
 		RETURNING id`,
 		orgID, uuids.New(), null.String(name), null.String(string(language)), dates.Now(), userID,
 	)
