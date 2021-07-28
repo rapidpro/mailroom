@@ -1,3 +1,8 @@
+v6.5.5
+----------
+ * Fix tests broken by recent db changes to msgs and broadcasts
+ * Populate ticket_count when creating new contacts
+
 v6.5.4
 ----------
  * Actually save IVR messages with sent_on set
