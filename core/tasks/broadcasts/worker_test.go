@@ -17,7 +17,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBroadcastEvents(t *testing.T) {
@@ -128,11 +127,7 @@ func TestBroadcastTask(t *testing.T) {
 	eng := envs.Language("eng")
 
 	// insert a broadcast so we can check it is being set to sent
-	var legacyID models.BroadcastID
-	err = db.Get(&legacyID,
-		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id)
-							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, 1, 1, 1) RETURNING id`)
-	require.NoError(t, err)
+	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil)
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "", "", nil)
 	modelTicket := ticket.Load(db)

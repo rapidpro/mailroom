@@ -74,6 +74,7 @@ const (
 	MsgStatusQueued       = MsgStatus("Q")
 	MsgStatusWired        = MsgStatus("W")
 	MsgStatusSent         = MsgStatus("S")
+	MsgStatusDelivered    = MsgStatus("D")
 	MsgStatusHandled      = MsgStatus("H")
 	MsgStatusErrored      = MsgStatus("E")
 	MsgStatusFailed       = MsgStatus("F")
