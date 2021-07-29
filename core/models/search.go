@@ -17,10 +17,10 @@ import (
 )
 
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, status ContactStatus, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
+func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStatus, excludeIDs []ContactID, query *contactql.ContactQuery) (elastic.Query, error) {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
-		elastic.NewTermQuery("org_id", org.OrgID()),
+		elastic.NewTermQuery("org_id", oa.OrgID()),
 		elastic.NewTermQuery("is_active", true),
 	)
 
@@ -45,39 +45,46 @@ func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, status ContactSta
 
 	// and by our query if present
 	if query != nil {
-		q := es.ToElasticQuery(org.Env(), query)
+		q, err := es.ToElasticQuery(oa.Env(), oa.SessionAssets(), query)
+		if err != nil {
+			return nil, errors.Wrap(err, "error translating query to elastic")
+		}
+
 		eq = eq.Must(q)
 	}
 
-	return eq
+	return eq, nil
 }
 
 // ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
-func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, excludeIDs []ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
-	env := org.Env()
-	start := time.Now()
-	var parsed *contactql.ContactQuery
-	var err error
-
+func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *OrgAssets, group assets.GroupUUID, excludeIDs []ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
 	if client == nil {
 		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
 	}
 
+	start := time.Now()
+	var parsed *contactql.ContactQuery
+	var err error
+
 	if query != "" {
-		parsed, err = contactql.ParseQuery(env, query, org.SessionAssets())
+		parsed, err = parseAndValidateQuery(oa, query)
 		if err != nil {
 			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
 		}
 	}
 
-	eq := BuildElasticQuery(org, group, NilContactStatus, excludeIDs, parsed)
+	// turn into elastic query
+	eq, err := BuildElasticQuery(oa, group, NilContactStatus, excludeIDs, parsed)
+	if err != nil {
+		return nil, nil, 0, errors.Wrapf(err, "error building elastic query: %s", query)
+	}
 
-	fieldSort, err := es.ToElasticFieldSort(sort, org.SessionAssets())
+	fieldSort, err := es.ToElasticFieldSort(sort, oa.SessionAssets())
 	if err != nil {
 		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
 	}
 
-	s := client.Search("contacts").TrackTotalHits(true).Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	s := client.Search("contacts").TrackTotalHits(true).Routing(strconv.FormatInt(int64(oa.OrgID()), 10))
 	s = s.Size(pageSize).From(offset).Query(eq).SortBy(fieldSort).FetchSource(false)
 
 	results, err := s.Do(ctx)
@@ -101,7 +108,7 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"org_id":      org.OrgID(),
+		"org_id":      oa.OrgID(),
 		"parsed":      parsed,
 		"group_uuid":  group,
 		"query":       query,
@@ -114,32 +121,34 @@ func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *Or
 }
 
 // ContactIDsForQuery returns the ids of all the contacts that match the passed in query
-func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAssets, query string) ([]ContactID, error) {
-	env := org.Env()
+func ContactIDsForQuery(ctx context.Context, client *elastic.Client, oa *OrgAssets, query string) ([]ContactID, error) {
 	start := time.Now()
 
 	if client == nil {
 		return nil, errors.Errorf("no elastic client available, check your configuration")
 	}
 
-	// turn into elastic query
-	parsed, err := contactql.ParseQuery(env, query, org.SessionAssets())
+	parsed, err := parseAndValidateQuery(oa, query)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing query: %s", query)
 	}
 
-	eq := BuildElasticQuery(org, "", ContactStatusActive, nil, parsed)
+	// turn into elastic query
+	eq, err := BuildElasticQuery(oa, "", ContactStatusActive, nil, parsed)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error building elastic query: %s", query)
+	}
 
 	ids := make([]ContactID, 0, 100)
 
 	// iterate across our results, building up our contact ids
-	scroll := client.Scroll("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	scroll := client.Scroll("contacts").Routing(strconv.FormatInt(int64(oa.OrgID()), 10))
 	scroll = scroll.KeepAlive("15m").Size(10000).Query(eq).FetchSource(false)
 	for {
 		results, err := scroll.Do(ctx)
 		if err == io.EOF {
 			logrus.WithFields(logrus.Fields{
-				"org_id":      org.OrgID(),
+				"org_id":      oa.OrgID(),
 				"query":       query,
 				"elapsed":     time.Since(start),
 				"match_count": len(ids),
@@ -160,4 +169,18 @@ func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAss
 			ids = append(ids, ContactID(id))
 		}
 	}
+}
+
+func parseAndValidateQuery(oa *OrgAssets, query string) (*contactql.ContactQuery, error) {
+	parsed, err := contactql.ParseQuery(oa.Env(), query)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	err = parsed.Validate(oa.Env(), oa.SessionAssets())
+	if err != nil {
+		return nil, err
+	}
+
+	return parsed, nil
 }

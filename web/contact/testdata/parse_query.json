@@ -44,6 +44,35 @@
         }
     },
     {
+        "label": "query with invalid property but parse_only = true",
+        "method": "POST",
+        "path": "/mr/contact/parse_query",
+        "body": {
+            "org_id": 1,
+            "query": "birthday = tomorrow AND tel = 12345",
+            "parse_only": true
+        },
+        "status": 200,
+        "response": {
+            "query": "birthday = \"tomorrow\" AND tel = 12345",
+            "elastic_query": null,
+            "metadata": {
+                "attributes": [],
+                "schemes": [
+                    "tel"
+                ],
+                "fields": [
+                    {
+                        "key": "birthday",
+                        "name": ""
+                    }
+                ],
+                "groups": [],
+                "allow_as_group": true
+            }
+        }
+    },
+    {
         "label": "valid query without group",
         "method": "POST",
         "path": "/mr/contact/parse_query",
@@ -102,16 +131,12 @@
                 "fields": [
                     {
                         "key": "age",
-                        "name": "Age"
+                        "name": ""
                     }
                 ],
                 "groups": [],
                 "allow_as_group": true
-            },
-            "fields": [
-                "age"
-            ],
-            "allow_as_group": true
+            }
         }
     },
     {
@@ -179,16 +204,12 @@
                 "fields": [
                     {
                         "key": "age",
-                        "name": "Age"
+                        "name": ""
                     }
                 ],
                 "groups": [],
                 "allow_as_group": true
-            },
-            "fields": [
-                "age"
-            ],
-            "allow_as_group": true
+            }
         }
     },
     {
@@ -231,16 +252,11 @@
                 "fields": [],
                 "groups": [
                     {
-                        "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
-                        "name": "Testers"
+                        "name_match": "Testers"
                     }
                 ],
                 "allow_as_group": false
-            },
-            "fields": [
-                "group"
-            ],
-            "allow_as_group": false
+            }
         }
     }
 ]

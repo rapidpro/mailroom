@@ -22,7 +22,7 @@ func TestErrorResponse(t *testing.T) {
 	assert.JSONEq(t, `{"error": "I'm an error!"}`, string(er1JSON))
 
 	// create a rich error
-	_, err = contactql.ParseQuery(envs.NewBuilder().Build(), "$$", nil)
+	_, err = contactql.ParseQuery(envs.NewBuilder().Build(), "$$")
 
 	er2 := web.NewErrorResponse(err)
 	assert.Equal(t, "mismatched input '$' expecting {'(', TEXT, STRING}", er2.Error)
