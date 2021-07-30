@@ -104,7 +104,7 @@ func NewMailroomConfig() *Config {
 		Port:    8090,
 
 		UUIDSeed:    0,
-		TimeoutTime: 15,
+		TimeoutTime: 60,
 	}
 }
 
