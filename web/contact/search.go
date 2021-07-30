@@ -172,11 +172,12 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request)
 	}
 
 	env := oa.Env()
-	parsed, err := contactql.ParseQuery(env, request.Query)
-	if err == nil && !request.ParseOnly {
-		err = parsed.Validate(env, oa.SessionAssets())
+	var resolver contactql.Resolver
+	if !request.ParseOnly {
+		resolver = oa.SessionAssets()
 	}
 
+	parsed, err := contactql.ParseQuery(env, request.Query, resolver)
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
 		if isQueryError {
@@ -191,11 +192,7 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request)
 
 	var elasticSource interface{}
 	if !request.ParseOnly {
-		eq, err := models.BuildElasticQuery(oa, request.GroupUUID, models.NilContactStatus, nil, parsed)
-		if err != nil {
-			return nil, http.StatusInternalServerError, errors.Wrap(err, "error building elastic query")
-		}
-
+		eq := models.BuildElasticQuery(oa, request.GroupUUID, models.NilContactStatus, nil, parsed)
 		elasticSource, err = eq.Source()
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrap(err, "error getting elastic source")

@@ -917,10 +917,7 @@ func URNForID(ctx context.Context, db Queryer, org *OrgAssets, urnID URNID) (urn
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
 // campaigns as necessary based on those group changes.
 func CalculateDynamicGroups(ctx context.Context, db Queryer, org *OrgAssets, contact *flows.Contact) error {
-	added, removed, errs := contact.ReevaluateQueryBasedGroups(org.Env())
-	if len(errs) > 0 {
-		return errors.Wrapf(errs[0], "error calculating dynamic groups")
-	}
+	added, removed := contact.ReevaluateQueryBasedGroups(org.Env())
 
 	campaigns := make(map[CampaignID]*Campaign)
 
