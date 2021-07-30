@@ -1,3 +1,7 @@
+v6.5.6
+----------
+ * Update to latest goflow and add parse_only as param to parse_query to allow us to extract field dependencies even when they don't yet exist in the database
+
 v6.5.5
 ----------
  * Fix tests broken by recent db changes to msgs and broadcasts
