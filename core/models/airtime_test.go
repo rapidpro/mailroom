@@ -1,25 +1,28 @@
-package models
+package models_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAirtimeTransfers(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer db.MustExec(`DELETE FROM airtime_airtimetransfer`)
 
 	// insert a transfer
-	transfer := NewAirtimeTransfer(
-		Org1,
-		AirtimeTransferStatusSuccess,
-		CathyID,
+	transfer := models.NewAirtimeTransfer(
+		testdata.Org1.ID,
+		models.AirtimeTransferStatusSuccess,
+		testdata.Cathy.ID,
 		urns.URN("tel:+250700000001"),
 		urns.URN("tel:+250700000002"),
 		"RWF",
@@ -27,18 +30,16 @@ func TestAirtimeTransfers(t *testing.T) {
 		decimal.RequireFromString(`1000`),
 		time.Now(),
 	)
-	err := InsertAirtimeTransfers(ctx, db, []*AirtimeTransfer{transfer})
+	err := models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`,
-		[]interface{}{Org1, AirtimeTransferStatusSuccess}, 1)
+	testsuite.AssertQuery(t, db, `SELECT org_id, status from airtime_airtimetransfer`).Columns(map[string]interface{}{"org_id": int64(1), "status": "S"})
 
 	// insert a failed transfer with nil sender, empty currency
-	transfer = NewAirtimeTransfer(
-		Org1,
-		AirtimeTransferStatusFailed,
-		CathyID,
+	transfer = models.NewAirtimeTransfer(
+		testdata.Org1.ID,
+		models.AirtimeTransferStatusFailed,
+		testdata.Cathy.ID,
 		urns.NilURN,
 		urns.URN("tel:+250700000002"),
 		"",
@@ -46,10 +47,8 @@ func TestAirtimeTransfers(t *testing.T) {
 		decimal.Zero,
 		time.Now(),
 	)
-	err = InsertAirtimeTransfers(ctx, db, []*AirtimeTransfer{transfer})
+	err = models.InsertAirtimeTransfers(ctx, db, []*models.AirtimeTransfer{transfer})
 	assert.Nil(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`,
-		[]interface{}{Org1, AirtimeTransferStatusFailed}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from airtime_airtimetransfer WHERE org_id = $1 AND status = $2`, testdata.Org1.ID, models.AirtimeTransferStatusFailed).Returns(1)
 }

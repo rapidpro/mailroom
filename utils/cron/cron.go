@@ -28,7 +28,7 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 		defer log.Info("exiting")
 
 		// we run expiration every minute on the minute
-		for true {
+		for {
 			select {
 			case <-quit:
 				// we are exiting, return so our goroutine can exit

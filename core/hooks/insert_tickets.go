@@ -32,5 +32,17 @@ func (h *insertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 		return errors.Wrapf(err, "error inserting tickets")
 	}
 
+	// generate opened events for each ticket
+	openEvents := make([]*models.TicketEvent, len(tickets))
+	for i, ticket := range tickets {
+		openEvents[i] = models.NewTicketOpenedEvent(ticket, models.NilUserID, ticket.AssigneeID())
+	}
+
+	// and insert those too
+	err = models.InsertTicketEvents(ctx, tx, openEvents)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting ticket opened events")
+	}
+
 	return nil
 }

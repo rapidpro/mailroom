@@ -9,5 +9,5 @@ import (
 
 func TestServer(t *testing.T) {
 	testsuite.Reset()
-	web.RunWebTests(t, "testdata/migrate.json")
+	web.RunWebTests(t, "testdata/migrate.json", nil)
 }

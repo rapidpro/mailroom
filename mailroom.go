@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/gomodule/redigo/redis"
@@ -22,7 +23,7 @@ import (
 )
 
 // InitFunction is a function that will be called when mailroom starts
-type InitFunction func(mr *Mailroom) error
+type InitFunction func(runtime *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 
 var initFunctions = make([]InitFunction, 0)
 
@@ -32,7 +33,7 @@ func AddInitFunction(initFunc InitFunction) {
 }
 
 // TaskFunction is the function that will be called for a type of task
-type TaskFunction func(ctx context.Context, mr *Mailroom, task *queue.Task) error
+type TaskFunction func(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error
 
 var taskFunctions = make(map[string]TaskFunction)
 
@@ -43,16 +44,12 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
-	Config        *config.Config
-	DB            *sqlx.DB
-	RP            *redis.Pool
-	ElasticClient *elastic.Client
-	Storage       storage.Storage
+	ctx    context.Context
+	cancel context.CancelFunc
 
-	Quit      chan bool
-	CTX       context.Context
-	Cancel    context.CancelFunc
-	WaitGroup *sync.WaitGroup
+	rt   *runtime.Runtime
+	wg   *sync.WaitGroup
+	quit chan bool
 
 	batchForeman   *Foreman
 	handlerForeman *Foreman
@@ -63,48 +60,50 @@ type Mailroom struct {
 // NewMailroom creates and returns a new mailroom instance
 func NewMailroom(config *config.Config) *Mailroom {
 	mr := &Mailroom{
-		Config:    config,
-		Quit:      make(chan bool),
-		WaitGroup: &sync.WaitGroup{},
+		rt:   &runtime.Runtime{Config: config},
+		quit: make(chan bool),
+		wg:   &sync.WaitGroup{},
 	}
-	mr.CTX, mr.Cancel = context.WithCancel(context.Background())
-	mr.batchForeman = NewForeman(mr, queue.BatchQueue, config.BatchWorkers)
-	mr.handlerForeman = NewForeman(mr, queue.HandlerQueue, config.HandlerWorkers)
+	mr.ctx, mr.cancel = context.WithCancel(context.Background())
+	mr.batchForeman = NewForeman(mr.rt, mr.wg, queue.BatchQueue, config.BatchWorkers)
+	mr.handlerForeman = NewForeman(mr.rt, mr.wg, queue.HandlerQueue, config.HandlerWorkers)
 
 	return mr
 }
 
 // Start starts the mailroom service
 func (mr *Mailroom) Start() error {
+	c := mr.rt.Config
+
 	log := logrus.WithFields(logrus.Fields{
 		"state": "starting",
 	})
 
 	// parse and test our db config
-	dbURL, err := url.Parse(mr.Config.DB)
+	dbURL, err := url.Parse(c.DB)
 	if err != nil {
-		return fmt.Errorf("unable to parse DB URL '%s': %s", mr.Config.DB, err)
+		return fmt.Errorf("unable to parse DB URL '%s': %s", c.DB, err)
 	}
 
 	if dbURL.Scheme != "postgres" {
-		return fmt.Errorf("invalid DB URL: '%s', only postgres is supported", mr.Config.DB)
+		return fmt.Errorf("invalid DB URL: '%s', only postgres is supported", c.DB)
 	}
 
 	// build our db
-	db, err := sqlx.Open("postgres", mr.Config.DB)
+	db, err := sqlx.Open("postgres", c.DB)
 	if err != nil {
-		return fmt.Errorf("unable to open DB with config: '%s': %s", mr.Config.DB, err)
+		return fmt.Errorf("unable to open DB with config: '%s': %s", c.DB, err)
 	}
 
 	// configure our pool
-	mr.DB = db
-	mr.DB.SetMaxIdleConns(8)
-	mr.DB.SetMaxOpenConns(mr.Config.DBPoolSize)
-	mr.DB.SetConnMaxLifetime(time.Minute * 30)
+	db.SetMaxIdleConns(8)
+	db.SetMaxOpenConns(c.DBPoolSize)
+	db.SetConnMaxLifetime(time.Minute * 30)
+	mr.rt.DB = db
 
 	// try connecting
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	err = mr.DB.PingContext(ctx)
+	err = db.PingContext(ctx)
 	cancel()
 	if err != nil {
 		log.Error("db not reachable")
@@ -113,9 +112,9 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// parse and test our redis config
-	redisURL, err := url.Parse(mr.Config.Redis)
+	redisURL, err := url.Parse(mr.rt.Config.Redis)
 	if err != nil {
-		return fmt.Errorf("unable to parse Redis URL '%s': %s", mr.Config.Redis, err)
+		return fmt.Errorf("unable to parse Redis URL '%s': %s", c.Redis, err)
 	}
 
 	// create our pool
@@ -125,7 +124,7 @@ func (mr *Mailroom) Start() error {
 		MaxIdle:     4,                 // only keep up to this many idle
 		IdleTimeout: 240 * time.Second, // how long to wait before reaping a connection
 		Dial: func() (redis.Conn, error) {
-			conn, err := redis.Dial("tcp", fmt.Sprintf("%s", redisURL.Host))
+			conn, err := redis.Dial("tcp", redisURL.Host)
 			if err != nil {
 				return nil, err
 			}
@@ -146,7 +145,7 @@ func (mr *Mailroom) Start() error {
 			return conn, err
 		},
 	}
-	mr.RP = redisPool
+	mr.rt.RP = redisPool
 
 	// test our redis connection
 	conn := redisPool.Get()
@@ -159,33 +158,48 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// create our storage (S3 or file system)
-	if mr.Config.AWSAccessKeyID != "" {
+	if mr.rt.Config.AWSAccessKeyID != "" {
 		s3Client, err := storage.NewS3Client(&storage.S3Options{
-			AWSAccessKeyID:     mr.Config.AWSAccessKeyID,
-			AWSSecretAccessKey: mr.Config.AWSSecretAccessKey,
-			Endpoint:           mr.Config.S3Endpoint,
-			Region:             mr.Config.S3Region,
-			DisableSSL:         mr.Config.S3DisableSSL,
-			ForcePathStyle:     mr.Config.S3ForcePathStyle,
+			AWSAccessKeyID:     c.AWSAccessKeyID,
+			AWSSecretAccessKey: c.AWSSecretAccessKey,
+			Endpoint:           c.S3Endpoint,
+			Region:             c.S3Region,
+			DisableSSL:         c.S3DisableSSL,
+			ForcePathStyle:     c.S3ForcePathStyle,
 		})
 		if err != nil {
 			return err
 		}
-		mr.Storage = storage.NewS3(s3Client, mr.Config.S3MediaBucket)
+		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, 32)
+		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, 32)
 	} else {
-		mr.Storage = storage.NewFS("_storage")
+		mr.rt.MediaStorage = storage.NewFS("_storage")
+		mr.rt.SessionStorage = storage.NewFS("_storage")
 	}
 
-	// test our storage
-	err = mr.Storage.Test()
+	// test our media storage
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+	err = mr.rt.MediaStorage.Test(ctx)
+	cancel()
+
 	if err != nil {
-		log.WithError(err).Error(mr.Storage.Name() + " storage not available")
+		log.WithError(err).Error(mr.rt.MediaStorage.Name() + " media storage not available")
 	} else {
-		log.Info(mr.Storage.Name() + " storage ok")
+		log.Info(mr.rt.MediaStorage.Name() + " media storage ok")
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+	err = mr.rt.SessionStorage.Test(ctx)
+	cancel()
+
+	if err != nil {
+		log.WithError(err).Warn(mr.rt.SessionStorage.Name() + " session storage not available")
+	} else {
+		log.Info(mr.rt.SessionStorage.Name() + " session storage ok")
 	}
 
 	// initialize our elastic client
-	mr.ElasticClient, err = newElasticClient(mr.Config.Elastic)
+	mr.rt.ES, err = newElasticClient(c.Elastic)
 	if err != nil {
 		log.WithError(err).Error("unable to connect to elastic, check configuration")
 	} else {
@@ -193,18 +207,18 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// warn if we won't be doing FCM syncing
-	if config.Mailroom.FCMKey == "" {
+	if c.FCMKey == "" {
 		logrus.Error("fcm not configured, no syncing of android channels")
 	}
 
 	for _, initFunc := range initFunctions {
-		initFunc(mr)
+		initFunc(mr.rt, mr.wg, mr.quit)
 	}
 
 	// if we have a librato token, configure it
-	if mr.Config.LibratoToken != "" {
+	if c.LibratoToken != "" {
 		host, _ := os.Hostname()
-		librato.Configure(mr.Config.LibratoUsername, mr.Config.LibratoToken, host, time.Second, mr.WaitGroup)
+		librato.Configure(c.LibratoUsername, c.LibratoToken, host, time.Second, mr.wg)
 		librato.Start()
 	}
 
@@ -213,7 +227,7 @@ func (mr *Mailroom) Start() error {
 	mr.handlerForeman.Start()
 
 	// start our web server
-	mr.webserver = web.NewServer(mr.CTX, mr.Config, mr.DB, mr.RP, mr.Storage, mr.ElasticClient, mr.WaitGroup)
+	mr.webserver = web.NewServer(mr.ctx, c, mr.rt.DB, mr.rt.RP, mr.rt.MediaStorage, mr.rt.ES, mr.wg)
 	mr.webserver.Start()
 
 	logrus.Info("mailroom started")
@@ -227,14 +241,14 @@ func (mr *Mailroom) Stop() error {
 	mr.batchForeman.Stop()
 	mr.handlerForeman.Stop()
 	librato.Stop()
-	close(mr.Quit)
-	mr.Cancel()
+	close(mr.quit)
+	mr.cancel()
 
 	// stop our web server
 	mr.webserver.Stop()
 
-	mr.WaitGroup.Wait()
-	mr.ElasticClient.Stop()
+	mr.wg.Wait()
+	mr.rt.ES.Stop()
 	logrus.Info("mailroom stopped")
 	return nil
 }

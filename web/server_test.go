@@ -5,5 +5,5 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	RunWebTests(t, "testdata/server.json")
+	RunWebTests(t, "testdata/server.json", nil)
 }

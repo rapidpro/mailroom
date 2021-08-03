@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,9 @@ import (
 )
 
 func TestEngineWebhook(t *testing.T) {
-	svc, err := goflow.Engine().Services().Webhook(nil)
+	_, rt, _, _ := testsuite.Get()
+
+	svc, err := goflow.Engine(rt.Config).Services().Webhook(nil)
 	assert.NoError(t, err)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -37,7 +40,9 @@ func TestEngineWebhook(t *testing.T) {
 }
 
 func TestSimulatorAirtime(t *testing.T) {
-	svc, err := goflow.Simulator().Services().Airtime(nil)
+	_, rt, _, _ := testsuite.Get()
+
+	svc, err := goflow.Simulator(rt.Config).Services().Airtime(nil)
 	assert.NoError(t, err)
 
 	amounts := map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.50`)}
@@ -55,25 +60,25 @@ func TestSimulatorAirtime(t *testing.T) {
 }
 
 func TestSimulatorTicket(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	testsuite.ResetDB()
+	ctx, rt, db, _ := testsuite.Get()
 
-	ticketer, err := models.LookupTicketerByUUID(ctx, db, models.MailgunUUID)
+	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Mailgun.UUID)
 	require.NoError(t, err)
 
-	svc, err := goflow.Simulator().Services().Ticket(nil, flows.NewTicketer(ticketer))
+	svc, err := goflow.Simulator(rt.Config).Services().Ticket(nil, flows.NewTicketer(ticketer))
 	assert.NoError(t, err)
 
 	ticket, err := svc.Open(nil, "New ticket", "Where are my cookies?", nil)
 	assert.NoError(t, err)
-	assert.Equal(t, models.MailgunUUID, ticket.Ticketer.UUID)
-	assert.Equal(t, "New ticket", ticket.Subject)
-	assert.Equal(t, "Where are my cookies?", ticket.Body)
+	assert.Equal(t, testdata.Mailgun.UUID, ticket.Ticketer().UUID())
+	assert.Equal(t, "New ticket", ticket.Subject())
+	assert.Equal(t, "Where are my cookies?", ticket.Body())
 }
 
 func TestSimulatorWebhook(t *testing.T) {
-	svc, err := goflow.Simulator().Services().Webhook(nil)
+	_, rt, _, _ := testsuite.Get()
+
+	svc, err := goflow.Simulator(rt.Config).Services().Webhook(nil)
 	assert.NoError(t, err)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)

@@ -1,3 +1,168 @@
+v6.5.6
+----------
+ * Update to latest goflow and add parse_only as param to parse_query to allow us to extract field dependencies even when they don't yet exist in the database
+
+v6.5.5
+----------
+ * Fix tests broken by recent db changes to msgs and broadcasts
+ * Populate ticket_count when creating new contacts
+
+v6.5.4
+----------
+ * Actually save IVR messages with sent_on set
+
+v6.5.3
+----------
+ * Update contact modified_on after populate dynamic group task
+ * Update to latest goflow
+
+v6.5.2
+----------
+ * Set sent_on for outgoing IVR messages
+
+v6.5.1
+----------
+ * Support flow config ivr_retry values of -1 meaning no retry
+ * Log error if marking event fire as fired fails
+
+v6.5.0
+----------
+ * Update to latest goflow and gocommon
+
+v6.4.3
+----------
+ * Fix triggering new IVR flow from a simulation resume so that it includes connection to test channel
+
+v6.4.2
+----------
+ * Latest goflow with latest localization
+
+v6.4.1
+----------
+ * Update to latest goflow to get fixes for nulls in webhook responses
+ * Add new error type for failed SQL queries
+
+v6.4.0
+----------
+ * move s3 session config error to a warning for the time being since not strictly required yet
+
+v6.3.31
+----------
+ * Support ticket open events with assignees
+ * Add endpoints for ticket assignment and adding notes
+
+v6.3.30
+----------
+ * Update to latest goflow
+
+v6.3.29
+----------
+ * Include args in BulkQuery error output
+
+v6.3.28
+----------
+ * Return more SQL when BulkQuery errors
+ * Update to latest goflow/gocommon
+
+v6.3.27
+----------
+ * Fix handling of inbox messages to also update open tickets
+
+v6.3.26
+----------
+ * Stop writing broadcast.is_active which is now nullable
+
+v6.3.25
+----------
+ * Update to latest goflow
+
+v6.3.24
+----------
+ * Update to latest goflow
+ * Load org users as assets and use for ticket assignees and manual trigger users
+ * Add ticket to broadcasts and update last_activity_on after creating messages for a broadcast with a ticket
+
+v6.3.23
+----------
+ * Add support for exclusion groups on scheduled triggers
+
+v6.3.22
+----------
+ * Update ticket last_activity_on when opening/closing and for incoming messages
+ * Set contact_id when creating new tickets events
+
+v6.3.21
+----------
+ * Update to latest goflow and which no longer takes default_language
+
+v6.3.20
+----------
+ * Have our session filename lead with timestamp so other objects can exist in contact dirs
+
+v6.3.19
+----------
+ * Parse URL to get path out for sessions
+
+v6.3.18
+----------
+ * Use s3 session prefix when building s3 paths, default to /
+ * Throw error upwards if we have no DB backdown
+ * Read session files from storage when org configured to do so
+
+v6.3.17
+----------
+ * Ignore contact tickets on ticketers which have been deleted
+
+v6.3.16
+----------
+ * Add ticket closed triggers and use to handle close ticket events
+ * Add ticket events and insert when opening/closing/reopening tickets
+
+v6.3.15
+----------
+ * Fix test which modifies org
+ * Update to latest goflow as last release was broken
+
+v6.3.14
+----------
+ * Update to latest goflow
+ * Write sessions to s3 on resumes (optionally)
+ * Add support for exclusion groups on triggers and generalize trigger matching
+
+v6.3.13
+----------
+ * Introduce runtime.Runtime
+ * Simplify testdata functions
+ * Various fixes from linter
+ * Simplify use of test contacts in handler tests
+ * Move test constants out of models package
+ * Remove reduntant resend_msgs task
+
+v6.3.12
+----------
+ * Update to latest goflow (legacy_extra is no longer an issue)
+ * Make Msg.next_attempt nullable
+ * Add web endpoint for msg resends so they can be a synchronous operation
+
+v6.3.11
+----------
+ * Expose open tickets as @contact.tickets
+
+v6.3.9
+----------
+ * Fix queueing of resent messages to courier and improve testing of queueing
+ * Update to latest goflow
+ * Add WA template translation namespace
+
+v6.3.8
+----------
+ * Add task to resend messages
+
+v6.3.7
+----------
+ * Update to latest goflow
+ * Update test database and rename Nexmo to Vonage
+
 v6.3.6
 ----------
  * Update to latest goflow

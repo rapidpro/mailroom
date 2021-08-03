@@ -11,32 +11,30 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSessionTriggered(t *testing.T) {
-	testsuite.Reset()
-	testsuite.ResetRP()
-	models.FlushCache()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Get()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	defer testsuite.Reset()
+
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
-	simpleFlow, err := oa.FlowByID(models.SingleMessageFlowID)
+	simpleFlow, err := oa.FlowByID(testdata.SingleMessage.ID)
 	assert.NoError(t, err)
 
 	contactRef := &flows.ContactReference{
-		UUID: models.GeorgeUUID,
+		UUID: testdata.George.UUID,
 	}
 
 	groupRef := &assets.GroupReference{
-		UUID: models.TestersGroupUUID,
+		UUID: testdata.TestersGroup.UUID,
 	}
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(1234567))
@@ -45,34 +43,37 @@ func TestSessionTriggered(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewStartSession(handlers.NewActionUUID(), simpleFlow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
-					Args:  []interface{}{models.CathyID},
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart where org_id = 1 AND start_type = 'F' AND flow_id = $1 AND status = 'P' AND parent_summary IS NOT NULL AND session_history IS NOT NULL;",
-					Args:  []interface{}{models.SingleMessageFlowID},
+					Args:  []interface{}{testdata.SingleMessage.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart_contacts where id = 1 AND contact_id = $1",
-					Args:  []interface{}{models.GeorgeID},
+					Args:  []interface{}{testdata.George.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from flows_flowstart_groups where id = 1 AND contactgroup_id = $1",
-					Args:  []interface{}{models.TestersGroupID},
+					Args:  []interface{}{testdata.TestersGroup.ID},
 					Count: 1,
 				},
 			},
 			Assertions: []handlers.Assertion{
-				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
+				func(t *testing.T, rt *runtime.Runtime) error {
+					rc := rt.RP.Get()
+					defer rc.Close()
+
 					task, err := queue.PopNextTask(rc, queue.BatchQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)
@@ -80,8 +81,8 @@ func TestSessionTriggered(t *testing.T) {
 					err = json.Unmarshal(task.Task, &start)
 					assert.NoError(t, err)
 					assert.True(t, start.CreateContact())
-					assert.Equal(t, []models.ContactID{models.GeorgeID}, start.ContactIDs())
-					assert.Equal(t, []models.GroupID{models.TestersGroupID}, start.GroupIDs())
+					assert.Equal(t, []models.ContactID{testdata.George.ID}, start.ContactIDs())
+					assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.GroupIDs())
 					assert.Equal(t, simpleFlow.ID(), start.FlowID())
 					assert.JSONEq(t, `{"parent_uuid":"39a9f95e-3641-4d19-95e0-ed866f27c829", "ancestors":1, "ancestors_since_input":1}`, string(start.SessionHistory()))
 					return nil
@@ -94,16 +95,12 @@ func TestSessionTriggered(t *testing.T) {
 }
 
 func TestQuerySessionTriggered(t *testing.T) {
-	testsuite.Reset()
-	testsuite.ResetRP()
-	models.FlushCache()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, rp := testsuite.Reset()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
-	favoriteFlow, err := oa.FlowByID(models.FavoritesFlowID)
+	favoriteFlow, err := oa.FlowByID(testdata.Favorites.ID)
 	assert.NoError(t, err)
 
 	sessionAction := actions.NewStartSession(handlers.NewActionUUID(), favoriteFlow.FlowReference(), nil, nil, nil, nil, true)
@@ -112,17 +109,20 @@ func TestQuerySessionTriggered(t *testing.T) {
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{sessionAction},
+				testdata.Cathy: []flows.Action{sessionAction},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   `select count(*) from flows_flowstart where flow_id = $1 AND start_type = 'F' AND status = 'P' AND query = 'name ~ "Cathy"' AND parent_summary IS NOT NULL;`,
-					Args:  []interface{}{models.FavoritesFlowID},
+					Args:  []interface{}{testdata.Favorites.ID},
 					Count: 1,
 				},
 			},
 			Assertions: []handlers.Assertion{
-				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
+				func(t *testing.T, rt *runtime.Runtime) error {
+					rc := rp.Get()
+					defer rc.Close()
+
 					task, err := queue.PopNextTask(rc, queue.BatchQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)

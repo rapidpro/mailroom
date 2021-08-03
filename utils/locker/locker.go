@@ -9,8 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const sleep = time.Second * 1
-
 // GrabLock grabs the passed in lock from redis in an atomic operation. It returns the lock value
 // if successful. It will retry until the retry period, returning empty string if not acquired
 // in that time.

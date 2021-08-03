@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/Masterminds/semver"
@@ -36,20 +37,20 @@ type migrateRequest struct {
 	ToVersion *semver.Version `json:"to_version"`
 }
 
-func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &migrateRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// do a JSON to JSON migration of the definition
-	migrated, err := goflow.MigrateDefinition(request.Flow, request.ToVersion)
+	migrated, err := goflow.MigrateDefinition(rt.Config, request.Flow, request.ToVersion)
 	if err != nil {
 		return errors.Wrapf(err, "unable to migrate flow"), http.StatusUnprocessableEntity, nil
 	}
 
 	// try to read result to check that it's valid
-	_, err = goflow.ReadFlow(migrated)
+	_, err = goflow.ReadFlow(rt.Config, migrated)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read migrated flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -71,13 +72,13 @@ type inspectRequest struct {
 	OrgID models.OrgID    `json:"org_id"`
 }
 
-func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleInspect(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &inspectRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	flow, err := goflow.ReadFlow(request.Flow)
+	flow, err := goflow.ReadFlow(rt.Config, request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -85,7 +86,7 @@ func handleInspect(ctx context.Context, s *web.Server, r *http.Request) (interfa
 	var sa flows.SessionAssets
 	// if we have an org ID, create session assets to look for missing dependencies
 	if request.OrgID != models.NilOrgID {
-		oa, err := models.GetOrgAssetsWithRefresh(ctx, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
+		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt.DB, request.OrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -110,7 +111,7 @@ type cloneRequest struct {
 	Flow              json.RawMessage           `json:"flow" validate:"required"`
 }
 
-func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleClone(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &cloneRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -123,7 +124,7 @@ func handleClone(ctx context.Context, s *web.Server, r *http.Request) (interface
 	}
 
 	// read flow to check that cloning produced something valid
-	_, err = goflow.ReadFlow(cloneJSON)
+	_, err = goflow.ReadFlow(rt.Config, cloneJSON)
 	if err != nil {
 		return errors.Wrapf(err, "unable to clone flow"), http.StatusUnprocessableEntity, nil
 	}
@@ -143,13 +144,13 @@ type changeLanguageRequest struct {
 	Flow     json.RawMessage `json:"flow"     validate:"required"`
 }
 
-func handleChangeLanguage(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleChangeLanguage(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &changeLanguageRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
-	flow, err := goflow.ReadFlow(request.Flow)
+	flow, err := goflow.ReadFlow(rt.Config, request.Flow)
 	if err != nil {
 		return errors.Wrapf(err, "unable to read flow"), http.StatusUnprocessableEntity, nil
 	}

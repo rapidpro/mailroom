@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 )
 
@@ -13,8 +14,8 @@ func init() {
 	docServer = http.StripPrefix("/mr/docs", http.FileServer(http.Dir("docs")))
 
 	// redirect non slashed docs to slashed version so relative URLs work
-	web.RegisterRoute(http.MethodGet, "/mr/docs", func(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
-		http.Redirect(rawW, r, "/mr/docs/", 301)
+	web.RegisterRoute(http.MethodGet, "/mr/docs", func(ctx context.Context, rt *runtime.Runtime, r *http.Request, rawW http.ResponseWriter) error {
+		http.Redirect(rawW, r, "/mr/docs/", http.StatusMovedPermanently)
 		return nil
 	})
 
@@ -22,7 +23,7 @@ func init() {
 	web.RegisterRoute(http.MethodGet, "/mr/docs/*", handleDocs)
 }
 
-func handleDocs(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
+func handleDocs(ctx context.Context, rt *runtime.Runtime, r *http.Request, rawW http.ResponseWriter) error {
 	docServer.ServeHTTP(rawW, r)
 	return nil
 }

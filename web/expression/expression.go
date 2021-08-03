@@ -6,6 +6,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -29,7 +30,7 @@ type migrateResponse struct {
 	Migrated string `json:"migrated"`
 }
 
-func handleMigrate(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &migrateRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil

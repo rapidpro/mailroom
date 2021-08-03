@@ -81,14 +81,22 @@ func (f *Flow) FlowType() FlowType { return f.f.FlowType }
 // Version returns the version this flow was authored in
 func (f *Flow) Version() string { return f.f.Version }
 
-// IVRRetryWait returns the wait before retrying a failed IVR call
-func (f *Flow) IVRRetryWait() time.Duration {
+// IVRRetryWait returns the wait before retrying a failed IVR call (nil means no retry)
+func (f *Flow) IVRRetryWait() *time.Duration {
+	wait := ConnectionRetryWait
+
 	value := f.f.Config.Get(flowConfigIVRRetryMinutes, nil)
 	fv, isFloat := value.(float64)
 	if isFloat {
-		return time.Minute * time.Duration(int(fv))
+		minutes := int(fv)
+		if minutes >= 0 {
+			wait = time.Minute * time.Duration(minutes)
+		} else {
+			return nil // ivr_retry -1 means no retry
+		}
 	}
-	return ConnectionRetryWait
+
+	return &wait
 }
 
 // IgnoreTriggers returns whether this flow ignores triggers
@@ -106,7 +114,7 @@ func (f *Flow) cloneWithNewDefinition(def []byte) *Flow {
 	return &c
 }
 
-func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
+func FlowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
 	// first try to look up in our assets
 	flow, _ := oa.Flow(flowUUID)
 	if flow != nil {
@@ -119,11 +127,11 @@ func flowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID ass
 	return flowID, err
 }
 
-func loadFlowByUUID(ctx context.Context, db Queryer, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
+func LoadFlowByUUID(ctx context.Context, db Queryer, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
 	return loadFlow(ctx, db, selectFlowByUUIDSQL, orgID, flowUUID)
 }
 
-func loadFlowByID(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID) (*Flow, error) {
+func LoadFlowByID(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID) (*Flow, error) {
 	return loadFlow(ctx, db, selectFlowByIDSQL, orgID, flowID)
 }
 

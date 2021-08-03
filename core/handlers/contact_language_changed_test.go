@@ -6,43 +6,46 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestContactLanguageChanged(t *testing.T) {
+	defer testsuite.Reset()
+
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewSetContactLanguage(handlers.NewActionUUID(), "fra"),
 					actions.NewSetContactLanguage(handlers.NewActionUUID(), "eng"),
 				},
-				models.GeorgeID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewSetContactLanguage(handlers.NewActionUUID(), "spa"),
 				},
-				models.AlexandriaID: []flows.Action{
+				testdata.Alexandria: []flows.Action{
 					actions.NewSetContactLanguage(handlers.NewActionUUID(), ""),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'eng'",
-					Args:  []interface{}{models.CathyID},
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language = 'spa'",
-					Args:  []interface{}{models.GeorgeID},
+					Args:  []interface{}{testdata.George.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language is NULL;",
-					Args:  []interface{}{models.BobID},
+					Args:  []interface{}{testdata.Bob.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contact where id = $1 and language is NULL;",
-					Args:  []interface{}{models.AlexandriaID},
+					Args:  []interface{}{testdata.Alexandria.ID},
 					Count: 1,
 				},
 			},

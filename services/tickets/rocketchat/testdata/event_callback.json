@@ -111,7 +111,7 @@
     },
     "body": {
       "type": "other",
-      "ticketID": "c69f103c-db64-4481-815b-1112890419ef",
+      "ticketID": "$cathy_ticket_uuid$",
       "visitor": {
         "token": "1234"
       },
@@ -133,7 +133,7 @@
     },
     "body": {
       "type": "agent-message",
-      "ticketID": "c69f103c-db64-4481-815b-1112890419ef",
+      "ticketID": "$cathy_ticket_uuid$",
       "visitor": {
         "token": "1234"
       },
@@ -165,15 +165,17 @@
     },
     "body": {
       "type": "agent-message",
-      "ticketID": "c69f103c-db64-4481-815b-1112890419ef",
+      "ticketID": "$cathy_ticket_uuid$",
       "visitor": {
         "token": "1234"
       },
       "data": {
-        "attachments": [{
-          "type": "image/jpg",
-          "url": "https://link.to/image.jpg"
-        }]
+        "attachments": [
+          {
+            "type": "image/jpg",
+            "url": "https://link.to/image.jpg"
+          }
+        ]
       }
     },
     "http_mocks": {
@@ -190,7 +192,7 @@
     },
     "db_assertions": [
       {
-        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{text/plain:https:///_test_storage/media/1/6929/26ea/692926ea-09d6-4942-bd38-d266ec8d3716.jpg}'",
+        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{text/plain:https:///_test_media_storage/media/1/6929/26ea/692926ea-09d6-4942-bd38-d266ec8d3716.jpg}'",
         "count": 1
       }
     ]
@@ -204,7 +206,7 @@
     },
     "body": {
       "type": "close-room",
-      "ticketID": "c69f103c-db64-4481-815b-1112890419ef",
+      "ticketID": "$cathy_ticket_uuid$",
       "visitor": {
         "token": "1234"
       }

@@ -17,7 +17,7 @@ var httpRetries *httpx.RetryConfig
 var httpAccess *httpx.AccessConfig
 
 // HTTP returns the configuration objects for HTTP calls from the engine and its services
-func HTTP() (*http.Client, *httpx.RetryConfig, *httpx.AccessConfig) {
+func HTTP(cfg *config.Config) (*http.Client, *httpx.RetryConfig, *httpx.AccessConfig) {
 	httpInit.Do(func() {
 		// customize the default golang transport
 		t := http.DefaultTransport.(*http.Transport).Clone()
@@ -30,16 +30,16 @@ func HTTP() (*http.Client, *httpx.RetryConfig, *httpx.AccessConfig) {
 
 		httpClient = &http.Client{
 			Transport: t,
-			Timeout:   time.Duration(config.Mailroom.WebhooksTimeout) * time.Millisecond,
+			Timeout:   time.Duration(cfg.WebhooksTimeout) * time.Millisecond,
 		}
 
 		httpRetries = httpx.NewExponentialRetries(
-			time.Duration(config.Mailroom.WebhooksInitialBackoff)*time.Millisecond,
-			config.Mailroom.WebhooksMaxRetries,
-			config.Mailroom.WebhooksBackoffJitter,
+			time.Duration(cfg.WebhooksInitialBackoff)*time.Millisecond,
+			cfg.WebhooksMaxRetries,
+			cfg.WebhooksBackoffJitter,
 		)
 
-		disallowedIPs, disallowedNets, _ := config.Mailroom.ParseDisallowedNetworks()
+		disallowedIPs, disallowedNets, _ := cfg.ParseDisallowedNetworks()
 		httpAccess = httpx.NewAccessConfig(10*time.Second, disallowedIPs, disallowedNets)
 	})
 	return httpClient, httpRetries, httpAccess

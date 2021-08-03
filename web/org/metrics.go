@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 	dto "github.com/prometheus/client_model/go"
@@ -47,8 +48,8 @@ type groupCountRow struct {
 	Count int64            `db:"count"`
 }
 
-func calculateGroupCounts(ctx context.Context, s *web.Server, org *models.OrgReference) (*dto.MetricFamily, error) {
-	rows, err := s.DB.QueryxContext(ctx, groupCountsSQL, org.ID)
+func calculateGroupCounts(ctx context.Context, rt *runtime.Runtime, org *models.OrgReference) (*dto.MetricFamily, error) {
+	rows, err := rt.DB.QueryxContext(ctx, groupCountsSQL, org.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying group counts for org")
 	}
@@ -144,8 +145,8 @@ type channelStats struct {
 	Counts      map[string]int64
 }
 
-func calculateChannelCounts(ctx context.Context, s *web.Server, org *models.OrgReference) (*dto.MetricFamily, error) {
-	rows, err := s.DB.QueryxContext(ctx, channelCountsSQL, org.ID)
+func calculateChannelCounts(ctx context.Context, rt *runtime.Runtime, org *models.OrgReference) (*dto.MetricFamily, error) {
+	rows, err := rt.DB.QueryxContext(ctx, channelCountsSQL, org.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channel counts for org")
 	}
@@ -260,7 +261,7 @@ func calculateChannelCounts(ctx context.Context, s *web.Server, org *models.OrgR
 	return family, err
 }
 
-func handleMetrics(ctx context.Context, s *web.Server, r *http.Request, rawW http.ResponseWriter) error {
+func handleMetrics(ctx context.Context, rt *runtime.Runtime, r *http.Request, rawW http.ResponseWriter) error {
 	// we should have basic auth headers, username should be metrics
 	username, token, ok := r.BasicAuth()
 	if !ok || username != "metrics" {
@@ -270,7 +271,7 @@ func handleMetrics(ctx context.Context, s *web.Server, r *http.Request, rawW htt
 	}
 
 	orgUUID := uuids.UUID(chi.URLParam(r, "uuid"))
-	org, err := models.LookupOrgByUUIDAndToken(ctx, s.DB, orgUUID, "Prometheus", token)
+	org, err := models.LookupOrgByUUIDAndToken(ctx, rt.DB, orgUUID, "Prometheus", token)
 	if err != nil {
 		return errors.Wrapf(err, "error looking up org for token")
 	}
@@ -281,12 +282,12 @@ func handleMetrics(ctx context.Context, s *web.Server, r *http.Request, rawW htt
 		return nil
 	}
 
-	groups, err := calculateGroupCounts(ctx, s, org)
+	groups, err := calculateGroupCounts(ctx, rt, org)
 	if err != nil {
 		return errors.Wrapf(err, "error calculating group counts for org: %d", org.ID)
 	}
 
-	channels, err := calculateChannelCounts(ctx, s, org)
+	channels, err := calculateChannelCounts(ctx, rt, org)
 	if err != nil {
 		return errors.Wrapf(err, "error calculating channel counts for org: %d", org.ID)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,35 +82,35 @@ func TestCampaignSchedule(t *testing.T) {
 }
 
 func TestAddEventFires(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer db.MustExec(`DELETE FROM campaigns_eventfire`)
 
 	scheduled1 := time.Date(2020, 9, 8, 14, 38, 30, 123456789, time.UTC)
 
 	err := models.AddEventFires(ctx, db, []*models.FireAdd{
-		{ContactID: models.CathyID, EventID: models.RemindersEvent1ID, Scheduled: scheduled1},
-		{ContactID: models.BobID, EventID: models.RemindersEvent1ID, Scheduled: scheduled1},
-		{ContactID: models.BobID, EventID: models.RemindersEvent2ID, Scheduled: scheduled1},
+		{ContactID: testdata.Cathy.ID, EventID: testdata.RemindersEvent1.ID, Scheduled: scheduled1},
+		{ContactID: testdata.Bob.ID, EventID: testdata.RemindersEvent1.ID, Scheduled: scheduled1},
+		{ContactID: testdata.Bob.ID, EventID: testdata.RemindersEvent2.ID, Scheduled: scheduled1},
 	})
 	require.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire`, nil, 3)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{models.CathyID, models.RemindersEvent1ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{models.BobID, models.RemindersEvent1ID}, 1)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{models.BobID, models.RemindersEvent2ID}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire`).Returns(3)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent1.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Bob.ID, testdata.RemindersEvent1.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Bob.ID, testdata.RemindersEvent2.ID).Returns(1)
 
-	db.MustExec(`UPDATE campaigns_eventfire SET fired = NOW() WHERE contact_id = $1`, models.CathyID)
+	db.MustExec(`UPDATE campaigns_eventfire SET fired = NOW() WHERE contact_id = $1`, testdata.Cathy.ID)
 
 	scheduled2 := time.Date(2020, 9, 8, 14, 38, 30, 123456789, time.UTC)
 
 	err = models.AddEventFires(ctx, db, []*models.FireAdd{
-		{ContactID: models.CathyID, EventID: models.RemindersEvent1ID, Scheduled: scheduled2}, // fine because previous one now has non-null fired
-		{ContactID: models.BobID, EventID: models.RemindersEvent1ID, Scheduled: scheduled2},   // won't be added due to conflict
+		{ContactID: testdata.Cathy.ID, EventID: testdata.RemindersEvent1.ID, Scheduled: scheduled2}, // fine because previous one now has non-null fired
+		{ContactID: testdata.Bob.ID, EventID: testdata.RemindersEvent1.ID, Scheduled: scheduled2},   // won't be added due to conflict
 	})
 	require.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire`, nil, 4)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, []interface{}{models.CathyID, models.RemindersEvent1ID}, 2)
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, []interface{}{models.BobID}, 2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire`).Returns(4)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent1.ID).Returns(2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Bob.ID).Returns(2)
 }

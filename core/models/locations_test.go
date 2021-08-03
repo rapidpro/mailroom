@@ -1,25 +1,30 @@
-package models
+package models_test
 
 import (
 	"testing"
 
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLocations(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	db.MustExec(`INSERT INTO locations_boundaryalias(is_active, created_on, modified_on, name, boundary_id, created_by_id, modified_by_id, org_id)
 											  VALUES(TRUE, NOW(), NOW(), 'Soko', 8148, 1, 1, 1);`)
 	db.MustExec(`INSERT INTO locations_boundaryalias(is_active, created_on, modified_on, name, boundary_id, created_by_id, modified_by_id, org_id)
 	                                          VALUES(TRUE, NOW(), NOW(), 'Sokoz', 8148, 1, 1, 2);`)
 
-	root, err := loadLocations(ctx, db, 1)
-	assert.NoError(t, err)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshLocations)
+	require.NoError(t, err)
+
+	root, err := oa.Locations()
+	require.NoError(t, err)
 
 	locations := root[0].FindByName("Nigeria", 0, nil)
 

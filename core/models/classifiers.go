@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/services/classification/bothub"
 	"github.com/nyaruka/goflow/services/classification/luis"
 	"github.com/nyaruka/goflow/services/classification/wit"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
@@ -90,7 +91,7 @@ func (c *Classifier) Type() string { return c.c.Type }
 
 // AsService builds the corresponding ClassificationService for the passed in Classifier
 func (c *Classifier) AsService(classifier *flows.Classifier) (flows.ClassificationService, error) {
-	httpClient, httpRetries, httpAccess := goflow.HTTP()
+	httpClient, httpRetries, httpAccess := goflow.HTTP(config.Mailroom)
 
 	switch c.Type() {
 	case ClassifierTypeWit:

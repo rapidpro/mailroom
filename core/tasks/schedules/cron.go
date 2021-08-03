@@ -2,6 +2,7 @@ package schedules
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -9,6 +10,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -23,15 +25,15 @@ func init() {
 }
 
 // StartCheckSchedules starts our cron job of firing schedules every minute
-func StartCheckSchedules(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, scheduleLock, time.Minute*1,
+func StartCheckSchedules(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+	cron.StartCron(quit, rt.RP, scheduleLock, time.Minute*1,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
 			// we sleep 1 second since we fire right on the minute and want to make sure to fire
 			// things that are schedules right at the minute as well (and DB time may be slightly drifted)
 			time.Sleep(time.Second * 1)
-			return checkSchedules(ctx, mr.DB, mr.RP, lockName, lockValue)
+			return checkSchedules(ctx, rt.DB, rt.RP, lockName, lockValue)
 		},
 	)
 	return nil

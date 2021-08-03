@@ -1,4 +1,4 @@
-package models
+package models_test
 
 import (
 	"testing"
@@ -6,72 +6,80 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFlows(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+func TestLoadFlows(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
 
-	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, IVRFlowID)
+	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": 30}'::json WHERE id = $1`, testdata.IVRFlow.ID)
+	db.MustExec(`UPDATE flows_flow SET metadata = '{"ivr_retry": -1}'::json WHERE id = $1`, testdata.SurveyorFlow.ID)
+
+	sixtyMinutes := 60 * time.Minute
+	thirtyMinutes := 30 * time.Minute
 
 	tcs := []struct {
-		OrgID    OrgID
-		FlowID   FlowID
-		FlowUUID assets.FlowUUID
-		Name     string
-		IVRRetry time.Duration
-		Found    bool
+		org              *testdata.Org
+		flowID           models.FlowID
+		flowUUID         assets.FlowUUID
+		expectedName     string
+		expectedIVRRetry *time.Duration
 	}{
-		{Org1, FavoritesFlowID, FavoritesFlowUUID, "Favorites", 60 * time.Minute, true},
-		{Org1, IVRFlowID, IVRFlowUUID, "IVR Flow", 30 * time.Minute, true},
-		{Org2, FlowID(0), assets.FlowUUID("51e3c67d-8483-449c-abf7-25e50686f0db"), "", 0, false},
+		{testdata.Org1, testdata.Favorites.ID, testdata.Favorites.UUID, "Favorites", &sixtyMinutes},    // will use default IVR retry
+		{testdata.Org1, testdata.IVRFlow.ID, testdata.IVRFlow.UUID, "IVR Flow", &thirtyMinutes},        // will have explicit IVR retry
+		{testdata.Org1, testdata.SurveyorFlow.ID, testdata.SurveyorFlow.UUID, "Contact Surveyor", nil}, // will have no IVR retry
+		{testdata.Org2, models.FlowID(0), assets.FlowUUID("51e3c67d-8483-449c-abf7-25e50686f0db"), "", nil},
 	}
 
-	for _, tc := range tcs {
-		flow, err := loadFlowByUUID(ctx, db, tc.OrgID, tc.FlowUUID)
+	for i, tc := range tcs {
+		// test loading by UUID
+		flow, err := models.LoadFlowByUUID(ctx, db, tc.org.ID, tc.flowUUID)
 		assert.NoError(t, err)
 
-		if tc.Found {
-			assert.Equal(t, tc.Name, flow.Name())
-			assert.Equal(t, tc.FlowID, flow.ID())
-			assert.Equal(t, tc.FlowUUID, flow.UUID())
-			assert.Equal(t, tc.IVRRetry, flow.IVRRetryWait())
+		if tc.expectedName != "" {
+			assert.Equal(t, tc.flowID, flow.ID())
+			assert.Equal(t, tc.flowUUID, flow.UUID())
+			assert.Equal(t, tc.expectedName, flow.Name(), "%d: name mismatch", i)
+			assert.Equal(t, tc.expectedIVRRetry, flow.IVRRetryWait(), "%d: IVR retry mismatch", i)
 
-			_, err := goflow.ReadFlow(flow.Definition())
+			_, err := goflow.ReadFlow(rt.Config, flow.Definition())
 			assert.NoError(t, err)
 		} else {
 			assert.Nil(t, flow)
 		}
 
-		flow, err = loadFlowByID(ctx, db, tc.OrgID, tc.FlowID)
+		// test loading by ID
+		flow, err = models.LoadFlowByID(ctx, db, tc.org.ID, tc.flowID)
 		assert.NoError(t, err)
 
-		if tc.Found {
-			assert.Equal(t, tc.Name, flow.Name())
-			assert.Equal(t, tc.FlowID, flow.ID())
-			assert.Equal(t, tc.FlowUUID, flow.UUID())
+		if tc.expectedName != "" {
+			assert.Equal(t, tc.flowID, flow.ID())
+			assert.Equal(t, tc.flowUUID, flow.UUID())
+			assert.Equal(t, tc.expectedName, flow.Name(), "%d: name mismatch", i)
+			assert.Equal(t, tc.expectedIVRRetry, flow.IVRRetryWait(), "%d: IVR retry mismatch", i)
 		} else {
 			assert.Nil(t, flow)
 		}
 	}
 }
 
-func TestGetFlowUUID(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	org, _ := GetOrgAssets(ctx, db, Org1)
+func TestFlowIDForUUID(t *testing.T) {
+	ctx, _, db, _ := testsuite.Get()
+
+	org, _ := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 
 	tx, err := db.BeginTxx(ctx, nil)
 	assert.NoError(t, err)
 
-	id, err := flowIDForUUID(ctx, tx, org, FavoritesFlowUUID)
+	id, err := models.FlowIDForUUID(ctx, tx, org, testdata.Favorites.UUID)
 	assert.NoError(t, err)
-	assert.Equal(t, FavoritesFlowID, id)
+	assert.Equal(t, testdata.Favorites.ID, id)
 
 	// make favorite inactive
-	tx.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, FavoritesFlowID)
+	tx.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Favorites.ID)
 	tx.Commit()
 
 	tx, err = db.BeginTxx(ctx, nil)
@@ -79,10 +87,10 @@ func TestGetFlowUUID(t *testing.T) {
 	defer tx.Rollback()
 
 	// clear our assets so it isn't cached
-	FlushCache()
-	org, _ = GetOrgAssets(ctx, db, Org1)
+	models.FlushCache()
+	org, _ = models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 
-	id, err = flowIDForUUID(ctx, tx, org, FavoritesFlowUUID)
+	id, err = models.FlowIDForUUID(ctx, tx, org, testdata.Favorites.UUID)
 	assert.NoError(t, err)
-	assert.Equal(t, FavoritesFlowID, id)
+	assert.Equal(t, testdata.Favorites.ID, id)
 }

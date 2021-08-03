@@ -67,10 +67,24 @@ type Schedule struct {
 	}
 }
 
-func (s *Schedule) ID() ScheduleID        { return s.s.ID }
-func (s *Schedule) OrgID() OrgID          { return s.s.OrgID }
-func (s *Schedule) Broadcast() *Broadcast { return s.s.Broadcast }
-func (s *Schedule) FlowStart() *FlowStart { return s.s.FlowStart }
+func NewSchedule(period RepeatPeriod, hourOfDay, minuteOfHour, dayOfMonth *int, daysOfWeek string) *Schedule {
+	sched := &Schedule{}
+	s := &sched.s
+	s.RepeatPeriod = period
+	s.HourOfDay = hourOfDay
+	s.MinuteOfHour = minuteOfHour
+	s.DayOfMonth = dayOfMonth
+	s.DaysOfWeek = null.String(daysOfWeek)
+	return sched
+}
+
+func (s *Schedule) ID() ScheduleID             { return s.s.ID }
+func (s *Schedule) OrgID() OrgID               { return s.s.OrgID }
+func (s *Schedule) Broadcast() *Broadcast      { return s.s.Broadcast }
+func (s *Schedule) FlowStart() *FlowStart      { return s.s.FlowStart }
+func (s *Schedule) RepeatPeriod() RepeatPeriod { return s.s.RepeatPeriod }
+func (s *Schedule) NextFire() *time.Time       { return s.s.NextFire }
+func (s *Schedule) LastFire() *time.Time       { return s.s.LastFire }
 func (s *Schedule) Timezone() (*time.Location, error) {
 	return time.LoadLocation(s.s.Timezone)
 }
@@ -253,7 +267,15 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 					triggers_trigger_groups tg
 				WHERE
 					tg.trigger_id = t.id
-			) tg) as group_ids
+			) tg) as group_ids,
+			(SELECT ARRAY_AGG(tg.contactgroup_id) FROM (
+				SELECT
+					tg.contactgroup_id
+				FROM
+					triggers_trigger_exclude_groups tg
+				WHERE
+					tg.trigger_id = t.id
+			) tg) as exclude_group_ids
 		FROM
 			triggers_trigger t JOIN
 			flows_flow f on t.flow_id = f.id

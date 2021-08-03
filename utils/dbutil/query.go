@@ -29,7 +29,7 @@ func BulkQuery(ctx context.Context, tx Queryer, query string, structs []interfac
 
 	rows, err := tx.QueryxContext(ctx, bulkQuery, args...)
 	if err != nil {
-		return errors.Wrapf(err, "error making bulk query: %.100s", bulkQuery)
+		return NewQueryErrorf(err, bulkQuery, args, "error making bulk query")
 	}
 	defer rows.Close()
 

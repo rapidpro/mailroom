@@ -8,7 +8,6 @@ import (
 
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -64,8 +63,7 @@ func newMockFCMEndpoint(tokens ...string) *MockFCMEndpoint {
 }
 
 func TestSyncAndroidChannels(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	mockFCM := newMockFCMEndpoint("FCMID3")
 	defer mockFCM.Stop()
@@ -73,16 +71,16 @@ func TestSyncAndroidChannels(t *testing.T) {
 	fc := mockFCM.Client("FCMKEY123")
 
 	// create some Android channels
-	channel1ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": ""})       // no FCM ID
-	channel2ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"}) // invalid FCM ID
-	channel3ID := testdata.InsertChannel(t, db, models.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"}) // valid FCM ID
+	testChannel1 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": ""})       // no FCM ID
+	testChannel2 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"}) // invalid FCM ID
+	testChannel3 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"}) // valid FCM ID
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
 
-	channel1 := oa.ChannelByID(channel1ID)
-	channel2 := oa.ChannelByID(channel2ID)
-	channel3 := oa.ChannelByID(channel3ID)
+	channel1 := oa.ChannelByID(testChannel1.ID)
+	channel2 := oa.ChannelByID(testChannel2.ID)
+	channel3 := oa.ChannelByID(testChannel3.ID)
 
 	msgio.SyncAndroidChannels(fc, []*models.Channel{channel1, channel2, channel3})
 
@@ -97,11 +95,13 @@ func TestSyncAndroidChannels(t *testing.T) {
 }
 
 func TestCreateFCMClient(t *testing.T) {
-	config.Mailroom.FCMKey = "1234"
+	_, rt, _, _ := testsuite.Get()
 
-	assert.NotNil(t, msgio.CreateFCMClient())
+	rt.Config.FCMKey = "1234"
 
-	config.Mailroom.FCMKey = ""
+	assert.NotNil(t, msgio.CreateFCMClient(rt.Config))
 
-	assert.Nil(t, msgio.CreateFCMClient())
+	rt.Config.FCMKey = ""
+
+	assert.Nil(t, msgio.CreateFCMClient(rt.Config))
 }

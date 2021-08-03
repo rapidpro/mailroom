@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/pkg/errors"
 )
@@ -19,7 +20,7 @@ var registeredTypes = map[string](func() Task){}
 func RegisterType(name string, initFunc func() Task) {
 	registeredTypes[name] = initFunc
 
-	mailroom.AddTaskFunction(name, func(ctx context.Context, mr *mailroom.Mailroom, task *queue.Task) error {
+	mailroom.AddTaskFunction(name, func(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
 		// decode our task body
 		typedTask, err := ReadTask(task.Type, task.Task)
 		if err != nil {
@@ -29,7 +30,7 @@ func RegisterType(name string, initFunc func() Task) {
 		ctx, cancel := context.WithTimeout(ctx, typedTask.Timeout())
 		defer cancel()
 
-		return typedTask.Perform(ctx, mr, models.OrgID(task.OrgID))
+		return typedTask.Perform(ctx, rt, models.OrgID(task.OrgID))
 	})
 }
 
@@ -39,7 +40,7 @@ type Task interface {
 	Timeout() time.Duration
 
 	// Perform performs the task
-	Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error
+	Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error
 }
 
 //------------------------------------------------------------------------------------------

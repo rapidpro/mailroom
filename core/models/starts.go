@@ -103,13 +103,13 @@ func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
 // FlowStartBatch represents a single flow batch that needs to be started
 type FlowStartBatch struct {
 	b struct {
-		StartID    StartID     `json:"start_id"`
-		StartType  StartType   `json:"start_type"`
-		OrgID      OrgID       `json:"org_id"`
-		CreatedBy  string      `json:"created_by"`
-		FlowID     FlowID      `json:"flow_id"`
-		FlowType   FlowType    `json:"flow_type"`
-		ContactIDs []ContactID `json:"contact_ids"`
+		StartID     StartID     `json:"start_id"`
+		StartType   StartType   `json:"start_type"`
+		OrgID       OrgID       `json:"org_id"`
+		CreatedByID UserID      `json:"created_by_id"`
+		FlowID      FlowID      `json:"flow_id"`
+		FlowType    FlowType    `json:"flow_type"`
+		ContactIDs  []ContactID `json:"contact_ids"`
 
 		ParentSummary  null.JSON `json:"parent_summary,omitempty"`
 		SessionHistory null.JSON `json:"session_history,omitempty"`
@@ -120,13 +120,15 @@ type FlowStartBatch struct {
 
 		IsLast        bool `json:"is_last,omitempty"`
 		TotalContacts int  `json:"total_contacts"`
+
+		CreatedBy string `json:"created_by"` // deprecated
 	}
 }
 
 func (b *FlowStartBatch) StartID() StartID                         { return b.b.StartID }
 func (b *FlowStartBatch) StartType() StartType                     { return b.b.StartType }
 func (b *FlowStartBatch) OrgID() OrgID                             { return b.b.OrgID }
-func (b *FlowStartBatch) CreatedBy() string                        { return b.b.CreatedBy }
+func (b *FlowStartBatch) CreatedByID() UserID                      { return b.b.CreatedByID }
 func (b *FlowStartBatch) FlowID() FlowID                           { return b.b.FlowID }
 func (b *FlowStartBatch) ContactIDs() []ContactID                  { return b.b.ContactIDs }
 func (b *FlowStartBatch) RestartParticipants() RestartParticipants { return b.b.RestartParticipants }
@@ -144,19 +146,20 @@ func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarsha
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
 	s struct {
-		ID        StartID    `json:"start_id"   db:"id"`
-		UUID      uuids.UUID `                  db:"uuid"`
-		StartType StartType  `json:"start_type" db:"start_type"`
-		OrgID     OrgID      `json:"org_id"     db:"org_id"`
-		FlowID    FlowID     `json:"flow_id"    db:"flow_id"`
-		FlowType  FlowType   `json:"flow_type"`
+		ID          StartID    `json:"start_id"      db:"id"`
+		UUID        uuids.UUID `                     db:"uuid"`
+		StartType   StartType  `json:"start_type"    db:"start_type"`
+		OrgID       OrgID      `json:"org_id"        db:"org_id"`
+		CreatedByID UserID     `json:"created_by_id" db:"created_by_id"`
+		FlowID      FlowID     `json:"flow_id"       db:"flow_id"`
+		FlowType    FlowType   `json:"flow_type"`
 
-		GroupIDs   []GroupID   `json:"group_ids,omitempty"`
-		ContactIDs []ContactID `json:"contact_ids,omitempty"`
-		URNs       []urns.URN  `json:"urns,omitempty"`
-		Query      null.String `json:"query,omitempty"        db:"query"`
-
-		CreateContact bool `json:"create_contact"`
+		URNs            []urns.URN  `json:"urns,omitempty"`
+		ContactIDs      []ContactID `json:"contact_ids,omitempty"`
+		GroupIDs        []GroupID   `json:"group_ids,omitempty"`
+		ExcludeGroupIDs []GroupID   `json:"exclude_group_ids,omitempty"` // used when loading scheduled triggers as flow starts
+		Query           null.String `json:"query,omitempty"        db:"query"`
+		CreateContact   bool        `json:"create_contact"`
 
 		RestartParticipants RestartParticipants `json:"restart_participants" db:"restart_participants"`
 		IncludeActive       IncludeActive       `json:"include_active"       db:"include_active"`
@@ -165,18 +168,24 @@ type FlowStart struct {
 		ParentSummary  null.JSON `json:"parent_summary,omitempty"  db:"parent_summary"`
 		SessionHistory null.JSON `json:"session_history,omitempty" db:"session_history"`
 
-		CreatedBy string `json:"created_by"`
+		CreatedBy string `json:"created_by"` // TODO deprecated
 	}
 }
 
-func (s *FlowStart) ID() StartID        { return s.s.ID }
-func (s *FlowStart) OrgID() OrgID       { return s.s.OrgID }
-func (s *FlowStart) FlowID() FlowID     { return s.s.FlowID }
-func (s *FlowStart) FlowType() FlowType { return s.s.FlowType }
+func (s *FlowStart) ID() StartID         { return s.s.ID }
+func (s *FlowStart) OrgID() OrgID        { return s.s.OrgID }
+func (s *FlowStart) CreatedByID() UserID { return s.s.CreatedByID }
+func (s *FlowStart) FlowID() FlowID      { return s.s.FlowID }
+func (s *FlowStart) FlowType() FlowType  { return s.s.FlowType }
 
 func (s *FlowStart) GroupIDs() []GroupID { return s.s.GroupIDs }
 func (s *FlowStart) WithGroupIDs(groupIDs []GroupID) *FlowStart {
 	s.s.GroupIDs = groupIDs
+	return s
+}
+func (s *FlowStart) ExcludeGroupIDs() []GroupID { return s.s.ExcludeGroupIDs }
+func (s *FlowStart) WithExcludeGroupIDs(groupIDs []GroupID) *FlowStart {
+	s.s.ExcludeGroupIDs = groupIDs
 	return s
 }
 
@@ -354,6 +363,7 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 	b.b.IsLast = last
 	b.b.TotalContacts = totalContacts
 	b.b.CreatedBy = s.s.CreatedBy
+	b.b.CreatedByID = s.s.CreatedByID
 	return b
 }
 

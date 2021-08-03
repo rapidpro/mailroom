@@ -1,13 +1,13 @@
-package groups
+package contacts
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/locker"
 
 	"github.com/pkg/errors"
@@ -35,13 +35,13 @@ func (t *PopulateDynamicGroupTask) Timeout() time.Duration {
 }
 
 // Perform figures out the membership for a query based group then repopulates it
-func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
+func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	lockKey := fmt.Sprintf(populateLockKey, t.GroupID)
-	lock, err := locker.GrabLock(mr.RP, lockKey, time.Hour, time.Minute*5)
+	lock, err := locker.GrabLock(rt.RP, lockKey, time.Hour, time.Minute*5)
 	if err != nil {
 		return errors.Wrapf(err, "error grabbing lock to repopulate dynamic group: %d", t.GroupID)
 	}
-	defer locker.ReleaseLock(mr.RP, lockKey, lock)
+	defer locker.ReleaseLock(rt.RP, lockKey, lock)
 
 	start := time.Now()
 	log := logrus.WithFields(logrus.Fields{
@@ -52,12 +52,12 @@ func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, mr *mailroom.Mai
 
 	log.Info("starting population of dynamic group")
 
-	oa, err := models.GetOrgAssets(ctx, mr.DB, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org when populating group: %d", t.GroupID)
 	}
 
-	count, err := models.PopulateDynamicGroup(ctx, mr.DB, mr.ElasticClient, oa, t.GroupID, t.Query)
+	count, err := models.PopulateDynamicGroup(ctx, rt.DB, rt.ES, oa, t.GroupID, t.Query)
 	if err != nil {
 		return errors.Wrapf(err, "error populating dynamic group: %d", t.GroupID)
 	}

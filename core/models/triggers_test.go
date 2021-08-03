@@ -1,151 +1,296 @@
-package models
+package models_test
 
 import (
-	"fmt"
 	"testing"
 
+	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func insertTrigger(t *testing.T, db *sqlx.DB, active bool, flowID FlowID, triggerType TriggerType, keyword string, matchType MatchType, groupIDs []GroupID, contactIDs []ContactID, referrerID string, channelID ChannelID) TriggerID {
-	var triggerID TriggerID
-	err := db.Get(&triggerID,
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, referrer_id, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id, channel_id)
-		VALUES($1, now(), now(), $2, $6, false, $3, $4, $5, 1, 1, 1, $7) RETURNING id`, active, keyword, flowID, triggerType, matchType, referrerID, channelID)
+func TestLoadTriggers(t *testing.T) {
+	ctx, _, db, _ := testsuite.Reset()
 
-	assert.NoError(t, err)
+	db.MustExec(`DELETE FROM triggers_trigger`)
+	farmersGroup := testdata.InsertContactGroup(db, testdata.Org1, assets.GroupUUID(uuids.New()), "Farmers", "")
 
-	// insert any group associations
-	for _, g := range groupIDs {
-		db.MustExec(`INSERT INTO triggers_trigger_groups(trigger_id, contactgroup_id) VALUES($1, $2)`, triggerID, g)
-	}
-
-	// insert any contact associations
-	for _, c := range contactIDs {
-		db.MustExec(`INSERT INTO triggers_trigger_contacts(trigger_id, contact_id) VALUES($1, $2)`, triggerID, c)
-	}
-
-	return triggerID
-}
-
-func TestChannelTriggers(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
-
-	fooID := insertTrigger(t, db, true, FavoritesFlowID, ReferralTriggerType, "", MatchFirst, nil, nil, "foo", TwitterChannelID)
-	barID := insertTrigger(t, db, true, FavoritesFlowID, ReferralTriggerType, "", MatchFirst, nil, nil, "bar", NilChannelID)
-	bazID := insertTrigger(t, db, true, FavoritesFlowID, ReferralTriggerType, "", MatchFirst, nil, nil, "", TwitterChannelID)
-
-	FlushCache()
-
-	org, err := GetOrgAssets(ctx, db, Org1)
-	assert.NoError(t, err)
+	// create trigger for other org to ensure it isn't loaded
+	testdata.InsertCatchallTrigger(db, testdata.Org2, testdata.Org2Favorites, nil, nil)
 
 	tcs := []struct {
-		ReferrerID string
-		Channel    ChannelID
-		TriggerID  TriggerID
+		id               models.TriggerID
+		type_            models.TriggerType
+		flowID           models.FlowID
+		keyword          string
+		keywordMatchType models.MatchType
+		referrerID       string
+		includeGroups    []models.GroupID
+		excludeGroups    []models.GroupID
+		includeContacts  []models.ContactID
+		channelID        models.ChannelID
 	}{
-		{"", TwilioChannelID, NilTriggerID},
-		{"foo", TwilioChannelID, NilTriggerID},
-		{"foo", TwitterChannelID, fooID},
-		{"FOO", TwitterChannelID, fooID},
-		{"bar", TwilioChannelID, barID},
-		{"bar", TwitterChannelID, barID},
-		{"zap", TwilioChannelID, NilTriggerID},
-		{"zap", TwitterChannelID, bazID},
+		{
+			id:               testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "join", models.MatchFirst, nil, nil),
+			type_:            models.KeywordTriggerType,
+			flowID:           testdata.Favorites.ID,
+			keyword:          "join",
+			keywordMatchType: models.MatchFirst,
+		},
+		{
+			id: testdata.InsertKeywordTrigger(
+				db, testdata.Org1, testdata.PickANumber, "start", models.MatchOnly,
+				[]*testdata.Group{testdata.DoctorsGroup, testdata.TestersGroup},
+				[]*testdata.Group{farmersGroup},
+			),
+			type_:            models.KeywordTriggerType,
+			flowID:           testdata.PickANumber.ID,
+			keyword:          "start",
+			keywordMatchType: models.MatchOnly,
+			includeGroups:    []models.GroupID{testdata.DoctorsGroup.ID, testdata.TestersGroup.ID},
+			excludeGroups:    []models.GroupID{farmersGroup.ID},
+		},
+		{
+			id:            testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, []*testdata.Group{testdata.DoctorsGroup, testdata.TestersGroup}, []*testdata.Group{farmersGroup}),
+			type_:         models.IncomingCallTriggerType,
+			flowID:        testdata.Favorites.ID,
+			includeGroups: []models.GroupID{testdata.DoctorsGroup.ID, testdata.TestersGroup.ID},
+			excludeGroups: []models.GroupID{farmersGroup.ID},
+		},
+		{
+			id:     testdata.InsertMissedCallTrigger(db, testdata.Org1, testdata.Favorites),
+			type_:  models.MissedCallTriggerType,
+			flowID: testdata.Favorites.ID,
+		},
+		{
+			id:        testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwilioChannel),
+			type_:     models.NewConversationTriggerType,
+			flowID:    testdata.Favorites.ID,
+			channelID: testdata.TwilioChannel.ID,
+		},
+		{
+			id:     testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "", nil),
+			type_:  models.ReferralTriggerType,
+			flowID: testdata.Favorites.ID,
+		},
+		{
+			id:         testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "3256437635", testdata.TwilioChannel),
+			type_:      models.ReferralTriggerType,
+			flowID:     testdata.Favorites.ID,
+			referrerID: "3256437635",
+			channelID:  testdata.TwilioChannel.ID,
+		},
+		{
+			id:     testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.Favorites, nil, nil),
+			type_:  models.CatchallTriggerType,
+			flowID: testdata.Favorites.ID,
+		},
 	}
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	require.Equal(t, len(tcs), len(oa.Triggers()))
 
 	for i, tc := range tcs {
-		channel := org.ChannelByID(tc.Channel)
+		actual := oa.Triggers()[i]
 
-		trigger := FindMatchingReferralTrigger(org, channel, tc.ReferrerID)
-		if trigger == nil {
-			assert.Equal(t, tc.TriggerID, NilTriggerID, "%d: did not get back expected trigger", i)
-		} else {
-			assert.Equal(t, tc.TriggerID, trigger.ID(), "%d: did not get back expected trigger", i)
-		}
+		assert.Equal(t, tc.id, actual.ID(), "id mismatch in trigger #%d", i)
+		assert.Equal(t, tc.type_, actual.TriggerType(), "type mismatch in trigger #%d", i)
+		assert.Equal(t, tc.flowID, actual.FlowID(), "flow id mismatch in trigger #%d", i)
+		assert.Equal(t, tc.keyword, actual.Keyword(), "keyword mismatch in trigger #%d", i)
+		assert.Equal(t, tc.keywordMatchType, actual.MatchType(), "match type mismatch in trigger #%d", i)
+		assert.Equal(t, tc.referrerID, actual.ReferrerID(), "referrer id mismatch in trigger #%d", i)
+		assert.ElementsMatch(t, tc.includeGroups, actual.IncludeGroupIDs(), "include groups mismatch in trigger #%d", i)
+		assert.ElementsMatch(t, tc.excludeGroups, actual.ExcludeGroupIDs(), "exclude groups mismatch in trigger #%d", i)
+		assert.ElementsMatch(t, tc.includeContacts, actual.ContactIDs(), "include contacts mismatch in trigger #%d", i)
+		assert.Equal(t, tc.channelID, actual.ChannelID(), "channel id mismatch in trigger #%d", i)
 	}
 }
 
-func TestTriggers(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+func TestFindMatchingMsgTrigger(t *testing.T) {
+	ctx, _, db, _ := testsuite.Reset()
 
-	joinID := insertTrigger(t, db, true, FavoritesFlowID, KeywordTriggerType, "join", MatchFirst, nil, nil, "", NilChannelID)
-	resistID := insertTrigger(t, db, true, SingleMessageFlowID, KeywordTriggerType, "resist", MatchOnly, nil, nil, "", NilChannelID)
-	farmersID := insertTrigger(t, db, true, SingleMessageFlowID, KeywordTriggerType, "resist", MatchOnly, []GroupID{DoctorsGroupID}, nil, "", NilChannelID)
-	farmersAllID := insertTrigger(t, db, true, SingleMessageFlowID, CatchallTriggerType, "", MatchOnly, []GroupID{DoctorsGroupID}, nil, "", NilChannelID)
-	othersAllID := insertTrigger(t, db, true, SingleMessageFlowID, CatchallTriggerType, "", MatchOnly, nil, nil, "", NilChannelID)
+	db.MustExec(`DELETE FROM triggers_trigger`)
 
-	FlushCache()
+	joinID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "join", models.MatchFirst, nil, nil)
+	resistID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.SingleMessage, "resist", models.MatchOnly, nil, nil)
+	doctorsID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.SingleMessage, "resist", models.MatchOnly, []*testdata.Group{testdata.DoctorsGroup}, nil)
+	doctorsAndNotTestersID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.SingleMessage, "resist", models.MatchOnly, []*testdata.Group{testdata.DoctorsGroup}, []*testdata.Group{testdata.TestersGroup})
+	doctorsCatchallID := testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.SingleMessage, []*testdata.Group{testdata.DoctorsGroup}, nil)
+	othersAllID := testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.SingleMessage, nil, nil)
 
-	org, err := GetOrgAssets(ctx, db, Org1)
-	assert.NoError(t, err)
+	// trigger for other org
+	testdata.InsertCatchallTrigger(db, testdata.Org2, testdata.Org2Favorites, nil, nil)
 
-	contactIDs := []ContactID{CathyID, GeorgeID}
-	contacts, err := LoadContacts(ctx, db, org, contactIDs)
-	assert.NoError(t, err)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
 
-	cathy, err := contacts[0].FlowContact(org)
-	assert.NoError(t, err)
+	testdata.DoctorsGroup.Add(db, testdata.Bob)
+	testdata.TestersGroup.Add(db, testdata.Bob)
 
-	george, err := contacts[1].FlowContact(org)
-	assert.NoError(t, err)
+	_, cathy := testdata.Cathy.Load(db, oa)
+	_, george := testdata.George.Load(db, oa)
+	_, bob := testdata.Bob.Load(db, oa)
 
 	tcs := []struct {
-		Text      string
-		Contact   *flows.Contact
-		TriggerID TriggerID
+		text              string
+		contact           *flows.Contact
+		expectedTriggerID models.TriggerID
 	}{
 		{"join", cathy, joinID},
 		{"JOIN", cathy, joinID},
 		{"join this", cathy, joinID},
 		{"resist", george, resistID},
-		{"resist", cathy, farmersID},
-		{"resist this", cathy, farmersAllID},
-		{"other", cathy, farmersAllID},
+		{"resist", bob, doctorsID},
+		{"resist", cathy, doctorsAndNotTestersID},
+		{"resist this", cathy, doctorsCatchallID},
+		{"other", cathy, doctorsCatchallID},
 		{"other", george, othersAllID},
 		{"", george, othersAllID},
 	}
 
 	for _, tc := range tcs {
-		testID := fmt.Sprintf("'%s' sent by %s", tc.Text, tc.Contact.Name())
+		trigger := models.FindMatchingMsgTrigger(oa, tc.contact, tc.text)
 
-		actualTriggerID := NilTriggerID
-		actualTrigger := FindMatchingMsgTrigger(org, tc.Contact, tc.Text)
-		if actualTrigger != nil {
-			actualTriggerID = actualTrigger.ID()
-		}
+		assertTrigger(t, tc.expectedTriggerID, trigger, "trigger mismatch for %s sending '%s'", tc.contact.Name(), tc.text)
+	}
+}
 
-		assert.Equal(t, tc.TriggerID, actualTriggerID, "did not get back expected trigger for %s", testID)
+func TestFindMatchingIncomingCallTrigger(t *testing.T) {
+	ctx, _, db, _ := testsuite.Reset()
+
+	doctorsAndNotTestersTriggerID := testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, []*testdata.Group{testdata.DoctorsGroup}, []*testdata.Group{testdata.TestersGroup})
+	doctorsTriggerID := testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, []*testdata.Group{testdata.DoctorsGroup}, nil)
+	notTestersTriggerID := testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, nil, []*testdata.Group{testdata.TestersGroup})
+	everyoneTriggerID := testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, nil, nil)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	testdata.DoctorsGroup.Add(db, testdata.Bob)
+	testdata.TestersGroup.Add(db, testdata.Bob, testdata.Alexandria)
+
+	_, cathy := testdata.Cathy.Load(db, oa)
+	_, bob := testdata.Bob.Load(db, oa)
+	_, george := testdata.George.Load(db, oa)
+	_, alexa := testdata.Alexandria.Load(db, oa)
+
+	tcs := []struct {
+		contact           *flows.Contact
+		expectedTriggerID models.TriggerID
+	}{
+		{cathy, doctorsAndNotTestersTriggerID}, // they're in doctors and not in testers
+		{bob, doctorsTriggerID},                // they're in doctors and testers
+		{george, notTestersTriggerID},          // they're not in doctors and not in testers
+		{alexa, everyoneTriggerID},             // they're not in doctors but are in testers
+	}
+
+	for _, tc := range tcs {
+		trigger := models.FindMatchingIncomingCallTrigger(oa, tc.contact)
+
+		assertTrigger(t, tc.expectedTriggerID, trigger, "trigger mismatch for %s", tc.contact.Name())
+	}
+}
+
+func TestFindMatchingMissedCallTrigger(t *testing.T) {
+	ctx, _, db, _ := testsuite.Reset()
+
+	testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.SingleMessage, nil, nil)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	// no missed call trigger yet
+	trigger := models.FindMatchingMissedCallTrigger(oa)
+	assert.Nil(t, trigger)
+
+	triggerID := testdata.InsertMissedCallTrigger(db, testdata.Org1, testdata.Favorites)
+
+	oa, err = models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	trigger = models.FindMatchingMissedCallTrigger(oa)
+	assertTrigger(t, triggerID, trigger)
+}
+
+func TestFindMatchingNewConversationTrigger(t *testing.T) {
+	ctx, _, db, _ := testsuite.Reset()
+
+	twilioTriggerID := testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwilioChannel)
+	noChTriggerID := testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, nil)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	tcs := []struct {
+		channelID         models.ChannelID
+		expectedTriggerID models.TriggerID
+	}{
+		{testdata.TwilioChannel.ID, twilioTriggerID},
+		{testdata.VonageChannel.ID, noChTriggerID},
+	}
+
+	for i, tc := range tcs {
+		channel := oa.ChannelByID(tc.channelID)
+		trigger := models.FindMatchingNewConversationTrigger(oa, channel)
+
+		assertTrigger(t, tc.expectedTriggerID, trigger, "trigger mismatch in test case #%d", i)
+	}
+}
+
+func TestFindMatchingReferralTrigger(t *testing.T) {
+	ctx, _, db, _ := testsuite.Reset()
+
+	fooID := testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "foo", testdata.TwitterChannel)
+	barID := testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "bar", nil)
+	bazID := testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "", testdata.TwitterChannel)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	tcs := []struct {
+		referrerID        string
+		channelID         models.ChannelID
+		expectedTriggerID models.TriggerID
+	}{
+		{"", testdata.TwilioChannel.ID, models.NilTriggerID},
+		{"foo", testdata.TwilioChannel.ID, models.NilTriggerID},
+		{"foo", testdata.TwitterChannel.ID, fooID},
+		{"FOO", testdata.TwitterChannel.ID, fooID},
+		{"bar", testdata.TwilioChannel.ID, barID},
+		{"bar", testdata.TwitterChannel.ID, barID},
+		{"zap", testdata.TwilioChannel.ID, models.NilTriggerID},
+		{"zap", testdata.TwitterChannel.ID, bazID},
+	}
+
+	for i, tc := range tcs {
+		channel := oa.ChannelByID(tc.channelID)
+		trigger := models.FindMatchingReferralTrigger(oa, channel, tc.referrerID)
+
+		assertTrigger(t, tc.expectedTriggerID, trigger, "trigger mismatch in test case #%d", i)
 	}
 }
 
 func TestArchiveContactTriggers(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
+	ctx, _, db, _ := testsuite.Reset()
 
-	everybodyID := insertTrigger(t, db, true, FavoritesFlowID, KeywordTriggerType, "join", MatchFirst, nil, nil, "", NilChannelID)
-	cathyOnly1ID := insertTrigger(t, db, true, FavoritesFlowID, KeywordTriggerType, "join", MatchFirst, nil, []ContactID{CathyID}, "", NilChannelID)
-	cathyOnly2ID := insertTrigger(t, db, true, FavoritesFlowID, KeywordTriggerType, "this", MatchOnly, nil, []ContactID{CathyID}, "", NilChannelID)
-	cathyAndGeorgeID := insertTrigger(t, db, true, FavoritesFlowID, KeywordTriggerType, "join", MatchFirst, nil, []ContactID{CathyID, GeorgeID}, "", NilChannelID)
-	cathyAndGroupID := insertTrigger(t, db, true, FavoritesFlowID, KeywordTriggerType, "join", MatchFirst, []GroupID{DoctorsGroupID}, []ContactID{CathyID}, "", NilChannelID)
-	georgeOnlyID := insertTrigger(t, db, true, FavoritesFlowID, KeywordTriggerType, "join", MatchFirst, nil, []ContactID{GeorgeID}, "", NilChannelID)
+	everybodyID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "join", models.MatchFirst, nil, nil)
+	cathyOnly1ID := testdata.InsertScheduledTrigger(db, testdata.Org1, testdata.Favorites, nil, nil, []*testdata.Contact{testdata.Cathy})
+	cathyOnly2ID := testdata.InsertScheduledTrigger(db, testdata.Org1, testdata.Favorites, nil, nil, []*testdata.Contact{testdata.Cathy})
+	cathyAndGeorgeID := testdata.InsertScheduledTrigger(db, testdata.Org1, testdata.Favorites, nil, nil, []*testdata.Contact{testdata.Cathy, testdata.George})
+	cathyAndGroupID := testdata.InsertScheduledTrigger(db, testdata.Org1, testdata.Favorites, []*testdata.Group{testdata.DoctorsGroup}, nil, []*testdata.Contact{testdata.Cathy})
+	georgeOnlyID := testdata.InsertScheduledTrigger(db, testdata.Org1, testdata.Favorites, nil, nil, []*testdata.Contact{testdata.George})
 
-	err := ArchiveContactTriggers(ctx, db, []ContactID{CathyID, BobID})
+	err := models.ArchiveContactTriggers(ctx, db, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})
 	require.NoError(t, err)
 
-	assertTriggerArchived := func(id TriggerID, archived bool) {
+	assertTriggerArchived := func(id models.TriggerID, archived bool) {
 		var isArchived bool
 		db.Get(&isArchived, `SELECT is_archived FROM triggers_trigger WHERE id = $1`, id)
 		assert.Equal(t, archived, isArchived, `is_archived mismatch for trigger %d`, id)
@@ -157,4 +302,12 @@ func TestArchiveContactTriggers(t *testing.T) {
 	assertTriggerArchived(cathyAndGeorgeID, false)
 	assertTriggerArchived(cathyAndGroupID, false)
 	assertTriggerArchived(georgeOnlyID, false)
+}
+
+func assertTrigger(t *testing.T, expected models.TriggerID, actual *models.Trigger, msgAndArgs ...interface{}) {
+	if actual == nil {
+		assert.Equal(t, expected, models.NilTriggerID, msgAndArgs...)
+	} else {
+		assert.Equal(t, expected, actual.ID(), msgAndArgs...)
+	}
 }

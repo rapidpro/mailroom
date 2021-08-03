@@ -4,15 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/go-chi/chi"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
-	"net/http"
 )
 
 func init() {
@@ -35,11 +37,11 @@ type agentMessageData struct {
 	} `json:"attachments"`
 }
 
-func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 
 	// look up ticketer
-	ticketer, _, err := tickets.FromTicketerUUID(ctx, s.DB, ticketerUUID, typeRocketChat)
+	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt.DB, ticketerUUID, typeRocketChat)
 	if err != nil {
 		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
@@ -56,7 +58,7 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 	}
 
 	// look up ticket
-	ticket, _, _, err := tickets.FromTicketUUID(ctx, s.DB, flows.TicketUUID(request.TicketID), typeRocketChat)
+	ticket, _, _, err := tickets.FromTicketUUID(ctx, rt.DB, flows.TicketUUID(request.TicketID), typeRocketChat)
 	if err != nil {
 		return errors.Errorf("no such ticket %s", request.TicketID), http.StatusNotFound, nil
 	}
@@ -88,10 +90,10 @@ func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l 
 			attachments = append(attachments, attachment.URL)
 		}
 
-		_, err = tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, data.Text, files)
+		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files)
 
 	case "close-room":
-		err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)
+		err = tickets.CloseTicket(ctx, rt, nil, ticket, false, l)
 
 	default:
 		err = errors.New("invalid event type")

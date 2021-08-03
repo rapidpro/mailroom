@@ -8,17 +8,18 @@ import (
 	"github.com/nyaruka/goflow/assets/static/types"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCloneForSimulation(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
+
 	models.FlushCache()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	newFavoritesDef := `{
@@ -28,7 +29,7 @@ func TestCloneForSimulation(t *testing.T) {
 	}`
 
 	newDefs := map[assets.FlowUUID]json.RawMessage{
-		models.FavoritesFlowUUID: []byte(newFavoritesDef),
+		testdata.Favorites.UUID: []byte(newFavoritesDef),
 	}
 
 	testChannels := []assets.Channel{
@@ -40,7 +41,7 @@ func TestCloneForSimulation(t *testing.T) {
 	require.NoError(t, err)
 
 	// should get new definition
-	flow, err := clone.Flow(models.FavoritesFlowUUID)
+	flow, err := clone.Flow(testdata.Favorites.UUID)
 	require.NoError(t, err)
 	assert.Equal(t, newFavoritesDef, string(flow.Definition()))
 
@@ -51,11 +52,11 @@ func TestCloneForSimulation(t *testing.T) {
 	assert.Equal(t, "Test Channel 2", testChannel2.Name())
 
 	// as well as the regular channels
-	vonage := clone.SessionAssets().Channels().Get(models.VonageChannelUUID)
+	vonage := clone.SessionAssets().Channels().Get(testdata.VonageChannel.UUID)
 	assert.Equal(t, "Vonage", vonage.Name())
 
 	// original assets still has original flow definition
-	flow, err = oa.Flow(models.FavoritesFlowUUID)
+	flow, err = oa.Flow(testdata.Favorites.UUID)
 	require.NoError(t, err)
 	assert.Equal(t, "{\"_ui\": {\"nodes\": {\"10c9c241-777f-4010-a841-6e87abed8520\": {\"typ", string(flow.Definition())[:64])
 
@@ -64,6 +65,6 @@ func TestCloneForSimulation(t *testing.T) {
 	assert.Nil(t, testChannel1)
 
 	// can't override definition for a non-existent flow
-	oa, err = oa.CloneForSimulation(ctx, db, map[assets.FlowUUID]json.RawMessage{"a121f1af-7dfa-47af-9d22-9726372e2daa": []byte(newFavoritesDef)}, nil)
+	_, err = oa.CloneForSimulation(ctx, db, map[assets.FlowUUID]json.RawMessage{"a121f1af-7dfa-47af-9d22-9726372e2daa": []byte(newFavoritesDef)}, nil)
 	assert.EqualError(t, err, "unable to find flow with UUID 'a121f1af-7dfa-47af-9d22-9726372e2daa': not found")
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
@@ -48,7 +49,7 @@ type channelbackResponse struct {
 	AllowChannelback bool   `json:"allow_channelback"`
 }
 
-func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &channelbackRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
@@ -61,7 +62,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 	}
 
 	// lookup the ticket and ticketer
-	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, s.DB, flows.TicketUUID(request.ThreadID), typeZendesk)
+	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, rt.DB, flows.TicketUUID(request.ThreadID), typeZendesk)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -71,9 +72,17 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		return errors.New("ticketer secret mismatch"), http.StatusUnauthorized, nil
 	}
 
-	err = models.UpdateAndKeepOpenTicket(ctx, s.DB, ticket, nil)
-	if err != nil {
-		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusBadRequest, nil
+	// reopen ticket if necessary
+	if ticket.Status() != models.TicketStatusOpen {
+		oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+		if err != nil {
+			return err, http.StatusBadRequest, nil
+		}
+
+		err = tickets.ReopenTicket(ctx, rt, oa, ticket, false, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error reopening ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
+		}
 	}
 
 	// fetch files
@@ -85,7 +94,7 @@ func handleChannelback(ctx context.Context, s *web.Server, r *http.Request) (int
 		}
 	}
 
-	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, request.Message, files)
+	msg, err := tickets.SendReply(ctx, rt, ticket, request.Message, files)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -123,14 +132,14 @@ type eventCallbackRequest struct {
 	Events []*channelEvent `json:"events" validate:"required"`
 }
 
-func handleEventCallback(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &eventCallbackRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
 	for _, e := range request.Events {
-		if err := processChannelEvent(ctx, s.DB, e, l); err != nil {
+		if err := processChannelEvent(ctx, rt.DB, e, l); err != nil {
 			return err, http.StatusBadRequest, nil
 		}
 	}
@@ -244,11 +253,11 @@ type targetRequest struct {
 	Status string `json:"status"`
 }
 
-func handleTicketerTarget(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 
 	// look up our ticketer
-	ticketer, _, err := tickets.FromTicketerUUID(ctx, s.DB, ticketerUUID, typeZendesk)
+	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt.DB, ticketerUUID, typeZendesk)
 	if err != nil || ticketer == nil {
 		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
@@ -266,7 +275,7 @@ func handleTicketerTarget(ctx context.Context, s *web.Server, r *http.Request, l
 	}
 
 	// lookup ticket
-	ticket, err := models.LookupTicketByExternalID(ctx, s.DB, ticketer.ID(), fmt.Sprintf("%d", request.ID))
+	ticket, err := models.LookupTicketByExternalID(ctx, rt.DB, ticketer.ID(), fmt.Sprintf("%d", request.ID))
 	if err != nil || ticket == nil {
 		// we don't return an error here, because ticket might just belong to a different ticketer
 		return map[string]string{"status": "ignored"}, http.StatusOK, nil
@@ -275,9 +284,9 @@ func handleTicketerTarget(ctx context.Context, s *web.Server, r *http.Request, l
 	if request.Event == "status_changed" {
 		switch strings.ToLower(request.Status) {
 		case statusSolved, statusClosed:
-			err = models.CloseTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)
+			err = tickets.CloseTicket(ctx, rt, nil, ticket, false, l)
 		case statusOpen:
-			err = models.ReopenTickets(ctx, s.DB, nil, []*models.Ticket{ticket}, false, l)
+			err = tickets.ReopenTicket(ctx, rt, nil, ticket, false, l)
 		}
 
 		if err != nil {

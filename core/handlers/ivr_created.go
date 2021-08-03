@@ -38,10 +38,7 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mode
 		return nil
 	}
 
-	msg, err := models.NewOutgoingIVR(oa.OrgID(), conn, event.Msg, event.CreatedOn())
-	if err != nil {
-		return errors.Wrapf(err, "error creating outgoing ivr say: %s", event.Msg.Text())
-	}
+	msg := models.NewOutgoingIVR(oa.OrgID(), conn, event.Msg, event.CreatedOn())
 
 	// register to have this message committed
 	scene.AppendToEventPreCommitHook(hooks.CommitIVRHook, msg)

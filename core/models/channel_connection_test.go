@@ -1,27 +1,31 @@
-package models
+package models_test
 
 import (
 	"testing"
 
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestChannelConnections(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
-	conn, err := InsertIVRConnection(ctx, db, Org1, TwilioChannelID, NilStartID, CathyID, CathyURNID, ConnectionDirectionOut, ConnectionStatusPending, "")
+	defer db.MustExec(`DELETE FROM channels_channelconnection`)
+
+	conn, err := models.InsertIVRConnection(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.ConnectionDirectionOut, models.ConnectionStatusPending, "")
 	assert.NoError(t, err)
 
-	assert.NotEqual(t, ConnectionID(0), conn.ID())
+	assert.NotEqual(t, models.ConnectionID(0), conn.ID())
 
 	err = conn.UpdateExternalID(ctx, db, "test1")
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) from channels_channelconnection where external_id = 'test1' AND id = $1`, []interface{}{conn.ID()}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from channels_channelconnection where external_id = 'test1' AND id = $1`, conn.ID()).Returns(1)
 
-	conn2, err := SelectChannelConnection(ctx, db, conn.ID())
+	conn2, err := models.SelectChannelConnection(ctx, db, conn.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, "test1", conn2.ExternalID())
 }
