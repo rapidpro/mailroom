@@ -18,18 +18,17 @@ import (
 )
 
 const (
-	timeoutLock  = "sessions_timeouts"
-	markerGroup  = "session_timeouts"
-	tickInterval = 15
+	timeoutLock = "sessions_timeouts"
+	markerGroup = "session_timeouts"
 )
 
 func init() {
 	mailroom.AddInitFunction(StartTimeoutCron)
 }
 
-// StartTimeoutCron starts our cron job of continuing timed out sessions every minute
+// StartTimeoutCron starts our cron job of continuing timed out sessions every defined interval in config TimeoutTime
 func StartTimeoutCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, timeoutLock, time.Second*tickInterval,
+	cron.StartCron(mr.Quit, mr.RP, timeoutLock, time.Second*time.Duration(mr.Config.TimeoutTime),
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()

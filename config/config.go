@@ -63,7 +63,8 @@ type Config struct {
 	Address   string `help:"the address to bind our web server to"`
 	Port      int    `help:"the port to bind our web server to"`
 
-	UUIDSeed int `help:"seed to use for UUID generation in a testing environment"`
+	UUIDSeed    int `help:"seed to use for UUID generation in a testing environment"`
+	TimeoutTime int `help:"the amount of time to between every timeout queued"`
 }
 
 // NewMailroomConfig returns a new default configuration object
@@ -102,7 +103,8 @@ func NewMailroomConfig() *Config {
 		Address: "localhost",
 		Port:    8090,
 
-		UUIDSeed: 0,
+		UUIDSeed:    0,
+		TimeoutTime: 60,
 	}
 }
 
