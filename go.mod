@@ -6,10 +6,10 @@ require (
 	github.com/aws/aws-sdk-go v1.35.20
 	github.com/buger/jsonparser v1.0.0
 	github.com/certifi/gocertifi v0.0.0-20200211180108-c7c1fbc02894 // indirect
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/edganiukov/fcm v0.4.0
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-chi/chi v4.1.2+incompatible
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.4.0
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.1.0
@@ -35,4 +35,4 @@ require (
 	gopkg.in/go-playground/validator.v9 v9.31.0
 )
 
-go 1.14
+go 1.16
