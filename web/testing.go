@@ -28,7 +28,7 @@ import (
 )
 
 // RunWebTests runs the tests in the passed in filename, optionally updating them if the update flag is set
-func RunWebTests(t *testing.T, truthFile string) {
+func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string) {
 	rp := testsuite.RP()
 	db := testsuite.DB()
 	wg := &sync.WaitGroup{}
@@ -40,7 +40,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 
 	defer testsuite.ResetStorage()
 
-	server := NewServer(context.Background(), config.Mailroom, db, rp, testsuite.Storage(), nil, wg)
+	server := NewServer(context.Background(), config.Mailroom, db, rp, testsuite.MediaStorage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -68,6 +68,10 @@ func RunWebTests(t *testing.T, truthFile string) {
 	tcs := make([]*TestCase, 0, 20)
 	tcJSON, err := ioutil.ReadFile(truthFile)
 	require.NoError(t, err)
+
+	for key, value := range substitutions {
+		tcJSON = bytes.ReplaceAll(tcJSON, []byte("$"+key+"$"), []byte(value))
+	}
 
 	err = json.Unmarshal(tcJSON, &tcs)
 	require.NoError(t, err)
@@ -148,7 +152,7 @@ func RunWebTests(t *testing.T, truthFile string) {
 			}
 
 			for _, dba := range tc.DBAssertions {
-				testsuite.AssertQueryCount(t, db, dba.Query, nil, dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
+				testsuite.AssertQuery(t, db, dba.Query).Returns(dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
 			}
 
 		} else {

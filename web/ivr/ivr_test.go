@@ -20,7 +20,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/ivr/twiml"
@@ -29,9 +31,10 @@ import (
 )
 
 func TestTwilioIVR(t *testing.T) {
-	ctx, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
+
 	defer testsuite.ResetStorage()
 
 	// start test server
@@ -60,18 +63,18 @@ func TestTwilioIVR(t *testing.T) {
 	twiml.IgnoreSignatures = true
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.Storage(), nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.MediaStorage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 
 	// add auth tokens
-	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, models.TwilioChannelID)
+	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// create a flow start for cathy and george
 	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+16055741111?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
 
-	start := models.NewFlowStart(models.Org1, models.StartTypeTrigger, models.FlowTypeVoice, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
-		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
 		WithParentSummary(parentSummary)
 
 	err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
@@ -92,16 +95,12 @@ func TestTwilioIVR(t *testing.T) {
 	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db,
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.ConnectionStatusWired, "Call1").Returns(1)
+
+	testsuite.AssertQuery(t, db,
 		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.CathyID, models.ConnectionStatusWired, "Call1"},
-		1,
-	)
-	testsuite.AssertQueryCount(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.GeorgeID, models.ConnectionStatusWired, "Call2"},
-		1,
-	)
+		testdata.George.ID, models.ConnectionStatusWired, "Call2").Returns(1)
 
 	tcs := []struct {
 		Action       string
@@ -113,7 +112,7 @@ func TestTwilioIVR(t *testing.T) {
 	}{
 		{
 			Action:       "start",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form:         nil,
 			StatusCode:   200,
@@ -121,7 +120,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -133,7 +132,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -145,7 +144,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -157,7 +156,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -169,7 +168,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus": []string{"in-progress"},
@@ -185,7 +184,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallStatus":     []string{"in-progress"},
@@ -200,7 +199,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "status",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"CallSid":      []string{"Call1"},
@@ -212,7 +211,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "start",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Form:         nil,
 			StatusCode:   200,
@@ -220,7 +219,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "resume",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Form: url.Values{
 				"CallStatus": []string{"completed"},
@@ -232,7 +231,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "incoming",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(3),
 			Form: url.Values{
 				"CallSid":    []string{"Call2"},
@@ -244,7 +243,7 @@ func TestTwilioIVR(t *testing.T) {
 		},
 		{
 			Action:       "status",
-			ChannelUUID:  models.TwilioChannelUUID,
+			ChannelUUID:  testdata.TwilioChannel.UUID,
 			ConnectionID: models.ConnectionID(3),
 			Form: url.Values{
 				"CallSid":      []string{"Call2"},
@@ -273,6 +272,7 @@ func TestTwilioIVR(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
 		assert.Equal(t, tc.StatusCode, resp.StatusCode)
 
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -283,80 +283,38 @@ func TestTwilioIVR(t *testing.T) {
 	}
 
 	// check our final state of sessions, runs, msgs, connections
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`,
-		[]interface{}{models.CathyID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`,
-		[]interface{}{models.CathyID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{models.CathyID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{models.CathyID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`, testdata.Cathy.ID).Returns(8)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
-		[]interface{}{models.CathyID},
-		8,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`,
-		[]interface{}{},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`,
-		[]interface{}{models.CathyID},
-		5,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`).Returns(9)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`,
-		[]interface{}{},
-		9,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 
+		AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.George.ID).Returns(2)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`,
-		[]interface{}{models.GeorgeID},
-		2,
-	)
-
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`,
-		[]interface{}{models.GeorgeID},
-		1,
-	)
-
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`, testdata.George.ID).Returns(1)
 }
 
 func TestVonageIVR(t *testing.T) {
-	ctx, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Reset()
 	rc := rp.Get()
 	defer rc.Close()
+
 	defer testsuite.ResetStorage()
-	models.FlushCache()
 
 	// deactivate our twilio channel
-	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, models.TwilioChannelID)
+	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// add auth tokens
-	db.MustExec(`UPDATE channels_channel SET config = '{"nexmo_app_id": "app_id", "nexmo_app_private_key": "-----BEGIN PRIVATE KEY-----\nMIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAKNwapOQ6rQJHetP\nHRlJBIh1OsOsUBiXb3rXXE3xpWAxAha0MH+UPRblOko+5T2JqIb+xKf9Vi3oTM3t\nKvffaOPtzKXZauscjq6NGzA3LgeiMy6q19pvkUUOlGYK6+Xfl+B7Xw6+hBMkQuGE\nnUS8nkpR5mK4ne7djIyfHFfMu4ptAgMBAAECgYA+s0PPtMq1osG9oi4xoxeAGikf\nJB3eMUptP+2DYW7mRibc+ueYKhB9lhcUoKhlQUhL8bUUFVZYakP8xD21thmQqnC4\nf63asad0ycteJMLb3r+z26LHuCyOdPg1pyLk3oQ32lVQHBCYathRMcVznxOG16VK\nI8BFfstJTaJu0lK/wQJBANYFGusBiZsJQ3utrQMVPpKmloO2++4q1v6ZR4puDQHx\nTjLjAIgrkYfwTJBLBRZxec0E7TmuVQ9uJ+wMu/+7zaUCQQDDf2xMnQqYknJoKGq+\noAnyC66UqWC5xAnQS32mlnJ632JXA0pf9pb1SXAYExB1p9Dfqd3VAwQDwBsDDgP6\nHD8pAkEA0lscNQZC2TaGtKZk2hXkdcH1SKru/g3vWTkRHxfCAznJUaza1fx0wzdG\nGcES1Bdez0tbW4llI5By/skZc2eE3QJAFl6fOskBbGHde3Oce0F+wdZ6XIJhEgCP\niukIcKZoZQzoiMJUoVRrA5gqnmaYDI5uRRl/y57zt6YksR3KcLUIuQJAd242M/WF\n6YAZat3q/wEeETeQq1wrooew+8lHl05/Nt0cCpV48RGEhJ83pzBm3mnwHf8lTBJH\nx6XroMXsmbnsEw==\n-----END PRIVATE KEY-----", "callback_domain": "localhost:8090"}', role='SRCA' WHERE id = $1`, models.VonageChannelID)
+	db.MustExec(`UPDATE channels_channel SET config = '{"nexmo_app_id": "app_id", "nexmo_app_private_key": "-----BEGIN PRIVATE KEY-----\nMIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAKNwapOQ6rQJHetP\nHRlJBIh1OsOsUBiXb3rXXE3xpWAxAha0MH+UPRblOko+5T2JqIb+xKf9Vi3oTM3t\nKvffaOPtzKXZauscjq6NGzA3LgeiMy6q19pvkUUOlGYK6+Xfl+B7Xw6+hBMkQuGE\nnUS8nkpR5mK4ne7djIyfHFfMu4ptAgMBAAECgYA+s0PPtMq1osG9oi4xoxeAGikf\nJB3eMUptP+2DYW7mRibc+ueYKhB9lhcUoKhlQUhL8bUUFVZYakP8xD21thmQqnC4\nf63asad0ycteJMLb3r+z26LHuCyOdPg1pyLk3oQ32lVQHBCYathRMcVznxOG16VK\nI8BFfstJTaJu0lK/wQJBANYFGusBiZsJQ3utrQMVPpKmloO2++4q1v6ZR4puDQHx\nTjLjAIgrkYfwTJBLBRZxec0E7TmuVQ9uJ+wMu/+7zaUCQQDDf2xMnQqYknJoKGq+\noAnyC66UqWC5xAnQS32mlnJ632JXA0pf9pb1SXAYExB1p9Dfqd3VAwQDwBsDDgP6\nHD8pAkEA0lscNQZC2TaGtKZk2hXkdcH1SKru/g3vWTkRHxfCAznJUaza1fx0wzdG\nGcES1Bdez0tbW4llI5By/skZc2eE3QJAFl6fOskBbGHde3Oce0F+wdZ6XIJhEgCP\niukIcKZoZQzoiMJUoVRrA5gqnmaYDI5uRRl/y57zt6YksR3KcLUIuQJAd242M/WF\n6YAZat3q/wEeETeQq1wrooew+8lHl05/Nt0cCpV48RGEhJ83pzBm3mnwHf8lTBJH\nx6XroMXsmbnsEw==\n-----END PRIVATE KEY-----", "callback_domain": "localhost:8090"}', role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -396,7 +354,7 @@ func TestVonageIVR(t *testing.T) {
 	defer ts.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.Storage(), nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.MediaStorage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -405,8 +363,8 @@ func TestVonageIVR(t *testing.T) {
 
 	// create a flow start for cathy and george
 	extra := json.RawMessage(`{"ref_id":"123"}`)
-	start := models.NewFlowStart(models.Org1, models.StartTypeTrigger, models.FlowTypeVoice, models.IVRFlowID, models.DoRestartParticipants, models.DoIncludeActive).
-		WithContactIDs([]models.ContactID{models.CathyID, models.GeorgeID}).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
 		WithExtra(extra)
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
@@ -425,16 +383,11 @@ func TestVonageIVR(t *testing.T) {
 	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
 	assert.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.CathyID, models.ConnectionStatusWired, "Call1"},
-		1,
-	)
-	testsuite.AssertQueryCount(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		[]interface{}{models.GeorgeID, models.ConnectionStatusWired, "Call2"},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.ConnectionStatusWired, "Call1").Returns(1)
+
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.George.ID, models.ConnectionStatusWired, "Call2").Returns(1)
 
 	tcs := []struct {
 		Label        string
@@ -449,7 +402,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "start and prompt",
 			Action:       "start",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -458,7 +411,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "invalid dtmf",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -470,7 +423,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "dtmf 1",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -482,7 +435,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "dtmf too large",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -494,7 +447,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "dtmf 56",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -506,7 +459,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "recording callback",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":      []string{"recording_url"},
@@ -519,7 +472,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "resume with recording",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":      []string{"record"},
@@ -532,7 +485,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "transfer answered",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"uuid": "Call3", "status": "answered"}`,
 			StatusCode:   200,
@@ -541,7 +494,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "transfer completed",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"uuid": "Call3", "duration": "25", "status": "completed"}`,
 			StatusCode:   200,
@@ -550,7 +503,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "transfer callback",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Form: url.Values{
 				"wait_type":     []string{"dial"},
@@ -563,7 +516,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "call complete",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(1),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
@@ -572,7 +525,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "new call",
 			Action:       "start",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -581,7 +534,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "new call dtmf 1",
 			Action:       "resume",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Form: url.Values{
 				"wait_type": []string{"gather"},
@@ -593,7 +546,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "new call ended",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(2),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call2","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
@@ -602,7 +555,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "incoming call",
 			Action:       "incoming",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(3),
 			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call4","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
 			StatusCode:   200,
@@ -611,7 +564,7 @@ func TestVonageIVR(t *testing.T) {
 		{
 			Label:        "failed call",
 			Action:       "status",
-			ChannelUUID:  models.VonageChannelUUID,
+			ChannelUUID:  testdata.VonageChannel.UUID,
 			ConnectionID: models.ConnectionID(3),
 			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call4","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
 			StatusCode:   200,
@@ -639,6 +592,7 @@ func TestVonageIVR(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
 		assert.Equal(t, tc.StatusCode, resp.StatusCode)
 
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -650,64 +604,24 @@ func TestVonageIVR(t *testing.T) {
 	}
 
 	// check our final state of sessions, runs, msgs, connections
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`,
-		[]interface{}{models.CathyID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`,
-		[]interface{}{models.CathyID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{models.CathyID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`, testdata.Cathy.ID).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`,
-		[]interface{}{models.CathyID},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
+		AND connection_id = 1 AND status = 'W' AND direction = 'O'`, testdata.Cathy.ID).Returns(9)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'W' AND direction = 'O'`,
-		[]interface{}{models.CathyID},
-		9,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`).Returns(1)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`,
-		[]interface{}{},
-		1,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
+		AND connection_id = 1 AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 1 AND status = 'H' AND direction = 'I'`,
-		[]interface{}{models.CathyID},
-		5,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`).Returns(10)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`,
-		[]interface{}{},
-		10,
-	)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
+		AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.George.ID).Returns(3)
 
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`,
-		[]interface{}{models.GeorgeID},
-		3,
-	)
-
-	testsuite.AssertQueryCount(t, db,
-		`SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`,
-		[]interface{}{models.GeorgeID},
-		1,
-	)
-
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`, testdata.George.ID).Returns(1)
 }

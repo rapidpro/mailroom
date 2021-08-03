@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
@@ -22,7 +23,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type TicketID int
+type TicketID null.Int
+
+// NilTicketID is our constant for a nil ticket id
+const NilTicketID = TicketID(0)
+
+// MarshalJSON marshals into JSON. 0 values will become null
+func (i TicketID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+// UnmarshalJSON unmarshals from JSON. null values become 0
+func (i *TicketID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for 0
+func (i TicketID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+// Scan scans from the db value. null values become 0
+func (i *TicketID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
+}
+
 type TicketerID null.Int
 type TicketStatus string
 
@@ -35,31 +60,33 @@ const (
 func init() {
 	goflow.RegisterTicketServiceFactory(
 		func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-			return ticketer.Asset().(*Ticketer).AsService(ticketer)
+			return ticketer.Asset().(*Ticketer).AsService(config.Mailroom, ticketer)
 		},
 	)
 }
 
 type Ticket struct {
 	t struct {
-		ID         TicketID         `db:"id"`
-		UUID       flows.TicketUUID `db:"uuid"`
-		OrgID      OrgID            `db:"org_id"`
-		ContactID  ContactID        `db:"contact_id"`
-		TicketerID TicketerID       `db:"ticketer_id"`
-		ExternalID null.String      `db:"external_id"`
-		Status     TicketStatus     `db:"status"`
-		Subject    string           `db:"subject"`
-		Body       string           `db:"body"`
-		Config     null.Map         `db:"config"`
-		OpenedOn   time.Time        `db:"opened_on"`
-		ModifiedOn time.Time        `db:"modified_on"`
-		ClosedOn   *time.Time       `db:"closed_on"`
+		ID             TicketID         `db:"id"`
+		UUID           flows.TicketUUID `db:"uuid"`
+		OrgID          OrgID            `db:"org_id"`
+		ContactID      ContactID        `db:"contact_id"`
+		TicketerID     TicketerID       `db:"ticketer_id"`
+		ExternalID     null.String      `db:"external_id"`
+		Status         TicketStatus     `db:"status"`
+		Subject        string           `db:"subject"`
+		Body           string           `db:"body"`
+		AssigneeID     UserID           `db:"assignee_id"`
+		Config         null.Map         `db:"config"`
+		OpenedOn       time.Time        `db:"opened_on"`
+		ModifiedOn     time.Time        `db:"modified_on"`
+		ClosedOn       *time.Time       `db:"closed_on"`
+		LastActivityOn time.Time        `db:"last_activity_on"`
 	}
 }
 
 // NewTicket creates a new open ticket
-func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID, subject, body string, config map[string]interface{}) *Ticket {
+func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID, subject, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
 	t := &Ticket{}
 	t.t.UUID = uuid
 	t.t.OrgID = orgID
@@ -69,21 +96,48 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketer
 	t.t.Status = TicketStatusOpen
 	t.t.Subject = subject
 	t.t.Body = body
+	t.t.AssigneeID = assigneeID
 	t.t.Config = null.NewMap(config)
 	return t
 }
 
-func (t *Ticket) ID() TicketID            { return t.t.ID }
-func (t *Ticket) UUID() flows.TicketUUID  { return t.t.UUID }
-func (t *Ticket) OrgID() OrgID            { return t.t.OrgID }
-func (t *Ticket) ContactID() ContactID    { return t.t.ContactID }
-func (t *Ticket) TicketerID() TicketerID  { return t.t.TicketerID }
-func (t *Ticket) ExternalID() null.String { return t.t.ExternalID }
-func (t *Ticket) Status() TicketStatus    { return t.t.Status }
-func (t *Ticket) Subject() string         { return t.t.Subject }
-func (t *Ticket) Body() string            { return t.t.Body }
+func (t *Ticket) ID() TicketID              { return t.t.ID }
+func (t *Ticket) UUID() flows.TicketUUID    { return t.t.UUID }
+func (t *Ticket) OrgID() OrgID              { return t.t.OrgID }
+func (t *Ticket) ContactID() ContactID      { return t.t.ContactID }
+func (t *Ticket) TicketerID() TicketerID    { return t.t.TicketerID }
+func (t *Ticket) ExternalID() null.String   { return t.t.ExternalID }
+func (t *Ticket) Status() TicketStatus      { return t.t.Status }
+func (t *Ticket) Subject() string           { return t.t.Subject }
+func (t *Ticket) Body() string              { return t.t.Body }
+func (t *Ticket) AssigneeID() UserID        { return t.t.AssigneeID }
+func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
+}
+
+func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
+	modelTicketer := oa.TicketerByID(t.TicketerID())
+	if modelTicketer == nil {
+		return nil, errors.New("unable to load ticketer with id %d")
+	}
+
+	var flowUser *flows.User
+	if t.AssigneeID() != NilUserID {
+		user := oa.UserByID(t.AssigneeID())
+		if user != nil {
+			flowUser = oa.SessionAssets().Users().Get(user.Email())
+		}
+	}
+
+	return flows.NewTicket(
+		t.UUID(),
+		oa.SessionAssets().Ticketers().Get(modelTicketer.UUID()),
+		t.Subject(),
+		t.Body(),
+		string(t.ExternalID()),
+		flowUser,
+	), nil
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
@@ -93,7 +147,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
 	}
 
-	service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+	service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
 	if err != nil {
 		return err
 	}
@@ -101,7 +155,9 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets
 	logger := &HTTPLogger{}
 	err = service.Forward(t, msgUUID, text, attachments, logger.Ticketer(ticketer))
 
-	return logger.Insert(ctx, db)
+	logger.Insert(ctx, db)
+
+	return err
 }
 
 const selectOpenTicketsSQL = `
@@ -115,10 +171,12 @@ SELECT
   t.status AS status,
   t.subject AS subject,
   t.body AS body,
+  t.assignee_id AS assignee_id,
   t.config AS config,
   t.opened_on AS opened_on,
   t.modified_on AS modified_on,
-  t.closed_on AS closed_on
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
   tickets_ticket t
 WHERE
@@ -142,21 +200,21 @@ SELECT
   t.status AS status,
   t.subject AS subject,
   t.body AS body,
+  t.assignee_id AS assignee_id,
   t.config AS config,
   t.opened_on AS opened_on,
   t.modified_on AS modified_on,
-  t.closed_on AS closed_on
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
   tickets_ticket t
 WHERE
-  t.org_id = $1 AND
-  t.id = ANY($2) AND
-  t.status = $3
+  t.id = ANY($1)
 `
 
 // LoadTickets loads all of the tickets with the given ids
-func LoadTickets(ctx context.Context, db Queryer, orgID OrgID, ids []TicketID, status TicketStatus) ([]*Ticket, error) {
-	return loadTickets(ctx, db, selectTicketsByIDSQL, orgID, pq.Array(ids), status)
+func LoadTickets(ctx context.Context, db Queryer, ids []TicketID) ([]*Ticket, error) {
+	return loadTickets(ctx, db, selectTicketsByIDSQL, pq.Array(ids))
 }
 
 func loadTickets(ctx context.Context, db Queryer, query string, params ...interface{}) ([]*Ticket, error) {
@@ -181,50 +239,54 @@ func loadTickets(ctx context.Context, db Queryer, query string, params ...interf
 
 const selectTicketByUUIDSQL = `
 SELECT
-  id,
-  uuid,
-  org_id,
-  contact_id,
-  ticketer_id,
-  external_id,
-  status,
-  subject,
-  body,
-  config,
-  opened_on,
-  modified_on,
-  closed_on
+  t.id AS id,
+  t.uuid AS uuid,
+  t.org_id AS org_id,
+  t.contact_id AS contact_id,
+  t.ticketer_id AS ticketer_id,
+  t.external_id AS external_id,
+  t.status AS status,
+  t.subject AS subject,
+  t.body AS body,
+  t.assignee_id AS assignee_id,
+  t.config AS config,
+  t.opened_on AS opened_on,
+  t.modified_on AS modified_on,
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
-  tickets_ticket
+  tickets_ticket t
 WHERE
-  uuid = $1
+  t.uuid = $1
 `
 
 // LookupTicketByUUID looks up the ticket with the passed in UUID
-func LookupTicketByUUID(ctx context.Context, db Queryer, uuid flows.TicketUUID) (*Ticket, error) {
+func LookupTicketByUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID) (*Ticket, error) {
 	return lookupTicket(ctx, db, selectTicketByUUIDSQL, uuid)
 }
 
 const selectTicketByExternalIDSQL = `
 SELECT
-  id,
-  uuid,
-  org_id,
-  contact_id,
-  ticketer_id,
-  external_id,
-  status,
-  subject,
-  body,
-  config,
-  opened_on,
-  modified_on,
-  closed_on
+  t.id AS id,
+  t.uuid AS uuid,
+  t.org_id AS org_id,
+  t.contact_id AS contact_id,
+  t.ticketer_id AS ticketer_id,
+  t.external_id AS external_id,
+  t.status AS status,
+  t.subject AS subject,
+  t.body AS body,
+  t.assignee_id AS assignee_id,
+  t.config AS config,
+  t.opened_on AS opened_on,
+  t.modified_on AS modified_on,
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
 FROM
-  tickets_ticket
+  tickets_ticket t
 WHERE
-  ticketer_id = $1 AND
-  external_id = $2
+  t.ticketer_id = $1 AND
+  t.external_id = $2
 `
 
 // LookupTicketByExternalID looks up the ticket with the passed in ticketer and external ID
@@ -254,8 +316,8 @@ func lookupTicket(ctx context.Context, db Queryer, query string, params ...inter
 
 const insertTicketSQL = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  config,  opened_on,  modified_on)
-  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :config, NOW(),      NOW()      )
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  assignee_id,  config,  opened_on, modified_on, last_activity_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :assignee_id, :config, NOW(),     NOW()      , NOW())
 RETURNING
   id
 `
@@ -274,45 +336,106 @@ func InsertTickets(ctx context.Context, tx Queryer, tickets []*Ticket) error {
 	return BulkQuery(ctx, "inserted tickets", tx, insertTicketSQL, ts)
 }
 
-const updateTicketExternalIDSQL = `
-UPDATE
-  tickets_ticket
-SET
-  external_id = $2
-WHERE
-  id = $1
-`
-
 // UpdateTicketExternalID updates the external ID of the given ticket
 func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, externalID string) error {
 	t := &ticket.t
 	t.ExternalID = null.String(externalID)
-	return Exec(ctx, "update ticket external ID", db, updateTicketExternalIDSQL, t.ID, t.ExternalID)
+	return Exec(ctx, "update ticket external ID", db, `UPDATE tickets_ticket SET external_id = $2 WHERE id = $1`, t.ID, t.ExternalID)
 }
 
-const updateTicketAndKeepOpenSQL = `
-UPDATE
-  tickets_ticket
-SET
-  status = $2,
-  config = $3,
-  modified_on = $4,
-  closed_on = NULL
-WHERE
-  id = $1
-`
-
-// UpdateAndKeepOpenTicket updates the passed in ticket to ensure it's open and updates the config with any passed in values
-func UpdateAndKeepOpenTicket(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
-	now := dates.Now()
+// UpdateTicketConfig updates the passed in ticket's config with any passed in values
+func UpdateTicketConfig(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
 	t := &ticket.t
-	t.Status = TicketStatusOpen
-	t.ModifiedOn = now
 	for key, value := range config {
 		t.Config.Map()[key] = value
 	}
 
-	return Exec(ctx, "update ticket", db, updateTicketAndKeepOpenSQL, t.ID, t.Status, t.Config, t.ModifiedOn)
+	return Exec(ctx, "update ticket config", db, `UPDATE tickets_ticket SET config = $2 WHERE id = $1`, t.ID, t.Config)
+}
+
+// UpdateTicketLastActivity updates the last_activity_on of the given tickets to be now
+func UpdateTicketLastActivity(ctx context.Context, db Queryer, tickets []*Ticket) error {
+	now := dates.Now()
+	ids := make([]TicketID, len(tickets))
+	for i, t := range tickets {
+		t.t.LastActivityOn = now
+		ids[i] = t.ID()
+	}
+	return updateTicketLastActivity(ctx, db, ids, now)
+}
+
+func updateTicketLastActivity(ctx context.Context, db Queryer, ids []TicketID, now time.Time) error {
+	return Exec(ctx, "update ticket last activity", db, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
+}
+
+const assignTicketSQL = `
+UPDATE
+  tickets_ticket
+SET
+  assignee_id = $2,
+  modified_on = $3,
+  last_activity_on = $3
+WHERE
+  id = ANY($1)
+`
+
+// AssignTickets assigns the passed in tickets
+func AssignTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID, note string) (map[*Ticket]*TicketEvent, error) {
+	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	now := dates.Now()
+
+	for _, ticket := range tickets {
+		if ticket.AssigneeID() != assigneeID {
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.AssigneeID = assigneeID
+			t.ModifiedOn = now
+			t.LastActivityOn = now
+
+			e := NewTicketAssignedEvent(ticket, userID, assigneeID, note)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
+		}
+	}
+
+	// mark the tickets as assigned in the db
+	err := Exec(ctx, "assign tickets", db, assignTicketSQL, pq.Array(ids), assigneeID, now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
+}
+
+// NoteTickets adds a note to the passed in tickets
+func NoteTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, note string) (map[*Ticket]*TicketEvent, error) {
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+
+	for _, ticket := range tickets {
+		e := NewTicketNoteEvent(ticket, userID, note)
+		events = append(events, e)
+		eventsByTicket[ticket] = e
+	}
+
+	err := UpdateTicketLastActivity(ctx, db, tickets)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating ticket activity")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
 }
 
 const closeTicketSQL = `
@@ -321,43 +444,65 @@ UPDATE
 SET
   status = 'C',
   modified_on = $2,
-  closed_on = $2
+  closed_on = $2,
+  last_activity_on = $2
 WHERE
   id = ANY($1)
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
+func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
-	ids := make([]TicketID, len(tickets))
+	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
-	for i, ticket := range tickets {
-		byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
-		ids[i] = ticket.ID()
-		t := &ticket.t
-		t.Status = TicketStatusClosed
-		t.ModifiedOn = now
-		t.ClosedOn = &now
+
+	for _, ticket := range tickets {
+		if ticket.Status() != TicketStatusClosed {
+			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.Status = TicketStatusClosed
+			t.ModifiedOn = now
+			t.ClosedOn = &now
+			t.LastActivityOn = now
+
+			e := NewTicketClosedEvent(ticket, userID)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
+		}
 	}
 
 	if externally {
 		for ticketerID, ticketerTickets := range byTicketer {
-			ticketer := org.TicketerByID(ticketerID)
+			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	return Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	// mark the tickets as closed in the db
+	err := Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
 }
 
 const reopenTicketSQL = `
@@ -366,43 +511,65 @@ UPDATE
 SET
   status = 'O',
   modified_on = $2,
-  closed_on = NULL
+  closed_on = NULL,
+  last_activity_on = $2
 WHERE
   id = ANY($1)
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, tickets []*Ticket, externally bool, logger *HTTPLogger) error {
+func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
-	ids := make([]TicketID, len(tickets))
+	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
-	for i, ticket := range tickets {
-		byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
-		ids[i] = ticket.ID()
-		t := &ticket.t
-		t.Status = TicketStatusOpen
-		t.ModifiedOn = now
-		t.ClosedOn = nil
+
+	for _, ticket := range tickets {
+		if ticket.Status() != TicketStatusOpen {
+			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.Status = TicketStatusOpen
+			t.ModifiedOn = now
+			t.ClosedOn = nil
+			t.LastActivityOn = now
+
+			e := NewTicketReopenedEvent(ticket, userID)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
+		}
 	}
 
 	if externally {
 		for ticketerID, ticketerTickets := range byTicketer {
 			ticketer := org.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				err = service.Reopen(ticketerTickets, logger.Ticketer(ticketer))
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	return Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	// mark the tickets as opened in the db
+	err := Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
 }
 
 // Ticketer is our type for a ticketer asset
@@ -435,26 +602,22 @@ func (t *Ticketer) Type() string { return t.t.Type }
 // Config returns the named config value
 func (t *Ticketer) Config(key string) string { return t.t.Config[key] }
 
+// Reference returns an asset reference to this ticketer
+func (t *Ticketer) Reference() *assets.TicketerReference {
+	return assets.NewTicketerReference(t.t.UUID, t.t.Name)
+}
+
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(ticketer *flows.Ticketer) (TicketService, error) {
-	httpClient, httpRetries, _ := goflow.HTTP()
+func (t *Ticketer) AsService(cfg *config.Config, ticketer *flows.Ticketer) (TicketService, error) {
+	httpClient, httpRetries, _ := goflow.HTTP(cfg)
 
 	initFunc := ticketServices[t.Type()]
 	if initFunc != nil {
-		return initFunc(httpClient, httpRetries, ticketer, t.t.Config)
+		return initFunc(cfg, httpClient, httpRetries, ticketer, t.t.Config)
 	}
 
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
 }
-
-const updateTicketerConfigSQL = `
-UPDATE 
-	tickets_ticketer
-SET
-	config = $2
-WHERE 
-	id = $1
-`
 
 // UpdateConfig updates the configuration of this ticketer with the given values
 func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]string, remove map[string]bool) error {
@@ -471,7 +634,7 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]
 		dbMap[key] = value
 	}
 
-	return Exec(ctx, "update ticketer config", db, updateTicketerConfigSQL, t.t.ID, null.NewMap(dbMap))
+	return Exec(ctx, "update ticketer config", db, `UPDATE tickets_ticketer SET config = $2 WHERE id = $1`, t.t.ID, null.NewMap(dbMap))
 }
 
 // TicketService extends the engine's ticket service and adds support for forwarding new incoming messages
@@ -484,7 +647,7 @@ type TicketService interface {
 }
 
 // TicketServiceFunc is a func which creates a ticket service
-type TicketServiceFunc func(httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (TicketService, error)
+type TicketServiceFunc func(*config.Config, *http.Client, *httpx.RetryConfig, *flows.Ticketer, map[string]string) (TicketService, error)
 
 var ticketServices = map[string]TicketServiceFunc{}
 

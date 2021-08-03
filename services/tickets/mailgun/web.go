@@ -12,6 +12,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
@@ -60,13 +61,13 @@ type receiveResponse struct {
 
 var addressRegex = regexp.MustCompile(`^ticket\+([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})@.*$`)
 
-func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &receiveRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
 		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
 	}
 
-	if !request.verify(s.Config.MailgunSigningKey) {
+	if !request.verify(rt.Config.MailgunSigningKey) {
 		return errors.New("request signature validation failed"), http.StatusForbidden, nil
 	}
 
@@ -87,7 +88,7 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *model
 	}
 
 	// look up the ticket and ticketer
-	ticket, ticketer, svc, err := tickets.FromTicketUUID(s.CTX, s.DB, flows.TicketUUID(match[0][1]), typeMailgun)
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, rt.DB, flows.TicketUUID(match[0][1]), typeMailgun)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -103,10 +104,14 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *model
 		return &receiveResponse{Action: "rejected", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}
 
+	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	if err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		org, _ := models.GetOrgAssets(ctx, s.DB, ticket.OrgID())
-		err = models.CloseTickets(ctx, s.DB, org, []*models.Ticket{ticket}, true, l)
+		err = tickets.CloseTicket(ctx, rt, oa, ticket, true, l)
 		if err != nil {
 			return errors.Wrapf(err, "error closing ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 		}
@@ -114,16 +119,21 @@ func handleReceive(ctx context.Context, s *web.Server, r *http.Request, l *model
 		return &receiveResponse{Action: "closed", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}
 
-	// update our ticket
-	config := map[string]string{
-		ticketConfigLastMessageID: request.MessageID,
-	}
-	err = models.UpdateAndKeepOpenTicket(ctx, s.DB, ticket, config)
+	// update our ticket config
+	err = models.UpdateTicketConfig(ctx, rt.DB, ticket, map[string]string{ticketConfigLastMessageID: request.MessageID})
 	if err != nil {
 		return errors.Wrapf(err, "error updating ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 	}
 
-	msg, err := tickets.SendReply(ctx, s.DB, s.RP, s.Storage, ticket, request.StrippedText, files)
+	// reopen ticket if necessary
+	if ticket.Status() != models.TicketStatusOpen {
+		err = tickets.ReopenTicket(ctx, rt, oa, ticket, false, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error reopening ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
+		}
+	}
+
+	msg, err := tickets.SendReply(ctx, rt, ticket, request.StrippedText, files)
 	if err != nil {
 		return err, http.StatusInternalServerError, nil
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -34,9 +35,6 @@ type CallID string
 const (
 	NilCallID     = CallID("")
 	NilAttachment = utils.Attachment("")
-
-	// Our user agent
-	userAgent = "Mailroom/"
 
 	// ErrorMessage that is spoken to an IVR user if an error occurs
 	ErrorMessage = "An error has occurred, please try again later."
@@ -298,17 +296,17 @@ func WriteErrorResponse(ctx context.Context, db *sqlx.DB, client Client, conn *m
 
 // StartIVRFlow takes care of starting the flow in the passed in start for the passed in contact and URN
 func StartIVRFlow(
-	ctx context.Context, db *sqlx.DB, rp *redis.Pool, client Client, resumeURL string, oa *models.OrgAssets,
+	ctx context.Context, rt *runtime.Runtime, client Client, resumeURL string, oa *models.OrgAssets,
 	channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN, startID models.StartID,
 	r *http.Request, w http.ResponseWriter) error {
 
 	// connection isn't in a wired status, that's an error
 	if conn.Status() != models.ConnectionStatusWired && conn.Status() != models.ConnectionStatusInProgress {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
+		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
 	}
 
 	// get the flow for our start
-	start, err := models.GetFlowStartAttributes(ctx, db, startID)
+	start, err := models.GetFlowStartAttributes(ctx, rt.DB, startID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
@@ -358,7 +356,7 @@ func StartIVRFlow(
 	}
 
 	// mark our connection as started
-	err = conn.MarkStarted(ctx, db, time.Now())
+	err = conn.MarkStarted(ctx, rt.DB, time.Now())
 	if err != nil {
 		return errors.Wrapf(err, "error updating call status")
 	}
@@ -372,7 +370,7 @@ func StartIVRFlow(
 	}
 
 	// start our flow
-	sessions, err := runner.StartFlowForContacts(ctx, db, rp, oa, flow, []flows.Trigger{trigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, hook, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow")
 	}
@@ -382,7 +380,7 @@ func StartIVRFlow(
 	}
 
 	// have our client output our session status
-	err = client.WriteSessionResponse(ctx, rp, channel, conn, sessions[0], urn, resumeURL, r, w)
+	err = client.WriteSessionResponse(ctx, rt.RP, channel, conn, sessions[0], urn, resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for start")
 	}
@@ -392,7 +390,7 @@ func StartIVRFlow(
 
 // ResumeIVRFlow takes care of resuming the flow in the passed in start for the passed in contact and URN
 func ResumeIVRFlow(
-	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage,
+	ctx context.Context, rt *runtime.Runtime,
 	resumeURL string, client Client,
 	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
@@ -402,25 +400,25 @@ func ResumeIVRFlow(
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
-	session, err := models.ActiveSessionForContact(ctx, db, oa, models.FlowTypeVoice, contact)
+	session, err := models.ActiveSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeVoice, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading session for contact")
 	}
 
 	if session == nil {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("no active IVR session for contact"))
+		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("no active IVR session for contact"))
 	}
 
 	if session.ConnectionID() == nil {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
+		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
 	}
 
 	if *session.ConnectionID() != conn.ID() {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
+		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
 	}
 
 	// preprocess this request
-	body, err := client.PreprocessResume(ctx, db, rp, conn, r)
+	body, err := client.PreprocessResume(ctx, rt.DB, rt.RP, conn, r)
 	if err != nil {
 		return errors.Wrapf(err, "error preprocessing resume")
 	}
@@ -444,7 +442,7 @@ func ResumeIVRFlow(
 	// make sure our call is still happening
 	status, _ := client.StatusForRequest(r)
 	if status != models.ConnectionStatusInProgress {
-		err := conn.UpdateStatus(ctx, db, status, 0, time.Now())
+		err := conn.UpdateStatus(ctx, rt.DB, status, 0, time.Now())
 		if err != nil {
 			return errors.Wrapf(err, "error updating status")
 		}
@@ -455,17 +453,17 @@ func ResumeIVRFlow(
 	if err != nil {
 		// call has ended, so will our session
 		if err == CallEndedError {
-			WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "call already ended"))
+			WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Wrapf(err, "call already ended"))
 		}
 
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Wrapf(err, "error finding input for request"))
+		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Wrapf(err, "error finding input for request"))
 	}
 
 	var resume flows.Resume
 	var clientErr error
 	switch res := ivrResume.(type) {
 	case InputResume:
-		resume, clientErr, err = buildMsgResume(ctx, config, db, rp, store, client, channel, contact, urn, conn, oa, r, res)
+		resume, clientErr, err = buildMsgResume(ctx, rt.Config, rt.DB, rt.RP, rt.MediaStorage, client, channel, contact, urn, conn, oa, r, res)
 
 	case DialResume:
 		resume, clientErr, err = buildDialResume(oa, contact, res)
@@ -484,19 +482,19 @@ func ResumeIVRFlow(
 		return client.WriteErrorResponse(w, fmt.Errorf("no resume found, ending call"))
 	}
 
-	session, err = runner.ResumeFlow(ctx, db, rp, oa, session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, rt, oa, session, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}
 
 	// if still active, write out our response
 	if status == models.ConnectionStatusInProgress {
-		err = client.WriteSessionResponse(ctx, rp, channel, conn, session, urn, resumeURL, r, w)
+		err = client.WriteSessionResponse(ctx, rt.RP, channel, conn, session, urn, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}
 	} else {
-		err = models.ExitSessions(ctx, db, []models.SessionID{session.ID()}, models.ExitCompleted, time.Now())
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitCompleted, time.Now())
 		if err != nil {
 			logrus.WithError(err).Error("error closing session")
 		}
@@ -547,7 +545,7 @@ func buildMsgResume(
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(resume.Attachment.URL())
 
-		resume.Attachment, err = oa.Org().StoreAttachment(store, filename, resume.Attachment.ContentType(), resp.Body)
+		resume.Attachment, err = oa.Org().StoreAttachment(ctx, store, filename, resume.Attachment.ContentType(), resp.Body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to download and store attachment, ending call"), nil
 		}
@@ -583,7 +581,7 @@ func buildMsgResume(
 
 // HandleIVRStatus is called on status callbacks for an IVR call. We let the client decide whether the call has
 // ended for some reason and update the state of the call and session if so
-func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
+func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
 	status, duration := client.StatusForRequest(r)
 
@@ -591,12 +589,12 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *model
 	if status == models.ConnectionStatusErrored {
 		// no associated start? this is a permanent failure
 		if conn.StartID() == models.NilStartID {
-			conn.MarkFailed(ctx, db, time.Now())
-			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: F"))
+			conn.MarkFailed(ctx, rt.DB, time.Now())
+			return client.WriteEmptyResponse(w, "status updated: F")
 		}
 
 		// on errors we need to look up the flow to know how long to wait before retrying
-		start, err := models.GetFlowStartAttributes(ctx, db, conn.StartID())
+		start, err := models.GetFlowStartAttributes(ctx, rt.DB, conn.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "unable to load start: %d", conn.StartID())
 		}
@@ -606,16 +604,16 @@ func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *model
 			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}
 
-		conn.MarkErrored(ctx, db, time.Now(), flow.IVRRetryWait())
+		conn.MarkErrored(ctx, rt.DB, time.Now(), flow.IVRRetryWait())
 
 		if conn.Status() == models.ConnectionStatusErrored {
 			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
 		}
 	} else if status == models.ConnectionStatusFailed {
-		conn.MarkFailed(ctx, db, time.Now())
+		conn.MarkFailed(ctx, rt.DB, time.Now())
 	} else {
 		if status != conn.Status() || duration > 0 {
-			err := conn.UpdateStatus(ctx, db, status, duration, time.Now())
+			err := conn.UpdateStatus(ctx, rt.DB, status, duration, time.Now())
 			if err != nil {
 				return errors.Wrapf(err, "error updating call status")
 			}

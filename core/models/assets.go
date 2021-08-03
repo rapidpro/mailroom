@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
@@ -67,6 +68,10 @@ type OrgAssets struct {
 
 	locations        []assets.LocationHierarchy
 	locationsBuiltAt time.Time
+
+	users        []assets.User
+	usersByID    map[UserID]*User
+	usersByEmail map[string]*User
 }
 
 var ErrNotFound = errors.New("not found")
@@ -125,7 +130,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	var err error
 
 	if prev == nil || refresh&RefreshOrg > 0 {
-		oa.org, err = loadOrg(ctx, db, orgID)
+		oa.org, err = LoadOrg(ctx, config.Mailroom, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading environment for org %d", orgID)
 		}
@@ -315,8 +320,25 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		oa.ticketersByUUID = prev.ticketersByUUID
 	}
 
+	if prev == nil || refresh&RefreshUsers > 0 {
+		oa.users, err = loadUsers(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading user assets for org %d", orgID)
+		}
+		oa.usersByID = make(map[UserID]*User)
+		oa.usersByEmail = make(map[string]*User)
+		for _, u := range oa.users {
+			oa.usersByID[u.(*User).ID()] = u.(*User)
+			oa.usersByEmail[u.Email()] = u.(*User)
+		}
+	} else {
+		oa.users = prev.users
+		oa.usersByID = prev.usersByID
+		oa.usersByEmail = prev.usersByEmail
+	}
+
 	// intialize our session assets
-	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig())
+	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(config.Mailroom))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", orgID)
 	}
@@ -345,6 +367,7 @@ const (
 	RefreshLabels      = Refresh(1 << 12)
 	RefreshFlows       = Refresh(1 << 13)
 	RefreshTicketers   = Refresh(1 << 14)
+	RefreshUsers       = Refresh(1 << 15)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -439,6 +462,9 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
 	clone, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows)
+	if err != nil {
+		return nil, err
+	}
 
 	for flowUUID, newDef := range newDefs {
 		// get the original flow
@@ -455,13 +481,10 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs
 		clone.flowByID[cf.ID()] = cf
 	}
 
-	for _, channel := range testChannels {
-		// we don't populate our maps for uuid or id, shouldn't be used in any hook anyways
-		clone.channels = append(clone.channels, channel)
-	}
+	clone.channels = append(clone.channels, testChannels...)
 
 	// rebuild our session assets with our new items
-	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig())
+	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig(config.Mailroom))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", clone.OrgID())
 	}
@@ -482,7 +505,7 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 		return flow, nil
 	}
 
-	dbFlow, err := loadFlowByUUID(ctx, a.db, a.orgID, flowUUID)
+	dbFlow, err := LoadFlowByUUID(ctx, a.db, a.orgID, flowUUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %s", flowUUID)
 	}
@@ -512,7 +535,7 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 		return flow.(*Flow), nil
 	}
 
-	dbFlow, err := loadFlowByID(ctx, a.db, a.orgID, flowID)
+	dbFlow, err := LoadFlowByID(ctx, a.db, a.orgID, flowID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %d", flowID)
 	}
@@ -604,4 +627,16 @@ func (a *OrgAssets) TicketerByID(id TicketerID) *Ticketer {
 
 func (a *OrgAssets) TicketerByUUID(uuid assets.TicketerUUID) *Ticketer {
 	return a.ticketersByUUID[uuid]
+}
+
+func (a *OrgAssets) Users() ([]assets.User, error) {
+	return a.users, nil
+}
+
+func (a *OrgAssets) UserByID(id UserID) *User {
+	return a.usersByID[id]
+}
+
+func (a *OrgAssets) UserByEmail(email string) *User {
+	return a.usersByEmail[email]
 }

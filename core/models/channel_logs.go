@@ -61,7 +61,7 @@ func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Chann
 	l.URL = url
 	l.Method = trace.Request.Method
 	l.Request = string(trace.RequestTrace)
-	l.Response = trace.ResponseTraceUTF8("...")
+	l.Response = string(trace.SanitizedResponse("..."))
 	l.Status = statusCode
 	l.CreatedOn = trace.StartTime
 	l.RequestTime = int((trace.EndTime.Sub(trace.StartTime)) / time.Millisecond)

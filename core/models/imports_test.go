@@ -26,23 +26,20 @@ import (
 )
 
 func TestContactImports(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	testsuite.Reset()
+	ctx, _, db, _ := testsuite.Reset()
+
 	defer testsuite.Reset()
 
-	models.FlushCache()
-
-	testdata.DeleteContactsAndURNs(t, db)
+	testdata.DeleteContactsAndURNs(db)
 
 	// add contact in other org to make sure we can't update it
-	testdata.InsertContact(t, db, models.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa")
+	testdata.InsertContact(db, testdata.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa")
 
 	// add dynamic group to test imported contacts are added to it
-	testdata.InsertContactGroup(t, db, models.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
+	testdata.InsertContactGroup(db, testdata.Org1, "fc32f928-ad37-477c-a88e-003d30fd7406", "Adults", "age >= 40")
 
 	// give our org a country by setting country on a channel
-	db.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, models.TwilioChannelID)
+	db.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	testJSON, err := ioutil.ReadFile("testdata/imports.json")
 	require.NoError(t, err)
@@ -66,13 +63,13 @@ func TestContactImports(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	for i, tc := range tcs {
-		importID := testdata.InsertContactImport(t, db, models.Org1)
-		batchID := testdata.InsertContactImportBatch(t, db, importID, tc.Specs)
+		importID := testdata.InsertContactImport(db, testdata.Org1)
+		batchID := testdata.InsertContactImportBatch(db, importID, tc.Specs)
 
 		batch, err := models.LoadContactImportBatch(ctx, db, batchID)
 		require.NoError(t, err)
 
-		err = batch.Import(ctx, db, models.Org1)
+		err = batch.Import(ctx, db, testdata.Org1.ID)
 		require.NoError(t, err)
 
 		results := &struct {
@@ -127,8 +124,8 @@ func TestContactImports(t *testing.T) {
 
 			test.AssertEqualJSON(t, tc.Errors, actual.Errors, "errors mismatch in '%s'", tc.Description)
 
-			actualJSON, _ := jsonx.Marshal(actual.Contacts)
-			expectedJSON, _ := jsonx.Marshal(tc.Contacts)
+			actualJSON := jsonx.MustMarshal(actual.Contacts)
+			expectedJSON := jsonx.MustMarshal(tc.Contacts)
 			test.AssertEqualJSON(t, expectedJSON, actualJSON, "imported contacts mismatch in '%s'", tc.Description)
 		} else {
 			tcs[i] = actual
@@ -145,11 +142,10 @@ func TestContactImports(t *testing.T) {
 }
 
 func TestContactImportBatch(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
-	importID := testdata.InsertContactImport(t, db, models.Org1)
-	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
+	importID := testdata.InsertContactImport(db, testdata.Org1)
+	batchID := testdata.InsertContactImportBatch(db, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
 	]`))
@@ -163,10 +159,10 @@ func TestContactImportBatch(t *testing.T) {
 	assert.Equal(t, 0, batch.RecordStart)
 	assert.Equal(t, 2, batch.RecordEnd)
 
-	err = batch.Import(ctx, db, models.Org1)
+	err = batch.Import(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`, []interface{}{}, 1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`).Returns(1)
 }
 
 func TestContactSpecUnmarshal(t *testing.T) {

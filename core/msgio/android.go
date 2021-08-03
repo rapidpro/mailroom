@@ -45,11 +45,11 @@ func SyncAndroidChannels(fc *fcm.Client, channels []*models.Channel) {
 }
 
 // CreateFCMClient creates an FCM client based on the configured FCM API key
-func CreateFCMClient() *fcm.Client {
-	if config.Mailroom.FCMKey == "" {
+func CreateFCMClient(cfg *config.Config) *fcm.Client {
+	if cfg.FCMKey == "" {
 		return nil
 	}
-	client, err := fcm.NewClient(config.Mailroom.FCMKey)
+	client, err := fcm.NewClient(cfg.FCMKey)
 	if err != nil {
 		panic(errors.Wrap(err, "unable to create FCM client"))
 	}

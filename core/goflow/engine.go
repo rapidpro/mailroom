@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
@@ -46,22 +45,22 @@ func RegisterAirtimeServiceFactory(factory engine.AirtimeServiceFactory) {
 }
 
 // Engine returns the global engine instance for use with real sessions
-func Engine() flows.Engine {
+func Engine(cfg *config.Config) flows.Engine {
 	engInit.Do(func() {
 		webhookHeaders := map[string]string{
-			"User-Agent":      "RapidProMailroom/" + config.Mailroom.Version,
+			"User-Agent":      "RapidProMailroom/" + cfg.Version,
 			"X-Mailroom-Mode": "normal",
 		}
 
-		httpClient, httpRetries, httpAccess := HTTP()
+		httpClient, httpRetries, httpAccess := HTTP(cfg)
 
 		eng = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, cfg.WebhooksMaxBodyBytes)).
 			WithClassificationServiceFactory(classificationFactory).
 			WithEmailServiceFactory(emailFactory).
 			WithTicketServiceFactory(ticketFactory).
 			WithAirtimeServiceFactory(airtimeFactory).
-			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
+			WithMaxStepsPerSprint(cfg.MaxStepsPerSprint).
 			Build()
 	})
 
@@ -69,22 +68,22 @@ func Engine() flows.Engine {
 }
 
 // Simulator returns the global engine instance for use with simulated sessions
-func Simulator() flows.Engine {
+func Simulator(cfg *config.Config) flows.Engine {
 	simulatorInit.Do(func() {
 		webhookHeaders := map[string]string{
-			"User-Agent":      "RapidProMailroom/" + config.Mailroom.Version,
+			"User-Agent":      "RapidProMailroom/" + cfg.Version,
 			"X-Mailroom-Mode": "simulation",
 		}
 
-		httpClient, _, httpAccess := HTTP() // don't do retries in simulator
+		httpClient, _, httpAccess := HTTP(cfg) // don't do retries in simulator
 
 		simulator = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, config.Mailroom.WebhooksMaxBodyBytes)).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, cfg.WebhooksMaxBodyBytes)).
 			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
 			WithEmailServiceFactory(simulatorEmailServiceFactory).     // but faked emails
 			WithTicketServiceFactory(simulatorTicketServiceFactory).   // and faked tickets
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // and faked airtime transfers
-			WithMaxStepsPerSprint(config.Mailroom.MaxStepsPerSprint).
+			WithMaxStepsPerSprint(cfg.MaxStepsPerSprint).
 			Build()
 	})
 
@@ -110,7 +109,7 @@ type simulatorTicketService struct {
 }
 
 func (s *simulatorTicketService) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	return flows.NewTicket(flows.TicketUUID(uuids.New()), s.ticketer.Reference(), subject, body, ""), nil
+	return flows.OpenTicket(s.ticketer, subject, body), nil
 }
 
 func simulatorAirtimeServiceFactory(session flows.Session) (flows.AirtimeService, error) {

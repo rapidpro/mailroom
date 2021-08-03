@@ -7,23 +7,26 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
 
 func TestContactGroupsChanged(t *testing.T) {
-	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
-	testers := assets.NewGroupReference(models.TestersGroupUUID, "Testers")
+	defer testsuite.Reset()
+
+	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
+	testers := assets.NewGroupReference(testdata.TestersGroup.UUID, "Testers")
 
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}),
 					actions.NewRemoveContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}, false),
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{testers}),
 				},
-				models.GeorgeID: []flows.Action{
+				testdata.George: []flows.Action{
 					actions.NewRemoveContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{doctors}, false),
 					actions.NewAddContactGroups(handlers.NewActionUUID(), []*assets.GroupReference{testers}),
 				},
@@ -31,22 +34,22 @@ func TestContactGroupsChanged(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{models.CathyID, models.DoctorsGroupID},
+					Args:  []interface{}{testdata.Cathy.ID, testdata.DoctorsGroup.ID},
 					Count: 0,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{models.CathyID, models.TestersGroupID},
+					Args:  []interface{}{testdata.Cathy.ID, testdata.TestersGroup.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{models.GeorgeID, models.TestersGroupID},
+					Args:  []interface{}{testdata.George.ID, testdata.TestersGroup.ID},
 					Count: 1,
 				},
 				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
-					Args:  []interface{}{models.BobID, models.TestersGroupID},
+					Args:  []interface{}{testdata.Bob.ID, testdata.TestersGroup.ID},
 					Count: 0,
 				},
 			},

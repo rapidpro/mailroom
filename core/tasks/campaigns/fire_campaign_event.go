@@ -7,10 +7,10 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/marker"
 
 	"github.com/pkg/errors"
@@ -47,9 +47,9 @@ func (t *FireCampaignEventTask) Timeout() time.Duration {
 //   - creates the trigger for that event
 //   - runs the flow that is to be started through our engine
 //   - saves the flow run and session resulting from our run
-func (t *FireCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
-	db := mr.DB
-	rp := mr.RP
+func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	db := rt.DB
+	rp := rt.RP
 	log := logrus.WithField("comp", "campaign_worker").WithField("event_id", t.EventID)
 
 	// grab all the fires for this event
@@ -82,7 +82,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailro
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(t.CampaignUUID), t.CampaignName)
 
-	started, err := runner.FireCampaignEvents(ctx, db, rp, orgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
+	started, err := runner.FireCampaignEvents(ctx, rt, orgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
 
 	// remove all the contacts that were started
 	for _, contactID := range started {
@@ -93,7 +93,10 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, mr *mailroom.Mailro
 	if len(contactMap) > 0 {
 		rc := rp.Get()
 		for _, failed := range contactMap {
-			marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", failed.FireID))
+			rerr := marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", failed.FireID))
+			if rerr != nil {
+				log.WithError(rerr).WithField("fire_id", failed.FireID).Error("error unmarking campaign fire")
+			}
 		}
 		rc.Close()
 	}

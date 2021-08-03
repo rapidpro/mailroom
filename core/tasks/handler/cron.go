@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/utils/marker"
 
@@ -29,19 +31,19 @@ func init() {
 }
 
 // StartRetryCron starts our cron job of retrying pending incoming messages
-func StartRetryCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, retryLock, time.Minute*5,
+func StartRetryCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+	cron.StartCron(quit, rt.RP, retryLock, time.Minute*5,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return retryPendingMsgs(ctx, mr.DB, mr.RP, lockName, lockValue)
+			return RetryPendingMsgs(ctx, rt.DB, rt.RP, lockName, lockValue)
 		},
 	)
 	return nil
 }
 
-// retryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
-func retryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+// RetryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
+func RetryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
 	if !config.Mailroom.RetryPendingMessages {
 		return nil
 	}
@@ -104,7 +106,7 @@ func retryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName
 		}
 
 		// queue this event up for handling
-		err = AddHandleTask(rc, contactID, task)
+		err = QueueHandleTask(rc, contactID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error queuing retry for task")
 		}

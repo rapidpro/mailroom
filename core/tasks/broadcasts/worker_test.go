@@ -20,14 +20,11 @@ import (
 )
 
 func TestBroadcastEvents(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-	db := testsuite.DB()
-	rc := testsuite.RC()
+	ctx, _, db, rp := testsuite.Reset()
+	rc := rp.Get()
 	defer rc.Close()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	eng := envs.Language("eng")
@@ -39,20 +36,20 @@ func TestBroadcastEvents(t *testing.T) {
 		},
 	}
 
-	doctors := assets.NewGroupReference(models.DoctorsGroupUUID, "Doctors")
+	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
 	doctorsOnly := []*assets.GroupReference{doctors}
 
-	cathy := flows.NewContactReference(models.CathyUUID, "Cathy")
+	cathy := flows.NewContactReference(testdata.Cathy.UUID, "Cathy")
 	cathyOnly := []*flows.ContactReference{cathy}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(t, db, models.Org1, models.CathyID, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	// change george's URN to an invalid twitter URN so it can't be sent
 	db.MustExec(
-		`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, models.GeorgeURNID,
+		`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, testdata.George.URNID,
 	)
-	george := flows.NewContactReference(models.GeorgeUUID, "George")
+	george := flows.NewContactReference(testdata.George.UUID, "George")
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
@@ -112,9 +109,8 @@ func TestBroadcastEvents(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`,
-			[]interface{}{lastNow, tc.MsgText}, tc.MsgCount, "%d: unexpected msg count", i)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
+			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
@@ -122,23 +118,19 @@ func TestBroadcastEvents(t *testing.T) {
 }
 
 func TestBroadcastTask(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	rp := testsuite.RP()
-	db := testsuite.DB()
-	rc := testsuite.RC()
+	ctx, _, db, rp := testsuite.Reset()
+	rc := rp.Get()
 	defer rc.Close()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.Org1)
+	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 	eng := envs.Language("eng")
 
 	// insert a broadcast so we can check it is being set to sent
-	var legacyID models.BroadcastID
-	err = db.Get(&legacyID,
-		`INSERT INTO msgs_broadcast(status, text, base_language, is_active, created_on, modified_on, send_all, created_by_id, modified_by_id, org_id)
-							 VALUES('P', '"base"=>"hi @(PROPER(contact.name)) legacy"'::hstore, 'base', TRUE, NOW(), NOW(), FALSE, 1, 1, 1) RETURNING id`)
-	assert.NoError(t, err)
+	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil)
+
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "", "", nil)
+	modelTicket := ticket.Load(db)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{
 		eng: {
@@ -164,11 +156,11 @@ func TestBroadcastTask(t *testing.T) {
 		},
 	}
 
-	doctorsOnly := []models.GroupID{models.DoctorsGroupID}
-	cathyOnly := []models.ContactID{models.CathyID}
+	doctorsOnly := []models.GroupID{testdata.DoctorsGroup.ID}
+	cathyOnly := []models.ContactID{testdata.Cathy.ID}
 
 	// add an extra URN fo cathy
-	testdata.InsertContactURN(t, db, models.Org1, models.CathyID, urns.URN("tel:+12065551212"), 1001)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
 		BroadcastID   models.BroadcastID
@@ -178,14 +170,54 @@ func TestBroadcastTask(t *testing.T) {
 		GroupIDs      []models.GroupID
 		ContactIDs    []models.ContactID
 		URNs          []urns.URN
+		TicketID      models.TicketID
 		Queue         string
 		BatchCount    int
 		MsgCount      int
 		MsgText       string
 	}{
-		{models.NilBroadcastID, evaluated, models.TemplateStateEvaluated, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{legacyID, legacy, models.TemplateStateLegacy, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy legacy URN: +12065551212 Gender: F"},
-		{models.NilBroadcastID, template, models.TemplateStateUnevaluated, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hi Cathy from Nyaruka goflow URN: tel:+12065551212 Gender: F"},
+		{
+			models.NilBroadcastID,
+			evaluated,
+			models.TemplateStateEvaluated,
+			eng,
+			doctorsOnly,
+			cathyOnly,
+			nil,
+			ticket.ID,
+			queue.BatchQueue,
+			2,
+			121,
+			"hello world",
+		},
+		{
+			legacyID,
+			legacy,
+			models.TemplateStateLegacy,
+			eng,
+			nil,
+			cathyOnly,
+			nil,
+			models.NilTicketID,
+			queue.HandlerQueue,
+			1,
+			1,
+			"hi Cathy legacy URN: +12065551212 Gender: F",
+		},
+		{
+			models.NilBroadcastID,
+			template,
+			models.TemplateStateUnevaluated,
+			eng,
+			nil,
+			cathyOnly,
+			nil,
+			models.NilTicketID,
+			queue.HandlerQueue,
+			1,
+			1,
+			"hi Cathy from Nyaruka goflow URN: tel:+12065551212 Gender: F",
+		},
 	}
 
 	lastNow := time.Now()
@@ -193,7 +225,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID)
 		err = CreateBroadcastBatches(ctx, db, rp, bcast)
 		assert.NoError(t, err)
 
@@ -221,15 +253,19 @@ func TestBroadcastTask(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		testsuite.AssertQueryCount(t, db,
-			`SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`,
-			[]interface{}{lastNow, tc.MsgText}, tc.MsgCount, "%d: unexpected msg count", i)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
+			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
 		// make sure our broadcast is marked as sent
 		if tc.BroadcastID != models.NilBroadcastID {
-			testsuite.AssertQueryCount(t, db,
-				`SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`,
-				[]interface{}{tc.BroadcastID}, 1, "%d: broadcast not marked as sent", i)
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
+				Returns(1, "%d: broadcast not marked as sent", i)
+		}
+
+		// if we had a ticket, make sure its last_activity_on was updated
+		if tc.TicketID != models.NilTicketID {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, tc.TicketID, modelTicket.LastActivityOn()).
+				Returns(1, "%d: ticket last_activity_on not updated", i)
 		}
 
 		lastNow = time.Now()

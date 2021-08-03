@@ -3,16 +3,19 @@ package mailroom
 import (
 	"context"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/sirupsen/logrus"
 )
 
 // Foreman takes care of managing our set of workers and assigns msgs for each to send
 type Foreman struct {
-	mr               *Mailroom
+	rt               *runtime.Runtime
+	wg               *sync.WaitGroup
 	queue            string
 	workers          []*Worker
 	availableWorkers chan *Worker
@@ -20,9 +23,10 @@ type Foreman struct {
 }
 
 // NewForeman creates a new Foreman for the passed in server with the number of max workers
-func NewForeman(mr *Mailroom, queue string, maxWorkers int) *Foreman {
+func NewForeman(rt *runtime.Runtime, wg *sync.WaitGroup, queue string, maxWorkers int) *Foreman {
 	foreman := &Foreman{
-		mr:               mr,
+		rt:               rt,
+		wg:               wg,
 		queue:            queue,
 		workers:          make([]*Worker, maxWorkers),
 		availableWorkers: make(chan *Worker, maxWorkers),
@@ -56,8 +60,8 @@ func (f *Foreman) Stop() {
 // Assign is our main loop for the Foreman, it takes care of popping the next outgoing task from our
 // backend and assigning them to workers
 func (f *Foreman) Assign() {
-	f.mr.WaitGroup.Add(1)
-	defer f.mr.WaitGroup.Done()
+	f.wg.Add(1)
+	defer f.wg.Done()
 	log := logrus.WithField("comp", "foreman")
 
 	log.WithFields(logrus.Fields{
@@ -68,7 +72,7 @@ func (f *Foreman) Assign() {
 
 	lastSleep := false
 
-	for true {
+	for {
 		select {
 		// return if we have been told to stop
 		case <-f.quit:
@@ -78,7 +82,7 @@ func (f *Foreman) Assign() {
 		// otherwise, grab the next task and assign it to a worker
 		case worker := <-f.availableWorkers:
 			// see if we have a task to work on
-			rc := f.mr.RP.Get()
+			rc := f.rt.RP.Get()
 			task, err := queue.PopNextTask(rc, f.queue)
 			rc.Close()
 
@@ -109,7 +113,6 @@ type Worker struct {
 	id      int
 	foreman *Foreman
 	job     chan *queue.Task
-	log     *logrus.Entry
 }
 
 // NewWorker creates a new worker responsible for working on events
@@ -124,14 +127,15 @@ func NewWorker(foreman *Foreman, id int) *Worker {
 
 // Start starts our Worker's goroutine and has it start waiting for tasks from the foreman
 func (w *Worker) Start() {
+	w.foreman.wg.Add(1)
+
 	go func() {
-		w.foreman.mr.WaitGroup.Add(1)
-		defer w.foreman.mr.WaitGroup.Done()
+		defer w.foreman.wg.Done()
 
 		log := logrus.WithField("queue", w.foreman.queue).WithField("worker_id", w.id)
 		log.Debug("started")
 
-		for true {
+		for {
 			// list ourselves as available for work
 			w.foreman.availableWorkers <- w
 
@@ -166,7 +170,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 		}
 
 		// mark our task as complete
-		rc := w.foreman.mr.RP.Get()
+		rc := w.foreman.rt.RP.Get()
 		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.OrgID)
 		if err != nil {
 			log.WithError(err)
@@ -179,7 +183,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 
 	taskFunc, found := taskFunctions[task.Type]
 	if found {
-		err := taskFunc(context.Background(), w.foreman.mr, task)
+		err := taskFunc(context.Background(), w.foreman.rt, task)
 		if err != nil {
 			log.WithError(err).WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Error("error running task")
 		}

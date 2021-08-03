@@ -17,7 +17,9 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -25,9 +27,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type ContactActionMap map[models.ContactID][]flows.Action
-type ContactMsgMap map[models.ContactID]*flows.MsgIn
-type ContactModifierMap map[models.ContactID][]flows.Modifier
+type ContactActionMap map[*testdata.Contact][]flows.Action
+type ContactMsgMap map[*testdata.Contact]*flows.MsgIn
+type ContactModifierMap map[*testdata.Contact][]flows.Modifier
 
 type modifyResult struct {
 	Contact *flows.Contact `json:"contact"`
@@ -43,7 +45,7 @@ type TestCase struct {
 	SQLAssertions []SQLAssertion
 }
 
-type Assertion func(t *testing.T, db *sqlx.DB, rc redis.Conn) error
+type Assertion func(t *testing.T, rt *runtime.Runtime) error
 
 type SQLAssertion struct {
 	SQL   string
@@ -82,11 +84,11 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 	exits := make([]flows.Exit, len(tc.Actions))
 	exitNodes := make([]flows.Node, len(tc.Actions))
 	i = 0
-	for cid, actions := range tc.Actions {
+	for contact, actions := range tc.Actions {
 		cases[i] = routers.NewCase(
 			uuids.New(),
 			"has_any_word",
-			[]string{fmt.Sprintf("%d", cid)},
+			[]string{fmt.Sprintf("%d", contact.ID)},
 			categoryUUIDs[i],
 		)
 
@@ -99,7 +101,7 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 
 		categories[i] = routers.NewCategory(
 			categoryUUIDs[i],
-			fmt.Sprintf("Contact %d", cid),
+			fmt.Sprintf("Contact %d", contact.ID),
 			exitUUIDs[i],
 		)
 
@@ -157,19 +159,22 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 }
 
 func RunTestCases(t *testing.T, tcs []TestCase) {
-	models.FlushCache()
+	ctx, rt, db, _ := testsuite.Get()
 
-	db := testsuite.DB()
-	ctx := testsuite.CTX()
-	rp := testsuite.RP()
+	models.FlushCache()
 
 	oa, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
 	assert.NoError(t, err)
 
 	// reuse id from one of our real flows
-	flowUUID := models.FavoritesFlowUUID
+	flowUUID := testdata.Favorites.UUID
 
 	for i, tc := range tcs {
+		msgsByContactID := make(map[models.ContactID]*flows.MsgIn)
+		for contact, msg := range tc.Msgs {
+			msgsByContactID[contact.ID] = msg
+		}
+
 		// build our flow for this test case
 		testFlow := createTestFlow(t, flowUUID, tc)
 		flowDef, err := json.Marshal(testFlow)
@@ -184,7 +189,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		options := runner.NewStartOptions()
 		options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, session []*models.Session) error {
 			for _, s := range session {
-				msg := tc.Msgs[s.ContactID()]
+				msg := msgsByContactID[s.ContactID()]
 				if msg != nil {
 					s.SetIncomingMsg(msg.ID(), "")
 				}
@@ -192,23 +197,24 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			return nil
 		}
 		options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
-			msg := tc.Msgs[models.ContactID(contact.ID())]
+			msg := msgsByContactID[models.ContactID(contact.ID())]
 			if msg == nil {
 				return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Manual().Build()
 			}
 			return triggers.NewBuilder(oa.Env(), testFlow.Reference(), contact).Msg(msg).Build()
 		}
 
-		_, err = runner.StartFlow(ctx, db, rp, oa, flow.(*models.Flow), []models.ContactID{models.CathyID, models.BobID, models.GeorgeID, models.AlexandriaID}, options)
-		assert.NoError(t, err)
+		for _, c := range []*testdata.Contact{testdata.Cathy, testdata.Bob, testdata.George, testdata.Alexandria} {
+			_, err := runner.StartFlow(ctx, rt, oa, flow.(*models.Flow), []models.ContactID{c.ID}, options)
+			require.NoError(t, err)
+		}
 
 		results := make(map[models.ContactID]modifyResult)
 
 		// create scenes for our contacts
 		scenes := make([]*models.Scene, 0, len(tc.Modifiers))
-		for contactID, mods := range tc.Modifiers {
-
-			contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{contactID})
+		for contact, mods := range tc.Modifiers {
+			contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{contact.ID})
 			assert.NoError(t, err)
 
 			contact := contacts[0]
@@ -236,11 +242,11 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		assert.NoError(t, err)
 
 		for _, scene := range scenes {
-			err := models.HandleEvents(ctx, tx, rp, oa, scene, results[scene.ContactID()].Events)
+			err := models.HandleEvents(ctx, tx, rt.RP, oa, scene, results[scene.ContactID()].Events)
 			assert.NoError(t, err)
 		}
 
-		err = models.ApplyEventPreCommitHooks(ctx, tx, rp, oa, scenes)
+		err = models.ApplyEventPreCommitHooks(ctx, tx, rt.RP, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -249,23 +255,22 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		tx, err = db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		err = models.ApplyEventPostCommitHooks(ctx, tx, rp, oa, scenes)
+		err = models.ApplyEventPostCommitHooks(ctx, tx, rt.RP, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
 		assert.NoError(t, err)
 
+		time.Sleep(500 * time.Millisecond)
+
 		// now check our assertions
-		time.Sleep(1 * time.Second)
-		for ii, a := range tc.SQLAssertions {
-			testsuite.AssertQueryCount(t, db, a.SQL, a.Args, a.Count, "%d:%d: mismatch in expected count for query: %s", i, ii, a.SQL)
+		for j, a := range tc.SQLAssertions {
+			testsuite.AssertQuery(t, db, a.SQL, a.Args...).Returns(a.Count, "%d:%d: mismatch in expected count for query: %s", i, j, a.SQL)
 		}
 
-		rc := rp.Get()
-		for ii, a := range tc.Assertions {
-			err := a(t, db, rc)
-			assert.NoError(t, err, "%d: %d error checking assertion", i, ii)
+		for j, a := range tc.Assertions {
+			err := a(t, rt)
+			assert.NoError(t, err, "%d:%d error checking assertion", i, j)
 		}
-		rc.Close()
 	}
 }

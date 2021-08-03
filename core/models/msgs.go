@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/gsm7"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
@@ -53,10 +54,10 @@ const (
 type MsgType string
 
 const (
-	TypeInbox = MsgType("I")
-	TypeFlow  = MsgType("F")
-	TypeIVR   = MsgType("V")
-	TypeUSSD  = MsgType("U")
+	MsgTypeInbox = MsgType("I")
+	MsgTypeFlow  = MsgType("F")
+	MsgTypeIVR   = MsgType("V")
+	MsgTypeUSSD  = MsgType("U")
 )
 
 type MsgStatus string
@@ -73,6 +74,7 @@ const (
 	MsgStatusQueued       = MsgStatus("Q")
 	MsgStatusWired        = MsgStatus("W")
 	MsgStatusSent         = MsgStatus("S")
+	MsgStatusDelivered    = MsgStatus("D")
 	MsgStatusHandled      = MsgStatus("H")
 	MsgStatusErrored      = MsgStatus("E")
 	MsgStatusFailed       = MsgStatus("F")
@@ -99,7 +101,7 @@ type Msg struct {
 		HighPriority         bool               `db:"high_priority"   json:"high_priority"`
 		CreatedOn            time.Time          `db:"created_on"      json:"created_on"`
 		ModifiedOn           time.Time          `db:"modified_on"     json:"modified_on"`
-		SentOn               time.Time          `db:"sent_on"         json:"sent_on"`
+		SentOn               *time.Time         `db:"sent_on"         json:"sent_on"`
 		QueuedOn             time.Time          `db:"queued_on"       json:"queued_on"`
 		Direction            MsgDirection       `db:"direction"       json:"direction"`
 		Status               MsgStatus          `db:"status"          json:"status"`
@@ -107,7 +109,7 @@ type Msg struct {
 		MsgType              MsgType            `db:"msg_type"`
 		MsgCount             int                `db:"msg_count"       json:"tps_cost"`
 		ErrorCount           int                `db:"error_count"     json:"error_count"`
-		NextAttempt          time.Time          `db:"next_attempt"    json:"next_attempt"`
+		NextAttempt          *time.Time         `db:"next_attempt"    json:"next_attempt"`
 		ExternalID           null.String        `db:"external_id"     json:"external_id"`
 		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
@@ -118,6 +120,7 @@ type Msg struct {
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
 		ResponseToID         MsgID              `db:"response_to_id"  json:"response_to_id"`
 		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
+		IsResend             bool               `                     json:"is_resend,omitempty"`
 		URN                  urns.URN           `                     json:"urn"`
 		URNAuth              null.String        `                     json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
@@ -144,14 +147,14 @@ func (m *Msg) Text() string                     { return m.m.Text }
 func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
 func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
 func (m *Msg) ModifiedOn() time.Time            { return m.m.ModifiedOn }
-func (m *Msg) SentOn() time.Time                { return m.m.SentOn }
+func (m *Msg) SentOn() *time.Time               { return m.m.SentOn }
 func (m *Msg) QueuedOn() time.Time              { return m.m.QueuedOn }
 func (m *Msg) Direction() MsgDirection          { return m.m.Direction }
 func (m *Msg) Status() MsgStatus                { return m.m.Status }
 func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
 func (m *Msg) MsgType() MsgType                 { return m.m.MsgType }
 func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
-func (m *Msg) NextAttempt() time.Time           { return m.m.NextAttempt }
+func (m *Msg) NextAttempt() *time.Time          { return m.m.NextAttempt }
 func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
 func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
 func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
@@ -164,6 +167,7 @@ func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
 func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
+func (m *Msg) IsResend() bool                   { return m.m.IsResend }
 
 func (m *Msg) SetTopup(topupID TopupID)               { m.m.TopupID = topupID }
 func (m *Msg) SetChannelID(channelID ChannelID)       { m.m.ChannelID = channelID }
@@ -223,7 +227,7 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, creat
 	m.Direction = DirectionIn
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
-	m.MsgType = TypeIVR
+	m.MsgType = MsgTypeIVR
 	m.ContactID = conn.ContactID()
 
 	urnID := conn.ContactURNID()
@@ -240,14 +244,14 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, creat
 
 	// add any attachments
 	for _, a := range in.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 	}
 
 	return msg
 }
 
 // NewOutgoingIVR creates a new IVR message for the passed in text with the optional attachment
-func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -258,7 +262,7 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 	m.Direction = DirectionOut
 	m.Status = MsgStatusWired
 	m.Visibility = VisibilityVisible
-	m.MsgType = TypeIVR
+	m.MsgType = MsgTypeIVR
 	m.ContactID = conn.ContactID()
 
 	urnID := conn.ContactURNID()
@@ -272,14 +276,15 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
+	m.SentOn = &createdOn
 	msg.SetChannelID(conn.ChannelID())
 
 	// if we have attachments, add them
 	for _, a := range out.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 	}
 
-	return msg, nil
+	return msg
 }
 
 // NewOutgoingMsg creates an outgoing message for the passed in flow message.
@@ -299,7 +304,7 @@ func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.
 	m.Direction = DirectionOut
 	m.Status = status
 	m.Visibility = VisibilityVisible
-	m.MsgType = TypeFlow
+	m.MsgType = MsgTypeFlow
 	m.ContactID = contactID
 	m.OrgID = org.ID()
 	m.TopupID = NilTopupID
@@ -321,7 +326,7 @@ func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
 		for _, a := range out.Attachments() {
-			m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+			m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 		}
 	}
 
@@ -361,7 +366,7 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 	m.Direction = DirectionIn
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
-	m.MsgType = TypeFlow
+	m.MsgType = MsgTypeFlow
 	m.ContactID = contactID
 
 	m.OrgID = orgID
@@ -376,15 +381,69 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 
 	// add any attachments
 	for _, a := range in.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
 	}
 
 	return msg
 }
 
+var loadMessagesSQL = `
+SELECT 
+	id,
+	broadcast_id,
+	uuid,
+	text,
+	created_on,
+	direction,
+	status,
+	visibility,
+	msg_count,
+	error_count,
+	next_attempt,
+	external_id,
+	attachments,
+	metadata,
+	channel_id,
+	connection_id,
+	contact_id,
+	contact_urn_id,
+	response_to_id,
+	org_id,
+	topup_id
+FROM
+	msgs_msg
+WHERE
+	org_id = $1 AND
+	direction = $2 AND
+	id = ANY($3)
+ORDER BY
+	id ASC`
+
+// LoadMessages loads the given messages for the passed in org
+func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, direction MsgDirection, msgIDs []MsgID) ([]*Msg, error) {
+	rows, err := db.QueryxContext(ctx, loadMessagesSQL, orgID, direction, pq.Array(msgIDs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying msgs for org: %d", orgID)
+	}
+	defer rows.Close()
+
+	msgs := make([]*Msg, 0)
+	for rows.Next() {
+		msg := &Msg{}
+		err = rows.StructScan(&msg.m)
+		if err != nil {
+			return nil, errors.Wrap(err, "error scanning msg row")
+		}
+
+		msgs = append(msgs, msg)
+	}
+
+	return msgs, nil
+}
+
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
-func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
+func NormalizeAttachment(cfg *config.Config, attachment utils.Attachment) utils.Attachment {
 	// don't try to modify geo type attachments which are just coordinates
 	if attachment.ContentType() == "geo" {
 		return attachment
@@ -393,9 +452,9 @@ func NormalizeAttachment(attachment utils.Attachment) utils.Attachment {
 	url := attachment.URL()
 	if !strings.HasPrefix(url, "http") {
 		if strings.HasPrefix(url, "/") {
-			url = fmt.Sprintf("https://%s%s", config.Mailroom.AttachmentDomain, url)
+			url = fmt.Sprintf("https://%s%s", cfg.AttachmentDomain, url)
 		} else {
-			url = fmt.Sprintf("https://%s/%s", config.Mailroom.AttachmentDomain, url)
+			url = fmt.Sprintf("https://%s/%s", cfg.AttachmentDomain, url)
 		}
 	}
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
@@ -424,10 +483,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 
 const insertMsgSQL = `
 INSERT INTO
-msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, direction, status, attachments, metadata,
+msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, connection_id, response_to_id,
 		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id)
-  VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :direction, :status, :attachments, :metadata,
+  VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :connection_id, :response_to_id,
 		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id)
 RETURNING 
@@ -517,17 +576,19 @@ type Broadcast struct {
 		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
 		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
 		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
+		TicketID      TicketID                                `json:"ticket_id,omitempty"    db:"ticket_id"`
 	}
 }
 
-func (b *Broadcast) BroadcastID() BroadcastID                              { return b.b.BroadcastID }
+func (b *Broadcast) ID() BroadcastID                                       { return b.b.BroadcastID }
+func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
 func (b *Broadcast) ContactIDs() []ContactID                               { return b.b.ContactIDs }
 func (b *Broadcast) GroupIDs() []GroupID                                   { return b.b.GroupIDs }
 func (b *Broadcast) URNs() []urns.URN                                      { return b.b.URNs }
-func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
 func (b *Broadcast) BaseLanguage() envs.Language                           { return b.b.BaseLanguage }
 func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { return b.b.Translations }
 func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
+func (b *Broadcast) TicketID() TicketID                                    { return b.b.TicketID }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -535,7 +596,7 @@ func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(
 	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID) *Broadcast {
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID) *Broadcast {
 
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
@@ -546,6 +607,7 @@ func NewBroadcast(
 	bcast.b.URNs = urns
 	bcast.b.ContactIDs = contactIDs
 	bcast.b.GroupIDs = groupIDs
+	bcast.b.TicketID = ticketID
 
 	return bcast
 }
@@ -561,9 +623,10 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.b.URNs,
 		parent.b.ContactIDs,
 		parent.b.GroupIDs,
+		parent.b.TicketID,
 	)
 	// populate our parent id
-	child.b.ParentID = parent.BroadcastID()
+	child.b.ParentID = parent.ID()
 
 	// populate text from our translations
 	child.b.Text.Map = make(map[string]sql.NullString)
@@ -577,14 +640,14 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	// insert our broadcast
 	err := BulkQuery(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.BroadcastID())
+		return nil, errors.Wrapf(err, "error inserting child broadcast for broadcast: %d", parent.ID())
 	}
 
 	// build up all our contact associations
 	contacts := make([]interface{}, 0, len(child.b.ContactIDs))
 	for _, contactID := range child.b.ContactIDs {
 		contacts = append(contacts, &broadcastContact{
-			BroadcastID: child.BroadcastID(),
+			BroadcastID: child.ID(),
 			ContactID:   contactID,
 		})
 	}
@@ -599,7 +662,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	groups := make([]interface{}, 0, len(child.b.GroupIDs))
 	for _, groupID := range child.b.GroupIDs {
 		groups = append(groups, &broadcastGroup{
-			BroadcastID: child.BroadcastID(),
+			BroadcastID: child.ID(),
 			GroupID:     groupID,
 		})
 	}
@@ -618,7 +681,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 			return nil, errors.Errorf("attempt to insert new broadcast with URNs that do not have id: %s", urn)
 		}
 		urns = append(urns, &broadcastURN{
-			BroadcastID: child.BroadcastID(),
+			BroadcastID: child.ID(),
 			URNID:       urnID,
 		})
 	}
@@ -649,8 +712,8 @@ type broadcastGroup struct {
 
 const insertBroadcastSQL = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id, is_active, created_on, modified_on, status,  text,  base_language, send_all)
-			VALUES(:org_id, :parent_id, TRUE,      NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
+	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all)
+			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
 RETURNING
 	id
 `
@@ -700,7 +763,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 		}
 	}
 
-	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs), nil
+	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
@@ -710,6 +773,7 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 	batch.b.Translations = b.b.Translations
 	batch.b.TemplateState = b.b.TemplateState
 	batch.b.OrgID = b.b.OrgID
+	batch.b.TicketID = b.b.TicketID
 	batch.b.ContactIDs = contactIDs
 	return batch
 }
@@ -725,6 +789,7 @@ type BroadcastBatch struct {
 		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
 		IsLast        bool                                    `json:"is_last"`
 		OrgID         OrgID                                   `json:"org_id"`
+		TicketID      TicketID                                `json:"ticket_id"`
 	}
 }
 
@@ -733,6 +798,7 @@ func (b *BroadcastBatch) ContactIDs() []ContactID             { return b.b.Conta
 func (b *BroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.URNs }
 func (b *BroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
 func (b *BroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
+func (b *BroadcastBatch) TicketID() TicketID                  { return b.b.TicketID }
 func (b *BroadcastBatch) Translations() map[envs.Language]*BroadcastTranslation {
 	return b.b.Translations
 }
@@ -759,10 +825,8 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 				repeatedContacts[id] = true
 			}
 		}
-	}
 
-	// if we have URN we need to send to, add those contacts as well if not already repeated
-	if broadcastURNs != nil {
+		// if we have URN we need to send to, add those contacts as well if not already repeated
 		for id := range broadcastURNs {
 			if !repeatedContacts[id] {
 				contactIDs = append(contactIDs, id)
@@ -946,7 +1010,89 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 		return nil, errors.Wrapf(err, "error inserting broadcast messages")
 	}
 
+	// if the broadcast was a ticket reply, update the ticket
+	if bcast.TicketID() != NilTicketID {
+		err = updateTicketLastActivity(ctx, db, []TicketID{bcast.TicketID()}, dates.Now())
+		if err != nil {
+			return nil, errors.Wrapf(err, "error updating broadcast ticket")
+		}
+	}
+
 	return msgs, nil
+}
+
+const updateMsgForResendingSQL = `
+	UPDATE
+		msgs_msg m
+	SET
+		channel_id = r.channel_id::int,
+		topup_id = r.topup_id::int,
+		status = 'P',
+		error_count = 0,
+		queued_on = r.queued_on::timestamp with time zone,
+		sent_on = NULL,
+		modified_on = NOW()
+	FROM (
+		VALUES(:id, :channel_id, :topup_id, :queued_on)
+	) AS
+		r(id, channel_id, topup_id, queued_on)
+	WHERE
+		m.id = r.id::bigint
+`
+
+// ResendMessages prepares messages for resending by reselecting a channel and marking them as PENDING
+func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) error {
+	channels := oa.SessionAssets().Channels()
+	resends := make([]interface{}, len(msgs))
+
+	for i, msg := range msgs {
+		// reselect channel for this message's URN
+		urn, err := URNForID(ctx, db, oa, *msg.ContactURNID())
+		if err != nil {
+			return errors.Wrap(err, "error loading URN")
+		}
+		msg.m.URN = urn // needs to be set for queueing to courier
+
+		contactURN, err := flows.ParseRawURN(channels, urn, assets.IgnoreMissing)
+		if err != nil {
+			return errors.Wrap(err, "error parsing URN")
+		}
+
+		ch := channels.GetForURN(contactURN, assets.ChannelRoleSend)
+		if ch != nil {
+			channel := oa.ChannelByUUID(ch.UUID())
+			msg.m.ChannelID = channel.ID()
+			msg.m.ChannelUUID = channel.UUID()
+			msg.channel = channel
+		} else {
+			msg.m.ChannelID = NilChannelID
+			msg.m.ChannelUUID = assets.ChannelUUID("")
+			msg.channel = nil
+		}
+
+		// allocate a new topup for this message if org uses topups
+		msg.m.TopupID, err = AllocateTopups(ctx, db, rp, oa.Org(), 1)
+		if err != nil {
+			return errors.Wrapf(err, "error allocating topup for message resending")
+		}
+
+		// mark message as being a resend so it will be queued to courier as such
+		msg.m.Status = MsgStatusPending
+		msg.m.QueuedOn = dates.Now()
+		msg.m.SentOn = nil
+		msg.m.ErrorCount = 0
+		msg.m.IsResend = true
+
+		resends[i] = msg.m
+	}
+
+	// update the messages in the database
+	err := BulkQuery(ctx, "updating messages for resending", db, updateMsgForResendingSQL, resends)
+	if err != nil {
+		return errors.Wrapf(err, "error updating messages for resending")
+	}
+
+	return nil
 }
 
 // MarkBroadcastSent marks the passed in broadcast as sent

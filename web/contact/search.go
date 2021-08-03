@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/pkg/errors"
@@ -65,7 +66,7 @@ type searchResponse struct {
 }
 
 // handles a contact search request
-func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &searchRequest{
 		Offset:   0,
 		PageSize: 50,
@@ -76,13 +77,13 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, s.ElasticClient, oa,
+	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, rt.ES, oa,
 		request.GroupUUID, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
@@ -135,6 +136,7 @@ func handleSearch(ctx context.Context, s *web.Server, r *http.Request) (interfac
 type parseRequest struct {
 	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
 	Query     string           `json:"query"      validate:"required"`
+	ParseOnly bool             `json:"parse_only"`
 	GroupUUID assets.GroupUUID `json:"group_uuid"`
 }
 
@@ -154,28 +156,28 @@ type parseResponse struct {
 	Query        string                `json:"query"`
 	ElasticQuery interface{}           `json:"elastic_query"`
 	Metadata     *contactql.Inspection `json:"metadata,omitempty"`
-
-	// deprecated
-	Fields       []string `json:"fields"`
-	AllowAsGroup bool     `json:"allow_as_group"`
 }
 
 // handles a query parsing request
-func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (interface{}, int, error) {
+func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &parseRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(s.CTX, s.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	env := oa.Env()
-	parsed, err := contactql.ParseQuery(env, request.Query, oa.SessionAssets())
+	var resolver contactql.Resolver
+	if !request.ParseOnly {
+		resolver = oa.SessionAssets()
+	}
 
+	parsed, err := contactql.ParseQuery(env, request.Query, resolver)
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
 		if isQueryError {
@@ -185,34 +187,23 @@ func handleParseQuery(ctx context.Context, s *web.Server, r *http.Request) (inte
 	}
 
 	// normalize and inspect the query
-	normalized := ""
-	var metadata *contactql.Inspection
-	allowAsGroup := false
-	fields := make([]string, 0)
+	normalized := parsed.String()
+	metadata := contactql.Inspect(parsed)
 
-	if parsed != nil {
-		normalized = parsed.String()
-		metadata = contactql.Inspect(parsed)
-		fields = append(fields, metadata.Attributes...)
-		for _, f := range metadata.Fields {
-			fields = append(fields, f.Key)
+	var elasticSource interface{}
+	if !request.ParseOnly {
+		eq := models.BuildElasticQuery(oa, request.GroupUUID, models.NilContactStatus, nil, parsed)
+		elasticSource, err = eq.Source()
+		if err != nil {
+			return nil, http.StatusInternalServerError, errors.Wrap(err, "error getting elastic source")
 		}
-		allowAsGroup = metadata.AllowAsGroup
-	}
-
-	eq := models.BuildElasticQuery(oa, request.GroupUUID, models.NilContactStatus, nil, parsed)
-	eqj, err := eq.Source()
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
 	}
 
 	// build our response
 	response := &parseResponse{
 		Query:        normalized,
-		ElasticQuery: eqj,
+		ElasticQuery: elasticSource,
 		Metadata:     metadata,
-		Fields:       fields,
-		AllowAsGroup: allowAsGroup,
 	}
 
 	return response, http.StatusOK, nil

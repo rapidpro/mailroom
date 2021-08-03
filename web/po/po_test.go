@@ -7,6 +7,6 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	web.RunWebTests(t, "testdata/export.json")
-	web.RunWebTests(t, "testdata/import.json")
+	web.RunWebTests(t, "testdata/export.json", nil)
+	web.RunWebTests(t, "testdata/import.json", nil)
 }

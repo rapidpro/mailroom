@@ -3,11 +3,13 @@ package timeouts
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/utils/marker"
 
@@ -26,13 +28,13 @@ func init() {
 	mailroom.AddInitFunction(StartTimeoutCron)
 }
 
-// StartTimeoutCron starts our cron job of continuing timed out sessions every defined interval in config TimeoutTime
-func StartTimeoutCron(mr *mailroom.Mailroom) error {
-	cron.StartCron(mr.Quit, mr.RP, timeoutLock, time.Second*time.Duration(mr.Config.TimeoutTime),
+// StartTimeoutCron starts our cron job of continuing timed out sessions every minute
+func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+	cron.StartCron(quit, rt.RP, timeoutLock, time.Second*time.Duration(rt.Config.TimeoutTime),
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return timeoutSessions(ctx, mr.DB, mr.RP, lockName, lockValue)
+			return timeoutSessions(ctx, rt.DB, rt.RP, lockName, lockValue)
 		},
 	)
 	return nil
@@ -77,7 +79,7 @@ func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName 
 
 		// ok, queue this task
 		task := handler.NewTimeoutTask(timeout.OrgID, timeout.ContactID, timeout.SessionID, timeout.TimeoutOn)
-		err = handler.AddHandleTask(rc, timeout.ContactID, task)
+		err = handler.QueueHandleTask(rc, timeout.ContactID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error adding new handle task")
 		}

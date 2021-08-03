@@ -16,12 +16,16 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets/mailgun"
+	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestOpenAndForward(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
 	require.NoError(t, err)
 
@@ -51,6 +55,7 @@ func TestOpenAndForward(t *testing.T) {
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
 
 	_, err = mailgun.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -59,6 +64,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.EqualError(t, err, "missing domain or api_key or to_address or url_base in mailgun config")
 
 	svc, err := mailgun.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -81,19 +87,15 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
 	assert.NoError(t, err)
-	assert.Equal(t, &flows.Ticket{
-		UUID:       flows.TicketUUID("9688d21d-95aa-4bed-afc7-f31b35731a3d"),
-		Ticketer:   ticketer.Reference(),
-		Subject:    "Need help",
-		Body:       "Where are my cookies?",
-		ExternalID: "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
-	}, ticket)
-
+	assert.Equal(t, flows.TicketUUID("9688d21d-95aa-4bed-afc7-f31b35731a3d"), ticket.UUID())
+	assert.Equal(t, "Need help", ticket.Subject())
+	assert.Equal(t, "Where are my cookies?", ticket.Body())
+	assert.Equal(t, "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>", ticket.ExternalID())
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID, models.Org1, models.CathyID, models.MailgunID, "", "Need help", "Where are my cookies?", map[string]interface{}{
-		"contact-uuid":    string(models.CathyUUID),
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, "", "Need help", "Where are my cookies?", models.NilUserID, map[string]interface{}{
+		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})
 
@@ -112,6 +114,8 @@ func TestOpenAndForward(t *testing.T) {
 }
 
 func TestCloseAndReopen(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
@@ -135,6 +139,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
 	svc, err := mailgun.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -149,8 +154,8 @@ func TestCloseAndReopen(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", models.Org1, models.CathyID, models.ZendeskID, "12", "New ticket", "Where my cookies?", nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", models.Org1, models.BobID, models.ZendeskID, "14", "Second ticket", "Where my shoes?", nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "12", "New ticket", "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Zendesk.ID, "14", "Second ticket", "Where my shoes?", models.NilUserID, nil)
 
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 

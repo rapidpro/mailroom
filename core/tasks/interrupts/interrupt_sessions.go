@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
@@ -63,8 +63,8 @@ func (t *InterruptSessionsTask) Timeout() time.Duration {
 	return time.Hour
 }
 
-func (t *InterruptSessionsTask) Perform(ctx context.Context, mr *mailroom.Mailroom, orgID models.OrgID) error {
-	db := mr.DB
+func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	db := rt.DB
 
 	sessionIDs := make(map[models.SessionID]bool)
 	for _, sid := range t.SessionIDs {

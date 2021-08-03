@@ -10,34 +10,37 @@ import (
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBroadcastCreated(t *testing.T) {
-	testsuite.Reset()
+	defer testsuite.Reset()
 
 	// TODO: test contacts, groups
 
 	tcs := []handlers.TestCase{
 		{
 			Actions: handlers.ContactActionMap{
-				models.CathyID: []flows.Action{
+				testdata.Cathy: []flows.Action{
 					actions.NewSendBroadcast(handlers.NewActionUUID(), "hello world", nil, nil, []urns.URN{urns.URN("tel:+12065551212")}, nil, nil, nil),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
-					Args:  []interface{}{models.CathyID},
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
 				},
 			},
 			Assertions: []handlers.Assertion{
-				func(t *testing.T, db *sqlx.DB, rc redis.Conn) error {
+				func(t *testing.T, rt *runtime.Runtime) error {
+					rc := rt.RP.Get()
+					defer rc.Close()
+
 					task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)

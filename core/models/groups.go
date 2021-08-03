@@ -376,7 +376,7 @@ func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, 
 		return 0, errors.Wrapf(err, "error performing query: %s for group: %d", query, groupID)
 	}
 
-	// find which need to be added or removed
+	// find which contacts need to be added or removed
 	adds := make([]ContactID, 0, 100)
 	for _, id := range new {
 		if !present[id] {
@@ -407,6 +407,16 @@ func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, 
 	err = UpdateGroupStatus(ctx, db, groupID, GroupStatusReady)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error marking dynamic group as ready")
+	}
+
+	// finally update modified_on for all affected contacts to ensure these changes are seen by rp-indexer
+	changed := make([]ContactID, 0, len(adds))
+	changed = append(changed, adds...)
+	changed = append(changed, removals...)
+
+	err = UpdateContactModifiedOn(ctx, db, changed)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error updating contact modified_on after group population")
 	}
 
 	return len(new), nil

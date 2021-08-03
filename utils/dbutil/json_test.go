@@ -3,18 +3,17 @@ package dbutil_test
 import (
 	"testing"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReadJSONRow(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
 	type group struct {
 		UUID string `json:"uuid"`
@@ -29,7 +28,7 @@ func TestReadJSONRow(t *testing.T) {
 	}
 
 	// if query returns valid JSON which can be unmarshaled into our struct, all good
-	rows := queryRows(`SELECT ROW_TO_JSON(r) FROM (SELECT g.uuid as uuid, g.name AS name FROM contacts_contactgroup g WHERE id = $1) r`, models.TestersGroupID)
+	rows := queryRows(`SELECT ROW_TO_JSON(r) FROM (SELECT g.uuid as uuid, g.name AS name FROM contacts_contactgroup g WHERE id = $1) r`, testdata.TestersGroup.ID)
 
 	g := &group{}
 	err := dbutil.ReadJSONRow(rows, g)
@@ -38,12 +37,12 @@ func TestReadJSONRow(t *testing.T) {
 	assert.Equal(t, "Testers", g.Name)
 
 	// error if row value is not JSON
-	rows = queryRows(`SELECT id FROM contacts_contactgroup g WHERE id = $1`, models.TestersGroupID)
+	rows = queryRows(`SELECT id FROM contacts_contactgroup g WHERE id = $1`, testdata.TestersGroup.ID)
 	err = dbutil.ReadJSONRow(rows, g)
 	assert.EqualError(t, err, "error unmarshalling row JSON: json: cannot unmarshal number into Go value of type dbutil_test.group")
 
 	// error if rows aren't ready to be scanned - e.g. next hasn't been called
-	rows, err = db.QueryxContext(ctx, `SELECT ROW_TO_JSON(r) FROM (SELECT g.uuid as uuid, g.name AS name FROM contacts_contactgroup g WHERE id = $1) r`, models.TestersGroupID)
+	rows, err = db.QueryxContext(ctx, `SELECT ROW_TO_JSON(r) FROM (SELECT g.uuid as uuid, g.name AS name FROM contacts_contactgroup g WHERE id = $1) r`, testdata.TestersGroup.ID)
 	require.NoError(t, err)
 	err = dbutil.ReadJSONRow(rows, g)
 	assert.EqualError(t, err, "error scanning row JSON: sql: Scan called without calling Next")

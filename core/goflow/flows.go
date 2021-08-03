@@ -22,8 +22,8 @@ func SpecVersion() *semver.Version {
 }
 
 // ReadFlow reads a flow from the given JSON definition, migrating it if necessary
-func ReadFlow(data json.RawMessage) (flows.Flow, error) {
-	return definition.ReadFlow(data, MigrationConfig())
+func ReadFlow(cfg *config.Config, data json.RawMessage) (flows.Flow, error) {
+	return definition.ReadFlow(data, MigrationConfig(cfg))
 }
 
 // CloneDefinition clones the given flow definition
@@ -32,14 +32,14 @@ func CloneDefinition(data json.RawMessage, depMapping map[uuids.UUID]uuids.UUID)
 }
 
 // MigrateDefinition migrates the given flow definition to the specified version
-func MigrateDefinition(data json.RawMessage, toVersion *semver.Version) (json.RawMessage, error) {
-	return migrations.MigrateToVersion(data, toVersion, MigrationConfig())
+func MigrateDefinition(cfg *config.Config, data json.RawMessage, toVersion *semver.Version) (json.RawMessage, error) {
+	return migrations.MigrateToVersion(data, toVersion, MigrationConfig(cfg))
 }
 
 // MigrationConfig returns the migration configuration for flows
-func MigrationConfig() *migrations.Config {
+func MigrationConfig(cfg *config.Config) *migrations.Config {
 	migConfInit.Do(func() {
-		migConf = &migrations.Config{BaseMediaURL: "https://" + config.Mailroom.AttachmentDomain}
+		migConf = &migrations.Config{BaseMediaURL: "https://" + cfg.AttachmentDomain}
 	})
 
 	return migConf

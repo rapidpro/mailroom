@@ -11,10 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -85,60 +88,7 @@ const (
                     "name": "Twitter",
                     "uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91"
                 },
-                "text": "I like blue!",
-                "urn": "tel:+12065551212",
-                "uuid": "9bf91c2b-ce58-4cef-aacc-281e03f69ab5"
-            },
-            "resumed_on": "2000-01-01T00:00:00.000000000-00:00",
-            "type": "msg"
-		},
-		"assets": {
-			"channels": [
-				{
-					"uuid": "440099cf-200c-4d45-a8e7-4a564f4a0e8b",
-					"name": "Test Channel",
-					"address": "+18005551212",
-					"schemes": ["tel"],
-					"roles": ["send", "receive", "call"],
-					"country": "US"
-				}
-			]
-		},
-		"session": $$SESSION$$
-	}`
-
-	triggerResumeBody = `
-	{
-		"org_id": 1,
-		"resume": {
-			"contact": {
-                "created_on": "2000-01-01T00:00:00.000000000-00:00",
-                "fields": {},
-                "id": 1234567,
-                "language": "eng",
-                "name": "Ben Haggerty",
-                "timezone": "America/Guayaquil",
-                "urns": [
-                    "tel:+12065551212"
-                ],
-                "uuid": "ba96bf7f-bc2a-4873-a7c7-254d1927c4e3"
-            },
-            "environment": {
-                "allowed_languages": [
-                    "eng",
-                    "fra"
-                ],
-                "date_format": "YYYY-MM-DD",
-                "default_language": "eng",
-                "time_format": "hh:mm",
-                "timezone": "America/New_York"
-            },
-            "msg": {
-                "channel": {
-                    "name": "Twitter",
-                    "uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91"
-                },
-                "text": "trigger",
+                "text": "$$MESSAGE$$",
                 "urn": "tel:+12065551212",
                 "uuid": "9bf91c2b-ce58-4cef-aacc-281e03f69ab5"
             },
@@ -249,10 +199,8 @@ const (
 )
 
 func TestServer(t *testing.T) {
-	testsuite.Reset()
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-	rp := testsuite.RP()
+	ctx, _, db, rp := testsuite.Reset()
+
 	wg := &sync.WaitGroup{}
 
 	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
@@ -262,51 +210,52 @@ func TestServer(t *testing.T) {
 	time.Sleep(time.Second)
 
 	defer server.Stop()
-	session := ""
+
+	var session json.RawMessage
 
 	// add a trigger for our campaign flow with 'trigger'
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), 'trigger', false, $1, 'K', 'O', 1, 1, 1) RETURNING id`,
-		models.CampaignFlowID,
-	)
+	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.CampaignFlow, "trigger", models.MatchOnly, nil, nil)
+
+	// and a trigger which will trigger an IVR flow
+	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
 
 	// also add a catch all
-	db.MustExec(
-		`INSERT INTO triggers_trigger(is_active, created_on, modified_on, keyword, is_archived, 
-									  flow_id, trigger_type, match_type, created_by_id, modified_by_id, org_id)
-		VALUES(TRUE, now(), now(), NULL, false, $1, 'C', NULL, 1, 1, 1) RETURNING id`,
-		models.CampaignFlowID,
-	)
+	testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.CampaignFlow, nil, nil)
 
 	tcs := []struct {
-		URL      string
-		Method   string
-		Body     string
-		Status   int
-		Response string
+		URL              string
+		Method           string
+		Body             string
+		Message          string
+		ExpectedStatus   int
+		ExpectedResponse string
 	}{
-		{"/mr/sim/start", "GET", "", 405, "illegal"},
-		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
-		{"/mr/sim/resume", "GET", "", 405, "illegal"},
-		{"/mr/sim/resume", "POST", resumeBody, 200, "Good choice, I like Blue too! What is your favorite beer?"},
-		{"/mr/sim/start", "POST", customStartBody, 200, "Your channel is Test Channel"},
-		{"/mr/sim/start", "POST", startBody, 200, "What is your favorite color?"},
-		{"/mr/sim/resume", "POST", triggerResumeBody, 200, "it is time to consult with your patients"},
-		{"/mr/sim/resume", "POST", resumeBody, 200, "it is time to consult with your patients"},
+		{"/mr/sim/start", "GET", "", "", 405, "illegal"},
+		{"/mr/sim/start", "POST", startBody, "", 200, "What is your favorite color?"},
+		{"/mr/sim/resume", "POST", resumeBody, "I like blue!", 200, "Good choice, I like Blue too! What is your favorite beer?"},
+
+		// start with a definition of the flow to override what we have in assets
+		{"/mr/sim/start", "POST", customStartBody, "", 200, "Your channel is Test Channel"},
+
+		// start regular flow again but resume with a message that matches the campaign flow trigger
+		{"/mr/sim/start", "POST", startBody, "", 200, "What is your favorite color?"},
+		{"/mr/sim/resume", "POST", resumeBody, "trigger", 200, "it is time to consult with your patients"},
+		{"/mr/sim/resume", "POST", resumeBody, "I like blue!", 200, "it is time to consult with your patients"},
+
+		// start favorties again but this time resume with a message that matches the IVR flow trigger
+		{"/mr/sim/start", "POST", startBody, "", 200, "What is your favorite color?"},
+		{"/mr/sim/resume", "POST", resumeBody, "ivr", 200, "Hello there. Please enter one or two."},
 	}
 
 	for i, tc := range tcs {
-		var body io.Reader
+		bodyStr := strings.Replace(tc.Body, "$$MESSAGE$$", tc.Message, -1)
 
 		// in the case of a resume, we have to sub in our session body from our start
-		if strings.Contains(tc.Body, "$$SESSION$$") {
-			tc.Body = strings.Replace(tc.Body, "$$SESSION$$", session, -1)
-		}
+		bodyStr = strings.Replace(bodyStr, "$$SESSION$$", string(session), -1)
 
+		var body io.Reader
 		if tc.Body != "" {
-			body = bytes.NewReader([]byte(tc.Body))
+			body = bytes.NewReader([]byte(bodyStr))
 		}
 
 		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.URL, body)
@@ -315,7 +264,7 @@ func TestServer(t *testing.T) {
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err, "%d: error making request", i)
 
-		assert.Equal(t, tc.Status, resp.StatusCode, "%d: unexpected status", i)
+		assert.Equal(t, tc.ExpectedStatus, resp.StatusCode, "%d: unexpected status", i)
 
 		content, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
@@ -324,9 +273,8 @@ func TestServer(t *testing.T) {
 		if resp.StatusCode == 200 {
 			// save the session for use in a resume
 			parsed := make(map[string]interface{})
-			json.Unmarshal(content, &parsed)
-			sessionJSON, _ := json.Marshal(parsed["session"])
-			session = string(sessionJSON)
+			jsonx.MustUnmarshal(content, &parsed)
+			session = jsonx.MustMarshal(parsed["session"])
 
 			context, hasContext := parsed["context"]
 			if hasContext {
@@ -335,6 +283,6 @@ func TestServer(t *testing.T) {
 			}
 		}
 
-		assert.True(t, strings.Contains(string(content), tc.Response), "%d: did not find string: %s in body: %s", i, tc.Response, string(content))
+		assert.Contains(t, string(content), tc.ExpectedResponse, "%d: did not find expected response content")
 	}
 }

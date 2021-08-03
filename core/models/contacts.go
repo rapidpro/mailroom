@@ -80,6 +80,7 @@ type Contact struct {
 	fields     map[string]*flows.Value
 	groups     []*Group
 	urns       []urns.URN
+	tickets    []*Ticket
 	createdOn  time.Time
 	modifiedOn time.Time
 	lastSeenOn *time.Time
@@ -191,27 +192,38 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, db Queryer, org *OrgAs
 }
 
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
-func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
+func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 	// convert our groups to a list of references
 	groups := make([]*assets.GroupReference, len(c.groups))
 	for i, g := range c.groups {
 		groups[i] = assets.NewGroupReference(g.UUID(), g.Name())
 	}
 
+	// convert our tickets to flow tickets
+	tickets := make([]*flows.Ticket, len(c.tickets))
+	var err error
+	for i, t := range c.tickets {
+		tickets[i], err = t.FlowTicket(oa)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating flow ticket")
+		}
+	}
+
 	// create our flow contact
 	contact, err := flows.NewContact(
-		org.SessionAssets(),
+		oa.SessionAssets(),
 		c.uuid,
 		flows.ContactID(c.id),
 		c.name,
 		c.language,
 		contactToFlowStatus[c.Status()],
-		org.Env().Timezone(),
+		oa.Env().Timezone(),
 		c.createdOn,
 		c.lastSeenOn,
 		c.urns,
 		groups,
 		c.fields,
+		tickets,
 		assets.IgnoreMissing,
 	)
 	if err != nil {
@@ -305,6 +317,16 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 		}
 		contact.urns = contactURNs
 
+		// initialize our tickets
+		tickets := make([]*Ticket, 0, len(e.Tickets))
+		for _, t := range e.Tickets {
+			ticketer := org.TicketerByID(t.TicketerID)
+			if ticketer != nil {
+				tickets = append(tickets, NewTicket(t.UUID, org.OrgID(), contact.ID(), ticketer.ID(), t.ExternalID, t.Subject, t.Body, t.AssigneeID, nil))
+			}
+		}
+		contact.tickets = tickets
+
 		contacts = append(contacts, contact)
 	}
 
@@ -384,16 +406,6 @@ func queryContactIDs(ctx context.Context, db Queryer, query string, args ...inte
 	return ids, nil
 }
 
-// fieldValueEnvelope is our utility struct for the value of a field
-type fieldValueEnvelope struct {
-	Text     types.XText       `json:"text"`
-	Datetime *types.XDateTime  `json:"datetime,omitempty"`
-	Number   *types.XNumber    `json:"number,omitempty"`
-	State    envs.LocationPath `json:"state,omitempty"`
-	District envs.LocationPath `json:"district,omitempty"`
-	Ward     envs.LocationPath `json:"ward,omitempty"`
-}
-
 type ContactURN struct {
 	ID        URNID     `json:"id"          db:"id"`
 	Priority  int       `json:"priority"    db:"priority"`
@@ -435,17 +447,32 @@ func (u *ContactURN) AsURN(org *OrgAssets) (urns.URN, error) {
 
 // contactEnvelope is our JSON structure for a contact as read from the database
 type contactEnvelope struct {
-	ID         ContactID                                `json:"id"`
-	UUID       flows.ContactUUID                        `json:"uuid"`
-	Name       string                                   `json:"name"`
-	Language   envs.Language                            `json:"language"`
-	Status     ContactStatus                            `json:"status"`
-	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
-	GroupIDs   []GroupID                                `json:"group_ids"`
-	URNs       []ContactURN                             `json:"urns"`
-	CreatedOn  time.Time                                `json:"created_on"`
-	ModifiedOn time.Time                                `json:"modified_on"`
-	LastSeenOn *time.Time                               `json:"last_seen_on"`
+	ID       ContactID         `json:"id"`
+	UUID     flows.ContactUUID `json:"uuid"`
+	Name     string            `json:"name"`
+	Language envs.Language     `json:"language"`
+	Status   ContactStatus     `json:"status"`
+	Fields   map[assets.FieldUUID]struct {
+		Text     types.XText       `json:"text"`
+		Datetime *types.XDateTime  `json:"datetime,omitempty"`
+		Number   *types.XNumber    `json:"number,omitempty"`
+		State    envs.LocationPath `json:"state,omitempty"`
+		District envs.LocationPath `json:"district,omitempty"`
+		Ward     envs.LocationPath `json:"ward,omitempty"`
+	} `json:"fields"`
+	GroupIDs []GroupID    `json:"group_ids"`
+	URNs     []ContactURN `json:"urns"`
+	Tickets  []struct {
+		UUID       flows.TicketUUID `json:"uuid"`
+		TicketerID TicketerID       `json:"ticketer_id"`
+		ExternalID string           `json:"external_id"`
+		Subject    string           `json:"subject"`
+		Body       string           `json:"body"`
+		AssigneeID UserID           `json:"assignee_id"`
+	} `json:"tickets"`
+	CreatedOn  time.Time  `json:"created_on"`
+	ModifiedOn time.Time  `json:"modified_on"`
+	LastSeenOn *time.Time `json:"last_seen_on"`
 }
 
 const selectContactSQL = `
@@ -462,7 +489,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	last_seen_on,
 	fields,
 	g.groups AS group_ids,
-	u.urns AS urns
+	u.urns AS urns,
+	t.tickets AS tickets
 FROM
 	contacts_contact c
 LEFT JOIN (
@@ -497,6 +525,26 @@ LEFT JOIN (
 	GROUP BY 
 		contact_id
 ) u ON c.id = u.contact_id
+LEFT JOIN (
+	SELECT
+		contact_id,
+		array_agg(
+			json_build_object(
+				'uuid', t.uuid,
+				'subject', t.subject,
+				'body', t.body,
+				'external_id', t.external_id,
+				'ticketer_id', t.ticketer_id,
+				'assignee_id', t.assignee_id
+			) ORDER BY t.opened_on ASC, t.id ASC
+		) as tickets
+	FROM
+		tickets_ticket t
+	WHERE
+		t.status = 'O' AND t.contact_id = ANY($1)
+	GROUP BY
+		contact_id
+) t ON c.id = t.contact_id
 WHERE 
 	c.id = ANY($1) AND
 	is_active = TRUE AND
@@ -740,8 +788,8 @@ func insertContactAndURNs(ctx context.Context, db Queryer, orgID OrgID, userID U
 	// first insert our contact
 	var contactID ContactID
 	err := db.GetContext(ctx, &contactID,
-		`INSERT INTO contacts_contact (org_id, is_active, status, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
-		VALUES($1, TRUE, 'A', $2, $3, $4, $5, $5, $6, $6)
+		`INSERT INTO contacts_contact (org_id, is_active, status, uuid, name, language, ticket_count, created_on, modified_on, created_by_id, modified_by_id) 
+		VALUES($1, TRUE, 'A', $2, $3, $4, 0, $5, $5, $6, $6)
 		RETURNING id`,
 		orgID, uuids.New(), null.String(name), null.String(string(language)), dates.Now(), userID,
 	)
@@ -869,10 +917,7 @@ func URNForID(ctx context.Context, db Queryer, org *OrgAssets, urnID URNID) (urn
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
 // campaigns as necessary based on those group changes.
 func CalculateDynamicGroups(ctx context.Context, db Queryer, org *OrgAssets, contact *flows.Contact) error {
-	added, removed, errs := contact.ReevaluateQueryBasedGroups(org.Env())
-	if len(errs) > 0 {
-		return errors.Wrapf(errs[0], "error calculating dynamic groups")
-	}
+	added, removed := contact.ReevaluateQueryBasedGroups(org.Env())
 
 	campaigns := make(map[CampaignID]*Campaign)
 

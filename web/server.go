@@ -3,7 +3,6 @@ package web
 import (
 	"compress/flate"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -33,8 +33,8 @@ const (
 	MaxRequestBytes int64 = 1048576 * 32 // 32MB
 )
 
-type JSONHandler func(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error)
-type Handler func(ctx context.Context, s *Server, r *http.Request, w http.ResponseWriter) error
+type JSONHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error)
+type Handler func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error
 
 type jsonRoute struct {
 	method  string
@@ -61,14 +61,16 @@ func RegisterRoute(method string, pattern string, handler Handler) {
 }
 
 // NewServer creates a new web server, it will need to be started after being created
-func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage, elasticClient *elastic.Client, wg *sync.WaitGroup) *Server {
+func NewServer(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage, es *elastic.Client, wg *sync.WaitGroup) *Server {
 	s := &Server{
-		CTX:           ctx,
-		RP:            rp,
-		DB:            db,
-		Storage:       store,
-		ElasticClient: elasticClient,
-		Config:        config,
+		ctx: ctx,
+		rt: &runtime.Runtime{
+			RP:           rp,
+			DB:           db,
+			ES:           es,
+			MediaStorage: store,
+			Config:       config,
+		},
 
 		wg: wg,
 	}
@@ -115,7 +117,7 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-type", "application/json")
 
-		value, status, err := handler(r.Context(), s, r)
+		value, status, err := handler(r.Context(), s.rt, r)
 
 		// handler errored (a hard error)
 		if err != nil {
@@ -151,16 +153,15 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 // WrapHandler wraps a simple Handler, taking care of passing down server and handling errors
 func (s *Server) WrapHandler(handler Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := handler(r.Context(), s, r, w)
+		err := handler(r.Context(), s.rt, r, w)
 		if err == nil {
 			return
 		}
 
 		logrus.WithError(err).WithField("http_request", r).Error("error handling request")
 		w.WriteHeader(http.StatusInternalServerError)
-		serialized, _ := json.Marshal(NewErrorResponse(err))
+		serialized := jsonx.MustMarshal(NewErrorResponse(err))
 		w.Write(serialized)
-		return
 	}
 }
 
@@ -181,7 +182,7 @@ func (s *Server) Start() {
 		}
 	}()
 
-	logrus.WithField("address", s.Config.Address).WithField("port", s.Config.Port).Info("server started")
+	logrus.WithField("address", s.rt.Config.Address).WithField("port", s.rt.Config.Port).Info("server started")
 }
 
 // Stop stops our web server
@@ -192,30 +193,26 @@ func (s *Server) Stop() {
 	}
 }
 
-func handleIndex(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
+func handleIndex(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	response := map[string]string{
 		"url":       fmt.Sprintf("%s", r.URL),
 		"component": "mailroom",
-		"version":   s.Config.Version,
+		"version":   rt.Config.Version,
 	}
 	return response, http.StatusOK, nil
 }
 
-func handle404(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
+func handle404(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	return errors.Errorf("not found: %s", r.URL.String()), http.StatusNotFound, nil
 }
 
-func handle405(ctx context.Context, s *Server, r *http.Request) (interface{}, int, error) {
+func handle405(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	return errors.Errorf("illegal method: %s", r.Method), http.StatusMethodNotAllowed, nil
 }
 
 type Server struct {
-	CTX           context.Context
-	RP            *redis.Pool
-	DB            *sqlx.DB
-	Storage       storage.Storage
-	Config        *config.Config
-	ElasticClient *elastic.Client
+	ctx context.Context
+	rt  *runtime.Runtime
 
 	wg *sync.WaitGroup
 

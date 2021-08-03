@@ -1,56 +1,43 @@
-package models
+package models_test
 
 import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFields(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+	ctx, _, db, _ := testsuite.Get()
 
-	userFields, systemFields, err := loadFields(ctx, db, 1)
-	assert.NoError(t, err)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshFields)
+	require.NoError(t, err)
 
-	expectedUserFields := []struct {
-		Key       string
-		Name      string
-		ValueType assets.FieldType
+	expectedFields := []struct {
+		field     testdata.Field
+		key       string
+		name      string
+		valueType assets.FieldType
 	}{
-		{"age", "Age", assets.FieldTypeNumber},
-		{"district", "District", assets.FieldTypeDistrict},
-		{"gender", "Gender", assets.FieldTypeText},
-		{"joined", "Joined", assets.FieldTypeDatetime},
-		{"state", "State", assets.FieldTypeState},
-		{"ward", "Ward", assets.FieldTypeWard},
+		{*testdata.GenderField, "gender", "Gender", assets.FieldTypeText},
+		{*testdata.AgeField, "age", "Age", assets.FieldTypeNumber},
+		{*testdata.CreatedOnField, "created_on", "Created On", assets.FieldTypeDatetime},
+		{*testdata.LastSeenOnField, "last_seen_on", "Last Seen On", assets.FieldTypeDatetime},
 	}
+	for _, tc := range expectedFields {
+		field := oa.FieldByUUID(tc.field.UUID)
+		require.NotNil(t, field, "no such field: %s", tc.field.UUID)
 
-	assert.Equal(t, len(expectedUserFields), len(userFields))
-	for i, tc := range expectedUserFields {
-		assert.Equal(t, tc.Key, userFields[i].Key())
-		assert.Equal(t, tc.Name, userFields[i].Name())
-		assert.Equal(t, tc.ValueType, userFields[i].Type())
-	}
+		fieldByKey := oa.FieldByKey(tc.key)
+		assert.Equal(t, field, fieldByKey)
 
-	expectedSystemFields := []struct {
-		Key       string
-		Name      string
-		ValueType assets.FieldType
-	}{
-		{"created_on", "Created On", assets.FieldTypeDatetime},
-		{"id", "ID", assets.FieldTypeNumber},
-		{"language", "Language", assets.FieldTypeText},
-		{"last_seen_on", "Last Seen On", assets.FieldTypeDatetime},
-		{"name", "Name", assets.FieldTypeText},
-	}
-
-	assert.Equal(t, len(expectedSystemFields), len(systemFields))
-	for i, tc := range expectedSystemFields {
-		assert.Equal(t, tc.Key, systemFields[i].Key())
-		assert.Equal(t, tc.Name, systemFields[i].Name())
-		assert.Equal(t, tc.ValueType, systemFields[i].Type())
+		assert.Equal(t, tc.field.UUID, field.UUID(), "uuid mismatch for field %s", tc.field.ID)
+		assert.Equal(t, tc.key, field.Key())
+		assert.Equal(t, tc.name, field.Name())
+		assert.Equal(t, tc.valueType, field.Type())
 	}
 }

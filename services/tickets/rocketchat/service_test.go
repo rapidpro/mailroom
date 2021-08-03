@@ -1,6 +1,10 @@
 package rocketchat_test
 
 import (
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -12,14 +16,16 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
+	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net/http"
-	"testing"
-	"time"
 )
 
 func TestOpenAndForward(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
 
@@ -44,6 +50,7 @@ func TestOpenAndForward(t *testing.T) {
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
 
 	_, err = rocketchat.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -52,6 +59,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.EqualError(t, err, "missing base_url or secret config")
 
 	svc, err := rocketchat.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -69,20 +77,15 @@ func TestOpenAndForward(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
 	assert.NoError(t, err)
-
-	assert.Equal(t, &flows.Ticket{
-		UUID:       flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"),
-		Ticketer:   ticketer.Reference(),
-		Subject:    "Need help",
-		Body:       "Where are my cookies?",
-		ExternalID: "uiF7ybjsv7PSJGSw6",
-	}, ticket)
-
+	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
+	assert.Equal(t, "Need help", ticket.Subject())
+	assert.Equal(t, "Where are my cookies?", ticket.Body())
+	assert.Equal(t, "uiF7ybjsv7PSJGSw6", ticket.ExternalID())
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID, models.Org1, models.CathyID, models.RocketChatID, "", "Need help", "Where are my cookies?", map[string]interface{}{
-		"contact-uuid":    string(models.CathyUUID),
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "", "Need help", "Where are my cookies?", models.NilUserID, map[string]interface{}{
+		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})
 	logger = &flows.HTTPLogger{}
@@ -96,11 +99,14 @@ func TestOpenAndForward(t *testing.T) {
 		"audio/ogg:https://link.to/audio.ogg",
 	}
 	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, logger.Log)
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
 }
 
 func TestCloseAndReopen(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
@@ -115,6 +121,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
 	svc, err := rocketchat.NewService(
+		rt.Config,
 		http.DefaultClient,
 		nil,
 		ticketer,
@@ -125,8 +132,8 @@ func TestCloseAndReopen(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", models.Org1, models.CathyID, models.RocketChatID, "X5gwXeaxbnGDaq8Q3", "New ticket", "Where my cookies?", nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", models.Org1, models.BobID, models.RocketChatID, "cq7AokJHKkGhAMoBK", "Second ticket", "Where my shoes?", nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "X5gwXeaxbnGDaq8Q3", "New ticket", "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.RocketChat.ID, "cq7AokJHKkGhAMoBK", "Second ticket", "Where my shoes?", models.NilUserID, nil)
 
 	logger := &flows.HTTPLogger{}
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)

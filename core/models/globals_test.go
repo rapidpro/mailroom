@@ -1,25 +1,26 @@
-package models
+package models_test
 
 import (
 	"testing"
 
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestGlobals(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
+func TestLoadGlobals(t *testing.T) {
+	ctx, _, db, _ := testsuite.Get()
 
 	// set one of our global values to empty
-	db.MustExec(`UPDATE globals_global SET value = '' WHERE org_id = $1 AND key = $2`, Org1, "org_name")
+	db.MustExec(`UPDATE globals_global SET value = '' WHERE org_id = $1 AND key = $2`, testdata.Org1.ID, "org_name")
 
-	tx, err := db.BeginTxx(ctx, nil)
-	assert.NoError(t, err)
-	defer tx.Rollback()
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshGlobals)
+	require.NoError(t, err)
 
-	globals, err := loadGlobals(ctx, tx, 1)
-	assert.NoError(t, err)
+	globals, err := oa.Globals()
+	require.NoError(t, err)
 
 	assert.Equal(t, 2, len(globals))
 	assert.Equal(t, "access_token", globals[0].Key())

@@ -5,11 +5,15 @@ import (
 	"testing"
 
 	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParseDisallowedNetworks(t *testing.T) {
+	// this is only here because this is the first test run.. should find a better way to ensure DB is in correct state for first test that needs it
+	testsuite.Reset()
+
 	cfg := config.NewMailroomConfig()
 
 	privateNetwork1 := &net.IPNet{IP: net.IPv4(10, 0, 0, 0).To4(), Mask: net.CIDRMask(8, 32)}
