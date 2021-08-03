@@ -30,7 +30,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/buger/jsonparser"
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
