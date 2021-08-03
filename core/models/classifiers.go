@@ -109,7 +109,7 @@ func (c *Classifier) AsService(classifier *flows.Classifier) (flows.Classificati
 			return nil, errors.Errorf("missing %s, %s or %s on LUIS classifier: %s",
 				LuisConfigEndpointURL, LuisConfigAppID, LuisConfigPrimaryKey, c.UUID())
 		}
-		return luis.NewService(httpClient, httpRetries, httpAccess, classifier, endpoint, appID, key), nil
+		return luis.NewService(httpClient, httpRetries, httpAccess, classifier, endpoint, "production", appID, key), nil
 
 	case ClassifierTypeBothub:
 		accessToken := c.c.Config[BothubConfigAccessToken]
