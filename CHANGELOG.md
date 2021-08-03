@@ -1,3 +1,8 @@
+v6.5.7
+----------
+ * Switch from abandoned dgrijalva/jwt-go to golang-jwt/jwt
+ * Update to latest goflow (adds support for queries on tickets, fixes LUIS classifiers)
+
 v6.5.6
 ----------
  * Update to latest goflow and add parse_only as param to parse_query to allow us to extract field dependencies even when they don't yet exist in the database
