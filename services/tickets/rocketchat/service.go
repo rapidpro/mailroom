@@ -51,8 +51,8 @@ func NewService(rtCfg *config.Config, httpClient *http.Client, httpRetries *http
 type VisitorToken models.ContactID
 
 // Open opens a ticket which for RocketChat means open a room associated to a visitor user
-func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	ticket := flows.OpenTicket(s.ticketer, subject, body)
+func (s *service) Open(session flows.Session, topic *flows.Topic, subject, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+	ticket := flows.OpenTicket(s.ticketer, topic, subject, body, assignee)
 	contact := session.Contact()
 	email := ""
 	phone := ""

@@ -71,11 +71,11 @@ func TestOpenAndForward(t *testing.T) {
 	assert.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	_, err = svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
+	_, err = svc.Open(session, nil, "Need help", "Where are my cookies?", nil, logger.Log)
 	assert.EqualError(t, err, "error calling RocketChat: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
-	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
+	ticket, err := svc.Open(session, nil, "Need help", "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
 	assert.Equal(t, "Need help", ticket.Subject())

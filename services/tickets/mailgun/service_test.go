@@ -80,12 +80,12 @@ func TestOpenAndForward(t *testing.T) {
 
 	logger := &flows.HTTPLogger{}
 
-	_, err = svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
+	_, err = svc.Open(session, nil, "Need help", "Where are my cookies?", nil, logger.Log)
 	assert.EqualError(t, err, "error calling mailgun API: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
 
-	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
+	ticket, err := svc.Open(session, nil, "Need help", "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("9688d21d-95aa-4bed-afc7-f31b35731a3d"), ticket.UUID())
 	assert.Equal(t, "Need help", ticket.Subject())

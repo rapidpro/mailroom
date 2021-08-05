@@ -107,9 +107,13 @@ func NewService(rtCfg *config.Config, httpClient *http.Client, httpRetries *http
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
-func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	ticket := flows.OpenTicket(s.ticketer, subject, body)
+func (s *service) Open(session flows.Session, topic *flows.Topic, subject, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+	ticket := flows.OpenTicket(s.ticketer, topic, subject, body, assignee)
 	contactDisplay := tickets.GetContactDisplay(session.Environment(), session.Contact())
+
+	if topic != nil {
+		subject = topic.Name()
+	}
 
 	from := s.ticketAddress(contactDisplay, ticket.UUID())
 	context := s.templateContext(subject, body, "", string(session.Contact().UUID()), contactDisplay)

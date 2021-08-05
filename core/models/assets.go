@@ -367,7 +367,8 @@ const (
 	RefreshLabels      = Refresh(1 << 12)
 	RefreshFlows       = Refresh(1 << 13)
 	RefreshTicketers   = Refresh(1 << 14)
-	RefreshUsers       = Refresh(1 << 15)
+	RefreshTopics      = Refresh(1 << 15)
+	RefreshUsers       = Refresh(1 << 16)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -627,6 +628,10 @@ func (a *OrgAssets) TicketerByID(id TicketerID) *Ticketer {
 
 func (a *OrgAssets) TicketerByUUID(uuid assets.TicketerUUID) *Ticketer {
 	return a.ticketersByUUID[uuid]
+}
+
+func (a *OrgAssets) Topics() ([]assets.Topic, error) {
+	return nil, nil // TODO
 }
 
 func (a *OrgAssets) Users() ([]assets.User, error) {
