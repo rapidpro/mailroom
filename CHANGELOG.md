@@ -1,3 +1,7 @@
+v6.5.8
+----------
+ * Use new config keys for LUIS classifiers
+
 v6.5.7
 ----------
  * Switch from abandoned dgrijalva/jwt-go to golang-jwt/jwt
