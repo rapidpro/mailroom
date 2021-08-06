@@ -504,6 +504,20 @@ INSERT INTO
 RETURNING id
 `
 
+const insertCompleteSessionSQLNoOutput = `
+INSERT INTO
+	flows_flowsession( uuid, session_type, status, responded, output_url, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output_url,:contact_id,:org_id, NOW(),      NOW(),    NULL,           :connection_id)
+RETURNING id
+`
+
+const insertIncompleteSessionSQLNoOutput = `
+INSERT INTO
+	flows_flowsession( uuid, session_type, status, responded,  output_url, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output_url,:contact_id,:org_id, NOW(),     :current_flow_id,:timeout_on,:wait_started_on,:connection_id)
+RETURNING id
+`
+
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
 func (s *Session) FlowSession(sa flows.SessionAssets, env envs.Environment) (flows.Session, error) {
 	session, err := goflow.Engine(config.Mailroom).ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
@@ -608,17 +622,23 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 		}
 	}
 
+	// the SQL statement we'll use to update this session
+	updateSQL := updateSessionSQL
+
 	// if writing to S3, do so
 	sessionMode := org.Org().SessionStorageMode()
-	if sessionMode == S3Sessions || sessionMode == S3WriteSessions {
+	if sessionMode == S3Sessions {
 		err := WriteSessionOutputsToStorage(ctx, st, []*Session{s})
 		if err != nil {
 			logrus.WithError(err).Error("error writing session to s3")
 		}
+
+		// don't write output in our SQL
+		updateSQL = updateSessionSQLNoOutput
 	}
 
 	// write our new session state to the db
-	_, err = tx.NamedExecContext(ctx, updateSessionSQL, s.s)
+	_, err = tx.NamedExecContext(ctx, updateSQL, s.s)
 	if err != nil {
 		return errors.Wrapf(err, "error updating session")
 	}
@@ -703,6 +723,21 @@ WHERE
 	id = :id
 `
 
+const updateSessionSQLNoOutput = `
+UPDATE 
+	flows_flowsession
+SET 
+	output_url = :output_url,
+	status = :status, 
+	ended_on = CASE WHEN :status = 'W' THEN NULL ELSE NOW() END,
+	responded = :responded,
+	current_flow_id = :current_flow_id,
+	timeout_on = :timeout_on,
+	wait_started_on = :wait_started_on
+WHERE 
+	id = :id
+`
+
 const updateRunSQL = `
 UPDATE
 	flows_flowrun fr
@@ -773,18 +808,25 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.
 		}
 	}
 
+	// the SQL we'll use to do our insert of complete sessions
+	insertCompleteSQL := insertCompleteSessionSQL
+	insertIncompleteSQL := insertIncompleteSessionSQL
+
 	// if writing our sessions to S3, do so
 	sessionMode := org.Org().SessionStorageMode()
-	if sessionMode == S3Sessions || sessionMode == S3WriteSessions {
+	if sessionMode == S3Sessions {
 		err := WriteSessionOutputsToStorage(ctx, st, sessions)
 		if err != nil {
 			// for now, continue on for errors, we are still reading from the DB
 			logrus.WithError(err).Error("error writing sessions to s3")
 		}
+
+		insertCompleteSQL = insertCompleteSessionSQLNoOutput
+		insertIncompleteSQL = insertIncompleteSessionSQLNoOutput
 	}
 
 	// insert our complete sessions first
-	err := BulkQuery(ctx, "insert completed sessions", tx, insertCompleteSessionSQL, completeSessionsI)
+	err := BulkQuery(ctx, "insert completed sessions", tx, insertCompleteSQL, completeSessionsI)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting completed sessions")
 	}
@@ -796,7 +838,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.
 	}
 
 	// insert incomplete sessions
-	err = BulkQuery(ctx, "insert incomplete sessions", tx, insertIncompleteSessionSQL, incompleteSessionsI)
+	err = BulkQuery(ctx, "insert incomplete sessions", tx, insertIncompleteSQL, incompleteSessionsI)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting incomplete sessions")
 	}

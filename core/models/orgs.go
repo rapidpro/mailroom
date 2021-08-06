@@ -68,9 +68,8 @@ const (
 
 	configSessionStorageMode = "session_storage_mode"
 
-	DBSessions      = SessionStorageMode("db")
-	S3Sessions      = SessionStorageMode("s3")
-	S3WriteSessions = SessionStorageMode("s3_write")
+	DBSessions = SessionStorageMode("db")
+	S3Sessions = SessionStorageMode("s3")
 )
 
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
