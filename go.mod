@@ -13,7 +13,7 @@ require (
 	github.com/golang/protobuf v1.4.0
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.1.0
-	github.com/greatnonprofits-nfp/goflow v0.50.3-0.20210617220407-547e250be682
+	github.com/greatnonprofits-nfp/goflow v0.50.3-0.20210806195803-f8a6c2dfb7c8
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lib/pq v1.4.0
