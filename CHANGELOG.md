@@ -1,3 +1,8 @@
+v6.5.9
+----------
+ * Add support for answering machine detection on Twilio calls
+ * Update to latest goflow
+
 v6.5.8
 ----------
  * Use new config keys for LUIS classifiers
