@@ -1,3 +1,7 @@
+v6.5.10
+----------
+ * Fix requests to twilio to start calls with machine detection
+
 v6.5.9
 ----------
  * Add support for answering machine detection on Twilio calls
