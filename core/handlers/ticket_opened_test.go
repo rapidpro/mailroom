@@ -53,10 +53,26 @@ func TestTicketOpened(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				testdata.Cathy: []flows.Action{
-					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(testdata.Mailgun.UUID, "Mailgun (IT Support)"), "Need help", "Where are my cookies?", "Email Ticket"),
+					actions.NewOpenTicket(
+						handlers.NewActionUUID(),
+						assets.NewTicketerReference(testdata.Mailgun.UUID, "Mailgun (IT Support)"),
+						nil,
+						"Need help",
+						"Where are my cookies?",
+						assets.NewUserReference(testdata.Admin.Email, "Admin"),
+						"Email Ticket",
+					),
 				},
 				testdata.Bob: []flows.Action{
-					actions.NewOpenTicket(handlers.NewActionUUID(), assets.NewTicketerReference(testdata.Zendesk.UUID, "Zendesk (Nyaruka)"), "Interesting", "I've found some cookies", "Zen Ticket"),
+					actions.NewOpenTicket(
+						handlers.NewActionUUID(),
+						assets.NewTicketerReference(testdata.Zendesk.UUID, "Zendesk (Nyaruka)"),
+						nil,
+						"Interesting",
+						"I've found some cookies",
+						nil,
+						"Zen Ticket",
+					),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
@@ -93,6 +109,11 @@ func TestTicketOpened(t *testing.T) {
 				{ // and we have 2 ticket opened events for the 2 tickets opened
 					SQL:   "select count(*) from tickets_ticketevent where event_type = 'O'",
 					Count: 2,
+				},
+				{ // one of our tickets is assigned to admin
+					SQL:   "select count(*) from tickets_ticket where assignee_id = $1",
+					Args:  []interface{}{testdata.Admin.ID},
+					Count: 1,
 				},
 			},
 		},

@@ -68,7 +68,7 @@ func TestSimulatorTicket(t *testing.T) {
 	svc, err := goflow.Simulator(rt.Config).Services().Ticket(nil, flows.NewTicketer(ticketer))
 	assert.NoError(t, err)
 
-	ticket, err := svc.Open(nil, "New ticket", "Where are my cookies?", nil)
+	ticket, err := svc.Open(nil, nil, "New ticket", "Where are my cookies?", nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, testdata.Mailgun.UUID, ticket.Ticketer().UUID())
 	assert.Equal(t, "New ticket", ticket.Subject())

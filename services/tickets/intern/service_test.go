@@ -42,7 +42,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	logger := &flows.HTTPLogger{}
 
-	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
+	ticket, err := svc.Open(session, nil, "Need help", "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID())
 	assert.Equal(t, "Need help", ticket.Subject())

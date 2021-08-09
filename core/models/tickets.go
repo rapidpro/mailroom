@@ -133,6 +133,7 @@ func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
 	return flows.NewTicket(
 		t.UUID(),
 		oa.SessionAssets().Ticketers().Get(modelTicketer.UUID()),
+		nil, // TODO
 		t.Subject(),
 		t.Body(),
 		string(t.ExternalID()),
