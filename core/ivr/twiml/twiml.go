@@ -188,6 +188,9 @@ func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL stri
 	form.Set("From", c.channel.Address())
 	form.Set("Url", callbackURL)
 	form.Set("StatusCallback", statusURL)
+	form.Set("MachineDetection", "Enabled")
+	form.Set("AsyncAMD", "true")
+	form.Set("AsyncAmdStatusCallback", callbackURL)
 
 	sendURL := c.baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
 
@@ -286,6 +289,16 @@ func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
 func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
+	answeredBy := r.Form.Get("AnsweredBy")
+
+	switch answeredBy {
+	case "human", "unknown", "":
+		break
+
+	default:
+		return models.ConnectionStatusErrored, 0
+	}
+
 	status := r.Form.Get("CallStatus")
 	switch status {
 
