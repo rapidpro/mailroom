@@ -291,8 +291,8 @@ FROM
 	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
 	cc.connection_type = 'V' AND
-	next_attempt < NOW() AND
-	(cc.status = 'E' OR cc.status = 'Q')
+	cc.status IN ('Q', 'N', 'B', 'E') AND
+	next_attempt < NOW()
 ORDER BY 
 	cc.next_attempt ASC
 LIMIT
