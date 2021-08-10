@@ -305,6 +305,12 @@ func StartIVRFlow(
 		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
 	}
 
+	// check that the call that has been created has a valid state
+	status, _ := client.StatusForRequest(r)
+	if status == models.ConnectionStatusErrored {
+		return errors.Errorf("new call not in valid state: %s", status)
+	}
+
 	// get the flow for our start
 	start, err := models.GetFlowStartAttributes(ctx, rt.DB, startID)
 	if err != nil {

@@ -189,8 +189,6 @@ func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL stri
 	form.Set("Url", callbackURL)
 	form.Set("StatusCallback", statusURL)
 	form.Set("MachineDetection", "Enable")
-	form.Set("AsyncAmd", "true")
-	form.Set("AsyncAmdStatusCallback", callbackURL)
 
 	sendURL := c.baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
 
