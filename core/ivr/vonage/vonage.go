@@ -375,6 +375,7 @@ type NCCO struct {
 	Name   string `json:"name"`
 }
 
+// CallRequest is the request payload to create a new call, see https://developer.nexmo.com/api/voice#createCall
 type CallRequest struct {
 	To           []Phone  `json:"to"`
 	From         Phone    `json:"from"`
@@ -383,11 +384,12 @@ type CallRequest struct {
 	EventURL     []string `json:"event_url"`
 	EventMethod  string   `json:"event_method"`
 
-	NCCO         []NCCO `json:"ncco,omitempty"`
-	RingingTimer int    `json:"ringing_timer,omitempty"`
+	NCCO             []NCCO `json:"ncco,omitempty"`
+	MachineDetection string `json:"machine_detection"`
+	RingingTimer     int    `json:"ringing_timer,omitempty"`
 }
 
-// CallResponse is our struct for a Vonage call response
+// CallResponse is the response from creating a new call
 // {
 //  "uuid": "63f61863-4a51-4f6b-86e1-46edebcf9356",
 //  "status": "started",
@@ -409,6 +411,8 @@ func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string
 
 		EventURL:    []string{statusURL + "?sig=" + url.QueryEscape(c.calculateSignature(statusURL))},
 		EventMethod: http.MethodPost,
+
+		MachineDetection: "hangup", // if an answering machine answers, just hangup
 	}
 
 	callR.To = append(callR.To, Phone{Type: "phone", Number: strings.TrimLeft(number.Path(), "+")})
