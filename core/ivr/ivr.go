@@ -417,6 +417,11 @@ func ResumeIVRFlow(
 		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
 	}
 
+	// check connection is still marked as in progress
+	if conn.Status() != models.ConnectionStatusInProgress {
+		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
+	}
+
 	// preprocess this request
 	body, err := client.PreprocessResume(ctx, rt.DB, rt.RP, conn, r)
 	if err != nil {
@@ -590,7 +595,7 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 		// no associated start? this is a permanent failure
 		if conn.StartID() == models.NilStartID {
 			conn.MarkFailed(ctx, rt.DB, time.Now())
-			return client.WriteEmptyResponse(w, "status updated: F")
+			return client.WriteEmptyResponse(w, "no flow start found, status updated: F")
 		}
 
 		// on errors we need to look up the flow to know how long to wait before retrying
