@@ -1,3 +1,8 @@
+v6.5.11
+----------
+ * Implement asynchronous AMD for Twilio IVR
+ * Enable answering machine detection for Vonage IVR
+
 v6.5.10
 ----------
  * Fix requests to twilio to start calls with machine detection
