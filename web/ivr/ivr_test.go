@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -31,11 +31,14 @@ import (
 )
 
 func TestTwilioIVR(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.ResetStorage()
+	defer func() {
+		testsuite.ResetStorage()
+		testsuite.Reset()
+	}()
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -103,181 +106,186 @@ func TestTwilioIVR(t *testing.T) {
 		testdata.George.ID, models.ConnectionStatusWired, "Call2").Returns(1)
 
 	tcs := []struct {
-		Action       string
-		ChannelUUID  assets.ChannelUUID
-		ConnectionID models.ConnectionID
-		Form         url.Values
-		StatusCode   int
-		Contains     []string
+		action           string
+		channel          *testdata.Channel
+		connectionID     models.ConnectionID
+		form             url.Values
+		expectedStatus   int
+		expectedResponse string
+		contains         []string
 	}{
 		{
-			Action:       "start",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form:         nil,
-			StatusCode:   200,
-			Contains:     []string{"Hello there. Please enter one or two.  This flow was triggered by Cathy"},
+			action:         "start",
+			channel:        testdata.TwilioChannel,
+			connectionID:   models.ConnectionID(1),
+			form:           nil,
+			expectedStatus: 200,
+			contains:       []string{"Hello there. Please enter one or two.  This flow was triggered by Cathy"},
 		},
 		{
-			Action:       "resume",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			action:       "resume",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"CallStatus": []string{"in-progress"},
 				"wait_type":  []string{"gather"},
 				"timeout":    []string{"true"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"Sorry, that is not one or two, try again."},
+			expectedStatus: 200,
+			contains:       []string{"Sorry, that is not one or two, try again."},
 		},
 		{
-			Action:       "resume",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			action:       "resume",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"CallStatus": []string{"in-progress"},
 				"wait_type":  []string{"gather"},
 				"Digits":     []string{"1"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"Great! You said One."},
+			expectedStatus: 200,
+			contains:       []string{"Great! You said One."},
 		},
 		{
-			Action:       "resume",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			action:       "resume",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"CallStatus": []string{"in-progress"},
 				"wait_type":  []string{"gather"},
 				"Digits":     []string{"101"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"too big"},
+			expectedStatus: 200,
+			contains:       []string{"too big"},
 		},
 		{
-			Action:       "resume",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			action:       "resume",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"CallStatus": []string{"in-progress"},
 				"wait_type":  []string{"gather"},
 				"Digits":     []string{"56"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"You picked the number 56"},
+			expectedStatus: 200,
+			contains:       []string{"You picked the number 56"},
 		},
 		{
-			Action:       "resume",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			action:       "resume",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"CallStatus": []string{"in-progress"},
 				"wait_type":  []string{"record"},
 				// no recording as we don't have S3 to back us up, flow just moves forward
 			},
-			StatusCode: 200,
-			Contains: []string{
+			expectedStatus: 200,
+			contains: []string{
 				"I hope hearing that makes you feel better",
 				"<Dial ",
 				"2065551212",
 			},
 		},
 		{
-			Action:       "resume",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			action:       "resume",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"CallStatus":     []string{"in-progress"},
 				"DialCallStatus": []string{"answered"},
 				"wait_type":      []string{"dial"},
 			},
-			StatusCode: 200,
-			Contains: []string{
+			expectedStatus: 200,
+			contains: []string{
 				"Great, they answered.",
 				"<Hangup",
 			},
 		},
 		{
-			Action:       "status",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			action:       "status",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"CallSid":      []string{"Call1"},
 				"CallStatus":   []string{"completed"},
 				"CallDuration": []string{"50"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"status updated: D"},
+			expectedStatus: 200,
+			contains:       []string{"status updated: D"},
 		},
 		{
-			Action:       "start",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(2),
-			Form:         nil,
-			StatusCode:   200,
-			Contains:     []string{"Hello there. Please enter one or two."},
+			action:         "start",
+			channel:        testdata.TwilioChannel,
+			connectionID:   models.ConnectionID(2),
+			form:           nil,
+			expectedStatus: 200,
+			contains:       []string{"Hello there. Please enter one or two."},
 		},
 		{
-			Action:       "resume",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(2),
-			Form: url.Values{
+			action:       "resume",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(2),
+			form: url.Values{
 				"CallStatus": []string{"completed"},
 				"wait_type":  []string{"gather"},
 				"Digits":     []string{"56"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"<!--call completed-->"},
+			expectedStatus: 200,
+			contains:       []string{"<!--call completed-->"},
 		},
 		{
-			Action:       "incoming",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(3),
-			Form: url.Values{
+			action:       "incoming",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(3),
+			form: url.Values{
 				"CallSid":    []string{"Call2"},
 				"CallStatus": []string{"completed"},
 				"Caller":     []string{"+12065551212"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"missed call handled"},
+			expectedStatus: 200,
+			contains:       []string{"missed call handled"},
 		},
 		{
-			Action:       "status",
-			ChannelUUID:  testdata.TwilioChannel.UUID,
-			ConnectionID: models.ConnectionID(3),
-			Form: url.Values{
+			action:       "status",
+			channel:      testdata.TwilioChannel,
+			connectionID: models.ConnectionID(3),
+			form: url.Values{
 				"CallSid":      []string{"Call2"},
 				"CallStatus":   []string{"failed"},
 				"CallDuration": []string{"50"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"<!--status updated: F-->"},
+			expectedStatus:   200,
+			expectedResponse: "<Response><!--no flow start found, status updated: F--></Response>",
 		},
 	}
 
 	for i, tc := range tcs {
 		form := url.Values{
-			"action":     []string{tc.Action},
-			"connection": []string{fmt.Sprintf("%d", tc.ConnectionID)},
+			"action":     []string{tc.action},
+			"connection": []string{fmt.Sprintf("%d", tc.connectionID)},
 		}
-		url := fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/handle", tc.ChannelUUID) + "?" + form.Encode()
-		if tc.Action == "status" {
-			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/status", tc.ChannelUUID)
+		url := fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/handle", tc.channel.UUID) + "?" + form.Encode()
+		if tc.action == "status" {
+			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/status", tc.channel.UUID)
 		}
-		if tc.Action == "incoming" {
-			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/incoming", tc.ChannelUUID)
+		if tc.action == "incoming" {
+			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/incoming", tc.channel.UUID)
 		}
-		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(tc.Form.Encode()))
+		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(tc.form.Encode()))
 		assert.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
-		assert.Equal(t, tc.StatusCode, resp.StatusCode)
+		assert.Equal(t, tc.expectedStatus, resp.StatusCode, "%d: status code mismatch", i)
 
 		body, _ := ioutil.ReadAll(resp.Body)
 
-		for _, needle := range tc.Contains {
+		if tc.expectedResponse != "" {
+			assert.Equal(t, `<?xml version="1.0" encoding="UTF-8"?>`+"\n"+tc.expectedResponse, string(body), "%d: response mismatch", i)
+		}
+
+		for _, needle := range tc.contains {
 			assert.Containsf(t, string(body), needle, "%d does not contain expected body", i)
 		}
 	}
@@ -304,11 +312,14 @@ func TestTwilioIVR(t *testing.T) {
 }
 
 func TestVonageIVR(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.ResetStorage()
+	defer func() {
+		testsuite.ResetStorage()
+		testsuite.Reset()
+	}()
 
 	// deactivate our twilio channel
 	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
@@ -390,214 +401,254 @@ func TestVonageIVR(t *testing.T) {
 		testdata.George.ID, models.ConnectionStatusWired, "Call2").Returns(1)
 
 	tcs := []struct {
-		Label        string
-		Action       string
-		ChannelUUID  assets.ChannelUUID
-		ConnectionID models.ConnectionID
-		Form         url.Values
-		Body         string
-		StatusCode   int
-		Contains     []string
+		label            string
+		action           string
+		channel          *testdata.Channel
+		connectionID     models.ConnectionID
+		form             url.Values
+		body             string
+		expectedStatus   int
+		expectedResponse string
+		contains         []string
 	}{
 		{
-			Label:        "start and prompt",
-			Action:       "start",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Body:         `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
-			StatusCode:   200,
-			Contains:     []string{"Hello there. Please enter one or two. Your reference id is 123"},
+			label:          "start and prompt",
+			action:         "start",
+			channel:        testdata.VonageChannel,
+			connectionID:   models.ConnectionID(1),
+			body:           `{"from":"12482780345","to":"12067799294","uuid":"80c9a606-717e-48b9-ae22-ce00269cbb08","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
+			expectedStatus: 200,
+			contains:       []string{"Hello there. Please enter one or two. Your reference id is 123"},
 		},
 		{
-			Label:        "invalid dtmf",
-			Action:       "resume",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			label:        "invalid dtmf",
+			action:       "resume",
+			channel:      testdata.VonageChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"wait_type": []string{"gather"},
 			},
-			Body:       `{"dtmf":"3","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
-			StatusCode: 200,
-			Contains:   []string{"Sorry, that is not one or two, try again."},
+			body:           `{"dtmf":"3","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
+			expectedStatus: 200,
+			contains:       []string{"Sorry, that is not one or two, try again."},
 		},
 		{
-			Label:        "dtmf 1",
-			Action:       "resume",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			label:        "dtmf 1",
+			action:       "resume",
+			channel:      testdata.VonageChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"wait_type": []string{"gather"},
 			},
-			Body:       `{"dtmf":"1","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
-			StatusCode: 200,
-			Contains:   []string{"Great! You said One."},
+			body:           `{"dtmf":"1","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
+			expectedStatus: 200,
+			contains:       []string{"Great! You said One."},
 		},
 		{
-			Label:        "dtmf too large",
-			Action:       "resume",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			label:        "dtmf too large",
+			action:       "resume",
+			channel:      testdata.VonageChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"wait_type": []string{"gather"},
 			},
-			Body:       `{"dtmf":"101","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
-			StatusCode: 200,
-			Contains:   []string{"too big"},
+			body:           `{"dtmf":"101","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
+			expectedStatus: 200,
+			contains:       []string{"too big"},
 		},
 		{
-			Label:        "dtmf 56",
-			Action:       "resume",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			label:        "dtmf 56",
+			action:       "resume",
+			channel:      testdata.VonageChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"wait_type": []string{"gather"},
 			},
-			Body:       `{"dtmf":"56","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
-			StatusCode: 200,
-			Contains:   []string{"You picked the number 56"},
+			body:           `{"dtmf":"56","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
+			expectedStatus: 200,
+			contains:       []string{"You picked the number 56"},
 		},
 		{
-			Label:        "recording callback",
-			Action:       "resume",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			label:        "recording callback",
+			action:       "resume",
+			channel:      testdata.VonageChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"wait_type":      []string{"recording_url"},
 				"recording_uuid": []string{"0c15f253-8e67-45c8-9980-7d38292edd3c"},
 			},
-			Body:       fmt.Sprintf(`{"recording_url": "%s", "end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","status":"answered","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`, ts.URL+"?recording=true"),
-			StatusCode: 200,
-			Contains:   []string{"inserted recording url"},
+			body:           fmt.Sprintf(`{"recording_url": "%s", "end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","status":"answered","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`, ts.URL+"?recording=true"),
+			expectedStatus: 200,
+			contains:       []string{"inserted recording url"},
 		},
 		{
-			Label:        "resume with recording",
-			Action:       "resume",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			label:        "resume with recording",
+			action:       "resume",
+			channel:      testdata.VonageChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"wait_type":      []string{"record"},
 				"recording_uuid": []string{"0c15f253-8e67-45c8-9980-7d38292edd3c"},
 			},
-			Body:       `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","status":"answered","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z", "recording_url": "http://foo.bar/"}`,
-			StatusCode: 200,
-			Contains:   []string{"I hope hearing that makes you feel better.", `"action": "conversation"`},
+			body:           `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","status":"answered","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z", "recording_url": "http://foo.bar/"}`,
+			expectedStatus: 200,
+			contains:       []string{"I hope hearing that makes you feel better.", `"action": "conversation"`},
 		},
 		{
-			Label:        "transfer answered",
-			Action:       "status",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Body:         `{"uuid": "Call3", "status": "answered"}`,
-			StatusCode:   200,
-			Contains:     []string{"updated status for call: Call1 to: answered"},
+			label:          "transfer answered",
+			action:         "status",
+			channel:        testdata.VonageChannel,
+			connectionID:   models.ConnectionID(1),
+			body:           `{"uuid": "Call3", "status": "answered"}`,
+			expectedStatus: 200,
+			contains:       []string{"updated status for call: Call1 to: answered"},
 		},
 		{
-			Label:        "transfer completed",
-			Action:       "status",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Body:         `{"uuid": "Call3", "duration": "25", "status": "completed"}`,
-			StatusCode:   200,
-			Contains:     []string{"reconnected call: Call1 to flow with dial status: answered"},
+			label:          "transfer completed",
+			action:         "status",
+			channel:        testdata.VonageChannel,
+			connectionID:   models.ConnectionID(1),
+			body:           `{"uuid": "Call3", "duration": "25", "status": "completed"}`,
+			expectedStatus: 200,
+			contains:       []string{"reconnected call: Call1 to flow with dial status: answered"},
 		},
 		{
-			Label:        "transfer callback",
-			Action:       "resume",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Form: url.Values{
+			label:        "transfer callback",
+			action:       "resume",
+			channel:      testdata.VonageChannel,
+			connectionID: models.ConnectionID(1),
+			form: url.Values{
 				"wait_type":     []string{"dial"},
 				"dial_status":   []string{"answered"},
 				"dial_duration": []string{"25"},
 			},
-			StatusCode: 200,
-			Contains:   []string{"Great, they answered."},
+			expectedStatus: 200,
+			contains:       []string{"Great, they answered."},
 		},
 		{
-			Label:        "call complete",
-			Action:       "status",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(1),
-			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
-			StatusCode:   200,
-			Contains:     []string{"status updated: D"},
+			label:            "call complete",
+			action:           "status",
+			channel:          testdata.VonageChannel,
+			connectionID:     models.ConnectionID(1),
+			body:             `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call1","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
+			expectedStatus:   200,
+			expectedResponse: `{"_message":"status updated: D"}`,
 		},
 		{
-			Label:        "new call",
-			Action:       "start",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(2),
-			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
-			StatusCode:   200,
-			Contains:     []string{"Hello there. Please enter one or two."},
+			label:          "new call",
+			action:         "start",
+			channel:        testdata.VonageChannel,
+			connectionID:   models.ConnectionID(2),
+			body:           `{"from":"12482780345","to":"12067799294","uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
+			expectedStatus: 200,
+			expectedResponse: `[
+				{
+					"action": "talk",
+					"bargeIn": true,
+					"text": "Hello there. Please enter one or two. Your reference id is 123"
+				},
+				{
+					"action": "input",
+					"eventMethod": "POST",
+					"eventUrl": [
+						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002%26priority%3D1000&wait_type=gather&sig=QbU8c2ChHdJln%2BE5wUi%2BR6mF0nY%3D"
+					],
+					"maxDigits": 1,
+					"submitOnHash": true,
+					"timeOut": 30
+				}
+			]`,
 		},
 		{
-			Label:        "new call dtmf 1",
-			Action:       "resume",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(2),
-			Form: url.Values{
+			label:        "new call dtmf 1",
+			action:       "resume",
+			channel:      testdata.VonageChannel,
+			connectionID: models.ConnectionID(2),
+			form: url.Values{
 				"wait_type": []string{"gather"},
 			},
-			Body:       `{"dtmf":"1","timed_out":false,"uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
-			StatusCode: 200,
-			Contains:   []string{"Great! You said One."},
+			body:           `{"dtmf":"1","timed_out":false,"uuid":"Call2","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
+			expectedStatus: 200,
+			expectedResponse: `[
+				{
+					"action": "talk",
+					"bargeIn": true,
+					"text": "Great! You said One. Ok, now enter a number 1 to 100 then press pound."
+				},
+				{
+					"action": "input",
+					"eventMethod": "POST",
+					"eventUrl": [
+						"https://localhost:8090/mr/ivr/c/19012bfd-3ce3-4cae-9bb9-76cf92c73d49/handle?action=resume&connection=2&urn=tel%3A%2B16055743333%3Fid%3D10002%26priority%3D1000&wait_type=gather&sig=QbU8c2ChHdJln%2BE5wUi%2BR6mF0nY%3D"
+					],
+					"maxDigits": 20,
+					"submitOnHash": true,
+					"timeOut": 30
+				}
+			]`,
 		},
 		{
-			Label:        "new call ended",
-			Action:       "status",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(2),
-			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call2","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
-			StatusCode:   200,
-			Contains:     []string{"status updated: D"},
+			label:            "new call ended",
+			action:           "status",
+			channel:          testdata.VonageChannel,
+			connectionID:     models.ConnectionID(2),
+			body:             `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call2","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"completed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
+			expectedStatus:   200,
+			expectedResponse: `{"_message":"status updated: D"}`,
 		},
 		{
-			Label:        "incoming call",
-			Action:       "incoming",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(3),
-			Body:         `{"from":"12482780345","to":"12067799294","uuid":"Call4","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
-			StatusCode:   200,
-			Contains:     []string{"missed call handled"},
+			label:            "incoming call",
+			action:           "incoming",
+			channel:          testdata.VonageChannel,
+			connectionID:     models.ConnectionID(3),
+			body:             `{"from":"12482780345","to":"12067799294","uuid":"Call4","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c"}`,
+			expectedStatus:   200,
+			expectedResponse: `{"_message":"missed call handled"}`,
 		},
 		{
-			Label:        "failed call",
-			Action:       "status",
-			ChannelUUID:  testdata.VonageChannel.UUID,
-			ConnectionID: models.ConnectionID(3),
-			Body:         `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call4","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
-			StatusCode:   200,
-			Contains:     []string{"status updated: F"},
+			label:            "failed call",
+			action:           "status",
+			channel:          testdata.VonageChannel,
+			connectionID:     models.ConnectionID(3),
+			body:             `{"end_time":"2019-04-01T21:08:56.000Z","uuid":"Call4","network":"310260","duration":"50","start_time":"2019-04-01T21:08:42.000Z","rate":"0.01270000","price":"0.00296333","from":"12482780345","to":"12067799294","conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","status":"failed","direction":"outbound","timestamp":"2019-04-01T21:08:56.342Z"}`,
+			expectedStatus:   200,
+			expectedResponse: `{"_message":"no flow start found, status updated: F"}`,
 		},
 	}
 
 	for _, tc := range tcs {
+		testID := fmt.Sprintf("test '%s' with action '%s'", tc.label, tc.action)
+
 		form := url.Values{
-			"action":     []string{tc.Action},
-			"connection": []string{fmt.Sprintf("%d", tc.ConnectionID)},
+			"action":     []string{tc.action},
+			"connection": []string{fmt.Sprintf("%d", tc.connectionID)},
 		}
-		for k, v := range tc.Form {
+		for k, v := range tc.form {
 			form[k] = v
 		}
-		url := fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/handle", tc.ChannelUUID) + "?" + form.Encode()
-		if tc.Action == "status" {
-			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/status", tc.ChannelUUID)
+		url := fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/handle", tc.channel.UUID) + "?" + form.Encode()
+		if tc.action == "status" {
+			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/status", tc.channel.UUID)
 		}
-		if tc.Action == "incoming" {
-			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/incoming", tc.ChannelUUID)
+		if tc.action == "incoming" {
+			url = fmt.Sprintf("http://localhost:8090/mr/ivr/c/%s/incoming", tc.channel.UUID)
 		}
-		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(tc.Body))
+		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(tc.body))
 		assert.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
-		assert.Equal(t, tc.StatusCode, resp.StatusCode)
+		assert.Equal(t, tc.expectedStatus, resp.StatusCode, "status code mismatch in %s", testID)
 
 		body, _ := ioutil.ReadAll(resp.Body)
-		for _, needle := range tc.Contains {
-			if !assert.Containsf(t, string(body), needle, "testcase '%s' does not contain expected body", tc.Label) {
+
+		if tc.expectedResponse != "" {
+			test.AssertEqualJSON(t, []byte(tc.expectedResponse), body, "response mismatch in %s", testID)
+		}
+
+		for _, needle := range tc.contains {
+			if !assert.Containsf(t, string(body), needle, "testcase '%s' does not contain expected body", tc.label) {
 				t.FailNow()
 			}
 		}
