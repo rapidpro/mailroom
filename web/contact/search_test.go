@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync"
 	"testing"
@@ -213,7 +212,7 @@ func TestSearch(t *testing.T) {
 
 		assert.Equal(t, tc.ExpectedStatus, resp.StatusCode, "%d: unexpected status", i)
 
-		content, err := ioutil.ReadAll(resp.Body)
+		content, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
 
 		// on 200 responses parse them

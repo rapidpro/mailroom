@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -66,7 +66,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 		actualResponse []byte
 	}
 	tcs := make([]*TestCase, 0, 20)
-	tcJSON, err := ioutil.ReadFile(truthFile)
+	tcJSON, err := os.ReadFile(truthFile)
 	require.NoError(t, err)
 
 	for key, value := range substitutions {
@@ -126,7 +126,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 		actual.HTTPMocks = clonedMocks
 
 		tc.HTTPMocks = clonedMocks
-		tc.actualResponse, err = ioutil.ReadAll(resp.Body)
+		tc.actualResponse, err = io.ReadAll(resp.Body)
 		assert.NoError(t, err, "%s: error reading body", tc.Label)
 
 		if !test.UpdateSnapshots {
@@ -136,7 +136,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 			expectedIsJSON := false
 
 			if tc.ResponseFile != "" {
-				expectedResponse, err = ioutil.ReadFile(tc.ResponseFile)
+				expectedResponse, err = os.ReadFile(tc.ResponseFile)
 				require.NoError(t, err)
 
 				expectedIsJSON = strings.HasSuffix(tc.ResponseFile, ".json")
@@ -164,7 +164,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 	if test.UpdateSnapshots {
 		for _, tc := range tcs {
 			if tc.ResponseFile != "" {
-				err = ioutil.WriteFile(tc.ResponseFile, tc.actualResponse, 0644)
+				err = os.WriteFile(tc.ResponseFile, tc.actualResponse, 0644)
 				require.NoError(t, err, "failed to update response file")
 			} else {
 				tc.Response = tc.actualResponse
@@ -174,7 +174,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 		truth, err := jsonx.MarshalPretty(tcs)
 		require.NoError(t, err)
 
-		err = ioutil.WriteFile(truthFile, truth, 0644)
+		err = os.WriteFile(truthFile, truth, 0644)
 		require.NoError(t, err, "failed to update truth file")
 	}
 }

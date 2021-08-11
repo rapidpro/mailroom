@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -138,7 +137,7 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 
 	contentType, _, _ := mime.ParseMediaType(trace.Response.Header.Get("Content-Type"))
 
-	return &File{URL: url, ContentType: contentType, Body: ioutil.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
+	return &File{URL: url, ContentType: contentType, Body: io.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
 }
 
 // CloseTicket closes the given ticket, and creates and queues a closed event

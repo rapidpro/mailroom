@@ -3,8 +3,9 @@ package surveyor
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -112,7 +113,7 @@ func TestSurveyor(t *testing.T) {
 	for i, tc := range tcs {
 		testID := fmt.Sprintf("%s[token=%s]", tc.File, tc.Token)
 		path := filepath.Join("testdata", tc.File)
-		submission, err := ioutil.ReadFile(path)
+		submission, err := os.ReadFile(path)
 		assert.NoError(t, err)
 
 		url := "http://localhost:8090/mr/surveyor/submit"
@@ -128,7 +129,7 @@ func TestSurveyor(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, tc.StatusCode, resp.StatusCode, "unexpected status code for %s", testID)
 
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		assert.Containsf(t, string(body), tc.Contains, "%s does not contain expected body", testID)
 
 		id, _ := jsonparser.GetInt(body, "contact", "id")

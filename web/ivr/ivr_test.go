@@ -3,7 +3,7 @@ package ivr
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -253,7 +253,7 @@ func TestTwilioIVR(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, tc.expectedStatus, resp.StatusCode, "status code mismatch in %s", tc.label)
 
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 
 		if tc.expectedResponse != "" {
 			assert.Equal(t, `<?xml version="1.0" encoding="UTF-8"?>`+"\n"+tc.expectedResponse, string(body), "response mismatch in %s", tc.label)
@@ -313,7 +313,7 @@ func TestVonageIVR(t *testing.T) {
 				} `json:"to"`
 				Action string `json:"action,omitempty"`
 			}
-			body, _ := ioutil.ReadAll(r.Body)
+			body, _ := io.ReadAll(r.Body)
 			form := &CallForm{}
 			json.Unmarshal(body, form)
 			logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).WithField("form", form).Info("test server called")
@@ -377,10 +377,6 @@ func TestVonageIVR(t *testing.T) {
 	tcs := []struct {
 		label            string
 		url              string
-		action           string
-		channel          *testdata.Channel
-		connectionID     models.ConnectionID
-		form             url.Values
 		body             string
 		expectedStatus   int
 		expectedResponse string
@@ -424,14 +420,14 @@ func TestVonageIVR(t *testing.T) {
 			contains:       []string{"Great! You said One."},
 		},
 		{
-			label:          "dtmf too large",
+			label:          "handle resume with digits out of range in flow",
 			url:            fmt.Sprintf("/ivr/c/%s/handle?action=resume&connection=1&wait_type=gather", testdata.VonageChannel.UUID),
 			body:           `{"dtmf":"101","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
 			expectedStatus: 200,
 			contains:       []string{"too big"},
 		},
 		{
-			label:          "dtmf 56",
+			label:          "handle resume with digits within range in flow",
 			url:            fmt.Sprintf("/ivr/c/%s/handle?action=resume&connection=1&wait_type=gather", testdata.VonageChannel.UUID),
 			body:           `{"dtmf":"56","timed_out":false,"uuid":null,"conversation_uuid":"CON-f90649c3-cbf3-42d6-9ab1-01503befac1c","timestamp":"2019-04-01T21:08:54.680Z"}`,
 			expectedStatus: 200,
@@ -558,7 +554,7 @@ func TestVonageIVR(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, tc.expectedStatus, resp.StatusCode, "status code mismatch in %s", tc.label)
 
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 
 		if tc.expectedResponse != "" {
 			test.AssertEqualJSON(t, []byte(tc.expectedResponse), body, "response mismatch in %s", tc.label)

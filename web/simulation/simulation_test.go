@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -266,7 +265,7 @@ func TestServer(t *testing.T) {
 
 		assert.Equal(t, tc.ExpectedStatus, resp.StatusCode, "%d: unexpected status", i)
 
-		content, err := ioutil.ReadAll(resp.Body)
+		content, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
 
 		// if this was a success, save our session

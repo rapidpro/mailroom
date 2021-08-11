@@ -2,7 +2,7 @@ package org_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sync"
 	"testing"
@@ -95,7 +95,7 @@ func TestMetrics(t *testing.T) {
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err, "%s: received error", tc.Label)
 
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 
 		if tc.Response != "" {
 			assert.Equal(t, tc.Response, string(body), "%s: response mismatch", tc.Label)

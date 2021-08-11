@@ -3,7 +3,7 @@ package models_test
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -41,7 +41,7 @@ func TestContactImports(t *testing.T) {
 	// give our org a country by setting country on a channel
 	db.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, testdata.TwilioChannel.ID)
 
-	testJSON, err := ioutil.ReadFile("testdata/imports.json")
+	testJSON, err := os.ReadFile("testdata/imports.json")
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -136,7 +136,7 @@ func TestContactImports(t *testing.T) {
 		testJSON, err = jsonx.MarshalPretty(tcs)
 		require.NoError(t, err)
 
-		err = ioutil.WriteFile("testdata/imports.json", testJSON, 0600)
+		err = os.WriteFile("testdata/imports.json", testJSON, 0600)
 		require.NoError(t, err)
 	}
 }

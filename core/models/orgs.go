@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -186,7 +185,7 @@ func (o *Org) StoreAttachment(ctx context.Context, s storage.Storage, filename s
 	prefix := config.Mailroom.S3MediaPrefix
 
 	// read the content
-	contentBytes, err := ioutil.ReadAll(content)
+	contentBytes, err := io.ReadAll(content)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to read attachment content")
 	}
