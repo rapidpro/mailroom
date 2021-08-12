@@ -50,8 +50,8 @@ type Field struct {
 func InsertContact(db *sqlx.DB, org *Org, uuid flows.ContactUUID, name string, language envs.Language) *Contact {
 	var id models.ContactID
 	must(db.Get(&id,
-		`INSERT INTO contacts_contact (org_id, is_active, status, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
-		VALUES($1, TRUE, 'A', $2, $3, $4, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, uuid, name, language,
+		`INSERT INTO contacts_contact (org_id, is_active, status, ticket_count, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
+		VALUES($1, TRUE, 'A', 0, $2, $3, $4, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, uuid, name, language,
 	))
 	return &Contact{id, uuid, "", models.NilURNID}
 }

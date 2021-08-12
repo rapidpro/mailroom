@@ -42,7 +42,6 @@ const (
 	ConnectionStatusPending    = ConnectionStatus("P")
 	ConnectionStatusQueued     = ConnectionStatus("Q")
 	ConnectionStatusWired      = ConnectionStatus("W")
-	ConnectionStatusRinging    = ConnectionStatus("R")
 	ConnectionStatusInProgress = ConnectionStatus("I")
 	ConnectionStatusBusy       = ConnectionStatus("B")
 	ConnectionStatusFailed     = ConnectionStatus("F")
@@ -79,7 +78,6 @@ type ChannelConnection struct {
 		ContactID      ContactID           `json:"contact_id"      db:"contact_id"`
 		ContactURNID   URNID               `json:"contact_urn_id"  db:"contact_urn_id"`
 		OrgID          OrgID               `json:"org_id"          db:"org_id"`
-		ErrorCount     int                 `json:"error_count"     db:"error_count"`
 		StartID        StartID             `json:"start_id"        db:"start_id"`
 	}
 }
@@ -113,7 +111,6 @@ INSERT INTO
 	channel_id,
 	contact_id,
 	contact_urn_id,
-	error_count,
 	retry_count
 )
 
@@ -129,7 +126,6 @@ VALUES(
 	:channel_id,
 	:contact_id,
 	:contact_urn_id,
-	0,
 	0
 )
 RETURNING
@@ -205,7 +201,6 @@ SELECT
 	cc.contact_id as contact_id, 
 	cc.contact_urn_id as contact_urn_id, 
 	cc.org_id as org_id, 
-	cc.error_count as error_count, 
 	fsc.flowstart_id as start_id
 FROM
 	channels_channelconnection as cc
@@ -242,7 +237,6 @@ SELECT
 	cc.contact_id as contact_id, 
 	cc.contact_urn_id as contact_urn_id, 
 	cc.org_id as org_id, 
-	cc.error_count as error_count, 
 	fsc.flowstart_id as start_id
 FROM
 	channels_channelconnection as cc
@@ -284,7 +278,6 @@ SELECT
 	cc.contact_id as contact_id, 
 	cc.contact_urn_id as contact_urn_id, 
 	cc.org_id as org_id, 
-	cc.error_count as error_count, 
 	fsc.flowstart_id as start_id
 FROM
 	channels_channelconnection as cc
