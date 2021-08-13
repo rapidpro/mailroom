@@ -73,6 +73,7 @@ type ChannelConnection struct {
 		ConnectionType ConnectionType      `json:"connection_type" db:"connection_type"`
 		Duration       int                 `json:"duration"        db:"duration"`
 		RetryCount     int                 `json:"retry_count"     db:"retry_count"`
+		ErrorCount     int                 `json:"error_count"     db:"retry_count"`
 		NextAttempt    *time.Time          `json:"next_attempt"    db:"next_attempt"`
 		ChannelID      ChannelID           `json:"channel_id"      db:"channel_id"`
 		ContactID      ContactID           `json:"contact_id"      db:"contact_id"`
@@ -111,6 +112,7 @@ INSERT INTO
 	channel_id,
 	contact_id,
 	contact_urn_id,
+	error_count,
 	retry_count
 )
 
@@ -126,6 +128,7 @@ VALUES(
 	:channel_id,
 	:contact_id,
 	:contact_urn_id,
+	0,
 	0
 )
 RETURNING
@@ -196,6 +199,7 @@ SELECT
 	cc.connection_type as connection_type, 
 	cc.duration as duration, 
 	cc.retry_count as retry_count, 
+	cc.error_count as error_count,
 	cc.next_attempt as next_attempt, 
 	cc.channel_id as channel_id, 
 	cc.contact_id as contact_id, 
@@ -232,6 +236,7 @@ SELECT
 	cc.connection_type as connection_type, 
 	cc.duration as duration, 
 	cc.retry_count as retry_count, 
+	cc.error_count as error_count,
 	cc.next_attempt as next_attempt, 
 	cc.channel_id as channel_id, 
 	cc.contact_id as contact_id, 
@@ -273,6 +278,7 @@ SELECT
 	cc.connection_type as connection_type, 
 	cc.duration as duration, 
 	cc.retry_count as retry_count, 
+	cc.error_count as error_count,
 	cc.next_attempt as next_attempt, 
 	cc.channel_id as channel_id, 
 	cc.contact_id as contact_id, 
@@ -352,6 +358,7 @@ func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now tim
 
 	if c.c.RetryCount < ConnectionMaxRetries && retryWait != nil {
 		c.c.RetryCount++
+		c.c.ErrorCount++
 		next := now.Add(*retryWait)
 		c.c.NextAttempt = &next
 	} else {
@@ -360,8 +367,8 @@ func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now tim
 	}
 
 	_, err := db.ExecContext(ctx,
-		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, retry_count = $4, next_attempt = $5, modified_on = NOW() WHERE id = $1`,
-		c.c.ID, c.c.Status, c.c.EndedOn, c.c.RetryCount, c.c.NextAttempt,
+		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, retry_count = $4, error_count = $5, next_attempt = $6, modified_on = NOW() WHERE id = $1`,
+		c.c.ID, c.c.Status, c.c.EndedOn, c.c.RetryCount, c.c.ErrorCount, c.c.NextAttempt,
 	)
 
 	if err != nil {
