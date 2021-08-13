@@ -303,7 +303,7 @@ FROM
 	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
 	cc.connection_type = 'V' AND
-	cc.status IN ('Q', 'N', 'B', 'E') AND
+	cc.status IN ('Q', 'E') AND
 	next_attempt < NOW()
 ORDER BY 
 	cc.next_attempt ASC
