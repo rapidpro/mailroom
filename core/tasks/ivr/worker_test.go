@@ -102,8 +102,8 @@ func (c *MockClient) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	return nil, nil
 }
 
-func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
-	return models.ConnectionStatusFailed, 10
+func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
+	return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 10
 }
 
 func (c *MockClient) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
