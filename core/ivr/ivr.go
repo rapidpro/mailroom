@@ -78,7 +78,10 @@ type Client interface {
 
 	ResumeForRequest(r *http.Request) (Resume, error)
 
-	StatusForRequest(r *http.Request) (models.ConnectionStatus, int)
+	// StatusForRequest returns the current call status for the passed in request and also:
+	//  - duration of call if known
+	//  - whether we should hangup - i.e. the call is still in progress on the provider side, but we shouldn't continue with it
+	StatusForRequest(r *http.Request) (models.ConnectionStatus, int, bool)
 
 	PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error)
 
@@ -445,7 +448,7 @@ func ResumeIVRFlow(
 	}
 
 	// make sure our call is still happening
-	status, _ := client.StatusForRequest(r)
+	status, _, _ := client.StatusForRequest(r)
 	if status != models.ConnectionStatusInProgress {
 		err := conn.UpdateStatus(ctx, rt.DB, status, 0, time.Now())
 		if err != nil {
@@ -588,10 +591,30 @@ func buildMsgResume(
 // ended for some reason and update the state of the call and session if so
 func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
-	status, duration := client.StatusForRequest(r)
+	status, duration, hangup := client.StatusForRequest(r)
 
-	// if we errored schedule a retry if appropriate
+	if hangup {
+		err := HangupCall(ctx, rt.Config, rt.DB, conn)
+		if err != nil {
+			return errors.Wrapf(err, "error hanging up call")
+		}
+	}
+
 	if status == models.ConnectionStatusErrored {
+		// get session associated with this connection
+		sessionID, sessionStatus, err := models.SessionForConnection(ctx, rt.DB, conn)
+		if err != nil {
+			return errors.Wrapf(err, "error fetching session for connection")
+		}
+
+		// if session is still active we interrupt it
+		if sessionStatus == models.SessionStatusWaiting {
+			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{sessionID}, models.ExitInterrupted, time.Now())
+			if err != nil {
+				logrus.WithError(err).Error("error interrupting session for connection")
+			}
+		}
+
 		// no associated start? this is a permanent failure
 		if conn.StartID() == models.NilStartID {
 			conn.MarkFailed(ctx, rt.DB, time.Now())
@@ -611,9 +634,8 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 
 		conn.MarkErrored(ctx, rt.DB, time.Now(), flow.IVRRetryWait())
 
-		if conn.Status() == models.ConnectionStatusErrored {
-			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
-		}
+		return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
+
 	} else if status == models.ConnectionStatusFailed {
 		conn.MarkFailed(ctx, rt.DB, time.Now())
 	} else {

@@ -43,11 +43,8 @@ const (
 	ConnectionStatusQueued     = ConnectionStatus("Q")
 	ConnectionStatusWired      = ConnectionStatus("W")
 	ConnectionStatusInProgress = ConnectionStatus("I")
-	ConnectionStatusBusy       = ConnectionStatus("B")
 	ConnectionStatusFailed     = ConnectionStatus("F")
 	ConnectionStatusErrored    = ConnectionStatus("E")
-	ConnectionStatusNoAnswer   = ConnectionStatus("N")
-	ConnectionStatusCancelled  = ConnectionStatus("C")
 	ConnectionStatusCompleted  = ConnectionStatus("D")
 
 	ConnectionMaxRetries = 3

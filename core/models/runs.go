@@ -33,6 +33,8 @@ type SessionCommitHook func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, 
 type SessionID int64
 type SessionStatus string
 
+const NilSessionID = SessionID(0)
+
 type FlowRunID int64
 
 const NilFlowRunID = FlowRunID(0)
@@ -986,6 +988,18 @@ WHERE
 	ff.flow_type = $1 AND
 	fs.contact_id = ANY($2)
 `
+
+func SessionForConnection(ctx context.Context, db *sqlx.DB, conn *ChannelConnection) (SessionID, SessionStatus, error) {
+	res := struct {
+		ID     SessionID     `db:"id"`
+		Status SessionStatus `db:"status"`
+	}{}
+	err := db.GetContext(ctx, &res, `SELECT id, status FROM flows_flowsession WHERE connection_id = $1`, conn.ID())
+	if err == sql.ErrNoRows {
+		return NilSessionID, SessionStatusFailed, nil
+	}
+	return res.ID, res.Status, err
+}
 
 // RunExpiration looks up the run expiration for the passed in run, can return nil if the run is no longer active
 func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (*time.Time, error) {
