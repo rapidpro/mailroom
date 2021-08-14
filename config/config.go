@@ -65,9 +65,8 @@ type Config struct {
 
 	UUIDSeed int `help:"seed to use for UUID generation in a testing environment"`
 
-	YourlsLogin    string `help:"the YoURLs API login used to generate shorten links"`
-	YourlsPassword string `help:"the YoURLs API password used to access the shorten link generated"`
-	YourlsHost     string `help:"the YoURLs API host"`
+	UrlshHost  string `help:"the URLsh API host"`
+	UrlshToken string `help:"the URLsh API token used to access the shorten link generated"`
 }
 
 // NewMailroomConfig returns a new default configuration object
@@ -108,9 +107,8 @@ func NewMailroomConfig() *Config {
 
 		UUIDSeed: 0,
 
-		YourlsLogin:    "",
-		YourlsPassword: "",
-		YourlsHost:     "",
+		UrlshHost:  "",
+		UrlshToken: "",
 	}
 }
 
