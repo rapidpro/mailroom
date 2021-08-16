@@ -54,7 +54,6 @@ const (
 	ConnectionErrorBusy     = ConnectionError("B")
 	ConnectionErrorNoAnswer = ConnectionError("N")
 	ConnectionErrorMachine  = ConnectionError("M")
-	ConnectionNoError       = ConnectionError("")
 
 	ConnectionMaxRetries = 3
 
@@ -387,8 +386,8 @@ func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now tim
 	}
 
 	_, err := db.ExecContext(ctx,
-		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, retry_count = $4, error_count = $5, next_attempt = $6, modified_on = NOW() WHERE id = $1`,
-		c.c.ID, c.c.Status, c.c.EndedOn, c.c.RetryCount, c.c.ErrorCount, c.c.NextAttempt,
+		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, retry_count = $4, error_reason = $5, error_count = $6, next_attempt = $7, modified_on = NOW() WHERE id = $1`,
+		c.c.ID, c.c.Status, c.c.EndedOn, c.c.RetryCount, c.c.ErrorReason, c.c.ErrorCount, c.c.NextAttempt,
 	)
 
 	if err != nil {

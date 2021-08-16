@@ -546,37 +546,38 @@ type StatusRequest struct {
 func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
 	// this is a resume, call is in progress, no need to look at the body
 	if r.Form.Get("action") == "resume" {
-		return models.ConnectionStatusInProgress, models.ConnectionNoError, 0
+		return models.ConnectionStatusInProgress, "", 0
 	}
 
-	status := &StatusRequest{}
 	bb, err := readBody(r)
 	if err != nil {
 		logrus.WithError(err).Error("error reading status request body")
-		return models.ConnectionStatusErrored, models.ConnectionNoError, 0
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 	}
+
+	status := &StatusRequest{}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
 		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
-		return models.ConnectionStatusErrored, models.ConnectionNoError, 0
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 	}
 
 	// transfer status callbacks have no status, safe to ignore them
 	if status.Status == "" {
-		return models.ConnectionStatusInProgress, models.ConnectionNoError, 0
+		return models.ConnectionStatusInProgress, "", 0
 	}
 
 	switch status.Status {
 
 	case "started", "ringing":
-		return models.ConnectionStatusWired, models.ConnectionNoError, 0
+		return models.ConnectionStatusWired, "", 0
 
 	case "answered":
-		return models.ConnectionStatusInProgress, models.ConnectionNoError, 0
+		return models.ConnectionStatusInProgress, "", 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(status.Duration)
-		return models.ConnectionStatusCompleted, models.ConnectionNoError, duration
+		return models.ConnectionStatusCompleted, "", duration
 
 	case "busy":
 		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0

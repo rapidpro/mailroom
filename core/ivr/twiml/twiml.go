@@ -297,28 +297,28 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, mod
 		case "machine_start", "fax":
 			return models.ConnectionStatusErrored, models.ConnectionErrorMachine, 0
 		}
-		return models.ConnectionStatusInProgress, models.ConnectionNoError, 0
+		return models.ConnectionStatusInProgress, "", 0
 	}
 
 	status := r.Form.Get("CallStatus")
 	switch status {
 
 	case "queued", "ringing":
-		return models.ConnectionStatusWired, models.ConnectionNoError, 0
+		return models.ConnectionStatusWired, "", 0
 
 	case "in-progress", "initiated":
-		return models.ConnectionStatusInProgress, models.ConnectionNoError, 0
+		return models.ConnectionStatusInProgress, "", 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
-		return models.ConnectionStatusCompleted, models.ConnectionNoError, duration
+		return models.ConnectionStatusCompleted, "", duration
 
 	case "busy":
 		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
 	case "no-answer":
 		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
 	case "canceled", "failed":
-		return models.ConnectionStatusErrored, models.ConnectionNoError, 0
+		return models.ConnectionStatusErrored, "", 0
 
 	default:
 		logrus.WithField("call_status", status).Error("unknown call status in status callback")
