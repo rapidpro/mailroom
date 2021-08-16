@@ -1,3 +1,10 @@
+v6.5.12
+----------
+ * Revert previous to query to fetch calls to retry so we only look as statuses Q and E
+ * Add ChannelConnection.errorReason and start populating
+ * Reinstate channel connection error_count and write it
+ * Fix retrying of calls where answering machine was detected
+
 v6.5.11
 ----------
  * Implement asynchronous AMD for Twilio IVR
