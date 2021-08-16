@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
@@ -30,6 +31,30 @@ import (
 	ivr_tasks "github.com/nyaruka/mailroom/core/tasks/ivr"
 )
 
+// mocks the Twilio API
+func mockTwilioHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("form", r.Form).Info("test server called")
+	if strings.HasSuffix(r.URL.String(), "Calls.json") {
+		to := r.Form.Get("To")
+		if to == "+16055741111" {
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"sid": "Call1"}`))
+		} else if to == "+16055742222" {
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"sid": "Call2"}`))
+		} else if to == "+16055743333" {
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"sid": "Call3"}`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}
+	if strings.HasSuffix(r.URL.String(), "recording.mp3") {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 func TestTwilioIVR(t *testing.T) {
 	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
@@ -41,25 +66,7 @@ func TestTwilioIVR(t *testing.T) {
 	}()
 
 	// start test server
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
-		logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("form", r.Form).Info("test server called")
-		if strings.HasSuffix(r.URL.String(), "Calls.json") {
-			to := r.Form.Get("To")
-			if to == "+16055741111" {
-				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{"sid": "Call1"}`))
-			} else if to == "+16055743333" {
-				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{"sid": "Call2"}`))
-			} else {
-				w.WriteHeader(http.StatusNotFound)
-			}
-		}
-		if strings.HasSuffix(r.URL.String(), "recording.mp3") {
-			w.WriteHeader(http.StatusOK)
-		}
-	}))
+	ts := httptest.NewServer(http.HandlerFunc(mockTwilioHandler))
 	defer ts.Close()
 
 	twiml.BaseURL = ts.URL
@@ -73,37 +80,51 @@ func TestTwilioIVR(t *testing.T) {
 	// add auth tokens
 	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, testdata.TwilioChannel.ID)
 
-	// create a flow start for cathy and george
-	parentSummary := json.RawMessage(`{"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, "uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", "status": "active", "contact": {"id": 10000, "name": "Cathy", "urns": ["tel:+16055741111?id=10000&priority=50"], "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "fields": {"gender": {"text": "F"}}, "groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], "timezone": "America/Los_Angeles", "created_on": "2019-07-23T09:35:01.439614-07:00"}, "results": {}}`)
-
+	// create a flow start for cathy bob, and george
+	parentSummary := json.RawMessage(`{
+		"flow": {"name": "IVR Flow", "uuid": "2f81d0ea-4d75-4843-9371-3f7465311cce"}, 
+		"uuid": "8bc73097-ac57-47fb-82e5-184f8ec6dbef", 
+		"status": "active", 
+		"contact": {
+			"id": 10000, 
+			"name": "Cathy", 
+			"urns": ["tel:+16055741111?id=10000&priority=50"], 
+			"uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", 
+			"fields": {"gender": {"text": "F"}}, 
+			"groups": [{"name": "Doctors", "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"}], 
+			"timezone": "America/Los_Angeles", 
+			"created_on": "2019-07-23T09:35:01.439614-07:00"
+		}, 
+		"results": {}
+	}`)
 	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, models.DoRestartParticipants, models.DoIncludeActive).
-		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID}).
 		WithParentSummary(parentSummary)
 
 	err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// call our master starter
 	err = starts.CreateFlowBatches(ctx, db, rp, nil, start)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// start our task
-	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
-	assert.NoError(t, err)
+	task, err := queue.PopNextTask(rc, queue.BatchQueue)
+	require.NoError(t, err)
 	batch := &models.FlowStartBatch{}
-	err = json.Unmarshal(task.Task, batch)
-	assert.NoError(t, err)
+	jsonx.MustUnmarshal(task.Task, batch)
 
-	// request our call to start
+	// request our calls to start
 	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
+	// check our 3 contacts have 3 wired calls
 	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.Cathy.ID, models.ConnectionStatusWired, "Call1").Returns(1)
-
-	testsuite.AssertQuery(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdata.George.ID, models.ConnectionStatusWired, "Call2").Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Bob.ID, models.ConnectionStatusWired, "Call2").Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.George.ID, models.ConnectionStatusWired, "Call3").Returns(1)
 
 	tcs := []struct {
 		label            string
@@ -240,6 +261,25 @@ func TestTwilioIVR(t *testing.T) {
 			expectedStatus:   200,
 			expectedResponse: "<Response><!--no flow start found, status updated: F--></Response>",
 		},
+		{
+			label:          "call3 started",
+			url:            fmt.Sprintf("/ivr/c/%s/handle?action=start&connection=3", testdata.TwilioChannel.UUID),
+			form:           nil,
+			expectedStatus: 200,
+			contains:       []string{`<Gather numDigits="1" timeout="30"`, `<Say>Hello there. Please enter one or two.  This flow was triggered by Cathy</Say>`},
+		},
+		{
+			label: "answer machine detection sent to tell us we're talking to a voicemail",
+			url:   fmt.Sprintf("/ivr/c/%s/status", testdata.TwilioChannel.UUID),
+			form: url.Values{
+				"CallSid":                  []string{"Call3"},
+				"AccountSid":               []string{"sid"},
+				"AnsweredBy":               []string{"machine_start"},
+				"MachineDetectionDuration": []string{"2000"},
+			},
+			expectedStatus: 200,
+			contains:       []string{"<Response><!--status updated: E next_attempt:"},
+		},
 	}
 
 	for i, tc := range tcs {
@@ -280,9 +320,11 @@ func TestTwilioIVR(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id IS NOT NULL`).Returns(9)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 
-		AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.George.ID).Returns(2)
+		AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.Bob.ID).Returns(2)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`, testdata.George.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`, testdata.Bob.ID).Returns(1)
+
+	testsuite.AssertQuery(t, db, `SELECT status, error_reason FROM channels_channelconnection WHERE contact_id = $1 AND next_attempt IS NOT NULL`, testdata.George.ID).Columns(map[string]interface{}{"status": "E", "error_reason": "M"})
 }
 
 func TestVonageIVR(t *testing.T) {

@@ -78,7 +78,9 @@ type Client interface {
 
 	ResumeForRequest(r *http.Request) (Resume, error)
 
-	StatusForRequest(r *http.Request) (models.ConnectionStatus, int)
+	// StatusForRequest returns the call status for the passed in request, and if it's an error the reason,
+	// and if available, the current call duration
+	StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int)
 
 	PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error)
 
@@ -445,7 +447,7 @@ func ResumeIVRFlow(
 	}
 
 	// make sure our call is still happening
-	status, _ := client.StatusForRequest(r)
+	status, _, _ := client.StatusForRequest(r)
 	if status != models.ConnectionStatusInProgress {
 		err := conn.UpdateStatus(ctx, rt.DB, status, 0, time.Now())
 		if err != nil {
@@ -588,7 +590,7 @@ func buildMsgResume(
 // ended for some reason and update the state of the call and session if so
 func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
-	status, duration := client.StatusForRequest(r)
+	status, errorReason, duration := client.StatusForRequest(r)
 
 	// if we errored schedule a retry if appropriate
 	if status == models.ConnectionStatusErrored {
@@ -609,7 +611,7 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}
 
-		conn.MarkErrored(ctx, rt.DB, time.Now(), flow.IVRRetryWait())
+		conn.MarkErrored(ctx, rt.DB, time.Now(), flow.IVRRetryWait(), errorReason)
 
 		if conn.Status() == models.ConnectionStatusErrored {
 			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
