@@ -425,7 +425,7 @@ func ResumeIVRFlow(
 			logrus.WithError(err).Error("error interrupting session")
 		}
 
-		return client.WriteErrorResponse(w, fmt.Errorf("call ended due to previous status callback"))
+		return client.WriteErrorResponse(w, fmt.Errorf("ending call due to previous status callback"))
 	}
 
 	// preprocess this request

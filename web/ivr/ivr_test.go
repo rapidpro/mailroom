@@ -280,6 +280,17 @@ func TestTwilioIVR(t *testing.T) {
 			expectedStatus: 200,
 			contains:       []string{"<Response><!--status updated: E next_attempt:"},
 		},
+		{
+			label: "subsequent resume which should see we are now errored and hangup",
+			url:   fmt.Sprintf("/ivr/c/%s/handle?action=resume&connection=3", testdata.TwilioChannel.UUID),
+			form: url.Values{
+				"CallStatus": []string{"completed"},
+				"wait_type":  []string{"gather"},
+				"Digits":     []string{"56"},
+			},
+			expectedStatus:   200,
+			expectedResponse: `<Response><!--ending call due to previous status callback--><Say>An error has occurred, please try again later.</Say><Hangup></Hangup></Response>`,
+		},
 	}
 
 	for i, tc := range tcs {
