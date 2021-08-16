@@ -78,10 +78,9 @@ type Client interface {
 
 	ResumeForRequest(r *http.Request) (Resume, error)
 
-	// StatusForRequest returns the current call status for the passed in request and also:
-	//  - duration of call if known
-	//  - whether we should hangup - i.e. the call is still in progress on the provider side, but we shouldn't continue with it
-	StatusForRequest(r *http.Request) (models.ConnectionStatus, int, bool)
+	// StatusForRequest returns the call status for the passed in request, and if it's an error the reason,
+	// and if available, the current call duration
+	StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int)
 
 	PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error)
 
@@ -415,14 +414,18 @@ func ResumeIVRFlow(
 	if session.ConnectionID() == nil {
 		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
 	}
-
 	if *session.ConnectionID() != conn.ID() {
 		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
 	}
 
-	// check connection is still marked as in progress
-	if conn.Status() != models.ConnectionStatusInProgress {
-		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
+	// check if connection has been marked as errored - it maybe have been updated by status callback
+	if conn.Status() == models.ConnectionStatusErrored || conn.Status() == models.ConnectionStatusFailed {
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitInterrupted, time.Now())
+		if err != nil {
+			logrus.WithError(err).Error("error interrupting session")
+		}
+
+		return client.WriteErrorResponse(w, fmt.Errorf("call ended due to previous status callback"))
 	}
 
 	// preprocess this request
@@ -591,30 +594,10 @@ func buildMsgResume(
 // ended for some reason and update the state of the call and session if so
 func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
-	status, duration, hangup := client.StatusForRequest(r)
+	status, errorReason, duration := client.StatusForRequest(r)
 
-	if hangup {
-		err := HangupCall(ctx, rt.Config, rt.DB, conn)
-		if err != nil {
-			return errors.Wrapf(err, "error hanging up call")
-		}
-	}
-
+	// if we errored schedule a retry if appropriate
 	if status == models.ConnectionStatusErrored {
-		// get session associated with this connection
-		sessionID, sessionStatus, err := models.SessionForConnection(ctx, rt.DB, conn)
-		if err != nil {
-			return errors.Wrapf(err, "error fetching session for connection")
-		}
-
-		// if session is still active we interrupt it
-		if sessionStatus == models.SessionStatusWaiting {
-			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{sessionID}, models.ExitInterrupted, time.Now())
-			if err != nil {
-				logrus.WithError(err).Error("error interrupting session for connection")
-			}
-		}
-
 		// no associated start? this is a permanent failure
 		if conn.StartID() == models.NilStartID {
 			conn.MarkFailed(ctx, rt.DB, time.Now())
@@ -632,9 +615,11 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}
 
-		conn.MarkErrored(ctx, rt.DB, time.Now(), flow.IVRRetryWait())
+		conn.MarkErrored(ctx, rt.DB, time.Now(), flow.IVRRetryWait(), errorReason)
 
-		return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
+		if conn.Status() == models.ConnectionStatusErrored {
+			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
+		}
 
 	} else if status == models.ConnectionStatusFailed {
 		conn.MarkFailed(ctx, rt.DB, time.Now())

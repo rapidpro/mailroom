@@ -542,50 +542,55 @@ type StatusRequest struct {
 	Duration string `json:"duration"`
 }
 
-// StatusForRequest returns the current call status for the passed in request and also:
-//  - duration of call if known
-//  - whether we should hangup - i.e. the call is still in progress on the provider side, but we shouldn't continue with it
-func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int, bool) {
+// StatusForRequest returns the current call status for the passed in status (and optional duration if known)
+func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
 	// this is a resume, call is in progress, no need to look at the body
 	if r.Form.Get("action") == "resume" {
-		return models.ConnectionStatusInProgress, 0, false
+		return models.ConnectionStatusInProgress, "", 0
 	}
 
-	status := &StatusRequest{}
 	bb, err := readBody(r)
 	if err != nil {
 		logrus.WithError(err).Error("error reading status request body")
-		return models.ConnectionStatusErrored, 0, false
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 	}
+
+	status := &StatusRequest{}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
 		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
-		return models.ConnectionStatusErrored, 0, false
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 	}
 
 	// transfer status callbacks have no status, safe to ignore them
 	if status.Status == "" {
-		return models.ConnectionStatusInProgress, 0, false
+		return models.ConnectionStatusInProgress, "", 0
 	}
 
 	switch status.Status {
 
 	case "started", "ringing":
-		return models.ConnectionStatusWired, 0, false
+		return models.ConnectionStatusWired, "", 0
 
 	case "answered":
-		return models.ConnectionStatusInProgress, 0, false
+		return models.ConnectionStatusInProgress, "", 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(status.Duration)
-		return models.ConnectionStatusCompleted, duration, false
+		return models.ConnectionStatusCompleted, "", duration
 
-	case "rejected", "busy", "unanswered", "timeout", "failed", "machine":
-		return models.ConnectionStatusErrored, 0, false
+	case "busy":
+		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
+	case "rejected", "unanswered", "timeout":
+		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
+	case "machine":
+		return models.ConnectionStatusErrored, models.ConnectionErrorMachine, 0
+	case "failed":
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 
 	default:
 		logrus.WithField("status", status.Status).Error("unknown call status in ncco callback")
-		return models.ConnectionStatusFailed, 0, false
+		return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 0
 	}
 }
 

@@ -287,39 +287,42 @@ func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	}
 }
 
-// StatusForRequest returns the current call status for the passed in request and also:
-//  - duration of call if known
-//  - whether we should hangup - i.e. the call is still in progress on the provider side, but we shouldn't continue with it
-func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int, bool) {
+// StatusForRequest returns the call status for the passed in request, and if it's an error the reason,
+// and if available, the current call duration
+func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
 	// we re-use our status callback for AMD results which will have an AnsweredBy field but no CallStatus field
 	answeredBy := r.Form.Get("AnsweredBy")
 	if answeredBy != "" {
 		switch answeredBy {
 		case "machine_start", "fax":
-			return models.ConnectionStatusErrored, 0, true
+			return models.ConnectionStatusErrored, models.ConnectionErrorMachine, 0
 		}
-		return models.ConnectionStatusInProgress, 0, false
+		return models.ConnectionStatusInProgress, "", 0
 	}
 
 	status := r.Form.Get("CallStatus")
 	switch status {
 
 	case "queued", "ringing":
-		return models.ConnectionStatusWired, 0, false
+		return models.ConnectionStatusWired, "", 0
 
 	case "in-progress", "initiated":
-		return models.ConnectionStatusInProgress, 0, false
+		return models.ConnectionStatusInProgress, "", 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
-		return models.ConnectionStatusCompleted, duration, false
+		return models.ConnectionStatusCompleted, "", duration
 
-	case "busy", "no-answer", "canceled", "failed":
-		return models.ConnectionStatusErrored, 0, false
+	case "busy":
+		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
+	case "no-answer":
+		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
+	case "canceled", "failed":
+		return models.ConnectionStatusErrored, "", 0
 
 	default:
 		logrus.WithField("call_status", status).Error("unknown call status in status callback")
-		return models.ConnectionStatusFailed, 0, false
+		return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 0
 	}
 }
 
