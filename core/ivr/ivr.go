@@ -414,14 +414,18 @@ func ResumeIVRFlow(
 	if session.ConnectionID() == nil {
 		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
 	}
-
 	if *session.ConnectionID() != conn.ID() {
 		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
 	}
 
-	// check connection is still marked as in progress
-	if conn.Status() != models.ConnectionStatusInProgress {
-		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
+	// check if connection has been marked as errored - it maybe have been updated by status callback
+	if conn.Status() == models.ConnectionStatusErrored || conn.Status() == models.ConnectionStatusFailed {
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitInterrupted, time.Now())
+		if err != nil {
+			logrus.WithError(err).Error("error interrupting session")
+		}
+
+		return client.WriteErrorResponse(w, fmt.Errorf("ending call due to previous status callback"))
 	}
 
 	// preprocess this request
@@ -616,6 +620,7 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 		if conn.Status() == models.ConnectionStatusErrored {
 			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
 		}
+
 	} else if status == models.ConnectionStatusFailed {
 		conn.MarkFailed(ctx, rt.DB, time.Now())
 	} else {
