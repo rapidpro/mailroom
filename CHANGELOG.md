@@ -1,3 +1,7 @@
+v6.5.13
+----------
+ * Don't let IVR status callbacks overwrite error status (otherwise calls aren't retried)
+
 v6.5.12
 ----------
  * Revert previous to query to fetch calls to retry so we only look as statuses Q and E
