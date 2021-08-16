@@ -596,9 +596,14 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 	// read our status and duration from our client
 	status, errorReason, duration := client.StatusForRequest(r)
 
+	if conn.Status() == models.ConnectionStatusErrored || conn.Status() == models.ConnectionStatusFailed {
+		return client.WriteEmptyResponse(w, fmt.Sprintf("status %s ignored, already errored", status))
+	}
+
 	// if we errored schedule a retry if appropriate
 	if status == models.ConnectionStatusErrored {
-		// no associated start? this is a permanent failure
+
+		// if this is an incoming call it won't have an associated start and we don't retry it so just fail permanently
 		if conn.StartID() == models.NilStartID {
 			conn.MarkFailed(ctx, rt.DB, time.Now())
 			return client.WriteEmptyResponse(w, "no flow start found, status updated: F")
