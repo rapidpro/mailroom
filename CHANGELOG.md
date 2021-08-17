@@ -1,3 +1,7 @@
+v6.5.14
+----------
+ * Stop reading/writing channelconnection.retry_count so that it can be dropped
+
 v6.5.13
 ----------
  * Don't let IVR status callbacks overwrite error status (otherwise calls aren't retried)
