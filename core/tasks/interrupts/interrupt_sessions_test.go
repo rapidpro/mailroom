@@ -18,8 +18,8 @@ func TestInterrupts(t *testing.T) {
 	insertConnection := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urnID models.URNID) models.ConnectionID {
 		var connectionID models.ConnectionID
 		err := db.Get(&connectionID,
-			`INSERT INTO channels_channelconnection(created_on, modified_on, external_id, status, direction, connection_type, retry_count, error_count, org_id, channel_id, contact_id, contact_urn_id) 
- 						VALUES(NOW(), NOW(), 'ext1', 'I', 'I', 'V', 0, 0, $1, $2, $3, $4) RETURNING id`,
+			`INSERT INTO channels_channelconnection(created_on, modified_on, external_id, status, direction, connection_type, error_count, org_id, channel_id, contact_id, contact_urn_id) 
+ 						VALUES(NOW(), NOW(), 'ext1', 'I', 'I', 'V', 0, $1, $2, $3, $4) RETURNING id`,
 			orgID, channelID, contactID, urnID,
 		)
 		assert.NoError(t, err)
