@@ -77,7 +77,6 @@ type ChannelConnection struct {
 		EndedOn        *time.Time          `json:"ended_on"        db:"ended_on"`
 		ConnectionType ConnectionType      `json:"connection_type" db:"connection_type"`
 		Duration       int                 `json:"duration"        db:"duration"`
-		RetryCount     int                 `json:"retry_count"     db:"retry_count"` // TODO replace use with error_count
 		ErrorReason    null.String         `json:"error_reason"    db:"error_reason"`
 		ErrorCount     int                 `json:"error_count"     db:"error_count"`
 		NextAttempt    *time.Time          `json:"next_attempt"    db:"next_attempt"`
@@ -121,8 +120,7 @@ INSERT INTO
 	channel_id,
 	contact_id,
 	contact_urn_id,
-	error_count,
-	retry_count
+	error_count
 )
 
 VALUES(
@@ -137,7 +135,6 @@ VALUES(
 	:channel_id,
 	:contact_id,
 	:contact_urn_id,
-	0,
 	0
 )
 RETURNING
@@ -207,7 +204,6 @@ SELECT
 	cc.ended_on as ended_on, 
 	cc.connection_type as connection_type, 
 	cc.duration as duration, 
-	cc.retry_count as retry_count, 
 	cc.error_reason as error_reason,
 	cc.error_count as error_count,
 	cc.next_attempt as next_attempt, 
@@ -245,7 +241,6 @@ SELECT
 	cc.ended_on as ended_on, 
 	cc.connection_type as connection_type, 
 	cc.duration as duration, 
-	cc.retry_count as retry_count, 
 	cc.error_reason as error_reason,
 	cc.error_count as error_count,
 	cc.next_attempt as next_attempt, 
@@ -288,7 +283,6 @@ SELECT
 	cc.ended_on as ended_on, 
 	cc.connection_type as connection_type, 
 	cc.duration as duration, 
-	cc.retry_count as retry_count, 
 	cc.error_reason as error_reason,
 	cc.error_count as error_count,
 	cc.next_attempt as next_attempt, 
@@ -369,14 +363,7 @@ func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now tim
 	c.c.ErrorReason = null.String(errorReason)
 	c.c.EndedOn = &now
 
-	// TODO remove this once we only use error_count
-	errorCount := c.c.ErrorCount
-	if c.c.RetryCount > errorCount {
-		errorCount = c.c.RetryCount
-	}
-
-	if errorCount < ConnectionMaxRetries && retryWait != nil {
-		c.c.RetryCount++
+	if c.c.ErrorCount < ConnectionMaxRetries && retryWait != nil {
 		c.c.ErrorCount++
 		next := now.Add(*retryWait)
 		c.c.NextAttempt = &next
@@ -386,8 +373,8 @@ func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now tim
 	}
 
 	_, err := db.ExecContext(ctx,
-		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, retry_count = $4, error_reason = $5, error_count = $6, next_attempt = $7, modified_on = NOW() WHERE id = $1`,
-		c.c.ID, c.c.Status, c.c.EndedOn, c.c.RetryCount, c.c.ErrorReason, c.c.ErrorCount, c.c.NextAttempt,
+		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, error_reason = $4, error_count = $5, next_attempt = $6, modified_on = NOW() WHERE id = $1`,
+		c.c.ID, c.c.Status, c.c.EndedOn, c.c.ErrorReason, c.c.ErrorCount, c.c.NextAttempt,
 	)
 
 	if err != nil {
