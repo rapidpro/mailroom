@@ -66,7 +66,7 @@ func GetClient(channel *models.Channel) (Client, error) {
 
 // Client defines the interface IVR clients must satisfy
 type Client interface {
-	RequestCall(number urns.URN, handleURL string, statusURL string) (CallID, *httpx.Trace, error)
+	RequestCall(number urns.URN, handleURL string, statusURL string, machineDetection bool) (CallID, *httpx.Trace, error)
 
 	HangupCall(externalID string) (*httpx.Trace, error)
 
@@ -250,7 +250,7 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 	}
 
 	// try to request our call start
-	callID, trace, err := c.RequestCall(telURN, resumeURL, statusURL)
+	callID, trace, err := c.RequestCall(telURN, resumeURL, statusURL, channel.MachineDetection())
 
 	/// insert an channel log if we have an HTTP trace
 	if trace != nil {

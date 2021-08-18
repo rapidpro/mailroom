@@ -182,15 +182,18 @@ type CallResponse struct {
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
+func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
 	form := url.Values{}
 	form.Set("To", number.Path())
 	form.Set("From", c.channel.Address())
 	form.Set("Url", callbackURL)
 	form.Set("StatusCallback", statusURL)
-	form.Set("MachineDetection", "Enable")
-	form.Set("AsyncAmd", "true")
-	form.Set("AsyncAmdStatusCallback", statusURL)
+
+	if machineDetection {
+		form.Set("MachineDetection", "Enable")
+		form.Set("AsyncAmd", "true")
+		form.Set("AsyncAmdStatusCallback", statusURL)
+	}
 
 	sendURL := c.baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
 
