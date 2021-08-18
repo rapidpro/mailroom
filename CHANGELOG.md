@@ -1,3 +1,7 @@
+v6.5.15
+----------
+ * Make IVR machine detection an option in channel config
+
 v6.5.14
 ----------
  * Stop reading/writing channelconnection.retry_count so that it can be dropped
