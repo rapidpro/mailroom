@@ -78,7 +78,7 @@ func TestTwilioIVR(t *testing.T) {
 	defer server.Stop()
 
 	// add auth tokens
-	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090"}' WHERE id = $1`, testdata.TwilioChannel.ID)
+	db.MustExec(`UPDATE channels_channel SET config = '{"auth_token": "token", "account_sid": "sid", "callback_domain": "localhost:8090", "machine_detection": true}' WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	// create a flow start for cathy bob, and george
 	parentSummary := json.RawMessage(`{

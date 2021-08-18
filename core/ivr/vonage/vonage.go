@@ -404,15 +404,17 @@ type CallResponse struct {
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
+func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
 	callR := &CallRequest{
 		AnswerURL:    []string{resumeURL + "&sig=" + url.QueryEscape(c.calculateSignature(resumeURL))},
 		AnswerMethod: http.MethodPost,
 
 		EventURL:    []string{statusURL + "?sig=" + url.QueryEscape(c.calculateSignature(statusURL))},
 		EventMethod: http.MethodPost,
+	}
 
-		MachineDetection: "hangup", // if an answering machine answers, just hangup
+	if machineDetection {
+		callR.MachineDetection = "hangup" // if an answering machine answers, just hangup
 	}
 
 	callR.To = append(callR.To, Phone{Type: "phone", Number: strings.TrimLeft(number.Path(), "+")})
