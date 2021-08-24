@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -149,6 +148,15 @@ func (c *client) DownloadMedia(url string) (*http.Response, error) {
 	return http.Get(url)
 }
 
+func (c *client) CheckStartRequest(r *http.Request) models.ConnectionError {
+	r.ParseForm()
+	answeredBy := r.Form.Get("AnsweredBy")
+	if answeredBy == "machine_start" || answeredBy == "fax" {
+		return models.ConnectionErrorMachine
+	}
+	return ""
+}
+
 func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
@@ -177,7 +185,7 @@ func (c *client) URNForRequest(r *http.Request) (urns.URN, error) {
 
 // CallResponse is our struct for a Twilio call response
 type CallResponse struct {
-	SID    string `json:"sid"`
+	SID    string `json:"sid" validate:"required"`
 	Status string `json:"status"`
 }
 
@@ -191,8 +199,6 @@ func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL stri
 
 	if machineDetection {
 		form.Set("MachineDetection", "Enable")
-		form.Set("AsyncAmd", "true")
-		form.Set("AsyncAmdStatusCallback", statusURL)
 	}
 
 	sendURL := c.baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
@@ -206,13 +212,11 @@ func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL stri
 		return ivr.NilCallID, trace, errors.Errorf("received non 201 status for call start: %d", trace.Response.StatusCode)
 	}
 
-	// parse out our call sid
+	// parse the response from Twilio
 	call := &CallResponse{}
-	err = json.Unmarshal(trace.ResponseBody, call)
-	if err != nil || call.SID == "" {
-		return ivr.NilCallID, trace, errors.Errorf("unable to read call id")
+	if err := utils.UnmarshalAndValidate(trace.ResponseBody, call); err != nil {
+		return ivr.NilCallID, trace, errors.Wrap(err, "unable parse Twilio response")
 	}
-
 	if call.Status == statusFailed {
 		return ivr.NilCallID, trace, errors.Errorf("call status returned as failed")
 	}
@@ -293,25 +297,13 @@ func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 // StatusForRequest returns the call status for the passed in request, and if it's an error the reason,
 // and if available, the current call duration
 func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
-	// we re-use our status callback for AMD results which will have an AnsweredBy field but no CallStatus field
-	answeredBy := r.Form.Get("AnsweredBy")
-	if answeredBy != "" {
-		switch answeredBy {
-		case "machine_start", "fax":
-			return models.ConnectionStatusErrored, models.ConnectionErrorMachine, 0
-		}
-		return models.ConnectionStatusInProgress, "", 0
-	}
-
 	status := r.Form.Get("CallStatus")
 	switch status {
 
 	case "queued", "ringing":
 		return models.ConnectionStatusWired, "", 0
-
 	case "in-progress", "initiated":
 		return models.ConnectionStatusInProgress, "", 0
-
 	case "completed":
 		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
 		return models.ConnectionStatusCompleted, "", duration
@@ -321,7 +313,7 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, mod
 	case "no-answer":
 		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
 	case "canceled", "failed":
-		return models.ConnectionStatusErrored, "", 0
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 
 	default:
 		logrus.WithField("call_status", status).Error("unknown call status in status callback")

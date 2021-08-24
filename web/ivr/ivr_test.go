@@ -253,36 +253,14 @@ func TestTwilioIVR(t *testing.T) {
 			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "W"},
 		},
 		{
-			label:              "call3 started",
-			url:                fmt.Sprintf("/ivr/c/%s/handle?action=start&connection=3", testdata.TwilioChannel.UUID),
-			form:               nil,
-			expectedStatus:     200,
-			expectedContains:   []string{`<Gather numDigits="1" timeout="30"`, `<Say>Hello there. Please enter one or two.  This flow was triggered by Cathy</Say>`},
-			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "I"},
-		},
-		{
-			label: "answer machine detection sent to tell us we're talking to a voicemail",
-			url:   fmt.Sprintf("/ivr/c/%s/status", testdata.TwilioChannel.UUID),
+			label: "call3 started with answered_by telling us it's a machine",
+			url:   fmt.Sprintf("/ivr/c/%s/handle?action=start&connection=3", testdata.TwilioChannel.UUID),
 			form: url.Values{
-				"CallSid":                  []string{"Call3"},
-				"AccountSid":               []string{"sid"},
-				"AnsweredBy":               []string{"machine_start"},
-				"MachineDetectionDuration": []string{"2000"},
+				"CallStatus": []string{"in-progress"},
+				"AnsweredBy": []string{"machine_start"},
 			},
 			expectedStatus:     200,
-			expectedContains:   []string{"<Response><!--status updated: E next_attempt:"},
-			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "E"},
-		},
-		{
-			label: "subsequent resume which should see we are now errored and hangup",
-			url:   fmt.Sprintf("/ivr/c/%s/handle?action=resume&connection=3", testdata.TwilioChannel.UUID),
-			form: url.Values{
-				"CallStatus": []string{"completed"},
-				"wait_type":  []string{"gather"},
-				"Digits":     []string{"56"},
-			},
-			expectedStatus:     200,
-			expectedResponse:   `<Response><!--ending call due to previous status callback--><Say>An error has occurred, please try again later.</Say><Hangup></Hangup></Response>`,
+			expectedContains:   []string{`<Response><!--status updated: E, next_attempt: `, `<Say>An error has occurred, please try again later.</Say><Hangup></Hangup></Response>`},
 			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "E"},
 		},
 		{
@@ -363,8 +341,41 @@ func TestTwilioIVR(t *testing.T) {
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND connection_id = 2 
 		AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.Bob.ID).Returns(2)
+}
 
-	testsuite.AssertQuery(t, db, `SELECT status, error_reason FROM channels_channelconnection WHERE contact_id = $1 AND next_attempt IS NOT NULL`, testdata.George.ID).Columns(map[string]interface{}{"status": "E", "error_reason": "M"})
+func mockVonageHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("recording") != "" {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte{})
+	} else {
+		type CallForm struct {
+			To []struct {
+				Number string `json:"number"`
+			} `json:"to"`
+			Action string `json:"action,omitempty"`
+		}
+		body, _ := io.ReadAll(r.Body)
+		form := &CallForm{}
+		json.Unmarshal(body, form)
+		logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).WithField("form", form).Info("test server called")
+
+		// end of a leg
+		if form.Action == "transfer" {
+			w.WriteHeader(http.StatusNoContent)
+		} else if form.To[0].Number == "16055741111" {
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{ "uuid": "Call1","status": "started","direction": "outbound","conversation_uuid": "Conversation1"}`))
+		} else if form.To[0].Number == "16055743333" {
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{ "uuid": "Call2","status": "started","direction": "outbound","conversation_uuid": "Conversation2"}`))
+		} else if form.To[0].Number == "2065551212" {
+			// start of a transfer leg
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{ "uuid": "Call3","status": "started","direction": "outbound","conversation_uuid": "Conversation3"}`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}
 }
 
 func TestVonageIVR(t *testing.T) {
@@ -384,40 +395,7 @@ func TestVonageIVR(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET config = '{"nexmo_app_id": "app_id", "nexmo_app_private_key": "-----BEGIN PRIVATE KEY-----\nMIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAKNwapOQ6rQJHetP\nHRlJBIh1OsOsUBiXb3rXXE3xpWAxAha0MH+UPRblOko+5T2JqIb+xKf9Vi3oTM3t\nKvffaOPtzKXZauscjq6NGzA3LgeiMy6q19pvkUUOlGYK6+Xfl+B7Xw6+hBMkQuGE\nnUS8nkpR5mK4ne7djIyfHFfMu4ptAgMBAAECgYA+s0PPtMq1osG9oi4xoxeAGikf\nJB3eMUptP+2DYW7mRibc+ueYKhB9lhcUoKhlQUhL8bUUFVZYakP8xD21thmQqnC4\nf63asad0ycteJMLb3r+z26LHuCyOdPg1pyLk3oQ32lVQHBCYathRMcVznxOG16VK\nI8BFfstJTaJu0lK/wQJBANYFGusBiZsJQ3utrQMVPpKmloO2++4q1v6ZR4puDQHx\nTjLjAIgrkYfwTJBLBRZxec0E7TmuVQ9uJ+wMu/+7zaUCQQDDf2xMnQqYknJoKGq+\noAnyC66UqWC5xAnQS32mlnJ632JXA0pf9pb1SXAYExB1p9Dfqd3VAwQDwBsDDgP6\nHD8pAkEA0lscNQZC2TaGtKZk2hXkdcH1SKru/g3vWTkRHxfCAznJUaza1fx0wzdG\nGcES1Bdez0tbW4llI5By/skZc2eE3QJAFl6fOskBbGHde3Oce0F+wdZ6XIJhEgCP\niukIcKZoZQzoiMJUoVRrA5gqnmaYDI5uRRl/y57zt6YksR3KcLUIuQJAd242M/WF\n6YAZat3q/wEeETeQq1wrooew+8lHl05/Nt0cCpV48RGEhJ83pzBm3mnwHf8lTBJH\nx6XroMXsmbnsEw==\n-----END PRIVATE KEY-----", "callback_domain": "localhost:8090"}', role='SRCA' WHERE id = $1`, testdata.VonageChannel.ID)
 
 	// start test server
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("recording") != "" {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte{})
-		} else {
-			type CallForm struct {
-				To []struct {
-					Number string `json:"number"`
-				} `json:"to"`
-				Action string `json:"action,omitempty"`
-			}
-			body, _ := io.ReadAll(r.Body)
-			form := &CallForm{}
-			json.Unmarshal(body, form)
-			logrus.WithField("method", r.Method).WithField("url", r.URL.String()).WithField("body", string(body)).WithField("form", form).Info("test server called")
-
-			// end of a leg
-			if form.Action == "transfer" {
-				w.WriteHeader(http.StatusNoContent)
-			} else if form.To[0].Number == "16055741111" {
-				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{ "uuid": "Call1","status": "started","direction": "outbound","conversation_uuid": "Conversation1"}`))
-			} else if form.To[0].Number == "16055743333" {
-				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{ "uuid": "Call2","status": "started","direction": "outbound","conversation_uuid": "Conversation2"}`))
-			} else if form.To[0].Number == "2065551212" {
-				// start of a transfer leg
-				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{ "uuid": "Call3","status": "started","direction": "outbound","conversation_uuid": "Conversation3"}`))
-			} else {
-				w.WriteHeader(http.StatusNotFound)
-			}
-		}
-	}))
+	ts := httptest.NewServer(http.HandlerFunc(mockVonageHandler))
 	defer ts.Close()
 
 	wg := &sync.WaitGroup{}

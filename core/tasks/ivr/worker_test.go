@@ -106,6 +106,10 @@ func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus,
 	return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 10
 }
 
+func (c *MockClient) CheckStartRequest(r *http.Request) models.ConnectionError {
+	return ""
+}
+
 func (c *MockClient) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
