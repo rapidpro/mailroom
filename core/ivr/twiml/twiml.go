@@ -148,6 +148,15 @@ func (c *client) DownloadMedia(url string) (*http.Response, error) {
 	return http.Get(url)
 }
 
+func (c *client) CheckStartRequest(r *http.Request) models.ConnectionError {
+	r.ParseForm()
+	answeredBy := r.Form.Get("AnsweredBy")
+	if answeredBy == "machine_start" || answeredBy == "fax" {
+		return models.ConnectionErrorMachine
+	}
+	return ""
+}
+
 func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
@@ -176,9 +185,8 @@ func (c *client) URNForRequest(r *http.Request) (urns.URN, error) {
 
 // CallResponse is our struct for a Twilio call response
 type CallResponse struct {
-	SID        string `json:"sid" validate:"required"`
-	Status     string `json:"status"`
-	AnsweredBy string `json:"answered_by"`
+	SID    string `json:"sid" validate:"required"`
+	Status string `json:"status"`
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
@@ -211,9 +219,6 @@ func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL stri
 	}
 	if call.Status == statusFailed {
 		return ivr.NilCallID, trace, errors.Errorf("call status returned as failed")
-	}
-	if call.AnsweredBy == "machine_start" || call.AnsweredBy == "fax" {
-		return ivr.NilCallID, trace, errors.Errorf("call answered by machine")
 	}
 
 	return ivr.CallID(call.SID), trace, nil

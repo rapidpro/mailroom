@@ -170,6 +170,10 @@ func (c *client) DownloadMedia(url string) (*http.Response, error) {
 	return http.DefaultClient.Do(req)
 }
 
+func (c *client) CheckStartRequest(r *http.Request) models.ConnectionError {
+	return ""
+}
+
 func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
 	// parse out the call status, we are looking for a leg of one of our conferences ending in the "forward" case
 	// get our recording url out

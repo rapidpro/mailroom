@@ -251,6 +251,29 @@ func TestTwilioIVR(t *testing.T) {
 			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "W"},
 		},
 		{
+			label: "call3 started with answered_by telling us it's a machine",
+			url:   fmt.Sprintf("/ivr/c/%s/handle?action=start&connection=3", testdata.TwilioChannel.UUID),
+			form: url.Values{
+				"CallStatus": []string{"in-progress"},
+				"AnsweredBy": []string{"machine_start"},
+			},
+			expectedStatus:     200,
+			expectedContains:   []string{`<Response><!--status updated: E, next_attempt: `, `<Say>An error has occurred, please try again later.</Say><Hangup></Hangup></Response>`},
+			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "E"},
+		},
+		{
+			label: "then Twilio will call the status callback to say that we're done but don't overwrite the error status",
+			url:   fmt.Sprintf("/ivr/c/%s/status", testdata.TwilioChannel.UUID),
+			form: url.Values{
+				"CallSid":      []string{"Call3"},
+				"CallStatus":   []string{"completed"},
+				"CallDuration": []string{"50"},
+			},
+			expectedStatus:     200,
+			expectedResponse:   `<Response><!--status D ignored, already errored--></Response>`,
+			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "E"},
+		},
+		{
 			label: "we don't have a call trigger so incoming call creates a missed call event",
 			url:   fmt.Sprintf("/ivr/c/%s/incoming", testdata.TwilioChannel.UUID),
 			form: url.Values{
@@ -260,7 +283,7 @@ func TestTwilioIVR(t *testing.T) {
 			},
 			expectedStatus:     200,
 			expectedResponse:   `<Response><!--missed call handled--></Response>`,
-			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "W", "Call4": "I"},
+			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "E", "Call4": "I"},
 		},
 		{
 			label: "",
@@ -272,7 +295,7 @@ func TestTwilioIVR(t *testing.T) {
 			},
 			expectedStatus:     200,
 			expectedResponse:   `<Response><!--no flow start found, status updated: F--></Response>`,
-			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "W", "Call4": "F"},
+			expectedConnStatus: map[string]string{"Call1": "D", "Call2": "D", "Call3": "E", "Call4": "F"},
 		},
 	}
 

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/urns"
@@ -81,6 +82,9 @@ type Client interface {
 	// StatusForRequest returns the call status for the passed in request, and if it's an error the reason,
 	// and if available, the current call duration
 	StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int)
+
+	// CheckStartRequest checks the start request from the provider is as we expect and if not returns an error reason
+	CheckStartRequest(r *http.Request) models.ConnectionError
 
 	PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error)
 
@@ -302,7 +306,7 @@ func StartIVRFlow(
 	channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN, startID models.StartID,
 	r *http.Request, w http.ResponseWriter) error {
 
-	// connection isn't in a wired status, that's an error
+	// connection isn't in a wired or in-progress status then we shouldn't be here
 	if conn.Status() != models.ConnectionStatusWired && conn.Status() != models.ConnectionStatusInProgress {
 		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
 	}
@@ -312,10 +316,24 @@ func StartIVRFlow(
 	if err != nil {
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
-
 	flow, err := oa.FlowByID(start.FlowID())
 	if err != nil {
 		return errors.Wrapf(err, "unable to load flow: %d", startID)
+	}
+
+	// check that call on provider side is in the state we need to continue
+	if errorReason := client.CheckStartRequest(r); errorReason != "" {
+		err := conn.MarkErrored(ctx, rt.DB, dates.Now(), flow.IVRRetryWait(), errorReason)
+		if err != nil {
+			return errors.Wrap(err, "unable to mark connection as errored")
+		}
+
+		errMsg := fmt.Sprintf("status updated: %s", conn.Status())
+		if conn.Status() == models.ConnectionStatusErrored {
+			errMsg = fmt.Sprintf("%s, next_attempt: %s", errMsg, conn.NextAttempt())
+		}
+
+		return client.WriteErrorResponse(w, errors.New(errMsg))
 	}
 
 	// our flow contact
@@ -620,10 +638,10 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
 		}
 
-		conn.MarkErrored(ctx, rt.DB, time.Now(), flow.IVRRetryWait(), errorReason)
+		conn.MarkErrored(ctx, rt.DB, dates.Now(), flow.IVRRetryWait(), errorReason)
 
 		if conn.Status() == models.ConnectionStatusErrored {
-			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s next_attempt: %s", conn.Status(), conn.NextAttempt()))
+			return client.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s, next_attempt: %s", conn.Status(), conn.NextAttempt()))
 		}
 
 	} else if status == models.ConnectionStatusFailed {
