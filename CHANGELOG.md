@@ -1,3 +1,7 @@
+v6.5.18
+----------
+ * Switch to synchronous answering machine detection for Twilio channels
+
 v6.5.15
 ----------
  * Make IVR machine detection an option in channel config
