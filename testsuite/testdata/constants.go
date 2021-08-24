@@ -71,10 +71,10 @@ var TestersGroup = &Group{10001, "5e9d8fab-5e7e-4f51-b533-261af5dea70d"}
 var ReportingLabel = &Label{10000, "ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"}
 var TestingLabel = &Label{10001, "a6338cdc-7938-4437-8b05-2d5d785e3a08"}
 
-var Mailgun = &Ticketer{1, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
-var Zendesk = &Ticketer{2, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}
-var RocketChat = &Ticketer{3, "6c50665f-b4ff-4e37-9625-bc464fe6a999"}
-var Internal = &Ticketer{4, "8bd48029-6ca1-46a8-aa14-68f7213b82b3"}
+var Internal = &Ticketer{1, "8bd48029-6ca1-46a8-aa14-68f7213b82b3"}
+var Mailgun = &Ticketer{2, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
+var Zendesk = &Ticketer{3, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}
+var RocketChat = &Ticketer{4, "6c50665f-b4ff-4e37-9625-bc464fe6a999"}
 
 var Luis = &Classifier{1, "097e026c-ae79-4740-af67-656dbedf0263"}
 var Wit = &Classifier{2, "ff2a817c-040a-4eb2-8404-7d92e8b79dd0"}
