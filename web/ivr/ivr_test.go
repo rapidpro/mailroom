@@ -123,6 +123,8 @@ func TestTwilioIVR(t *testing.T) {
 		testdata.Cathy.ID, models.ConnectionStatusWired, "Call1").Returns(1)
 	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.Bob.ID, models.ConnectionStatusWired, "Call2").Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.George.ID, models.ConnectionStatusWired, "Call3").Returns(1)
 
 	tcs := []struct {
 		label              string

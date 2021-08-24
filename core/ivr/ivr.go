@@ -41,9 +41,6 @@ const (
 	ErrorMessage = "An error has occurred, please try again later."
 )
 
-// CallEndedError is our constant error for when a call has ended
-var CallEndedError = fmt.Errorf("call ended")
-
 // our map of client constructors
 var constructors = make(map[models.ChannelType]ClientConstructor)
 
@@ -291,11 +288,11 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 	return nil
 }
 
-// WriteErrorResponse marks the passed in connection as errored and writes the appropriate error response to our writer
-func WriteErrorResponse(ctx context.Context, db *sqlx.DB, client Client, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
+// HandleAsFailure marks the passed in connection as errored and writes the appropriate error response to our writer
+func HandleAsFailure(ctx context.Context, db *sqlx.DB, client Client, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
 	err := conn.MarkFailed(ctx, db, time.Now())
 	if err != nil {
-		logrus.WithError(err).Error("error when trying to mark connection as errored")
+		logrus.WithError(err).Error("error marking connection as failed")
 	}
 	return client.WriteErrorResponse(w, rootErr)
 }
@@ -308,7 +305,7 @@ func StartIVRFlow(
 
 	// connection isn't in a wired or in-progress status then we shouldn't be here
 	if conn.Status() != models.ConnectionStatusWired && conn.Status() != models.ConnectionStatusInProgress {
-		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
+		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
 	}
 
 	// get the flow for our start
@@ -426,14 +423,14 @@ func ResumeIVRFlow(
 	}
 
 	if session == nil {
-		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("no active IVR session for contact"))
+		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Errorf("no active IVR session for contact"))
 	}
 
 	if session.ConnectionID() == nil {
-		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
+		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
 	}
 	if *session.ConnectionID() != conn.ID() {
-		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
+		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
 	}
 
 	// check if connection has been marked as errored - it maybe have been updated by status callback
@@ -480,12 +477,7 @@ func ResumeIVRFlow(
 	// get the input of our request
 	ivrResume, err := client.ResumeForRequest(r)
 	if err != nil {
-		// call has ended, so will our session
-		if err == CallEndedError {
-			WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Wrapf(err, "call already ended"))
-		}
-
-		return WriteErrorResponse(ctx, rt.DB, client, conn, w, errors.Wrapf(err, "error finding input for request"))
+		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Wrapf(err, "error finding input for request"))
 	}
 
 	var resume flows.Resume

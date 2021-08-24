@@ -3,13 +3,13 @@ package ivr
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
@@ -173,7 +173,7 @@ func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	}
 
 	// try to handle it, this time looking for a missed call event
-	session, err = handler.HandleChannelEvent(ctx, rt, models.MOMissEventType, event, nil)
+	_, err = handler.HandleChannelEvent(ctx, rt, models.MOMissEventType, event, nil)
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error handling missed call")
 		return channel, conn, client.WriteErrorResponse(w, errors.Wrapf(err, "error handling missed call"))
@@ -196,19 +196,11 @@ type IVRRequest struct {
 }
 
 // writeClientError is just a small utility method to write out a simple JSON error when we don't have a client yet
-// to do it on our behalf
 func writeClientError(w http.ResponseWriter, err error) error {
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
-	response := map[string]string{
-		"error": err.Error(),
-	}
-	serialized, err := json.Marshal(response)
-	if err != nil {
-		return errors.Wrapf(err, "error serializing error")
-	}
-	_, err = w.Write([]byte(serialized))
-	return errors.Wrapf(err, "error writing error")
+	_, err = w.Write(jsonx.MustMarshal(map[string]string{"error": err.Error()}))
+	return err
 }
 
 func buildResumeURL(cfg *config.Config, channel *models.Channel, conn *models.ChannelConnection, urn urns.URN) string {
@@ -322,7 +314,7 @@ func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w htt
 	// had an error? mark our connection as errored and log it
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error while handling IVR")
-		return channel, conn, ivr.WriteErrorResponse(ctx, rt.DB, client, conn, w, err)
+		return channel, conn, ivr.HandleAsFailure(ctx, rt.DB, client, conn, w, err)
 	}
 
 	return channel, conn, nil
@@ -397,7 +389,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request, w h
 	// had an error? mark our connection as errored and log it
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error while handling status")
-		return channel, conn, ivr.WriteErrorResponse(ctx, rt.DB, client, conn, w, err)
+		return channel, conn, ivr.HandleAsFailure(ctx, rt.DB, client, conn, w, err)
 	}
 
 	return channel, conn, nil
