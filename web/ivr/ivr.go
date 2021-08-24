@@ -75,25 +75,25 @@ func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	// load the org id for this UUID (we could load the entire channel here but we want to take the same paths through everything else)
 	orgID, err := models.OrgIDForChannelUUID(ctx, rt.DB, channelUUID)
 	if err != nil {
-		return nil, nil, writeClientError(w, err)
+		return nil, nil, writeGenericErrorResponse(w, err)
 	}
 
 	// load our org assets
 	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
 	if err != nil {
-		return nil, nil, writeClientError(w, errors.Wrapf(err, "error loading org assets"))
+		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
 	}
 
 	// and our channel
 	channel := oa.ChannelByUUID(channelUUID)
 	if channel == nil {
-		return nil, nil, writeClientError(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
+		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
 	}
 
 	// get the right kind of client
 	client, err := ivr.GetClient(channel)
 	if client == nil {
-		return channel, nil, writeClientError(w, errors.Wrapf(err, "unable to load client for channel: %s", channelUUID))
+		return channel, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %s", channelUUID))
 	}
 
 	// validate this request's signature
@@ -195,8 +195,8 @@ type IVRRequest struct {
 	Action       string              `form:"action"     validate:"required"`
 }
 
-// writeClientError is just a small utility method to write out a simple JSON error when we don't have a client yet
-func writeClientError(w http.ResponseWriter, err error) error {
+// writeGenericErrorResponse is just a small utility method to write out a simple JSON error when we don't have a client yet
+func writeGenericErrorResponse(w http.ResponseWriter, err error) error {
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 	_, err = w.Write(jsonx.MustMarshal(map[string]string{"error": err.Error()}))
@@ -233,25 +233,25 @@ func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w htt
 	// load our org assets
 	oa, err := models.GetOrgAssets(ctx, rt.DB, conn.OrgID())
 	if err != nil {
-		return nil, nil, writeClientError(w, errors.Wrapf(err, "error loading org assets"))
+		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
 	}
 
 	// and our channel
 	channel := oa.ChannelByID(conn.ChannelID())
 	if channel == nil {
-		return nil, nil, writeClientError(w, errors.Errorf("no active channel with id: %d", conn.ChannelID()))
+		return nil, nil, writeGenericErrorResponse(w, errors.Errorf("no active channel with id: %d", conn.ChannelID()))
 	}
 
 	// get the right kind of client
 	client, err := ivr.GetClient(channel)
 	if client == nil {
-		return channel, conn, writeClientError(w, errors.Wrapf(err, "unable to load client for channel: %d", conn.ChannelID()))
+		return channel, conn, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %d", conn.ChannelID()))
 	}
 
 	// validate this request's signature if relevant
 	err = client.ValidateRequestSignature(r)
 	if err != nil {
-		return channel, conn, writeClientError(w, errors.Wrapf(err, "request failed signature validation"))
+		return channel, conn, writeGenericErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
 	}
 
 	// load our contact
@@ -330,31 +330,31 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request, w h
 	// load the org id for this UUID (we could load the entire channel here but we want to take the same paths through everything else)
 	orgID, err := models.OrgIDForChannelUUID(ctx, rt.DB, channelUUID)
 	if err != nil {
-		return nil, nil, writeClientError(w, err)
+		return nil, nil, writeGenericErrorResponse(w, err)
 	}
 
 	// load our org assets
 	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
 	if err != nil {
-		return nil, nil, writeClientError(w, errors.Wrapf(err, "error loading org assets"))
+		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
 	}
 
 	// and our channel
 	channel := oa.ChannelByUUID(channelUUID)
 	if channel == nil {
-		return nil, nil, writeClientError(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
+		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "no active channel with uuid: %s", channelUUID))
 	}
 
 	// get the right kind of client
 	client, err := ivr.GetClient(channel)
 	if client == nil {
-		return channel, nil, writeClientError(w, errors.Wrapf(err, "unable to load client for channel: %s", channelUUID))
+		return channel, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %s", channelUUID))
 	}
 
 	// validate this request's signature if relevant
 	err = client.ValidateRequestSignature(r)
 	if err != nil {
-		return channel, nil, writeClientError(w, errors.Wrapf(err, "request failed signature validation"))
+		return channel, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
 	}
 
 	// preprocess this status
