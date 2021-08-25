@@ -13,6 +13,11 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type Topic struct {
+	ID   models.TopicID
+	UUID assets.TopicUUID
+}
+
 type Ticket struct {
 	ID   models.TicketID
 	UUID flows.TicketUUID

@@ -100,7 +100,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "", "Need help", "Where are my cookies?", models.NilUserID, map[string]interface{}{
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "", testdata.DefaultTopic.ID, "Need help", "Where are my cookies?", models.NilUserID, map[string]interface{}{
 		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})
@@ -161,8 +161,8 @@ func TestCloseAndReopen(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "12", "New ticket", "Where my cookies?", models.NilUserID, nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Zendesk.ID, "14", "Second ticket", "Where my shoes?", models.NilUserID, nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "12", testdata.DefaultTopic.ID, "New ticket", "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Zendesk.ID, "14", testdata.DefaultTopic.ID, "Second ticket", "Where my shoes?", models.NilUserID, nil)
 
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 

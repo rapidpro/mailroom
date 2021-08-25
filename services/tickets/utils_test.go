@@ -165,7 +165,8 @@ func TestCloseTicket(t *testing.T) {
 		testdata.Cathy.ID,
 		testdata.Mailgun.ID,
 		"EX12345",
-		"New Ticket",
+		testdata.DefaultTopic.ID,
+		"",
 		"Where are my cookies?",
 		models.NilUserID,
 		map[string]interface{}{
@@ -187,5 +188,5 @@ func TestCloseTicket(t *testing.T) {
 	require.NoError(t, err)
 
 	testsuite.AssertContactTasks(t, 1, testdata.Cathy.ID,
-		[]string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:31Z"},"queued_on":"2021-06-08T16:40:34Z"}`})
+		[]string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:32Z"},"queued_on":"2021-06-08T16:40:35Z"}`})
 }

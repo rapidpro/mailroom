@@ -322,7 +322,7 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 		for _, t := range e.Tickets {
 			ticketer := org.TicketerByID(t.TicketerID)
 			if ticketer != nil {
-				tickets = append(tickets, NewTicket(t.UUID, org.OrgID(), contact.ID(), ticketer.ID(), t.ExternalID, t.Subject, t.Body, t.AssigneeID, nil))
+				tickets = append(tickets, NewTicket(t.UUID, org.OrgID(), contact.ID(), ticketer.ID(), t.ExternalID, t.TopicID, t.Subject, t.Body, t.AssigneeID, nil))
 			}
 		}
 		contact.tickets = tickets
@@ -466,6 +466,7 @@ type contactEnvelope struct {
 		UUID       flows.TicketUUID `json:"uuid"`
 		TicketerID TicketerID       `json:"ticketer_id"`
 		ExternalID string           `json:"external_id"`
+		TopicID    TopicID          `json:"topic_id"`
 		Subject    string           `json:"subject"`
 		Body       string           `json:"body"`
 		AssigneeID UserID           `json:"assignee_id"`

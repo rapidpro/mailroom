@@ -61,6 +61,10 @@ type OrgAssets struct {
 	ticketersByID   map[TicketerID]*Ticketer
 	ticketersByUUID map[assets.TicketerUUID]*Ticketer
 
+	topics       []assets.Topic
+	topicsByID   map[TopicID]*Topic
+	topicsByUUID map[assets.TopicUUID]*Topic
+
 	resthooks []assets.Resthook
 	templates []assets.Template
 	triggers  []*Trigger
@@ -318,6 +322,23 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		oa.ticketers = prev.ticketers
 		oa.ticketersByID = prev.ticketersByID
 		oa.ticketersByUUID = prev.ticketersByUUID
+	}
+
+	if prev == nil || refresh&RefreshTopics > 0 {
+		oa.topics, err = loadTopics(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading topic assets for org %d", orgID)
+		}
+		oa.topicsByID = make(map[TopicID]*Topic, len(oa.topics))
+		oa.topicsByUUID = make(map[assets.TopicUUID]*Topic, len(oa.topics))
+		for _, t := range oa.topics {
+			oa.topicsByID[t.(*Topic).ID()] = t.(*Topic)
+			oa.topicsByUUID[t.UUID()] = t.(*Topic)
+		}
+	} else {
+		oa.topics = prev.topics
+		oa.topicsByID = prev.topicsByID
+		oa.topicsByUUID = prev.topicsByUUID
 	}
 
 	if prev == nil || refresh&RefreshUsers > 0 {
@@ -631,7 +652,15 @@ func (a *OrgAssets) TicketerByUUID(uuid assets.TicketerUUID) *Ticketer {
 }
 
 func (a *OrgAssets) Topics() ([]assets.Topic, error) {
-	return nil, nil // TODO
+	return a.topics, nil
+}
+
+func (a *OrgAssets) TopicByID(id TopicID) *Topic {
+	return a.topicsByID[id]
+}
+
+func (a *OrgAssets) TopicByUUID(uuid assets.TopicUUID) *Topic {
+	return a.topicsByUUID[uuid]
 }
 
 func (a *OrgAssets) Users() ([]assets.User, error) {

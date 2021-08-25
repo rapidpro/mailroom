@@ -68,6 +68,7 @@ func TestTickets(t *testing.T) {
 		testdata.Cathy.ID,
 		testdata.Mailgun.ID,
 		"EX12345",
+		testdata.DefaultTopic.ID,
 		"New Ticket",
 		"Where are my cookies?",
 		testdata.Admin.ID,
@@ -81,6 +82,7 @@ func TestTickets(t *testing.T) {
 		testdata.Bob.ID,
 		testdata.Zendesk.ID,
 		"EX7869",
+		testdata.SalesTopic.ID,
 		"New Zen Ticket",
 		"Where are my trousers?",
 		models.NilUserID,
@@ -92,6 +94,7 @@ func TestTickets(t *testing.T) {
 		testdata.Alexandria.ID,
 		testdata.Zendesk.ID,
 		"EX6677",
+		models.NilTopicID,
 		"Other Org Ticket",
 		"Where are my pants?",
 		testdata.Org2Admin.ID,
@@ -103,6 +106,7 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, testdata.Cathy.ID, ticket1.ContactID())
 	assert.Equal(t, testdata.Mailgun.ID, ticket1.TicketerID())
 	assert.Equal(t, null.String("EX12345"), ticket1.ExternalID())
+	assert.Equal(t, testdata.DefaultTopic.ID, ticket1.TopicID())
 	assert.Equal(t, "New Ticket", ticket1.Subject())
 	assert.Equal(t, "Cathy", ticket1.Config("contact-display"))
 	assert.Equal(t, testdata.Admin.ID, ticket1.AssigneeID())
