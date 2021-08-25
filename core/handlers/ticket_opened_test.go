@@ -110,6 +110,10 @@ func TestTicketOpened(t *testing.T) {
 					SQL:   "select count(*) from tickets_ticketevent where event_type = 'O'",
 					Count: 2,
 				},
+				{ // both of our tickets have a topic (one without an explicit topic get's the default)
+					SQL:   "select count(*) from tickets_ticket where topic_id is null",
+					Count: 0,
+				},
 				{ // one of our tickets is assigned to admin
 					SQL:   "select count(*) from tickets_ticket where assignee_id = $1",
 					Args:  []interface{}{testdata.Admin.ID},
