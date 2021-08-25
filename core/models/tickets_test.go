@@ -82,7 +82,7 @@ func TestTickets(t *testing.T) {
 		testdata.Bob.ID,
 		testdata.Zendesk.ID,
 		"EX7869",
-		testdata.DefaultTopic.ID,
+		testdata.SalesTopic.ID,
 		"New Zen Ticket",
 		"Where are my trousers?",
 		models.NilUserID,

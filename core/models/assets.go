@@ -332,6 +332,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		oa.topicsByID = make(map[TopicID]*Topic, len(oa.topics))
 		oa.topicsByUUID = make(map[assets.TopicUUID]*Topic, len(oa.topics))
 		for _, t := range oa.topics {
+			oa.topicsByID[t.(*Topic).ID()] = t.(*Topic)
 			oa.topicsByUUID[t.UUID()] = t.(*Topic)
 		}
 	} else {
