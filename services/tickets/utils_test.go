@@ -64,7 +64,7 @@ func TestFromTicketUUID(t *testing.T) {
 
 	// err if no ticketer type doesn't match
 	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1.UUID, "zendesk")
-	assert.EqualError(t, err, "error looking up ticketer #1")
+	assert.EqualError(t, err, "error looking up ticketer #2")
 
 	// err if ticketer isn't configured correctly and can't be loaded as a service
 	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1.UUID, "mailgun")
