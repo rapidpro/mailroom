@@ -1,3 +1,8 @@
+v6.5.19
+----------
+ * Update to latest goflow to get ticket topic changes there
+ * Add ticket topics
+
 v6.5.18
 ----------
  * Switch to synchronous answering machine detection for Twilio channels
