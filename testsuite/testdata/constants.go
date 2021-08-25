@@ -71,6 +71,8 @@ var TestersGroup = &Group{10001, "5e9d8fab-5e7e-4f51-b533-261af5dea70d"}
 var ReportingLabel = &Label{10000, "ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"}
 var TestingLabel = &Label{10001, "a6338cdc-7938-4437-8b05-2d5d785e3a08"}
 
+var DefaultTopic = &Topic{1, "ffc903f7-8cbb-443f-9627-87106842d1aa"}
+
 var Internal = &Ticketer{1, "8bd48029-6ca1-46a8-aa14-68f7213b82b3"}
 var Mailgun = &Ticketer{2, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
 var Zendesk = &Ticketer{3, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}

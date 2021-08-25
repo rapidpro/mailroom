@@ -28,6 +28,15 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mo
 		return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticket.Ticketer.UUID)
 	}
 
+	var topicID models.TopicID
+	if event.Ticket.Topic != nil {
+		topic := oa.TopicByUUID(event.Ticket.Topic.UUID)
+		if topic == nil {
+			return errors.Errorf("unable to find topic with UUID: %s", event.Ticket.Topic.UUID)
+		}
+		topicID = topic.ID()
+	}
+
 	var assigneeID models.UserID
 	if event.Ticket.Assignee != nil {
 		assignee := oa.UserByEmail(event.Ticket.Assignee.Email)
@@ -43,6 +52,7 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mo
 		scene.ContactID(),
 		ticketer.ID(),
 		event.Ticket.ExternalID,
+		topicID,
 		event.Ticket.Subject,
 		event.Ticket.Body,
 		assigneeID,

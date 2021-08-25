@@ -60,8 +60,10 @@ type OrgAssets struct {
 	ticketers       []assets.Ticketer
 	ticketersByID   map[TicketerID]*Ticketer
 	ticketersByUUID map[assets.TicketerUUID]*Ticketer
-	topics          []assets.Topic
-	topicsByUUID    map[assets.TopicUUID]*Topic
+
+	topics       []assets.Topic
+	topicsByID   map[TopicID]*Topic
+	topicsByUUID map[assets.TopicUUID]*Topic
 
 	resthooks []assets.Resthook
 	templates []assets.Template
@@ -327,12 +329,14 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading topic assets for org %d", orgID)
 		}
-		oa.topicsByUUID = make(map[assets.TopicUUID]*Topic)
+		oa.topicsByID = make(map[TopicID]*Topic, len(oa.topics))
+		oa.topicsByUUID = make(map[assets.TopicUUID]*Topic, len(oa.topics))
 		for _, t := range oa.topics {
 			oa.topicsByUUID[t.UUID()] = t.(*Topic)
 		}
 	} else {
 		oa.topics = prev.topics
+		oa.topicsByID = prev.topicsByID
 		oa.topicsByUUID = prev.topicsByUUID
 	}
 
@@ -648,6 +652,10 @@ func (a *OrgAssets) TicketerByUUID(uuid assets.TicketerUUID) *Ticketer {
 
 func (a *OrgAssets) Topics() ([]assets.Topic, error) {
 	return a.topics, nil
+}
+
+func (a *OrgAssets) TopicByID(id TopicID) *Topic {
+	return a.topicsByID[id]
 }
 
 func (a *OrgAssets) TopicByUUID(uuid assets.TopicUUID) *Topic {

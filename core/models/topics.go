@@ -17,6 +17,8 @@ import (
 
 type TopicID null.Int
 
+const NilTopicID = TopicID(0)
+
 type Topic struct {
 	t struct {
 		ID        TopicID          `json:"id"`

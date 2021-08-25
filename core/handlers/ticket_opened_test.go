@@ -45,7 +45,7 @@ func TestTicketOpened(t *testing.T) {
 	}))
 
 	// an existing ticket
-	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, "748363", "Old Question", "Who?", models.NilUserID, nil)
+	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, "748363", testdata.DefaultTopic.ID, "Old Question", "Who?", models.NilUserID, nil)
 	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyTicket})
 	require.NoError(t, err)
 
