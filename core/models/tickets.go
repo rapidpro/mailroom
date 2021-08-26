@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -181,6 +182,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
+  t.topic_id AS topic_id,
   t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
@@ -210,6 +212,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
+  t.topic_id AS topic_id,
   t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
@@ -258,6 +261,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
+  t.topic_id AS topic_id,
   t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
@@ -286,6 +290,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
+  t.topic_id AS topic_id,
   t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
@@ -468,7 +473,10 @@ func TicketsChangeTopic(ctx context.Context, db Queryer, oa *OrgAssets, userID U
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
 
+	fmt.Printf("TicketsChangeTopic topic=%d\n", topicID)
+
 	for _, ticket := range tickets {
+		fmt.Printf("ticket #%d topic=%d\n", ticket.ID(), ticket.TopicID())
 		if ticket.TopicID() != topicID {
 			ids = append(ids, ticket.ID())
 			t := &ticket.t
