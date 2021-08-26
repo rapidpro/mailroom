@@ -129,7 +129,7 @@ func TestBroadcastTask(t *testing.T) {
 	// insert a broadcast so we can check it is being set to sent
 	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Problem", "", "", nil)
 	modelTicket := ticket.Load(db)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{

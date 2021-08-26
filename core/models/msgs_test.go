@@ -284,7 +284,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		db.MustExec(`DELETE FROM tickets_ticket`)
 	}()
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Problem", "", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "Problem", "", "", nil)
 	modelTicket := ticket.Load(db)
 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("eng"): {Text: "Hi there"}}

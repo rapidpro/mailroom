@@ -34,16 +34,16 @@ func TestMsgEvents(t *testing.T) {
 	// give Cathy and Bob some tickets...
 	openTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Hi there", "Ok", "", nil),
-			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Hi again", "Ok", "", nil),
+			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Hi there", "Ok", "", nil),
+			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Hi again", "Ok", "", nil),
 		},
 	}
 	closedTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Old", "", "", nil),
+			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Old", "", "", nil),
 		},
 		testdata.Bob: {
-			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Hi there", "Ok", "", nil),
+			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "Hi there", "Ok", "", nil),
 		},
 	}
 
@@ -309,7 +309,7 @@ func TestTicketEvents(t *testing.T) {
 	// add a ticket closed trigger
 	testdata.InsertTicketClosedTrigger(rt.DB, testdata.Org1, testdata.Favorites)
 
-	ticket := testdata.InsertClosedTicket(rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where are my shoes?", "", nil)
+	ticket := testdata.InsertClosedTicket(rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Problem", "Where are my shoes?", "", nil)
 	modelTicket := ticket.Load(db)
 
 	event := models.NewTicketClosedEvent(modelTicket, testdata.Admin.ID)
