@@ -12,6 +12,7 @@ import (
 )
 
 func init() {
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/note", web.RequireAuthToken(handleAddNote)) // deprecated
 	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/add_note", web.RequireAuthToken(handleAddNote))
 }
 
