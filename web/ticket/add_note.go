@@ -12,13 +12,14 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/add_note", web.RequireAuthToken(web.WithHTTPLogs(handleAddNote)))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/note", web.RequireAuthToken(handleAddNote)) // deprecated
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/add_note", web.RequireAuthToken(handleAddNote))
 }
 
 type addNoteRequest struct {
 	bulkTicketRequest
 
-	Note string `json:"note"`
+	Note string `json:"note" validate:"required"`
 }
 
 // Adds the given text note to the tickets with the given ids
@@ -30,7 +31,7 @@ type addNoteRequest struct {
 //     "note": "spam"
 //   }
 //
-func handleAddNote(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleAddNote(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &addNoteRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
@@ -47,7 +48,7 @@ func handleAddNote(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	evts, err := models.NoteTickets(ctx, rt.DB, oa, request.UserID, tickets, request.Note)
+	evts, err := models.TicketsAddNote(ctx, rt.DB, oa, request.UserID, tickets, request.Note)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error adding notes to tickets")
 	}

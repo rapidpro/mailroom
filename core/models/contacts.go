@@ -536,6 +536,7 @@ LEFT JOIN (
 				'body', t.body,
 				'external_id', t.external_id,
 				'ticketer_id', t.ticketer_id,
+				'topic_id', t.topic_id,
 				'assignee_id', t.assignee_id
 			) ORDER BY t.opened_on ASC, t.id ASC
 		) as tickets

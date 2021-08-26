@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -181,6 +182,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
+  t.topic_id AS topic_id,
   t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
@@ -210,6 +212,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
+  t.topic_id AS topic_id,
   t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
@@ -258,6 +261,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
+  t.topic_id AS topic_id,
   t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
@@ -286,6 +290,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
+  t.topic_id AS topic_id,
   t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
@@ -380,7 +385,7 @@ func updateTicketLastActivity(ctx context.Context, db Queryer, ids []TicketID, n
 	return Exec(ctx, "update ticket last activity", db, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
 }
 
-const assignTicketSQL = `
+const ticketsAssignSQL = `
 UPDATE
   tickets_ticket
 SET
@@ -391,8 +396,8 @@ WHERE
   id = ANY($1)
 `
 
-// AssignTickets assigns the passed in tickets
-func AssignTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID, note string) (map[*Ticket]*TicketEvent, error) {
+// TicketsAssign assigns the passed in tickets
+func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID, note string) (map[*Ticket]*TicketEvent, error) {
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
@@ -413,7 +418,7 @@ func AssignTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 	}
 
 	// mark the tickets as assigned in the db
-	err := Exec(ctx, "assign tickets", db, assignTicketSQL, pq.Array(ids), assigneeID, now)
+	err := Exec(ctx, "assign tickets", db, ticketsAssignSQL, pq.Array(ids), assigneeID, now)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
@@ -426,13 +431,13 @@ func AssignTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 	return eventsByTicket, nil
 }
 
-// NoteTickets adds a note to the passed in tickets
-func NoteTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, note string) (map[*Ticket]*TicketEvent, error) {
+// TicketsAddNote adds a note to the passed in tickets
+func TicketsAddNote(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, note string) (map[*Ticket]*TicketEvent, error) {
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 
 	for _, ticket := range tickets {
-		e := NewTicketNoteEvent(ticket, userID, note)
+		e := NewTicketNoteAddedEvent(ticket, userID, note)
 		events = append(events, e)
 		eventsByTicket[ticket] = e
 	}
@@ -440,6 +445,55 @@ func NoteTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, 
 	err := UpdateTicketLastActivity(ctx, db, tickets)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating ticket activity")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	return eventsByTicket, nil
+}
+
+const ticketsChangeTopicSQL = `
+UPDATE
+  tickets_ticket
+SET
+  topic_id = $2,
+  modified_on = $3,
+  last_activity_on = $3
+WHERE
+  id = ANY($1)
+`
+
+// TicketsChangeTopic changes the topic of the passed in tickets
+func TicketsChangeTopic(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, topicID TopicID) (map[*Ticket]*TicketEvent, error) {
+	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	now := dates.Now()
+
+	fmt.Printf("TicketsChangeTopic topic=%d\n", topicID)
+
+	for _, ticket := range tickets {
+		fmt.Printf("ticket #%d topic=%d\n", ticket.ID(), ticket.TopicID())
+		if ticket.TopicID() != topicID {
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.TopicID = topicID
+			t.ModifiedOn = now
+			t.LastActivityOn = now
+
+			e := NewTicketTopicChangedEvent(ticket, userID, topicID)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
+		}
+	}
+
+	// mark the tickets as assigned in the db
+	err := Exec(ctx, "change tickets topic", db, ticketsChangeTopicSQL, pq.Array(ids), topicID, now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
 	}
 
 	err = InsertTicketEvents(ctx, db, events)

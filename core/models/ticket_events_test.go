@@ -19,7 +19,7 @@ func TestTicketEvents(t *testing.T) {
 		db.MustExec(`DELETE FROM tickets_ticket`)
 	}()
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "17", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Need help", "Have you seen my cookies?", "17", nil)
 	modelTicket := ticket.Load(db)
 
 	e1 := models.NewTicketOpenedEvent(modelTicket, testdata.Admin.ID, testdata.Agent.ID)
@@ -36,8 +36,8 @@ func TestTicketEvents(t *testing.T) {
 	assert.Equal(t, null.String("please handle"), e2.Note())
 	assert.Equal(t, testdata.Admin.ID, e2.CreatedByID())
 
-	e3 := models.NewTicketNoteEvent(modelTicket, testdata.Agent.ID, "please handle")
-	assert.Equal(t, models.TicketEventTypeNote, e3.EventType())
+	e3 := models.NewTicketNoteAddedEvent(modelTicket, testdata.Agent.ID, "please handle")
+	assert.Equal(t, models.TicketEventTypeNoteAdded, e3.EventType())
 	assert.Equal(t, null.String("please handle"), e3.Note())
 	assert.Equal(t, testdata.Agent.ID, e3.CreatedByID())
 
@@ -48,6 +48,11 @@ func TestTicketEvents(t *testing.T) {
 	e5 := models.NewTicketReopenedEvent(modelTicket, testdata.Editor.ID)
 	assert.Equal(t, models.TicketEventTypeReopened, e5.EventType())
 	assert.Equal(t, testdata.Editor.ID, e5.CreatedByID())
+
+	e6 := models.NewTicketTopicChangedEvent(modelTicket, testdata.Agent.ID, testdata.SupportTopic.ID)
+	assert.Equal(t, models.TicketEventTypeTopicChanged, e6.EventType())
+	assert.Equal(t, testdata.SupportTopic.ID, e6.TopicID())
+	assert.Equal(t, testdata.Agent.ID, e6.CreatedByID())
 
 	err := models.InsertTicketEvents(ctx, db, []*models.TicketEvent{e1, e2, e3, e4, e5})
 	require.NoError(t, err)

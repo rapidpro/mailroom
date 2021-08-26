@@ -26,9 +26,9 @@ func TestContacts(t *testing.T) {
 	defer testsuite.Reset()
 
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Problem!", "Where are my shoes?", "1234", testdata.Agent)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Another Problem!", "Where are my pants?", "2345", nil)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Urgent", "His name is Bob", "", testdata.Editor)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Problem!", "Where are my shoes?", "1234", testdata.Agent)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SalesTopic, "Another Problem!", "Where are my pants?", "2345", nil)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "Urgent", "His name is Bob", "", testdata.Editor)
 
 	// delete mailgun ticketer
 	db.MustExec(`UPDATE tickets_ticketer SET is_active = false WHERE id = $1`, testdata.Mailgun.ID)
@@ -64,8 +64,10 @@ func TestContacts(t *testing.T) {
 
 	cathyTickets := cathy.Tickets().All()
 	assert.Equal(t, "Problem!", cathyTickets[0].Subject())
+	assert.Equal(t, "Support", cathyTickets[0].Topic().Name())
 	assert.Equal(t, "agent1@nyaruka.com", cathyTickets[0].Assignee().Email())
 	assert.Equal(t, "Another Problem!", cathyTickets[1].Subject())
+	assert.Equal(t, "Sales", cathyTickets[1].Topic().Name())
 	assert.Nil(t, cathyTickets[1].Assignee())
 
 	assert.Equal(t, "Yobe", cathy.Fields()["state"].QueryValue())
