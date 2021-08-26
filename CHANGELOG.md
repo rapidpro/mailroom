@@ -1,3 +1,8 @@
+v6.5.20
+----------
+ * Add endpoint to change ticket topic
+ * Update to latest goflow/gocommon/phonenumbers
+
 v6.5.19
 ----------
  * Update to latest goflow to get ticket topic changes there
