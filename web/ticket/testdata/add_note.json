@@ -2,7 +2,7 @@
     {
         "label": "adds a note to the given tickets",
         "method": "POST",
-        "path": "/mr/ticket/note",
+        "path": "/mr/ticket/add_note",
         "body": {
             "org_id": 1,
             "user_id": 3,

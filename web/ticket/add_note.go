@@ -12,16 +12,16 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/note", web.RequireAuthToken(web.WithHTTPLogs(handleNote)))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/add_note", web.RequireAuthToken(web.WithHTTPLogs(handleAddNote)))
 }
 
-type noteRequest struct {
+type addNoteRequest struct {
 	bulkTicketRequest
 
 	Note string `json:"note"`
 }
 
-// Assigns the tickets with the given ids to the given user
+// Adds the given text note to the tickets with the given ids
 //
 //   {
 //     "org_id": 123,
@@ -30,8 +30,8 @@ type noteRequest struct {
 //     "note": "spam"
 //   }
 //
-func handleNote(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
-	request := &noteRequest{}
+func handleAddNote(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+	request := &addNoteRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}

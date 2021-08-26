@@ -22,7 +22,7 @@ func TestTicketAssign(t *testing.T) {
 	web.RunWebTests(t, "testdata/assign.json", nil)
 }
 
-func TestTicketNote(t *testing.T) {
+func TestTicketAddNote(t *testing.T) {
 	_, _, db, _ := testsuite.Reset()
 
 	// create 2 open tickets and 1 closed one for Cathy across two different ticketers
@@ -30,7 +30,7 @@ func TestTicketNote(t *testing.T) {
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "More help", "Have you seen my cookies?", "21", testdata.Agent)
 	testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Old question", "Have you seen my cookies?", "34", nil)
 
-	web.RunWebTests(t, "testdata/note.json", nil)
+	web.RunWebTests(t, "testdata/add_note.json", nil)
 }
 
 func TestTicketClose(t *testing.T) {
