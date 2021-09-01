@@ -18,6 +18,13 @@ type User struct {
 	Email string
 }
 
+func (u *User) SafeID() models.UserID {
+	if u != nil {
+		return u.ID
+	}
+	return models.NilUserID
+}
+
 type Classifier struct {
 	ID   models.ClassifierID
 	UUID assets.ClassifierUUID

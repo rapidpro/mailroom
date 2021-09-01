@@ -44,5 +44,11 @@ func (h *insertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 		return errors.Wrapf(err, "error inserting ticket opened events")
 	}
 
+	// and insert logs/notifications for those
+	err = models.LogTicketsOpened(ctx, tx, oa, openEvents)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting ticket opened logs and notifications")
+	}
+
 	return nil
 }

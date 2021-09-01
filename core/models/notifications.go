@@ -34,9 +34,10 @@ type Log struct {
 	LogType     LogType `db:"log_type"`
 	CreatedByID UserID  `db:"created_by_id"`
 
-	BroadcastID BroadcastID `db:"broadcast_id"`
-	FlowStartID StartID     `db:"flow_start_id"`
-	TicketID    TicketID    `db:"ticket_id"`
+	BroadcastID   BroadcastID   `db:"broadcast_id"`
+	FlowStartID   StartID       `db:"flow_start_id"`
+	TicketID      TicketID      `db:"ticket_id"`
+	TicketEventID TicketEventID `db:"ticket_event_id"`
 }
 
 type Notification struct {
@@ -46,32 +47,92 @@ type Notification struct {
 	LogID  LogID  `db:"log_id"`
 }
 
-func LogTicketOpened(ctx context.Context, db Queryer, oa *OrgAssets, ticket *Ticket) error {
-	log := &Log{OrgID: ticket.OrgID(), LogType: LogTypeTicketOpened, TicketID: ticket.ID()}
-	return logAndNotify(ctx, db, oa, log, []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}, false)
+type notifyWhoFunc func(l *Log) ([]UserRole, []UserID)
+
+func notifyUser(id UserID) notifyWhoFunc {
+	return func(l *Log) ([]UserRole, []UserID) {
+		return nil, []UserID{id}
+	}
+}
+
+func notifyRoles(roles ...UserRole) notifyWhoFunc {
+	return func(l *Log) ([]UserRole, []UserID) {
+		return roles, nil
+	}
+}
+
+// LogTicketsOpened logs the opening of new tickets and notifies all assignable users if tickets is not already assigned
+func LogTicketsOpened(ctx context.Context, db Queryer, oa *OrgAssets, openEvents []*TicketEvent) error {
+	// create log for each ticket event and record of which ones are for tickets which are already assigned
+	logs := make([]*Log, len(openEvents))
+	assigned := make(map[*Log]bool, len(openEvents))
+
+	for i, evt := range openEvents {
+		log := &Log{
+			OrgID:         evt.OrgID(),
+			LogType:       LogTypeTicketOpened,
+			CreatedByID:   evt.CreatedByID(),
+			TicketID:      evt.TicketID(),
+			TicketEventID: evt.ID(),
+		}
+		logs[i] = log
+		assigned[log] = evt.AssigneeID() != NilUserID
+	}
+
+	return insertLogsAndNotifications(ctx, db, oa, logs, func(l *Log) ([]UserRole, []UserID) {
+		if !assigned[l] {
+			return []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}, nil
+		}
+		return nil, nil
+	})
+}
+
+// LogTicketAssigned logs the assignment of a ticket and notifies the assignee
+func LogTicketAssigned(ctx context.Context, db Queryer, oa *OrgAssets, ticket *Ticket, assignment *TicketEvent) error {
+	log := &Log{
+		OrgID:         assignment.OrgID(),
+		LogType:       LogTypeTicketAssignment,
+		CreatedByID:   assignment.CreatedByID(),
+		TicketID:      ticket.ID(),
+		TicketEventID: assignment.ID(),
+	}
+
+	return insertLogsAndNotifications(ctx, db, oa, []*Log{log}, notifyUser(assignment.AssigneeID()))
 }
 
 const insertLogSQL = `
-INSERT INTO notifications_log(org_id,  log_type, created_on,  created_by_id,  broadcast_id,  flow_start_id,  ticket_id) 
-                      VALUES(:org_id, :log_type,      NOW(), :created_by_id, :broadcast_id, :flow_start_id, :ticket_id)
+INSERT INTO notifications_log(org_id,  log_type, created_on,  created_by_id,  broadcast_id,  flow_start_id,  ticket_id,  ticket_event_id) 
+                      VALUES(:org_id, :log_type,      NOW(), :created_by_id, :broadcast_id, :flow_start_id, :ticket_id, :ticket_event_id)
 RETURNING id`
 
 const insertNotificationSQL = `
 INSERT INTO notifications_notification(org_id,  user_id,  log_id,  is_seen) 
                                VALUES(:org_id, :user_id, :log_id,  FALSE)`
 
-func logAndNotify(ctx context.Context, db Queryer, oa *OrgAssets, log *Log, notifyRoles []UserRole, notifyUser bool) error {
-	// TODO use a more efficient simple Exec
-	err := dbutil.BulkQuery(ctx, db, insertLogSQL, []interface{}{log})
-	if err != nil {
-		return errors.Wrapf(err, "error inserting %s log", log.LogType)
+func insertLogsAndNotifications(ctx context.Context, db Queryer, oa *OrgAssets, logs []*Log, notifyWho notifyWhoFunc) error {
+	is := make([]interface{}, len(logs))
+	for i := range logs {
+		is[i] = logs[i]
 	}
 
-	notifyUsers := getUsersToNotify(oa, notifyRoles, notifyUser, log.CreatedByID)
+	err := dbutil.BulkQuery(ctx, db, insertLogSQL, is)
+	if err != nil {
+		return errors.Wrap(err, "error inserting logs")
+	}
 
 	var notifications []interface{}
-	for _, user := range notifyUsers {
-		notifications = append(notifications, &Notification{OrgID: oa.OrgID(), UserID: user.ID(), LogID: log.ID})
+
+	for _, log := range logs {
+		notifyRoles, notifyUsers := notifyWho(log)
+
+		for _, u := range oa.users {
+			user := u.(*User)
+
+			// don't create a notification for the user that did the logged thing
+			if log.CreatedByID != user.ID() && userMatchesRoleOrID(user, notifyRoles, notifyUsers) {
+				notifications = append(notifications, &Notification{OrgID: oa.OrgID(), UserID: user.ID(), LogID: log.ID})
+			}
+		}
 	}
 
 	err = dbutil.BulkQuery(ctx, db, insertNotificationSQL, notifications)
@@ -79,23 +140,16 @@ func logAndNotify(ctx context.Context, db Queryer, oa *OrgAssets, log *Log, noti
 	return errors.Wrap(err, "error inserting notifications")
 }
 
-func getUsersToNotify(oa *OrgAssets, notifyRoles []UserRole, notifyUser bool, logUserID UserID) []*User {
-	var users []*User
-
-	for _, u := range oa.users {
-		user := u.(*User)
-
-		if !notifyUser && logUserID == user.ID() {
-			continue
-		}
-
-		for _, r := range notifyRoles {
-			if user.Role() == r {
-				users = append(users, user)
-				break
-			}
+func userMatchesRoleOrID(user *User, roles []UserRole, ids []UserID) bool {
+	for _, r := range roles {
+		if user.Role() == r {
+			return true
 		}
 	}
-
-	return users
+	for _, id := range ids {
+		if user.ID() == id {
+			return true
+		}
+	}
+	return false
 }
