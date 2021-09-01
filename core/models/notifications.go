@@ -24,7 +24,7 @@ const (
 	LogTypeImportCompleted    LogType = "import:completed"
 	LogTypeTicketOpened       LogType = "ticket:opened"
 	LogTypeTicketNewMsgs      LogType = "ticket:msgs"
-	LogTypeTicketAssignment   LogType = "ticket:assign"
+	LogTypeTicketAssigned     LogType = "ticket:assigned"
 	LogTypeTicketNote         LogType = "ticket:note"
 )
 
@@ -62,42 +62,68 @@ func notifyRoles(roles ...UserRole) notifyWhoFunc {
 }
 
 // LogTicketsOpened logs the opening of new tickets and notifies all assignable users if tickets is not already assigned
-func LogTicketsOpened(ctx context.Context, db Queryer, oa *OrgAssets, openEvents []*TicketEvent) error {
-	// create log for each ticket event and record of which ones are for tickets which are already assigned
-	logs := make([]*Log, len(openEvents))
-	assigned := make(map[*Log]bool, len(openEvents))
+func LogTicketsOpened(ctx context.Context, db Queryer, oa *OrgAssets, events []*TicketEvent) error {
+	// create log for each ticket event and record which users are assigned
+	logs := make([]*Log, len(events))
+	assignees := make(map[*Log]UserID, len(events))
 
-	for i, evt := range openEvents {
+	for i, evt := range events {
+		logType := LogTypeTicketOpened
+		if evt.AssigneeID() != NilUserID {
+			logType = LogTypeTicketAssigned
+		}
+
 		log := &Log{
 			OrgID:         evt.OrgID(),
-			LogType:       LogTypeTicketOpened,
+			LogType:       logType,
 			CreatedByID:   evt.CreatedByID(),
 			TicketID:      evt.TicketID(),
 			TicketEventID: evt.ID(),
 		}
 		logs[i] = log
-		assigned[log] = evt.AssigneeID() != NilUserID
+		assignees[log] = evt.AssigneeID()
 	}
 
 	return insertLogsAndNotifications(ctx, db, oa, logs, func(l *Log) ([]UserRole, []UserID) {
-		if !assigned[l] {
-			return []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}, nil
+		// if this log is actually an assignment then only notify the assignee
+		if l.LogType == LogTypeTicketAssigned {
+			return nil, []UserID{assignees[l]}
 		}
-		return nil, nil
+
+		// otherwise notify all possible assignees
+		return []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}, nil
 	})
 }
 
-// LogTicketAssigned logs the assignment of a ticket and notifies the assignee
-func LogTicketAssigned(ctx context.Context, db Queryer, oa *OrgAssets, ticket *Ticket, assignment *TicketEvent) error {
-	log := &Log{
-		OrgID:         assignment.OrgID(),
-		LogType:       LogTypeTicketAssignment,
-		CreatedByID:   assignment.CreatedByID(),
-		TicketID:      ticket.ID(),
-		TicketEventID: assignment.ID(),
+// LogTicketsAssigned logs the assignment of tickets and notifies the assignees
+func LogTicketsAssigned(ctx context.Context, db Queryer, oa *OrgAssets, events []*TicketEvent) error {
+	// create log for each ticket event and record which users are assigned
+	logs := make([]*Log, len(events))
+	assignees := make(map[*Log]UserID, len(events))
+
+	for i, evt := range events {
+		log := &Log{
+			OrgID:         evt.OrgID(),
+			LogType:       LogTypeTicketAssigned,
+			CreatedByID:   evt.CreatedByID(),
+			TicketID:      evt.TicketID(),
+			TicketEventID: evt.ID(),
+		}
+		logs[i] = log
+		assignees[log] = evt.AssigneeID()
 	}
 
-	return insertLogsAndNotifications(ctx, db, oa, []*Log{log}, notifyUser(assignment.AssigneeID()))
+	return insertLogsAndNotifications(ctx, db, oa, logs, func(l *Log) ([]UserRole, []UserID) {
+		assigneeID := assignees[l]
+
+		// if ticket has been assigned, notify assignee
+		if assigneeID != NilUserID {
+			return nil, []UserID{assigneeID}
+		}
+
+		// otherwise don't notify anyone if it's being unassigned
+		return nil, nil
+	})
 }
 
 const insertLogSQL = `

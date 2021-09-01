@@ -420,12 +420,17 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 	// mark the tickets as assigned in the db
 	err := Exec(ctx, "assign tickets", db, ticketsAssignSQL, pq.Array(ids), assigneeID, now)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error updating tickets")
+		return nil, errors.Wrap(err, "error updating tickets")
 	}
 
 	err = InsertTicketEvents(ctx, db, events)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting ticket events")
+		return nil, errors.Wrap(err, "error inserting ticket events")
+	}
+
+	err = LogTicketsAssigned(ctx, db, oa, events)
+	if err != nil {
+		return nil, errors.Wrap(err, "error inserting logs and notifications")
 	}
 
 	return eventsByTicket, nil
