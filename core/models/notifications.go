@@ -49,6 +49,7 @@ type Notification struct {
 
 type notifyWhoFunc func(l *Log) ([]UserRole, []UserID)
 
+/*
 func notifyUser(id UserID) notifyWhoFunc {
 	return func(l *Log) ([]UserRole, []UserID) {
 		return nil, []UserID{id}
@@ -60,6 +61,7 @@ func notifyRoles(roles ...UserRole) notifyWhoFunc {
 		return roles, nil
 	}
 }
+*/
 
 // LogTicketsOpened logs the opening of new tickets and notifies all assignable users if tickets is not already assigned
 func LogTicketsOpened(ctx context.Context, db Queryer, oa *OrgAssets, events []*TicketEvent) error {
