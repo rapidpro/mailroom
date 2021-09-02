@@ -167,7 +167,7 @@ func TestResume(t *testing.T) {
 
 	defer testsuite.ResetStorage()
 
-	// write sessions to storage as well
+	// write sessions to s3 storage
 	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3"}' WHERE id = 1`)
 	defer testsuite.ResetDB()
 
@@ -186,7 +186,7 @@ func TestResume(t *testing.T) {
 
 	testsuite.AssertQuery(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`, contact.ID(), flow.ID()).Returns(1)
+		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NULL`, contact.ID(), flow.ID()).Returns(1)
 
 	testsuite.AssertQuery(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
@@ -220,7 +220,7 @@ func TestResume(t *testing.T) {
 
 		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND output_url IS NOT NULL`, contact.ID(), flow.ID(), tc.SessionStatus).
+			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, contact.ID(), flow.ID(), tc.SessionStatus).
 			Returns(1, "%d: didn't find expected session", i)
 
 		runIsActive := tc.RunStatus == models.RunStatusActive || tc.RunStatus == models.RunStatusWaiting
