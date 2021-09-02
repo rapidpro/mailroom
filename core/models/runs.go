@@ -429,34 +429,28 @@ func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, st storage.Storag
 		contact: contact,
 	}
 	session.scene = NewSceneForSession(session)
-	err = rows.StructScan(&session.s)
-	if err != nil {
+
+	if err := rows.StructScan(&session.s); err != nil {
 		return nil, errors.Wrapf(err, "error scanning session")
 	}
 
-	// load our output if necessary
-	if org.Org().SessionStorageMode() == S3Sessions && session.OutputURL() != "" {
-		start := time.Now()
-
+	// load our output from storage if necessary
+	if session.OutputURL() != "" {
 		// strip just the path out of our output URL
 		u, err := url.Parse(session.OutputURL())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error parsing output URL: %s", session.OutputURL())
 		}
 
-		// get our session from storage
+		start := time.Now()
+
 		_, output, err := st.Get(ctx, u.Path)
 		if err != nil {
-			logrus.WithField("output_url", session.OutputURL()).WithField("org_id", org.OrgID()).WithField("session_uuid", session.UUID()).WithError(err).Error("error reading in session output from storage")
-
-			// we'll throw an error up only if we don't have a DB backdown
-			if session.Output() == "" {
-				return nil, errors.Wrapf(err, "error reading session from storage: %s", session.OutputURL())
-			}
-		} else {
-			session.s.Output = null.String(output)
-			logrus.WithField("elapsed", time.Since(start)).WithField("output_url", session.OutputURL()).Debug("loaded session from storage")
+			return nil, errors.Wrapf(err, "error reading session from storage: %s", session.OutputURL())
 		}
+
+		logrus.WithField("elapsed", time.Since(start)).WithField("output_url", session.OutputURL()).Debug("loaded session from storage")
+		session.s.Output = null.String(output)
 	}
 
 	return session, nil
