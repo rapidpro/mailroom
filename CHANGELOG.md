@@ -1,3 +1,8 @@
+v6.5.21
+----------
+ * Read sessions from db or s3 depending on whether output_url is set
+ * Don't write output in db when writing to s3
+
 v6.5.20
 ----------
  * Add endpoint to change ticket topic
