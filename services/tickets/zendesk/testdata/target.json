@@ -105,5 +105,28 @@
                 "count": 1
             }
         ]
+    },
+    {
+        "label": "ticket updated also when status is non-English",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/target/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "headers": {
+            "Authorization": "Basic emVuZGVzazpzZXNhbWU="
+        },
+        "body": {
+            "event": "status_changed",
+            "id": 1234,
+            "status": "Abierto"
+        },
+        "status": 200,
+        "response": {
+            "status": "handled"
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from tickets_ticket where status = 'O'",
+                "count": 1
+            }
+        ]
     }
 ]
