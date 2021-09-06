@@ -2,180 +2,114 @@ package models
 
 import (
 	"context"
+	"time"
 
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/pkg/errors"
 )
 
-// LogID is our type for log ids
-type LogID int
+// NotificationID is our type for notification ids
+type NotificationID int
 
-type LogType string
+type NotificationType string
 
 const (
-	LogTypeBroadcastStarted   LogType = "bcast:started"
-	LogTypeBroadcastCompleted LogType = "bcast:completed"
-	LogTypeChannelAlert       LogType = "channel:alert"
-	LogTypeExportStarted      LogType = "export:started"
-	LogTypeExportCompleted    LogType = "export:completed"
-	LogTypeFlowStartStarted   LogType = "start:started"
-	LogTypeFlowStartCompleted LogType = "start:completed"
-	LogTypeImportStarted      LogType = "import:started"
-	LogTypeImportCompleted    LogType = "import:completed"
-	LogTypeTicketOpened       LogType = "ticket:opened"
-	LogTypeTicketNewMsgs      LogType = "ticket:msgs"
-	LogTypeTicketAssigned     LogType = "ticket:assigned"
-	LogTypeTicketNote         LogType = "ticket:note"
+	NotificationTypeChannelAlert    NotificationType = "channel:alert"
+	NotificationTypeExportFinished  NotificationType = "export:finished"
+	NotificationTypeImportFinished  NotificationType = "import:finished"
+	NotificationTypeTicketsOpened   NotificationType = "tickets:opened"
+	NotificationTypeTicketsActivity NotificationType = "tickets:activity"
 )
 
-type Log struct {
-	ID          LogID   `db:"id"`
-	OrgID       OrgID   `db:"org_id"`
-	LogType     LogType `db:"log_type"`
-	CreatedByID UserID  `db:"created_by_id"`
-
-	BroadcastID   BroadcastID   `db:"broadcast_id"`
-	FlowStartID   StartID       `db:"flow_start_id"`
-	TicketID      TicketID      `db:"ticket_id"`
-	TicketEventID TicketEventID `db:"ticket_event_id"`
-}
-
 type Notification struct {
-	ID     LogID  `db:"id"`
-	OrgID  OrgID  `db:"org_id"`
-	UserID UserID `db:"user_id"`
-	LogID  LogID  `db:"log_id"`
+	ID        NotificationID   `db:"id"`
+	OrgID     OrgID            `db:"org_id"`
+	Type      NotificationType `db:"notification_type"`
+	Scope     string           `db:"scope"`
+	UserID    UserID           `db:"user_id"`
+	IsSeen    bool             `db:"is_seen"`
+	CreatedOn time.Time        `db:"created_on"`
+
+	ChannelID       ChannelID       `db:"channel_id"`
+	ContactImportID ContactImportID `db:"contact_import_id"`
 }
 
-type notifyWhoFunc func(l *Log) ([]UserRole, []UserID)
+var ticketAssignableToles = []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}
 
-/*
-func notifyUser(id UserID) notifyWhoFunc {
-	return func(l *Log) ([]UserRole, []UserID) {
-		return nil, []UserID{id}
-	}
-}
+// NotificationsFromTicketEvents logs the opening of new tickets and notifies all assignable users if tickets is not already assigned
+func NotificationsFromTicketEvents(ctx context.Context, db Queryer, oa *OrgAssets, events map[*Ticket]*TicketEvent) error {
+	notifyTicketsOpened := make(map[UserID]bool)
+	notifyTicketsActivity := make(map[UserID]bool)
 
-func notifyRoles(roles ...UserRole) notifyWhoFunc {
-	return func(l *Log) ([]UserRole, []UserID) {
-		return roles, nil
-	}
-}
-*/
+	for ticket, evt := range events {
+		switch evt.EventType() {
+		case TicketEventTypeOpened:
+			// if ticket is unassigned notify all possible assignees
+			if evt.AssigneeID() == NilUserID {
+				for _, u := range oa.users {
+					user := u.(*User)
 
-// LogTicketsOpened logs the opening of new tickets and notifies all assignable users if tickets is not already assigned
-func LogTicketsOpened(ctx context.Context, db Queryer, oa *OrgAssets, events []*TicketEvent) error {
-	// create log for each ticket event and record which users are assigned
-	logs := make([]*Log, len(events))
-	assignees := make(map[*Log]UserID, len(events))
-
-	for i, evt := range events {
-		logType := LogTypeTicketOpened
-		if evt.AssigneeID() != NilUserID {
-			logType = LogTypeTicketAssigned
-		}
-
-		log := &Log{
-			OrgID:         evt.OrgID(),
-			LogType:       logType,
-			CreatedByID:   evt.CreatedByID(),
-			TicketID:      evt.TicketID(),
-			TicketEventID: evt.ID(),
-		}
-		logs[i] = log
-		assignees[log] = evt.AssigneeID()
-	}
-
-	return insertLogsAndNotifications(ctx, db, oa, logs, func(l *Log) ([]UserRole, []UserID) {
-		// if this log is actually an assignment then only notify the assignee
-		if l.LogType == LogTypeTicketAssigned {
-			return nil, []UserID{assignees[l]}
-		}
-
-		// otherwise notify all possible assignees
-		return []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}, nil
-	})
-}
-
-// LogTicketsAssigned logs the assignment of tickets and notifies the assignees
-func LogTicketsAssigned(ctx context.Context, db Queryer, oa *OrgAssets, events []*TicketEvent) error {
-	// create log for each ticket event and record which users are assigned
-	logs := make([]*Log, len(events))
-	assignees := make(map[*Log]UserID, len(events))
-
-	for i, evt := range events {
-		log := &Log{
-			OrgID:         evt.OrgID(),
-			LogType:       LogTypeTicketAssigned,
-			CreatedByID:   evt.CreatedByID(),
-			TicketID:      evt.TicketID(),
-			TicketEventID: evt.ID(),
-		}
-		logs[i] = log
-		assignees[log] = evt.AssigneeID()
-	}
-
-	return insertLogsAndNotifications(ctx, db, oa, logs, func(l *Log) ([]UserRole, []UserID) {
-		assigneeID := assignees[l]
-
-		// if ticket has been assigned, notify assignee
-		if assigneeID != NilUserID {
-			return nil, []UserID{assigneeID}
-		}
-
-		// otherwise don't notify anyone if it's being unassigned
-		return nil, nil
-	})
-}
-
-const insertLogSQL = `
-INSERT INTO notifications_log(org_id,  log_type, created_on,  created_by_id,  broadcast_id,  flow_start_id,  ticket_id,  ticket_event_id) 
-                      VALUES(:org_id, :log_type,      NOW(), :created_by_id, :broadcast_id, :flow_start_id, :ticket_id, :ticket_event_id)
-RETURNING id`
-
-const insertNotificationSQL = `
-INSERT INTO notifications_notification(org_id,  user_id,  log_id,  is_seen) 
-                               VALUES(:org_id, :user_id, :log_id,  FALSE)`
-
-func insertLogsAndNotifications(ctx context.Context, db Queryer, oa *OrgAssets, logs []*Log, notifyWho notifyWhoFunc) error {
-	is := make([]interface{}, len(logs))
-	for i := range logs {
-		is[i] = logs[i]
-	}
-
-	err := dbutil.BulkQuery(ctx, db, insertLogSQL, is)
-	if err != nil {
-		return errors.Wrap(err, "error inserting logs")
-	}
-
-	var notifications []interface{}
-
-	for _, log := range logs {
-		notifyRoles, notifyUsers := notifyWho(log)
-
-		for _, u := range oa.users {
-			user := u.(*User)
-
-			// don't create a notification for the user that did the logged thing
-			if log.CreatedByID != user.ID() && userMatchesRoleOrID(user, notifyRoles, notifyUsers) {
-				notifications = append(notifications, &Notification{OrgID: oa.OrgID(), UserID: user.ID(), LogID: log.ID})
+					if hasAnyRole(user, ticketAssignableToles) && evt.CreatedByID() != user.ID() {
+						notifyTicketsOpened[user.ID()] = true
+					}
+				}
+			} else if evt.AssigneeID() != evt.CreatedByID() {
+				notifyTicketsActivity[evt.AssigneeID()] = true
+			}
+		case TicketEventTypeAssigned:
+			// notify new ticket assignee if they didn't self-assign
+			if evt.AssigneeID() != NilUserID && evt.AssigneeID() != evt.CreatedByID() {
+				notifyTicketsActivity[evt.AssigneeID()] = true
+			}
+		case TicketEventTypeNoteAdded:
+			// notify ticket assignee if they didn't add note themselves
+			if ticket.AssigneeID() != evt.CreatedByID() {
+				notifyTicketsActivity[ticket.AssigneeID()] = true
 			}
 		}
 	}
 
-	err = dbutil.BulkQuery(ctx, db, insertNotificationSQL, notifications)
+	notifications := make([]*Notification, 0, len(events))
 
+	for userID := range notifyTicketsOpened {
+		notifications = append(notifications, &Notification{
+			OrgID:  oa.OrgID(),
+			Type:   NotificationTypeTicketsOpened,
+			Scope:  "",
+			UserID: userID,
+		})
+	}
+
+	for userID := range notifyTicketsActivity {
+		notifications = append(notifications, &Notification{
+			OrgID:  oa.OrgID(),
+			Type:   NotificationTypeTicketsActivity,
+			Scope:  "",
+			UserID: userID,
+		})
+	}
+
+	return insertNotifications(ctx, db, notifications)
+}
+
+const insertNotificationSQL = `
+INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user_id, is_seen, created_on,  channel_id,  contact_import_id) 
+                               VALUES(:org_id, :notification_type, :scope, :user_id,   FALSE, NOW(),      :channel_id, :contact_import_id) 
+							   ON CONFLICT DO NOTHING`
+
+func insertNotifications(ctx context.Context, db Queryer, notifications []*Notification) error {
+	is := make([]interface{}, len(notifications))
+	for i := range notifications {
+		is[i] = notifications[i]
+	}
+
+	err := dbutil.BulkQuery(ctx, db, insertNotificationSQL, is)
 	return errors.Wrap(err, "error inserting notifications")
 }
 
-func userMatchesRoleOrID(user *User, roles []UserRole, ids []UserID) bool {
+func hasAnyRole(user *User, roles []UserRole) bool {
 	for _, r := range roles {
 		if user.Role() == r {
-			return true
-		}
-	}
-	for _, id := range ids {
-		if user.ID() == id {
 			return true
 		}
 	}

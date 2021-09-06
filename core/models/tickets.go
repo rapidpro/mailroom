@@ -428,9 +428,9 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 		return nil, errors.Wrap(err, "error inserting ticket events")
 	}
 
-	err = LogTicketsAssigned(ctx, db, oa, events)
+	err = NotificationsFromTicketEvents(ctx, db, oa, eventsByTicket)
 	if err != nil {
-		return nil, errors.Wrap(err, "error inserting logs and notifications")
+		return nil, errors.Wrap(err, "error inserting notifications")
 	}
 
 	return eventsByTicket, nil

@@ -34,8 +34,11 @@ func (h *insertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 
 	// generate opened events for each ticket
 	openEvents := make([]*models.TicketEvent, len(tickets))
+	eventsByTicket := make(map[*models.Ticket]*models.TicketEvent, len(tickets))
 	for i, ticket := range tickets {
-		openEvents[i] = models.NewTicketOpenedEvent(ticket, models.NilUserID, ticket.AssigneeID())
+		evt := models.NewTicketOpenedEvent(ticket, models.NilUserID, ticket.AssigneeID())
+		openEvents[i] = evt
+		eventsByTicket[ticket] = evt
 	}
 
 	// and insert those too
@@ -45,9 +48,9 @@ func (h *insertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 	}
 
 	// and insert logs/notifications for those
-	err = models.LogTicketsOpened(ctx, tx, oa, openEvents)
+	err = models.NotificationsFromTicketEvents(ctx, tx, oa, eventsByTicket)
 	if err != nil {
-		return errors.Wrapf(err, "error inserting logs and notifications")
+		return errors.Wrapf(err, "error inserting notifications")
 	}
 
 	return nil

@@ -210,8 +210,7 @@ func TestTicketsAssign(t *testing.T) {
 	// and there are new assigned events
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A' AND note = 'please handle these'`).Returns(2)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_log WHERE log_type = 'ticket:assigned' AND created_by_id = $1`, testdata.Admin.ID).Returns(2)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_notification WHERE user_id = $1`, testdata.Agent.ID).Returns(2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_notification WHERE user_id = $1 AND notification_type = 'tickets:activity'`, testdata.Agent.ID).Returns(1)
 }
 
 func TestTicketsAddNote(t *testing.T) {
@@ -374,7 +373,6 @@ func TestReopenTickets(t *testing.T) {
 
 func deleteTickets(db *sqlx.DB) {
 	db.MustExec(`DELETE FROM notifications_notification`)
-	db.MustExec(`DELETE FROM notifications_log`)
 	db.MustExec(`DELETE FROM request_logs_httplog`)
 	db.MustExec(`DELETE FROM tickets_ticketevent`)
 	db.MustExec(`DELETE FROM tickets_ticket`)
