@@ -224,7 +224,7 @@ func TestTicketsAddNote(t *testing.T) {
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Problem", "Where my shoes", "123", nil)
 	modelTicket1 := ticket1.Load(db)
 
-	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Old Problem", "Where my pants", "234", nil)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Old Problem", "Where my pants", "234", testdata.Agent)
 	modelTicket2 := ticket2.Load(db)
 
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Ignore", "", "", nil)
@@ -237,6 +237,8 @@ func TestTicketsAddNote(t *testing.T) {
 
 	// check there are new note events
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'N' AND note = 'spam'`).Returns(2)
+
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_notification WHERE user_id = $1 AND notification_type = 'tickets:activity'`, testdata.Agent.ID).Returns(1)
 }
 
 func TestTicketsChangeTopic(t *testing.T) {

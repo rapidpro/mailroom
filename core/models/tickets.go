@@ -457,6 +457,11 @@ func TicketsAddNote(ctx context.Context, db Queryer, oa *OrgAssets, userID UserI
 		return nil, errors.Wrapf(err, "error inserting ticket events")
 	}
 
+	err = NotificationsFromTicketEvents(ctx, db, oa, eventsByTicket)
+	if err != nil {
+		return nil, errors.Wrap(err, "error inserting notifications")
+	}
+
 	return eventsByTicket, nil
 }
 

@@ -63,7 +63,7 @@ func NotificationsFromTicketEvents(ctx context.Context, db Queryer, oa *OrgAsset
 			}
 		case TicketEventTypeNoteAdded:
 			// notify ticket assignee if they didn't add note themselves
-			if ticket.AssigneeID() != evt.CreatedByID() {
+			if ticket.AssigneeID() != NilUserID && ticket.AssigneeID() != evt.CreatedByID() {
 				notifyTicketsActivity[ticket.AssigneeID()] = true
 			}
 		}
