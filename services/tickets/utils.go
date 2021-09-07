@@ -142,7 +142,7 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 
 // CloseTicket closes the given ticket, and creates and queues a closed event
 func CloseTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
-	events, err := models.CloseTickets(ctx, rt.DB, oa, models.NilUserID, []*models.Ticket{ticket}, externally, l)
+	events, err := models.CloseTickets(ctx, rt.DB, oa, models.NilUserID, []*models.Ticket{ticket}, externally, false, l)
 	if err != nil {
 		return errors.Wrap(err, "error closing ticket")
 	}
