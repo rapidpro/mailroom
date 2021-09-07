@@ -1,3 +1,7 @@
+v6.5.22
+----------
+ * Support Spanish status names passed back from Zendesk targets
+
 v6.5.21
 ----------
  * Read sessions from db or s3 depending on whether output_url is set
