@@ -1,3 +1,7 @@
+v6.5.23
+----------
+ * Add force param to close tickets endpoint to let us ignore errors on external ticket service when removing a ticketer
+
 v6.5.22
 ----------
  * Support Spanish status names passed back from Zendesk targets
