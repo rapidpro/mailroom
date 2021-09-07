@@ -517,7 +517,7 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally, force bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
@@ -550,7 +550,7 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 				}
 
 				err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
-				if err != nil {
+				if err != nil && !force {
 					return nil, err
 				}
 			}

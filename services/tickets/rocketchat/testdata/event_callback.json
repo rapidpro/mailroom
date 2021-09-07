@@ -32,7 +32,7 @@
         "text": "We can help"
       }
     },
-    "status": 404,
+    "status": 401,
     "response": {
       "status": "unauthorized"
     }
@@ -54,7 +54,7 @@
         "text": "We can help"
       }
     },
-    "status": 404,
+    "status": 401,
     "response": {
       "status": "unauthorized"
     }
@@ -97,7 +97,7 @@
         "text": "We can help"
       }
     },
-    "status": 400,
+    "status": 404,
     "response": {
       "error": "no such ticket 88bfa1dc-be33-45c2-b469-294ecb0eba90"
     }

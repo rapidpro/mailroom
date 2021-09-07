@@ -48,6 +48,7 @@ func TestTicketClose(t *testing.T) {
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Need help", "Have you seen my cookies?", "17", testdata.Admin)
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "More help", "Have you seen my cookies?", "21", nil)
 	testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Old question", "Have you seen my cookies?", "34", testdata.Editor)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "More help", "Have you seen my cookies?", "21", nil)
 
 	web.RunWebTests(t, "testdata/close.json", nil)
 }

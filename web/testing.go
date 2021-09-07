@@ -65,7 +65,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 
 		actualResponse []byte
 	}
-	tcs := make([]*TestCase, 0, 20)
+	tcs := make([]TestCase, 0, 20)
 	tcJSON, err := os.ReadFile(truthFile)
 	require.NoError(t, err)
 
@@ -73,8 +73,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 		tcJSON = bytes.ReplaceAll(tcJSON, []byte("$"+key+"$"), []byte(value))
 	}
 
-	err = json.Unmarshal(tcJSON, &tcs)
-	require.NoError(t, err)
+	jsonx.MustUnmarshal(tcJSON, &tcs)
 
 	for i, tc := range tcs {
 		dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
@@ -91,14 +90,13 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 		var req *http.Request
 		if tc.BodyEncode == "multipart" {
 			var parts []MultiPartPart
-			err = json.Unmarshal(tc.Body, &parts)
-			require.NoError(t, err)
+			jsonx.MustUnmarshal(tc.Body, &parts)
 
 			req, err = MakeMultipartRequest(tc.Method, testURL, parts, tc.Headers)
 
 		} else if len(tc.Body) >= 2 && tc.Body[0] == '"' { // if body is a string, treat it as a URL encoded submission
 			bodyStr := ""
-			json.Unmarshal(tc.Body, &bodyStr)
+			jsonx.MustUnmarshal(tc.Body, &bodyStr)
 			bodyReader := strings.NewReader(bodyStr)
 			req, err = httpx.NewRequest(tc.Method, testURL, bodyReader, tc.Headers)
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
