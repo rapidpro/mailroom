@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -14,13 +15,19 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 
 	"github.com/jmoiron/sqlx"
 )
 
 // ContactImportID is the type for contact import IDs
-type ContactImportID int64
+type ContactImportID null.Int
+
+func (i ContactImportID) MarshalJSON() ([]byte, error)  { return null.Int(i).MarshalJSON() }
+func (i *ContactImportID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, (*null.Int)(i)) }
+func (i ContactImportID) Value() (driver.Value, error)  { return null.Int(i).Value() }
+func (i *ContactImportID) Scan(value interface{}) error { return null.ScanInt(value, (*null.Int)(i)) }
 
 // ContactImportBatchID is the type for contact import batch IDs
 type ContactImportBatchID int64

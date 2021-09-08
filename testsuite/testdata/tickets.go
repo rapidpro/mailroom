@@ -51,15 +51,11 @@ func insertTicket(db *sqlx.DB, org *Org, contact *Contact, ticketer *Ticketer, s
 		t := dates.Now()
 		closedOn = &t
 	}
-	assigneeID := models.NilUserID
-	if assignee != nil {
-		assigneeID = assignee.ID
-	}
 
 	var id models.TicketID
 	must(db.Get(&id,
 		`INSERT INTO tickets_ticket(uuid, org_id, contact_id, ticketer_id, status, topic_id, subject, body, external_id, opened_on, modified_on, closed_on, last_activity_on, assignee_id)
-		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW(), $10, NOW(), $11) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, status, topic.ID, subject, body, externalID, closedOn, assigneeID,
+		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW(), $10, NOW(), $11) RETURNING id`, uuid, org.ID, contact.ID, ticketer.ID, status, topic.ID, subject, body, externalID, closedOn, assignee.SafeID(),
 	))
 	return &Ticket{id, uuid}
 }

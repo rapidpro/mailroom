@@ -119,6 +119,16 @@ func TestTicketOpened(t *testing.T) {
 					Args:  []interface{}{testdata.Admin.ID},
 					Count: 1,
 				},
+				{ // admin will have a ticket assigned notification for the ticket directly assigned to them
+					SQL:   "select count(*) from notifications_notification where user_id = $1 and notification_type = 'tickets:activity'",
+					Args:  []interface{}{testdata.Admin.ID},
+					Count: 1,
+				},
+				{ // all assignable users will have a ticket opened notification for the unassigned ticket
+					SQL:   "select count(*) from notifications_notification where notification_type = 'tickets:opened'",
+					Args:  nil,
+					Count: 3,
+				},
 			},
 		},
 	}
