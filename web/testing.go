@@ -40,7 +40,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 
 	defer testsuite.ResetStorage()
 
-	server := NewServer(context.Background(), config.Mailroom, db, rp, testsuite.MediaStorage(), nil, wg)
+	server := NewServer(context.Background(), config.Mailroom, db, rp, testsuite.MediaStorage(), testsuite.SessionStorage(), nil, wg)
 	server.Start()
 	defer server.Stop()
 
