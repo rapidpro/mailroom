@@ -29,7 +29,7 @@ func TestSurveyor(t *testing.T) {
 	defer rc.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, nil, wg)
 	server.Start()
 	defer server.Stop()
 
