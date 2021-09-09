@@ -50,7 +50,8 @@ type ContactImport struct {
 	CreatedByID UserID              `db:"created_by_id"`
 	FinishedOn  *time.Time          `db:"finished_on"`
 
-	BatchStatuses []string `db:"batch_statuses"`
+	// we fetch unique batch statuses concatenated as a string, see https://github.com/jmoiron/sqlx/issues/168
+	BatchStatuses string `db:"batch_statuses"`
 }
 
 var loadContactImportSQL = `
@@ -59,16 +60,16 @@ SELECT
   	i.org_id AS "org_id",
   	i.status AS "status",
   	i.created_by_id AS "created_by_id",
-	i.finished_on AS "finished_on"
-	array_agg(DISTINCT b.status) AS "batch_statuses"
+	i.finished_on AS "finished_on",
+	array_to_string(array_agg(DISTINCT b.status), '') AS "batch_statuses"
 FROM
 	contacts_contactimport i
 INNER JOIN
 	contacts_contactimportbatch b ON b.contact_import_id = i.id
 WHERE
-	id = $1
+	i.id = $1
 GROUP BY
-	c.id`
+	i.id`
 
 // LoadContactImport loads a contact import by ID
 func LoadContactImport(ctx context.Context, db Queryer, id ContactImportID) (*ContactImport, error) {

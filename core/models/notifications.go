@@ -38,10 +38,11 @@ type Notification struct {
 // NotifyImportFinished logs the the finishing of a contact import
 func NotifyImportFinished(ctx context.Context, db Queryer, imp *ContactImport) error {
 	n := &Notification{
-		OrgID:  imp.OrgID,
-		Type:   NotificationTypeImportFinished,
-		Scope:  fmt.Sprintf("contact:%d", imp.ID),
-		UserID: imp.CreatedByID,
+		OrgID:           imp.OrgID,
+		Type:            NotificationTypeImportFinished,
+		Scope:           fmt.Sprintf("contact:%d", imp.ID),
+		UserID:          imp.CreatedByID,
+		ContactImportID: imp.ID,
 	}
 
 	return insertNotifications(ctx, db, []*Notification{n})
