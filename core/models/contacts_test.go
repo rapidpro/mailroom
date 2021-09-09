@@ -201,7 +201,7 @@ func TestGetOrCreateContact(t *testing.T) {
 
 	defer testdata.ResetContactData(db)
 
-	testdata.InsertContactGroup(db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Telegrammer", `telegram = 100001`)
+	testdata.InsertContactGroup(db, testdata.Org1, "dcc16d85-8274-4d19-a3c2-152d4ee99380", "Telegrammer", `telegram = 100001`)
 
 	// add some orphaned URNs
 	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
@@ -248,7 +248,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			true,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			testdata.TwilioChannel.ID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
@@ -257,7 +257,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			false,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
@@ -266,7 +266,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			false,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
@@ -275,7 +275,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			false,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
@@ -284,7 +284,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			false,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,

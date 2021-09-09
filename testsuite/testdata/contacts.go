@@ -88,6 +88,7 @@ func InsertContactURN(db *sqlx.DB, org *Org, contact *Contact, urn urns.URN, pri
 func ResetContactData(db *sqlx.DB) {
 	db.MustExec(`DELETE FROM tickets_ticketevent`)
 	db.MustExec(`DELETE FROM tickets_ticket`)
+	db.MustExec(`DELETE FROM channels_channelcount`)
 	db.MustExec(`DELETE FROM msgs_msg`)
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE id >= 30000`)
 	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id >= 30000`)
@@ -101,4 +102,7 @@ func ResetContactData(db *sqlx.DB) {
 	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
 	db.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 30000`)
 	db.MustExec(`ALTER SEQUENCE contacts_contactgroup_id_seq RESTART WITH 30000`)
+
+	// because groups have changed
+	models.FlushCache()
 }

@@ -11,7 +11,9 @@ import (
 )
 
 func TestTicketAssign(t *testing.T) {
-	_, _, db, _ := testsuite.Reset()
+	_, _, db, _ := testsuite.Get()
+
+	defer testdata.ResetContactData(db)
 
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.DefaultTopic, "Need help", "Have you seen my cookies?", "17", testdata.Admin)
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.DefaultTopic, "More help", "Have you seen my cookies?", "21", testdata.Agent)
@@ -22,7 +24,9 @@ func TestTicketAssign(t *testing.T) {
 }
 
 func TestTicketAddNote(t *testing.T) {
-	_, _, db, _ := testsuite.Reset()
+	_, _, db, _ := testsuite.Get()
+
+	defer testdata.ResetContactData(db)
 
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.DefaultTopic, "Need help", "Have you seen my cookies?", "17", testdata.Admin)
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.DefaultTopic, "More help", "Have you seen my cookies?", "21", testdata.Agent)
@@ -32,7 +36,9 @@ func TestTicketAddNote(t *testing.T) {
 }
 
 func TestTicketChangeTopic(t *testing.T) {
-	_, _, db, _ := testsuite.Reset()
+	_, _, db, _ := testsuite.Get()
+
+	defer testdata.ResetContactData(db)
 
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.DefaultTopic, "Need help", "Have you seen my cookies?", "17", testdata.Admin)
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.SupportTopic, "More help", "Have you seen my cookies?", "21", testdata.Agent)
@@ -42,7 +48,9 @@ func TestTicketChangeTopic(t *testing.T) {
 }
 
 func TestTicketClose(t *testing.T) {
-	_, _, db, _ := testsuite.Reset()
+	_, _, db, _ := testsuite.Get()
+
+	defer testdata.ResetContactData(db)
 
 	// create 2 open tickets and 1 closed one for Cathy across two different ticketers
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Need help", "Have you seen my cookies?", "17", testdata.Admin)
@@ -54,7 +62,9 @@ func TestTicketClose(t *testing.T) {
 }
 
 func TestTicketReopen(t *testing.T) {
-	_, _, db, _ := testsuite.Reset()
+	_, _, db, _ := testsuite.Get()
+
+	defer testdata.ResetContactData(db)
 
 	// create 2 closed tickets and 1 open one for Cathy
 	testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Need help", "Have you seen my cookies?", "17", testdata.Admin)
