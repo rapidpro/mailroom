@@ -3,7 +3,6 @@ package contacts_test
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/tasks/contacts"
@@ -18,13 +17,7 @@ func TestImportContactBatch(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	start := time.Now()
-
-	defer func() {
-		db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id > $1`, testdata.Org2Contact.ID)
-		db.MustExec(`DELETE FROM contacts_contacturn WHERE id > $1`, testdata.Org2Contact.URNID)
-		db.MustExec(`DELETE FROM contacts_contact WHERE id > $1`, testdata.Org2Contact.ID)
-	}()
+	defer testdata.ResetContactData(db)
 
 	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
 	batch1ID := testdata.InsertContactImportBatch(db, importID, []byte(`[
@@ -50,7 +43,7 @@ func TestImportContactBatch(t *testing.T) {
 	err = task2.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE created_on > $1`, start).Returns(3)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id >= 30000`).Returns(3)
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Norbert' AND language = 'eng'`).Returns(1)
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Leah' AND language IS NULL`).Returns(1)
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Rowan' AND language = 'spa'`).Returns(1)

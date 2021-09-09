@@ -1,3 +1,8 @@
+v6.5.24
+----------
+ * Fix IVR for orgs using S3 sessions
+ * Ticket notifications (opened and activity)
+
 v6.5.23
 ----------
  * Add force param to close tickets endpoint to let us ignore errors on external ticket service when removing a ticketer
