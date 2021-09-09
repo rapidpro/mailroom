@@ -13,7 +13,7 @@ import (
 func TestServer(t *testing.T) {
 	_, _, db, _ := testsuite.Get()
 
-	defer testdata.ResetContactData(db)
+	defer testsuite.ResetData(db)
 
 	cathyIn := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hello", models.MsgStatusHandled)
 	cathyOut := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "how can we help", nil, models.MsgStatusSent)

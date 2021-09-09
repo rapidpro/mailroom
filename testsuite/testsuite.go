@@ -136,6 +136,37 @@ func ResetStorage() {
 	}
 }
 
+var resetDataSQL = `
+DELETE FROM notifications_notification;
+DELETE FROM request_logs_httplog;
+DELETE FROM tickets_ticketevent;
+DELETE FROM tickets_ticket;
+DELETE FROM channels_channelcount;
+DELETE FROM msgs_msg;
+DELETE FROM campaigns_eventfire;
+DELETE FROM contacts_contactimportbatch;
+DELETE FROM contacts_contactimport;
+DELETE FROM contacts_contacturn WHERE id >= 30000;
+DELETE FROM contacts_contactgroup_contacts WHERE contact_id >= 30000;
+DELETE FROM contacts_contact WHERE id >= 30000;
+DELETE FROM contacts_contactgroupcount WHERE group_id >= 30000;
+DELETE FROM contacts_contactgroup WHERE id >= 30000;
+
+ALTER SEQUENCE tickets_ticket_id_seq RESTART WITH 1;
+ALTER SEQUENCE msgs_msg_id_seq RESTART WITH 1;
+ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000;
+ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 30000;
+ALTER SEQUENCE contacts_contactgroup_id_seq RESTART WITH 30000;`
+
+// ResetData removes contact data not in the test database dump. Note that this function can't
+// undo changes made to the contact data in the test database dump.
+func ResetData(db *sqlx.DB) {
+	db.MustExec(resetDataSQL)
+
+	// because groups have changed
+	models.FlushCache()
+}
+
 // utility function for running a command panicking if there is any error
 func mustExec(command string, args ...string) {
 	cmd := exec.Command(command, args...)

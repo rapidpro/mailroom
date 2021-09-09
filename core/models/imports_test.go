@@ -26,7 +26,7 @@ import (
 )
 
 func TestContactImports(t *testing.T) {
-	ctx, _, db, _ := testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
 
 	defer testsuite.Reset()
 
@@ -149,7 +149,7 @@ func TestContactImports(t *testing.T) {
 func TestLoadContactImport(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testdata.ResetContactData(db)
+	defer testsuite.ResetData(db)
 
 	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
 	batch1ID := testdata.InsertContactImportBatch(db, importID, []byte(`[

@@ -17,7 +17,7 @@ func TestImportContactBatch(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testdata.ResetContactData(db)
+	defer testsuite.ResetData(db)
 
 	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
 	batch1ID := testdata.InsertContactImportBatch(db, importID, []byte(`[

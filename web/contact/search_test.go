@@ -23,7 +23,7 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 
 	wg := &sync.WaitGroup{}
 
