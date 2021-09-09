@@ -1,3 +1,7 @@
+v6.5.25
+----------
+ * Add notifications for contact imports and set contact import status
+
 v6.5.24
 ----------
  * Fix IVR for orgs using S3 sessions
