@@ -64,7 +64,7 @@ SELECT
 	array_to_string(array_agg(DISTINCT b.status), '') AS "batch_statuses"
 FROM
 	contacts_contactimport i
-INNER JOIN
+LEFT OUTER JOIN
 	contacts_contactimportbatch b ON b.contact_import_id = i.id
 WHERE
 	i.id = $1
