@@ -83,14 +83,26 @@ func InsertContactURN(db *sqlx.DB, org *Org, contact *Contact, urn urns.URN, pri
 	return id
 }
 
-// DeleteContactsAndURNs deletes all contacts and URNs
-func DeleteContactsAndURNs(db *sqlx.DB) {
+// ResetContactData removes contact data not in the test database dump. Note that this function can't
+// undo changes made to the contact data in the test database dump.
+func ResetContactData(db *sqlx.DB) {
+	db.MustExec(`DELETE FROM tickets_ticketevent`)
+	db.MustExec(`DELETE FROM tickets_ticket`)
+	db.MustExec(`DELETE FROM channels_channelcount`)
 	db.MustExec(`DELETE FROM msgs_msg`)
-	db.MustExec(`DELETE FROM contacts_contacturn`)
-	db.MustExec(`DELETE FROM contacts_contactgroup_contacts`)
-	db.MustExec(`DELETE FROM contacts_contact`)
+	db.MustExec(`DELETE FROM contacts_contacturn WHERE id >= 30000`)
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id >= 30000`)
+	db.MustExec(`DELETE FROM contacts_contact WHERE id >= 30000`)
+	db.MustExec(`DELETE FROM contacts_contactgroupcount WHERE group_id >= 30000`)
+	db.MustExec(`DELETE FROM contacts_contactgroup WHERE id >= 30000`)
 
-	// reset id sequences back to a known number
-	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 10000`)
-	db.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 10000`)
+	// reset id sequences back
+	db.MustExec(`ALTER SEQUENCE tickets_ticket_id_seq RESTART WITH 1`)
+	db.MustExec(`ALTER SEQUENCE msgs_msg_id_seq RESTART WITH 1`)
+	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
+	db.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 30000`)
+	db.MustExec(`ALTER SEQUENCE contacts_contactgroup_id_seq RESTART WITH 30000`)
+
+	// because groups have changed
+	models.FlushCache()
 }

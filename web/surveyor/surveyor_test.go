@@ -24,9 +24,11 @@ import (
 )
 
 func TestSurveyor(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	wg := &sync.WaitGroup{}
 	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, nil, wg)

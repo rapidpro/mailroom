@@ -30,7 +30,12 @@ func TestContactImports(t *testing.T) {
 
 	defer testsuite.Reset()
 
-	testdata.DeleteContactsAndURNs(db)
+	// start with no contacts or URNs
+	db.MustExec(`DELETE FROM contacts_contacturn`)
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts`)
+	db.MustExec(`DELETE FROM contacts_contact`)
+	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 10000`)
+	db.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 10000`)
 
 	// add contact in other org to make sure we can't update it
 	testdata.InsertContact(db, testdata.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa")
@@ -63,7 +68,7 @@ func TestContactImports(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	for i, tc := range tcs {
-		importID := testdata.InsertContactImport(db, testdata.Org1)
+		importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
 		batchID := testdata.InsertContactImportBatch(db, importID, tc.Specs)
 
 		batch, err := models.LoadContactImportBatch(ctx, db, batchID)
@@ -144,7 +149,7 @@ func TestContactImports(t *testing.T) {
 func TestContactImportBatch(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	importID := testdata.InsertContactImport(db, testdata.Org1)
+	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
 	batchID := testdata.InsertContactImportBatch(db, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
