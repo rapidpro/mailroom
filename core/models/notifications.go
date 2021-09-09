@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -32,6 +33,19 @@ type Notification struct {
 
 	ChannelID       ChannelID       `db:"channel_id"`
 	ContactImportID ContactImportID `db:"contact_import_id"`
+}
+
+// NotifyImportFinished logs the the finishing of a contact import
+func NotifyImportFinished(ctx context.Context, db Queryer, imp *ContactImport) error {
+	n := &Notification{
+		OrgID:           imp.OrgID,
+		Type:            NotificationTypeImportFinished,
+		Scope:           fmt.Sprintf("contact:%d", imp.ID),
+		UserID:          imp.CreatedByID,
+		ContactImportID: imp.ID,
+	}
+
+	return insertNotifications(ctx, db, []*Notification{n})
 }
 
 var ticketAssignableToles = []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}

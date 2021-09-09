@@ -16,7 +16,7 @@ import (
 func TestTicketNotifications(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer deleteTickets(db)
+	defer testdata.ResetContactData(db)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -103,6 +103,28 @@ func TestTicketNotifications(t *testing.T) {
 
 	// no notifications for self-assignment
 	assertNotifications(t, ctx, db, t5, map[*testdata.User][]models.NotificationType{})
+}
+
+func TestImportNotifications(t *testing.T) {
+	ctx, _, db, _ := testsuite.Get()
+
+	defer testdata.ResetContactData(db)
+
+	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Editor)
+	imp, err := models.LoadContactImport(ctx, db, importID)
+	require.NoError(t, err)
+
+	err = imp.MarkFinished(ctx, db, models.ContactImportStatusComplete)
+	require.NoError(t, err)
+
+	t0 := time.Now()
+
+	err = models.NotifyImportFinished(ctx, db, imp)
+	require.NoError(t, err)
+
+	assertNotifications(t, ctx, db, t0, map[*testdata.User][]models.NotificationType{
+		testdata.Editor: {models.NotificationTypeImportFinished},
+	})
 }
 
 func assertNotifications(t *testing.T, ctx context.Context, db *sqlx.DB, after time.Time, expected map[*testdata.User][]models.NotificationType) {
