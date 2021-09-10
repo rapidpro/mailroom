@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/assets/static/types"
+	"github.com/nyaruka/goflow/assets/static"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/test"
@@ -57,7 +57,7 @@ func TestOpenAndForward(t *testing.T) {
 		},
 	}))
 
-	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
 
 	_, err = zendesk.NewService(
 		rt.Config,
@@ -144,7 +144,7 @@ func TestCloseAndReopen(t *testing.T) {
 		},
 	}))
 
-	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
 	svc, err := zendesk.NewService(
 		rt.Config,
 		http.DefaultClient,
