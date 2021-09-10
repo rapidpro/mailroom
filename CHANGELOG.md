@@ -1,3 +1,7 @@
+v6.5.26
+----------
+ * Update to latest goflow
+
 v6.5.25
 ----------
  * Add notifications for contact imports and set contact import status
