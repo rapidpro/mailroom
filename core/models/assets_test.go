@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/assets/static/types"
+	"github.com/nyaruka/goflow/assets/static"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -33,8 +33,8 @@ func TestCloneForSimulation(t *testing.T) {
 	}
 
 	testChannels := []assets.Channel{
-		types.NewChannel("d7be3965-4c76-4abd-af78-ebc0b84ab621", "Test Channel 1", "1234567890", []string{"tel"}, nil, nil),
-		types.NewChannel("fd130d20-65f8-43fc-a3c5-a3fa4d1e4193", "Test Channel 2", "2345678901", []string{"tel"}, nil, nil),
+		static.NewChannel("d7be3965-4c76-4abd-af78-ebc0b84ab621", "Test Channel 1", "1234567890", []string{"tel"}, nil, nil),
+		static.NewChannel("fd130d20-65f8-43fc-a3c5-a3fa4d1e4193", "Test Channel 2", "2345678901", []string{"tel"}, nil, nil),
 	}
 
 	clone, err := oa.CloneForSimulation(ctx, db, newDefs, testChannels)
