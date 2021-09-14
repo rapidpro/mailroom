@@ -1,3 +1,7 @@
+v6.5.27
+----------
+ * Update to latest goflow (fixes word_slice)
+
 v6.5.26
 ----------
  * Update to latest goflow
