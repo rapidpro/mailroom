@@ -1,3 +1,7 @@
+v6.5.28
+----------
+ * Add warning log entry when task takes longer than 1 minute
+
 v6.5.27
 ----------
  * Update to latest goflow (fixes word_slice)
