@@ -185,11 +185,18 @@ func (w *Worker) handleTask(task *queue.Task) {
 	if found {
 		err := taskFunc(context.Background(), w.foreman.rt, task)
 		if err != nil {
-			log.WithError(err).WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Error("error running task")
+			log.WithError(err).WithField("task", string(task.Task)).Error("error running task")
 		}
 	} else {
 		log.Error("unable to find function for task type")
 	}
 
-	log.WithField("elapsed", time.Since(start)).Info("task complete")
+	elapsed := time.Since(start)
+
+	log.WithField("elapsed", elapsed).Info("task complete")
+
+	// additionally if any task took longer than 1 minute, log as warning
+	if elapsed > time.Minute {
+		log.WithField("task", string(task.Task)).Warn("long running task")
+	}
 }
