@@ -47,7 +47,9 @@ func TestGetContactDisplay(t *testing.T) {
 }
 
 func TestFromTicketUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	// create some tickets
 	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
@@ -83,7 +85,9 @@ func TestFromTicketUUID(t *testing.T) {
 }
 
 func TestFromTicketerUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
@@ -112,8 +116,9 @@ func TestFromTicketerUUID(t *testing.T) {
 }
 
 func TestSendReply(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
 
+	defer testsuite.Reset()
 	defer testsuite.ResetStorage()
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
@@ -142,7 +147,9 @@ func TestSendReply(t *testing.T) {
 }
 
 func TestCloseTicket(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)

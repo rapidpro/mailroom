@@ -17,9 +17,11 @@ import (
 )
 
 func TestTimeouts(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	err := marker.ClearTasks(rc, timeoutLock)
 	assert.NoError(t, err)

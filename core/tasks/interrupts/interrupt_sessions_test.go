@@ -13,7 +13,9 @@ import (
 )
 
 func TestInterrupts(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	insertConnection := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urnID models.URNID) models.ConnectionID {
 		var connectionID models.ConnectionID

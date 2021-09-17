@@ -18,18 +18,23 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+/*var tableHashes = map[string]string{
+	"channels_channel": "3587399bad341401f1880431c0bc772a",
+	"contacts_contact": "0382ef6e58e260c0c76dcc84550e6793",
+	"orgs_org":         "0f650bf7b9fb77ffa3ff0992be98da53",
+	"tickets_ticketer": "6487a4aed61e16c3aa0d6cf117f58de3",
+}*/
+
 const MediaStorageDir = "_test_media_storage"
 const SessionStorageDir = "_test_session_storage"
 
 // Reset clears out both our database and redis DB
-func Reset() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
+func Reset() {
 	ResetDB()
 	ResetRP()
 
 	models.FlushCache()
 	logrus.SetLevel(logrus.DebugLevel)
-
-	return Get()
 }
 
 // Get returns the various runtime things a test might need
@@ -44,6 +49,15 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 		SessionStorage: SessionStorage(),
 		Config:         config.NewMailroomConfig(),
 	}
+
+	/*for name, expected := range tableHashes {
+		var actual string
+	    must(db.Get(&actual, fmt.Sprintf(`SELECT md5(array_to_string(array_agg(t.* order by id), '|', '')) FROM %s t`, name)))
+		if actual != expected {
+			panic(fmt.Sprintf("table has mismatch for %s, expected: %s, got %s", name, expected, actual))
+		}
+	}*/
+
 	return context.Background(), rt, db, rp
 }
 
@@ -105,13 +119,9 @@ func RP() *redis.Pool {
 // RC returns a redis connection, Close() should be called on it when done
 func RC() redis.Conn {
 	conn, err := redis.Dial("tcp", "localhost:6379")
-	if err != nil {
-		panic(err)
-	}
+	must(err)
 	_, err = conn.Do("SELECT", 0)
-	if err != nil {
-		panic(err)
-	}
+	must(err)
 	return conn
 }
 
@@ -127,13 +137,39 @@ func SessionStorage() storage.Storage {
 
 // ResetStorage clears our storage for tests
 func ResetStorage() {
-	if err := os.RemoveAll(MediaStorageDir); err != nil {
-		panic(err)
-	}
+	must(os.RemoveAll(MediaStorageDir))
+	must(os.RemoveAll(SessionStorageDir))
+}
 
-	if err := os.RemoveAll(SessionStorageDir); err != nil {
-		panic(err)
-	}
+var resetDataSQL = `
+DELETE FROM notifications_notification;
+DELETE FROM request_logs_httplog;
+DELETE FROM tickets_ticketevent;
+DELETE FROM tickets_ticket;
+DELETE FROM channels_channelcount;
+DELETE FROM msgs_msg;
+DELETE FROM campaigns_eventfire;
+DELETE FROM contacts_contactimportbatch;
+DELETE FROM contacts_contactimport;
+DELETE FROM contacts_contacturn WHERE id >= 30000;
+DELETE FROM contacts_contactgroup_contacts WHERE contact_id >= 30000;
+DELETE FROM contacts_contact WHERE id >= 30000;
+DELETE FROM contacts_contactgroupcount WHERE group_id >= 30000;
+DELETE FROM contacts_contactgroup WHERE id >= 30000;
+
+ALTER SEQUENCE tickets_ticket_id_seq RESTART WITH 1;
+ALTER SEQUENCE msgs_msg_id_seq RESTART WITH 1;
+ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000;
+ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 30000;
+ALTER SEQUENCE contacts_contactgroup_id_seq RESTART WITH 30000;`
+
+// ResetData removes contact data not in the test database dump. Note that this function can't
+// undo changes made to the contact data in the test database dump.
+func ResetData(db *sqlx.DB) {
+	db.MustExec(resetDataSQL)
+
+	// because groups have changed
+	models.FlushCache()
 }
 
 // utility function for running a command panicking if there is any error
@@ -142,5 +178,11 @@ func mustExec(command string, args ...string) {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		panic(fmt.Sprintf("error restoring database: %s: %s", err, string(output)))
+	}
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
 	}
 }

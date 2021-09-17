@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
@@ -20,7 +19,9 @@ import (
 )
 
 func TestTicketers(t *testing.T) {
-	ctx, _, db, _ := testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	// can load directly by UUID
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Zendesk.UUID)
@@ -58,9 +59,7 @@ func TestTicketers(t *testing.T) {
 func TestTickets(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer deleteTickets(db)
-
-	deleteTickets(db)
+	defer testsuite.ResetData(db)
 
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
@@ -138,7 +137,7 @@ func TestTickets(t *testing.T) {
 func TestUpdateTicketConfig(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer deleteTickets(db)
+	defer testsuite.ResetData(db)
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
 	modelTicket := ticket.Load(db)
@@ -159,7 +158,7 @@ func TestUpdateTicketConfig(t *testing.T) {
 func TestUpdateTicketLastActivity(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer deleteTickets(db)
+	defer testsuite.ResetData(db)
 
 	now := time.Date(2021, 6, 22, 15, 59, 30, 123456789, time.UTC)
 
@@ -180,7 +179,7 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 func TestTicketsAssign(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer deleteTickets(db)
+	defer testsuite.ResetData(db)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
@@ -212,7 +211,7 @@ func TestTicketsAssign(t *testing.T) {
 func TestTicketsAddNote(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer deleteTickets(db)
+	defer testsuite.ResetData(db)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
@@ -240,7 +239,7 @@ func TestTicketsAddNote(t *testing.T) {
 func TestTicketsChangeTopic(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer deleteTickets(db)
+	defer testsuite.ResetData(db)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
@@ -271,7 +270,7 @@ func TestCloseTickets(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	defer deleteTickets(db)
+	defer testsuite.ResetData(db)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
@@ -327,8 +326,8 @@ func TestCloseTickets(t *testing.T) {
 func TestReopenTickets(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
+	defer testsuite.ResetData(db)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	defer deleteTickets(db)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
@@ -367,11 +366,4 @@ func TestReopenTickets(t *testing.T) {
 
 	// but no events for ticket #2 which waas already open
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, ticket2.ID).Returns(0)
-}
-
-func deleteTickets(db *sqlx.DB) {
-	db.MustExec(`DELETE FROM notifications_notification`)
-	db.MustExec(`DELETE FROM request_logs_httplog`)
-	db.MustExec(`DELETE FROM tickets_ticketevent`)
-	db.MustExec(`DELETE FROM tickets_ticket`)
 }

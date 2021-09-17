@@ -21,7 +21,9 @@ import (
 )
 
 func TestCampaignStarts(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(testdata.RemindersCampaign.UUID), "Doctor Reminders")
 
@@ -96,7 +98,9 @@ func TestCampaignStarts(t *testing.T) {
 }
 
 func TestBatchStart(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	// create a start object
 	testdata.InsertFlowStart(db, testdata.Org1, testdata.SingleMessage, nil)
@@ -163,8 +167,9 @@ func TestBatchStart(t *testing.T) {
 }
 
 func TestResume(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
 
+	defer testsuite.Reset()
 	defer testsuite.ResetStorage()
 
 	// write sessions to s3 storage

@@ -14,10 +14,7 @@ import (
 func TestTicketEvents(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer func() {
-		db.MustExec(`DELETE FROM tickets_ticketevent`)
-		db.MustExec(`DELETE FROM tickets_ticket`)
-	}()
+	defer testsuite.ResetData(db)
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", nil)
 	modelTicket := ticket.Load(db)
