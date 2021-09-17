@@ -475,8 +475,6 @@ func TicketsChangeTopic(ctx context.Context, db Queryer, oa *OrgAssets, userID U
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
 
-	fmt.Printf("TicketsChangeTopic topic=%d\n", topicID)
-
 	for _, ticket := range tickets {
 		fmt.Printf("ticket #%d topic=%d\n", ticket.ID(), ticket.TopicID())
 		if ticket.TopicID() != topicID {

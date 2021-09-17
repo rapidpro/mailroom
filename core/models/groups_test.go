@@ -57,6 +57,8 @@ func TestLoadGroups(t *testing.T) {
 func TestDynamicGroups(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
+	defer testsuite.Reset()
+
 	// insert an event on our campaign
 	var eventID models.CampaignEventID
 	testsuite.DB().Get(&eventID,

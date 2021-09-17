@@ -124,7 +124,9 @@ func TestOpenAndForward(t *testing.T) {
 }
 
 func TestCloseAndReopen(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt, db, _ := testsuite.Get()
+
+	defer testsuite.ResetData(db)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{

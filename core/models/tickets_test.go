@@ -21,6 +21,8 @@ import (
 func TestTicketers(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
+	defer testsuite.Reset()
+
 	// can load directly by UUID
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Zendesk.UUID)
 	assert.NoError(t, err)
@@ -324,8 +326,8 @@ func TestCloseTickets(t *testing.T) {
 func TestReopenTickets(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	defer testsuite.ResetData(db)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {

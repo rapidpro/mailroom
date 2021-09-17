@@ -22,7 +22,7 @@ func TestChannelback(t *testing.T) {
 func TestEventCallback(t *testing.T) {
 	_, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset() // tests include destroying ticketer
 
 	// create a zendesk ticket for Cathy
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "1234", nil)

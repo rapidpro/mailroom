@@ -410,6 +410,8 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
+	defer testsuite.ResetData(db)
+
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 

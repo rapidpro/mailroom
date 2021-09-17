@@ -16,10 +16,11 @@ import (
 )
 
 func TestCampaigns(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Reset()
-
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
@@ -48,9 +49,11 @@ func TestCampaigns(t *testing.T) {
 }
 
 func TestIVRCampaigns(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Reset()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)

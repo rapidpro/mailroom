@@ -2,7 +2,6 @@ package expirations
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -17,15 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(m *testing.M) {
-	testsuite.Reset()
-	os.Exit(m.Run())
-}
-
 func TestExpirations(t *testing.T) {
 	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	err := marker.ClearTasks(rc, expirationLock)
 	assert.NoError(t, err)
