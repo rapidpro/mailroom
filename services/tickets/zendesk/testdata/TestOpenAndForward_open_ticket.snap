@@ -6,4 +6,4 @@ Authorization: Bearer ****************
 Content-Type: application/json
 Accept-Encoding: gzip
 
-{"instance_push_id":"1234-abcd","request_id":"sesame:1570461695000000000","external_resources":[{"external_id":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","message":"Where are my cookies?","thread_id":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","created_at":"2019-10-07T15:21:34Z","author":{"external_id":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis"},"allow_channelback":true}]}
+{"instance_push_id":"1234-abcd","request_id":"sesame:1570461696000000000","external_resources":[{"external_id":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","message":"Where are my cookies?","thread_id":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","created_at":"2019-10-07T15:21:35Z","author":{"external_id":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis"},"allow_channelback":true}]}

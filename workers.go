@@ -54,7 +54,7 @@ func (f *Foreman) Stop() {
 		worker.Stop()
 	}
 	close(f.quit)
-	logrus.WithField("comp", "foreman").WithField("state", "stopping").Info("foreman stopping")
+	logrus.WithField("comp", "foreman").WithField("queue", f.queue).WithField("state", "stopping").Info("foreman stopping")
 }
 
 // Assign is our main loop for the Foreman, it takes care of popping the next outgoing task from our
@@ -62,7 +62,7 @@ func (f *Foreman) Stop() {
 func (f *Foreman) Assign() {
 	f.wg.Add(1)
 	defer f.wg.Done()
-	log := logrus.WithField("comp", "foreman")
+	log := logrus.WithField("comp", "foreman").WithField("queue", f.queue)
 
 	log.WithFields(logrus.Fields{
 		"state":   "started",
@@ -185,11 +185,18 @@ func (w *Worker) handleTask(task *queue.Task) {
 	if found {
 		err := taskFunc(context.Background(), w.foreman.rt, task)
 		if err != nil {
-			log.WithError(err).WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Error("error running task")
+			log.WithError(err).WithField("task", string(task.Task)).Error("error running task")
 		}
 	} else {
 		log.Error("unable to find function for task type")
 	}
 
-	log.WithField("elapsed", time.Since(start)).Info("task complete")
+	elapsed := time.Since(start)
+
+	log.WithField("elapsed", elapsed).Info("task complete")
+
+	// additionally if any task took longer than 1 minute, log as warning
+	if elapsed > time.Minute {
+		log.WithField("task", string(task.Task)).WithField("elapsed", elapsed).Warn("long running task")
+	}
 }

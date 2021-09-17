@@ -1,3 +1,15 @@
+v6.5.28
+----------
+ * Add warning log entry when task takes longer than 1 minute
+
+v6.5.27
+----------
+ * Update to latest goflow (fixes word_slice)
+
+v6.5.26
+----------
+ * Update to latest goflow
+
 v6.5.25
 ----------
  * Add notifications for contact imports and set contact import status
