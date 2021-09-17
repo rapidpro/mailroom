@@ -45,7 +45,7 @@ func TestTicketOpened(t *testing.T) {
 	}))
 
 	// an existing ticket
-	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, "748363", testdata.DefaultTopic.ID, "Old Question", "Who?", models.NilUserID, nil)
+	cathyTicket := models.NewTicket(flows.TicketUUID(uuids.New()), testdata.Org1.ID, testdata.Cathy.ID, testdata.Mailgun.ID, "748363", testdata.DefaultTopic.ID, "Who?", models.NilUserID, nil)
 	err := models.InsertTickets(ctx, db, []*models.Ticket{cathyTicket})
 	require.NoError(t, err)
 
@@ -57,7 +57,6 @@ func TestTicketOpened(t *testing.T) {
 						handlers.NewActionUUID(),
 						assets.NewTicketerReference(testdata.Mailgun.UUID, "Mailgun (IT Support)"),
 						assets.NewTopicReference(testdata.SupportTopic.UUID, "Support"),
-						"",
 						"Where are my cookies?",
 						assets.NewUserReference(testdata.Admin.Email, "Admin"),
 						"Email Ticket",
@@ -68,7 +67,6 @@ func TestTicketOpened(t *testing.T) {
 						handlers.NewActionUUID(),
 						assets.NewTicketerReference(testdata.Zendesk.UUID, "Zendesk (Nyaruka)"),
 						nil,
-						"Interesting",
 						"I've found some cookies",
 						nil,
 						"Zen Ticket",

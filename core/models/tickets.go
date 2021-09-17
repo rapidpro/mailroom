@@ -76,7 +76,6 @@ type Ticket struct {
 		ExternalID     null.String      `db:"external_id"`
 		Status         TicketStatus     `db:"status"`
 		TopicID        TopicID          `db:"topic_id"`
-		Subject        string           `db:"subject"`
 		Body           string           `db:"body"`
 		AssigneeID     UserID           `db:"assignee_id"`
 		Config         null.Map         `db:"config"`
@@ -88,7 +87,7 @@ type Ticket struct {
 }
 
 // NewTicket creates a new open ticket
-func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID string, topicID TopicID, subject, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
+func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID string, topicID TopicID, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
 	t := &Ticket{}
 	t.t.UUID = uuid
 	t.t.OrgID = orgID
@@ -97,7 +96,6 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketer
 	t.t.ExternalID = null.String(externalID)
 	t.t.Status = TicketStatusOpen
 	t.t.TopicID = topicID
-	t.t.Subject = subject
 	t.t.Body = body
 	t.t.AssigneeID = assigneeID
 	t.t.Config = null.NewMap(config)
@@ -112,7 +110,6 @@ func (t *Ticket) TicketerID() TicketerID    { return t.t.TicketerID }
 func (t *Ticket) ExternalID() null.String   { return t.t.ExternalID }
 func (t *Ticket) Status() TicketStatus      { return t.t.Status }
 func (t *Ticket) TopicID() TopicID          { return t.t.TopicID }
-func (t *Ticket) Subject() string           { return t.t.Subject }
 func (t *Ticket) Body() string              { return t.t.Body }
 func (t *Ticket) AssigneeID() UserID        { return t.t.AssigneeID }
 func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
@@ -146,7 +143,6 @@ func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
 		t.UUID(),
 		oa.SessionAssets().Ticketers().Get(modelTicketer.UUID()),
 		topic,
-		t.Subject(),
 		t.Body(),
 		string(t.ExternalID()),
 		assignee,
@@ -183,7 +179,6 @@ SELECT
   t.external_id AS external_id,
   t.status AS status,
   t.topic_id AS topic_id,
-  t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
   t.config AS config,
@@ -213,7 +208,6 @@ SELECT
   t.external_id AS external_id,
   t.status AS status,
   t.topic_id AS topic_id,
-  t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
   t.config AS config,
@@ -262,7 +256,6 @@ SELECT
   t.external_id AS external_id,
   t.status AS status,
   t.topic_id AS topic_id,
-  t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
   t.config AS config,
@@ -291,7 +284,6 @@ SELECT
   t.external_id AS external_id,
   t.status AS status,
   t.topic_id AS topic_id,
-  t.subject AS subject,
   t.body AS body,
   t.assignee_id AS assignee_id,
   t.config AS config,
@@ -333,8 +325,8 @@ func lookupTicket(ctx context.Context, db Queryer, query string, params ...inter
 
 const insertTicketSQL = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  topic_id,  subject,  body,  assignee_id,  config,  opened_on, modified_on, last_activity_on)
-  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :topic_id, :subject, :body, :assignee_id, :config, NOW(),     NOW()      , NOW())
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  topic_id,  body,  assignee_id,  config,  opened_on, modified_on, last_activity_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :topic_id, :body, :assignee_id, :config, NOW(),     NOW()      , NOW())
 RETURNING
   id
 `
