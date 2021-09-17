@@ -19,7 +19,7 @@ func TestTicketEvents(t *testing.T) {
 		db.MustExec(`DELETE FROM tickets_ticket`)
 	}()
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Need help", "Have you seen my cookies?", "17", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", nil)
 	modelTicket := ticket.Load(db)
 
 	e1 := models.NewTicketOpenedEvent(modelTicket, testdata.Admin.ID, testdata.Agent.ID)

@@ -53,7 +53,6 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mo
 		ticketer.ID(),
 		event.Ticket.ExternalID,
 		topicID,
-		event.Ticket.Subject,
 		event.Ticket.Body,
 		assigneeID,
 		map[string]interface{}{

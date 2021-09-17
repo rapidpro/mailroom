@@ -21,7 +21,7 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
 	require.NoError(t, err)
@@ -42,15 +42,19 @@ func TestOpenAndForward(t *testing.T) {
 
 	logger := &flows.HTTPLogger{}
 
-	ticket, err := svc.Open(session, nil, "Need help", "Where are my cookies?", nil, logger.Log)
+	oa, err := models.GetOrgAssets(ctx, rt.DB, testdata.Org1.ID)
+	require.NoError(t, err)
+	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
+
+	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID())
-	assert.Equal(t, "Need help", ticket.Subject())
+	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, "Where are my cookies?", ticket.Body())
 	assert.Equal(t, "", ticket.ExternalID())
 	assert.Equal(t, 0, len(logger.Logs))
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "", testdata.DefaultTopic.ID, "Need help", "Where are my cookies?", models.NilUserID, nil)
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, nil)
 
 	logger = &flows.HTTPLogger{}
 	err = svc.Forward(
@@ -77,8 +81,8 @@ func TestCloseAndReopen(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "12", testdata.DefaultTopic.ID, "New ticket", "Where my cookies?", models.NilUserID, nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Internal.ID, "14", testdata.DefaultTopic.ID, "Second ticket", "Where my shoes?", models.NilUserID, nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Internal.ID, "12", testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Internal.ID, "14", testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
 
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
 
