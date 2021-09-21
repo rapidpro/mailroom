@@ -18,7 +18,7 @@ import (
 func TestHTTPLogs(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	// insert a log
+	// insert a classifier log
 	log := models.NewClassifierCalledLog(testdata.Org1.ID, testdata.Wit.ID, "http://foo.bar", "GET /", "STATUS 200", false, time.Second, time.Now())
 	err := models.InsertHTTPLogs(ctx, db, []*models.HTTPLog{log})
 	assert.Nil(t, err)
@@ -31,6 +31,13 @@ func TestHTTPLogs(t *testing.T) {
 	assert.Nil(t, err)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND classifier_id = $2 AND is_error = TRUE AND response IS NULL`, testdata.Org1.ID, testdata.Wit.ID).Returns(1)
+
+	// insert a webhook log
+	log = models.NewWebhookCalledLog(testdata.Org1.ID, testdata.Favorites.ID, "http://foo.bar", "GET /", "HTTP 200", false, time.Second, time.Now())
+	err = models.InsertHTTPLogs(ctx, db, []*models.HTTPLog{log})
+	assert.Nil(t, err)
+
+	testsuite.AssertQuery(t, db, `SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND flow_id = $2`, testdata.Org1.ID, testdata.Favorites.ID).Returns(1)
 }
 
 func TestHTTPLogger(t *testing.T) {

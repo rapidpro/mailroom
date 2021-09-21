@@ -91,7 +91,7 @@ func TestTickets(t *testing.T) {
 		testdata.Alexandria.ID,
 		testdata.Zendesk.ID,
 		"EX6677",
-		models.NilTopicID,
+		testdata.SupportTopic.ID,
 		"Where are my pants?",
 		testdata.Org2Admin.ID,
 		nil,

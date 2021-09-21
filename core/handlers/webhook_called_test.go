@@ -43,10 +43,10 @@ func TestWebhookCalled(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				testdata.Cathy: []flows.Action{
-					actions.NewCallResthook(handlers.NewActionUUID(), "foo", "foo"),
+					actions.NewCallResthook(handlers.NewActionUUID(), "foo", "foo"), // calls both subscribers
 				},
 				testdata.George: []flows.Action{
-					actions.NewCallResthook(handlers.NewActionUUID(), "foo", "foo"),
+					actions.NewCallResthook(handlers.NewActionUUID(), "foo", "foo"), // calls both subscribers
 					actions.NewCallWebhook(handlers.NewActionUUID(), "GET", "http://rapidpro.io/?unsub=1", nil, "", ""),
 				},
 			},
@@ -67,6 +67,10 @@ func TestWebhookCalled(t *testing.T) {
 					Count: 2,
 				},
 				{
+					SQL:   "select count(*) from request_logs_httplog where log_type = 'webhook_called' AND flow_id IS NOT NULL",
+					Count: 5,
+				},
+				{
 					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 200",
 					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
@@ -75,6 +79,11 @@ func TestWebhookCalled(t *testing.T) {
 					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 410",
 					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
+				},
+				{
+					SQL:   "select count(*) from api_webhookresult where contact_id = $1",
+					Args:  []interface{}{testdata.George.ID},
+					Count: 3,
 				},
 				{
 					SQL:   "select count(*) from api_webhookresult where contact_id = $1",

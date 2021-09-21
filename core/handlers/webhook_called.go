@@ -41,13 +41,24 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 		scene.AppendToEventPreCommitHook(hooks.UnsubscribeResthookHook, unsub)
 	}
 
-	// if this is a connection error, use that as our response
+	run, _ := scene.Session().FindStep(e.StepUUID())
+	flow, _ := oa.Flow(run.FlowReference().UUID)
+
+	// create an HTTP log
+	httpLog := models.NewWebhookCalledLog(
+		oa.OrgID(),
+		flow.(*models.Flow).ID(),
+		event.URL, event.Request, event.Response,
+		event.Status != flows.CallStatusSuccess,
+		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),
+	)
+	scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, httpLog)
+
+	// for backwards compatibility, for now also create a webhook result...
 	response := event.Response
 	if event.Status == flows.CallStatusConnectionError {
 		response = "connection error"
 	}
-
-	// create a result for this call
 	result := models.NewWebhookResult(
 		oa.OrgID(), scene.ContactID(),
 		event.URL, event.Request,
