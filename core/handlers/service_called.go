@@ -54,10 +54,12 @@ func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 				oa.OrgID(),
 				classifier.ID(),
 				httpLog.URL,
+				httpLog.StatusCode,
 				httpLog.Request,
 				httpLog.Response,
 				httpLog.Status != flows.CallStatusSuccess,
 				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+				httpLog.Retries,
 				httpLog.CreatedOn,
 			)
 		} else if event.Service == "ticketer" {
@@ -65,10 +67,12 @@ func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 				oa.OrgID(),
 				ticketer.ID(),
 				httpLog.URL,
+				httpLog.StatusCode,
 				httpLog.Request,
 				httpLog.Response,
 				httpLog.Status != flows.CallStatusSuccess,
 				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+				httpLog.Retries,
 				httpLog.CreatedOn,
 			)
 		}

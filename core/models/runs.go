@@ -140,6 +140,8 @@ type Session struct {
 
 	// we also keep around a reference to the wait (if any)
 	wait flows.ActivatedWait
+
+	findStep func(flows.StepUUID) (flows.FlowRun, flows.Step)
 }
 
 func (s *Session) ID() SessionID                      { return s.s.ID }
@@ -232,6 +234,11 @@ func (s *Session) Sprint() flows.Sprint {
 // Wait returns the wait associated with this session (if any)
 func (s *Session) Wait() flows.ActivatedWait {
 	return s.wait
+}
+
+// FindStep finds the run and step with the given UUID
+func (s *Session) FindStep(uuid flows.StepUUID) (flows.FlowRun, flows.Step) {
+	return s.findStep(uuid)
 }
 
 // Timeout returns the amount of time after our last message sends that we should timeout
@@ -384,6 +391,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 
 	session.sprint = sprint
 	session.wait = fs.Wait()
+	session.findStep = fs.FindStep
 
 	// now build up our runs
 	for _, r := range fs.Runs() {
