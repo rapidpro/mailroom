@@ -53,7 +53,6 @@ func TestWebhookCalled(t *testing.T) {
 			SQLAssertions: []handlers.SQLAssertion{
 				{
 					SQL:   "select count(*) from api_resthooksubscriber where is_active = FALSE",
-					Args:  nil,
 					Count: 1,
 				},
 				{
@@ -63,12 +62,15 @@ func TestWebhookCalled(t *testing.T) {
 				},
 				{
 					SQL:   "select count(*) from api_resthooksubscriber where is_active = TRUE",
-					Args:  nil,
 					Count: 2,
 				},
 				{
-					SQL:   "select count(*) from request_logs_httplog where log_type = 'webhook_called' AND flow_id IS NOT NULL",
-					Count: 5,
+					SQL:   "select count(*) from request_logs_httplog where log_type = 'webhook_called' AND flow_id IS NOT NULL AND status_code = 200",
+					Count: 2,
+				},
+				{
+					SQL:   "select count(*) from request_logs_httplog where log_type = 'webhook_called' AND flow_id IS NOT NULL AND status_code = 410",
+					Count: 3,
 				},
 				{
 					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 200",

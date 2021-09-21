@@ -55,6 +55,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 		transfer.AddLog(models.NewAirtimeTransferredLog(
 			oa.OrgID(),
 			httpLog.URL,
+			httpLog.StatusCode,
 			httpLog.Request,
 			httpLog.Response,
 			httpLog.Status != flows.CallStatusSuccess,

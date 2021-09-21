@@ -48,7 +48,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 	httpLog := models.NewWebhookCalledLog(
 		oa.OrgID(),
 		flow.(*models.Flow).ID(),
-		event.URL, event.Request, event.Response,
+		event.URL, event.StatusCode, event.Request, event.Response,
 		event.Status != flows.CallStatusSuccess,
 		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),
 	)
