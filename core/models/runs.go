@@ -589,9 +589,10 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// calculate our new timeout
 	s.calculateTimeout(fs, sprint)
 
-	// set our sprint and wait
+	// set our sprint, wait and step finder
 	s.sprint = sprint
 	s.wait = fs.Wait()
+	s.findStep = fs.FindStep
 
 	// run through our runs to figure out our current flow
 	for _, r := range fs.Runs() {
