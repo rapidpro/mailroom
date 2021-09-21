@@ -1,3 +1,8 @@
+v6.5.29
+----------
+ * Add new fields to HTTPLog and save for webhook called events
+ * Stop writing ticket subjects
+
 v6.5.28
 ----------
  * Add warning log entry when task takes longer than 1 minute
