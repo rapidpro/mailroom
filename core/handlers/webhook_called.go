@@ -45,16 +45,20 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 	flow, _ := oa.Flow(run.FlowReference().UUID)
 
 	// create an HTTP log
-	httpLog := models.NewWebhookCalledLog(
-		oa.OrgID(),
-		flow.(*models.Flow).ID(),
-		event.URL, event.StatusCode, event.Request, event.Response,
-		event.Status != flows.CallStatusSuccess,
-		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),
-	)
-	scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, httpLog)
+	if flow != nil {
+		httpLog := models.NewWebhookCalledLog(
+			oa.OrgID(),
+			flow.(*models.Flow).ID(),
+			event.URL, event.StatusCode, event.Request, event.Response,
+			event.Status != flows.CallStatusSuccess,
+			time.Millisecond*time.Duration(event.ElapsedMS),
+			event.Retries,
+			event.CreatedOn(),
+		)
+		scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, httpLog)
+	}
 
-	// for backwards compatibility, for now also create a webhook result...
+	// TODO drop this once RP UI is switched to using HTTP logs
 	response := event.Response
 	if event.Status == flows.CallStatusConnectionError {
 		response = "connection error"

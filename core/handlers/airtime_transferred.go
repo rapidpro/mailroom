@@ -60,6 +60,7 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 			httpLog.Response,
 			httpLog.Status != flows.CallStatusSuccess,
 			time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+			httpLog.Retries,
 			httpLog.CreatedOn,
 		))
 	}

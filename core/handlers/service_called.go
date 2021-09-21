@@ -59,6 +59,7 @@ func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 				httpLog.Response,
 				httpLog.Status != flows.CallStatusSuccess,
 				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+				httpLog.Retries,
 				httpLog.CreatedOn,
 			)
 		} else if event.Service == "ticketer" {
@@ -71,6 +72,7 @@ func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 				httpLog.Response,
 				httpLog.Status != flows.CallStatusSuccess,
 				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+				httpLog.Retries,
 				httpLog.CreatedOn,
 			)
 		}

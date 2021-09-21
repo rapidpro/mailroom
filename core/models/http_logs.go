@@ -43,6 +43,7 @@ type HTTPLog struct {
 	Response          null.String       `db:"response"`
 	IsError           bool              `db:"is_error"`
 	RequestTime       int               `db:"request_time"`
+	NumRetries        int               `db:"num_retries"`
 	CreatedOn         time.Time         `db:"created_on"`
 	FlowID            FlowID            `db:"flow_id"`
 	ClassifierID      ClassifierID      `db:"classifier_id"`
@@ -50,7 +51,7 @@ type HTTPLog struct {
 	AirtimeTransferID AirtimeTransferID `db:"airtime_transfer_id"`
 }
 
-func newHTTPLog(orgID OrgID, logType HTTPLogType, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
+func newHTTPLog(orgID OrgID, logType HTTPLogType, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
 	return &HTTPLog{
 		OrgID:       orgID,
 		LogType:     logType,
@@ -60,34 +61,35 @@ func newHTTPLog(orgID OrgID, logType HTTPLogType, url string, statusCode int, re
 		Response:    null.String(response),
 		IsError:     isError,
 		RequestTime: int(elapsed / time.Millisecond),
+		NumRetries:  retries,
 		CreatedOn:   createdOn,
 	}
 }
 
 // NewWebhookCalledLog creates a new HTTP log for an in-flow webhook call
-func NewWebhookCalledLog(orgID OrgID, fid FlowID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
-	h := newHTTPLog(orgID, LogTypeWebhookCalled, url, statusCode, request, response, isError, elapsed, createdOn)
+func NewWebhookCalledLog(orgID OrgID, fid FlowID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
+	h := newHTTPLog(orgID, LogTypeWebhookCalled, url, statusCode, request, response, isError, elapsed, retries, createdOn)
 	h.FlowID = fid
 	return h
 }
 
 // NewClassifierCalledLog creates a new HTTP log for a classifier call
-func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
-	h := newHTTPLog(orgID, LogTypeClassifierCalled, url, statusCode, request, response, isError, elapsed, createdOn)
+func NewClassifierCalledLog(orgID OrgID, cid ClassifierID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
+	h := newHTTPLog(orgID, LogTypeClassifierCalled, url, statusCode, request, response, isError, elapsed, retries, createdOn)
 	h.ClassifierID = cid
 	return h
 }
 
 // NewTicketerCalledLog creates a new HTTP log for a ticketer call
-func NewTicketerCalledLog(orgID OrgID, tid TicketerID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
-	h := newHTTPLog(orgID, LogTypeTicketerCalled, url, statusCode, request, response, isError, elapsed, createdOn)
+func NewTicketerCalledLog(orgID OrgID, tid TicketerID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
+	h := newHTTPLog(orgID, LogTypeTicketerCalled, url, statusCode, request, response, isError, elapsed, retries, createdOn)
 	h.TicketerID = tid
 	return h
 }
 
 // NewAirtimeTransferredLog creates a new HTTP log for an airtime transfer
-func NewAirtimeTransferredLog(orgID OrgID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, createdOn time.Time) *HTTPLog {
-	return newHTTPLog(orgID, LogTypeAirtimeTransferred, url, statusCode, request, response, isError, elapsed, createdOn)
+func NewAirtimeTransferredLog(orgID OrgID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
+	return newHTTPLog(orgID, LogTypeAirtimeTransferred, url, statusCode, request, response, isError, elapsed, retries, createdOn)
 }
 
 // SetAirtimeTransferID called to set the transfer ID on a log after the transfer has been created
@@ -96,8 +98,8 @@ func (h *HTTPLog) SetAirtimeTransferID(tid AirtimeTransferID) {
 }
 
 const insertHTTPLogsSQL = `
-INSERT INTO request_logs_httplog( log_type,  org_id,  url,  status_code,  flow_id,  classifier_id,  ticketer_id,  airtime_transfer_id,  request,  response,  is_error,  request_time,  created_on)
-					      VALUES(:log_type, :org_id, :url, :status_code, :flow_id, :classifier_id, :ticketer_id, :airtime_transfer_id, :request, :response, :is_error, :request_time, :created_on)
+INSERT INTO request_logs_httplog( log_type,  org_id,  url,  status_code,  flow_id,  classifier_id,  ticketer_id,  airtime_transfer_id,  request,  response,  is_error,  request_time,  num_retries,  created_on)
+					      VALUES(:log_type, :org_id, :url, :status_code, :flow_id, :classifier_id, :ticketer_id, :airtime_transfer_id, :request, :response, :is_error, :request_time, :num_retries, :created_on)
 RETURNING id
 `
 
@@ -152,6 +154,7 @@ func (h *HTTPLogger) Ticketer(t *Ticketer) flows.HTTPLogCallback {
 			l.Response,
 			l.Status != flows.CallStatusSuccess,
 			time.Duration(l.ElapsedMS)*time.Millisecond,
+			l.Retries,
 			l.CreatedOn,
 		))
 	}
