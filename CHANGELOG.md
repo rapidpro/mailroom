@@ -1,3 +1,7 @@
+v6.5.30
+----------
+ * Fix handling webhook called events on resumes
+
 v6.5.29
 ----------
  * Add new fields to HTTPLog and save for webhook called events
