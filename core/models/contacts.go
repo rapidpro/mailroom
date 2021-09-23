@@ -592,7 +592,7 @@ func CreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, userID 
 		return nil, nil, errors.Wrapf(err, "error creating flow contact")
 	}
 
-	err = CalculateDynamicGroups(ctx, db, oa, flowContact)
+	err = CalculateDynamicGroups(ctx, db, oa, []*flows.Contact{flowContact})
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error calculating dynamic groups")
 	}
@@ -632,7 +632,7 @@ func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, ur
 
 	// calculate dynamic groups if contact was created
 	if created {
-		err := CalculateDynamicGroups(ctx, db, oa, flowContact)
+		err := CalculateDynamicGroups(ctx, db, oa, []*flows.Contact{flowContact})
 		if err != nil {
 			return nil, nil, false, errors.Wrapf(err, "error calculating dynamic groups")
 		}
@@ -918,42 +918,46 @@ func URNForID(ctx context.Context, db Queryer, org *OrgAssets, urnID URNID) (urn
 
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
 // campaigns as necessary based on those group changes.
-func CalculateDynamicGroups(ctx context.Context, db Queryer, org *OrgAssets, contact *flows.Contact) error {
-	added, removed := contact.ReevaluateQueryBasedGroups(org.Env())
+func CalculateDynamicGroups(ctx context.Context, db Queryer, org *OrgAssets, contacts []*flows.Contact) error {
+	contactIDs := make([]ContactID, len(contacts))
+	groupAdds := make([]*GroupAdd, 0, 2*len(contacts))
+	groupRemoves := make([]*GroupRemove, 0, 2*len(contacts))
+	checkCampaigns := make(map[*Campaign][]*flows.Contact)
 
-	campaigns := make(map[CampaignID]*Campaign)
+	for i, contact := range contacts {
+		contactIDs[i] = ContactID(contact.ID())
+		added, removed := contact.ReevaluateQueryBasedGroups(org.Env())
 
-	groupAdds := make([]*GroupAdd, 0, 1)
-	for _, a := range added {
-		group := org.GroupByUUID(a.UUID())
-		if group == nil {
-			return errors.Errorf("added to unknown group: %s", a.UUID())
+		for _, a := range added {
+			group := org.GroupByUUID(a.UUID())
+			if group != nil {
+				groupAdds = append(groupAdds, &GroupAdd{
+					ContactID: ContactID(contact.ID()),
+					GroupID:   group.ID(),
+				})
+			}
+
+			// add in any campaigns we may qualify for
+			for _, campaign := range org.CampaignByGroupID(group.ID()) {
+				checkCampaigns[campaign] = append(checkCampaigns[campaign], contact)
+			}
 		}
-		groupAdds = append(groupAdds, &GroupAdd{
-			ContactID: ContactID(contact.ID()),
-			GroupID:   group.ID(),
-		})
 
-		// add in any campaigns we may qualify for
-		for _, c := range org.CampaignByGroupID(group.ID()) {
-			campaigns[c.ID()] = c
+		for _, r := range removed {
+			group := org.GroupByUUID(r.UUID())
+			if group != nil {
+				groupRemoves = append(groupRemoves, &GroupRemove{
+					ContactID: ContactID(contact.ID()),
+					GroupID:   group.ID(),
+				})
+			}
+
 		}
 	}
+
 	err := AddContactsToGroups(ctx, db, groupAdds)
 	if err != nil {
 		return errors.Wrapf(err, "error adding contact to groups")
-	}
-
-	groupRemoves := make([]*GroupRemove, 0, 1)
-	for _, r := range removed {
-		group := org.GroupByUUID(r.UUID())
-		if group == nil {
-			return errors.Wrapf(err, "removed from an unknown group: %s", r.UUID())
-		}
-		groupRemoves = append(groupRemoves, &GroupRemove{
-			ContactID: ContactID(contact.ID()),
-			GroupID:   group.ID(),
-		})
 	}
 	err = RemoveContactsFromGroups(ctx, db, groupRemoves)
 	if err != nil {
@@ -961,28 +965,32 @@ func CalculateDynamicGroups(ctx context.Context, db Queryer, org *OrgAssets, con
 	}
 
 	// clear any unfired campaign events for this contact
-	err = DeleteUnfiredContactEvents(ctx, db, ContactID(contact.ID()))
+	err = DeleteUnfiredContactEvents(ctx, db, contactIDs)
 	if err != nil {
-		return errors.Wrapf(err, "error deleting unfired events for contact")
+		return errors.Wrapf(err, "error deleting unfired events")
 	}
 
 	// for each campaign figure out if we need to be added to any events
-	fireAdds := make([]*FireAdd, 0, 2)
+	fireAdds := make([]*FireAdd, 0, 2*len(contacts))
 	tz := org.Env().Timezone()
 	now := time.Now()
-	for _, c := range campaigns {
-		for _, ce := range c.Events() {
-			scheduled, err := ce.ScheduleForContact(tz, now, contact)
-			if err != nil {
-				return errors.Wrapf(err, "error calculating schedule for event: %d", ce.ID())
-			}
 
-			if scheduled != nil {
-				fireAdds = append(fireAdds, &FireAdd{
-					ContactID: ContactID(contact.ID()),
-					EventID:   ce.ID(),
-					Scheduled: *scheduled,
-				})
+	for campaign, eligibleContacts := range checkCampaigns {
+		for _, ce := range campaign.Events() {
+
+			for _, contact := range eligibleContacts {
+				scheduled, err := ce.ScheduleForContact(tz, now, contact)
+				if err != nil {
+					return errors.Wrapf(err, "error calculating schedule for event: %d", ce.ID())
+				}
+
+				if scheduled != nil {
+					fireAdds = append(fireAdds, &FireAdd{
+						ContactID: ContactID(contact.ID()),
+						EventID:   ce.ID(),
+						Scheduled: *scheduled,
+					})
+				}
 			}
 		}
 	}

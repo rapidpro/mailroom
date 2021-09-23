@@ -364,7 +364,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	}
 
 	if event.IsNewContact() {
-		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, contact)
+		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to initialize new contact")
 		}
@@ -546,7 +546,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if this is a new contact, we need to calculate dynamic groups and campaigns
 	if newContact {
-		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, contact)
+		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
 		if err != nil {
 			return errors.Wrapf(err, "unable to initialize new contact")
 		}
