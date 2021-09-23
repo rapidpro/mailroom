@@ -63,6 +63,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		return errors.Errorf("no such ticket %s", request.TicketID), http.StatusNotFound, nil
 	}
 
+	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	if err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
 	// handle event callback
 	switch request.Type {
 
@@ -93,7 +98,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files)
 
 	case "close-room":
-		err = tickets.CloseTicket(ctx, rt, nil, ticket, false, l)
+		err = tickets.Close(ctx, rt, oa, ticket, false, l)
 
 	default:
 		err = errors.New("invalid event type")
