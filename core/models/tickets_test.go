@@ -281,7 +281,9 @@ func TestCloseTickets(t *testing.T) {
 		},
 	}))
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab80", "Tickets", "tickets > 0")
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -289,6 +291,14 @@ func TestCloseTickets(t *testing.T) {
 
 	ticket2 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", nil)
 	modelTicket2 := ticket2.Load(db)
+
+	_, cathy := testdata.Cathy.Load(db, oa)
+
+	err = models.CalculateDynamicGroups(ctx, db, oa, []*flows.Contact{cathy})
+	require.NoError(t, err)
+
+	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
+	assert.Equal(t, "Tickets", cathy.Groups().All()[1].Name())
 
 	logger := &models.HTTPLogger{}
 	evts, err := models.CloseTickets(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, false, logger)
@@ -308,7 +318,12 @@ func TestCloseTickets(t *testing.T) {
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, testdata.Mailgun.ID).Returns(1)
 
-	// but no events for ticket #2 which waas already closed
+	// reload Cathy and check they're no longer in the tickets group
+	_, cathy = testdata.Cathy.Load(db, oa)
+	assert.Equal(t, 1, len(cathy.Groups().All()))
+	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
+
+	// but no events for ticket #2 which was already closed
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, ticket2.ID).Returns(0)
 
 	// can close tickets without a user
@@ -338,7 +353,9 @@ func TestReopenTickets(t *testing.T) {
 		},
 	}))
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab80", "Two Tickets", "tickets = 2")
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -366,4 +383,10 @@ func TestReopenTickets(t *testing.T) {
 
 	// but no events for ticket #2 which waas already open
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, ticket2.ID).Returns(0)
+
+	// check Cathy is now in the two tickets group
+	_, cathy := testdata.Cathy.Load(db, oa)
+	assert.Equal(t, 2, len(cathy.Groups().All()))
+	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
+	assert.Equal(t, "Two Tickets", cathy.Groups().All()[1].Name())
 }

@@ -522,6 +522,7 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	contactIDs := make(map[ContactID]bool, len(tickets))
 	now := dates.Now()
 
 	for _, ticket := range tickets {
@@ -537,6 +538,7 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 			e := NewTicketClosedEvent(ticket, userID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
+			contactIDs[ticket.ContactID()] = true
 		}
 	}
 
@@ -563,9 +565,12 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
 
-	err = InsertTicketEvents(ctx, db, events)
-	if err != nil {
+	if err := InsertTicketEvents(ctx, db, events); err != nil {
 		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	if err := recalcGroupsForTicketChanges(ctx, db, oa, contactIDs); err != nil {
+		return nil, errors.Wrapf(err, "error recalculting groups")
 	}
 
 	return eventsByTicket, nil
@@ -584,11 +589,12 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+func ReopenTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	contactIDs := make(map[ContactID]bool, len(tickets))
 	now := dates.Now()
 
 	for _, ticket := range tickets {
@@ -604,12 +610,13 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserI
 			e := NewTicketReopenedEvent(ticket, userID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
+			contactIDs[ticket.ContactID()] = true
 		}
 	}
 
 	if externally {
 		for ticketerID, ticketerTickets := range byTicketer {
-			ticketer := org.TicketerByID(ticketerID)
+			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
 				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
 				if err != nil {
@@ -635,7 +642,34 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserI
 		return nil, errors.Wrapf(err, "error inserting ticket events")
 	}
 
+	if err := recalcGroupsForTicketChanges(ctx, db, oa, contactIDs); err != nil {
+		return nil, errors.Wrapf(err, "error recalculting groups")
+	}
+
 	return eventsByTicket, nil
+}
+
+// because groups can be based on "tickets" need to recalculate after closing/reopening tickets
+func recalcGroupsForTicketChanges(ctx context.Context, db Queryer, oa *OrgAssets, contactIDs map[ContactID]bool) error {
+	ids := make([]ContactID, 0, len(contactIDs))
+	for cid := range contactIDs {
+		ids = append(ids, cid)
+	}
+
+	contacts, err := LoadContacts(ctx, db, oa, ids)
+	if err != nil {
+		return errors.Wrap(err, "error loading contacts with ticket changes")
+	}
+
+	flowContacts := make([]*flows.Contact, len(contacts))
+	for i, contact := range contacts {
+		flowContacts[i], err = contact.FlowContact(oa)
+		if err != nil {
+			return errors.Wrap(err, "error loading flow contact")
+		}
+	}
+
+	return CalculateDynamicGroups(ctx, db, oa, flowContacts)
 }
 
 // Ticketer is our type for a ticketer asset
