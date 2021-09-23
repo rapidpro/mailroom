@@ -58,18 +58,5 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 		scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, httpLog)
 	}
 
-	// TODO drop this once RP UI is switched to using HTTP logs
-	response := event.Response
-	if event.Status == flows.CallStatusConnectionError {
-		response = "connection error"
-	}
-	result := models.NewWebhookResult(
-		oa.OrgID(), scene.ContactID(),
-		event.URL, event.Request,
-		event.StatusCode, response,
-		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),
-	)
-	scene.AppendToEventPreCommitHook(hooks.InsertWebhookResultHook, result)
-
 	return nil
 }
