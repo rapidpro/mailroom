@@ -1,3 +1,8 @@
+v6.5.31
+----------
+ * Recalculate dynamic groups after closing and reopening tickets
+ * Stop writing webhook results
+
 v6.5.30
 ----------
  * Fix handling webhook called events on resumes
