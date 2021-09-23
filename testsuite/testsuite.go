@@ -152,7 +152,7 @@ DELETE FROM campaigns_eventfire;
 DELETE FROM contacts_contactimportbatch;
 DELETE FROM contacts_contactimport;
 DELETE FROM contacts_contacturn WHERE id >= 30000;
-DELETE FROM contacts_contactgroup_contacts WHERE contact_id >= 30000;
+DELETE FROM contacts_contactgroup_contacts WHERE contact_id >= 30000 OR contactgroup_id >= 30000;
 DELETE FROM contacts_contact WHERE id >= 30000;
 DELETE FROM contacts_contactgroupcount WHERE group_id >= 30000;
 DELETE FROM contacts_contactgroup WHERE id >= 30000;
