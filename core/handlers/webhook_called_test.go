@@ -73,26 +73,6 @@ func TestWebhookCalled(t *testing.T) {
 					Count: 3,
 				},
 				{
-					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 200",
-					Args:  []interface{}{testdata.Cathy.ID},
-					Count: 1,
-				},
-				{
-					SQL:   "select count(*) from api_webhookresult where contact_id = $1 AND status_code = 410",
-					Args:  []interface{}{testdata.Cathy.ID},
-					Count: 1,
-				},
-				{
-					SQL:   "select count(*) from api_webhookresult where contact_id = $1",
-					Args:  []interface{}{testdata.George.ID},
-					Count: 3,
-				},
-				{
-					SQL:   "select count(*) from api_webhookresult where contact_id = $1",
-					Args:  []interface{}{testdata.George.ID},
-					Count: 3,
-				},
-				{
 					SQL:   "select count(*) from api_webhookevent where org_id = $1",
 					Args:  []interface{}{testdata.Org1.ID},
 					Count: 2,
