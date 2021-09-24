@@ -33,5 +33,5 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: 452158872079.dkr.ecr.eu-west-1.amazonaws.com/mailroom:${{ steps.vars.outputs.tag }}
+          tags: 452158872079.dkr.ecr.eu-west-1.amazonaws.com/rp-mailroom-rapidpro:${{ steps.vars.outputs.tag }}
           no-cache: true
