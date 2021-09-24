@@ -54,6 +54,7 @@ type Channel struct {
 		Roles              []assets.ChannelRole     `json:"roles"`
 		MatchPrefixes      []string                 `json:"match_prefixes"`
 		AllowInternational bool                     `json:"allow_international"`
+		MachineDetection   bool                     `json:"machine_detection"`
 		Config             map[string]interface{}   `json:"config"`
 	}
 }
@@ -90,6 +91,9 @@ func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
 
 // AllowInternational returns whether this channel allows sending internationally (only applies to TEL schemes)
 func (c *Channel) AllowInternational() bool { return c.c.AllowInternational }
+
+// MachineDetection returns whether this channel should do answering machine detection (only applies to IVR)
+func (c *Channel) MachineDetection() bool { return c.c.MachineDetection }
 
 // Parent returns a reference to the parent channel of this channel (if any)
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
@@ -169,7 +173,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		FROM unnest(regexp_split_to_array(c.role,'')) as r)
 	) as roles,
 	JSON_EXTRACT_PATH(c.config::json, 'matching_prefixes') as match_prefixes,
-	JSON_EXTRACT_PATH(c.config::json, 'allow_international') as allow_international
+	JSON_EXTRACT_PATH(c.config::json, 'allow_international') as allow_international,
+	JSON_EXTRACT_PATH(c.config::json, 'machine_detection') as machine_detection
 FROM 
 	channels_channel c
 WHERE 

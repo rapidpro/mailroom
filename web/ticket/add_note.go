@@ -12,28 +12,27 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/assign", web.RequireAuthToken(handleAssign))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/note", web.RequireAuthToken(handleAddNote)) // deprecated
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/add_note", web.RequireAuthToken(handleAddNote))
 }
 
-type assignRequest struct {
+type addNoteRequest struct {
 	bulkTicketRequest
 
-	AssigneeID models.UserID `json:"assignee_id"`
-	Note       string        `json:"note"`
+	Note string `json:"note" validate:"required"`
 }
 
-// Assigns the tickets with the given ids to the given user
+// Adds the given text note to the tickets with the given ids
 //
 //   {
 //     "org_id": 123,
 //     "user_id": 234,
 //     "ticket_ids": [1234, 2345],
-//     "assignee_id": 567,
-//     "note": "please look at these"
+//     "note": "spam"
 //   }
 //
-func handleAssign(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
-	request := &assignRequest{}
+func handleAddNote(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+	request := &addNoteRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
@@ -49,9 +48,9 @@ func handleAssign(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	evts, err := models.TicketsAssign(ctx, rt.DB, oa, request.UserID, tickets, request.AssigneeID, request.Note)
+	evts, err := models.TicketsAddNote(ctx, rt.DB, oa, request.UserID, tickets, request.Note)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.Wrap(err, "error assigning tickets")
+		return nil, http.StatusInternalServerError, errors.Wrap(err, "error adding notes to tickets")
 	}
 
 	return newBulkResponse(evts), http.StatusOK, nil

@@ -25,7 +25,7 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 	log := logrus.WithField("cron", name).WithField("lockName", lockName)
 
 	go func() {
-		defer log.Info("exiting")
+		defer log.Info("cron exiting")
 
 		// we run expiration every minute on the minute
 		for {
@@ -64,7 +64,7 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 
 			// calculate our next fire time
 			nextFire := nextFire(lastFire, interval)
-			wait = nextFire.Sub(time.Now())
+			wait = time.Until(nextFire)
 			if wait < time.Duration(0) {
 				wait = time.Duration(0)
 			}

@@ -233,7 +233,8 @@ func TestNormalizeAttachment(t *testing.T) {
 }
 
 func TestMarkMessages(t *testing.T) {
-	ctx, _, db, _ := testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
+
 	defer testsuite.Reset()
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
@@ -277,14 +278,11 @@ func TestMarkMessages(t *testing.T) {
 }
 
 func TestNonPersistentBroadcasts(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 
-	defer func() {
-		db.MustExec(`DELETE FROM msgs_msg`)
-		db.MustExec(`DELETE FROM tickets_ticket`)
-	}()
+	defer testsuite.ResetData(db)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Problem", "", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
 	modelTicket := ticket.Load(db)
 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("eng"): {Text: "Hi there"}}

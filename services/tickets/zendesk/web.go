@@ -79,7 +79,7 @@ func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request
 			return err, http.StatusBadRequest, nil
 		}
 
-		err = tickets.ReopenTicket(ctx, rt, oa, ticket, false, nil)
+		err = tickets.Reopen(ctx, rt, oa, ticket, false, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error reopening ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 		}
@@ -281,12 +281,17 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 		return map[string]string{"status": "ignored"}, http.StatusOK, nil
 	}
 
+	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	if err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
 	if request.Event == "status_changed" {
 		switch strings.ToLower(request.Status) {
-		case statusSolved, statusClosed:
-			err = tickets.CloseTicket(ctx, rt, nil, ticket, false, l)
-		case statusOpen:
-			err = tickets.ReopenTicket(ctx, rt, nil, ticket, false, l)
+		case statusSolved, statusClosed, "resuelto", "cerrado":
+			err = tickets.Close(ctx, rt, oa, ticket, false, l)
+		case statusOpen, "abierto":
+			err = tickets.Reopen(ctx, rt, oa, ticket, false, l)
 		}
 
 		if err != nil {

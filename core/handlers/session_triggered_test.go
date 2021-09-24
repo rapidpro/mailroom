@@ -95,7 +95,9 @@ func TestSessionTriggered(t *testing.T) {
 }
 
 func TestQuerySessionTriggered(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
