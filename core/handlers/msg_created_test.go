@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -22,6 +23,9 @@ func TestMsgCreated(t *testing.T) {
 	_, _, db, _ := testsuite.Get()
 
 	defer testsuite.Reset()
+
+	config.Mailroom.AttachmentDomain = "foo.bar.com"
+	defer func() { config.Mailroom.AttachmentDomain = "" }()
 
 	// add a URN for cathy so we can test all urn sends
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 10)
