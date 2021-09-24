@@ -22,7 +22,7 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	wg := &sync.WaitGroup{}
 
@@ -36,7 +36,9 @@ func TestSearch(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	server := web.NewServer(ctx, rt.Config, db, rp, nil, nil, client, wg)
+	rt.ES = client
+
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 
 	// give our server time to start

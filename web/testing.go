@@ -27,7 +27,7 @@ import (
 
 // RunWebTests runs the tests in the passed in filename, optionally updating them if the update flag is set
 func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	wg := &sync.WaitGroup{}
 
@@ -38,7 +38,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 
 	defer testsuite.ResetStorage()
 
-	server := NewServer(ctx, rt.Config, db, rp, testsuite.MediaStorage(), testsuite.SessionStorage(), nil, wg)
+	server := NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 

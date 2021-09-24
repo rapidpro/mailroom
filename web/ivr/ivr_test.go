@@ -72,7 +72,7 @@ func TestTwilioIVR(t *testing.T) {
 	twiml.IgnoreSignatures = true
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, rt.Config, db, rp, testsuite.MediaStorage(), testsuite.SessionStorage(), nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -398,7 +398,7 @@ func TestVonageIVR(t *testing.T) {
 	defer ts.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, rt.Config, db, rp, testsuite.MediaStorage(), testsuite.SessionStorage(), nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 

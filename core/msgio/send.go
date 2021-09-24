@@ -12,7 +12,7 @@ import (
 )
 
 // SendMessages tries to send the given messages via Courier or Android syncing
-func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fcm.Client, msgs []*models.Msg) {
+func SendMessages(ctx context.Context, cfg *config.Config, db models.Queryer, rp *redis.Pool, fc *fcm.Client, msgs []*models.Msg) {
 	// messages to be sent by courier, organized by contact
 	courierMsgs := make(map[models.ContactID][]*models.Msg, 100)
 
@@ -62,7 +62,7 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fc
 	// if we have any android messages, trigger syncs for the unique channels
 	if len(androidChannels) > 0 {
 		if fc == nil {
-			fc = CreateFCMClient(config.Mailroom)
+			fc = CreateFCMClient(cfg)
 		}
 		SyncAndroidChannels(fc, androidChannels)
 	}

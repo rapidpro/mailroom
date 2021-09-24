@@ -197,13 +197,13 @@ const (
 )
 
 func TestServer(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset()
 
 	wg := &sync.WaitGroup{}
 
-	server := web.NewServer(ctx, rt.Config, db, rp, nil, nil, nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 
 	// give our server time to start

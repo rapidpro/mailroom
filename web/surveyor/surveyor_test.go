@@ -30,7 +30,7 @@ func TestSurveyor(t *testing.T) {
 	defer testsuite.Reset()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, rt.Config, db, rp, nil, nil, nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 

@@ -16,7 +16,7 @@ import (
 )
 
 func TestMetrics(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset()
 
@@ -27,7 +27,7 @@ func TestMetrics(t *testing.T) {
 	db.MustExec(`INSERT INTO api_apitoken(is_active, org_id, created, key, role_id, user_id) VALUES(TRUE, $1, NOW(), $2, 8, 1);`, testdata.Org1.ID, adminToken)
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, rt.Config, db, rp, nil, nil, nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 
 	// wait for the server to start

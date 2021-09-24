@@ -108,7 +108,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
 
-	msgio.SendMessages(ctx, rt.DB, rt.RP, nil, msgs)
+	msgio.SendMessages(ctx, rt.Config, rt.DB, rt.RP, nil, msgs)
 	return msgs[0], nil
 }
 

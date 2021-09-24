@@ -3,6 +3,7 @@ package hooks
 import (
 	"context"
 
+	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 
@@ -35,6 +36,6 @@ func (h *sendMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Poo
 		msgs = append(msgs, sceneMsgs...)
 	}
 
-	msgio.SendMessages(ctx, tx, rp, nil, msgs)
+	msgio.SendMessages(ctx, config.Mailroom, tx, rp, nil, msgs)
 	return nil
 }
