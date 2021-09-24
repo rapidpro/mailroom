@@ -28,7 +28,7 @@ func TestCampaigns(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our campaign to be started
-	err := fireCampaignEvents(ctx, db, rp, campaignsLock, "lock")
+	err := fireCampaignEvents(ctx, rt, campaignsLock, "lock")
 	assert.NoError(t, err)
 
 	// then actually work on the event
@@ -62,7 +62,7 @@ func TestIVRCampaigns(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our campaign to be started
-	err := fireCampaignEvents(ctx, rt.DB, rt.RP, campaignsLock, "lock")
+	err := fireCampaignEvents(ctx, rt, campaignsLock, "lock")
 	assert.NoError(t, err)
 
 	// then actually work on the event

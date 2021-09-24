@@ -41,29 +41,29 @@ func handleSendBroadcast(ctx context.Context, rt *runtime.Runtime, task *queue.T
 		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
 	}
 
-	return CreateBroadcastBatches(ctx, rt.DB, rt.RP, broadcast)
+	return CreateBroadcastBatches(ctx, rt, broadcast)
 }
 
 // CreateBroadcastBatches takes our master broadcast and creates batches of broadcast sends for all the unique contacts
-func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.Broadcast) error {
+func CreateBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *models.Broadcast) error {
 	// we are building a set of contact ids, start with the explicit ones
 	contactIDs := make(map[models.ContactID]bool)
 	for _, id := range bcast.ContactIDs() {
 		contactIDs[id] = true
 	}
 
-	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, db, bcast.GroupIDs())
+	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, bcast.GroupIDs())
 	for _, id := range groupContactIDs {
 		contactIDs[id] = true
 	}
 
-	oa, err := models.GetOrgAssets(ctx, db, bcast.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt.DB, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
 	// get the contact ids for our URNs
-	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, db, oa, bcast.URNs())
+	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, bcast.URNs())
 	if err != nil {
 		return errors.Wrapf(err, "error getting contact ids for urns")
 	}
@@ -87,7 +87,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 		urnContacts[id] = u
 	}
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	contacts := make([]models.ContactID, 0, 100)

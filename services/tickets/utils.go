@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -35,15 +34,15 @@ func GetContactDisplay(env envs.Environment, contact *flows.Contact) string {
 }
 
 // FromTicketUUID takes a ticket UUID and looks up the ticket and ticketer, and creates the service
-func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, ticketerType string) (*models.Ticket, *models.Ticketer, models.TicketService, error) {
+func FromTicketUUID(ctx context.Context, rt *runtime.Runtime, uuid flows.TicketUUID, ticketerType string) (*models.Ticket, *models.Ticketer, models.TicketService, error) {
 	// look up our ticket
-	ticket, err := models.LookupTicketByUUID(ctx, db, uuid)
+	ticket, err := models.LookupTicketByUUID(ctx, rt.DB, uuid)
 	if err != nil || ticket == nil {
 		return nil, nil, nil, errors.Errorf("error looking up ticket %s", uuid)
 	}
 
 	// look up our assets
-	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
+	assets, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
@@ -64,8 +63,8 @@ func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, tic
 }
 
 // FromTicketerUUID takes a ticketer UUID and looks up the ticketer and creates the service
-func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID, ticketerType string) (*models.Ticketer, models.TicketService, error) {
-	ticketer, err := models.LookupTicketerByUUID(ctx, db, uuid)
+func FromTicketerUUID(ctx context.Context, rt *runtime.Runtime, uuid assets.TicketerUUID, ticketerType string) (*models.Ticketer, models.TicketService, error) {
+	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB, uuid)
 	if err != nil || ticketer == nil || ticketer.Type() != ticketerType {
 		return nil, nil, errors.Errorf("error looking up ticketer %s", uuid)
 	}
