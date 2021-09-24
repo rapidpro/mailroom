@@ -242,7 +242,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		assert.NoError(t, err)
 
 		for _, scene := range scenes {
-			err := models.HandleEvents(ctx, tx, rt.RP, oa, scene, results[scene.ContactID()].Events)
+			err := models.HandleEvents(ctx, rt, tx, oa, scene, results[scene.ContactID()].Events)
 			assert.NoError(t, err)
 		}
 

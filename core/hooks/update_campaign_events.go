@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -18,7 +18,7 @@ var UpdateCampaignEventsHook models.EventCommitHook = &updateCampaignEventsHook{
 type updateCampaignEventsHook struct{}
 
 // Apply will update all the campaigns for the passed in scene, minimizing the number of queries to do so
-func (h *updateCampaignEventsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// these are all the events we need to delete unfired fires for
 	deletes := make([]*models.FireDelete, 0, 5)
 

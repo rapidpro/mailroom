@@ -170,6 +170,6 @@ func SendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, bcast *models.
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
-	msgio.SendMessages(ctx, rt.Config, rt.DB, rt.RP, nil, msgs)
+	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
 	return nil
 }

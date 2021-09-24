@@ -6,7 +6,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -71,7 +70,7 @@ func (s *Scene) AppendToEventPostCommitHook(hook EventCommitHook, event interfac
 }
 
 // EventHandler defines a call for handling events that occur in a flow
-type EventHandler func(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, *Scene, flows.Event) error
+type EventHandler func(context.Context, *sqlx.Tx, *OrgAssets, *Scene, flows.Event) error
 
 // our registry of event type to internal handlers
 var eventHandlers = make(map[string]EventHandler)
@@ -100,7 +99,7 @@ func RegisterEventPreWriteHandler(eventType string, handler EventHandler) {
 }
 
 // HandleEvents handles the passed in event, IE, creates the db objects required etc..
-func HandleEvents(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scene *Scene, events []flows.Event) error {
+func HandleEvents(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, scene *Scene, events []flows.Event) error {
 	for _, e := range events {
 
 		handler, found := eventHandlers[e.Type()]
@@ -108,7 +107,7 @@ func HandleEvents(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAsse
 			return errors.Errorf("unable to find handler for event type: %s", e.Type())
 		}
 
-		err := handler(ctx, tx, rp, org, scene, e)
+		err := handler(ctx, tx, oa, scene, e)
 		if err != nil {
 			return err
 		}
@@ -118,18 +117,18 @@ func HandleEvents(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAsse
 
 // ApplyPreWriteEvent applies the passed in event before insertion or update, unlike normal event handlers it is not a requirement
 // that all types have a handler.
-func ApplyPreWriteEvent(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, org *OrgAssets, scene *Scene, e flows.Event) error {
+func ApplyPreWriteEvent(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, scene *Scene, e flows.Event) error {
 	handler, found := preHandlers[e.Type()]
 	if !found {
 		return nil
 	}
 
-	return handler(ctx, tx, rp, org, scene, e)
+	return handler(ctx, tx, oa, scene, e)
 }
 
 // EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing
 type EventCommitHook interface {
-	Apply(context.Context, *sqlx.Tx, *redis.Pool, *OrgAssets, map[*Scene][]interface{}) error
+	Apply(context.Context, *runtime.Runtime, *sqlx.Tx, *OrgAssets, map[*Scene][]interface{}) error
 }
 
 // ApplyEventPreCommitHooks runs through all the pre event hooks for the passed in sessions and applies their events
@@ -149,7 +148,7 @@ func ApplyEventPreCommitHooks(ctx context.Context, rt *runtime.Runtime, tx *sqlx
 
 	// now fire each of our hooks
 	for hook, args := range preHooks {
-		err := hook.Apply(ctx, tx, rt.RP, oa, args)
+		err := hook.Apply(ctx, rt, tx, oa, args)
 		if err != nil {
 			return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 		}
@@ -175,7 +174,7 @@ func ApplyEventPostCommitHooks(ctx context.Context, rt *runtime.Runtime, tx *sql
 
 	// now fire each of our hooks
 	for hook, args := range postHooks {
-		err := hook.Apply(ctx, tx, rt.RP, oa, args)
+		err := hook.Apply(ctx, rt, tx, oa, args)
 		if err != nil {
 			return errors.Wrapf(err, "error applying post commit hook: %v", hook)
 		}
@@ -201,7 +200,7 @@ func HandleAndCommitEvents(ctx context.Context, rt *runtime.Runtime, oa *OrgAsse
 
 	// handle the events to create the hooks on each scene
 	for _, scene := range scenes {
-		err := HandleEvents(ctx, tx, rt.RP, oa, scene, contactEvents[scene.Contact()])
+		err := HandleEvents(ctx, rt, tx, oa, scene, contactEvents[scene.Contact()])
 		if err != nil {
 			return errors.Wrapf(err, "error applying events")
 		}

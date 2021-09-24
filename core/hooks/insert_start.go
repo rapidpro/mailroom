@@ -6,8 +6,8 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -18,8 +18,8 @@ var InsertStartHook models.EventCommitHook = &insertStartHook{}
 type insertStartHook struct{}
 
 // Apply inserts our starts
-func (h *insertStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
-	rc := rp.Get()
+func (h *insertStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	starts := make([]*models.FlowStart, 0, len(scenes))

@@ -620,7 +620,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 
 	// apply all our pre write events
 	for _, e := range sprint.Events() {
-		err := ApplyPreWriteEvent(ctx, tx, rt.RP, org, s.scene, e)
+		err := ApplyPreWriteEvent(ctx, rt, tx, org, s.scene, e)
 		if err != nil {
 			return errors.Wrapf(err, "error applying event: %v", e)
 		}
@@ -696,7 +696,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 
 	// apply all our events
 	if s.Status() != SessionStatusFailed {
-		err = HandleEvents(ctx, tx, rt.RP, org, s.scene, sprint.Events())
+		err = HandleEvents(ctx, rt, tx, org, s.scene, sprint.Events())
 		if err != nil {
 			return errors.Wrapf(err, "error applying events: %d", s.ID())
 		}
@@ -797,7 +797,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	// apply all our pre write events
 	for i := range ss {
 		for _, e := range sprints[i].Events() {
-			err := ApplyPreWriteEvent(ctx, tx, rt.RP, org, sessions[i].scene, e)
+			err := ApplyPreWriteEvent(ctx, rt, tx, org, sessions[i].scene, e)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error applying event: %v", e)
 			}
@@ -871,7 +871,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 			continue
 		}
 
-		err = HandleEvents(ctx, tx, rt.RP, org, sessions[i].Scene(), sprints[i].Events())
+		err = HandleEvents(ctx, rt, tx, org, sessions[i].Scene(), sprints[i].Events())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error applying events for session: %d", sessions[i].ID())
 		}
