@@ -19,6 +19,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
@@ -556,7 +557,7 @@ func (s *Session) calculateTimeout(fs flows.Session, sprint flows.Sprint) {
 }
 
 // WriteUpdatedSession updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
-func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.Storage, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
+func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
 	// make sure we have our seen runs
 	if s.seenRuns == nil {
 		return errors.Errorf("missing seen runs, cannot update session")
@@ -619,7 +620,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// apply all our pre write events
 	for _, e := range sprint.Events() {
-		err := ApplyPreWriteEvent(ctx, tx, rp, org, s.scene, e)
+		err := ApplyPreWriteEvent(ctx, tx, rt.RP, org, s.scene, e)
 		if err != nil {
 			return errors.Wrapf(err, "error applying event: %v", e)
 		}
@@ -631,7 +632,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 	// if writing to S3, do so
 	sessionMode := org.Org().SessionStorageMode()
 	if sessionMode == S3Sessions {
-		err := WriteSessionOutputsToStorage(ctx, st, []*Session{s})
+		err := WriteSessionOutputsToStorage(ctx, rt.SessionStorage, []*Session{s})
 		if err != nil {
 			logrus.WithError(err).Error("error writing session to s3")
 		}
@@ -674,7 +675,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// call our global pre commit hook if present
 	if hook != nil {
-		err := hook(ctx, tx, rp, org, []*Session{s})
+		err := hook(ctx, tx, rt.RP, org, []*Session{s})
 		if err != nil {
 			return errors.Wrapf(err, "error calling commit hook: %v", hook)
 		}
@@ -695,14 +696,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, tx *sqlx.Tx, rp *redi
 
 	// apply all our events
 	if s.Status() != SessionStatusFailed {
-		err = HandleEvents(ctx, tx, rp, org, s.scene, sprint.Events())
+		err = HandleEvents(ctx, tx, rt.RP, org, s.scene, sprint.Events())
 		if err != nil {
 			return errors.Wrapf(err, "error applying events: %d", s.ID())
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = ApplyEventPreCommitHooks(ctx, tx, rp, org, []*Scene{s.scene})
+	err = ApplyEventPreCommitHooks(ctx, rt, tx, org, []*Scene{s.scene})
 	if err != nil {
 		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
@@ -766,7 +767,7 @@ WHERE
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.Storage, org *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
+func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
 	if len(ss) == 0 {
 		return nil, nil
 	}
@@ -796,7 +797,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.
 	// apply all our pre write events
 	for i := range ss {
 		for _, e := range sprints[i].Events() {
-			err := ApplyPreWriteEvent(ctx, tx, rp, org, sessions[i].scene, e)
+			err := ApplyPreWriteEvent(ctx, tx, rt.RP, org, sessions[i].scene, e)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error applying event: %v", e)
 			}
@@ -805,7 +806,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.
 
 	// call our global pre commit hook if present
 	if hook != nil {
-		err := hook(ctx, tx, rp, org, sessions)
+		err := hook(ctx, tx, rt.RP, org, sessions)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error calling commit hook: %v", hook)
 		}
@@ -818,7 +819,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.
 	// if writing our sessions to S3, do so
 	sessionMode := org.Org().SessionStorageMode()
 	if sessionMode == S3Sessions {
-		err := WriteSessionOutputsToStorage(ctx, st, sessions)
+		err := WriteSessionOutputsToStorage(ctx, rt.SessionStorage, sessions)
 		if err != nil {
 			// for now, continue on for errors, we are still reading from the DB
 			logrus.WithError(err).Error("error writing sessions to s3")
@@ -870,7 +871,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.
 			continue
 		}
 
-		err = HandleEvents(ctx, tx, rp, org, sessions[i].Scene(), sprints[i].Events())
+		err = HandleEvents(ctx, tx, rt.RP, org, sessions[i].Scene(), sprints[i].Events())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error applying events for session: %d", sessions[i].ID())
 		}
@@ -880,7 +881,7 @@ func WriteSessions(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, st storage.
 	}
 
 	// gather all our pre commit events, group them by hook
-	err = ApplyEventPreCommitHooks(ctx, tx, rp, org, scenes)
+	err = ApplyEventPreCommitHooks(ctx, rt, tx, org, scenes)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}

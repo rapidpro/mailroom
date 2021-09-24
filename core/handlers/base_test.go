@@ -246,7 +246,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 			assert.NoError(t, err)
 		}
 
-		err = models.ApplyEventPreCommitHooks(ctx, tx, rt.RP, oa, scenes)
+		err = models.ApplyEventPreCommitHooks(ctx, rt, tx, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -255,7 +255,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		tx, err = db.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		err = models.ApplyEventPostCommitHooks(ctx, tx, rt.RP, oa, scenes)
+		err = models.ApplyEventPostCommitHooks(ctx, rt, tx, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
