@@ -15,7 +15,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
@@ -54,7 +53,7 @@ func FromTicketUUID(ctx context.Context, rt *runtime.Runtime, uuid flows.TicketU
 	}
 
 	// and load it as a service
-	svc, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+	svc, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "error loading ticketer service")
 	}
@@ -70,7 +69,7 @@ func FromTicketerUUID(ctx context.Context, rt *runtime.Runtime, uuid assets.Tick
 	}
 
 	// and load it as a service
-	svc, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+	svc, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error loading ticketer service")
 	}

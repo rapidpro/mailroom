@@ -103,7 +103,7 @@ func TestBroadcastEvents(t *testing.T) {
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
 
-			err = SendBroadcastBatch(ctx, db, rp, batch)
+			err = SendBroadcastBatch(ctx, rt, batch)
 			assert.NoError(t, err)
 		}
 
@@ -249,7 +249,7 @@ func TestBroadcastTask(t *testing.T) {
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
 
-			err = SendBroadcastBatch(ctx, db, rp, batch)
+			err = SendBroadcastBatch(ctx, rt, batch)
 			assert.NoError(t, err)
 		}
 

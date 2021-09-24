@@ -119,7 +119,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling stop event: %s", event)
 			}
-			err = handleStopEvent(ctx, rt.DB, rt.RP, evt)
+			err = handleStopEvent(ctx, rt, evt)
 
 		case NewConversationEventType, ReferralEventType, MOMissEventType, WelcomeMessageEventType:
 			evt := &models.ChannelEvent{}
@@ -452,8 +452,8 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 }
 
 // handleStopEvent is called when a contact is stopped by courier
-func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *StopEvent) error {
-	tx, err := db.BeginTxx(ctx, nil)
+func handleStopEvent(ctx context.Context, rt *runtime.Runtime, event *StopEvent) error {
+	tx, err := rt.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction for stopping contact")
 	}
@@ -645,7 +645,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
-	err = handleAsInbox(ctx, rt.DB, rt.RP, oa, contact, msgIn, topupID, tickets)
+	err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
 	}
@@ -749,19 +749,19 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 }
 
 // handles a message as an inbox message
-func handleAsInbox(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID, tickets []*models.Ticket) error {
+func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID, tickets []*models.Ticket) error {
 	// usually last_seen_on is updated by handling the msg_received event in the engine sprint, but since this is an inbox
 	// message we manually create that event and handle it
 	msgEvent := events.NewMsgReceived(msg)
 	contact.SetLastSeenOn(msgEvent.CreatedOn())
 	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
 
-	err := models.HandleAndCommitEvents(ctx, db, rp, oa, contactEvents)
+	err := models.HandleAndCommitEvents(ctx, rt.DB, rt.RP, oa, contactEvents)
 	if err != nil {
 		return errors.Wrap(err, "error handling inbox message events")
 	}
 
-	return markMsgHandled(ctx, db, contact, msg, models.MsgTypeInbox, topupID, tickets)
+	return markMsgHandled(ctx, rt.DB, contact, msg, models.MsgTypeInbox, topupID, tickets)
 }
 
 // utility to mark as message as handled and update any open contact tickets

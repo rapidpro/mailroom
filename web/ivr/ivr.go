@@ -156,7 +156,7 @@ func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 		resumeURL := buildResumeURL(rt.Config, channel, conn, urn)
 
 		// have our client output our session status
-		err = provider.WriteSessionResponse(ctx, rt.RP, channel, conn, session, urn, resumeURL, r, w)
+		err = provider.WriteSessionResponse(ctx, rt, channel, conn, session, urn, resumeURL, r, w)
 		if err != nil {
 			return channel, conn, errors.Wrapf(err, "error writing ivr response for start")
 		}
@@ -358,7 +358,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request, w h
 	}
 
 	// preprocess this status
-	body, err := provider.PreprocessStatus(ctx, rt.DB, rt.RP, r)
+	body, err := provider.PreprocessStatus(ctx, rt, r)
 	if err != nil {
 		return channel, nil, provider.WriteErrorResponse(w, errors.Wrapf(err, "error while preprocessing status"))
 	}

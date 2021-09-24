@@ -28,11 +28,11 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/buger/jsonparser"
 	"github.com/golang-jwt/jwt"
 	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -171,7 +171,7 @@ func (p *provider) CheckStartRequest(r *http.Request) models.ConnectionError {
 	return ""
 }
 
-func (p *provider) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
+func (p *provider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request) ([]byte, error) {
 	// parse out the call status, we are looking for a leg of one of our conferences ending in the "forward" case
 	// get our recording url out
 	body, _ := readBody(r)
@@ -201,7 +201,7 @@ func (p *provider) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.
 	}
 
 	// look up to see whether this is a call we need to track
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	redisKey := fmt.Sprintf("dial_%s", legUUID)
@@ -281,7 +281,7 @@ func (p *provider) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.
 	return p.MakeEmptyResponseBody("ignoring non final status for tranfer leg"), nil
 }
 
-func (p *provider) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (p *provider) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
 	// if this is a recording_url resume, grab that
 	waitType := r.URL.Query().Get("wait_type")
 
@@ -292,7 +292,7 @@ func (p *provider) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.
 			return nil, errors.Errorf("record resume without recording_uuid")
 		}
 
-		rc := rp.Get()
+		rc := rt.RP.Get()
 		defer rc.Close()
 
 		redisKey := fmt.Sprintf("recording_%s", recordingUUID)
@@ -347,7 +347,7 @@ func (p *provider) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.
 		}
 
 		// write it to redis
-		rc := rp.Get()
+		rc := rt.RP.Get()
 		defer rc.Close()
 
 		redisKey := fmt.Sprintf("recording_%s", recordingUUID)
@@ -590,7 +590,7 @@ func (c *provider) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a NCCO response for the events in the passed in session
-func (c *provider) WriteSessionResponse(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (c *provider) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -603,7 +603,7 @@ func (c *provider) WriteSessionResponse(ctx context.Context, rp *redis.Pool, cha
 	}
 
 	// get our response
-	response, err := c.responseForSprint(ctx, rp, channel, conn, resumeURL, session.Wait(), sprint.Events())
+	response, err := c.responseForSprint(ctx, rt.RP, channel, conn, resumeURL, session.Wait(), sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}

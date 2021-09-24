@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
@@ -146,32 +144,32 @@ func handleSendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, task *qu
 	}
 
 	// try to send the batch
-	return SendBroadcastBatch(ctx, rt.DB, rt.RP, broadcast)
+	return SendBroadcastBatch(ctx, rt, broadcast)
 }
 
 // SendBroadcastBatch sends the passed in broadcast batch
-func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.BroadcastBatch) error {
+func SendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, bcast *models.BroadcastBatch) error {
 	// always set our broadcast as sent if it is our last
 	defer func() {
 		if bcast.IsLast() {
-			err := models.MarkBroadcastSent(ctx, db, bcast.BroadcastID())
+			err := models.MarkBroadcastSent(ctx, rt.DB, bcast.BroadcastID())
 			if err != nil {
 				logrus.WithError(err).Error("error marking broadcast as sent")
 			}
 		}
 	}()
 
-	oa, err := models.GetOrgAssets(ctx, db, bcast.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt.DB, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
 	// create this batch of messages
-	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, oa, bcast)
+	msgs, err := models.CreateBroadcastMessages(ctx, rt.DB, rt.RP, oa, bcast)
 	if err != nil {
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
-	msgio.SendMessages(ctx, db, rp, nil, msgs)
+	msgio.SendMessages(ctx, rt.DB, rt.RP, nil, msgs)
 	return nil
 }
