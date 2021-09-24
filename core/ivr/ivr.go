@@ -42,18 +42,18 @@ const (
 )
 
 // our map of client constructors
-var constructors = make(map[models.ChannelType]ClientConstructor)
+var constructors = make(map[models.ChannelType]ProviderConstructor)
 
-// ClientConstructor defines our signature for creating a new IVR client from a channel
-type ClientConstructor func(*http.Client, *models.Channel) (Client, error)
+// ProviderConstructor defines our signature for creating a new IVR client from a channel
+type ProviderConstructor func(*http.Client, *models.Channel) (Provider, error)
 
-// RegisterClientType registers the passed in channel type with the passed in constructor
-func RegisterClientType(channelType models.ChannelType, constructor ClientConstructor) {
+// RegisterProviderType registers the passed in channel type with the passed in constructor
+func RegisterProviderType(channelType models.ChannelType, constructor ProviderConstructor) {
 	constructors[channelType] = constructor
 }
 
-// GetClient creates the right kind of IVRClient for the passed in channel
-func GetClient(channel *models.Channel) (Client, error) {
+// GetProvider creates the right kind of IVR provider for the passed in channel
+func GetProvider(channel *models.Channel) (Provider, error) {
 	constructor := constructors[channel.Type()]
 	if constructor == nil {
 		return nil, errors.Errorf("no ivr client for channel type: %s", channel.Type())
@@ -62,8 +62,8 @@ func GetClient(channel *models.Channel) (Client, error) {
 	return constructor(http.DefaultClient, channel)
 }
 
-// Client defines the interface IVR clients must satisfy
-type Client interface {
+// Provider defines the interface IVR providers must satisfy
+type Provider interface {
 	RequestCall(number urns.URN, handleURL string, statusURL string, machineDetection bool) (CallID, *httpx.Trace, error)
 
 	HangupCall(externalID string) (*httpx.Trace, error)
@@ -114,7 +114,7 @@ func HangupCall(ctx context.Context, config *config.Config, db *sqlx.DB, conn *m
 	}
 
 	// create the right client
-	c, err := GetClient(channel)
+	c, err := GetProvider(channel)
 	if err != nil {
 		return errors.Wrapf(err, "unable to create ivr client")
 	}
@@ -245,7 +245,7 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 	statusURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/status", domain, channel.UUID())
 
 	// create the right client
-	c, err := GetClient(channel)
+	c, err := GetProvider(channel)
 	if err != nil {
 		return errors.Wrapf(err, "unable to create ivr client")
 	}
@@ -289,7 +289,7 @@ func RequestCallStartForConnection(ctx context.Context, config *config.Config, d
 }
 
 // HandleAsFailure marks the passed in connection as errored and writes the appropriate error response to our writer
-func HandleAsFailure(ctx context.Context, db *sqlx.DB, client Client, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
+func HandleAsFailure(ctx context.Context, db *sqlx.DB, client Provider, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
 	err := conn.MarkFailed(ctx, db, time.Now())
 	if err != nil {
 		logrus.WithError(err).Error("error marking connection as failed")
@@ -299,7 +299,7 @@ func HandleAsFailure(ctx context.Context, db *sqlx.DB, client Client, conn *mode
 
 // StartIVRFlow takes care of starting the flow in the passed in start for the passed in contact and URN
 func StartIVRFlow(
-	ctx context.Context, rt *runtime.Runtime, client Client, resumeURL string, oa *models.OrgAssets,
+	ctx context.Context, rt *runtime.Runtime, client Provider, resumeURL string, oa *models.OrgAssets,
 	channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN, startID models.StartID,
 	r *http.Request, w http.ResponseWriter) error {
 
@@ -408,7 +408,7 @@ func StartIVRFlow(
 // ResumeIVRFlow takes care of resuming the flow in the passed in start for the passed in contact and URN
 func ResumeIVRFlow(
 	ctx context.Context, rt *runtime.Runtime,
-	resumeURL string, client Client,
+	resumeURL string, provider Provider,
 	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
@@ -423,14 +423,14 @@ func ResumeIVRFlow(
 	}
 
 	if session == nil {
-		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Errorf("no active IVR session for contact"))
+		return HandleAsFailure(ctx, rt.DB, provider, conn, w, errors.Errorf("no active IVR session for contact"))
 	}
 
 	if session.ConnectionID() == nil {
-		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
+		return HandleAsFailure(ctx, rt.DB, provider, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
 	}
 	if *session.ConnectionID() != conn.ID() {
-		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
+		return HandleAsFailure(ctx, rt.DB, provider, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
 	}
 
 	// check if connection has been marked as errored - it maybe have been updated by status callback
@@ -440,11 +440,11 @@ func ResumeIVRFlow(
 			logrus.WithError(err).Error("error interrupting session")
 		}
 
-		return client.WriteErrorResponse(w, fmt.Errorf("ending call due to previous status callback"))
+		return provider.WriteErrorResponse(w, fmt.Errorf("ending call due to previous status callback"))
 	}
 
 	// preprocess this request
-	body, err := client.PreprocessResume(ctx, rt.DB, rt.RP, conn, r)
+	body, err := provider.PreprocessResume(ctx, rt.DB, rt.RP, conn, r)
 	if err != nil {
 		return errors.Wrapf(err, "error preprocessing resume")
 	}
@@ -466,7 +466,7 @@ func ResumeIVRFlow(
 	}
 
 	// make sure our call is still happening
-	status, _, _ := client.StatusForRequest(r)
+	status, _, _ := provider.StatusForRequest(r)
 	if status != models.ConnectionStatusInProgress {
 		err := conn.UpdateStatus(ctx, rt.DB, status, 0, time.Now())
 		if err != nil {
@@ -475,16 +475,16 @@ func ResumeIVRFlow(
 	}
 
 	// get the input of our request
-	ivrResume, err := client.ResumeForRequest(r)
+	ivrResume, err := provider.ResumeForRequest(r)
 	if err != nil {
-		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Wrapf(err, "error finding input for request"))
+		return HandleAsFailure(ctx, rt.DB, provider, conn, w, errors.Wrapf(err, "error finding input for request"))
 	}
 
 	var resume flows.Resume
 	var clientErr error
 	switch res := ivrResume.(type) {
 	case InputResume:
-		resume, clientErr, err = buildMsgResume(ctx, rt.Config, rt.DB, rt.RP, rt.MediaStorage, client, channel, contact, urn, conn, oa, r, res)
+		resume, clientErr, err = buildMsgResume(ctx, rt.Config, rt.DB, rt.RP, rt.MediaStorage, provider, channel, contact, urn, conn, oa, r, res)
 
 	case DialResume:
 		resume, clientErr, err = buildDialResume(oa, contact, res)
@@ -497,10 +497,10 @@ func ResumeIVRFlow(
 		return errors.Wrapf(err, "error building resume for request")
 	}
 	if clientErr != nil {
-		return client.WriteErrorResponse(w, clientErr)
+		return provider.WriteErrorResponse(w, clientErr)
 	}
 	if resume == nil {
-		return client.WriteErrorResponse(w, fmt.Errorf("no resume found, ending call"))
+		return provider.WriteErrorResponse(w, fmt.Errorf("no resume found, ending call"))
 	}
 
 	session, err = runner.ResumeFlow(ctx, rt, oa, session, resume, hook)
@@ -510,7 +510,7 @@ func ResumeIVRFlow(
 
 	// if still active, write out our response
 	if status == models.ConnectionStatusInProgress {
-		err = client.WriteSessionResponse(ctx, rt.RP, channel, conn, session, urn, resumeURL, r, w)
+		err = provider.WriteSessionResponse(ctx, rt.RP, channel, conn, session, urn, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}
@@ -520,7 +520,7 @@ func ResumeIVRFlow(
 			logrus.WithError(err).Error("error closing session")
 		}
 
-		return client.WriteErrorResponse(w, fmt.Errorf("call completed"))
+		return provider.WriteErrorResponse(w, fmt.Errorf("call completed"))
 	}
 
 	return nil
@@ -532,7 +532,7 @@ func buildDialResume(oa *models.OrgAssets, contact *flows.Contact, resume DialRe
 
 func buildMsgResume(
 	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage,
-	client Client, channel *models.Channel, contact *flows.Contact, urn urns.URN,
+	client Provider, channel *models.Channel, contact *flows.Contact, urn urns.URN,
 	conn *models.ChannelConnection, oa *models.OrgAssets, r *http.Request, resume InputResume) (flows.Resume, error, error) {
 	// our msg UUID
 	msgUUID := flows.MsgUUID(uuids.New())
@@ -602,7 +602,7 @@ func buildMsgResume(
 
 // HandleIVRStatus is called on status callbacks for an IVR call. We let the client decide whether the call has
 // ended for some reason and update the state of the call and session if so
-func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
+func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, client Provider, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
 	status, errorReason, duration := client.StatusForRequest(r)
 

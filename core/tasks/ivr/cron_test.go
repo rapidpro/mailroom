@@ -23,7 +23,7 @@ func TestRetries(t *testing.T) {
 	defer testsuite.Reset()
 
 	// register our mock client
-	ivr.RegisterClientType(models.ChannelType("ZZ"), newMockClient)
+	ivr.RegisterProviderType(models.ChannelType("ZZ"), newMockClient)
 
 	// update our twilio channel to be of type 'ZZ' and set max_concurrent_events to 1
 	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, testdata.TwilioChannel.ID)

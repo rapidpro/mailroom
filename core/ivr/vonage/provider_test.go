@@ -52,10 +52,10 @@ func TestResponseForSprint(t *testing.T) {
 	channel := oa.ChannelByUUID(testdata.VonageChannel.UUID)
 	assert.NotNil(t, channel)
 
-	c, err := NewClientFromChannel(http.DefaultClient, channel)
+	c, err := NewProviderFromChannel(http.DefaultClient, channel)
 	assert.NoError(t, err)
 
-	client := c.(*client)
+	client := c.(*provider)
 
 	indentMarshal = false
 
