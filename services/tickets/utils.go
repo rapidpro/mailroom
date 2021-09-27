@@ -90,7 +90,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	for i, file := range files {
 		filename := string(uuids.New()) + filepath.Ext(file.URL)
 
-		attachments[i], err = oa.Org().StoreAttachment(ctx, rt.MediaStorage, filename, file.ContentType, file.Body)
+		attachments[i], err = oa.Org().StoreAttachment(ctx, rt, filename, file.ContentType, file.Body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error storing attachment %s for ticket reply", file.URL)
 		}
@@ -103,7 +103,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	// we'll use a broadcast to send this message
 	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil, ticket.ID())
 	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
-	msgs, err := models.CreateBroadcastMessages(ctx, rt.DB, rt.RP, oa, batch)
+	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
@@ -140,7 +140,7 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 
 // Close closes the given ticket, and creates and queues a closed event
 func Close(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
-	events, err := models.CloseTickets(ctx, rt.DB, oa, models.NilUserID, []*models.Ticket{ticket}, externally, false, l)
+	events, err := models.CloseTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{ticket}, externally, false, l)
 	if err != nil {
 		return errors.Wrap(err, "error closing ticket")
 	}
@@ -160,6 +160,6 @@ func Close(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticke
 
 // Reopen reopens the given ticket
 func Reopen(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
-	_, err := models.ReopenTickets(ctx, rt.DB, oa, models.NilUserID, []*models.Ticket{ticket}, externally, l)
+	_, err := models.ReopenTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{ticket}, externally, l)
 	return err
 }

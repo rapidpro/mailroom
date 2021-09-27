@@ -20,7 +20,7 @@ import (
 )
 
 func TestOutgoingMsgs(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	tcs := []struct {
 		ChannelUUID  assets.ChannelUUID
@@ -102,7 +102,7 @@ func TestOutgoingMsgs(t *testing.T) {
 		channel := oa.ChannelByUUID(tc.ChannelUUID)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic)
-		msg, err := models.NewOutgoingMsg(oa.Org(), channel, tc.ContactID, flowMsg, now)
+		msg, err := models.NewOutgoingMsg(rt.Config, oa.Org(), channel, tc.ContactID, flowMsg, now)
 
 		if tc.HasError {
 			assert.Error(t, err)
@@ -233,7 +233,7 @@ func TestNormalizeAttachment(t *testing.T) {
 }
 
 func TestMarkMessages(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset()
 
@@ -245,7 +245,7 @@ func TestMarkMessages(t *testing.T) {
 	insertMsg := func(text string) *models.Msg {
 		urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
 		flowMsg := flows.NewMsgOut(urn, channel.ChannelReference(), text, nil, nil, nil, flows.NilMsgTopic)
-		msg, err := models.NewOutgoingMsg(oa.Org(), channel, testdata.Cathy.ID, flowMsg, time.Now())
+		msg, err := models.NewOutgoingMsg(rt.Config, oa.Org(), channel, testdata.Cathy.ID, flowMsg, time.Now())
 		require.NoError(t, err)
 
 		err = models.InsertMessages(ctx, db, []*models.Msg{msg})
@@ -278,7 +278,7 @@ func TestMarkMessages(t *testing.T) {
 }
 
 func TestNonPersistentBroadcasts(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.ResetData(db)
 
@@ -323,7 +323,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, oa, batch)
+	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch)
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, len(msgs))
@@ -335,7 +335,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 }
 
 func TestNewOutgoingIVR(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -347,7 +347,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 	createdOn := time.Date(2021, 7, 26, 12, 6, 30, 0, time.UTC)
 
 	flowMsg := flows.NewMsgOut(testdata.Cathy.URN, vonage.ChannelReference(), "Hello", []utils.Attachment{"audio/mp3:http://example.com/hi.mp3"}, nil, nil, flows.NilMsgTopic)
-	dbMsg := models.NewOutgoingIVR(testdata.Org1.ID, conn, flowMsg, createdOn)
+	dbMsg := models.NewOutgoingIVR(rt.Config, testdata.Org1.ID, conn, flowMsg, createdOn)
 
 	assert.Equal(t, flowMsg.UUID(), dbMsg.UUID())
 	assert.Equal(t, "Hello", dbMsg.Text())

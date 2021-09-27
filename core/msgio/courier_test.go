@@ -13,7 +13,7 @@ import (
 )
 
 func TestQueueCourierMessages(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -78,7 +78,7 @@ func TestQueueCourierMessages(t *testing.T) {
 		var contactID models.ContactID
 		msgs := make([]*models.Msg, len(tc.Msgs))
 		for i, ms := range tc.Msgs {
-			msgs[i] = ms.createMsg(t, db, oa)
+			msgs[i] = ms.createMsg(t, rt, oa)
 			contactID = ms.ContactID
 		}
 
@@ -95,7 +95,7 @@ func TestQueueCourierMessages(t *testing.T) {
 			ContactID: testdata.Cathy.ID,
 			URNID:     testdata.Cathy.URNID,
 		}
-		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, db, oa)})
+		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, rt, oa)})
 	})
 
 	testsuite.Reset()

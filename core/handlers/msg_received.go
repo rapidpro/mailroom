@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
@@ -17,7 +18,7 @@ func init() {
 }
 
 // handleMsgReceived takes care of creating the incoming message for surveyor flows, it is a noop for all other flows
-func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleMsgReceived(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.MsgReceivedEvent)
 
 	// for surveyor sessions we need to actually create the message
@@ -29,7 +30,7 @@ func handleMsgReceived(ctx context.Context, tx *sqlx.Tx, oa *models.OrgAssets, s
 			"urn":          event.Msg.URN(),
 		}).Debug("msg received event")
 
-		msg := models.NewIncomingMsg(oa.OrgID(), nil, scene.ContactID(), &event.Msg, event.CreatedOn())
+		msg := models.NewIncomingMsg(rt.Config, oa.OrgID(), nil, scene.ContactID(), &event.Msg, event.CreatedOn())
 
 		// we'll commit this message with all the others
 		scene.AppendToEventPreCommitHook(hooks.CommitMessagesHook, msg)

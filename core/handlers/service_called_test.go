@@ -13,6 +13,8 @@ import (
 )
 
 func TestServiceCalled(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+
 	defer testsuite.Reset()
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
@@ -50,5 +52,5 @@ func TestServiceCalled(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

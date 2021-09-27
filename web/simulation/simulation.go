@@ -131,7 +131,7 @@ func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (int
 	}
 
 	// create clone of assets for simulation
-	oa, err = oa.CloneForSimulation(ctx, rt.DB, request.flows(), request.channels())
+	oa, err = oa.CloneForSimulation(ctx, rt, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to clone org")
 	}
@@ -194,7 +194,7 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// create clone of assets for simulation
-	oa, err = oa.CloneForSimulation(ctx, rt.DB, request.flows(), request.channels())
+	oa, err = oa.CloneForSimulation(ctx, rt, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

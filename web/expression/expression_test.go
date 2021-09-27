@@ -8,6 +8,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	testsuite.Reset()
-	web.RunWebTests(t, "testdata/migrate.json", nil)
+	ctx, rt, _, _ := testsuite.Get()
+
+	web.RunWebTests(t, ctx, rt, "testdata/migrate.json", nil)
 }

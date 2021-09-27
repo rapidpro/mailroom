@@ -13,7 +13,7 @@ import (
 )
 
 func TestWebhookCalled(t *testing.T) {
-	_, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset()
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -81,5 +81,5 @@ func TestWebhookCalled(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

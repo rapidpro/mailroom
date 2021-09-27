@@ -11,7 +11,6 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -20,7 +19,6 @@ import (
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
@@ -484,7 +482,7 @@ func ResumeIVRFlow(
 	var clientErr error
 	switch res := ivrResume.(type) {
 	case InputResume:
-		resume, clientErr, err = buildMsgResume(ctx, rt.Config, rt.DB, rt.RP, rt.MediaStorage, provider, channel, contact, urn, conn, oa, r, res)
+		resume, clientErr, err = buildMsgResume(ctx, rt, provider, channel, contact, urn, conn, oa, r, res)
 
 	case DialResume:
 		resume, clientErr, err = buildDialResume(oa, contact, res)
@@ -531,7 +529,7 @@ func buildDialResume(oa *models.OrgAssets, contact *flows.Contact, resume DialRe
 }
 
 func buildMsgResume(
-	ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, store storage.Storage,
+	ctx context.Context, rt *runtime.Runtime,
 	client Provider, channel *models.Channel, contact *flows.Contact, urn urns.URN,
 	conn *models.ChannelConnection, oa *models.OrgAssets, r *http.Request, resume InputResume) (flows.Resume, error, error) {
 	// our msg UUID
@@ -566,7 +564,7 @@ func buildMsgResume(
 		// filename is based on our org id and msg UUID
 		filename := string(msgUUID) + path.Ext(resume.Attachment.URL())
 
-		resume.Attachment, err = oa.Org().StoreAttachment(ctx, store, filename, resume.Attachment.ContentType(), resp.Body)
+		resume.Attachment, err = oa.Org().StoreAttachment(ctx, rt, filename, resume.Attachment.ContentType(), resp.Body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to download and store attachment, ending call"), nil
 		}
@@ -580,10 +578,10 @@ func buildMsgResume(
 	msgIn := flows.NewMsgIn(msgUUID, urn, channel.ChannelReference(), resume.Input, attachments)
 
 	// create an incoming message
-	msg := models.NewIncomingIVR(oa.OrgID(), conn, msgIn, time.Now())
+	msg := models.NewIncomingIVR(rt.Config, oa.OrgID(), conn, msgIn, time.Now())
 
 	// allocate a topup for this message if org uses topups)
-	topupID, err := models.AllocateTopups(ctx, db, rp, oa.Org(), 1)
+	topupID, err := models.AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), 1)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error allocating topup for incoming IVR message")
 	}
@@ -591,7 +589,7 @@ func buildMsgResume(
 	msg.SetTopup(topupID)
 
 	// commit it
-	err = models.InsertMessages(ctx, db, []*models.Msg{msg})
+	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg})
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error committing new message")
 	}

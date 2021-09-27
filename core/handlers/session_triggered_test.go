@@ -19,7 +19,7 @@ import (
 )
 
 func TestSessionTriggered(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset()
 
@@ -91,11 +91,11 @@ func TestSessionTriggered(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }
 
 func TestQuerySessionTriggered(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 
 	defer testsuite.Reset()
 
@@ -142,5 +142,5 @@ func TestQuerySessionTriggered(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

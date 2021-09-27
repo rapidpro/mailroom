@@ -11,6 +11,8 @@ import (
 )
 
 func TestContactLanguageChanged(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+
 	defer testsuite.Reset()
 
 	tcs := []handlers.TestCase{
@@ -52,5 +54,5 @@ func TestContactLanguageChanged(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

@@ -41,7 +41,7 @@ func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	evts, err := models.ReopenTickets(ctx, rt.DB, oa, request.UserID, tickets, true, l)
+	evts, err := models.ReopenTickets(ctx, rt, oa, request.UserID, tickets, true, l)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error reopening tickets for org: %d", request.OrgID)
 	}

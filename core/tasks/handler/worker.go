@@ -558,7 +558,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return errors.Wrapf(err, "unable to look up open tickets for contact")
 	}
 	for _, ticket := range tickets {
-		ticket.ForwardIncoming(ctx, rt.DB, oa, event.MsgUUID, event.Text, event.Attachments)
+		ticket.ForwardIncoming(ctx, rt, oa, event.MsgUUID, event.Text, event.Attachments)
 	}
 
 	// find any matching triggers

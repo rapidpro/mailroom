@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/runtime"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 )
@@ -481,7 +482,7 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 }
 
 // CloneForSimulation clones our org assets for simulation
-func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
+func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
 	clone, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows)
 	if err != nil {
@@ -506,7 +507,7 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs
 	clone.channels = append(clone.channels, testChannels...)
 
 	// rebuild our session assets with our new items
-	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig(config.Mailroom))
+	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig(rt.Config))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", clone.OrgID())
 	}
