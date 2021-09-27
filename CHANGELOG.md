@@ -1,3 +1,8 @@
+v6.5.32
+----------
+ * Refactor more code to use runtime.Runtime instead of passing db instances and using the global config
+ * Update to latest goflow with doc fixes
+
 v6.5.31
 ----------
  * Recalculate dynamic groups after closing and reopening tickets
