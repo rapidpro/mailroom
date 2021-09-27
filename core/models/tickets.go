@@ -15,6 +15,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
@@ -150,13 +151,13 @@ func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
-func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
+func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
 	ticketer := org.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
 	}
 
-	service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+	service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 	if err != nil {
 		return err
 	}
@@ -164,7 +165,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets
 	logger := &HTTPLogger{}
 	err = service.Forward(t, msgUUID, text, attachments, logger.Ticketer(ticketer))
 
-	logger.Insert(ctx, db)
+	logger.Insert(ctx, rt.DB)
 
 	return err
 }
@@ -517,7 +518,7 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally, force bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, tickets []*Ticket, externally, force bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
@@ -546,7 +547,7 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 		for ticketerID, ticketerTickets := range byTicketer {
 			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 				if err != nil {
 					return nil, err
 				}
@@ -560,16 +561,16 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 	}
 
 	// mark the tickets as closed in the db
-	err := Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	err := Exec(ctx, "close tickets", rt.DB, closeTicketSQL, pq.Array(ids), now)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
 
-	if err := InsertTicketEvents(ctx, db, events); err != nil {
+	if err := InsertTicketEvents(ctx, rt.DB, events); err != nil {
 		return nil, errors.Wrapf(err, "error inserting ticket events")
 	}
 
-	if err := recalcGroupsForTicketChanges(ctx, db, oa, contactIDs); err != nil {
+	if err := recalcGroupsForTicketChanges(ctx, rt.DB, oa, contactIDs); err != nil {
 		return nil, errors.Wrapf(err, "error recalculting groups")
 	}
 
@@ -589,7 +590,7 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+func ReopenTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
@@ -618,7 +619,7 @@ func ReopenTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 		for ticketerID, ticketerTickets := range byTicketer {
 			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 				if err != nil {
 					return nil, err
 				}
@@ -632,17 +633,17 @@ func ReopenTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 	}
 
 	// mark the tickets as opened in the db
-	err := Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	err := Exec(ctx, "reopen tickets", rt.DB, reopenTicketSQL, pq.Array(ids), now)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
 
-	err = InsertTicketEvents(ctx, db, events)
+	err = InsertTicketEvents(ctx, rt.DB, events)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting ticket events")
 	}
 
-	if err := recalcGroupsForTicketChanges(ctx, db, oa, contactIDs); err != nil {
+	if err := recalcGroupsForTicketChanges(ctx, rt.DB, oa, contactIDs); err != nil {
 		return nil, errors.Wrapf(err, "error recalculting groups")
 	}
 

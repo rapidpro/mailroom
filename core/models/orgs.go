@@ -13,7 +13,6 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/services/airtime/dtone"
@@ -22,6 +21,7 @@ import (
 	"github.com/nyaruka/goflow/utils/smtpx"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
@@ -180,8 +180,8 @@ func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryCo
 }
 
 // StoreAttachment saves an attachment to storage
-func (o *Org) StoreAttachment(ctx context.Context, s storage.Storage, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
-	prefix := config.Mailroom.S3MediaPrefix
+func (o *Org) StoreAttachment(ctx context.Context, rt *runtime.Runtime, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
+	prefix := rt.Config.S3MediaPrefix
 
 	// read the content
 	contentBytes, err := io.ReadAll(content)
@@ -197,7 +197,7 @@ func (o *Org) StoreAttachment(ctx context.Context, s storage.Storage, filename s
 
 	path := o.attachmentPath(prefix, filename)
 
-	url, err := s.Put(ctx, path, contentType, contentBytes)
+	url, err := rt.MediaStorage.Put(ctx, path, contentType, contentBytes)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to store attachment content")
 	}

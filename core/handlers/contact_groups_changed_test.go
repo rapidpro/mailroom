@@ -12,6 +12,8 @@ import (
 )
 
 func TestContactGroupsChanged(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+
 	defer testsuite.Reset()
 
 	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
@@ -56,5 +58,5 @@ func TestContactGroupsChanged(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

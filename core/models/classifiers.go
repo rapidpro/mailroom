@@ -52,7 +52,7 @@ const (
 func init() {
 	goflow.RegisterClassificationServiceFactory(
 		func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
-			return classifier.Asset().(*Classifier).AsService(classifier)
+			return classifier.Asset().(*Classifier).AsService(config.Mailroom, classifier)
 		},
 	)
 }
@@ -90,8 +90,8 @@ func (c *Classifier) Intents() []string { return c.c.intentNames }
 func (c *Classifier) Type() string { return c.c.Type }
 
 // AsService builds the corresponding ClassificationService for the passed in Classifier
-func (c *Classifier) AsService(classifier *flows.Classifier) (flows.ClassificationService, error) {
-	httpClient, httpRetries, httpAccess := goflow.HTTP(config.Mailroom)
+func (c *Classifier) AsService(cfg *config.Config, classifier *flows.Classifier) (flows.ClassificationService, error) {
+	httpClient, httpRetries, httpAccess := goflow.HTTP(cfg)
 
 	switch c.Type() {
 	case ClassifierTypeWit:

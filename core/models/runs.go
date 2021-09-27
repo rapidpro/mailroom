@@ -167,20 +167,20 @@ func (s *Session) Scene() *Scene                      { return s.scene }
 
 // WriteSessionsToStorage writes the outputs of the passed in sessions to our storage (S3), updating the
 // output_url for each on success. Failure of any will cause all to fail.
-func WriteSessionOutputsToStorage(ctx context.Context, st storage.Storage, sessions []*Session) error {
+func WriteSessionOutputsToStorage(ctx context.Context, rt *runtime.Runtime, sessions []*Session) error {
 	start := time.Now()
 
 	uploads := make([]*storage.Upload, len(sessions))
 	for i, s := range sessions {
 		uploads[i] = &storage.Upload{
-			Path:        s.StoragePath(config.Mailroom),
+			Path:        s.StoragePath(rt.Config),
 			Body:        []byte(s.Output()),
 			ContentType: "application/json",
 			ACL:         s3.ObjectCannedACLPrivate,
 		}
 	}
 
-	err := st.BatchPut(ctx, uploads)
+	err := rt.SessionStorage.BatchPut(ctx, uploads)
 	if err != nil {
 		return errors.Wrapf(err, "error writing sessions to storage")
 	}
@@ -522,8 +522,8 @@ RETURNING id
 `
 
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
-func (s *Session) FlowSession(sa flows.SessionAssets, env envs.Environment) (flows.Session, error) {
-	session, err := goflow.Engine(config.Mailroom).ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
+func (s *Session) FlowSession(cfg *config.Config, sa flows.SessionAssets, env envs.Environment) (flows.Session, error) {
+	session, err := goflow.Engine(cfg).ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to unmarshal session")
 	}
@@ -632,7 +632,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 	// if writing to S3, do so
 	sessionMode := org.Org().SessionStorageMode()
 	if sessionMode == S3Sessions {
-		err := WriteSessionOutputsToStorage(ctx, rt.SessionStorage, []*Session{s})
+		err := WriteSessionOutputsToStorage(ctx, rt, []*Session{s})
 		if err != nil {
 			logrus.WithError(err).Error("error writing session to s3")
 		}
@@ -819,7 +819,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	// if writing our sessions to S3, do so
 	sessionMode := org.Org().SessionStorageMode()
 	if sessionMode == S3Sessions {
-		err := WriteSessionOutputsToStorage(ctx, rt.SessionStorage, sessions)
+		err := WriteSessionOutputsToStorage(ctx, rt, sessions)
 		if err != nil {
 			// for now, continue on for errors, we are still reading from the DB
 			logrus.WithError(err).Error("error writing sessions to s3")

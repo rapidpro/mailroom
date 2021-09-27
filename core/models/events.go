@@ -70,7 +70,7 @@ func (s *Scene) AppendToEventPostCommitHook(hook EventCommitHook, event interfac
 }
 
 // EventHandler defines a call for handling events that occur in a flow
-type EventHandler func(context.Context, *sqlx.Tx, *OrgAssets, *Scene, flows.Event) error
+type EventHandler func(context.Context, *runtime.Runtime, *sqlx.Tx, *OrgAssets, *Scene, flows.Event) error
 
 // our registry of event type to internal handlers
 var eventHandlers = make(map[string]EventHandler)
@@ -107,7 +107,7 @@ func HandleEvents(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *Org
 			return errors.Errorf("unable to find handler for event type: %s", e.Type())
 		}
 
-		err := handler(ctx, tx, oa, scene, e)
+		err := handler(ctx, rt, tx, oa, scene, e)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func ApplyPreWriteEvent(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 		return nil
 	}
 
-	return handler(ctx, tx, oa, scene, e)
+	return handler(ctx, rt, tx, oa, scene, e)
 }
 
 // EventCommitHook defines a callback that will accept a certain type of events across session, either before or after committing

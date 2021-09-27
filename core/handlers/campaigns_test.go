@@ -13,7 +13,9 @@ import (
 )
 
 func TestCampaigns(t *testing.T) {
-	testsuite.Reset()
+	ctx, rt, _, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	doctors := assets.NewGroupReference(testdata.DoctorsGroup.UUID, "Doctors")
 	joined := assets.NewFieldReference("joined", "Joined")
@@ -85,5 +87,5 @@ func TestCampaigns(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

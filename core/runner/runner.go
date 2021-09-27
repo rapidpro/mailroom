@@ -79,7 +79,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	}
 
 	// build our flow session
-	fs, err := session.FlowSession(sa, oa.Env())
+	fs, err := session.FlowSession(rt.Config, sa, oa.Env())
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to create session from output")
 	}

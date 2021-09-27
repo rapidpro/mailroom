@@ -15,7 +15,7 @@ import (
 )
 
 func TestMsgReceived(t *testing.T) {
-	_, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset()
 
@@ -67,5 +67,5 @@ func TestMsgReceived(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

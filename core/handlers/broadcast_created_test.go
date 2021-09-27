@@ -18,6 +18,8 @@ import (
 )
 
 func TestBroadcastCreated(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+
 	defer testsuite.Reset()
 
 	// TODO: test contacts, groups
@@ -56,5 +58,5 @@ func TestBroadcastCreated(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

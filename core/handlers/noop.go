@@ -6,6 +6,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -25,6 +26,6 @@ func init() {
 }
 
 // NoopHandler is our hook for events we ignore in a run
-func NoopHandler(ctx context.Context, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, event flows.Event) error {
+func NoopHandler(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, event flows.Event) error {
 	return nil
 }
