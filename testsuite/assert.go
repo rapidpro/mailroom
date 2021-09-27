@@ -16,7 +16,7 @@ import (
 
 // AssertCourierQueues asserts the sizes of message batches in the named courier queues
 func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...interface{}) {
-	rc := RC()
+	rc := getRC()
 	defer rc.Close()
 
 	queueKeys, err := redis.Strings(rc.Do("KEYS", "msgs:????????-*"))
@@ -50,7 +50,7 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 
 // AssertContactTasks asserts that the given contact has the given tasks queued for them
 func AssertContactTasks(t *testing.T, orgID models.OrgID, contactID models.ContactID, expected []string, msgAndArgs ...interface{}) {
-	rc := RC()
+	rc := getRC()
 	defer rc.Close()
 
 	tasks, err := redis.Strings(rc.Do("LRANGE", fmt.Sprintf("c:%d:%d", orgID, contactID), 0, -1))

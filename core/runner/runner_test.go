@@ -174,7 +174,6 @@ func TestResume(t *testing.T) {
 
 	// write sessions to s3 storage
 	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3"}' WHERE id = 1`)
-	defer testsuite.ResetDB()
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)

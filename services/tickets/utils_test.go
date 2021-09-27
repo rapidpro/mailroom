@@ -79,9 +79,6 @@ func TestFromTicketUUID(t *testing.T) {
 	assert.Equal(t, ticket2.UUID, ticket.UUID())
 	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
-
-	testsuite.ResetDB()
-	models.FlushCache()
 }
 
 func TestFromTicketerUUID(t *testing.T) {
@@ -110,9 +107,6 @@ func TestFromTicketerUUID(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
-
-	testsuite.ResetDB()
-	models.FlushCache()
 }
 
 func TestSendReply(t *testing.T) {
