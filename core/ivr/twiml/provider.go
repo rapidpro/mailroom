@@ -25,9 +25,8 @@ import (
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -154,11 +153,11 @@ func (p *provider) CheckStartRequest(r *http.Request) models.ConnectionError {
 	return ""
 }
 
-func (p *provider) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
+func (p *provider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 
-func (p *provider) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (p *provider) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 
@@ -353,7 +352,7 @@ func (p *provider) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a TWIML response for the events in the passed in session
-func (p *provider) WriteSessionResponse(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (p *provider) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -366,7 +365,7 @@ func (p *provider) WriteSessionResponse(ctx context.Context, rp *redis.Pool, cha
 	}
 
 	// get our response
-	response, err := responseForSprint(number, resumeURL, session.Wait(), sprint.Events())
+	response, err := responseForSprint(rt.Config, number, resumeURL, session.Wait(), sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -446,7 +445,7 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 
 // TWIML building utilities
 
-func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+func responseForSprint(cfg *config.Config, number urns.URN, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 
@@ -464,7 +463,7 @@ func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait,
 				commands = append(commands, Say{Text: event.Msg.Text(), Language: languageCode})
 			} else {
 				for _, a := range event.Msg.Attachments() {
-					a = models.NormalizeAttachment(config.Mailroom, a)
+					a = models.NormalizeAttachment(cfg, a)
 					commands = append(commands, Play{URL: a.URL()})
 				}
 			}

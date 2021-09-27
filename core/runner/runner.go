@@ -104,7 +104,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	}
 
 	// write our updated session and runs
-	err = session.WriteUpdatedSession(txCTX, tx, rt.RP, rt.SessionStorage, oa, fs, sprint, hook)
+	err = session.WriteUpdatedSession(txCTX, rt, tx, oa, fs, sprint, hook)
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
@@ -126,7 +126,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 		return nil, errors.Wrapf(err, "error starting transaction for post commit hooks")
 	}
 
-	err = models.ApplyEventPostCommitHooks(txCTX, tx, rt.RP, oa, []*models.Scene{session.Scene()})
+	err = models.ApplyEventPostCommitHooks(txCTX, rt, tx, oa, []*models.Scene{session.Scene()})
 	if err == nil {
 		err = tx.Commit()
 	}
@@ -596,7 +596,7 @@ func StartFlowForContacts(
 	}
 
 	// write our session to the db
-	dbSessions, err := models.WriteSessions(txCTX, tx, rt.RP, rt.SessionStorage, oa, sessions, sprints, hook)
+	dbSessions, err := models.WriteSessions(txCTX, rt, tx, oa, sessions, sprints, hook)
 	if err == nil {
 		// commit it at once
 		commitStart := time.Now()
@@ -636,7 +636,7 @@ func StartFlowForContacts(
 				}
 			}
 
-			dbSession, err := models.WriteSessions(txCTX, tx, rt.RP, rt.SessionStorage, oa, []flows.Session{session}, []flows.Sprint{sprint}, hook)
+			dbSession, err := models.WriteSessions(txCTX, rt, tx, oa, []flows.Session{session}, []flows.Sprint{sprint}, hook)
 			if err != nil {
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")
@@ -668,7 +668,7 @@ func StartFlowForContacts(
 		scenes = append(scenes, s.Scene())
 	}
 
-	err = models.ApplyEventPostCommitHooks(txCTX, tx, rt.RP, oa, scenes)
+	err = models.ApplyEventPostCommitHooks(txCTX, rt, tx, oa, scenes)
 	if err == nil {
 		err = tx.Commit()
 	}
@@ -690,7 +690,7 @@ func StartFlowForContacts(
 				continue
 			}
 
-			err = models.ApplyEventPostCommitHooks(ctx, tx, rt.RP, oa, []*models.Scene{session.Scene()})
+			err = models.ApplyEventPostCommitHooks(ctx, rt, tx, oa, []*models.Scene{session.Scene()})
 			if err != nil {
 				tx.Rollback()
 				log.WithError(err).Errorf("error applying post commit hook")

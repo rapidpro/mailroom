@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -42,20 +41,16 @@ func TestResponseForSprint(t *testing.T) {
 	// set our UUID generator
 	uuids.SetGenerator(uuids.NewSeededGenerator(0))
 
-	// set our attachment domain for testing
-	config.Mailroom.AttachmentDomain = "mailroom.io"
-	defer func() { config.Mailroom.AttachmentDomain = "" }()
-
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	channel := oa.ChannelByUUID(testdata.VonageChannel.UUID)
 	assert.NotNil(t, channel)
 
-	c, err := NewProviderFromChannel(http.DefaultClient, channel)
+	p, err := NewProviderFromChannel(http.DefaultClient, channel)
 	assert.NoError(t, err)
 
-	client := c.(*provider)
+	provider := p.(*provider)
 
 	indentMarshal = false
 
@@ -105,7 +100,7 @@ func TestResponseForSprint(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		response, err := client.responseForSprint(ctx, rp, channel, nil, resumeURL, tc.Wait, tc.Events)
+		response, err := provider.responseForSprint(ctx, rp, channel, nil, resumeURL, tc.Wait, tc.Events)
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, tc.Expected, response, "%d: unexpected response", i)
 	}

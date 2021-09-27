@@ -9,14 +9,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
@@ -35,15 +33,15 @@ func GetContactDisplay(env envs.Environment, contact *flows.Contact) string {
 }
 
 // FromTicketUUID takes a ticket UUID and looks up the ticket and ticketer, and creates the service
-func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, ticketerType string) (*models.Ticket, *models.Ticketer, models.TicketService, error) {
+func FromTicketUUID(ctx context.Context, rt *runtime.Runtime, uuid flows.TicketUUID, ticketerType string) (*models.Ticket, *models.Ticketer, models.TicketService, error) {
 	// look up our ticket
-	ticket, err := models.LookupTicketByUUID(ctx, db, uuid)
+	ticket, err := models.LookupTicketByUUID(ctx, rt.DB, uuid)
 	if err != nil || ticket == nil {
 		return nil, nil, nil, errors.Errorf("error looking up ticket %s", uuid)
 	}
 
 	// look up our assets
-	assets, err := models.GetOrgAssets(ctx, db, ticket.OrgID())
+	assets, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
@@ -55,7 +53,7 @@ func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, tic
 	}
 
 	// and load it as a service
-	svc, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+	svc, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "error loading ticketer service")
 	}
@@ -64,14 +62,14 @@ func FromTicketUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID, tic
 }
 
 // FromTicketerUUID takes a ticketer UUID and looks up the ticketer and creates the service
-func FromTicketerUUID(ctx context.Context, db *sqlx.DB, uuid assets.TicketerUUID, ticketerType string) (*models.Ticketer, models.TicketService, error) {
-	ticketer, err := models.LookupTicketerByUUID(ctx, db, uuid)
+func FromTicketerUUID(ctx context.Context, rt *runtime.Runtime, uuid assets.TicketerUUID, ticketerType string) (*models.Ticketer, models.TicketService, error) {
+	ticketer, err := models.LookupTicketerByUUID(ctx, rt.DB, uuid)
 	if err != nil || ticketer == nil || ticketer.Type() != ticketerType {
 		return nil, nil, errors.Errorf("error looking up ticketer %s", uuid)
 	}
 
 	// and load it as a service
-	svc, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+	svc, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error loading ticketer service")
 	}
@@ -110,7 +108,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
 
-	msgio.SendMessages(ctx, rt.DB, rt.RP, nil, msgs)
+	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
 	return msgs[0], nil
 }
 

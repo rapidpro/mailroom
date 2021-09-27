@@ -5,8 +5,8 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -17,8 +17,8 @@ var StartStartHook models.EventCommitHook = &startStartHook{}
 type startStartHook struct{}
 
 // Apply queues up our flow starts
-func (h *startStartHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
-	rc := rp.Get()
+func (h *startStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// for each of our scene

@@ -88,7 +88,7 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 	}
 
 	// look up the ticket and ticketer
-	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, rt.DB, flows.TicketUUID(match[0][1]), typeMailgun)
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(match[0][1]), typeMailgun)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

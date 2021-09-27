@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,7 +19,6 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
@@ -29,8 +27,8 @@ import (
 
 // RunWebTests runs the tests in the passed in filename, optionally updating them if the update flag is set
 func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string) {
-	rp := testsuite.RP()
-	db := testsuite.DB()
+	ctx, rt, db, _ := testsuite.Get()
+
 	wg := &sync.WaitGroup{}
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
@@ -40,7 +38,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 
 	defer testsuite.ResetStorage()
 
-	server := NewServer(context.Background(), config.Mailroom, db, rp, testsuite.MediaStorage(), testsuite.SessionStorage(), nil, wg)
+	server := NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 

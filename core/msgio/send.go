@@ -4,15 +4,14 @@ import (
 	"context"
 
 	"github.com/edganiukov/fcm"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/apex/log"
-	"github.com/gomodule/redigo/redis"
 )
 
 // SendMessages tries to send the given messages via Courier or Android syncing
-func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fcm.Client, msgs []*models.Msg) {
+func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, fc *fcm.Client, msgs []*models.Msg) {
 	// messages to be sent by courier, organized by contact
 	courierMsgs := make(map[models.ContactID][]*models.Msg, 100)
 
@@ -42,7 +41,7 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fc
 
 	// if there are courier messages to send, do so
 	if len(courierMsgs) > 0 {
-		rc := rp.Get()
+		rc := rt.RP.Get()
 		defer rc.Close()
 
 		for contactID, contactMsgs := range courierMsgs {
@@ -62,7 +61,7 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fc
 	// if we have any android messages, trigger syncs for the unique channels
 	if len(androidChannels) > 0 {
 		if fc == nil {
-			fc = CreateFCMClient(config.Mailroom)
+			fc = CreateFCMClient(rt.Config)
 		}
 		SyncAndroidChannels(fc, androidChannels)
 	}
@@ -70,7 +69,7 @@ func SendMessages(ctx context.Context, db models.Queryer, rp *redis.Pool, fc *fc
 	// any messages that didn't get sent should be moved back to pending (they are queued at creation to save an
 	// update in the common case)
 	if len(pending) > 0 {
-		err := models.MarkMessagesPending(ctx, db, pending)
+		err := models.MarkMessagesPending(ctx, tx, pending)
 		if err != nil {
 			log.WithError(err).Error("error marking message as pending")
 		}

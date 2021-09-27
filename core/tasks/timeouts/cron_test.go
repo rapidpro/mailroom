@@ -17,7 +17,7 @@ import (
 )
 
 func TestTimeouts(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -35,7 +35,7 @@ func TestTimeouts(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our timeouts
-	err = timeoutSessions(ctx, db, rp, timeoutLock, "foo")
+	err = timeoutSessions(ctx, rt, timeoutLock, "foo")
 	assert.NoError(t, err)
 
 	// should have created one task

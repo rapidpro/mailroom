@@ -40,7 +40,7 @@ func init() {
 
 	goflow.RegisterEmailServiceFactory(
 		func(session flows.Session) (flows.EmailService, error) {
-			return orgFromSession(session).EmailService(http.DefaultClient)
+			return orgFromSession(session).EmailService(config.Mailroom)
 		},
 	)
 
@@ -159,8 +159,8 @@ func (o *Org) ConfigValue(key string, def string) string {
 }
 
 // EmailService returns the email service for this org
-func (o *Org) EmailService(httpClient *http.Client) (flows.EmailService, error) {
-	connectionURL := o.ConfigValue(configSMTPServer, config.Mailroom.SMTPServer)
+func (o *Org) EmailService(cfg *config.Config) (flows.EmailService, error) {
+	connectionURL := o.ConfigValue(configSMTPServer, cfg.SMTPServer)
 
 	if connectionURL == "" {
 		return nil, errors.New("missing SMTP configuration")

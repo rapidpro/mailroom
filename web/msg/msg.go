@@ -53,7 +53,7 @@ func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error resending messages")
 	}
 
-	msgio.SendMessages(ctx, rt.DB, rt.RP, nil, msgs)
+	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
 
 	// response is the ids of the messages that were actually resent
 	resentMsgIDs := make([]flows.MsgID, len(msgs))

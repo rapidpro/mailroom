@@ -54,7 +54,7 @@ func (m *msgSpec) createMsg(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) *mo
 }
 
 func TestSendMessages(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -150,7 +150,7 @@ func TestSendMessages(t *testing.T) {
 		rc.Do("FLUSHDB")
 		mockFCM.Messages = nil
 
-		msgio.SendMessages(ctx, db, rp, fc, msgs)
+		msgio.SendMessages(ctx, rt, db, fc, msgs)
 
 		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 

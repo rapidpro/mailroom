@@ -14,8 +14,6 @@ import (
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/utils/marker"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -36,18 +34,18 @@ func StartExpirationCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return expireRuns(ctx, rt.DB, rt.RP, lockName, lockValue)
+			return expireRuns(ctx, rt, lockName, lockValue)
 		},
 	)
 	return nil
 }
 
 // expireRuns expires all the runs that have an expiration in the past
-func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+func expireRuns(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
 	start := time.Now()
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// we expire runs and sessions that have no continuation in batches
@@ -55,7 +53,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 	expiredSessions := make([]models.SessionID, 0, expireBatchSize)
 
 	// select our expired runs
-	rows, err := db.QueryxContext(ctx, selectExpiredRunsSQL)
+	rows, err := rt.DB.QueryxContext(ctx, selectExpiredRunsSQL)
 	if err != nil {
 		return errors.Wrapf(err, "error querying for expired runs")
 	}
@@ -83,7 +81,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 			// batch is full? commit it
 			if len(expiredRuns) == expireBatchSize {
-				err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
+				err = models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
 				if err != nil {
 					return errors.Wrapf(err, "error expiring runs and sessions")
 				}
@@ -122,7 +120,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 	// commit any stragglers
 	if len(expiredRuns) > 0 {
-		err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
+		err = models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
 		if err != nil {
 			return errors.Wrapf(err, "error expiring runs and sessions")
 		}
