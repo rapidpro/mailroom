@@ -7,6 +7,7 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/classification/bothub"
 	"github.com/nyaruka/goflow/services/classification/luis"
 	"github.com/nyaruka/goflow/services/classification/wit"
@@ -50,11 +51,13 @@ const (
 
 // Register a classification service factory with the engine
 func init() {
-	goflow.RegisterClassificationServiceFactory(
-		func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
-			return classifier.Asset().(*Classifier).AsService(runtime.GlobalConfig, classifier)
-		},
-	)
+	goflow.RegisterClassificationServiceFactory(classificationServiceFactory)
+}
+
+func classificationServiceFactory(c *runtime.Config) engine.ClassificationServiceFactory {
+	return func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
+		return classifier.Asset().(*Classifier).AsService(c, classifier)
+	}
 }
 
 // Classifier is our type for a classifier

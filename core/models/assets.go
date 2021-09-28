@@ -118,6 +118,8 @@ func FlushCache() {
 // NewOrgAssets creates and returns a new org assets objects, potentially using the previous
 // org assets passed in to prevent refetching locations
 func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets, refresh Refresh) (*OrgAssets, error) {
+	cfg := runtime.GlobalConfig
+
 	// build our new assets
 	oa := &OrgAssets{
 		db:      db,
@@ -134,7 +136,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	var err error
 
 	if prev == nil || refresh&RefreshOrg > 0 {
-		oa.org, err = LoadOrg(ctx, runtime.GlobalConfig, db, orgID)
+		oa.org, err = LoadOrg(ctx, cfg, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading environment for org %d", orgID)
 		}
@@ -359,7 +361,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	}
 
 	// intialize our session assets
-	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(runtime.GlobalConfig))
+	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(cfg))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", orgID)
 	}

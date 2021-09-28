@@ -15,6 +15,7 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/airtime/dtone"
 	"github.com/nyaruka/goflow/services/email/smtp"
 	"github.com/nyaruka/goflow/utils"
@@ -29,25 +30,28 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var emailRetries = smtpx.NewFixedRetries(time.Second*3, time.Second*6)
-
 // Register a airtime service factory with the engine
 func init() {
+	goflow.RegisterEmailServiceFactory(emailServiceFactory)
+	goflow.RegisterAirtimeServiceFactory(airtimeServiceFactory)
+}
+
+func emailServiceFactory(c *runtime.Config) engine.EmailServiceFactory {
+	var emailRetries = smtpx.NewFixedRetries(time.Second*3, time.Second*6)
+
+	return func(session flows.Session) (flows.EmailService, error) {
+		return orgFromSession(session).EmailService(c, emailRetries)
+	}
+}
+
+func airtimeServiceFactory(c *runtime.Config) engine.AirtimeServiceFactory {
 	// give airtime transfers an extra long timeout
 	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
 	airtimeHTTPRetries := httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
-	goflow.RegisterEmailServiceFactory(
-		func(session flows.Session) (flows.EmailService, error) {
-			return orgFromSession(session).EmailService(runtime.GlobalConfig)
-		},
-	)
-
-	goflow.RegisterAirtimeServiceFactory(
-		func(session flows.Session) (flows.AirtimeService, error) {
-			return orgFromSession(session).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
-		},
-	)
+	return func(session flows.Session) (flows.AirtimeService, error) {
+		return orgFromSession(session).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
+	}
 }
 
 // OrgID is our type for orgs ids
@@ -158,13 +162,13 @@ func (o *Org) ConfigValue(key string, def string) string {
 }
 
 // EmailService returns the email service for this org
-func (o *Org) EmailService(cfg *runtime.Config) (flows.EmailService, error) {
-	connectionURL := o.ConfigValue(configSMTPServer, cfg.SMTPServer)
+func (o *Org) EmailService(c *runtime.Config, retries *smtpx.RetryConfig) (flows.EmailService, error) {
+	connectionURL := o.ConfigValue(configSMTPServer, c.SMTPServer)
 
 	if connectionURL == "" {
 		return nil, errors.New("missing SMTP configuration")
 	}
-	return smtp.NewService(connectionURL, emailRetries)
+	return smtp.NewService(connectionURL, retries)
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
