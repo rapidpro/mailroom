@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
 )
 
@@ -13,18 +14,21 @@ import (
 var Mailroom *Config
 
 func init() {
-	Mailroom = NewMailroomConfig()
+	Mailroom = NewDefaultConfig()
 }
 
 // Config is our top level configuration object
 type Config struct {
-	SentryDSN  string `help:"the DSN used for logging errors to Sentry"`
-	DB         string `help:"URL for your Postgres database"`
-	DBPoolSize int    `help:"the size of our db pool"`
-	Redis      string `help:"URL for your Redis instance"`
-	Elastic    string `help:"URL for your ElasticSearch service"`
-	Version    string `help:"the version of this mailroom install"`
-	LogLevel   string `help:"the logging level courier should use"`
+	DB         string `validate:"url,startswith=postgres:"           help:"URL for your Postgres database"`
+	ReadonlyDB string `validate:"omitempty,url,startswith=postgres:" help:"URL of optional connection to readonly database instance"`
+	DBPoolSize int    `                                              help:"the size of our db pool"`
+	Redis      string `validate:"url,startswith=redis:"              help:"URL for your Redis instance"`
+	Elastic    string `validate:"url"                                help:"URL for your ElasticSearch service"`
+	SentryDSN  string `                                              help:"the DSN used for logging errors to Sentry"`
+
+	Address   string `help:"the address to bind our web server to"`
+	Port      int    `help:"the port to bind our web server to"`
+	AuthToken string `help:"the token clients will need to authenticate web requests"`
 
 	BatchWorkers   int `help:"the number of go routines that will be used to handle batch events"`
 	HandlerWorkers int `help:"the number of go routines that will be used to handle messages"`
@@ -65,24 +69,24 @@ type Config struct {
 	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
 	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 
-	AuthToken string `help:"the token clients will need to authenticate web requests"`
-	Address   string `help:"the address to bind our web server to"`
-	Port      int    `help:"the port to bind our web server to"`
-
-	UUIDSeed int `help:"seed to use for UUID generation in a testing environment"`
+	LogLevel string `help:"the logging level courier should use"`
+	UUIDSeed int    `help:"seed to use for UUID generation in a testing environment"`
+	Version  string `help:"the version of this mailroom install"`
 }
 
-// NewMailroomConfig returns a new default configuration object
-func NewMailroomConfig() *Config {
+// NewDefaultConfig returns a new default configuration object
+func NewDefaultConfig() *Config {
 	return &Config{
 		DB:             "postgres://temba:temba@localhost/temba?sslmode=disable&Timezone=UTC",
+		ReadonlyDB:     "",
 		DBPoolSize:     36,
 		Redis:          "redis://localhost:6379/15",
 		Elastic:        "http://localhost:9200",
 		BatchWorkers:   4,
 		HandlerWorkers: 32,
-		LogLevel:       "error",
-		Version:        "Dev",
+
+		Address: "localhost",
+		Port:    8090,
 
 		WebhooksTimeout:        15000,
 		WebhooksMaxRetries:     2,
@@ -107,18 +111,20 @@ func NewMailroomConfig() *Config {
 
 		RetryPendingMessages: true,
 
-		Address: "localhost",
-		Port:    8090,
-
+		LogLevel: "error",
 		UUIDSeed: 0,
+		Version:  "Dev",
 	}
 }
 
 // Validate validates the config
 func (c *Config) Validate() error {
-	_, _, err := c.ParseDisallowedNetworks()
-	if err != nil {
-		return errors.Wrap(err, "unable to parse DisallowedNetworks")
+	if err := utils.Validate(c); err != nil {
+		return err
+	}
+
+	if _, _, err := c.ParseDisallowedNetworks(); err != nil {
+		return errors.Wrap(err, "unable to parse 'DisallowedNetworks'")
 	}
 	return nil
 }
