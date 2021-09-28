@@ -15,7 +15,7 @@ import (
 )
 
 func TestLoadTriggers(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -94,7 +94,7 @@ func TestLoadTriggers(t *testing.T) {
 		},
 	}
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
 
 	require.Equal(t, len(tcs), len(oa.Triggers()))
@@ -116,7 +116,7 @@ func TestLoadTriggers(t *testing.T) {
 }
 
 func TestFindMatchingMsgTrigger(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -132,7 +132,7 @@ func TestFindMatchingMsgTrigger(t *testing.T) {
 	// trigger for other org
 	testdata.InsertCatchallTrigger(db, testdata.Org2, testdata.Org2Favorites, nil, nil)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
 
 	testdata.DoctorsGroup.Add(db, testdata.Bob)
@@ -167,7 +167,7 @@ func TestFindMatchingMsgTrigger(t *testing.T) {
 }
 
 func TestFindMatchingIncomingCallTrigger(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -176,7 +176,7 @@ func TestFindMatchingIncomingCallTrigger(t *testing.T) {
 	notTestersTriggerID := testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, nil, []*testdata.Group{testdata.TestersGroup})
 	everyoneTriggerID := testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, nil, nil)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
 
 	testdata.DoctorsGroup.Add(db, testdata.Bob)
@@ -205,13 +205,13 @@ func TestFindMatchingIncomingCallTrigger(t *testing.T) {
 }
 
 func TestFindMatchingMissedCallTrigger(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.SingleMessage, nil, nil)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
 
 	// no missed call trigger yet
@@ -220,7 +220,7 @@ func TestFindMatchingMissedCallTrigger(t *testing.T) {
 
 	triggerID := testdata.InsertMissedCallTrigger(db, testdata.Org1, testdata.Favorites)
 
-	oa, err = models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	oa, err = models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
 
 	trigger = models.FindMatchingMissedCallTrigger(oa)
@@ -228,14 +228,14 @@ func TestFindMatchingMissedCallTrigger(t *testing.T) {
 }
 
 func TestFindMatchingNewConversationTrigger(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	twilioTriggerID := testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwilioChannel)
 	noChTriggerID := testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, nil)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -255,7 +255,7 @@ func TestFindMatchingNewConversationTrigger(t *testing.T) {
 }
 
 func TestFindMatchingReferralTrigger(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -263,7 +263,7 @@ func TestFindMatchingReferralTrigger(t *testing.T) {
 	barID := testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "bar", nil)
 	bazID := testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "", testdata.TwitterChannel)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTriggers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
 
 	tcs := []struct {

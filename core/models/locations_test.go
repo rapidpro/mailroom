@@ -13,14 +13,14 @@ import (
 )
 
 func TestLocations(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	db.MustExec(`INSERT INTO locations_boundaryalias(is_active, created_on, modified_on, name, boundary_id, created_by_id, modified_by_id, org_id)
 											  VALUES(TRUE, NOW(), NOW(), 'Soko', 8148, 1, 1, 1);`)
 	db.MustExec(`INSERT INTO locations_boundaryalias(is_active, created_on, modified_on, name, boundary_id, created_by_id, modified_by_id, org_id)
 	                                          VALUES(TRUE, NOW(), NOW(), 'Sokoz', 8148, 1, 1, 2);`)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshLocations)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshLocations)
 	require.NoError(t, err)
 
 	root, err := oa.Locations()

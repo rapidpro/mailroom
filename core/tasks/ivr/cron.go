@@ -74,7 +74,7 @@ func retryCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lockV
 		}
 
 		// load the org for this connection
-		oa, err := models.GetOrgAssets(ctx, rt.DB, conn.OrgID())
+		oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
 		if err != nil {
 			log.WithError(err).WithField("org_id", conn.OrgID()).Error("error loading org")
 			continue

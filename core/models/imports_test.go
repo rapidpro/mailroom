@@ -61,7 +61,7 @@ func TestContactImports(t *testing.T) {
 	err = jsonx.Unmarshal(testJSON, &tcs)
 	require.NoError(t, err)
 
-	oa, err := models.GetOrgAssets(ctx, db, 1)
+	oa, err := models.GetOrgAssets(ctx, rt, 1)
 	require.NoError(t, err)
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))

@@ -174,7 +174,7 @@ func TestResume(t *testing.T) {
 	// write sessions to s3 storage
 	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3"}' WHERE id = 1`)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 
 	flow, err := oa.FlowByID(testdata.Favorites.ID)

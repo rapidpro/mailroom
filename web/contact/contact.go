@@ -50,7 +50,7 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// grab our org
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -126,7 +126,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -193,7 +193,7 @@ func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 	}
 
 	// grab our org
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}

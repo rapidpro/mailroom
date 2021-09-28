@@ -73,7 +73,7 @@ func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models
 	}
 
 	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, batch.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, batch.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org assets for org: %d", batch.OrgID())
 	}

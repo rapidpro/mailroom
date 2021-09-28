@@ -34,7 +34,6 @@ func (t *ScheduleCampaignEventTask) Timeout() time.Duration {
 
 // Perform creates the actual event fires to schedule the given campaign event
 func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
-	db := rt.DB
 	rp := rt.RP
 	lockKey := fmt.Sprintf(scheduleLockKey, t.CampaignEventID)
 
@@ -44,7 +43,7 @@ func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, rt *runtime.Run
 	}
 	defer locker.ReleaseLock(rp, lockKey, lock)
 
-	err = models.ScheduleCampaignEvent(ctx, db, orgID, t.CampaignEventID)
+	err = models.ScheduleCampaignEvent(ctx, rt, orgID, t.CampaignEventID)
 	if err != nil {
 		return errors.Wrapf(err, "error scheduling campaign event %d", t.CampaignEventID)
 	}

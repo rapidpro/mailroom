@@ -78,7 +78,7 @@ func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	}
 
 	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
 		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
 	}
@@ -230,7 +230,7 @@ func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w htt
 	}
 
 	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, conn.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
 	if err != nil {
 		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
 	}
@@ -333,7 +333,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request, w h
 	}
 
 	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
 		return nil, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "error loading org assets"))
 	}

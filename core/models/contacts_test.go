@@ -21,7 +21,7 @@ import (
 )
 
 func TestContacts(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -33,7 +33,7 @@ func TestContacts(t *testing.T) {
 	// delete mailgun ticketer
 	db.MustExec(`UPDATE tickets_ticketer SET is_active = false WHERE id = $1`, testdata.Mailgun.ID)
 
-	org, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshAll)
+	org, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
 	assert.NoError(t, err)
 
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.George.ID)
@@ -136,7 +136,7 @@ func TestContacts(t *testing.T) {
 }
 
 func TestCreateContact(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
@@ -145,7 +145,7 @@ func TestCreateContact(t *testing.T) {
 	// add an orphaned URN
 	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	contact, flowContact, err := models.CreateContact(ctx, db, oa, models.UserID(1), "Rich", envs.Language(`kin`), []urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:200002")})
@@ -166,11 +166,11 @@ func TestCreateContact(t *testing.T) {
 }
 
 func TestCreateContactRace(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
@@ -195,7 +195,7 @@ func TestCreateContactRace(t *testing.T) {
 }
 
 func TestGetOrCreateContact(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
@@ -209,7 +209,7 @@ func TestGetOrCreateContact(t *testing.T) {
 	newContact := func() models.ContactID { id := contactIDSeq; contactIDSeq++; return id }
 	prevContact := func() models.ContactID { return contactIDSeq - 1 }
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -322,11 +322,11 @@ func TestGetOrCreateContact(t *testing.T) {
 }
 
 func TestGetOrCreateContactRace(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
@@ -351,7 +351,7 @@ func TestGetOrCreateContactRace(t *testing.T) {
 }
 
 func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
@@ -362,7 +362,7 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 	newContact := func() models.ContactID { id := contactIDSeq; contactIDSeq++; return id }
 	prevContact := func() models.ContactID { return contactIDSeq - 1 }
 
-	org, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	tcs := []struct {
@@ -408,11 +408,11 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 }
 
 func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
@@ -466,11 +466,11 @@ func TestStopContact(t *testing.T) {
 }
 
 func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	t0 := time.Now()
@@ -562,11 +562,11 @@ func TestUpdateContactStatus(t *testing.T) {
 }
 
 func TestUpdateContactURNs(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	numInitialURNs := 0

@@ -20,7 +20,7 @@ import (
 )
 
 func TestResponseForSprint(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -41,7 +41,7 @@ func TestResponseForSprint(t *testing.T) {
 	// set our UUID generator
 	uuids.SetGenerator(uuids.NewSeededGenerator(0))
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	channel := oa.ChannelByUUID(testdata.VonageChannel.UUID)

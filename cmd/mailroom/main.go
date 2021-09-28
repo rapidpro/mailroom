@@ -49,7 +49,7 @@ import (
 var version = "Dev"
 
 func main() {
-	config := runtime.GlobalConfig
+	config := runtime.NewDefaultConfig()
 	loader := ezconf.NewLoader(
 		config,
 		"mailroom", "Mailroom - flow event handler for RapidPro",

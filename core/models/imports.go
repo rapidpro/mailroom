@@ -145,7 +145,7 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// grab our org assets
-	oa, err := GetOrgAssetsWithRefresh(ctx, rt.DB, orgID, RefreshFields|RefreshGroups)
+	oa, err := GetOrgAssetsWithRefresh(ctx, rt, orgID, RefreshFields|RefreshGroups)
 	if err != nil {
 		return errors.Wrap(err, "error loading org assets")
 	}

@@ -19,7 +19,7 @@ import (
 )
 
 func TestTicketers(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -33,7 +33,7 @@ func TestTicketers(t *testing.T) {
 	assert.Equal(t, "523562", ticketer.Config("push_token"))
 
 	// org through org assets
-	org1, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org1, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	ticketer = org1.TicketerByID(testdata.Zendesk.ID)
@@ -48,7 +48,7 @@ func TestTicketers(t *testing.T) {
 
 	ticketer.UpdateConfig(ctx, db, map[string]string{"new-key": "foo"}, map[string]bool{"push_id": true})
 
-	org1, _ = models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	org1, _ = models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers)
 	ticketer = org1.TicketerByID(testdata.Zendesk.ID)
 
 	assert.Equal(t, "foo", ticketer.Config("new-key"))       // new config value added
@@ -57,7 +57,7 @@ func TestTicketers(t *testing.T) {
 }
 
 func TestTickets(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
@@ -124,7 +124,7 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, "Where are my trousers?", tk2.Body())
 
 	// can lookup open tickets by contact
-	org1, _ := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org1, _ := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	cathy, err := models.LoadContact(ctx, db, org1, testdata.Cathy.ID)
 	require.NoError(t, err)
 
@@ -177,11 +177,11 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 }
 
 func TestTicketsAssign(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -209,11 +209,11 @@ func TestTicketsAssign(t *testing.T) {
 }
 
 func TestTicketsAddNote(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -237,11 +237,11 @@ func TestTicketsAddNote(t *testing.T) {
 }
 
 func TestTicketsChangeTopic(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.SalesTopic, "Where my shoes", "123", nil)
@@ -283,7 +283,7 @@ func TestCloseTickets(t *testing.T) {
 
 	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab80", "Tickets", "tickets > 0")
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -355,7 +355,7 @@ func TestReopenTickets(t *testing.T) {
 
 	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab80", "Two Tickets", "tickets = 2")
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)

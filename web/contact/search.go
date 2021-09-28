@@ -77,7 +77,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -166,7 +166,7 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request)
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt.DB, request.OrgID, models.RefreshFields|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}

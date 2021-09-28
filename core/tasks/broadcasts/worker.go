@@ -55,7 +55,7 @@ func CreateBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *mod
 		contactIDs[id] = true
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, bcast.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
@@ -159,7 +159,7 @@ func SendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, bcast *models.
 		}
 	}()
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, bcast.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
