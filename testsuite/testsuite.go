@@ -62,8 +62,9 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 	db := getDB()
 	rp := getRP()
 	rt := &runtime.Runtime{
-		RP:             rp,
 		DB:             db,
+		ReadonlyDB:     db,
+		RP:             rp,
 		ES:             nil,
 		MediaStorage:   storage.NewFS(MediaStorageDir),
 		SessionStorage: storage.NewFS(SessionStorageDir),
