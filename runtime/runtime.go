@@ -4,7 +4,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/storage"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/olivere/elastic/v7"
 )
 
@@ -17,5 +16,5 @@ type Runtime struct {
 	ES             *elastic.Client
 	MediaStorage   storage.Storage
 	SessionStorage storage.Storage
-	Config         *config.Config
+	Config         *Config
 }

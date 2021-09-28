@@ -10,8 +10,8 @@ import (
 	"github.com/nyaruka/goflow/services/classification/bothub"
 	"github.com/nyaruka/goflow/services/classification/luis"
 	"github.com/nyaruka/goflow/services/classification/wit"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
@@ -52,7 +52,7 @@ const (
 func init() {
 	goflow.RegisterClassificationServiceFactory(
 		func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
-			return classifier.Asset().(*Classifier).AsService(config.Mailroom, classifier)
+			return classifier.Asset().(*Classifier).AsService(runtime.GlobalConfig, classifier)
 		},
 	)
 }
@@ -90,7 +90,7 @@ func (c *Classifier) Intents() []string { return c.c.intentNames }
 func (c *Classifier) Type() string { return c.c.Type }
 
 // AsService builds the corresponding ClassificationService for the passed in Classifier
-func (c *Classifier) AsService(cfg *config.Config, classifier *flows.Classifier) (flows.ClassificationService, error) {
+func (c *Classifier) AsService(cfg *runtime.Config, classifier *flows.Classifier) (flows.ClassificationService, error) {
 	httpClient, httpRetries, httpAccess := goflow.HTTP(cfg)
 
 	switch c.Type() {

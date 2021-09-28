@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/storage"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -58,7 +57,7 @@ type Mailroom struct {
 }
 
 // NewMailroom creates and returns a new mailroom instance
-func NewMailroom(config *config.Config) *Mailroom {
+func NewMailroom(config *runtime.Config) *Mailroom {
 	mr := &Mailroom{
 		rt:   &runtime.Runtime{Config: config},
 		quit: make(chan bool),

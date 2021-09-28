@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
@@ -203,7 +202,7 @@ func writeGenericErrorResponse(w http.ResponseWriter, err error) error {
 	return err
 }
 
-func buildResumeURL(cfg *config.Config, channel *models.Channel, conn *models.ChannelConnection, urn urns.URN) string {
+func buildResumeURL(cfg *runtime.Config, channel *models.Channel, conn *models.ChannelConnection, urn urns.URN) string {
 	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, cfg.Domain)
 	form := url.Values{
 		"action":     []string{actionResume},

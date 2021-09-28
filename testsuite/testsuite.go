@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/nyaruka/gocommon/storage"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 
@@ -68,7 +67,7 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 		ES:             nil,
 		MediaStorage:   storage.NewFS(MediaStorageDir),
 		SessionStorage: storage.NewFS(SessionStorageDir),
-		Config:         config.NewDefaultConfig(),
+		Config:         runtime.NewDefaultConfig(),
 	}
 
 	/*for name, expected := range tableHashes {

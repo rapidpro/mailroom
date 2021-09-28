@@ -7,7 +7,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
-	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/shopspring/decimal"
 )
@@ -45,7 +45,7 @@ func RegisterAirtimeServiceFactory(factory engine.AirtimeServiceFactory) {
 }
 
 // Engine returns the global engine instance for use with real sessions
-func Engine(cfg *config.Config) flows.Engine {
+func Engine(cfg *runtime.Config) flows.Engine {
 	engInit.Do(func() {
 		webhookHeaders := map[string]string{
 			"User-Agent":      "RapidProMailroom/" + cfg.Version,
@@ -68,7 +68,7 @@ func Engine(cfg *config.Config) flows.Engine {
 }
 
 // Simulator returns the global engine instance for use with simulated sessions
-func Simulator(cfg *config.Config) flows.Engine {
+func Simulator(cfg *runtime.Config) flows.Engine {
 	simulatorInit.Do(func() {
 		webhookHeaders := map[string]string{
 			"User-Agent":      "RapidProMailroom/" + cfg.Version,

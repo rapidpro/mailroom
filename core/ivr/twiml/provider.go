@@ -22,7 +22,6 @@ import (
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -445,7 +444,7 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 
 // TWIML building utilities
 
-func responseForSprint(cfg *config.Config, number urns.URN, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+func responseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 

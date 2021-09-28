@@ -19,7 +19,6 @@ import (
 	"github.com/nyaruka/goflow/services/email/smtp"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/smtpx"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -40,7 +39,7 @@ func init() {
 
 	goflow.RegisterEmailServiceFactory(
 		func(session flows.Session) (flows.EmailService, error) {
-			return orgFromSession(session).EmailService(config.Mailroom)
+			return orgFromSession(session).EmailService(runtime.GlobalConfig)
 		},
 	)
 
@@ -159,7 +158,7 @@ func (o *Org) ConfigValue(key string, def string) string {
 }
 
 // EmailService returns the email service for this org
-func (o *Org) EmailService(cfg *config.Config) (flows.EmailService, error) {
+func (o *Org) EmailService(cfg *runtime.Config) (flows.EmailService, error) {
 	connectionURL := o.ConfigValue(configSMTPServer, cfg.SMTPServer)
 
 	if connectionURL == "" {
@@ -235,7 +234,7 @@ func orgFromSession(session flows.Session) *Org {
 }
 
 // LoadOrg loads the org for the passed in id, returning any error encountered
-func LoadOrg(ctx context.Context, cfg *config.Config, db sqlx.Queryer, orgID OrgID) (*Org, error) {
+func LoadOrg(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	start := time.Now()
 
 	org := &Org{}

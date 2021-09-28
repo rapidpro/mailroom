@@ -17,7 +17,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
@@ -197,7 +196,7 @@ func WriteSessionOutputsToStorage(ctx context.Context, rt *runtime.Runtime, sess
 const storageTSFormat = "20060102T150405.999Z"
 
 // StoragePath returns the path for the session
-func (s *Session) StoragePath(cfg *config.Config) string {
+func (s *Session) StoragePath(cfg *runtime.Config) string {
 	ts := s.CreatedOn().UTC().Format(storageTSFormat)
 
 	// example output: /orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/session_20060102T150405.123Z_8a7fc501-177b-4567-a0aa-81c48e6de1c5_51df83ac21d3cf136d8341f0b11cb1a7.json"
@@ -522,7 +521,7 @@ RETURNING id
 `
 
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
-func (s *Session) FlowSession(cfg *config.Config, sa flows.SessionAssets, env envs.Environment) (flows.Session, error) {
+func (s *Session) FlowSession(cfg *runtime.Config, sa flows.SessionAssets, env envs.Environment) (flows.Session, error) {
 	session, err := goflow.Engine(cfg).ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to unmarshal session")

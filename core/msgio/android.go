@@ -3,8 +3,8 @@ package msgio
 import (
 	"time"
 
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 
 	"github.com/edganiukov/fcm"
@@ -45,7 +45,7 @@ func SyncAndroidChannels(fc *fcm.Client, channels []*models.Channel) {
 }
 
 // CreateFCMClient creates an FCM client based on the configured FCM API key
-func CreateFCMClient(cfg *config.Config) *fcm.Client {
+func CreateFCMClient(cfg *runtime.Config) *fcm.Client {
 	if cfg.FCMKey == "" {
 		return nil
 	}

@@ -20,7 +20,6 @@ import (
 	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 
@@ -218,7 +217,7 @@ func (m *Msg) MarshalJSON() ([]byte, error) {
 }
 
 // NewIncomingIVR creates a new incoming IVR message for the passed in text and attachment
-func NewIncomingIVR(cfg *config.Config, orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, createdOn time.Time) *Msg {
+func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -252,7 +251,7 @@ func NewIncomingIVR(cfg *config.Config, orgID OrgID, conn *ChannelConnection, in
 }
 
 // NewOutgoingIVR creates a new IVR message for the passed in text with the optional attachment
-func NewOutgoingIVR(cfg *config.Config, orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) *Msg {
+func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -289,7 +288,7 @@ func NewOutgoingIVR(cfg *config.Config, orgID OrgID, conn *ChannelConnection, ou
 }
 
 // NewOutgoingMsg creates an outgoing message for the passed in flow message.
-func NewOutgoingMsg(cfg *config.Config, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+func NewOutgoingMsg(cfg *runtime.Config, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -357,7 +356,7 @@ func NewOutgoingMsg(cfg *config.Config, org *Org, channel *Channel, contactID Co
 }
 
 // NewIncomingMsg creates a new incoming message for the passed in text and attachment
-func NewIncomingMsg(cfg *config.Config, orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
+func NewIncomingMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -444,7 +443,7 @@ func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, direction MsgDir
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
-func NormalizeAttachment(cfg *config.Config, attachment utils.Attachment) utils.Attachment {
+func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils.Attachment {
 	// don't try to modify geo type attachments which are just coordinates
 	if attachment.ContentType() == "geo" {
 		return attachment

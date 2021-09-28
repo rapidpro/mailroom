@@ -13,7 +13,6 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -62,7 +61,7 @@ const (
 func init() {
 	goflow.RegisterTicketServiceFactory(
 		func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-			return ticketer.Asset().(*Ticketer).AsService(config.Mailroom, ticketer)
+			return ticketer.Asset().(*Ticketer).AsService(runtime.GlobalConfig, ticketer)
 		},
 	)
 }
@@ -709,7 +708,7 @@ func (t *Ticketer) Reference() *assets.TicketerReference {
 }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(cfg *config.Config, ticketer *flows.Ticketer) (TicketService, error) {
+func (t *Ticketer) AsService(cfg *runtime.Config, ticketer *flows.Ticketer) (TicketService, error) {
 	httpClient, httpRetries, _ := goflow.HTTP(cfg)
 
 	initFunc := ticketServices[t.Type()]
@@ -748,7 +747,7 @@ type TicketService interface {
 }
 
 // TicketServiceFunc is a func which creates a ticket service
-type TicketServiceFunc func(*config.Config, *http.Client, *httpx.RetryConfig, *flows.Ticketer, map[string]string) (TicketService, error)
+type TicketServiceFunc func(*runtime.Config, *http.Client, *httpx.RetryConfig, *flows.Ticketer, map[string]string) (TicketService, error)
 
 var ticketServices = map[string]TicketServiceFunc{}
 

@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	cache "github.com/patrickmn/go-cache"
@@ -135,7 +134,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	var err error
 
 	if prev == nil || refresh&RefreshOrg > 0 {
-		oa.org, err = LoadOrg(ctx, config.Mailroom, db, orgID)
+		oa.org, err = LoadOrg(ctx, runtime.GlobalConfig, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading environment for org %d", orgID)
 		}
@@ -360,7 +359,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	}
 
 	// intialize our session assets
-	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(config.Mailroom))
+	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(runtime.GlobalConfig))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", orgID)
 	}
