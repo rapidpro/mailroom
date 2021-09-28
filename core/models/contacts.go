@@ -4,18 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"net/url"
 	"strconv"
 	"time"
 
-	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/envs"
 	"github.com/greatnonprofits-nfp/goflow/excellent/types"
 	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
@@ -961,6 +963,116 @@ func CalculateDynamicGroups(ctx context.Context, db Queryer, org *OrgAssets, con
 	err = AddEventFires(ctx, db, fireAdds)
 	if err != nil {
 		return errors.Wrapf(err, "unable to add new event fires for contact")
+	}
+
+	return nil
+}
+
+const selectLastContactOptOutEvent = `
+SELECT row_to_json(r) FROM (
+    SELECT
+           id,
+           event_type,
+           extra::json as extra
+    FROM channels_channelevent WHERE contact_id = $1
+    ORDER BY occurred_on DESC
+    LIMIT 1
+) r
+`
+
+const updateContactOptOutEvent = `
+UPDATE channels_channelevent
+SET extra = :event_extra
+WHERE id = :event_id
+`
+
+const updateContactFields = `
+UPDATE 
+	contacts_contact c
+SET
+	fields = COALESCE(c.fields, '{}'::jsonb) || r.updates::jsonb,
+	modified_on = NOW()
+FROM (VALUES(:contact_id, :updates)) AS r(contact_id, updates)
+WHERE
+	c.id = r.contact_id::int
+`
+
+type FieldUpdate struct {
+	ContactID ContactID `db:"contact_id"`
+	Updates   string    `db:"updates"`
+}
+
+func UpdateContactOptOutChannelEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, contactID ContactID) error {
+	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshFields)
+	if err != nil {
+		return err
+	}
+
+	contact, err := LoadContact(ctx, db, oa, contactID)
+	if err != nil {
+		return err
+	}
+
+	event, err := db.QueryxContext(ctx, selectLastContactOptOutEvent, contact.ID())
+	if err != nil {
+		return errors.Wrapf(err, "error querying channel event by contact: %d", contact.ID())
+	}
+	defer event.Close()
+
+	// no row, no event!
+	if !event.Next() {
+		return nil
+	}
+
+	// read event
+	evt := &ChannelEvent{}
+	err = dbutil.ReadJSONRow(event, &evt.e)
+	if err != nil {
+		return errors.Wrapf(err, "error reading event definition by contact: %d", contact.ID())
+	}
+
+	if evt.e.EventType != "stop_conversation" {
+		return nil
+	}
+
+	// update contact fields with opt-out data
+	extra := evt.Extra()
+	updates := make(map[assets.FieldUUID]*flows.Value, 2)
+	fieldUpdates := make([]interface{}, 1)
+	updates[oa.FieldByKey("opt_out_message").UUID()] = &flows.Value{Text: types.NewXText(extra["opt_out_message"].(string))}
+	dateFieldValue, err := types.ToXDateTimeWithTimeFill(oa.Env(), types.NewXText(extra["opt_out_datetime"].(string)))
+	if err != nil {
+		return err
+	}
+	updates[oa.FieldByKey("opt_out_datetime").UUID()] = &flows.Value{Datetime: &dateFieldValue}
+	fieldJSON, err := json.Marshal(updates)
+	if err != nil {
+		return errors.Wrapf(err, "error marshalling field values")
+	}
+	fieldUpdates[0] = &FieldUpdate{
+		ContactID: contact.ID(),
+		Updates:   string(fieldJSON),
+	}
+	err = BulkQuery(ctx, "updating contact field values", db, updateContactFields, fieldUpdates)
+	if err != nil {
+		return errors.Wrapf(err, "error updating contact fields")
+	}
+
+	// update opt-out event with contact groups
+	contactGroups := contact.Groups()
+	contactGroupUUIDs := make([]assets.GroupUUID, 0, len(contactGroups))
+	for _, contactGroup := range contactGroups {
+		contactGroupUUIDs = append(contactGroupUUIDs, contactGroup.UUID())
+	}
+	extra["opted_out_groups"] = contactGroupUUIDs
+	eventExtra, _ := json.Marshal(extra)
+	eventUpdate := map[string]interface{}{
+		"event_id":    evt.ID(),
+		"event_extra": eventExtra,
+	}
+	_, err = db.NamedExecContext(ctx, updateContactOptOutEvent, eventUpdate)
+	if err != nil {
+		return errors.Wrapf(err, "error updating event definition by contact: %d", contact.ID())
 	}
 
 	return nil
