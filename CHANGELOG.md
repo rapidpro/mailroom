@@ -1,3 +1,8 @@
+v6.5.33
+----------
+ * Add support for READONLY_DB config setting that opens a new readonly database connection
+ * Finish the runtime.Runtime refactor
+
 v6.5.32
 ----------
  * Refactor more code to use runtime.Runtime instead of passing db instances and using the global config
