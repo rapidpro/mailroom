@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
@@ -59,11 +60,13 @@ const (
 
 // Register a ticket service factory with the engine
 func init() {
-	goflow.RegisterTicketServiceFactory(
-		func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-			return ticketer.Asset().(*Ticketer).AsService(runtime.GlobalConfig, ticketer)
-		},
-	)
+	goflow.RegisterTicketServiceFactory(ticketServiceFactory)
+}
+
+func ticketServiceFactory(c *runtime.Config) engine.TicketServiceFactory {
+	return func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
+		return ticketer.Asset().(*Ticketer).AsService(c, ticketer)
+	}
 }
 
 type Ticket struct {

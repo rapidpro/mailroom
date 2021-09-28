@@ -15,11 +15,11 @@ import (
 )
 
 func TestCloneForSimulation(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	models.FlushCache()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	newFavoritesDef := `{

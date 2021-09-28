@@ -100,7 +100,7 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelCo
 	defer conn.MarkFailed(ctx, rt.DB, time.Now())
 
 	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, conn.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org")
 	}

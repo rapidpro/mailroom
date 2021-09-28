@@ -202,7 +202,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		"run_id":     event.RunID,
 		"session_id": event.SessionID,
 	})
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
@@ -295,7 +295,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 
 // HandleChannelEvent is called for channel events
 func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
 	}
@@ -479,7 +479,7 @@ func handleStopEvent(ctx context.Context, rt *runtime.Runtime, event *StopEvent)
 
 // handleMsgEvent is called when a new message arrives from a contact
 func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) error {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
@@ -653,7 +653,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 }
 
 func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.TicketEvent) error {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}

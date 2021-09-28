@@ -155,7 +155,7 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []TestCase) {
 	models.FlushCache()
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, models.OrgID(1))
+	oa, err := models.GetOrgAssets(ctx, rt, models.OrgID(1))
 	assert.NoError(t, err)
 
 	// reuse id from one of our real flows

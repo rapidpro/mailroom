@@ -58,7 +58,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 	// grab our org assets
 	orgID := ctx.Value(web.OrgIDKey).(models.OrgID)
-	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}

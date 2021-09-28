@@ -158,7 +158,7 @@ func StartFlowBatch(
 	}
 
 	// create our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, batch.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, batch.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating assets for org: %d", batch.OrgID())
 	}
@@ -274,7 +274,7 @@ func FireCampaignEvents(
 	}
 
 	// create our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating assets for org: %d", orgID)
 	}

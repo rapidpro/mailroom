@@ -10,14 +10,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// GlobalConfig is the global configuration
-// TODO remove last few remaining places that use this
-var GlobalConfig *Config
-
-func init() {
-	GlobalConfig = NewDefaultConfig()
-}
-
 // Config is our top level configuration object
 type Config struct {
 	DB         string `validate:"url,startswith=postgres:"           help:"URL for your Postgres database"`

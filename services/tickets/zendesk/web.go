@@ -73,7 +73,7 @@ func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request
 
 	// reopen ticket if necessary
 	if ticket.Status() != models.TicketStatusOpen {
-		oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+		oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 		if err != nil {
 			return err, http.StatusBadRequest, nil
 		}
@@ -280,7 +280,7 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 		return map[string]string{"status": "ignored"}, http.StatusOK, nil
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

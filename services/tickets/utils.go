@@ -41,7 +41,7 @@ func FromTicketUUID(ctx context.Context, rt *runtime.Runtime, uuid flows.TicketU
 	}
 
 	// look up our assets
-	assets, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	assets, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}
@@ -80,7 +80,7 @@ func FromTicketerUUID(ctx context.Context, rt *runtime.Runtime, uuid assets.Tick
 // SendReply sends a message reply from the ticket system user to the contact
 func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, text string, files []*File) (*models.Msg, error) {
 	// look up our assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
 	}

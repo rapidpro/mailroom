@@ -19,11 +19,11 @@ import (
 )
 
 func TestSessionTriggered(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	simpleFlow, err := oa.FlowByID(testdata.SingleMessage.ID)
@@ -95,11 +95,11 @@ func TestSessionTriggered(t *testing.T) {
 }
 
 func TestQuerySessionTriggered(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, rt, _, rp := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	favoriteFlow, err := oa.FlowByID(testdata.Favorites.ID)

@@ -14,7 +14,6 @@ import (
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/go-chi/chi/middleware"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -45,7 +44,7 @@ func handleExport(ctx context.Context, rt *runtime.Runtime, r *http.Request, raw
 		return errors.Wrapf(err, "request failed validation")
 	}
 
-	flows, err := loadFlows(ctx, rt.DB, request.OrgID, request.FlowIDs)
+	flows, err := loadFlows(ctx, rt, request.OrgID, request.FlowIDs)
 	if err != nil {
 		return err
 	}
@@ -97,7 +96,7 @@ func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return errors.Wrapf(err, "invalid po file"), http.StatusBadRequest, nil
 	}
 
-	flows, err := loadFlows(ctx, rt.DB, form.OrgID, form.FlowIDs)
+	flows, err := loadFlows(ctx, rt, form.OrgID, form.FlowIDs)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -110,9 +109,9 @@ func handleImport(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	return map[string]interface{}{"flows": flows}, http.StatusOK, nil
 }
 
-func loadFlows(ctx context.Context, db *sqlx.DB, orgID models.OrgID, flowIDs []models.FlowID) ([]flows.Flow, error) {
+func loadFlows(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, flowIDs []models.FlowID) ([]flows.Flow, error) {
 	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, db, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load org assets")
 	}

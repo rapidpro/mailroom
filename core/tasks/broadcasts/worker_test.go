@@ -26,7 +26,7 @@ func TestBroadcastEvents(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	eng := envs.Language("eng")
@@ -126,7 +126,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 	eng := envs.Language("eng")
 

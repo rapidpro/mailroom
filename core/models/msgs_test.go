@@ -96,7 +96,7 @@ func TestOutgoingMsgs(t *testing.T) {
 
 		db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, tc.SuspendedOrg, testdata.Org1.ID)
 
-		oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
+		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 		require.NoError(t, err)
 
 		channel := oa.ChannelByUUID(tc.ChannelUUID)
@@ -176,11 +176,11 @@ func TestLoadMessages(t *testing.T) {
 }
 
 func TestResendMessages(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", nil, models.MsgStatusFailed)
@@ -237,7 +237,7 @@ func TestMarkMessages(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 
 	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
@@ -318,7 +318,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	assert.Equal(t, ticket.ID, batch.TicketID())
 	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs())
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch)
@@ -335,7 +335,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 func TestNewOutgoingIVR(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	vonage := oa.ChannelByUUID(testdata.VonageChannel.UUID)

@@ -32,7 +32,7 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 	// own org assets instance.
 	ctx := context.Background()
 	rt.DB.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, testdata.Org1.ID)
-	oaOrg, _ := models.GetOrgAssetsWithRefresh(ctx, rt.DB, testdata.Org1.ID, models.RefreshOrg)
+	oaOrg, _ := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 
 	var channel *models.Channel
 	var channelRef *assets.ChannelReference
@@ -68,7 +68,7 @@ func TestSendMessages(t *testing.T) {
 	androidChannel2 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
 	testdata.InsertChannel(db, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
 
 	tests := []struct {

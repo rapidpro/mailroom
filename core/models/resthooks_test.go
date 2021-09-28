@@ -11,7 +11,7 @@ import (
 )
 
 func TestResthooks(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	db.MustExec(`INSERT INTO api_resthook(is_active, created_on, modified_on, slug, created_by_id, modified_by_id, org_id)
 								   VALUES(TRUE, NOW(), NOW(), 'registration', 1, 1, 1);`)
@@ -22,7 +22,7 @@ func TestResthooks(t *testing.T) {
 	db.MustExec(`INSERT INTO api_resthooksubscriber(is_active, created_on, modified_on, target_url, created_by_id, modified_by_id, resthook_id)
 	                                         VALUES(TRUE, NOW(), NOW(), 'https://bar.foo', 1, 1, 2);`)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshResthooks)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshResthooks)
 	require.NoError(t, err)
 
 	resthooks, err := oa.Resthooks()

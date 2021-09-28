@@ -55,7 +55,7 @@ func TestLoadGroups(t *testing.T) {
 }
 
 func TestDynamicGroups(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -78,7 +78,7 @@ func TestDynamicGroups(t *testing.T) {
 		'{"%s": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
 		WHERE id = $1`, testdata.JoinedField.UUID), testdata.Bob.ID)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
 	assert.NoError(t, err)
 
 	esServer := testsuite.NewMockElasticServer()

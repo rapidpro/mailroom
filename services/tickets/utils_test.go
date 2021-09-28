@@ -22,9 +22,9 @@ import (
 )
 
 func TestGetContactDisplay(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	contact, err := models.LoadContact(ctx, db, oa, testdata.Cathy.ID)
@@ -178,7 +178,7 @@ func TestCloseTicket(t *testing.T) {
 	// create a close ticket trigger
 	testdata.InsertTicketClosedTrigger(db, testdata.Org1, testdata.Favorites)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	logger := &models.HTTPLogger{}

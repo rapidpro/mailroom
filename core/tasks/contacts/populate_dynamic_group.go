@@ -52,7 +52,7 @@ func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, rt *runtime.Runt
 
 	log.Info("starting population of dynamic group")
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org when populating group: %d", t.GroupID)
 	}

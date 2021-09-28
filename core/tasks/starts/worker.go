@@ -66,7 +66,7 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 		contactIDs[id] = true
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, start.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, start.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org assets")
 	}

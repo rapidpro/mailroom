@@ -13,7 +13,7 @@ import (
 )
 
 func TestChannels(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
@@ -23,7 +23,7 @@ func TestChannels(t *testing.T) {
 	// make twitter channel have a parent of twilio channel
 	db.MustExec(`UPDATE channels_channel SET parent_id = $1 WHERE id = $2`, testdata.TwilioChannel.ID, testdata.TwitterChannel.ID)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, 1, models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, 1, models.RefreshChannels)
 	require.NoError(t, err)
 
 	channels, err := oa.Channels()

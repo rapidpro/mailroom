@@ -63,7 +63,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		return errors.Errorf("no such ticket %s", request.TicketID), http.StatusNotFound, nil
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
