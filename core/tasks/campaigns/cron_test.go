@@ -20,7 +20,7 @@ func TestCampaigns(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
@@ -53,7 +53,7 @@ func TestIVRCampaigns(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)

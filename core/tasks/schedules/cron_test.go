@@ -17,7 +17,7 @@ func TestCheckSchedules(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add a schedule and tie a broadcast to it
 	var s1 models.ScheduleID

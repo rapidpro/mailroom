@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -55,11 +54,6 @@ type SQLAssertion struct {
 
 func NewActionUUID() flows.ActionUUID {
 	return flows.ActionUUID(uuids.New())
-}
-
-func TestMain(m *testing.M) {
-	testsuite.Reset()
-	os.Exit(m.Run())
 }
 
 // createTestFlow creates a flow that starts with a split by contact id

@@ -22,7 +22,7 @@ import (
 func TestResponseForSprint(t *testing.T) {
 	ctx, _, db, rp := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	rc := rp.Get()
 	defer rc.Close()

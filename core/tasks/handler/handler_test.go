@@ -25,7 +25,7 @@ func TestMsgEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
@@ -239,7 +239,7 @@ func TestChannelEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add some channel event triggers
 	testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
@@ -310,7 +310,7 @@ func TestTicketEvents(t *testing.T) {
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add a ticket closed trigger
 	testdata.InsertTicketClosedTrigger(rt.DB, testdata.Org1, testdata.Favorites)
@@ -337,7 +337,7 @@ func TestStopEvent(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// schedule an event for cathy and george
 	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, testdata.Cathy.ID, testdata.George.ID, testdata.RemindersEvent1.ID)
@@ -380,7 +380,7 @@ func TestTimedEvents(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// start to start our favorites flow
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)

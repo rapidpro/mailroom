@@ -13,7 +13,7 @@ import (
 func TestContactLanguageChanged(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	tcs := []handlers.TestCase{
 		{

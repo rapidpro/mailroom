@@ -17,7 +17,7 @@ import (
 func TestMsgReceived(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	now := time.Now()
 

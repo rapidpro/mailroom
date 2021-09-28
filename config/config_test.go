@@ -12,7 +12,7 @@ import (
 
 func TestParseDisallowedNetworks(t *testing.T) {
 	// this is only here because this is the first test run.. should find a better way to ensure DB is in correct state for first test that needs it
-	testsuite.Reset()
+	testsuite.Reset(testsuite.ResetAll)
 
 	cfg := config.NewMailroomConfig()
 

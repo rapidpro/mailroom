@@ -16,7 +16,7 @@ import (
 func TestPopulateTask(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	mes := testsuite.NewMockElasticServer()
 	defer mes.Close()

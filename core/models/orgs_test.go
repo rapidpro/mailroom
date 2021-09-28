@@ -60,7 +60,7 @@ func TestOrgs(t *testing.T) {
 func TestStoreAttachment(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetStorage()
+	defer testsuite.Reset(testsuite.ResetStorage)
 
 	image, err := os.Open("testdata/test.jpg")
 	require.NoError(t, err)

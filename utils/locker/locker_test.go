@@ -13,7 +13,7 @@ import (
 func TestLocker(t *testing.T) {
 	_, _, _, rp := testsuite.Get()
 
-	defer testsuite.ResetRP()
+	defer testsuite.Reset(testsuite.ResetRedis)
 
 	// acquire a lock, but have it expire in 5 seconds
 	v1, err := locker.GrabLock(rp, "test", time.Second*5, time.Second)

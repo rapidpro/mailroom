@@ -28,7 +28,7 @@ import (
 func TestContactImports(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// start with no contacts or URNs
 	db.MustExec(`DELETE FROM contacts_contacturn`)
@@ -149,7 +149,7 @@ func TestContactImports(t *testing.T) {
 func TestLoadContactImport(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
 	batch1ID := testdata.InsertContactImportBatch(db, importID, []byte(`[

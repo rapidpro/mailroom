@@ -16,7 +16,7 @@ import (
 func TestTicketNotifications(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -108,7 +108,7 @@ func TestTicketNotifications(t *testing.T) {
 func TestImportNotifications(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Editor)
 	imp, err := models.LoadContactImport(ctx, db, importID)

@@ -12,7 +12,7 @@ import (
 func TestBulkQueryBatches(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	db.MustExec(`CREATE TABLE foo (id serial NOT NULL PRIMARY KEY, name TEXT, age INT)`)
 

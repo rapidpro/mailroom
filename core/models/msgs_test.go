@@ -178,7 +178,7 @@ func TestLoadMessages(t *testing.T) {
 func TestResendMessages(t *testing.T) {
 	ctx, _, db, rp := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -235,7 +235,7 @@ func TestNormalizeAttachment(t *testing.T) {
 func TestMarkMessages(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
@@ -278,7 +278,7 @@ func TestMarkMessages(t *testing.T) {
 func TestNonPersistentBroadcasts(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
 	modelTicket := ticket.Load(db)
