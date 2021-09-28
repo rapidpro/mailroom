@@ -11,7 +11,7 @@ import (
 )
 
 func TestBulkSQL(t *testing.T) {
-	db := testsuite.DB()
+	_, _, db, _ := testsuite.Get()
 
 	type contact struct {
 		ID   int    `db:"id"`

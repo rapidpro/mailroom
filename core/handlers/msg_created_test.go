@@ -19,7 +19,7 @@ import (
 )
 
 func TestMsgCreated(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 
 	defer testsuite.Reset()
 
@@ -96,7 +96,7 @@ func TestMsgCreated(t *testing.T) {
 
 	handlers.RunTestCases(t, ctx, rt, tcs)
 
-	rc := testsuite.RP().Get()
+	rc := rp.Get()
 	defer rc.Close()
 
 	// Cathy should have 1 batch of queued messages at high priority

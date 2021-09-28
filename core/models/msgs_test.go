@@ -263,10 +263,8 @@ func TestMarkMessages(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
 
 	// try running on database with BIGINT message ids
-	db.MustExec(`ALTER TABLE "msgs_msg" ALTER COLUMN "id" TYPE bigint USING "id"::bigint;`)
 	db.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" AS bigint;`)
 	db.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" RESTART WITH 3000000000;`)
-	db = testsuite.DB() // need new connection after changes
 
 	msg4 := insertMsg("Big messages!")
 	assert.Equal(t, flows.MsgID(3000000000), msg4.ID())
