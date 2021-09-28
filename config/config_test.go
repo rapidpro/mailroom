@@ -10,11 +10,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestValidate(t *testing.T) {
+	c := config.NewDefaultConfig()
+	assert.NoError(t, c.Validate())
+
+	c.DB = "??"
+	c.ReadonlyDB = "??"
+	c.Redis = "??"
+	c.Elastic = "??"
+	assert.EqualError(t, c.Validate(), "field 'DB' is not a valid URL, field 'ReadonlyDB' is not a valid URL, field 'Redis' is not a valid URL, field 'Elastic' is not a valid URL")
+
+	c = config.NewDefaultConfig()
+	c.DB = "mysql://temba:temba@localhost/temba"
+	c.Redis = "bluedis://localhost:6379/15"
+	assert.EqualError(t, c.Validate(), "field 'DB' must start with 'postgres:', field 'Redis' must start with 'redis:'")
+}
+
 func TestParseDisallowedNetworks(t *testing.T) {
 	// this is only here because this is the first test run.. should find a better way to ensure DB is in correct state for first test that needs it
 	testsuite.Reset(testsuite.ResetAll)
 
-	cfg := config.NewMailroomConfig()
+	cfg := config.NewDefaultConfig()
 
 	privateNetwork1 := &net.IPNet{IP: net.IPv4(10, 0, 0, 0).To4(), Mask: net.CIDRMask(8, 32)}
 	privateNetwork2 := &net.IPNet{IP: net.IPv4(172, 16, 0, 0).To4(), Mask: net.CIDRMask(12, 32)}

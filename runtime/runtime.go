@@ -12,6 +12,7 @@ import (
 // those services to simplify call signatures but not create a direct dependency to Mailroom or Server
 type Runtime struct {
 	DB             *sqlx.DB
+	ReadonlyDB     *sqlx.DB
 	RP             *redis.Pool
 	ES             *elastic.Client
 	MediaStorage   storage.Storage
