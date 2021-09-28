@@ -64,7 +64,7 @@ const (
 
 var indentMarshal = true
 
-type provider struct {
+type service struct {
 	httpClient *http.Client
 	channel    *models.Channel
 	callURL    string
@@ -73,11 +73,11 @@ type provider struct {
 }
 
 func init() {
-	ivr.RegisterProviderType(vonageChannelType, NewProviderFromChannel)
+	ivr.RegisterServiceType(vonageChannelType, NewServiceFromChannel)
 }
 
-// NewProviderFromChannel creates a new Twilio IVR client for the passed in account and and auth token
-func NewProviderFromChannel(httpClient *http.Client, channel *models.Channel) (ivr.Provider, error) {
+// NewServiceFromChannel creates a new Vonage IVR service for the passed in account and and auth token
+func NewServiceFromChannel(httpClient *http.Client, channel *models.Channel) (ivr.Service, error) {
 	appID := channel.ConfigValue(appIDConfig, "")
 	key := channel.ConfigValue(privateKeyConfig, "")
 	if appID == "" || key == "" {
@@ -89,7 +89,7 @@ func NewProviderFromChannel(httpClient *http.Client, channel *models.Channel) (i
 		return nil, errors.Wrapf(err, "error parsing private key")
 	}
 
-	return &provider{
+	return &service{
 		httpClient: httpClient,
 		channel:    channel,
 		callURL:    CallURL,
@@ -110,7 +110,7 @@ func readBody(r *http.Request) ([]byte, error) {
 	return body, nil
 }
 
-func (p *provider) CallIDForRequest(r *http.Request) (string, error) {
+func (s *service) CallIDForRequest(r *http.Request) (string, error) {
 	body, err := readBody(r)
 	if err != nil {
 		return "", errors.Wrapf(err, "error reading body from request")
@@ -126,7 +126,7 @@ func (p *provider) CallIDForRequest(r *http.Request) (string, error) {
 	return callID, nil
 }
 
-func (p *provider) URNForRequest(r *http.Request) (urns.URN, error) {
+func (s *service) URNForRequest(r *http.Request) (urns.URN, error) {
 	// get our recording url out
 	body, err := readBody(r)
 	if err != nil {
@@ -156,9 +156,9 @@ func (p *provider) URNForRequest(r *http.Request) (urns.URN, error) {
 	return urns.NewTelURNForCountry("+"+urn, "")
 }
 
-func (p *provider) DownloadMedia(url string) (*http.Response, error) {
+func (s *service) DownloadMedia(url string) (*http.Response, error) {
 	req, _ := http.NewRequest(http.MethodGet, url, nil)
-	token, err := p.generateToken()
+	token, err := s.generateToken()
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating jwt token")
 	}
@@ -167,11 +167,11 @@ func (p *provider) DownloadMedia(url string) (*http.Response, error) {
 	return http.DefaultClient.Do(req)
 }
 
-func (p *provider) CheckStartRequest(r *http.Request) models.ConnectionError {
+func (s *service) CheckStartRequest(r *http.Request) models.ConnectionError {
 	return ""
 }
 
-func (p *provider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request) ([]byte, error) {
+func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request) ([]byte, error) {
 	// parse out the call status, we are looking for a leg of one of our conferences ending in the "forward" case
 	// get our recording url out
 	body, _ := readBody(r)
@@ -186,7 +186,7 @@ func (p *provider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r 
 	}
 
 	if nxType == "transfer" {
-		return p.MakeEmptyResponseBody("ignoring conversation callback"), nil
+		return s.MakeEmptyResponseBody("ignoring conversation callback"), nil
 	}
 
 	// grab our uuid out
@@ -240,7 +240,7 @@ func (p *provider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r 
 
 		resumeURL += "&dial_status=" + status
 		resumeURL += "&dial_duration=" + duration
-		resumeURL += "&sig=" + p.calculateSignature(resumeURL)
+		resumeURL += "&sig=" + s.calculateSignature(resumeURL)
 
 		nxBody := map[string]interface{}{
 			"action": "transfer",
@@ -249,7 +249,7 @@ func (p *provider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r 
 				"url":  []string{resumeURL},
 			},
 		}
-		trace, err := p.makeRequest(http.MethodPut, p.callURL+"/"+callUUID, nxBody)
+		trace, err := s.makeRequest(http.MethodPut, s.callURL+"/"+callUUID, nxBody)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reconnecting flow for call: %s", callUUID)
 		}
@@ -259,7 +259,7 @@ func (p *provider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r 
 			return nil, fmt.Errorf("error reconnecting flow for call: %s, received %d from vonage", callUUID, trace.Response.StatusCode)
 		}
 
-		return p.MakeEmptyResponseBody(fmt.Sprintf("reconnected call: %s to flow with dial status: %s", callUUID, status)), nil
+		return s.MakeEmptyResponseBody(fmt.Sprintf("reconnected call: %s to flow with dial status: %s", callUUID, status)), nil
 	}
 
 	// otherwise the call isn't over yet, instead stash away our status so we can use it to
@@ -275,13 +275,13 @@ func (p *provider) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r 
 		}
 
 		logrus.WithField("redisKey", redisKey).WithField("status", status).WithField("callUUID", callUUID).Debug("saved intermediary dial status for call")
-		return p.MakeEmptyResponseBody(fmt.Sprintf("updated status for call: %s to: %s", callUUID, status)), nil
+		return s.MakeEmptyResponseBody(fmt.Sprintf("updated status for call: %s to: %s", callUUID, status)), nil
 	}
 
-	return p.MakeEmptyResponseBody("ignoring non final status for tranfer leg"), nil
+	return s.MakeEmptyResponseBody("ignoring non final status for tranfer leg"), nil
 }
 
-func (p *provider) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
 	// if this is a recording_url resume, grab that
 	waitType := r.URL.Query().Get("wait_type")
 
@@ -366,13 +366,13 @@ func (p *provider) PreprocessResume(ctx context.Context, rt *runtime.Runtime, co
 	}
 }
 
-// RequestCall causes this client to request a new outgoing call for this provider
-func (p *provider) RequestCall(number urns.URN, resumeURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
+// RequestCall requests a new outgoing call for this service
+func (s *service) RequestCall(number urns.URN, resumeURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
 	callR := &CallRequest{
-		AnswerURL:    []string{resumeURL + "&sig=" + url.QueryEscape(p.calculateSignature(resumeURL))},
+		AnswerURL:    []string{resumeURL + "&sig=" + url.QueryEscape(s.calculateSignature(resumeURL))},
 		AnswerMethod: http.MethodPost,
 
-		EventURL:    []string{statusURL + "?sig=" + url.QueryEscape(p.calculateSignature(statusURL))},
+		EventURL:    []string{statusURL + "?sig=" + url.QueryEscape(s.calculateSignature(statusURL))},
 		EventMethod: http.MethodPost,
 	}
 
@@ -381,9 +381,9 @@ func (p *provider) RequestCall(number urns.URN, resumeURL string, statusURL stri
 	}
 
 	callR.To = append(callR.To, Phone{Type: "phone", Number: strings.TrimLeft(number.Path(), "+")})
-	callR.From = Phone{Type: "phone", Number: strings.TrimLeft(p.channel.Address(), "+")}
+	callR.From = Phone{Type: "phone", Number: strings.TrimLeft(s.channel.Address(), "+")}
 
-	trace, err := p.makeRequest(http.MethodPost, p.callURL, callR)
+	trace, err := s.makeRequest(http.MethodPost, s.callURL, callR)
 	if err != nil {
 		return ivr.NilCallID, trace, errors.Wrapf(err, "error trying to start call")
 	}
@@ -409,10 +409,10 @@ func (p *provider) RequestCall(number urns.URN, resumeURL string, statusURL stri
 }
 
 // HangupCall asks Vonage to hang up the call that is passed in
-func (p *provider) HangupCall(callID string) (*httpx.Trace, error) {
+func (s *service) HangupCall(callID string) (*httpx.Trace, error) {
 	hangupBody := map[string]string{"action": "hangup"}
-	url := p.callURL + "/" + callID
-	trace, err := p.makeRequest(http.MethodPut, url, hangupBody)
+	url := s.callURL + "/" + callID
+	trace, err := s.makeRequest(http.MethodPut, url, hangupBody)
 	if err != nil {
 		return trace, errors.Wrapf(err, "error trying to hangup call")
 	}
@@ -432,7 +432,7 @@ type NCCOInput struct {
 }
 
 // ResumeForRequest returns the resume (input or dial) for the passed in request, if any
-func (p *provider) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
+func (s *service) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	// this could be empty, in which case we return nothing at all
 	empty := r.Form.Get("empty")
 	if empty == "true" {
@@ -508,7 +508,7 @@ type StatusRequest struct {
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (c *provider) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
+func (s *service) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
 	// this is a resume, call is in progress, no need to look at the body
 	if r.Form.Get("action") == "resume" {
 		return models.ConnectionStatusInProgress, "", 0
@@ -560,7 +560,7 @@ func (c *provider) StatusForRequest(r *http.Request) (models.ConnectionStatus, m
 }
 
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
-func (c *provider) ValidateRequestSignature(r *http.Request) error {
+func (s *service) ValidateRequestSignature(r *http.Request) error {
 	if IgnoreSignatures {
 		return nil
 	}
@@ -582,7 +582,7 @@ func (c *provider) ValidateRequestSignature(r *http.Request) error {
 	}
 
 	url := fmt.Sprintf("https://%s%s", r.Host, path)
-	expected := c.calculateSignature(url)
+	expected := s.calculateSignature(url)
 	if expected != actual {
 		return errors.Errorf("mismatch in signatures for url: %s, actual: %s, expected: %s", url, actual, expected)
 	}
@@ -590,7 +590,7 @@ func (c *provider) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a NCCO response for the events in the passed in session
-func (c *provider) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -603,7 +603,7 @@ func (c *provider) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime
 	}
 
 	// get our response
-	response, err := c.responseForSprint(ctx, rt.RP, channel, conn, resumeURL, session.Wait(), sprint.Events())
+	response, err := s.responseForSprint(ctx, rt.RP, channel, conn, resumeURL, session.Wait(), sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -618,7 +618,7 @@ func (c *provider) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime
 }
 
 // WriteErrorResponse writes an error / unavailable response
-func (c *provider) WriteErrorResponse(w http.ResponseWriter, err error) error {
+func (s *service) WriteErrorResponse(w http.ResponseWriter, err error) error {
 	actions := []interface{}{Talk{
 		Action: "talk",
 		Text:   ivr.ErrorMessage,
@@ -635,13 +635,13 @@ func (c *provider) WriteErrorResponse(w http.ResponseWriter, err error) error {
 }
 
 // WriteEmptyResponse writes an empty (but valid) response
-func (c *provider) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
+func (s *service) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
 	w.Header().Set("Content-Type", "application/json")
-	_, err := w.Write(c.MakeEmptyResponseBody(msg))
+	_, err := w.Write(s.MakeEmptyResponseBody(msg))
 	return err
 }
 
-func (c *provider) MakeEmptyResponseBody(msg string) []byte {
+func (s *service) MakeEmptyResponseBody(msg string) []byte {
 	msgBody := map[string]string{
 		"_message": msg,
 	}
@@ -652,14 +652,14 @@ func (c *provider) MakeEmptyResponseBody(msg string) []byte {
 	return body
 }
 
-func (c *provider) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
+func (s *service) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
 	bb, err := json.Marshal(body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error json encoding request")
 	}
 
 	req, _ := http.NewRequest(method, sendURL, bytes.NewReader(bb))
-	token, err := c.generateToken()
+	token, err := s.generateToken()
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating jwt token")
 	}
@@ -668,11 +668,11 @@ func (c *provider) makeRequest(method string, sendURL string, body interface{}) 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
-	return httpx.DoTrace(c.httpClient, req, nil, nil, -1)
+	return httpx.DoTrace(s.httpClient, req, nil, nil, -1)
 }
 
 // calculateSignature calculates a signature for the passed in URL
-func (c *provider) calculateSignature(u string) string {
+func (s *service) calculateSignature(u string) string {
 	url, _ := url.Parse(u)
 
 	var buffer bytes.Buffer
@@ -701,7 +701,7 @@ func (c *provider) calculateSignature(u string) string {
 	}
 
 	// hash with SHA1
-	mac := hmac.New(sha1.New, []byte(c.appID))
+	mac := hmac.New(sha1.New, []byte(s.appID))
 	mac.Write(buffer.Bytes())
 	hash := mac.Sum(nil)
 
@@ -717,21 +717,21 @@ type jwtClaims struct {
 	jwt.StandardClaims
 }
 
-func (c *provider) generateToken() (string, error) {
+func (s *service) generateToken() (string, error) {
 	claims := jwtClaims{
-		c.appID,
+		s.appID,
 		jwt.StandardClaims{
 			Id:       strconv.Itoa(rand.Int()),
 			IssuedAt: time.Now().UTC().Unix(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims)
-	return token.SignedString(c.privateKey)
+	return token.SignedString(s.privateKey)
 }
 
 // NCCO building utilities
 
-func (p *provider) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 
@@ -741,7 +741,7 @@ func (p *provider) responseForSprint(ctx context.Context, rp *redis.Pool, channe
 			switch hint := wait.Hint().(type) {
 			case *hints.DigitsHint:
 				eventURL := resumeURL + "&wait_type=gather"
-				eventURL = eventURL + "&sig=" + url.QueryEscape(p.calculateSignature(eventURL))
+				eventURL = eventURL + "&sig=" + url.QueryEscape(s.calculateSignature(eventURL))
 				input := &Input{
 					Action:       "input",
 					Timeout:      gatherTimeout,
@@ -769,7 +769,7 @@ func (p *provider) responseForSprint(ctx context.Context, rp *redis.Pool, channe
 
 				recordingUUID := string(uuids.New())
 				eventURL := resumeURL + "&wait_type=recording_url&recording_uuid=" + recordingUUID
-				eventURL = eventURL + "&sig=" + url.QueryEscape(p.calculateSignature(eventURL))
+				eventURL = eventURL + "&sig=" + url.QueryEscape(s.calculateSignature(eventURL))
 				record := &Record{
 					Action:       "record",
 					EventURL:     []string{eventURL},
@@ -783,7 +783,7 @@ func (p *provider) responseForSprint(ctx context.Context, rp *redis.Pool, channe
 				// Vonage is goofy in that they do not call our event URL upon gathering the recording but
 				// instead move on. So we need to put in an input here as well
 				eventURL = resumeURL + "&wait_type=record&recording_uuid=" + recordingUUID
-				eventURL = eventURL + "&sig=" + url.QueryEscape(p.calculateSignature(eventURL))
+				eventURL = eventURL + "&sig=" + url.QueryEscape(s.calculateSignature(eventURL))
 				input := &Input{
 					Action:       "input",
 					Timeout:      1,
@@ -821,7 +821,7 @@ func (p *provider) responseForSprint(ctx context.Context, rp *redis.Pool, channe
 				call.RingingTimer = *wait.TimeoutSeconds()
 			}
 
-			trace, err := p.makeRequest(http.MethodPost, p.callURL, call)
+			trace, err := s.makeRequest(http.MethodPost, s.callURL, call)
 			logrus.WithField("trace", trace).Debug("initiated new call for transfer")
 			if err != nil {
 				return "", errors.Wrapf(err, "error trying to start call")

@@ -39,29 +39,29 @@ const (
 	ErrorMessage = "An error has occurred, please try again later."
 )
 
-// our map of client constructors
-var constructors = make(map[models.ChannelType]ProviderConstructor)
+// our map of service constructors
+var constructors = make(map[models.ChannelType]ServiceConstructor)
 
-// ProviderConstructor defines our signature for creating a new IVR client from a channel
-type ProviderConstructor func(*http.Client, *models.Channel) (Provider, error)
+// ServiceConstructor defines our signature for creating a new IVR service from a channel
+type ServiceConstructor func(*http.Client, *models.Channel) (Service, error)
 
-// RegisterProviderType registers the passed in channel type with the passed in constructor
-func RegisterProviderType(channelType models.ChannelType, constructor ProviderConstructor) {
+// RegisterServiceType registers the passed in channel type with the passed in constructor
+func RegisterServiceType(channelType models.ChannelType, constructor ServiceConstructor) {
 	constructors[channelType] = constructor
 }
 
-// GetProvider creates the right kind of IVR provider for the passed in channel
-func GetProvider(channel *models.Channel) (Provider, error) {
+// GetService creates the right kind of IVR service for the passed in channel
+func GetService(channel *models.Channel) (Service, error) {
 	constructor := constructors[channel.Type()]
 	if constructor == nil {
-		return nil, errors.Errorf("no ivr client for channel type: %s", channel.Type())
+		return nil, errors.Errorf("no IVR service for channel type: %s", channel.Type())
 	}
 
 	return constructor(http.DefaultClient, channel)
 }
 
-// Provider defines the interface IVR providers must satisfy
-type Provider interface {
+// Service defines the interface IVR services must satisfy
+type Service interface {
 	RequestCall(number urns.URN, handleURL string, statusURL string, machineDetection bool) (CallID, *httpx.Trace, error)
 
 	HangupCall(externalID string) (*httpx.Trace, error)
@@ -78,7 +78,7 @@ type Provider interface {
 	// and if available, the current call duration
 	StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int)
 
-	// CheckStartRequest checks the start request from the provider is as we expect and if not returns an error reason
+	// CheckStartRequest checks the start request from the service is as we expect and if not returns an error reason
 	CheckStartRequest(r *http.Request) models.ConnectionError
 
 	PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error)
@@ -111,10 +111,10 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelCo
 		return errors.Wrapf(err, "unable to load channel")
 	}
 
-	// create the right client
-	c, err := GetProvider(channel)
+	// create the right service
+	c, err := GetService(channel)
 	if err != nil {
-		return errors.Wrapf(err, "unable to create ivr client")
+		return errors.Wrapf(err, "unable to create IVR service")
 	}
 
 	// try to request our call hangup
@@ -242,10 +242,10 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 	resumeURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
 	statusURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/status", domain, channel.UUID())
 
-	// create the right client
-	c, err := GetProvider(channel)
+	// create the right service
+	c, err := GetService(channel)
 	if err != nil {
-		return errors.Wrapf(err, "unable to create ivr client")
+		return errors.Wrapf(err, "unable to create IVR service")
 	}
 
 	// try to request our call start
@@ -287,23 +287,23 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 }
 
 // HandleAsFailure marks the passed in connection as errored and writes the appropriate error response to our writer
-func HandleAsFailure(ctx context.Context, db *sqlx.DB, client Provider, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
+func HandleAsFailure(ctx context.Context, db *sqlx.DB, svc Service, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
 	err := conn.MarkFailed(ctx, db, time.Now())
 	if err != nil {
 		logrus.WithError(err).Error("error marking connection as failed")
 	}
-	return client.WriteErrorResponse(w, rootErr)
+	return svc.WriteErrorResponse(w, rootErr)
 }
 
 // StartIVRFlow takes care of starting the flow in the passed in start for the passed in contact and URN
 func StartIVRFlow(
-	ctx context.Context, rt *runtime.Runtime, client Provider, resumeURL string, oa *models.OrgAssets,
+	ctx context.Context, rt *runtime.Runtime, svc Service, resumeURL string, oa *models.OrgAssets,
 	channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN, startID models.StartID,
 	r *http.Request, w http.ResponseWriter) error {
 
 	// connection isn't in a wired or in-progress status then we shouldn't be here
 	if conn.Status() != models.ConnectionStatusWired && conn.Status() != models.ConnectionStatusInProgress {
-		return HandleAsFailure(ctx, rt.DB, client, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
 	}
 
 	// get the flow for our start
@@ -316,8 +316,8 @@ func StartIVRFlow(
 		return errors.Wrapf(err, "unable to load flow: %d", startID)
 	}
 
-	// check that call on provider side is in the state we need to continue
-	if errorReason := client.CheckStartRequest(r); errorReason != "" {
+	// check that call on service side is in the state we need to continue
+	if errorReason := svc.CheckStartRequest(r); errorReason != "" {
 		err := conn.MarkErrored(ctx, rt.DB, dates.Now(), flow.IVRRetryWait(), errorReason)
 		if err != nil {
 			return errors.Wrap(err, "unable to mark connection as errored")
@@ -328,7 +328,7 @@ func StartIVRFlow(
 			errMsg = fmt.Sprintf("%s, next_attempt: %s", errMsg, conn.NextAttempt())
 		}
 
-		return client.WriteErrorResponse(w, errors.New(errMsg))
+		return svc.WriteErrorResponse(w, errors.New(errMsg))
 	}
 
 	// our flow contact
@@ -394,8 +394,8 @@ func StartIVRFlow(
 		return errors.Errorf("no ivr session created")
 	}
 
-	// have our client output our session status
-	err = client.WriteSessionResponse(ctx, rt, channel, conn, sessions[0], urn, resumeURL, r, w)
+	// have our service output our session status
+	err = svc.WriteSessionResponse(ctx, rt, channel, conn, sessions[0], urn, resumeURL, r, w)
 	if err != nil {
 		return errors.Wrapf(err, "error writing ivr response for start")
 	}
@@ -406,7 +406,7 @@ func StartIVRFlow(
 // ResumeIVRFlow takes care of resuming the flow in the passed in start for the passed in contact and URN
 func ResumeIVRFlow(
 	ctx context.Context, rt *runtime.Runtime,
-	resumeURL string, provider Provider,
+	resumeURL string, svc Service,
 	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
 	r *http.Request, w http.ResponseWriter) error {
 
@@ -421,14 +421,14 @@ func ResumeIVRFlow(
 	}
 
 	if session == nil {
-		return HandleAsFailure(ctx, rt.DB, provider, conn, w, errors.Errorf("no active IVR session for contact"))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("no active IVR session for contact"))
 	}
 
 	if session.ConnectionID() == nil {
-		return HandleAsFailure(ctx, rt.DB, provider, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
 	}
 	if *session.ConnectionID() != conn.ID() {
-		return HandleAsFailure(ctx, rt.DB, provider, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
 	}
 
 	// check if connection has been marked as errored - it maybe have been updated by status callback
@@ -438,11 +438,11 @@ func ResumeIVRFlow(
 			logrus.WithError(err).Error("error interrupting session")
 		}
 
-		return provider.WriteErrorResponse(w, fmt.Errorf("ending call due to previous status callback"))
+		return svc.WriteErrorResponse(w, fmt.Errorf("ending call due to previous status callback"))
 	}
 
 	// preprocess this request
-	body, err := provider.PreprocessResume(ctx, rt, conn, r)
+	body, err := svc.PreprocessResume(ctx, rt, conn, r)
 	if err != nil {
 		return errors.Wrapf(err, "error preprocessing resume")
 	}
@@ -464,7 +464,7 @@ func ResumeIVRFlow(
 	}
 
 	// make sure our call is still happening
-	status, _, _ := provider.StatusForRequest(r)
+	status, _, _ := svc.StatusForRequest(r)
 	if status != models.ConnectionStatusInProgress {
 		err := conn.UpdateStatus(ctx, rt.DB, status, 0, time.Now())
 		if err != nil {
@@ -473,19 +473,19 @@ func ResumeIVRFlow(
 	}
 
 	// get the input of our request
-	ivrResume, err := provider.ResumeForRequest(r)
+	ivrResume, err := svc.ResumeForRequest(r)
 	if err != nil {
-		return HandleAsFailure(ctx, rt.DB, provider, conn, w, errors.Wrapf(err, "error finding input for request"))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Wrapf(err, "error finding input for request"))
 	}
 
 	var resume flows.Resume
-	var clientErr error
+	var svcErr error
 	switch res := ivrResume.(type) {
 	case InputResume:
-		resume, clientErr, err = buildMsgResume(ctx, rt, provider, channel, contact, urn, conn, oa, r, res)
+		resume, svcErr, err = buildMsgResume(ctx, rt, svc, channel, contact, urn, conn, oa, r, res)
 
 	case DialResume:
-		resume, clientErr, err = buildDialResume(oa, contact, res)
+		resume, svcErr, err = buildDialResume(oa, contact, res)
 
 	default:
 		return fmt.Errorf("unknown resume type: %vvv", ivrResume)
@@ -494,11 +494,11 @@ func ResumeIVRFlow(
 	if err != nil {
 		return errors.Wrapf(err, "error building resume for request")
 	}
-	if clientErr != nil {
-		return provider.WriteErrorResponse(w, clientErr)
+	if svcErr != nil {
+		return svc.WriteErrorResponse(w, svcErr)
 	}
 	if resume == nil {
-		return provider.WriteErrorResponse(w, fmt.Errorf("no resume found, ending call"))
+		return svc.WriteErrorResponse(w, fmt.Errorf("no resume found, ending call"))
 	}
 
 	session, err = runner.ResumeFlow(ctx, rt, oa, session, resume, hook)
@@ -508,7 +508,7 @@ func ResumeIVRFlow(
 
 	// if still active, write out our response
 	if status == models.ConnectionStatusInProgress {
-		err = provider.WriteSessionResponse(ctx, rt, channel, conn, session, urn, resumeURL, r, w)
+		err = svc.WriteSessionResponse(ctx, rt, channel, conn, session, urn, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}
@@ -518,7 +518,7 @@ func ResumeIVRFlow(
 			logrus.WithError(err).Error("error closing session")
 		}
 
-		return provider.WriteErrorResponse(w, fmt.Errorf("call completed"))
+		return svc.WriteErrorResponse(w, fmt.Errorf("call completed"))
 	}
 
 	return nil
@@ -530,7 +530,7 @@ func buildDialResume(oa *models.OrgAssets, contact *flows.Contact, resume DialRe
 
 func buildMsgResume(
 	ctx context.Context, rt *runtime.Runtime,
-	client Provider, channel *models.Channel, contact *flows.Contact, urn urns.URN,
+	svc Service, channel *models.Channel, contact *flows.Contact, urn urns.URN,
 	conn *models.ChannelConnection, oa *models.OrgAssets, r *http.Request, resume InputResume) (flows.Resume, error, error) {
 	// our msg UUID
 	msgUUID := flows.MsgUUID(uuids.New())
@@ -540,7 +540,7 @@ func buildMsgResume(
 		var err error
 		var resp *http.Response
 		for retry := 0; retry < 45; retry++ {
-			resp, err = client.DownloadMedia(resume.Attachment.URL())
+			resp, err = svc.DownloadMedia(resume.Attachment.URL())
 			if err == nil && resp.StatusCode == 200 {
 				break
 			}
@@ -598,14 +598,14 @@ func buildMsgResume(
 	return resumes.NewMsg(oa.Env(), contact, msgIn), nil, nil
 }
 
-// HandleIVRStatus is called on status callbacks for an IVR call. We let the provider decide whether the call has
+// HandleIVRStatus is called on status callbacks for an IVR call. We let the service decide whether the call has
 // ended for some reason and update the state of the call and session if so
-func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, provider Provider, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
-	// read our status and duration from our provider
-	status, errorReason, duration := provider.StatusForRequest(r)
+func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, svc Service, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
+	// read our status and duration from our service
+	status, errorReason, duration := svc.StatusForRequest(r)
 
 	if conn.Status() == models.ConnectionStatusErrored || conn.Status() == models.ConnectionStatusFailed {
-		return provider.WriteEmptyResponse(w, fmt.Sprintf("status %s ignored, already errored", status))
+		return svc.WriteEmptyResponse(w, fmt.Sprintf("status %s ignored, already errored", status))
 	}
 
 	// if we errored schedule a retry if appropriate
@@ -614,7 +614,7 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 		// if this is an incoming call it won't have an associated start and we don't retry it so just fail permanently
 		if conn.StartID() == models.NilStartID {
 			conn.MarkFailed(ctx, rt.DB, time.Now())
-			return provider.WriteEmptyResponse(w, "no flow start found, status updated: F")
+			return svc.WriteEmptyResponse(w, "no flow start found, status updated: F")
 		}
 
 		// on errors we need to look up the flow to know how long to wait before retrying
@@ -631,7 +631,7 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 		conn.MarkErrored(ctx, rt.DB, dates.Now(), flow.IVRRetryWait(), errorReason)
 
 		if conn.Status() == models.ConnectionStatusErrored {
-			return provider.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s, next_attempt: %s", conn.Status(), conn.NextAttempt()))
+			return svc.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s, next_attempt: %s", conn.Status(), conn.NextAttempt()))
 		}
 
 	} else if status == models.ConnectionStatusFailed {
@@ -645,5 +645,5 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 		}
 	}
 
-	return provider.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s", status))
+	return svc.WriteEmptyResponse(w, fmt.Sprintf("status updated: %s", status))
 }

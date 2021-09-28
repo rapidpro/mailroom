@@ -90,7 +90,7 @@ func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	}
 
 	// get the right kind of provider
-	provider, err := ivr.GetProvider(channel)
+	provider, err := ivr.GetService(channel)
 	if provider == nil {
 		return channel, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %s", channelUUID))
 	}
@@ -242,7 +242,7 @@ func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w htt
 	}
 
 	// get the right kind of provider
-	provider, err := ivr.GetProvider(channel)
+	provider, err := ivr.GetService(channel)
 	if provider == nil {
 		return channel, conn, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %d", conn.ChannelID()))
 	}
@@ -345,7 +345,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, r *http.Request, w h
 	}
 
 	// get the right kind of provider
-	provider, err := ivr.GetProvider(channel)
+	provider, err := ivr.GetService(channel)
 	if provider == nil {
 		return channel, nil, writeGenericErrorResponse(w, errors.Wrapf(err, "unable to load client for channel: %s", channelUUID))
 	}

@@ -25,9 +25,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/ivr/twiml"
-	"github.com/nyaruka/mailroom/core/ivr/vonage"
 	ivr_tasks "github.com/nyaruka/mailroom/core/tasks/ivr"
+	"github.com/nyaruka/mailroom/services/ivr/twiml"
+	"github.com/nyaruka/mailroom/services/ivr/vonage"
 )
 
 // mocks the Twilio API
