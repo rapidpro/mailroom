@@ -27,7 +27,7 @@ func TestSurveyor(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	wg := &sync.WaitGroup{}
 	server := web.NewServer(ctx, rt, wg)

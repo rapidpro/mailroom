@@ -21,7 +21,7 @@ import (
 func TestMsgCreated(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	rt.Config.AttachmentDomain = "foo.bar.com"
 	defer func() { rt.Config.AttachmentDomain = "" }()
@@ -113,7 +113,7 @@ func TestMsgCreated(t *testing.T) {
 func TestNoTopup(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// no more credits
 	db.MustExec(`UPDATE orgs_topup SET credits = 0 WHERE org_id = $1`, testdata.Org1.ID)
@@ -141,7 +141,7 @@ func TestNoTopup(t *testing.T) {
 func TestNewURN(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// switch our twitter channel to telegram
 	telegramUUID := testdata.TwitterChannel.UUID

@@ -17,7 +17,7 @@ func TestQueueCourierMessages(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create an Andoid channel
 	androidChannel := testdata.InsertChannel(db, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
@@ -97,6 +97,4 @@ func TestQueueCourierMessages(t *testing.T) {
 		}
 		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, rt, oa)})
 	})
-
-	testsuite.Reset()
 }

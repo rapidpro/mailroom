@@ -59,10 +59,7 @@ func TestTwilioIVR(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer func() {
-		testsuite.ResetStorage()
-		testsuite.Reset()
-	}()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(mockTwilioHandler))
@@ -382,10 +379,7 @@ func TestVonageIVR(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer func() {
-		testsuite.ResetStorage()
-		testsuite.Reset()
-	}()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// deactivate our twilio channel
 	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)

@@ -21,7 +21,7 @@ func TestRetryMsgs(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// noop does nothing
 	err := handler.RetryPendingMsgs(ctx, rt, "test", "test")

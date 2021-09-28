@@ -36,8 +36,6 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 
-	defer testsuite.ResetStorage()
-
 	server := NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()

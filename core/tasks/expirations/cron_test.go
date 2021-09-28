@@ -21,7 +21,7 @@ func TestExpirations(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	err := marker.ClearTasks(rc, expirationLock)
 	assert.NoError(t, err)

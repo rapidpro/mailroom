@@ -12,7 +12,7 @@ import (
 func TestMarker(t *testing.T) {
 	_, _, _, rp := testsuite.Get()
 
-	defer testsuite.ResetRP()
+	defer testsuite.Reset(testsuite.ResetRedis)
 
 	rc := rp.Get()
 	defer rc.Close()

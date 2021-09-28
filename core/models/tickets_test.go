@@ -21,7 +21,7 @@ import (
 func TestTicketers(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// can load directly by UUID
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Zendesk.UUID)
@@ -59,7 +59,7 @@ func TestTicketers(t *testing.T) {
 func TestTickets(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
@@ -137,7 +137,7 @@ func TestTickets(t *testing.T) {
 func TestUpdateTicketConfig(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
 	modelTicket := ticket.Load(db)
@@ -158,7 +158,7 @@ func TestUpdateTicketConfig(t *testing.T) {
 func TestUpdateTicketLastActivity(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	now := time.Date(2021, 6, 22, 15, 59, 30, 123456789, time.UTC)
 
@@ -179,7 +179,7 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 func TestTicketsAssign(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
@@ -211,7 +211,7 @@ func TestTicketsAssign(t *testing.T) {
 func TestTicketsAddNote(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
@@ -239,7 +239,7 @@ func TestTicketsAddNote(t *testing.T) {
 func TestTicketsChangeTopic(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
@@ -269,8 +269,8 @@ func TestTicketsChangeTopic(t *testing.T) {
 func TestCloseTickets(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
+	defer testsuite.Reset(testsuite.ResetData)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	defer testsuite.ResetData(db)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
@@ -341,7 +341,7 @@ func TestCloseTickets(t *testing.T) {
 func TestReopenTickets(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
