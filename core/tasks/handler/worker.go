@@ -580,6 +580,11 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 			return errors.Wrapf(err, "error unstopping contact")
 		}
 
+		err = models.AddContactToOptOutedGroups(ctx, db, event.OrgID, modelContact.ID())
+		if err != nil {
+			return errors.Wrapf(err, "error adding contact to groups")
+		}
+
 		newContact = true
 	}
 

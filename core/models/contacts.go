@@ -972,9 +972,8 @@ const selectLastContactOptOutEvent = `
 SELECT row_to_json(r) FROM (
     SELECT
            id,
-           event_type,
            extra::json as extra
-    FROM channels_channelevent WHERE contact_id = $1
+    FROM channels_channelevent WHERE contact_id = $1 AND event_type = 'stop_conversation'
     ORDER BY occurred_on DESC
     LIMIT 1
 ) r
@@ -1002,6 +1001,28 @@ type FieldUpdate struct {
 	Updates   string    `db:"updates"`
 }
 
+func GetLastContactOptOutEvent(ctx context.Context, db Queryer, contactID ContactID) (*ChannelEvent, error) {
+	event, err := db.QueryxContext(ctx, selectLastContactOptOutEvent, contactID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying channel event by contact: %d", contactID)
+	}
+	defer event.Close()
+
+	// no row, no event!
+	if !event.Next() {
+		return nil, nil
+	}
+
+	// read event
+	evt := &ChannelEvent{}
+	err = dbutil.ReadJSONRow(event, &evt.e)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error reading event definition by contact: %d", contactID)
+	}
+
+	return evt, nil
+}
+
 func UpdateContactOptOutChannelEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, contactID ContactID) error {
 	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshFields)
 	if err != nil {
@@ -1013,25 +1034,13 @@ func UpdateContactOptOutChannelEvent(ctx context.Context, db *sqlx.DB, orgID Org
 		return err
 	}
 
-	event, err := db.QueryxContext(ctx, selectLastContactOptOutEvent, contact.ID())
+	evt, err := GetLastContactOptOutEvent(ctx, db, contact.ID())
 	if err != nil {
-		return errors.Wrapf(err, "error querying channel event by contact: %d", contact.ID())
-	}
-	defer event.Close()
-
-	// no row, no event!
-	if !event.Next() {
-		return nil
+		return err
 	}
 
-	// read event
-	evt := &ChannelEvent{}
-	err = dbutil.ReadJSONRow(event, &evt.e)
-	if err != nil {
-		return errors.Wrapf(err, "error reading event definition by contact: %d", contact.ID())
-	}
-
-	if evt.e.EventType != "stop_conversation" {
+	// if no event, skip next code
+	if evt == nil {
 		return nil
 	}
 
@@ -1075,6 +1084,53 @@ func UpdateContactOptOutChannelEvent(ctx context.Context, db *sqlx.DB, orgID Org
 		return errors.Wrapf(err, "error updating event definition by contact: %d", contact.ID())
 	}
 
+	return nil
+}
+
+func AddContactToOptOutedGroups(ctx context.Context, db *sqlx.DB, orgID OrgID, contactID ContactID) error {
+	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshFields)
+	if err != nil {
+		return err
+	}
+
+	contact, err := LoadContact(ctx, db, oa, contactID)
+	if err != nil {
+		return err
+	}
+
+	evt, err := GetLastContactOptOutEvent(ctx, db, contact.ID())
+	if err != nil {
+		return err
+	}
+	if evt != nil {
+		extra := evt.Extra()
+		groupsToAdd := make([]*GroupAdd, 0)
+		contactGroups := extra["opted_out_groups"].([]interface{})
+		for _, group := range contactGroups {
+			groupUUID := assets.GroupUUID(group.(string))
+			if err != nil {
+				return err
+			}
+			contactNotInGroup := true
+			for _, contactGroup := range contact.Groups() {
+				if contactGroup.UUID() == groupUUID {
+					contactNotInGroup = false
+					break
+				}
+			}
+			orgGroup := oa.GroupByUUID(groupUUID)
+			if contactNotInGroup && orgGroup != nil {
+				groupsToAdd = append(groupsToAdd, &GroupAdd{
+					ContactID: contactID,
+					GroupID:   orgGroup.ID(),
+				})
+			}
+		}
+		err = AddContactsToGroups(ctx, db, groupsToAdd)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
