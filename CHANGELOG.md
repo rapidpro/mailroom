@@ -1,3 +1,7 @@
+v6.5.35
+----------
+ * Tweak mailroom startup to show warning if no distinct readonly DB configured
+
 v6.5.34
 ----------
  * Switch to readonly database for asset loading
