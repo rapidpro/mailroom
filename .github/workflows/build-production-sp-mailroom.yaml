@@ -9,7 +9,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     environment: 
-      name: develop
+      name: production
     steps:
       - name: Set output
         id: vars
