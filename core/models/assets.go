@@ -117,7 +117,8 @@ func FlushCache() {
 // NewOrgAssets creates and returns a new org assets objects, potentially using the previous
 // org assets passed in to prevent refetching locations
 func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *OrgAssets, refresh Refresh) (*OrgAssets, error) {
-	db := rt.DB
+	// assets are immutable in mailroom so safe to load from readonly database connection
+	db := rt.ReadonlyDB
 
 	// build our new assets
 	oa := &OrgAssets{
