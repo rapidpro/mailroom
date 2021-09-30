@@ -84,17 +84,17 @@ func (mr *Mailroom) Start() error {
 		log.Info("db ok")
 	}
 
-	// if readonly DB not specified, just use default DB again
-	readonlyDB := c.ReadonlyDB
-	if readonlyDB == "" {
-		readonlyDB = c.DB
-	}
-
-	mr.rt.ReadonlyDB, err = openAndCheckDBConnection(readonlyDB, c.DBPoolSize)
-	if err != nil {
-		log.WithError(err).Error("readonly db not reachable")
+	if c.ReadonlyDB != "" {
+		mr.rt.ReadonlyDB, err = openAndCheckDBConnection(c.ReadonlyDB, c.DBPoolSize)
+		if err != nil {
+			log.WithError(err).Error("readonly db not reachable")
+		} else {
+			log.Info("readonly db ok")
+		}
 	} else {
-		log.Info("readonly db ok")
+		// if readonly DB not specified, just use default DB again
+		mr.rt.ReadonlyDB = mr.rt.DB
+		log.Warn("no distinct readonly db configured")
 	}
 
 	mr.rt.RP, err = openAndCheckRedisPool(c.Redis)
