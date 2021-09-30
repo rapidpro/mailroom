@@ -1,4 +1,4 @@
-name: Build Develop Ireland Mailroom
+name: Build Production Ireland Mailroom
 on:
   push:
     tags:
@@ -11,13 +11,11 @@ jobs:
     steps:
       - name: Set output
         id: vars
-        run: |
-          echo ::set-output name=branch::$(echo ${GITHUB_REF#refs/heads/}|cut -d'-' -f3-4|tr -s '-' '/');
-          echo ::set-output name=tag::$(echo ${GITHUB_REF#refs/heads/}|cut -d'/' -f3-|cut -d'-' -f1-2);
+        run: echo ::set-output name=tag::$(echo ${GITHUB_REF#refs/heads/}|cut -d'/' -f3);
       - name: Check out the repo
         uses: actions/checkout@v2
         with: 
-          ref: ${{ steps.vars.ouptuts.branch }}
+          ref: main
       - name: Check out the repo
         uses: actions/checkout@v2
         with:
