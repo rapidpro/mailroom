@@ -1,3 +1,7 @@
+v6.5.34
+----------
+ * Switch to readonly database for asset loading
+
 v6.5.33
 ----------
  * Add support for READONLY_DB config setting that opens a new readonly database connection
