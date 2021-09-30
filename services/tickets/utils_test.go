@@ -47,11 +47,13 @@ func TestGetContactDisplay(t *testing.T) {
 }
 
 func TestFromTicketUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	// create some tickets
-	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)
-	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my shoes?", "", nil)
+	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my shoes?", "", nil)
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
@@ -64,7 +66,7 @@ func TestFromTicketUUID(t *testing.T) {
 
 	// err if no ticketer type doesn't match
 	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1.UUID, "zendesk")
-	assert.EqualError(t, err, "error looking up ticketer #1")
+	assert.EqualError(t, err, "error looking up ticketer #2")
 
 	// err if ticketer isn't configured correctly and can't be loaded as a service
 	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1.UUID, "mailgun")
@@ -83,7 +85,9 @@ func TestFromTicketUUID(t *testing.T) {
 }
 
 func TestFromTicketerUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Reset()
+	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
@@ -112,8 +116,9 @@ func TestFromTicketerUUID(t *testing.T) {
 }
 
 func TestSendReply(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
 
+	defer testsuite.Reset()
 	defer testsuite.ResetStorage()
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
@@ -125,7 +130,7 @@ func TestSendReply(t *testing.T) {
 	image := &tickets.File{URL: "http://coolfiles.com/a.jpg", ContentType: "image/jpeg", Body: imageBody}
 
 	// create a ticket
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Need help", "Have you seen my cookies?", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
 	modelTicket := ticket.Load(db)
 
 	msg, err := tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})
@@ -142,7 +147,9 @@ func TestSendReply(t *testing.T) {
 }
 
 func TestCloseTicket(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -165,7 +172,7 @@ func TestCloseTicket(t *testing.T) {
 		testdata.Cathy.ID,
 		testdata.Mailgun.ID,
 		"EX12345",
-		"New Ticket",
+		testdata.DefaultTopic.ID,
 		"Where are my cookies?",
 		models.NilUserID,
 		map[string]interface{}{
@@ -183,9 +190,9 @@ func TestCloseTicket(t *testing.T) {
 
 	logger := &models.HTTPLogger{}
 
-	err = tickets.CloseTicket(ctx, rt, oa, ticket1, true, logger)
+	err = tickets.Close(ctx, rt, oa, ticket1, true, logger)
 	require.NoError(t, err)
 
 	testsuite.AssertContactTasks(t, 1, testdata.Cathy.ID,
-		[]string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:31Z"},"queued_on":"2021-06-08T16:40:34Z"}`})
+		[]string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:32Z"},"queued_on":"2021-06-08T16:40:35Z"}`})
 }

@@ -20,9 +20,11 @@ import (
 )
 
 func TestBroadcastEvents(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
@@ -118,9 +120,11 @@ func TestBroadcastEvents(t *testing.T) {
 }
 
 func TestBroadcastTask(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
 	assert.NoError(t, err)
@@ -129,7 +133,7 @@ func TestBroadcastTask(t *testing.T) {
 	// insert a broadcast so we can check it is being set to sent
 	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
 	modelTicket := ticket.Load(db)
 
 	evaluated := map[envs.Language]*models.BroadcastTranslation{

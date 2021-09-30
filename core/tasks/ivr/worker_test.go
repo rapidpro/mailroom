@@ -23,9 +23,11 @@ import (
 )
 
 func TestIVR(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	// register our mock client
 	ivr.RegisterClientType(models.ChannelType("ZZ"), newMockClient)
@@ -78,7 +80,7 @@ type MockClient struct {
 	callError error
 }
 
-func (c *MockClient) RequestCall(number urns.URN, handleURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
+func (c *MockClient) RequestCall(number urns.URN, handleURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
 	return c.callID, nil, c.callError
 }
 
@@ -102,8 +104,12 @@ func (c *MockClient) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	return nil, nil
 }
 
-func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
-	return models.ConnectionStatusFailed, 10
+func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
+	return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 10
+}
+
+func (c *MockClient) CheckStartRequest(r *http.Request) models.ConnectionError {
+	return ""
 }
 
 func (c *MockClient) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {

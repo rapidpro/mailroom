@@ -16,9 +16,11 @@ import (
 )
 
 func TestRetries(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	// register our mock client
 	ivr.RegisterClientType(models.ChannelType("ZZ"), newMockClient)

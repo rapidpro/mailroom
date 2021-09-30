@@ -108,8 +108,8 @@ type simulatorTicketService struct {
 	ticketer *flows.Ticketer
 }
 
-func (s *simulatorTicketService) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	return flows.OpenTicket(s.ticketer, subject, body), nil
+func (s *simulatorTicketService) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+	return flows.OpenTicket(s.ticketer, topic, body, assignee), nil
 }
 
 func simulatorAirtimeServiceFactory(session flows.Session) (flows.AirtimeService, error) {

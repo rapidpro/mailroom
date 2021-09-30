@@ -42,10 +42,10 @@ const (
 	BothubConfigAccessToken = "access_token"
 
 	// LUIS config options
-	LuisConfigAppID       = "app_id"
-	LuisConfigVersion     = "version"
-	LuisConfigEndpointURL = "endpoint_url"
-	LuisConfigPrimaryKey  = "primary_key"
+	LuisConfigAppID              = "app_id"
+	LuisConfigPredictionEndpoint = "prediction_endpoint"
+	LuisConfigPredictionKey      = "prediction_key"
+	LuisConfigSlot               = "slot"
 )
 
 // Register a classification service factory with the engine
@@ -102,14 +102,15 @@ func (c *Classifier) AsService(classifier *flows.Classifier) (flows.Classificati
 		return wit.NewService(httpClient, httpRetries, classifier, accessToken), nil
 
 	case ClassifierTypeLuis:
-		endpoint := c.c.Config[LuisConfigEndpointURL]
 		appID := c.c.Config[LuisConfigAppID]
-		key := c.c.Config[LuisConfigPrimaryKey]
-		if endpoint == "" || appID == "" || key == "" {
-			return nil, errors.Errorf("missing %s, %s or %s on LUIS classifier: %s",
-				LuisConfigEndpointURL, LuisConfigAppID, LuisConfigPrimaryKey, c.UUID())
+		endpoint := c.c.Config[LuisConfigPredictionEndpoint]
+		key := c.c.Config[LuisConfigPredictionKey]
+		slot := c.c.Config[LuisConfigSlot]
+		if endpoint == "" || appID == "" || key == "" || slot == "" {
+			return nil, errors.Errorf("missing %s, %s, %s or %s on LUIS classifier: %s",
+				LuisConfigAppID, LuisConfigPredictionEndpoint, LuisConfigPredictionKey, LuisConfigSlot, c.UUID())
 		}
-		return luis.NewService(httpClient, httpRetries, httpAccess, classifier, endpoint, appID, key), nil
+		return luis.NewService(httpClient, httpRetries, httpAccess, classifier, endpoint, appID, key, slot), nil
 
 	case ClassifierTypeBothub:
 		accessToken := c.c.Config[BothubConfigAccessToken]

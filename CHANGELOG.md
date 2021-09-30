@@ -1,3 +1,107 @@
+v6.5.31
+----------
+ * Recalculate dynamic groups after closing and reopening tickets
+ * Stop writing webhook results
+
+v6.5.30
+----------
+ * Fix handling webhook called events on resumes
+
+v6.5.29
+----------
+ * Add new fields to HTTPLog and save for webhook called events
+ * Stop writing ticket subjects
+
+v6.5.28
+----------
+ * Add warning log entry when task takes longer than 1 minute
+
+v6.5.27
+----------
+ * Update to latest goflow (fixes word_slice)
+
+v6.5.26
+----------
+ * Update to latest goflow
+
+v6.5.25
+----------
+ * Add notifications for contact imports and set contact import status
+
+v6.5.24
+----------
+ * Fix IVR for orgs using S3 sessions
+ * Ticket notifications (opened and activity)
+
+v6.5.23
+----------
+ * Add force param to close tickets endpoint to let us ignore errors on external ticket service when removing a ticketer
+
+v6.5.22
+----------
+ * Support Spanish status names passed back from Zendesk targets
+
+v6.5.21
+----------
+ * Read sessions from db or s3 depending on whether output_url is set
+ * Don't write output in db when writing to s3
+
+v6.5.20
+----------
+ * Add endpoint to change ticket topic
+ * Update to latest goflow/gocommon/phonenumbers
+
+v6.5.19
+----------
+ * Update to latest goflow to get ticket topic changes there
+ * Add ticket topics
+
+v6.5.18
+----------
+ * Switch to synchronous answering machine detection for Twilio channels
+
+v6.5.15
+----------
+ * Make IVR machine detection an option in channel config
+
+v6.5.14
+----------
+ * Stop reading/writing channelconnection.retry_count so that it can be dropped
+
+v6.5.13
+----------
+ * Don't let IVR status callbacks overwrite error status (otherwise calls aren't retried)
+
+v6.5.12
+----------
+ * Revert previous to query to fetch calls to retry so we only look as statuses Q and E
+ * Add ChannelConnection.errorReason and start populating
+ * Reinstate channel connection error_count and write it
+ * Fix retrying of calls where answering machine was detected
+
+v6.5.11
+----------
+ * Implement asynchronous AMD for Twilio IVR
+ * Enable answering machine detection for Vonage IVR
+
+v6.5.10
+----------
+ * Fix requests to twilio to start calls with machine detection
+
+v6.5.9
+----------
+ * Add support for answering machine detection on Twilio calls
+ * Update to latest goflow
+
+v6.5.8
+----------
+ * Use new config keys for LUIS classifiers
+
+v6.5.7
+----------
+ * Switch from abandoned dgrijalva/jwt-go to golang-jwt/jwt
+ * Update to latest goflow (adds support for queries on tickets, fixes LUIS classifiers)
+
 v6.5.6
 ----------
  * Update to latest goflow and add parse_only as param to parse_query to allow us to extract field dependencies even when they don't yet exist in the database

@@ -28,8 +28,8 @@ func NewService(rtCfg *config.Config, httpClient *http.Client, httpRetries *http
 }
 
 // Open just returns a new ticket - no external service to notify
-func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	return flows.OpenTicket(s.ticketer, subject, body), nil
+func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+	return flows.OpenTicket(s.ticketer, topic, body, assignee), nil
 }
 
 // Forward is a noop

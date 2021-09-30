@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -68,9 +67,8 @@ const (
 
 	configSessionStorageMode = "session_storage_mode"
 
-	DBSessions      = SessionStorageMode("db")
-	S3Sessions      = SessionStorageMode("s3")
-	S3WriteSessions = SessionStorageMode("s3_write")
+	DBSessions = SessionStorageMode("db")
+	S3Sessions = SessionStorageMode("s3")
 )
 
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
@@ -186,7 +184,7 @@ func (o *Org) StoreAttachment(ctx context.Context, s storage.Storage, filename s
 	prefix := config.Mailroom.S3MediaPrefix
 
 	// read the content
-	contentBytes, err := ioutil.ReadAll(content)
+	contentBytes, err := io.ReadAll(content)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to read attachment content")
 	}

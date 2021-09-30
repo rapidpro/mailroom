@@ -17,7 +17,9 @@ import (
 )
 
 func TestWithHTTPLogs(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer db.MustExec(`DELETE FROM request_logs_httplog`)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
