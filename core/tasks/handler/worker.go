@@ -2,29 +2,31 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
-	"strings"
+	"image"
+	"image/jpeg"
+	"image/png"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
-	"image/jpeg"
-	"io/ioutil"
-	"database/sql"
-	"image/png"
-	"image"
+	"strings"
+	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/storage"
 	"github.com/greatnonprofits-nfp/goflow/excellent/types"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/flows/events"
 	"github.com/greatnonprofits-nfp/goflow/flows/resumes"
 	"github.com/greatnonprofits-nfp/goflow/flows/triggers"
 	"github.com/greatnonprofits-nfp/goflow/utils"
+	"github.com/jmoiron/sqlx"
+	"github.com/nfnt/resize"
+	"github.com/nyaruka/gocommon/storage"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/config"
@@ -34,10 +36,8 @@ import (
 	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/nfnt/resize"
-	"github.com/gofrs/uuid"
 	"github.com/rwcarlsen/goexif/exif"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -487,6 +487,11 @@ func HandleChannelEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, eventT
 
 // handleStopEvent is called when a contact is stopped by courier
 func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *StopEvent) error {
+	ceErr := models.UpdateContactOptOutChannelEvent(ctx, db, event.OrgID, event.ContactID)
+	if ceErr != nil {
+		return errors.Wrapf(ceErr, "unable to update opt-out channel event")
+	}
+
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction for stopping contact")
@@ -573,6 +578,11 @@ func handleMsgEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *Msg
 		err := modelContact.Unstop(ctx, db)
 		if err != nil {
 			return errors.Wrapf(err, "error unstopping contact")
+		}
+
+		err = models.AddContactToOptOutedGroups(ctx, db, event.OrgID, modelContact.ID())
+		if err != nil {
+			return errors.Wrapf(err, "error adding contact to groups")
 		}
 
 		newContact = true
