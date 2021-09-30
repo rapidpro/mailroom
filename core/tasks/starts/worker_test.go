@@ -19,9 +19,11 @@ import (
 )
 
 func TestStarts(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Reset()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset()
 
 	mes := testsuite.NewMockElasticServer()
 	defer mes.Close()

@@ -15,7 +15,9 @@ import (
 )
 
 func TestScheduleCampaignEvent(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset()
 
 	// add bob, george and alexandria to doctors group which campaign is based on
 	testdata.DoctorsGroup.Add(db, testdata.Bob, testdata.George, testdata.Alexandria)

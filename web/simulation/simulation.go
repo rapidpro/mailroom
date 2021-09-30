@@ -7,7 +7,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/assets/static/types"
+	"github.com/nyaruka/goflow/assets/static"
 	"github.com/nyaruka/goflow/excellent/tools"
 	xtypes "github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -39,7 +39,7 @@ type sessionRequest struct {
 	OrgID  models.OrgID     `json:"org_id"  validate:"required"`
 	Flows  []flowDefinition `json:"flows"`
 	Assets struct {
-		Channels []*types.Channel `json:"channels"`
+		Channels []*static.Channel `json:"channels"`
 	} `json:"assets"`
 }
 

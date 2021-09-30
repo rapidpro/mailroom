@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -30,7 +30,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/buger/jsonparser"
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -105,11 +105,11 @@ func readBody(r *http.Request) ([]byte, error) {
 	if r.Body == http.NoBody {
 		return nil, nil
 	}
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, nil
 	}
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	r.Body = io.NopCloser(bytes.NewBuffer(body))
 	return body, nil
 }
 
@@ -168,6 +168,10 @@ func (c *client) DownloadMedia(url string) (*http.Response, error) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	return http.DefaultClient.Do(req)
+}
+
+func (c *client) CheckStartRequest(r *http.Request) models.ConnectionError {
+	return ""
 }
 
 func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
@@ -333,7 +337,7 @@ func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Po
 		}
 
 		// get our recording url out
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading body from request")
 		}
@@ -375,6 +379,7 @@ type NCCO struct {
 	Name   string `json:"name"`
 }
 
+// CallRequest is the request payload to create a new call, see https://developer.nexmo.com/api/voice#createCall
 type CallRequest struct {
 	To           []Phone  `json:"to"`
 	From         Phone    `json:"from"`
@@ -383,11 +388,12 @@ type CallRequest struct {
 	EventURL     []string `json:"event_url"`
 	EventMethod  string   `json:"event_method"`
 
-	NCCO         []NCCO `json:"ncco,omitempty"`
-	RingingTimer int    `json:"ringing_timer,omitempty"`
+	NCCO             []NCCO `json:"ncco,omitempty"`
+	MachineDetection string `json:"machine_detection"`
+	RingingTimer     int    `json:"ringing_timer,omitempty"`
 }
 
-// CallResponse is our struct for a Vonage call response
+// CallResponse is the response from creating a new call
 // {
 //  "uuid": "63f61863-4a51-4f6b-86e1-46edebcf9356",
 //  "status": "started",
@@ -402,13 +408,17 @@ type CallResponse struct {
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
+func (c *client) RequestCall(number urns.URN, resumeURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
 	callR := &CallRequest{
 		AnswerURL:    []string{resumeURL + "&sig=" + url.QueryEscape(c.calculateSignature(resumeURL))},
 		AnswerMethod: http.MethodPost,
 
 		EventURL:    []string{statusURL + "?sig=" + url.QueryEscape(c.calculateSignature(statusURL))},
 		EventMethod: http.MethodPost,
+	}
+
+	if machineDetection {
+		callR.MachineDetection = "hangup" // if an answering machine answers, just hangup
 	}
 
 	callR.To = append(callR.To, Phone{Type: "phone", Number: strings.TrimLeft(number.Path(), "+")})
@@ -539,47 +549,54 @@ type StatusRequest struct {
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
+func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
 	// this is a resume, call is in progress, no need to look at the body
 	if r.Form.Get("action") == "resume" {
-		return models.ConnectionStatusInProgress, 0
+		return models.ConnectionStatusInProgress, "", 0
 	}
 
-	status := &StatusRequest{}
 	bb, err := readBody(r)
 	if err != nil {
 		logrus.WithError(err).Error("error reading status request body")
-		return models.ConnectionStatusErrored, 0
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 	}
+
+	status := &StatusRequest{}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
 		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
-		return models.ConnectionStatusErrored, 0
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 	}
 
 	// transfer status callbacks have no status, safe to ignore them
 	if status.Status == "" {
-		return models.ConnectionStatusInProgress, 0
+		return models.ConnectionStatusInProgress, "", 0
 	}
 
 	switch status.Status {
 
 	case "started", "ringing":
-		return models.ConnectionStatusWired, 0
+		return models.ConnectionStatusWired, "", 0
 
 	case "answered":
-		return models.ConnectionStatusInProgress, 0
+		return models.ConnectionStatusInProgress, "", 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(status.Duration)
-		return models.ConnectionStatusCompleted, duration
+		return models.ConnectionStatusCompleted, "", duration
 
-	case "rejected", "busy", "unanswered", "timeout", "failed", "machine":
-		return models.ConnectionStatusErrored, 0
+	case "busy":
+		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
+	case "rejected", "unanswered", "timeout":
+		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
+	case "machine":
+		return models.ConnectionStatusErrored, models.ConnectionErrorMachine, 0
+	case "failed":
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 
 	default:
 		logrus.WithField("status", status.Status).Error("unknown call status in ncco callback")
-		return models.ConnectionStatusFailed, 0
+		return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 0
 	}
 }
 

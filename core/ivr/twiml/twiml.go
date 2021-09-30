@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -149,6 +148,15 @@ func (c *client) DownloadMedia(url string) (*http.Response, error) {
 	return http.Get(url)
 }
 
+func (c *client) CheckStartRequest(r *http.Request) models.ConnectionError {
+	r.ParseForm()
+	answeredBy := r.Form.Get("AnsweredBy")
+	if answeredBy == "machine_start" || answeredBy == "fax" {
+		return models.ConnectionErrorMachine
+	}
+	return ""
+}
+
 func (c *client) PreprocessStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
@@ -177,17 +185,21 @@ func (c *client) URNForRequest(r *http.Request) (urns.URN, error) {
 
 // CallResponse is our struct for a Twilio call response
 type CallResponse struct {
-	SID    string `json:"sid"`
+	SID    string `json:"sid" validate:"required"`
 	Status string `json:"status"`
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL string) (ivr.CallID, *httpx.Trace, error) {
+func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL string, machineDetection bool) (ivr.CallID, *httpx.Trace, error) {
 	form := url.Values{}
 	form.Set("To", number.Path())
 	form.Set("From", c.channel.Address())
 	form.Set("Url", callbackURL)
 	form.Set("StatusCallback", statusURL)
+
+	if machineDetection {
+		form.Set("MachineDetection", "Enable")
+	}
 
 	sendURL := c.baseURL + strings.Replace(callPath, "{AccountSID}", c.accountSID, -1)
 
@@ -200,13 +212,11 @@ func (c *client) RequestCall(number urns.URN, callbackURL string, statusURL stri
 		return ivr.NilCallID, trace, errors.Errorf("received non 201 status for call start: %d", trace.Response.StatusCode)
 	}
 
-	// parse out our call sid
+	// parse the response from Twilio
 	call := &CallResponse{}
-	err = json.Unmarshal(trace.ResponseBody, call)
-	if err != nil || call.SID == "" {
-		return ivr.NilCallID, trace, errors.Errorf("unable to read call id")
+	if err := utils.UnmarshalAndValidate(trace.ResponseBody, call); err != nil {
+		return ivr.NilCallID, trace, errors.Wrap(err, "unable parse Twilio response")
 	}
-
 	if call.Status == statusFailed {
 		return ivr.NilCallID, trace, errors.Errorf("call status returned as failed")
 	}
@@ -284,27 +294,30 @@ func (c *client) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	}
 }
 
-// StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
+// StatusForRequest returns the call status for the passed in request, and if it's an error the reason,
+// and if available, the current call duration
+func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
 	status := r.Form.Get("CallStatus")
 	switch status {
 
 	case "queued", "ringing":
-		return models.ConnectionStatusWired, 0
-
+		return models.ConnectionStatusWired, "", 0
 	case "in-progress", "initiated":
-		return models.ConnectionStatusInProgress, 0
-
+		return models.ConnectionStatusInProgress, "", 0
 	case "completed":
 		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
-		return models.ConnectionStatusCompleted, duration
+		return models.ConnectionStatusCompleted, "", duration
 
-	case "busy", "no-answer", "canceled", "failed":
-		return models.ConnectionStatusErrored, 0
+	case "busy":
+		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
+	case "no-answer":
+		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
+	case "canceled", "failed":
+		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
 
 	default:
-		logrus.WithField("call_status", status).Error("unknown call status in ivr callback")
-		return models.ConnectionStatusFailed, 0
+		logrus.WithField("call_status", status).Error("unknown call status in status callback")
+		return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 0
 	}
 }
 

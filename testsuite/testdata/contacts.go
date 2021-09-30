@@ -50,8 +50,8 @@ type Field struct {
 func InsertContact(db *sqlx.DB, org *Org, uuid flows.ContactUUID, name string, language envs.Language) *Contact {
 	var id models.ContactID
 	must(db.Get(&id,
-		`INSERT INTO contacts_contact (org_id, is_active, status, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
-		VALUES($1, TRUE, 'A', $2, $3, $4, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, uuid, name, language,
+		`INSERT INTO contacts_contact (org_id, is_active, status, ticket_count, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
+		VALUES($1, TRUE, 'A', 0, $2, $3, $4, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, uuid, name, language,
 	))
 	return &Contact{id, uuid, "", models.NilURNID}
 }
@@ -81,16 +81,4 @@ func InsertContactURN(db *sqlx.DB, org *Org, contact *Contact, urn urns.URN, pri
 		 VALUES($1, $2, $3, $4, $5, $6) RETURNING id`, org.ID, contactID, scheme, path, urn.Identity(), priority,
 	))
 	return id
-}
-
-// DeleteContactsAndURNs deletes all contacts and URNs
-func DeleteContactsAndURNs(db *sqlx.DB) {
-	db.MustExec(`DELETE FROM msgs_msg`)
-	db.MustExec(`DELETE FROM contacts_contacturn`)
-	db.MustExec(`DELETE FROM contacts_contactgroup_contacts`)
-	db.MustExec(`DELETE FROM contacts_contact`)
-
-	// reset id sequences back to a known number
-	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 10000`)
-	db.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 10000`)
 }

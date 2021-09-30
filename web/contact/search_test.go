@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync"
 	"testing"
@@ -24,7 +23,7 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, _, db, rp := testsuite.Get()
 
 	wg := &sync.WaitGroup{}
 
@@ -38,7 +37,7 @@ func TestSearch(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, client, wg)
+	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, client, wg)
 	server.Start()
 
 	// give our server time to start
@@ -213,7 +212,7 @@ func TestSearch(t *testing.T) {
 
 		assert.Equal(t, tc.ExpectedStatus, resp.StatusCode, "%d: unexpected status", i)
 
-		content, err := ioutil.ReadAll(resp.Body)
+		content, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
 
 		// on 200 responses parse them

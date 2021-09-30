@@ -9,28 +9,34 @@ import (
 )
 
 func TestChannelback(t *testing.T) {
-	_, _, db, _ := testsuite.Reset()
+	_, _, db, _ := testsuite.Get()
+
+	defer testsuite.ResetData(db)
 
 	// create a zendesk ticket for Cathy
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "1234", nil)
 
 	web.RunWebTests(t, "testdata/channelback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }
 
 func TestEventCallback(t *testing.T) {
-	_, _, db, _ := testsuite.Reset()
+	_, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset() // tests include destroying ticketer
 
 	// create a zendesk ticket for Cathy
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "1234", nil)
 
 	web.RunWebTests(t, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }
 
 func TestTarget(t *testing.T) {
-	_, _, db, _ := testsuite.Reset()
+	_, _, db, _ := testsuite.Get()
+
+	defer testsuite.ResetData(db)
 
 	// create a zendesk ticket for Cathy
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Need help", "Have you seen my cookies?", "1234", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "1234", nil)
 
 	web.RunWebTests(t, "testdata/target.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }

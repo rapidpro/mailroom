@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -138,12 +137,12 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 
 	contentType, _, _ := mime.ParseMediaType(trace.Response.Header.Get("Content-Type"))
 
-	return &File{URL: url, ContentType: contentType, Body: ioutil.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
+	return &File{URL: url, ContentType: contentType, Body: io.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
 }
 
-// CloseTicket closes the given ticket, and creates and queues a closed event
-func CloseTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
-	events, err := models.CloseTickets(ctx, rt.DB, oa, models.NilUserID, []*models.Ticket{ticket}, externally, l)
+// Close closes the given ticket, and creates and queues a closed event
+func Close(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
+	events, err := models.CloseTickets(ctx, rt.DB, oa, models.NilUserID, []*models.Ticket{ticket}, externally, false, l)
 	if err != nil {
 		return errors.Wrap(err, "error closing ticket")
 	}
@@ -161,8 +160,8 @@ func CloseTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 	return nil
 }
 
-// ReopenTicket reopens the given ticket
-func ReopenTicket(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
+// Reopen reopens the given ticket
+func Reopen(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
 	_, err := models.ReopenTickets(ctx, rt.DB, oa, models.NilUserID, []*models.Ticket{ticket}, externally, l)
 	return err
 }

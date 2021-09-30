@@ -1,7 +1,7 @@
 package msgio_test
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -29,7 +29,7 @@ type MockFCMEndpoint struct {
 func (m *MockFCMEndpoint) Handle(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	requestBody, _ := ioutil.ReadAll(r.Body)
+	requestBody, _ := io.ReadAll(r.Body)
 
 	message := &fcm.Message{}
 	jsonx.Unmarshal(requestBody, message)

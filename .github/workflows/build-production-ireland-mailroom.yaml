@@ -2,9 +2,13 @@ name: Build Production Ireland Mailroom
 on:
   push:
     tags:
+<<<<<<< HEAD
       - '!v*.*.*-staging*'
       - '!v*.*.*-develop*'
       - 'v*.*.*'
+=======
+      - 'v*.*.*-develop*'
+>>>>>>> 3b2bd59aa6bc07c96be89495110e7b1c30f2f99c
 jobs:
   docker:
     runs-on: ubuntu-latest
