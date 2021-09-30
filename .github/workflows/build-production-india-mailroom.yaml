@@ -1,27 +1,23 @@
-name: Build Develop Ireland Mailroom
+name: Build Production India Mailroom
 on:
   push:
     tags:
-      - 'v*.*.*-develop*'
+      - '!v*.*.*-staging*'
+      - '!v*.*.*-develop*'
+      - 'v*.*.*'
 jobs:
   docker:
     runs-on: ubuntu-latest
     environment: 
-      name: develop-ireland
+      name: production-india
     steps:
       - name: Set output
         id: vars
-        run: |
-          echo ::set-output name=branch::$(echo ${GITHUB_REF#refs/heads/}|cut -d'-' -f3-4|tr -s '-' '/');
-          echo ::set-output name=tag::$(echo ${GITHUB_REF#refs/heads/}|cut -d'/' -f3-|cut -d'-' -f1-2);
+        run: echo ::set-output name=tag::$(echo ${GITHUB_REF#refs/heads/}|cut -d'/' -f3);
       - name: Check out the repo
         uses: actions/checkout@v2
         with: 
-          ref: ${{ steps.vars.ouptuts.branch }}
-      - name: Check out the repo
-        uses: actions/checkout@v2
-        with:
-          ref:  feature/build
+          ref: main
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -29,7 +25,7 @@ jobs:
       - name: Login to ECR
         uses: docker/login-action@v1 
         with:
-          registry: 452158872079.dkr.ecr.eu-west-1.amazonaws.com
+          registry: 242357350604.dkr.ecr.ap-south-1.amazonaws.com
           username: ${{ secrets.AWS_ACCESS_KEY_ID }}
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       - name: Build and push - Mailroom Image
@@ -39,5 +35,5 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: 452158872079.dkr.ecr.eu-west-1.amazonaws.com/mailroom:${{ steps.vars.outputs.tag }}
+          tags: 242357350604.dkr.ecr.ap-south-1.amazonaws.com/mailroom:${{ steps.vars.outputs.tag }}
           no-cache: true
