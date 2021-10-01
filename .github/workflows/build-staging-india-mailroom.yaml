@@ -1,15 +1,13 @@
-name: Build Production India Mailroom
+name: Build Staging India Mailroom
 on:
   push:
     tags:
-      - 'v*.*.*'
-      - '!v*.*.*-staging*'
-      - '!v*.*.*-develop*'
+      - 'v*.*.*-staging*'
 jobs:
   docker:
     runs-on: ubuntu-latest
     environment: 
-      name: production-india
+      name: staging-india
     steps:
       - name: Set output
         id: vars
