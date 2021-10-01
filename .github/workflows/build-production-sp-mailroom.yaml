@@ -29,7 +29,7 @@ jobs:
       - name: Login to ECR
         uses: docker/login-action@v1 
         with:
-          registry: 452158872079.dkr.ecr.eu-west-1.amazonaws.com
+          registry: 242357350604.dkr.ecr.sa-east-1.amazonaws.com
           username: ${{ secrets.AWS_ACCESS_KEY_ID }}
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       - name: Build and push - Mailroom Image
