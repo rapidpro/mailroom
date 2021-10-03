@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	openapi "github.com/twilio/twilio-go/rest/lookups/v1"
-	"os"
 	"strings"
 	"time"
 
@@ -156,7 +155,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 	}
 
 	if validateCarrier {
-		twilioClient = InitLookup()
+		twilioClient = InitLookup(oa)
 	}
 
 	for _, imp := range imports {
@@ -422,9 +421,9 @@ type PhoneNumberLookupOutput struct {
 	isValid     bool
 }
 
-func InitLookup() *twilio.RestClient {
-	accountSid := os.Getenv("TWILIO_ACCOUNT_SID")
-	authToken := os.Getenv("TWILIO_AUTH_TOKEN")
+func InitLookup(oa *OrgAssets) *twilio.RestClient {
+	accountSid := oa.Org().ConfigValue("ACCOUNT_SID", "")
+	authToken := oa.Org().ConfigValue("ACCOUNT_TOKEN", "")
 	client := twilio.NewRestClientWithParams(twilio.RestClientParams{
 		Username: accountSid,
 		Password: authToken,
