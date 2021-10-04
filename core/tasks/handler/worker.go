@@ -119,7 +119,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling stop event: %s", event)
 			}
-			err = handleStopEvent(ctx, rt.DB, rt.RP, evt)
+			err = handleStopEvent(ctx, rt, evt)
 
 		case NewConversationEventType, ReferralEventType, MOMissEventType, WelcomeMessageEventType:
 			evt := &models.ChannelEvent{}
@@ -202,7 +202,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		"run_id":     event.RunID,
 		"session_id": event.SessionID,
 	})
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
@@ -295,7 +295,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 
 // HandleChannelEvent is called for channel events
 func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
 	}
@@ -452,8 +452,8 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 }
 
 // handleStopEvent is called when a contact is stopped by courier
-func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *StopEvent) error {
-	tx, err := db.BeginTxx(ctx, nil)
+func handleStopEvent(ctx context.Context, rt *runtime.Runtime, event *StopEvent) error {
+	tx, err := rt.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction for stopping contact")
 	}
@@ -479,7 +479,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 
 // handleMsgEvent is called when a new message arrives from a contact
 func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) error {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
@@ -558,7 +558,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return errors.Wrapf(err, "unable to look up open tickets for contact")
 	}
 	for _, ticket := range tickets {
-		ticket.ForwardIncoming(ctx, rt.DB, oa, event.MsgUUID, event.Text, event.Attachments)
+		ticket.ForwardIncoming(ctx, rt, oa, event.MsgUUID, event.Text, event.Attachments)
 	}
 
 	// find any matching triggers
@@ -645,7 +645,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
-	err = handleAsInbox(ctx, rt.DB, rt.RP, oa, contact, msgIn, topupID, tickets)
+	err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
 	}
@@ -653,7 +653,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 }
 
 func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.TicketEvent) error {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
@@ -749,19 +749,19 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 }
 
 // handles a message as an inbox message
-func handleAsInbox(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID, tickets []*models.Ticket) error {
+func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID, tickets []*models.Ticket) error {
 	// usually last_seen_on is updated by handling the msg_received event in the engine sprint, but since this is an inbox
 	// message we manually create that event and handle it
 	msgEvent := events.NewMsgReceived(msg)
 	contact.SetLastSeenOn(msgEvent.CreatedOn())
 	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
 
-	err := models.HandleAndCommitEvents(ctx, db, rp, oa, contactEvents)
+	err := models.HandleAndCommitEvents(ctx, rt, oa, contactEvents)
 	if err != nil {
 		return errors.Wrap(err, "error handling inbox message events")
 	}
 
-	return markMsgHandled(ctx, db, contact, msg, models.MsgTypeInbox, topupID, tickets)
+	return markMsgHandled(ctx, rt.DB, contact, msg, models.MsgTypeInbox, topupID, tickets)
 }
 
 // utility to mark as message as handled and update any open contact tickets

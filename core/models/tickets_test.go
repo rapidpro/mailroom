@@ -19,9 +19,9 @@ import (
 )
 
 func TestTicketers(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// can load directly by UUID
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Zendesk.UUID)
@@ -33,7 +33,7 @@ func TestTicketers(t *testing.T) {
 	assert.Equal(t, "523562", ticketer.Config("push_token"))
 
 	// org through org assets
-	org1, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org1, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	ticketer = org1.TicketerByID(testdata.Zendesk.ID)
@@ -48,7 +48,7 @@ func TestTicketers(t *testing.T) {
 
 	ticketer.UpdateConfig(ctx, db, map[string]string{"new-key": "foo"}, map[string]bool{"push_id": true})
 
-	org1, _ = models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	org1, _ = models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers)
 	ticketer = org1.TicketerByID(testdata.Zendesk.ID)
 
 	assert.Equal(t, "foo", ticketer.Config("new-key"))       // new config value added
@@ -57,9 +57,9 @@ func TestTicketers(t *testing.T) {
 }
 
 func TestTickets(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
@@ -124,7 +124,7 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, "Where are my trousers?", tk2.Body())
 
 	// can lookup open tickets by contact
-	org1, _ := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org1, _ := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	cathy, err := models.LoadContact(ctx, db, org1, testdata.Cathy.ID)
 	require.NoError(t, err)
 
@@ -137,7 +137,7 @@ func TestTickets(t *testing.T) {
 func TestUpdateTicketConfig(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
 	modelTicket := ticket.Load(db)
@@ -158,7 +158,7 @@ func TestUpdateTicketConfig(t *testing.T) {
 func TestUpdateTicketLastActivity(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	now := time.Date(2021, 6, 22, 15, 59, 30, 123456789, time.UTC)
 
@@ -177,11 +177,11 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 }
 
 func TestTicketsAssign(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -209,11 +209,11 @@ func TestTicketsAssign(t *testing.T) {
 }
 
 func TestTicketsAddNote(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -237,11 +237,11 @@ func TestTicketsAddNote(t *testing.T) {
 }
 
 func TestTicketsChangeTopic(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.SalesTopic, "Where my shoes", "123", nil)
@@ -267,10 +267,10 @@ func TestTicketsChangeTopic(t *testing.T) {
 }
 
 func TestCloseTickets(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
+	defer testsuite.Reset(testsuite.ResetData)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	defer testsuite.ResetData(db)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
@@ -283,7 +283,7 @@ func TestCloseTickets(t *testing.T) {
 
 	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab80", "Tickets", "tickets > 0")
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -301,7 +301,7 @@ func TestCloseTickets(t *testing.T) {
 	assert.Equal(t, "Tickets", cathy.Groups().All()[1].Name())
 
 	logger := &models.HTTPLogger{}
-	evts, err := models.CloseTickets(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, false, logger)
+	evts, err := models.CloseTickets(ctx, rt, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, false, logger)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(evts))
 	assert.Equal(t, models.TicketEventTypeClosed, evts[modelTicket1].EventType())
@@ -330,7 +330,7 @@ func TestCloseTickets(t *testing.T) {
 	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
 	modelTicket3 := ticket3.Load(db)
 
-	evts, err = models.CloseTickets(ctx, db, oa, models.NilUserID, []*models.Ticket{modelTicket3}, false, false, logger)
+	evts, err = models.CloseTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{modelTicket3}, false, false, logger)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(evts))
 	assert.Equal(t, models.TicketEventTypeClosed, evts[modelTicket3].EventType())
@@ -339,9 +339,9 @@ func TestCloseTickets(t *testing.T) {
 }
 
 func TestReopenTickets(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
@@ -355,7 +355,7 @@ func TestReopenTickets(t *testing.T) {
 
 	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab80", "Two Tickets", "tickets = 2")
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -365,7 +365,7 @@ func TestReopenTickets(t *testing.T) {
 	modelTicket2 := ticket2.Load(db)
 
 	logger := &models.HTTPLogger{}
-	evts, err := models.ReopenTickets(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, logger)
+	evts, err := models.ReopenTickets(ctx, rt, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, logger)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(evts))
 	assert.Equal(t, models.TicketEventTypeReopened, evts[modelTicket1].EventType())

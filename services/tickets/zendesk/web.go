@@ -17,7 +17,6 @@ import (
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -62,7 +61,7 @@ func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request
 	}
 
 	// lookup the ticket and ticketer
-	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, rt.DB, flows.TicketUUID(request.ThreadID), typeZendesk)
+	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(request.ThreadID), typeZendesk)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -74,7 +73,7 @@ func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request
 
 	// reopen ticket if necessary
 	if ticket.Status() != models.TicketStatusOpen {
-		oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+		oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 		if err != nil {
 			return err, http.StatusBadRequest, nil
 		}
@@ -139,7 +138,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	for _, e := range request.Events {
-		if err := processChannelEvent(ctx, rt.DB, e, l); err != nil {
+		if err := processChannelEvent(ctx, rt, e, l); err != nil {
 			return err, http.StatusBadRequest, nil
 		}
 	}
@@ -147,7 +146,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	return map[string]string{"status": "OK"}, http.StatusOK, nil
 }
 
-func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, l *models.HTTPLogger) error {
+func processChannelEvent(ctx context.Context, rt *runtime.Runtime, event *channelEvent, l *models.HTTPLogger) error {
 	lr := logrus.WithField("integration_id", event.IntegrationID).WithField("subdomain", event.Subdomain)
 
 	switch event.TypeID {
@@ -169,7 +168,7 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 		}
 
 		// look up our ticketer
-		ticketer, svc, err := tickets.FromTicketerUUID(ctx, db, metadata.TicketerUUID, typeZendesk)
+		ticketer, svc, err := tickets.FromTicketerUUID(ctx, rt, metadata.TicketerUUID, typeZendesk)
 		if err != nil {
 			return err
 		}
@@ -188,7 +187,7 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 			}
 
 			// save away the target and trigger zendesk ids
-			if err := ticketer.UpdateConfig(ctx, db, newConfig, nil); err != nil {
+			if err := ticketer.UpdateConfig(ctx, rt.DB, newConfig, nil); err != nil {
 				return errors.Wrapf(err, "error updating config for ticketer %s", ticketer.UUID())
 			}
 
@@ -201,7 +200,7 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 
 			// delete config values that came from adding this account
 			remConfig := utils.StringSet([]string{configPushID, configPushToken, configTargetID, configTriggerID})
-			if err := ticketer.UpdateConfig(ctx, db, nil, remConfig); err != nil {
+			if err := ticketer.UpdateConfig(ctx, rt.DB, nil, remConfig); err != nil {
 				return errors.Wrapf(err, "error updating config for ticketer %s", ticketer.UUID())
 			}
 
@@ -222,7 +221,7 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 
 		for _, re := range data.ResourceEvents {
 			if re.TypeID == "comment_on_new_ticket" {
-				if err := processCommentOnNewTicket(ctx, db, reqID, re, l); err != nil {
+				if err := processCommentOnNewTicket(ctx, rt, reqID, re, l); err != nil {
 					return err
 				}
 			}
@@ -231,9 +230,9 @@ func processChannelEvent(ctx context.Context, db *sqlx.DB, event *channelEvent, 
 	return nil
 }
 
-func processCommentOnNewTicket(ctx context.Context, db *sqlx.DB, reqID RequestID, re resourceEvent, l *models.HTTPLogger) error {
+func processCommentOnNewTicket(ctx context.Context, rt *runtime.Runtime, reqID RequestID, re resourceEvent, l *models.HTTPLogger) error {
 	// look up our ticket and ticketer
-	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, db, flows.TicketUUID(re.ExternalID), typeZendesk)
+	ticket, ticketer, _, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(re.ExternalID), typeZendesk)
 	if err != nil {
 		return err
 	}
@@ -244,7 +243,7 @@ func processCommentOnNewTicket(ctx context.Context, db *sqlx.DB, reqID RequestID
 	}
 
 	// update our local ticket with the ID from Zendesk
-	return models.UpdateTicketExternalID(ctx, db, ticket, fmt.Sprintf("%d", re.TicketID))
+	return models.UpdateTicketExternalID(ctx, rt.DB, ticket, fmt.Sprintf("%d", re.TicketID))
 }
 
 type targetRequest struct {
@@ -257,7 +256,7 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 
 	// look up our ticketer
-	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt.DB, ticketerUUID, typeZendesk)
+	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt, ticketerUUID, typeZendesk)
 	if err != nil || ticketer == nil {
 		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
@@ -281,7 +280,7 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 		return map[string]string{"status": "ignored"}, http.StatusOK, nil
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

@@ -33,7 +33,7 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -43,7 +43,7 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	evts, err := models.CloseTickets(ctx, rt.DB, oa, request.UserID, tickets, true, request.Force, l)
+	evts, err := models.CloseTickets(ctx, rt, oa, request.UserID, tickets, true, request.Force, l)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error closing tickets")
 	}

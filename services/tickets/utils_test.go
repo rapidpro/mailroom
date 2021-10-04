@@ -22,9 +22,9 @@ import (
 )
 
 func TestGetContactDisplay(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	contact, err := models.LoadContact(ctx, db, oa, testdata.Cathy.ID)
@@ -47,9 +47,9 @@ func TestGetContactDisplay(t *testing.T) {
 }
 
 func TestFromTicketUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create some tickets
 	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
@@ -61,65 +61,58 @@ func TestFromTicketUUID(t *testing.T) {
 	models.FlushCache()
 
 	// err if no ticket with UUID
-	_, _, _, err := tickets.FromTicketUUID(ctx, db, "33c54d0c-bd49-4edf-87a9-c391a75a630c", "mailgun")
+	_, _, _, err := tickets.FromTicketUUID(ctx, rt, "33c54d0c-bd49-4edf-87a9-c391a75a630c", "mailgun")
 	assert.EqualError(t, err, "error looking up ticket 33c54d0c-bd49-4edf-87a9-c391a75a630c")
 
 	// err if no ticketer type doesn't match
-	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1.UUID, "zendesk")
+	_, _, _, err = tickets.FromTicketUUID(ctx, rt, ticket1.UUID, "zendesk")
 	assert.EqualError(t, err, "error looking up ticketer #2")
 
 	// err if ticketer isn't configured correctly and can't be loaded as a service
-	_, _, _, err = tickets.FromTicketUUID(ctx, db, ticket1.UUID, "mailgun")
+	_, _, _, err = tickets.FromTicketUUID(ctx, rt, ticket1.UUID, "mailgun")
 	assert.EqualError(t, err, "error loading ticketer service: missing domain or api_key or to_address or url_base in mailgun config")
 
 	// if all is correct, returns the ticket, ticketer asset, and ticket service
-	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, db, ticket2.UUID, "zendesk")
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, rt, ticket2.UUID, "zendesk")
 
 	assert.NoError(t, err)
 	assert.Equal(t, ticket2.UUID, ticket.UUID())
 	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
-
-	testsuite.ResetDB()
-	models.FlushCache()
 }
 
 func TestFromTicketerUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
 
 	// err if no ticketer with UUID
-	_, _, err := tickets.FromTicketerUUID(ctx, db, "33c54d0c-bd49-4edf-87a9-c391a75a630c", "mailgun")
+	_, _, err := tickets.FromTicketerUUID(ctx, rt, "33c54d0c-bd49-4edf-87a9-c391a75a630c", "mailgun")
 	assert.EqualError(t, err, "error looking up ticketer 33c54d0c-bd49-4edf-87a9-c391a75a630c")
 
 	// err if no ticketer type doesn't match
-	_, _, err = tickets.FromTicketerUUID(ctx, db, testdata.Mailgun.UUID, "zendesk")
+	_, _, err = tickets.FromTicketerUUID(ctx, rt, testdata.Mailgun.UUID, "zendesk")
 	assert.EqualError(t, err, "error looking up ticketer f9c9447f-a291-4f3c-8c79-c089bbd4e713")
 
 	// err if ticketer isn't configured correctly and can't be loaded as a service
-	_, _, err = tickets.FromTicketerUUID(ctx, db, testdata.Mailgun.UUID, "mailgun")
+	_, _, err = tickets.FromTicketerUUID(ctx, rt, testdata.Mailgun.UUID, "mailgun")
 	assert.EqualError(t, err, "error loading ticketer service: missing domain or api_key or to_address or url_base in mailgun config")
 
 	// if all is correct, returns the ticketer asset and ticket service
-	ticketer, svc, err := tickets.FromTicketerUUID(ctx, db, testdata.Zendesk.UUID, "zendesk")
+	ticketer, svc, err := tickets.FromTicketerUUID(ctx, rt, testdata.Zendesk.UUID, "zendesk")
 
 	assert.NoError(t, err)
 	assert.Equal(t, testdata.Zendesk.UUID, ticketer.UUID())
 	assert.Implements(t, (*models.TicketService)(nil), svc)
-
-	testsuite.ResetDB()
-	models.FlushCache()
 }
 
 func TestSendReply(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
-	defer testsuite.ResetStorage()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
@@ -149,7 +142,7 @@ func TestSendReply(t *testing.T) {
 func TestCloseTicket(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -185,7 +178,7 @@ func TestCloseTicket(t *testing.T) {
 	// create a close ticket trigger
 	testdata.InsertTicketClosedTrigger(db, testdata.Org1, testdata.Favorites)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	logger := &models.HTTPLogger{}

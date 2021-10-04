@@ -18,6 +18,9 @@ import (
 )
 
 func TestEngineWebhook(t *testing.T) {
+	// this is only here because this is the first test run.. should find a better way to ensure DB is in correct state for first test that needs it
+	testsuite.Reset(testsuite.ResetDB)
+
 	_, rt, _, _ := testsuite.Get()
 
 	svc, err := goflow.Engine(rt.Config).Services().Webhook(nil)
@@ -68,7 +71,7 @@ func TestSimulatorTicket(t *testing.T) {
 	svc, err := goflow.Simulator(rt.Config).Services().Ticket(nil, flows.NewTicketer(ticketer))
 	assert.NoError(t, err)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	ticket, err := svc.Open(nil, oa.SessionAssets().Topics().FindByName("General"), "Where are my cookies?", nil, nil)

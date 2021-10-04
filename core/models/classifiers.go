@@ -7,11 +7,12 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/classification/bothub"
 	"github.com/nyaruka/goflow/services/classification/luis"
 	"github.com/nyaruka/goflow/services/classification/wit"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
@@ -50,11 +51,13 @@ const (
 
 // Register a classification service factory with the engine
 func init() {
-	goflow.RegisterClassificationServiceFactory(
-		func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
-			return classifier.Asset().(*Classifier).AsService(classifier)
-		},
-	)
+	goflow.RegisterClassificationServiceFactory(classificationServiceFactory)
+}
+
+func classificationServiceFactory(c *runtime.Config) engine.ClassificationServiceFactory {
+	return func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
+		return classifier.Asset().(*Classifier).AsService(c, classifier)
+	}
 }
 
 // Classifier is our type for a classifier
@@ -90,8 +93,8 @@ func (c *Classifier) Intents() []string { return c.c.intentNames }
 func (c *Classifier) Type() string { return c.c.Type }
 
 // AsService builds the corresponding ClassificationService for the passed in Classifier
-func (c *Classifier) AsService(classifier *flows.Classifier) (flows.ClassificationService, error) {
-	httpClient, httpRetries, httpAccess := goflow.HTTP(config.Mailroom)
+func (c *Classifier) AsService(cfg *runtime.Config, classifier *flows.Classifier) (flows.ClassificationService, error) {
+	httpClient, httpRetries, httpAccess := goflow.HTTP(cfg)
 
 	switch c.Type() {
 	case ClassifierTypeWit:

@@ -16,7 +16,7 @@ import (
 )
 
 func TestContactIDsForQueryPage(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	es := testsuite.NewMockElasticServer()
 	defer es.Close()
@@ -28,7 +28,7 @@ func TestContactIDsForQueryPage(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	oa, err := models.GetOrgAssets(ctx, db, 1)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -252,7 +252,7 @@ func TestContactIDsForQueryPage(t *testing.T) {
 }
 
 func TestContactIDsForQuery(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	es := testsuite.NewMockElasticServer()
 	defer es.Close()
@@ -264,7 +264,7 @@ func TestContactIDsForQuery(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	oa, err := models.GetOrgAssets(ctx, db, 1)
+	oa, err := models.GetOrgAssets(ctx, rt, 1)
 	require.NoError(t, err)
 
 	tcs := []struct {

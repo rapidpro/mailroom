@@ -26,9 +26,9 @@ import (
 )
 
 func TestContactImports(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// start with no contacts or URNs
 	db.MustExec(`DELETE FROM contacts_contacturn`)
@@ -61,7 +61,7 @@ func TestContactImports(t *testing.T) {
 	err = jsonx.Unmarshal(testJSON, &tcs)
 	require.NoError(t, err)
 
-	oa, err := models.GetOrgAssets(ctx, db, 1)
+	oa, err := models.GetOrgAssets(ctx, rt, 1)
 	require.NoError(t, err)
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
@@ -74,7 +74,7 @@ func TestContactImports(t *testing.T) {
 		batch, err := models.LoadContactImportBatch(ctx, db, batchID)
 		require.NoError(t, err)
 
-		err = batch.Import(ctx, db, testdata.Org1.ID)
+		err = batch.Import(ctx, rt, testdata.Org1.ID)
 		require.NoError(t, err)
 
 		results := &struct {
@@ -147,9 +147,9 @@ func TestContactImports(t *testing.T) {
 }
 
 func TestLoadContactImport(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
 	batch1ID := testdata.InsertContactImportBatch(db, importID, []byte(`[
@@ -178,7 +178,7 @@ func TestLoadContactImport(t *testing.T) {
 	assert.Equal(t, 0, batch1.RecordStart)
 	assert.Equal(t, 2, batch1.RecordEnd)
 
-	err = batch1.Import(ctx, db, testdata.Org1.ID)
+	err = batch1.Import(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	imp, err = models.LoadContactImport(ctx, db, importID)

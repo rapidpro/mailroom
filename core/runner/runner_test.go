@@ -23,7 +23,7 @@ import (
 func TestCampaignStarts(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(testdata.RemindersCampaign.UUID), "Doctor Reminders")
 
@@ -100,7 +100,7 @@ func TestCampaignStarts(t *testing.T) {
 func TestBatchStart(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create a start object
 	testdata.InsertFlowStart(db, testdata.Org1, testdata.SingleMessage, nil)
@@ -169,14 +169,12 @@ func TestBatchStart(t *testing.T) {
 func TestResume(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
-	defer testsuite.ResetStorage()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// write sessions to s3 storage
 	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3"}' WHERE id = 1`)
-	defer testsuite.ResetDB()
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 
 	flow, err := oa.FlowByID(testdata.Favorites.ID)

@@ -11,13 +11,15 @@ import (
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestResponseForSprint(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
 	// for tests it is more convenient to not have formatted output
 	indentMarshal = false
 
@@ -27,8 +29,8 @@ func TestResponseForSprint(t *testing.T) {
 	resumeURL := "http://temba.io/resume?session=1"
 
 	// set our attachment domain for testing
-	config.Mailroom.AttachmentDomain = "mailroom.io"
-	defer func() { config.Mailroom.AttachmentDomain = "" }()
+	rt.Config.AttachmentDomain = "mailroom.io"
+	defer func() { rt.Config.AttachmentDomain = "" }()
 
 	tcs := []struct {
 		Events   []flows.Event
@@ -86,7 +88,7 @@ func TestResponseForSprint(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		response, err := responseForSprint(urn, resumeURL, tc.Wait, tc.Events)
+		response, err := responseForSprint(rt.Config, urn, resumeURL, tc.Wait, tc.Events)
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, xml.Header+tc.Expected, response, "%d: unexpected response", i)
 	}

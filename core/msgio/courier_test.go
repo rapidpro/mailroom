@@ -13,16 +13,16 @@ import (
 )
 
 func TestQueueCourierMessages(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create an Andoid channel
 	androidChannel := testdata.InsertChannel(db, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg|models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg|models.RefreshChannels)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -78,7 +78,7 @@ func TestQueueCourierMessages(t *testing.T) {
 		var contactID models.ContactID
 		msgs := make([]*models.Msg, len(tc.Msgs))
 		for i, ms := range tc.Msgs {
-			msgs[i] = ms.createMsg(t, db, oa)
+			msgs[i] = ms.createMsg(t, rt, oa)
 			contactID = ms.ContactID
 		}
 
@@ -95,8 +95,6 @@ func TestQueueCourierMessages(t *testing.T) {
 			ContactID: testdata.Cathy.ID,
 			URNID:     testdata.Cathy.URNID,
 		}
-		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, db, oa)})
+		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, rt, oa)})
 	})
-
-	testsuite.Reset()
 }

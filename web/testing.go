@@ -20,7 +20,7 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 
 	"github.com/stretchr/testify/assert"
@@ -28,9 +28,7 @@ import (
 )
 
 // RunWebTests runs the tests in the passed in filename, optionally updating them if the update flag is set
-func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string) {
-	rp := testsuite.RP()
-	db := testsuite.DB()
+func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFile string, substitutions map[string]string) {
 	wg := &sync.WaitGroup{}
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
@@ -38,9 +36,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 
-	defer testsuite.ResetStorage()
-
-	server := NewServer(context.Background(), config.Mailroom, db, rp, testsuite.MediaStorage(), testsuite.SessionStorage(), nil, wg)
+	server := NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -150,7 +146,7 @@ func RunWebTests(t *testing.T, truthFile string, substitutions map[string]string
 			}
 
 			for _, dba := range tc.DBAssertions {
-				testsuite.AssertQuery(t, db, dba.Query).Returns(dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
+				testsuite.AssertQuery(t, rt.DB, dba.Query).Returns(dba.Count, "%s: '%s' returned wrong count", tc.Label, dba.Query)
 			}
 
 		} else {

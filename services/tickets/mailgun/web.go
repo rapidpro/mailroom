@@ -88,7 +88,7 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 	}
 
 	// look up the ticket and ticketer
-	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, rt.DB, flows.TicketUUID(match[0][1]), typeMailgun)
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(match[0][1]), typeMailgun)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -104,7 +104,7 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 		return &receiveResponse{Action: "rejected", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

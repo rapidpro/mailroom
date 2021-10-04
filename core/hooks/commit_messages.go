@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -16,7 +16,7 @@ var CommitMessagesHook models.EventCommitHook = &commitMessagesHook{}
 type commitMessagesHook struct{}
 
 // Apply takes care of inserting all the messages in the passed in scene assigning topups to them as needed.
-func (h *commitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitMessagesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	msgs := make([]*models.Msg, 0, len(scenes))
 	for _, s := range scenes {
 		for _, m := range s {
@@ -25,7 +25,7 @@ func (h *commitMessagesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.P
 	}
 
 	// allocate a topup for this message if org uses topups
-	topup, err := models.AllocateTopups(ctx, tx, rp, oa.Org(), len(msgs))
+	topup, err := models.AllocateTopups(ctx, tx, rt.RP, oa.Org(), len(msgs))
 	if err != nil {
 		return errors.Wrapf(err, "error allocating topup for outgoing message")
 	}

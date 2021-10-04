@@ -20,7 +20,7 @@ import (
 	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
@@ -217,7 +217,7 @@ func (m *Msg) MarshalJSON() ([]byte, error) {
 }
 
 // NewIncomingIVR creates a new incoming IVR message for the passed in text and attachment
-func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, createdOn time.Time) *Msg {
+func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -244,14 +244,14 @@ func NewIncomingIVR(orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, creat
 
 	// add any attachments
 	for _, a := range in.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(cfg, a)))
 	}
 
 	return msg
 }
 
 // NewOutgoingIVR creates a new IVR message for the passed in text with the optional attachment
-func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) *Msg {
+func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -281,14 +281,14 @@ func NewOutgoingIVR(orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, cre
 
 	// if we have attachments, add them
 	for _, a := range out.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(cfg, a)))
 	}
 
 	return msg
 }
 
 // NewOutgoingMsg creates an outgoing message for the passed in flow message.
-func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+func NewOutgoingMsg(cfg *runtime.Config, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -326,7 +326,7 @@ func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
 		for _, a := range out.Attachments() {
-			m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
+			m.Attachments = append(m.Attachments, string(NormalizeAttachment(cfg, a)))
 		}
 	}
 
@@ -356,7 +356,7 @@ func NewOutgoingMsg(org *Org, channel *Channel, contactID ContactID, out *flows.
 }
 
 // NewIncomingMsg creates a new incoming message for the passed in text and attachment
-func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
+func NewIncomingMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -381,7 +381,7 @@ func NewIncomingMsg(orgID OrgID, channel *Channel, contactID ContactID, in *flow
 
 	// add any attachments
 	for _, a := range in.Attachments() {
-		m.Attachments = append(m.Attachments, string(NormalizeAttachment(config.Mailroom, a)))
+		m.Attachments = append(m.Attachments, string(NormalizeAttachment(cfg, a)))
 	}
 
 	return msg
@@ -443,7 +443,7 @@ func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, direction MsgDir
 
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
-func NormalizeAttachment(cfg *config.Config, attachment utils.Attachment) utils.Attachment {
+func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils.Attachment {
 	// don't try to modify geo type attachments which are just coordinates
 	if attachment.ContentType() == "geo" {
 		return attachment
@@ -810,7 +810,7 @@ func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
 func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
 	broadcastURNs := bcast.URNs()
 
@@ -835,7 +835,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 	}
 
 	// load all our contacts
-	contacts, err := LoadContacts(ctx, db, oa, contactIDs)
+	contacts, err := LoadContacts(ctx, rt.DB, oa, contactIDs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
 	}
@@ -956,7 +956,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingMsg(oa.Org(), channel, c.ID(), out, time.Now())
+		msg, err := NewOutgoingMsg(rt.Config, oa.Org(), channel, c.ID(), out, time.Now())
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -992,7 +992,7 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 	}
 
 	// allocate a topup for these message if org uses topups
-	topup, err := AllocateTopups(ctx, db, rp, oa.Org(), len(msgs))
+	topup, err := AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), len(msgs))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
 	}
@@ -1005,14 +1005,14 @@ func CreateBroadcastMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa
 	}
 
 	// insert them in a single request
-	err = InsertMessages(ctx, db, msgs)
+	err = InsertMessages(ctx, rt.DB, msgs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting broadcast messages")
 	}
 
 	// if the broadcast was a ticket reply, update the ticket
 	if bcast.TicketID() != NilTicketID {
-		err = updateTicketLastActivity(ctx, db, []TicketID{bcast.TicketID()}, dates.Now())
+		err = updateTicketLastActivity(ctx, rt.DB, []TicketID{bcast.TicketID()}, dates.Now())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error updating broadcast ticket")
 		}

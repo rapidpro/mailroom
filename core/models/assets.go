@@ -7,13 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/runtime"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 )
@@ -21,7 +20,7 @@ import (
 // OrgAssets is our top level cache of all things contained in an org. It is used to build
 // SessionAssets for the engine but also used to cache campaigns and other org level attributes
 type OrgAssets struct {
-	db      *sqlx.DB
+	rt      *runtime.Runtime
 	builtAt time.Time
 
 	orgID OrgID
@@ -96,14 +95,14 @@ type assetLoader struct {
 
 // loadOrgAssetsOnce is a thread safe method to create new org assets from the DB in a thread safe manner
 // that ensures only one goroutine is fetching the org at once. (others will block on the first completing)
-func loadOrgAssetsOnce(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
+func loadOrgAssetsOnce(ctx context.Context, rt *runtime.Runtime, orgID OrgID) (*OrgAssets, error) {
 	loader := assetLoader{done: make(chan struct{})}
 	actual, inFlight := assetLoaders.LoadOrStore(orgID, &loader)
 	actualLoader := actual.(*assetLoader)
 	if inFlight {
 		<-actualLoader.done
 	} else {
-		actualLoader.assets, actualLoader.err = NewOrgAssets(ctx, db, orgID, nil, RefreshAll)
+		actualLoader.assets, actualLoader.err = NewOrgAssets(ctx, rt, orgID, nil, RefreshAll)
 		close(actualLoader.done)
 		assetLoaders.Delete(orgID)
 	}
@@ -117,10 +116,13 @@ func FlushCache() {
 
 // NewOrgAssets creates and returns a new org assets objects, potentially using the previous
 // org assets passed in to prevent refetching locations
-func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets, refresh Refresh) (*OrgAssets, error) {
+func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *OrgAssets, refresh Refresh) (*OrgAssets, error) {
+	// assets are immutable in mailroom so safe to load from readonly database connection
+	db := rt.ReadonlyDB
+
 	// build our new assets
 	oa := &OrgAssets{
-		db:      db,
+		rt:      rt,
 		builtAt: time.Now(),
 		orgID:   orgID,
 	}
@@ -134,7 +136,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	var err error
 
 	if prev == nil || refresh&RefreshOrg > 0 {
-		oa.org, err = LoadOrg(ctx, config.Mailroom, db, orgID)
+		oa.org, err = LoadOrg(ctx, rt.Config, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading environment for org %d", orgID)
 		}
@@ -359,7 +361,7 @@ func NewOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID, prev *OrgAssets
 	}
 
 	// intialize our session assets
-	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(config.Mailroom))
+	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(rt.Config))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", orgID)
 	}
@@ -393,16 +395,12 @@ const (
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
-func GetOrgAssets(ctx context.Context, db *sqlx.DB, orgID OrgID) (*OrgAssets, error) {
-	return GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshNone)
+func GetOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID) (*OrgAssets, error) {
+	return GetOrgAssetsWithRefresh(ctx, rt, orgID, RefreshNone)
 }
 
 // GetOrgAssetsWithRefresh creates or gets org assets for the passed in org refreshing the passed in assets
-func GetOrgAssetsWithRefresh(ctx context.Context, db *sqlx.DB, orgID OrgID, refresh Refresh) (*OrgAssets, error) {
-	if db == nil {
-		return nil, errors.Errorf("nil db, cannot load org")
-	}
-
+func GetOrgAssetsWithRefresh(ctx context.Context, rt *runtime.Runtime, orgID OrgID, refresh Refresh) (*OrgAssets, error) {
 	// do we have a recent cache?
 	key := fmt.Sprintf("%d", orgID)
 	var cached *OrgAssets
@@ -418,7 +416,7 @@ func GetOrgAssetsWithRefresh(ctx context.Context, db *sqlx.DB, orgID OrgID, refr
 
 	// if it wasn't found at all, reload it
 	if !found {
-		o, err := loadOrgAssetsOnce(ctx, db, orgID)
+		o, err := loadOrgAssetsOnce(ctx, rt, orgID)
 		if err != nil {
 			return nil, err
 		}
@@ -429,7 +427,7 @@ func GetOrgAssetsWithRefresh(ctx context.Context, db *sqlx.DB, orgID OrgID, refr
 	}
 
 	// otherwise we need to refresh only some parts, go do that
-	o, err := NewOrgAssets(ctx, db, orgID, cached, refresh)
+	o, err := NewOrgAssets(ctx, rt, orgID, cached, refresh)
 	if err != nil {
 		return nil, err
 	}
@@ -481,9 +479,9 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 }
 
 // CloneForSimulation clones our org assets for simulation
-func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
+func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
-	clone, err := NewOrgAssets(context.Background(), a.db, a.OrgID(), a, RefreshFlows)
+	clone, err := NewOrgAssets(context.Background(), a.rt, a.OrgID(), a, RefreshFlows)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +504,7 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, db *sqlx.DB, newDefs
 	clone.channels = append(clone.channels, testChannels...)
 
 	// rebuild our session assets with our new items
-	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig(config.Mailroom))
+	clone.sessionAssets, err = engine.NewSessionAssets(a.Env(), clone, goflow.MigrationConfig(rt.Config))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error build session assets for org: %d", clone.OrgID())
 	}
@@ -527,7 +525,7 @@ func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
 		return flow, nil
 	}
 
-	dbFlow, err := LoadFlowByUUID(ctx, a.db, a.orgID, flowUUID)
+	dbFlow, err := LoadFlowByUUID(ctx, a.rt.DB, a.orgID, flowUUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %s", flowUUID)
 	}
@@ -557,7 +555,7 @@ func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
 		return flow.(*Flow), nil
 	}
 
-	dbFlow, err := LoadFlowByID(ctx, a.db, a.orgID, flowID)
+	dbFlow, err := LoadFlowByID(ctx, a.rt.DB, a.orgID, flowID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading flow: %d", flowID)
 	}

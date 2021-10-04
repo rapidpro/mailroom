@@ -15,11 +15,11 @@ import (
 )
 
 func TestCloneForSimulation(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	models.FlushCache()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	newFavoritesDef := `{
@@ -37,7 +37,7 @@ func TestCloneForSimulation(t *testing.T) {
 		static.NewChannel("fd130d20-65f8-43fc-a3c5-a3fa4d1e4193", "Test Channel 2", "2345678901", []string{"tel"}, nil, nil),
 	}
 
-	clone, err := oa.CloneForSimulation(ctx, db, newDefs, testChannels)
+	clone, err := oa.CloneForSimulation(ctx, rt, newDefs, testChannels)
 	require.NoError(t, err)
 
 	// should get new definition
@@ -65,6 +65,6 @@ func TestCloneForSimulation(t *testing.T) {
 	assert.Nil(t, testChannel1)
 
 	// can't override definition for a non-existent flow
-	_, err = oa.CloneForSimulation(ctx, db, map[assets.FlowUUID]json.RawMessage{"a121f1af-7dfa-47af-9d22-9726372e2daa": []byte(newFavoritesDef)}, nil)
+	_, err = oa.CloneForSimulation(ctx, rt, map[assets.FlowUUID]json.RawMessage{"a121f1af-7dfa-47af-9d22-9726372e2daa": []byte(newFavoritesDef)}, nil)
 	assert.EqualError(t, err, "unable to find flow with UUID 'a121f1af-7dfa-47af-9d22-9726372e2daa': not found")
 }

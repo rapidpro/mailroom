@@ -50,7 +50,7 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// grab our org
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -66,7 +66,7 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
-	_, err = models.ApplyModifiers(ctx, rt.DB, rt.RP, oa, modifiersByContact)
+	_, err = models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
 	}
@@ -126,7 +126,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -154,7 +154,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		modifiersByContact[flowContact] = mods
 	}
 
-	eventsByContact, err := models.ApplyModifiers(ctx, rt.DB, rt.RP, oa, modifiersByContact)
+	eventsByContact, err := models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -193,7 +193,7 @@ func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 	}
 
 	// grab our org
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}

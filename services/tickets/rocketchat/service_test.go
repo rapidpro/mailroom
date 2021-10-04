@@ -70,7 +70,7 @@ func TestOpenAndForward(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 

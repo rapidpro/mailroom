@@ -13,7 +13,7 @@ import (
 )
 
 func TestChannelLogs(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer db.MustExec(`DELETE FROM channels_channellog`)
 
@@ -24,7 +24,7 @@ func TestChannelLogs(t *testing.T) {
 		"http://rapidpro.io/new": {httpx.NewMockResponse(200, nil, "OK")},
 	}))
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	channel := oa.ChannelByID(testdata.TwilioChannel.ID)

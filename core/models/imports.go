@@ -15,10 +15,9 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
-
-	"github.com/jmoiron/sqlx"
 )
 
 // ContactImportID is the type for contact import IDs
@@ -120,10 +119,10 @@ type ContactImportBatch struct {
 }
 
 // Import does the actual import of this batch
-func (b *ContactImportBatch) Import(ctx context.Context, db *sqlx.DB, orgID OrgID) error {
+func (b *ContactImportBatch) Import(ctx context.Context, rt *runtime.Runtime, orgID OrgID) error {
 	// if any error occurs this batch should be marked as failed
-	if err := b.tryImport(ctx, db, orgID); err != nil {
-		b.markFailed(ctx, db)
+	if err := b.tryImport(ctx, rt, orgID); err != nil {
+		b.markFailed(ctx, rt.DB)
 		return err
 	}
 	return nil
@@ -140,13 +139,13 @@ type importContact struct {
 	errors      []string
 }
 
-func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID OrgID) error {
-	if err := b.markProcessing(ctx, db); err != nil {
+func (b *ContactImportBatch) tryImport(ctx context.Context, rt *runtime.Runtime, orgID OrgID) error {
+	if err := b.markProcessing(ctx, rt.DB); err != nil {
 		return errors.Wrap(err, "error marking as processing")
 	}
 
 	// grab our org assets
-	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshFields|RefreshGroups)
+	oa, err := GetOrgAssetsWithRefresh(ctx, rt, orgID, RefreshFields|RefreshGroups)
 	if err != nil {
 		return errors.Wrap(err, "error loading org assets")
 	}
@@ -163,7 +162,7 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID O
 		imports[i] = &importContact{record: b.RecordStart + i, spec: specs[i]}
 	}
 
-	if err := b.getOrCreateContacts(ctx, db, oa, imports); err != nil {
+	if err := b.getOrCreateContacts(ctx, rt.DB, oa, imports); err != nil {
 		return errors.Wrap(err, "error getting and creating contacts")
 	}
 
@@ -177,12 +176,12 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID O
 	}
 
 	// and apply in bulk
-	_, err = ApplyModifiers(ctx, db, nil, oa, modifiersByContact)
+	_, err = ApplyModifiers(ctx, rt, oa, modifiersByContact)
 	if err != nil {
 		return errors.Wrap(err, "error applying modifiers")
 	}
 
-	if err := b.markComplete(ctx, db, imports); err != nil {
+	if err := b.markComplete(ctx, rt.DB, imports); err != nil {
 		return errors.Wrap(err, "unable to mark as complete")
 	}
 

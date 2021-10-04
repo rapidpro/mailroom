@@ -11,7 +11,7 @@ import (
 )
 
 func TestBulkSQL(t *testing.T) {
-	db := testsuite.DB()
+	_, _, db, _ := testsuite.Get()
 
 	type contact struct {
 		ID   int    `db:"id"`
@@ -43,7 +43,7 @@ func TestBulkSQL(t *testing.T) {
 func TestBulkQuery(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	db.MustExec(`CREATE TABLE foo (id serial NOT NULL PRIMARY KEY, name VARCHAR(3), age INT)`)
 

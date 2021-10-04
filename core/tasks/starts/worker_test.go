@@ -23,7 +23,7 @@ func TestStarts(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	mes := testsuite.NewMockElasticServer()
 	defer mes.Close()

@@ -36,7 +36,7 @@ func (t *ImportContactBatchTask) Perform(ctx context.Context, rt *runtime.Runtim
 		return errors.Wrapf(err, "unable to load contact import batch with id %d", t.ContactImportBatchID)
 	}
 
-	batchErr := batch.Import(ctx, rt.DB, orgID)
+	batchErr := batch.Import(ctx, rt, orgID)
 
 	// decrement the redis key that holds remaining batches to see if the overall import is now finished
 	rc := rt.RP.Get()

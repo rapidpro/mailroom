@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -32,11 +29,11 @@ func handleFlowStartTask(ctx context.Context, rt *runtime.Runtime, task *queue.T
 		return errors.Wrapf(err, "error unmarshalling flow start batch: %s", string(task.Task))
 	}
 
-	return HandleFlowStartBatch(ctx, rt.Config, rt.DB, rt.RP, batch)
+	return HandleFlowStartBatch(ctx, rt, batch)
 }
 
 // HandleFlowStartBatch starts a batch of contacts in an IVR flow
-func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, batch *models.FlowStartBatch) error {
+func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) error {
 	ctx, cancel := context.WithTimeout(bg, time.Minute*5)
 	defer cancel()
 
@@ -46,7 +43,7 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 	// filter out anybody who has has a flow run in this flow if appropriate
 	if !batch.RestartParticipants() {
 		// find all participants that have been in this flow
-		started, err := models.FindFlowStartedOverlap(ctx, db, batch.FlowID(), batch.ContactIDs())
+		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, batch.FlowID(), batch.ContactIDs())
 		if err != nil {
 			return errors.Wrapf(err, "error finding others started flow: %d", batch.FlowID())
 		}
@@ -58,7 +55,7 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 	// filter out our list of contacts to only include those that should be started
 	if !batch.IncludeActive() {
 		// find all participants active in other sessions
-		active, err := models.FindActiveSessionOverlap(ctx, db, models.FlowTypeVoice, batch.ContactIDs())
+		active, err := models.FindActiveSessionOverlap(ctx, rt.DB, models.FlowTypeVoice, batch.ContactIDs())
 		if err != nil {
 			return errors.Wrapf(err, "error finding other active sessions: %d", batch.FlowID())
 		}
@@ -76,13 +73,13 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 	}
 
 	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, db, batch.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, batch.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org assets for org: %d", batch.OrgID())
 	}
 
 	// ok, we can initiate calls for the remaining contacts
-	contacts, err := models.LoadContacts(ctx, db, oa, contactIDs)
+	contacts, err := models.LoadContacts(ctx, rt.DB, oa, contactIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error loading contacts")
 	}
@@ -92,7 +89,7 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 		start := time.Now()
 
 		ctx, cancel := context.WithTimeout(bg, time.Minute)
-		session, err := ivr.RequestCallStart(ctx, config, db, oa, batch, contact)
+		session, err := ivr.RequestCallStart(ctx, rt, oa, batch, contact)
 		cancel()
 		if err != nil {
 			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID())
@@ -117,7 +114,7 @@ func HandleFlowStartBatch(bg context.Context, config *config.Config, db *sqlx.DB
 
 	// if this is a last batch, mark our start as started
 	if batch.IsLast() {
-		err := models.MarkStartComplete(bg, db, batch.StartID())
+		err := models.MarkStartComplete(bg, rt.DB, batch.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "error trying to set batch as complete")
 		}

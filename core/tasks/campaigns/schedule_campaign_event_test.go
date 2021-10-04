@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/campaigns"
@@ -17,7 +18,7 @@ import (
 func TestScheduleCampaignEvent(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add bob, george and alexandria to doctors group which campaign is based on
 	testdata.DoctorsGroup.Add(db, testdata.Bob, testdata.George, testdata.Alexandria)
@@ -41,7 +42,7 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	// cathy has no value for joined and alexandia has a value too far in past, but bob and george will have values...
-	assertContactFires(t, testdata.RemindersEvent1.ID, map[models.ContactID]time.Time{
+	assertContactFires(t, db, testdata.RemindersEvent1.ID, map[models.ContactID]time.Time{
 		testdata.Bob.ID:    time.Date(2030, 1, 5, 20, 0, 0, 0, time.UTC),  // 12:00 in PST
 		testdata.George.ID: time.Date(2030, 8, 23, 19, 0, 0, 0, time.UTC), // 12:00 in PST with DST
 	})
@@ -51,13 +52,13 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	assertContactFires(t, testdata.RemindersEvent2.ID, map[models.ContactID]time.Time{
+	assertContactFires(t, db, testdata.RemindersEvent2.ID, map[models.ContactID]time.Time{
 		testdata.Bob.ID:    time.Date(2030, 1, 1, 0, 10, 0, 0, time.UTC),
 		testdata.George.ID: time.Date(2030, 8, 18, 11, 42, 0, 0, time.UTC),
 	})
 
 	// fires for first event unaffected
-	assertContactFires(t, testdata.RemindersEvent1.ID, map[models.ContactID]time.Time{
+	assertContactFires(t, db, testdata.RemindersEvent1.ID, map[models.ContactID]time.Time{
 		testdata.Bob.ID:    time.Date(2030, 1, 5, 20, 0, 0, 0, time.UTC),
 		testdata.George.ID: time.Date(2030, 8, 23, 19, 0, 0, 0, time.UTC),
 	})
@@ -69,19 +70,19 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	db.MustExec(`UPDATE contacts_contact SET created_on = '2035-01-01T00:00:00Z' WHERE id = $1 OR id = $2`, testdata.Cathy.ID, testdata.Alexandria.ID)
 
 	// create new campaign event based on created_on + 5 minutes
-	event3 := insertCampaignEvent(t, testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.CreatedOnField.ID, 5, "M")
+	event3 := insertCampaignEvent(t, db, testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.CreatedOnField.ID, 5, "M")
 
 	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event3}
 	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	// only cathy is in the group and new enough to have a fire
-	assertContactFires(t, event3, map[models.ContactID]time.Time{
+	assertContactFires(t, db, event3, map[models.ContactID]time.Time{
 		testdata.Cathy.ID: time.Date(2035, 1, 1, 0, 5, 0, 0, time.UTC),
 	})
 
 	// create new campaign event based on last_seen_on + 1 day
-	event4 := insertCampaignEvent(t, testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.LastSeenOnField.ID, 1, "D")
+	event4 := insertCampaignEvent(t, db, testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.LastSeenOnField.ID, 1, "D")
 
 	// bump last_seen_on for bob
 	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, testdata.Bob.ID)
@@ -90,14 +91,14 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	assertContactFires(t, event4, map[models.ContactID]time.Time{
+	assertContactFires(t, db, event4, map[models.ContactID]time.Time{
 		testdata.Bob.ID: time.Date(2040, 1, 2, 0, 0, 0, 0, time.UTC),
 	})
 }
 
-func insertCampaignEvent(t *testing.T, campaignID models.CampaignID, flowID models.FlowID, relativeToID models.FieldID, offset int, unit string) models.CampaignEventID {
+func insertCampaignEvent(t *testing.T, db *sqlx.DB, campaignID models.CampaignID, flowID models.FlowID, relativeToID models.FieldID, offset int, unit string) models.CampaignEventID {
 	var eventID models.CampaignEventID
-	err := testsuite.DB().Get(&eventID, `
+	err := db.Get(&eventID, `
 	INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 	VALUES(TRUE, NOW(), NOW(), $1, $5, $6, 'F', -1, $2, 1, 1, $3, $4, 'I') RETURNING id`, uuids.New(), campaignID, flowID, relativeToID, offset, unit)
 	require.NoError(t, err)
@@ -105,14 +106,14 @@ func insertCampaignEvent(t *testing.T, campaignID models.CampaignID, flowID mode
 	return eventID
 }
 
-func assertContactFires(t *testing.T, eventID models.CampaignEventID, expected map[models.ContactID]time.Time) {
+func assertContactFires(t *testing.T, db *sqlx.DB, eventID models.CampaignEventID, expected map[models.ContactID]time.Time) {
 	type idAndTime struct {
 		ContactID models.ContactID `db:"contact_id"`
 		Scheduled time.Time        `db:"scheduled"`
 	}
 
 	actualAsSlice := make([]idAndTime, 0)
-	err := testsuite.DB().Select(&actualAsSlice, `SELECT contact_id, scheduled FROM campaigns_eventfire WHERE event_id = $1`, eventID)
+	err := db.Select(&actualAsSlice, `SELECT contact_id, scheduled FROM campaigns_eventfire WHERE event_id = $1`, eventID)
 	require.NoError(t, err)
 
 	actual := make(map[models.ContactID]time.Time)

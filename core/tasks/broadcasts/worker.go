@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
@@ -41,29 +39,29 @@ func handleSendBroadcast(ctx context.Context, rt *runtime.Runtime, task *queue.T
 		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
 	}
 
-	return CreateBroadcastBatches(ctx, rt.DB, rt.RP, broadcast)
+	return CreateBroadcastBatches(ctx, rt, broadcast)
 }
 
 // CreateBroadcastBatches takes our master broadcast and creates batches of broadcast sends for all the unique contacts
-func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.Broadcast) error {
+func CreateBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *models.Broadcast) error {
 	// we are building a set of contact ids, start with the explicit ones
 	contactIDs := make(map[models.ContactID]bool)
 	for _, id := range bcast.ContactIDs() {
 		contactIDs[id] = true
 	}
 
-	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, db, bcast.GroupIDs())
+	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, bcast.GroupIDs())
 	for _, id := range groupContactIDs {
 		contactIDs[id] = true
 	}
 
-	oa, err := models.GetOrgAssets(ctx, db, bcast.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
 	// get the contact ids for our URNs
-	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, db, oa, bcast.URNs())
+	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, bcast.URNs())
 	if err != nil {
 		return errors.Wrapf(err, "error getting contact ids for urns")
 	}
@@ -87,7 +85,7 @@ func CreateBroadcastBatches(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bc
 		urnContacts[id] = u
 	}
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	contacts := make([]models.ContactID, 0, 100)
@@ -146,32 +144,32 @@ func handleSendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, task *qu
 	}
 
 	// try to send the batch
-	return SendBroadcastBatch(ctx, rt.DB, rt.RP, broadcast)
+	return SendBroadcastBatch(ctx, rt, broadcast)
 }
 
 // SendBroadcastBatch sends the passed in broadcast batch
-func SendBroadcastBatch(ctx context.Context, db *sqlx.DB, rp *redis.Pool, bcast *models.BroadcastBatch) error {
+func SendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, bcast *models.BroadcastBatch) error {
 	// always set our broadcast as sent if it is our last
 	defer func() {
 		if bcast.IsLast() {
-			err := models.MarkBroadcastSent(ctx, db, bcast.BroadcastID())
+			err := models.MarkBroadcastSent(ctx, rt.DB, bcast.BroadcastID())
 			if err != nil {
 				logrus.WithError(err).Error("error marking broadcast as sent")
 			}
 		}
 	}()
 
-	oa, err := models.GetOrgAssets(ctx, db, bcast.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
 	// create this batch of messages
-	msgs, err := models.CreateBroadcastMessages(ctx, db, rp, oa, bcast)
+	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, bcast)
 	if err != nil {
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}
 
-	msgio.SendMessages(ctx, db, rp, nil, msgs)
+	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
 	return nil
 }
