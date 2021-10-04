@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
@@ -590,8 +591,8 @@ func AddCampaignEventsForGroupAddition(ctx context.Context, tx Queryer, org *Org
 }
 
 // ScheduleCampaignEvent calculates event fires for a new campaign event
-func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, eventID CampaignEventID) error {
-	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshCampaigns)
+func ScheduleCampaignEvent(ctx context.Context, rt *runtime.Runtime, orgID OrgID, eventID CampaignEventID) error {
+	oa, err := GetOrgAssetsWithRefresh(ctx, rt, orgID, RefreshCampaigns)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load org: %d", orgID)
 	}
@@ -606,7 +607,7 @@ func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, eventI
 		return errors.Errorf("can't find field with key %s", event.RelativeToKey())
 	}
 
-	eligible, err := campaignEventEligibleContacts(ctx, db, event.campaign.GroupID(), field)
+	eligible, err := campaignEventEligibleContacts(ctx, rt.DB, event.campaign.GroupID(), field)
 	if err != nil {
 		return errors.Wrapf(err, "unable to calculate eligible contacts for event %d", eventID)
 	}
@@ -631,7 +632,7 @@ func ScheduleCampaignEvent(ctx context.Context, db *sqlx.DB, orgID OrgID, eventI
 	}
 
 	// add all our new event fires
-	return AddEventFires(ctx, db, fas)
+	return AddEventFires(ctx, rt.DB, fas)
 }
 
 type eligibleContact struct {

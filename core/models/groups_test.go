@@ -55,30 +55,30 @@ func TestLoadGroups(t *testing.T) {
 }
 
 func TestDynamicGroups(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// insert an event on our campaign
 	var eventID models.CampaignEventID
-	testsuite.DB().Get(&eventID,
+	db.Get(&eventID,
 		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
 											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
 									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I') RETURNING id`,
 		uuids.New(), testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.JoinedField.ID)
 
 	// clear Cathy's value
-	testsuite.DB().MustExec(
+	db.MustExec(
 		`update contacts_contact set fields = fields - $2
 		WHERE id = $1`, testdata.Cathy.ID, testdata.JoinedField.UUID)
 
 	// and populate Bob's
-	testsuite.DB().MustExec(
+	db.MustExec(
 		fmt.Sprintf(`update contacts_contact set fields = fields ||
 		'{"%s": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
 		WHERE id = $1`, testdata.JoinedField.UUID), testdata.Bob.ID)
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
 	assert.NoError(t, err)
 
 	esServer := testsuite.NewMockElasticServer()

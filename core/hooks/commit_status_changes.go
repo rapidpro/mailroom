@@ -5,8 +5,8 @@ import (
 
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -17,7 +17,7 @@ var CommitStatusChangesHook models.EventCommitHook = &commitStatusChangesHook{}
 type commitStatusChangesHook struct{}
 
 // Apply commits our contact status change
-func (h *commitStatusChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitStatusChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 
 	statusChanges := make([]*models.ContactStatusChange, 0, len(scenes))
 	for scene, es := range scenes {

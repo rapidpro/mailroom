@@ -14,7 +14,7 @@ import (
 func TestTicketEvents(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.ResetData(db)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", nil)
 	modelTicket := ticket.Load(db)

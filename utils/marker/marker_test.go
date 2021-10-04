@@ -10,6 +10,13 @@ import (
 )
 
 func TestMarker(t *testing.T) {
+	_, _, _, rp := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetRedis)
+
+	rc := rp.Get()
+	defer rc.Close()
+
 	tcs := []struct {
 		Group  string
 		TaskID string
@@ -26,9 +33,6 @@ func TestMarker(t *testing.T) {
 		{"1", "1", "remove"},
 		{"1", "1", "absent"},
 	}
-
-	testsuite.ResetRP()
-	rc := testsuite.RC()
 
 	for i, tc := range tcs {
 		if tc.Action == "absent" {

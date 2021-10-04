@@ -11,7 +11,9 @@ import (
 )
 
 func TestContactNameChanged(t *testing.T) {
-	defer testsuite.Reset()
+	ctx, rt, _, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	tcs := []handlers.TestCase{
 		{
@@ -59,5 +61,5 @@ func TestContactNameChanged(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }

@@ -15,8 +15,6 @@ import (
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/utils/marker"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -37,7 +35,7 @@ func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) 
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return fireCampaignEvents(ctx, rt.DB, rt.RP, lockName, lockValue)
+			return fireCampaignEvents(ctx, rt, lockName, lockValue)
 		},
 	)
 
@@ -45,7 +43,7 @@ func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) 
 }
 
 // fireCampaignEvents looks for all expired campaign event fires and queues them to be started
-func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "campaign_events").WithField("lock", lockValue)
 	start := time.Now()
 
@@ -53,13 +51,13 @@ func fireCampaignEvents(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockNa
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	rows, err := db.QueryxContext(ctx, expiredEventsQuery)
+	rows, err := rt.DB.QueryxContext(ctx, expiredEventsQuery)
 	if err != nil {
 		return errors.Wrapf(err, "error loading expired campaign events")
 	}
 	defer rows.Close()
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	queued := 0

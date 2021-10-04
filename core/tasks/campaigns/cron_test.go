@@ -20,7 +20,7 @@ func TestCampaigns(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
@@ -28,7 +28,7 @@ func TestCampaigns(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our campaign to be started
-	err := fireCampaignEvents(ctx, db, rp, campaignsLock, "lock")
+	err := fireCampaignEvents(ctx, rt, campaignsLock, "lock")
 	assert.NoError(t, err)
 
 	// then actually work on the event
@@ -53,7 +53,7 @@ func TestIVRCampaigns(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
@@ -62,7 +62,7 @@ func TestIVRCampaigns(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our campaign to be started
-	err := fireCampaignEvents(ctx, rt.DB, rt.RP, campaignsLock, "lock")
+	err := fireCampaignEvents(ctx, rt, campaignsLock, "lock")
 	assert.NoError(t, err)
 
 	// then actually work on the event

@@ -8,8 +8,8 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,7 +20,7 @@ func init() {
 }
 
 // handleServiceCalled is called for each service called event
-func handleServiceCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleServiceCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ServiceCalledEvent)
 	var classifier *models.Classifier
 	var ticketer *models.Ticketer

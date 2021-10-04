@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -55,11 +54,6 @@ type SQLAssertion struct {
 
 func NewActionUUID() flows.ActionUUID {
 	return flows.ActionUUID(uuids.New())
-}
-
-func TestMain(m *testing.M) {
-	testsuite.Reset()
-	os.Exit(m.Run())
 }
 
 // createTestFlow creates a flow that starts with a split by contact id
@@ -158,12 +152,10 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 	return flow
 }
 
-func RunTestCases(t *testing.T, tcs []TestCase) {
-	ctx, rt, db, _ := testsuite.Get()
-
+func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []TestCase) {
 	models.FlushCache()
 
-	oa, err := models.GetOrgAssets(ctx, db, models.OrgID(1))
+	oa, err := models.GetOrgAssets(ctx, rt, models.OrgID(1))
 	assert.NoError(t, err)
 
 	// reuse id from one of our real flows
@@ -180,7 +172,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		flowDef, err := json.Marshal(testFlow)
 		require.NoError(t, err)
 
-		oa, err = oa.CloneForSimulation(ctx, db, map[assets.FlowUUID]json.RawMessage{flowUUID: flowDef}, nil)
+		oa, err = oa.CloneForSimulation(ctx, rt, map[assets.FlowUUID]json.RawMessage{flowUUID: flowDef}, nil)
 		assert.NoError(t, err)
 
 		flow, err := oa.Flow(flowUUID)
@@ -214,7 +206,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 		// create scenes for our contacts
 		scenes := make([]*models.Scene, 0, len(tc.Modifiers))
 		for contact, mods := range tc.Modifiers {
-			contacts, err := models.LoadContacts(ctx, db, oa, []models.ContactID{contact.ID})
+			contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{contact.ID})
 			assert.NoError(t, err)
 
 			contact := contacts[0]
@@ -238,24 +230,24 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 
 		}
 
-		tx, err := db.BeginTxx(ctx, nil)
+		tx, err := rt.DB.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
 		for _, scene := range scenes {
-			err := models.HandleEvents(ctx, tx, rt.RP, oa, scene, results[scene.ContactID()].Events)
+			err := models.HandleEvents(ctx, rt, tx, oa, scene, results[scene.ContactID()].Events)
 			assert.NoError(t, err)
 		}
 
-		err = models.ApplyEventPreCommitHooks(ctx, tx, rt.RP, oa, scenes)
+		err = models.ApplyEventPreCommitHooks(ctx, rt, tx, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
 		assert.NoError(t, err)
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = rt.DB.BeginTxx(ctx, nil)
 		assert.NoError(t, err)
 
-		err = models.ApplyEventPostCommitHooks(ctx, tx, rt.RP, oa, scenes)
+		err = models.ApplyEventPostCommitHooks(ctx, rt, tx, oa, scenes)
 		assert.NoError(t, err)
 
 		err = tx.Commit()
@@ -265,7 +257,7 @@ func RunTestCases(t *testing.T, tcs []TestCase) {
 
 		// now check our assertions
 		for j, a := range tc.SQLAssertions {
-			testsuite.AssertQuery(t, db, a.SQL, a.Args...).Returns(a.Count, "%d:%d: mismatch in expected count for query: %s", i, j, a.SQL)
+			testsuite.AssertQuery(t, rt.DB, a.SQL, a.Args...).Returns(a.Count, "%d:%d: mismatch in expected count for query: %s", i, j, a.SQL)
 		}
 
 		for j, a := range tc.Assertions {

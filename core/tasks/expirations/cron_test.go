@@ -17,11 +17,11 @@ import (
 )
 
 func TestExpirations(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	err := marker.ClearTasks(rc, expirationLock)
 	assert.NoError(t, err)
@@ -62,7 +62,7 @@ func TestExpirations(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
 
 	// expire our runs
-	err = expireRuns(ctx, db, rp, expirationLock, "foo")
+	err = expireRuns(ctx, rt, expirationLock, "foo")
 	assert.NoError(t, err)
 
 	// shouldn't have any active runs or sessions

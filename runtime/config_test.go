@@ -1,20 +1,32 @@
-package config_test
+package runtime_test
 
 import (
 	"net"
 	"testing"
 
-	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseDisallowedNetworks(t *testing.T) {
-	// this is only here because this is the first test run.. should find a better way to ensure DB is in correct state for first test that needs it
-	testsuite.Reset()
+func TestValidate(t *testing.T) {
+	c := runtime.NewDefaultConfig()
+	assert.NoError(t, c.Validate())
 
-	cfg := config.NewMailroomConfig()
+	c.DB = "??"
+	c.ReadonlyDB = "??"
+	c.Redis = "??"
+	c.Elastic = "??"
+	assert.EqualError(t, c.Validate(), "field 'DB' is not a valid URL, field 'ReadonlyDB' is not a valid URL, field 'Redis' is not a valid URL, field 'Elastic' is not a valid URL")
+
+	c = runtime.NewDefaultConfig()
+	c.DB = "mysql://temba:temba@localhost/temba"
+	c.Redis = "bluedis://localhost:6379/15"
+	assert.EqualError(t, c.Validate(), "field 'DB' must start with 'postgres:', field 'Redis' must start with 'redis:'")
+}
+
+func TestParseDisallowedNetworks(t *testing.T) {
+	cfg := runtime.NewDefaultConfig()
 
 	privateNetwork1 := &net.IPNet{IP: net.IPv4(10, 0, 0, 0).To4(), Mask: net.CIDRMask(8, 32)}
 	privateNetwork2 := &net.IPNet{IP: net.IPv4(172, 16, 0, 0).To4(), Mask: net.CIDRMask(12, 32)}

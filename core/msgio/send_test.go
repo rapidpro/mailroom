@@ -11,10 +11,10 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,13 +26,13 @@ type msgSpec struct {
 	Failed    bool
 }
 
-func (m *msgSpec) createMsg(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) *models.Msg {
+func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets) *models.Msg {
 	// Only way to create a failed outgoing message is to suspend the org and reload the org.
 	// However the channels have to be fetched from the same org assets thus why this uses its
 	// own org assets instance.
 	ctx := context.Background()
-	db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, testdata.Org1.ID)
-	oaOrg, _ := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
+	rt.DB.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, testdata.Org1.ID)
+	oaOrg, _ := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 
 	var channel *models.Channel
 	var channelRef *assets.ChannelReference
@@ -44,17 +44,17 @@ func (m *msgSpec) createMsg(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) *mo
 	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", m.URNID))
 
 	flowMsg := flows.NewMsgOut(urn, channelRef, "Hello", nil, nil, nil, flows.NilMsgTopic)
-	msg, err := models.NewOutgoingMsg(oaOrg.Org(), channel, m.ContactID, flowMsg, time.Now())
+	msg, err := models.NewOutgoingMsg(rt.Config, oaOrg.Org(), channel, m.ContactID, flowMsg, time.Now())
 	require.NoError(t, err)
 
-	models.InsertMessages(ctx, db, []*models.Msg{msg})
+	models.InsertMessages(ctx, rt.DB, []*models.Msg{msg})
 	require.NoError(t, err)
 
 	return msg
 }
 
 func TestSendMessages(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
@@ -68,7 +68,7 @@ func TestSendMessages(t *testing.T) {
 	androidChannel2 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
 	testdata.InsertChannel(db, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -144,13 +144,13 @@ func TestSendMessages(t *testing.T) {
 	for _, tc := range tests {
 		msgs := make([]*models.Msg, len(tc.Msgs))
 		for i, ms := range tc.Msgs {
-			msgs[i] = ms.createMsg(t, db, oa)
+			msgs[i] = ms.createMsg(t, rt, oa)
 		}
 
 		rc.Do("FLUSHDB")
 		mockFCM.Messages = nil
 
-		msgio.SendMessages(ctx, db, rp, fc, msgs)
+		msgio.SendMessages(ctx, rt, db, fc, msgs)
 
 		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 

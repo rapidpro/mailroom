@@ -13,7 +13,6 @@ import (
 
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
@@ -26,9 +25,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
-	"github.com/nyaruka/mailroom/core/ivr/twiml"
-	"github.com/nyaruka/mailroom/core/ivr/vonage"
 	ivr_tasks "github.com/nyaruka/mailroom/core/tasks/ivr"
+	"github.com/nyaruka/mailroom/services/ivr/twiml"
+	"github.com/nyaruka/mailroom/services/ivr/vonage"
 )
 
 // mocks the Twilio API
@@ -56,14 +55,11 @@ func mockTwilioHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestTwilioIVR(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer func() {
-		testsuite.ResetStorage()
-		testsuite.Reset()
-	}()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// start test server
 	ts := httptest.NewServer(http.HandlerFunc(mockTwilioHandler))
@@ -73,7 +69,7 @@ func TestTwilioIVR(t *testing.T) {
 	twiml.IgnoreSignatures = true
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.MediaStorage(), testsuite.SessionStorage(), nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -105,7 +101,7 @@ func TestTwilioIVR(t *testing.T) {
 	require.NoError(t, err)
 
 	// call our master starter
-	err = starts.CreateFlowBatches(ctx, db, rp, nil, start)
+	err = starts.CreateFlowBatches(ctx, rt, start)
 	require.NoError(t, err)
 
 	// start our task
@@ -115,7 +111,7 @@ func TestTwilioIVR(t *testing.T) {
 	jsonx.MustUnmarshal(task.Task, batch)
 
 	// request our calls to start
-	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
+	err = ivr_tasks.HandleFlowStartBatch(ctx, rt, batch)
 	require.NoError(t, err)
 
 	// check our 3 contacts have 3 wired calls
@@ -379,14 +375,11 @@ func mockVonageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestVonageIVR(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer func() {
-		testsuite.ResetStorage()
-		testsuite.Reset()
-	}()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// deactivate our twilio channel
 	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
@@ -399,7 +392,7 @@ func TestVonageIVR(t *testing.T) {
 	defer ts.Close()
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, testsuite.MediaStorage(), testsuite.SessionStorage(), nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -414,7 +407,7 @@ func TestVonageIVR(t *testing.T) {
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
 
 	// call our master starter
-	err := starts.CreateFlowBatches(ctx, db, rp, nil, start)
+	err := starts.CreateFlowBatches(ctx, rt, start)
 	assert.NoError(t, err)
 
 	// start our task
@@ -425,7 +418,7 @@ func TestVonageIVR(t *testing.T) {
 	assert.NoError(t, err)
 
 	// request our call to start
-	err = ivr_tasks.HandleFlowStartBatch(ctx, config.Mailroom, db, rp, batch)
+	err = ivr_tasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
 
 	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,

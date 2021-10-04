@@ -11,9 +11,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/sirupsen/logrus"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 )
 
 const (
@@ -30,7 +27,7 @@ func StartStatsCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) err
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return dumpStats(ctx, rt.DB, rt.RP, lockName, lockValue)
+			return dumpStats(ctx, rt, lockName, lockValue)
 		},
 	)
 	return nil
@@ -42,7 +39,7 @@ var (
 )
 
 // dumpStats calculates a bunch of stats every minute and both logs them and posts them to librato
-func dumpStats(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+func dumpStats(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
 	// We wait 15 seconds since we fire at the top of the minute, the same as expirations.
 	// That way any metrics related to the size of our queue are a bit more accurate (all expirations can
 	// usually be handled in 15 seconds). Something more complicated would take into account the age of
@@ -50,9 +47,9 @@ func dumpStats(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string
 	time.Sleep(time.Second * 15)
 
 	// get our DB status
-	stats := db.Stats()
+	stats := rt.DB.Stats()
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// calculate size of batch queue

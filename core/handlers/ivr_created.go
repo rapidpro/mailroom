@@ -7,8 +7,8 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -19,7 +19,7 @@ func init() {
 }
 
 // handleIVRCreated creates the db msg for the passed in event
-func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleIVRCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.IVRCreatedEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
@@ -38,7 +38,7 @@ func handleIVRCreated(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mode
 		return nil
 	}
 
-	msg := models.NewOutgoingIVR(oa.OrgID(), conn, event.Msg, event.CreatedOn())
+	msg := models.NewOutgoingIVR(rt.Config, oa.OrgID(), conn, event.Msg, event.CreatedOn())
 
 	// register to have this message committed
 	scene.AppendToEventPreCommitHook(hooks.CommitIVRHook, msg)

@@ -86,7 +86,7 @@ func handleInspect(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 	var sa flows.SessionAssets
 	// if we have an org ID, create session assets to look for missing dependencies
 	if request.OrgID != models.NilOrgID {
-		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt.DB, request.OrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
+		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, request.OrgID, models.RefreshFields|models.RefreshGroups|models.RefreshFlows)
 		if err != nil {
 			return nil, 0, err
 		}

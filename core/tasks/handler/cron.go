@@ -8,15 +8,12 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/utils/marker"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -36,22 +33,22 @@ func StartRetryCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) err
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return RetryPendingMsgs(ctx, rt.DB, rt.RP, lockName, lockValue)
+			return RetryPendingMsgs(ctx, rt, lockName, lockValue)
 		},
 	)
 	return nil
 }
 
 // RetryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
-func RetryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
-	if !config.Mailroom.RetryPendingMessages {
+func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
+	if !rt.Config.RetryPendingMessages {
 		return nil
 	}
 
 	log := logrus.WithField("comp", "handler_retrier").WithField("lock", lockValue)
 	start := time.Now()
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// check the size of our handle queue
@@ -67,7 +64,7 @@ func RetryPendingMsgs(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName
 	}
 
 	// get all incoming messages that are still empty
-	rows, err := db.Queryx(unhandledMsgsQuery)
+	rows, err := rt.DB.Queryx(unhandledMsgsQuery)
 	if err != nil {
 		return errors.Wrapf(err, "error querying for unhandled messages")
 	}

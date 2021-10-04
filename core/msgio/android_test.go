@@ -63,7 +63,7 @@ func newMockFCMEndpoint(tokens ...string) *MockFCMEndpoint {
 }
 
 func TestSyncAndroidChannels(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	mockFCM := newMockFCMEndpoint("FCMID3")
 	defer mockFCM.Stop()
@@ -75,7 +75,7 @@ func TestSyncAndroidChannels(t *testing.T) {
 	testChannel2 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"}) // invalid FCM ID
 	testChannel3 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"}) // valid FCM ID
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
 
 	channel1 := oa.ChannelByID(testChannel1.ID)

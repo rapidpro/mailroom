@@ -67,9 +67,9 @@ func TestLoadFlows(t *testing.T) {
 }
 
 func TestFlowIDForUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	org, _ := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org, _ := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 
 	tx, err := db.BeginTxx(ctx, nil)
 	assert.NoError(t, err)
@@ -88,7 +88,7 @@ func TestFlowIDForUUID(t *testing.T) {
 
 	// clear our assets so it isn't cached
 	models.FlushCache()
-	org, _ = models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org, _ = models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 
 	id, err = models.FlowIDForUUID(ctx, tx, org, testdata.Favorites.UUID)
 	assert.NoError(t, err)

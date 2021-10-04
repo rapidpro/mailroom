@@ -11,9 +11,11 @@ import (
 )
 
 func TestCron(t *testing.T) {
-	testsuite.ResetRP()
-	rp := testsuite.RP()
-	rc := testsuite.RC()
+	_, _, _, rp := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetRedis)
+
+	rc := rp.Get()
 	defer rc.Close()
 
 	mutex := sync.RWMutex{}

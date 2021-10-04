@@ -7,7 +7,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
-	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/shopspring/decimal"
 )
@@ -15,52 +15,52 @@ import (
 var eng, simulator flows.Engine
 var engInit, simulatorInit sync.Once
 
-var emailFactory engine.EmailServiceFactory
-var classificationFactory engine.ClassificationServiceFactory
-var ticketFactory engine.TicketServiceFactory
-var airtimeFactory engine.AirtimeServiceFactory
+var emailFactory func(*runtime.Config) engine.EmailServiceFactory
+var classificationFactory func(*runtime.Config) engine.ClassificationServiceFactory
+var ticketFactory func(*runtime.Config) engine.TicketServiceFactory
+var airtimeFactory func(*runtime.Config) engine.AirtimeServiceFactory
 
 // RegisterEmailServiceFactory can be used by outside callers to register a email factory
 // for use by the engine
-func RegisterEmailServiceFactory(factory engine.EmailServiceFactory) {
-	emailFactory = factory
+func RegisterEmailServiceFactory(f func(*runtime.Config) engine.EmailServiceFactory) {
+	emailFactory = f
 }
 
 // RegisterClassificationServiceFactory can be used by outside callers to register a classification factory
 // for use by the engine
-func RegisterClassificationServiceFactory(factory engine.ClassificationServiceFactory) {
-	classificationFactory = factory
+func RegisterClassificationServiceFactory(f func(*runtime.Config) engine.ClassificationServiceFactory) {
+	classificationFactory = f
 }
 
 // RegisterTicketServiceFactory can be used by outside callers to register a ticket service factory
 // for use by the engine
-func RegisterTicketServiceFactory(factory engine.TicketServiceFactory) {
-	ticketFactory = factory
+func RegisterTicketServiceFactory(f func(*runtime.Config) engine.TicketServiceFactory) {
+	ticketFactory = f
 }
 
 // RegisterAirtimeServiceFactory can be used by outside callers to register a airtime factory
 // for use by the engine
-func RegisterAirtimeServiceFactory(factory engine.AirtimeServiceFactory) {
-	airtimeFactory = factory
+func RegisterAirtimeServiceFactory(f func(*runtime.Config) engine.AirtimeServiceFactory) {
+	airtimeFactory = f
 }
 
 // Engine returns the global engine instance for use with real sessions
-func Engine(cfg *config.Config) flows.Engine {
+func Engine(c *runtime.Config) flows.Engine {
 	engInit.Do(func() {
 		webhookHeaders := map[string]string{
-			"User-Agent":      "RapidProMailroom/" + cfg.Version,
+			"User-Agent":      "RapidProMailroom/" + c.Version,
 			"X-Mailroom-Mode": "normal",
 		}
 
-		httpClient, httpRetries, httpAccess := HTTP(cfg)
+		httpClient, httpRetries, httpAccess := HTTP(c)
 
 		eng = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, cfg.WebhooksMaxBodyBytes)).
-			WithClassificationServiceFactory(classificationFactory).
-			WithEmailServiceFactory(emailFactory).
-			WithTicketServiceFactory(ticketFactory).
-			WithAirtimeServiceFactory(airtimeFactory).
-			WithMaxStepsPerSprint(cfg.MaxStepsPerSprint).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
+			WithClassificationServiceFactory(classificationFactory(c)).
+			WithEmailServiceFactory(emailFactory(c)).
+			WithTicketServiceFactory(ticketFactory(c)).
+			WithAirtimeServiceFactory(airtimeFactory(c)).
+			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			Build()
 	})
 
@@ -68,22 +68,22 @@ func Engine(cfg *config.Config) flows.Engine {
 }
 
 // Simulator returns the global engine instance for use with simulated sessions
-func Simulator(cfg *config.Config) flows.Engine {
+func Simulator(c *runtime.Config) flows.Engine {
 	simulatorInit.Do(func() {
 		webhookHeaders := map[string]string{
-			"User-Agent":      "RapidProMailroom/" + cfg.Version,
+			"User-Agent":      "RapidProMailroom/" + c.Version,
 			"X-Mailroom-Mode": "simulation",
 		}
 
-		httpClient, _, httpAccess := HTTP(cfg) // don't do retries in simulator
+		httpClient, _, httpAccess := HTTP(c) // don't do retries in simulator
 
 		simulator = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, cfg.WebhooksMaxBodyBytes)).
-			WithClassificationServiceFactory(classificationFactory).   // simulated sessions do real classification
-			WithEmailServiceFactory(simulatorEmailServiceFactory).     // but faked emails
-			WithTicketServiceFactory(simulatorTicketServiceFactory).   // and faked tickets
-			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory). // and faked airtime transfers
-			WithMaxStepsPerSprint(cfg.MaxStepsPerSprint).
+			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
+			WithClassificationServiceFactory(classificationFactory(c)). // simulated sessions do real classification
+			WithEmailServiceFactory(simulatorEmailServiceFactory).      // but faked emails
+			WithTicketServiceFactory(simulatorTicketServiceFactory).    // and faked tickets
+			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory).  // and faked airtime transfers
+			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			Build()
 	})
 

@@ -12,7 +12,6 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -24,14 +23,14 @@ import (
 )
 
 func TestSurveyor(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 

@@ -20,13 +20,13 @@ import (
 )
 
 func TestBroadcastEvents(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	eng := envs.Language("eng")
@@ -84,7 +84,7 @@ func TestBroadcastEvents(t *testing.T) {
 		bcast, err := models.NewBroadcastFromEvent(ctx, db, oa, event)
 		assert.NoError(t, err)
 
-		err = CreateBroadcastBatches(ctx, db, rp, bcast)
+		err = CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
@@ -103,7 +103,7 @@ func TestBroadcastEvents(t *testing.T) {
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
 
-			err = SendBroadcastBatch(ctx, db, rp, batch)
+			err = SendBroadcastBatch(ctx, rt, batch)
 			assert.NoError(t, err)
 		}
 
@@ -120,13 +120,13 @@ func TestBroadcastEvents(t *testing.T) {
 }
 
 func TestBroadcastTask(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 	eng := envs.Language("eng")
 
@@ -230,7 +230,7 @@ func TestBroadcastTask(t *testing.T) {
 	for i, tc := range tcs {
 		// handle our start task
 		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID)
-		err = CreateBroadcastBatches(ctx, db, rp, bcast)
+		err = CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
@@ -249,7 +249,7 @@ func TestBroadcastTask(t *testing.T) {
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
 
-			err = SendBroadcastBatch(ctx, db, rp, batch)
+			err = SendBroadcastBatch(ctx, rt, batch)
 			assert.NoError(t, err)
 		}
 

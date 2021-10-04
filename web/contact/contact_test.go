@@ -13,20 +13,22 @@ import (
 )
 
 func TestCreateContacts(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// detach Cathy's tel URN
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Cathy.ID)
 
 	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
 
-	web.RunWebTests(t, "testdata/create.json", nil)
+	web.RunWebTests(t, ctx, rt, "testdata/create.json", nil)
 }
 
 func TestModifyContacts(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// to be deterministic, update the creation date on cathy
 	db.MustExec(`UPDATE contacts_contact SET created_on = $1 WHERE id = $2`, time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC), testdata.Cathy.ID)
@@ -49,19 +51,20 @@ func TestModifyContacts(t *testing.T) {
 	// because we made changes to a group above, need to make sure we don't use stale org assets
 	models.FlushCache()
 
-	web.RunWebTests(t, "testdata/modify.json", nil)
+	web.RunWebTests(t, ctx, rt, "testdata/modify.json", nil)
 
 	models.FlushCache()
 }
 
 func TestResolveContacts(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// detach Cathy's tel URN
 	db.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Cathy.ID)
 
 	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
 
-	web.RunWebTests(t, "testdata/resolve.json", nil)
+	web.RunWebTests(t, ctx, rt, "testdata/resolve.json", nil)
 }

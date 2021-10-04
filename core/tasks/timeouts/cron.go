@@ -13,8 +13,6 @@ import (
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/utils/marker"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -34,7 +32,7 @@ func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) e
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return timeoutSessions(ctx, rt.DB, rt.RP, lockName, lockValue)
+			return timeoutSessions(ctx, rt, lockName, lockValue)
 		},
 	)
 	return nil
@@ -42,18 +40,18 @@ func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) e
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue
 // TODO: extend lock
-func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+func timeoutSessions(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "timeout").WithField("lock", lockValue)
 	start := time.Now()
 
 	// find all sessions that need to be expired (we exclude IVR runs)
-	rows, err := db.QueryxContext(ctx, timedoutSessionsSQL)
+	rows, err := rt.DB.QueryxContext(ctx, timedoutSessionsSQL)
 	if err != nil {
 		return errors.Wrapf(err, "error selecting timed out sessions")
 	}
 	defer rows.Close()
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// add a timeout task for each run

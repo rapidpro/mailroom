@@ -58,7 +58,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 	// grab our org assets
 	orgID := ctx.Value(web.OrgIDKey).(models.OrgID)
-	oa, err := models.GetOrgAssets(ctx, rt.DB, orgID)
+	oa, err := models.GetOrgAssets(ctx, rt, orgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -132,7 +132,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for session write")
 	}
-	sessions, err := models.WriteSessions(ctx, tx, rt.RP, rt.MediaStorage, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
+	sessions, err := models.WriteSessions(ctx, rt, tx, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
 	if err == nil && len(sessions) == 0 {
 		err = errors.Errorf("no sessions written")
 	}
@@ -151,7 +151,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// write our post commit hooks
-	err = models.ApplyEventPostCommitHooks(ctx, tx, rt.RP, oa, []*models.Scene{sessions[0].Scene()})
+	err = models.ApplyEventPostCommitHooks(ctx, rt, tx, oa, []*models.Scene{sessions[0].Scene()})
 	if err != nil {
 		tx.Rollback()
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error applying post commit hooks")

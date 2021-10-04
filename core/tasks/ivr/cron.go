@@ -7,14 +7,11 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -34,7 +31,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return retryCalls(ctx, rt.Config, rt.DB, rt.RP, retryIVRLock, lockValue)
+			return retryCalls(ctx, rt, retryIVRLock, lockValue)
 		},
 	)
 
@@ -42,7 +39,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return expireCalls(ctx, rt.Config, rt.DB, rt.RP, expireIVRLock, lockValue)
+			return expireCalls(ctx, rt, expireIVRLock, lockValue)
 		},
 	)
 
@@ -50,7 +47,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 }
 
 // retryCalls looks for calls that need to be retried and retries them
-func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+func retryCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "ivr_cron_retryer").WithField("lock", lockValue)
 	start := time.Now()
 
@@ -58,7 +55,7 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	conns, err := models.LoadChannelConnectionsToRetry(ctx, db, 100)
+	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, 100)
 	if err != nil {
 		return errors.Wrapf(err, "error loading connections to retry")
 	}
@@ -71,13 +68,13 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 
 		// if the channel for this connection is throttled, move on
 		if throttledChannels[conn.ChannelID()] {
-			conn.MarkThrottled(ctx, db, time.Now())
+			conn.MarkThrottled(ctx, rt.DB, time.Now())
 			log.WithField("channel_id", conn.ChannelID()).Info("skipping connection, throttled")
 			continue
 		}
 
 		// load the org for this connection
-		oa, err := models.GetOrgAssets(ctx, db, conn.OrgID())
+		oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
 		if err != nil {
 			log.WithError(err).WithField("org_id", conn.OrgID()).Error("error loading org")
 			continue
@@ -87,7 +84,7 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 		channel := oa.ChannelByID(conn.ChannelID())
 		if channel == nil {
 			// fail this call, channel is no longer active
-			err = models.UpdateChannelConnectionStatuses(ctx, db, []models.ConnectionID{conn.ID()}, models.ConnectionStatusFailed)
+			err = models.UpdateChannelConnectionStatuses(ctx, rt.DB, []models.ConnectionID{conn.ID()}, models.ConnectionStatusFailed)
 			if err != nil {
 				log.WithError(err).WithField("channel_id", conn.ChannelID()).Error("error marking call as failed due to missing channel")
 			}
@@ -95,13 +92,13 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 		}
 
 		// finally load the full URN
-		urn, err := models.URNForID(ctx, db, oa, conn.ContactURNID())
+		urn, err := models.URNForID(ctx, rt.DB, oa, conn.ContactURNID())
 		if err != nil {
 			log.WithError(err).WithField("urn_id", conn.ContactURNID()).Error("unable to load contact urn")
 			continue
 		}
 
-		err = ivr.RequestCallStartForConnection(ctx, config, db, channel, urn, conn)
+		err = ivr.RequestCallStartForConnection(ctx, rt, channel, urn, conn)
 		if err != nil {
 			log.WithError(err).Error(err)
 			continue
@@ -117,7 +114,7 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 }
 
 // expireCalls looks for calls that should be expired and ends them
-func expireCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
+func expireCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
 	log := logrus.WithField("comp", "ivr_cron_expirer").WithField("lock", lockValue)
 	start := time.Now()
 
@@ -125,7 +122,7 @@ func expireCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *re
 	defer cancel()
 
 	// select our expired runs
-	rows, err := db.QueryxContext(ctx, selectExpiredRunsSQL)
+	rows, err := rt.DB.QueryxContext(ctx, selectExpiredRunsSQL)
 	if err != nil {
 		return errors.Wrapf(err, "error querying for expired runs")
 	}
@@ -146,14 +143,14 @@ func expireCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *re
 		expiredSessions = append(expiredSessions, exp.SessionID)
 
 		// load our connection
-		conn, err := models.SelectChannelConnection(ctx, db, exp.ConnectionID)
+		conn, err := models.SelectChannelConnection(ctx, rt.DB, exp.ConnectionID)
 		if err != nil {
 			log.WithError(err).WithField("connection_id", exp.ConnectionID).Error("unable to load connection")
 			continue
 		}
 
 		// hang up our call
-		err = ivr.HangupCall(ctx, config, db, conn)
+		err = ivr.HangupCall(ctx, rt, conn)
 		if err != nil {
 			log.WithError(err).WithField("connection_id", conn.ID()).Error("error hanging up call")
 		}
@@ -161,7 +158,7 @@ func expireCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *re
 
 	// now expire our runs and sessions
 	if len(expiredRuns) > 0 {
-		err := models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
+		err := models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
 		if err != nil {
 			log.WithError(err).Error("error expiring runs and sessions for expired calls")
 		}

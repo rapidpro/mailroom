@@ -13,11 +13,11 @@ import (
 )
 
 func TestCheckSchedules(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add a schedule and tie a broadcast to it
 	var s1 models.ScheduleID
@@ -70,7 +70,7 @@ func TestCheckSchedules(t *testing.T) {
 	assert.NoError(t, err)
 
 	// run our task
-	err = checkSchedules(ctx, db, rp, "lock", "lock")
+	err = checkSchedules(ctx, rt, "lock", "lock")
 	assert.NoError(t, err)
 
 	// should have one flow start added to our DB ready to go

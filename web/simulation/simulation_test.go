@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -198,13 +197,13 @@ const (
 )
 
 func TestServer(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	wg := &sync.WaitGroup{}
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 
 	// give our server time to start

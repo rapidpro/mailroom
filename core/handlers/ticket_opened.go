@@ -7,9 +7,9 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,7 +20,7 @@ func init() {
 }
 
 // handleTicketOpened is called for each ticket opened event
-func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.TicketOpenedEvent)
 
 	ticketer := oa.TicketerByUUID(event.Ticket.Ticketer.UUID)

@@ -7,8 +7,8 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 )
@@ -18,7 +18,7 @@ func init() {
 }
 
 // handleResthookCalled is called for each resthook call in a scene
-func handleResthookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleResthookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.ResthookCalledEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),

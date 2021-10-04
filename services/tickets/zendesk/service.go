@@ -10,8 +10,8 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/pkg/errors"
 )
@@ -37,7 +37,7 @@ func init() {
 }
 
 type service struct {
-	rtConfig       *config.Config
+	rtConfig       *runtime.Config
 	restClient     *RESTClient
 	pushClient     *PushClient
 	ticketer       *flows.Ticketer
@@ -49,7 +49,7 @@ type service struct {
 }
 
 // NewService creates a new zendesk ticket service
-func NewService(rtCfg *config.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	subdomain := config[configSubdomain]
 	secret := config[configSecret]
 	oAuthToken := config[configOAuthToken]

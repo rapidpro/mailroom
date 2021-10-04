@@ -1,3 +1,21 @@
+v6.5.35
+----------
+ * Tweak mailroom startup to show warning if no distinct readonly DB configured
+
+v6.5.34
+----------
+ * Switch to readonly database for asset loading
+
+v6.5.33
+----------
+ * Add support for READONLY_DB config setting that opens a new readonly database connection
+ * Finish the runtime.Runtime refactor
+
+v6.5.32
+----------
+ * Refactor more code to use runtime.Runtime instead of passing db instances and using the global config
+ * Update to latest goflow with doc fixes
+
 v6.5.31
 ----------
  * Recalculate dynamic groups after closing and reopening tickets

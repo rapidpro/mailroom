@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/config"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -23,7 +22,7 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	wg := &sync.WaitGroup{}
 
@@ -37,7 +36,9 @@ func TestSearch(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, client, wg)
+	rt.ES = client
+
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 
 	// give our server time to start
@@ -237,7 +238,9 @@ func TestSearch(t *testing.T) {
 }
 
 func TestParseQuery(t *testing.T) {
-	testsuite.Reset()
+	ctx, rt, _, _ := testsuite.Get()
 
-	web.RunWebTests(t, "testdata/parse_query.json", nil)
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	web.RunWebTests(t, ctx, rt, "testdata/parse_query.json", nil)
 }

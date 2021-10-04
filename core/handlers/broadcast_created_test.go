@@ -18,7 +18,9 @@ import (
 )
 
 func TestBroadcastCreated(t *testing.T) {
-	defer testsuite.Reset()
+	ctx, rt, _, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// TODO: test contacts, groups
 
@@ -56,5 +58,5 @@ func TestBroadcastCreated(t *testing.T) {
 		},
 	}
 
-	handlers.RunTestCases(t, tcs)
+	handlers.RunTestCases(t, ctx, rt, tcs)
 }
