@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	openapi "github.com/twilio/twilio-go/rest/lookups/v1"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/twilio/twilio-go"
 )
 
 // ContactImportID is the type for contact import IDs
@@ -28,12 +30,18 @@ type ContactImportBatchID int64
 // ContactImportStatus is the status of an import
 type ContactImportStatus string
 
+type MaxCarrierGroupCount int
+
+type CarrierType string
+
 // import status constants
 const (
 	ContactImportStatusPending    ContactImportStatus = "P"
 	ContactImportStatusProcessing ContactImportStatus = "O"
 	ContactImportStatusComplete   ContactImportStatus = "C"
 	ContactImportStatusFailed     ContactImportStatus = "F"
+	MobileCarrierType             CarrierType         = "mobile"
+	VOIPCarrierType               CarrierType         = "voip"
 )
 
 // ContactImportBatch is a batch of contacts within a larger import
@@ -48,13 +56,14 @@ type ContactImportBatch struct {
 	RecordEnd   int `db:"record_end"`
 
 	// results written after processing this batch
-	NumCreated   int             `db:"num_created"`
-	NumUpdated   int             `db:"num_updated"`
-	NumBlocked   int             `db:"num_blocked"`
-	NumErrored   int             `db:"num_errored"`
-	BlockedUUIDs json.RawMessage `db:"blocked_uuids"`
-	Errors       json.RawMessage `db:"errors"`
-	FinishedOn   *time.Time      `db:"finished_on"`
+	NumCreated    int             `db:"num_created"`
+	NumUpdated    int             `db:"num_updated"`
+	NumBlocked    int             `db:"num_blocked"`
+	NumErrored    int             `db:"num_errored"`
+	BlockedUUIDs  json.RawMessage `db:"blocked_uuids"`
+	Errors        json.RawMessage `db:"errors"`
+	FinishedOn    *time.Time      `db:"finished_on"`
+	CarrierGroups json.RawMessage `db:"carrier_groups"`
 }
 
 // Import does the actual import of this batch
@@ -76,6 +85,7 @@ type importContact struct {
 	flowContact *flows.Contact
 	mods        []flows.Modifier
 	errors      []string
+	carrierType CarrierType
 }
 
 func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID OrgID) error {
@@ -105,7 +115,7 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID O
 		return errors.Wrap(err, "error getting and creating contacts")
 	}
 
-	// gather up contacts and modifiers
+	// gather contacts and modifiers
 	modifiersByContact := make(map[*flows.Contact][]flows.Modifier, len(imports))
 	for _, imp := range imports {
 		// ignore errored imports which couldn't get/create a contact
@@ -136,12 +146,23 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 	if err != nil {
 		return errors.Wrap(err, "error loading contacts by UUID")
 	}
+	var twilioClient = &twilio.RestClient{}
+	var validateCarrier bool
+
+	validateCarrier, err = checkValidateCarrier(ctx, db, b.ImportID)
+	if err != nil {
+		return errors.Wrap(err, "error checking urn carrier validation option")
+	}
+
+	if validateCarrier {
+		twilioClient = InitLookup(oa)
+	}
 
 	for _, imp := range imports {
 		addModifier := func(m flows.Modifier) { imp.mods = append(imp.mods, m) }
 		addError := func(s string, args ...interface{}) { imp.errors = append(imp.errors, fmt.Sprintf(s, args...)) }
 		spec := imp.spec
-
+		var carrierInfo *PhoneNumberLookupOutput
 		uuid := spec.UUID
 
 		if len(spec.URNs) == 0 && !(oa.Org().RedactionPolicy() == "urns" || uuid != "") {
@@ -162,6 +183,20 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			}
 
 		} else {
+			var validatedURNs []urns.URN
+
+			if validateCarrier {
+				carrierInfo, validatedURNs, err = validateURNCarrier(*spec, twilioClient)
+				if err != nil {
+					return errors.Wrap(err, "error validating urn carrier")
+				}
+				if len(validatedURNs) == 0 {
+					continue
+				}
+				spec.URNs = validatedURNs
+				imp.carrierType = carrierInfo.CarrierType
+			}
+
 			imp.contact, imp.flowContact, imp.created, err = GetOrCreateContact(ctx, db, oa, spec.URNs, NilChannelID)
 			if err != nil {
 				urnStrs := make([]string, len(spec.URNs))
@@ -195,6 +230,13 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			} else {
 				addModifier(modifiers.NewField(field, value))
 			}
+		}
+
+		if validateCarrier {
+			carrierTypeField := sa.Fields().Get("carrier_type")
+			carrierNameField := sa.Fields().Get("carrier_name")
+			addModifier(modifiers.NewField(carrierTypeField, string(carrierInfo.CarrierType)))
+			addModifier(modifiers.NewField(carrierNameField, carrierInfo.CarrierName))
 		}
 
 		if len(spec.Groups) > 0 {
@@ -248,6 +290,9 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 	numErrored := 0
 	importErrors := make([]importError, 0, 10)
 	blockedUUIDs := make([]flows.ContactUUID, 0)
+	carrierGroups := map[CarrierType][]ContactID{}
+	trackDuplicate := make(map[CarrierType]map[ContactID]bool)
+
 	for _, imp := range imports {
 		if imp.contact == nil {
 			numErrored++
@@ -262,6 +307,16 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 		if imp.contact != nil && (imp.contact.Status() == ContactStatusBlocked) {
 			blockedUUIDs = append(blockedUUIDs, imp.contact.UUID())
 		}
+
+		if imp.carrierType != "" {
+			if trackDuplicate[imp.carrierType] == nil {
+				trackDuplicate[imp.carrierType] = make(map[ContactID]bool)
+			}
+			if !trackDuplicate[imp.carrierType][imp.contact.ID()] {
+				trackDuplicate[imp.carrierType][imp.contact.ID()] = true
+				carrierGroups[imp.carrierType] = append(carrierGroups[imp.carrierType], imp.contact.ID())
+			}
+		}
 	}
 
 	errorsJSON, err := jsonx.Marshal(importErrors)
@@ -272,7 +327,13 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 	numBlocked := len(blockedUUIDs)
 	blockedUUIDsJson, err := jsonx.Marshal(blockedUUIDs)
 	if err != nil {
-		return errors.Wrap(err, "error marshaling errors")
+		return errors.Wrap(err, "error marshaling blocked contacts")
+	}
+
+	carrierGroupsJson, err := jsonx.Marshal(carrierGroups)
+
+	if err != nil {
+		return errors.Wrap(err, "error marshaling grouped contacts")
 	}
 
 	now := dates.Now()
@@ -284,6 +345,7 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 	b.NumErrored = numErrored
 	b.Errors = errorsJSON
 	b.FinishedOn = &now
+	b.CarrierGroups = carrierGroupsJson
 	_, err = db.NamedExecContext(ctx,
 		`UPDATE 
 			contacts_contactimportbatch
@@ -295,7 +357,8 @@ func (b *ContactImportBatch) markComplete(ctx context.Context, db Queryer, impor
 			blocked_uuids = :blocked_uuids,
 			num_errored = :num_errored, 
 			errors = :errors, 
-			finished_on = :finished_on 
+			carrier_groups = :carrier_groups,
+			finished_on = :finished_on
 		WHERE 
 			id = :id`,
 		b,
@@ -348,4 +411,87 @@ type ContactSpec struct {
 type importError struct {
 	Record  int    `json:"record"`
 	Message string `json:"message"`
+}
+
+// Carrier validation functions here
+
+type PhoneNumberLookupOutput struct {
+	CarrierType CarrierType
+	CarrierName string
+	isValid     bool
+}
+
+func InitLookup(oa *OrgAssets) *twilio.RestClient {
+	accountSid := oa.Org().ConfigValue("ACCOUNT_SID", "")
+	authToken := oa.Org().ConfigValue("ACCOUNT_TOKEN", "")
+	client := twilio.NewRestClientWithParams(twilio.RestClientParams{
+		Username: accountSid,
+		Password: authToken,
+	})
+
+	return client
+}
+
+func numberLookUp(client *twilio.RestClient, phoneNumber string) (*PhoneNumberLookupOutput, error) {
+	types := []string{"carrier"}
+	output := &PhoneNumberLookupOutput{}
+
+	params := &openapi.FetchPhoneNumberParams{}
+	params.SetType(types)
+	resp, err := client.LookupsV1.FetchPhoneNumber(phoneNumber, params)
+
+	if err != nil {
+		if !strings.Contains(err.Error(), "404") {
+			return nil, err
+		}
+		// avoid nil pointer
+		output.isValid = false
+		return output, nil
+	}
+	carrierInfo := *resp.Carrier
+	typeValue := CarrierType(fmt.Sprintf("%v", carrierInfo["type"]))
+	output.CarrierName = fmt.Sprintf("%v", carrierInfo["name"])
+	output.CarrierType = getCarrierType(typeValue)
+	output.isValid = true
+	return output, nil
+}
+
+var checkValidateCarrierValueSQL = `
+SELECT validate_carrier
+	FROM contacts_contactimport 
+WHERE
+	id = $1 AND is_active = TRUE AND validate_carrier = TRUE
+`
+
+func checkValidateCarrier(ctx context.Context, db Queryer, id ContactImportID) (bool, error) {
+	result, err := db.ExecContext(ctx, checkValidateCarrierValueSQL, id)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := result.RowsAffected()
+	rowCount := rows > 0
+	return rowCount, nil
+}
+
+func getCarrierType(cType CarrierType) CarrierType {
+	if cType == VOIPCarrierType || cType == MobileCarrierType {
+		return MobileCarrierType
+	}
+
+	return cType
+}
+
+func validateURNCarrier(spec ContactSpec, twilioClient *twilio.RestClient) (*PhoneNumberLookupOutput, []urns.URN, error) {
+	var validatedURNs []urns.URN
+	var urn = spec.URNs[0]
+	carrierInfo, err := numberLookUp(twilioClient, fmt.Sprintf("%v", urn))
+	if err != nil {
+		return nil, validatedURNs, err
+	}
+	if carrierInfo.isValid {
+		validatedURNs = append(validatedURNs, urn)
+	}
+
+	return carrierInfo, validatedURNs, nil
 }
