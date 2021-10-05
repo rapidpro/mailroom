@@ -1,3 +1,8 @@
+v6.5.36
+----------
+ * Drop ticket.subject
+ * Remove no longer used FlowStart.CreatedBy
+
 v6.5.35
 ----------
  * Tweak mailroom startup to show warning if no distinct readonly DB configured
