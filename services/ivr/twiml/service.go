@@ -93,8 +93,6 @@ var validLanguageCodes = map[string]bool{
 	"zh-TW": true,
 }
 
-var indentMarshal = true
-
 type service struct {
 	httpClient   *http.Client
 	channel      *models.Channel
@@ -173,7 +171,10 @@ func (s *service) URNForRequest(r *http.Request) (urns.URN, error) {
 	r.ParseForm()
 	tel := r.Form.Get("Caller")
 	if tel == "" {
-		return "", errors.Errorf("no Caller parameter found in URL: %s", r.URL)
+		tel = r.Form.Get("From")
+	}
+	if tel == "" {
+		return "", errors.New("no Caller or From parameter found in request")
 	}
 	return urns.NewTelURNForCountry(tel, "")
 }
@@ -364,7 +365,7 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// get our response
-	response, err := responseForSprint(rt.Config, number, resumeURL, session.Wait(), sprint.Events())
+	response, err := ResponseForSprint(rt.Config, number, resumeURL, session.Wait(), sprint.Events(), true)
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -444,7 +445,7 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 
 // TWIML building utilities
 
-func responseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, w flows.ActivatedWait, es []flows.Event, indent bool) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 
@@ -517,7 +518,7 @@ func responseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, w
 
 	var body []byte
 	var err error
-	if indentMarshal {
+	if indent {
 		body, err = xml.MarshalIndent(r, "", "  ")
 	} else {
 		body, err = xml.Marshal(r)
