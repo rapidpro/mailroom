@@ -146,7 +146,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 	if err != nil {
 		return errors.Wrap(err, "error loading contacts by UUID")
 	}
-	var twilioClient = &twilio.RestClient{}
+	var twilioClient *twilio.RestClient
 	var validateCarrier bool
 
 	validateCarrier, err = checkValidateCarrier(ctx, db, b.ImportID)
@@ -191,6 +191,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 					return errors.Wrap(err, "error validating urn carrier")
 				}
 				if len(validatedURNs) == 0 {
+					addError("urn %s failed carrier validation", string(spec.URNs[0].Identity()))
 					continue
 				}
 				spec.URNs = validatedURNs
@@ -449,6 +450,11 @@ func numberLookUp(client *twilio.RestClient, phoneNumber string) (*PhoneNumberLo
 		return output, nil
 	}
 	carrierInfo := *resp.Carrier
+
+	if carrierInfo["type"] == nil || carrierInfo["name"] == nil {
+		output.isValid = false
+		return output, nil
+	}
 	typeValue := CarrierType(fmt.Sprintf("%v", carrierInfo["type"]))
 	output.CarrierName = fmt.Sprintf("%v", carrierInfo["name"])
 	output.CarrierType = getCarrierType(typeValue)
