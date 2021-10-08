@@ -55,7 +55,7 @@ func retryCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lockV
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, 100)
+	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, 200)
 	if err != nil {
 		return errors.Wrapf(err, "error loading connections to retry")
 	}
