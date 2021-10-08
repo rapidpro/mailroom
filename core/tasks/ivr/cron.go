@@ -67,11 +67,11 @@ func retryCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lockV
 		log = log.WithField("connection_id", conn.ID())
 
 		// if the channel for this connection is throttled, move on
-		if throttledChannels[conn.ChannelID()] {
+		/*if throttledChannels[conn.ChannelID()] {
 			conn.MarkThrottled(ctx, rt.DB, time.Now())
 			log.WithField("channel_id", conn.ChannelID()).Info("skipping connection, throttled")
 			continue
-		}
+		}*/
 
 		// load the org for this connection
 		oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
