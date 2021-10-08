@@ -29,7 +29,7 @@ func init() {
 func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
 	cron.StartCron(quit, rt.RP, retryIVRLock, time.Minute,
 		func(lockName string, lockValue string) error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 			defer cancel()
 			return retryCalls(ctx, rt, retryIVRLock, lockValue)
 		},
@@ -37,7 +37,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 
 	cron.StartCron(quit, rt.RP, expireIVRLock, time.Minute,
 		func(lockName string, lockValue string) error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 			defer cancel()
 			return expireCalls(ctx, rt, expireIVRLock, lockValue)
 		},
@@ -52,10 +52,10 @@ func retryCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lockV
 	start := time.Now()
 
 	// find all calls that need restarting
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, 100)
+	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, 200)
 	if err != nil {
 		return errors.Wrapf(err, "error loading connections to retry")
 	}
@@ -67,11 +67,11 @@ func retryCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lockV
 		log = log.WithField("connection_id", conn.ID())
 
 		// if the channel for this connection is throttled, move on
-		if throttledChannels[conn.ChannelID()] {
+		/*if throttledChannels[conn.ChannelID()] {
 			conn.MarkThrottled(ctx, rt.DB, time.Now())
 			log.WithField("channel_id", conn.ChannelID()).Info("skipping connection, throttled")
 			continue
-		}
+		}*/
 
 		// load the org for this connection
 		oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
@@ -118,7 +118,7 @@ func expireCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lock
 	log := logrus.WithField("comp", "ivr_cron_expirer").WithField("lock", lockValue)
 	start := time.Now()
 
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
 	// select our expired runs
