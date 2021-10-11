@@ -10,13 +10,12 @@ require (
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/gofrs/uuid v3.3.0+incompatible
-	github.com/golang/protobuf v1.4.0
+	github.com/golang/protobuf v1.4.2
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.1.0
 	github.com/greatnonprofits-nfp/goflow v0.50.3-0.20211002030425-74b491abbd55
 	github.com/jmoiron/sqlx v1.2.0
-	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/lib/pq v1.4.0
+	github.com/lib/pq v1.9.0
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/nyaruka/ezconf v0.2.1
@@ -29,11 +28,12 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.9.1
+	github.com/prometheus/common v0.10.0
 	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd
 	github.com/shopspring/decimal v1.2.0
-	github.com/sirupsen/logrus v1.5.0
-	github.com/stretchr/testify v1.6.1
+	github.com/sirupsen/logrus v1.8.1
+	github.com/stretchr/testify v1.7.0
+	github.com/twilio/twilio-go v0.14.2
 	gopkg.in/go-playground/validator.v9 v9.31.0
 )
 
