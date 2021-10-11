@@ -254,7 +254,7 @@ func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w htt
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{conn.ContactID()})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{conn.ContactID()})
 	if err != nil {
 		return channel, conn, provider.WriteErrorResponse(w, errors.Wrapf(err, "no such contact"))
 	}
