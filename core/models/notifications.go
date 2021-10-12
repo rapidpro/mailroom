@@ -22,14 +22,23 @@ const (
 	NotificationTypeTicketsActivity NotificationType = "tickets:activity"
 )
 
+type EmailStatus string
+
+const (
+	EmailStatusPending = "P"
+	EmailStatusSent    = "S"
+	EmailStatusNone    = "N"
+)
+
 type Notification struct {
-	ID        NotificationID   `db:"id"`
-	OrgID     OrgID            `db:"org_id"`
-	Type      NotificationType `db:"notification_type"`
-	Scope     string           `db:"scope"`
-	UserID    UserID           `db:"user_id"`
-	IsSeen    bool             `db:"is_seen"`
-	CreatedOn time.Time        `db:"created_on"`
+	ID          NotificationID   `db:"id"`
+	OrgID       OrgID            `db:"org_id"`
+	Type        NotificationType `db:"notification_type"`
+	Scope       string           `db:"scope"`
+	UserID      UserID           `db:"user_id"`
+	IsSeen      bool             `db:"is_seen"`
+	EmailStatus EmailStatus      `db:"email_status"`
+	CreatedOn   time.Time        `db:"created_on"`
 
 	ChannelID       ChannelID       `db:"channel_id"`
 	ContactImportID ContactImportID `db:"contact_import_id"`
@@ -107,8 +116,8 @@ func NotificationsFromTicketEvents(ctx context.Context, db Queryer, oa *OrgAsset
 }
 
 const insertNotificationSQL = `
-INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user_id, is_seen, created_on,  channel_id,  contact_import_id) 
-                               VALUES(:org_id, :notification_type, :scope, :user_id,   FALSE, NOW(),      :channel_id, :contact_import_id) 
+INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user_id, is_seen, email_status, created_on,  channel_id,  contact_import_id) 
+                               VALUES(:org_id, :notification_type, :scope, :user_id,   FALSE,          'N',      NOW(), :channel_id, :contact_import_id) 
 							   ON CONFLICT DO NOTHING`
 
 func insertNotifications(ctx context.Context, db Queryer, notifications []*Notification) error {
