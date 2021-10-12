@@ -1,3 +1,7 @@
+v6.5.39
+----------
+ * Add notification.email_status
+
 v6.5.38
 ----------
  * Update to latest goflow which simplifies contactql queries after parsing
