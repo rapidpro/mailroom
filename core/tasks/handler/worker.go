@@ -208,7 +208,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
@@ -308,7 +308,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID()})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID()})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contact")
 	}
@@ -491,7 +491,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
@@ -671,7 +671,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 	modelTicket := tickets[0]
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{modelTicket.ContactID()})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{modelTicket.ContactID()})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
