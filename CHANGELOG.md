@@ -1,3 +1,9 @@
+v6.5.38
+----------
+ * Update to latest goflow which simplifies contactql queries after parsing
+ * Load contacts for flow starts from readonly database
+ * CI testing on PG12 and 13
+
 v6.5.37
 ----------
  * Look for From param if Caller param not found in incoming IVR call request
