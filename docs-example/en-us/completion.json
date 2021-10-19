@@ -31,6 +31,11 @@
             "name": "urns",
             "properties": [
                 {
+                    "key": "discord",
+                    "help": "Discord URN for the contact",
+                    "type": "text"
+                },
+                {
                     "key": "ext",
                     "help": "Ext URN for the contact",
                     "type": "text"
@@ -63,6 +68,11 @@
                 {
                     "key": "mailto",
                     "help": "Mailto URN for the contact",
+                    "type": "text"
+                },
+                {
+                    "key": "rocketchat",
+                    "help": "Rocketchat URN for the contact",
                     "type": "text"
                 },
                 {
@@ -169,6 +179,11 @@
                     "key": "created_on",
                     "help": "the creation date of the contact",
                     "type": "datetime"
+                },
+                {
+                    "key": "last_seen_on",
+                    "help": "the last seen date of the contact",
+                    "type": "any"
                 },
                 {
                     "key": "urns",
@@ -286,6 +301,21 @@
             ]
         },
         {
+            "name": "node",
+            "properties": [
+                {
+                    "key": "uuid",
+                    "help": "the UUID of the node",
+                    "type": "text"
+                },
+                {
+                    "key": "visit_count",
+                    "help": "the count of visits to the node in this run",
+                    "type": "number"
+                }
+            ]
+        },
+        {
             "name": "related_run",
             "properties": [
                 {
@@ -359,13 +389,13 @@
                     "type": "text"
                 },
                 {
-                    "key": "corrected",
-                    "help": "the input corrected by Bing Spell Checker",
+                    "key": "input",
+                    "help": "the input of the result",
                     "type": "text"
                 },
                 {
-                    "key": "input",
-                    "help": "the input of the result",
+                    "key": "corrected",
+                    "help": "the input corrected by Bing Spell Checker",
                     "type": "text"
                 },
                 {
@@ -382,6 +412,16 @@
                     "key": "created_on",
                     "help": "the creation date of the result",
                     "type": "datetime"
+                }
+            ]
+        },
+        {
+            "name": "resume",
+            "properties": [
+                {
+                    "key": "type",
+                    "help": "the type of resume that resumed this session",
+                    "type": "text"
                 }
             ]
         },
@@ -446,7 +486,17 @@
                 {
                     "key": "keyword",
                     "help": "the keyword match if this is a keyword trigger",
-                    "type": "any"
+                    "type": "text"
+                },
+                {
+                    "key": "user",
+                    "help": "the user who started this session if this is a manual trigger",
+                    "type": "text"
+                },
+                {
+                    "key": "origin",
+                    "help": "the origin of this session if this is a manual trigger",
+                    "type": "text"
                 }
             ]
         }
@@ -498,6 +548,11 @@
             "type": "any"
         },
         {
+            "key": "node",
+            "help": "the current node",
+            "type": "node"
+        },
+        {
             "key": "globals",
             "help": "the global values",
             "type": "globals"
@@ -506,6 +561,11 @@
             "key": "trigger",
             "help": "the trigger that started this session",
             "type": "trigger"
+        },
+        {
+            "key": "resume",
+            "help": "the current resume that continued this session",
+            "type": "resume"
         }
     ],
     "root_no_session": [
