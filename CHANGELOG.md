@@ -1,3 +1,7 @@
+v6.5.40
+----------
+ * Add config option for maximum resumes per session
+
 v6.5.39
 ----------
  * Add notification.email_status
