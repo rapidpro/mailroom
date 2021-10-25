@@ -37,6 +37,7 @@ type Config struct {
 	SMTPServer             string  `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
 	DisallowedNetworks     string  `help:"comma separated list of IP addresses and networks which engine can't make HTTP calls to"`
 	MaxStepsPerSprint      int     `help:"the maximum number of steps allowed per engine sprint"`
+	MaxResumesPerSession   int     `help:"the maximum number of resumes allowed per engine session"`
 	MaxValueLength         int     `help:"the maximum size in characters for contact field values and run result values"`
 
 	S3Endpoint       string `help:"the S3 endpoint we will write attachments to"`
@@ -86,6 +87,7 @@ func NewDefaultConfig() *Config {
 		SMTPServer:             "",
 		DisallowedNetworks:     `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fe80::/10`,
 		MaxStepsPerSprint:      100,
+		MaxResumesPerSession:   500,
 		MaxValueLength:         640,
 
 		S3Endpoint:       "https://s3.amazonaws.com",
