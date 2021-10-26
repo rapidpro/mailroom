@@ -1,3 +1,7 @@
+v6.5.41
+----------
+ * Update to latest goflow which adds sort function
+
 v6.5.40
 ----------
  * Add config option for maximum resumes per session
