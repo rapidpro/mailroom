@@ -1,0 +1,4 @@
+ignore:
+  - "docs/*"
+  - "docs-example/*"
+  - "**/*test.go"
