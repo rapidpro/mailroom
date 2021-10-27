@@ -1,3 +1,8 @@
+v6.5.42
+----------
+ * Change default resumes per session limit from 500 to 250
+ * Update to latest goflow
+
 v6.5.41
 ----------
  * Update to latest goflow which adds sort function
