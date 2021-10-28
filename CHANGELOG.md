@@ -1,3 +1,7 @@
+v6.5.43
+----------
+ * Update to latest goflow which adds reverse function
+
 v6.5.42
 ----------
  * Change default resumes per session limit from 500 to 250
