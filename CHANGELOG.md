@@ -1,3 +1,7 @@
+v7.0.0
+----------
+ * Tweak README
+
 v6.5.43
 ----------
  * Update to latest goflow which adds reverse function
