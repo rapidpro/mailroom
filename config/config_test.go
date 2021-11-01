@@ -35,7 +35,7 @@ func TestParseDisallowedNetworks(t *testing.T) {
 	// test with invalid CSV
 	cfg.DisallowedNetworks = `"127.0.0.1`
 	_, _, err = cfg.ParseDisallowedNetworks()
-	assert.EqualError(t, err, `record on line 1; parse error on line 2, column 0: extraneous or missing " in quoted-field`)
+	assert.EqualError(t, err, `parse error on line 1, column 11: extraneous or missing " in quoted-field`)
 
 	// test with invalid IP
 	cfg.DisallowedNetworks = `127.0.1`
