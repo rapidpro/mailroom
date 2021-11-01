@@ -64,7 +64,8 @@
                                 {
                                     "type": "send_msg",
                                     "uuid": "f4495f19-37ee-4e51-a7d5-d99ef6be147a",
-                                    "text": "What is your favorite color?"
+                                    "text": "What is your favorite color?",
+                                    "sharing_config": {}
                                 }
                             ],
                             "exits": [
@@ -80,7 +81,8 @@
                                 {
                                     "type": "send_msg",
                                     "uuid": "9631dddf-0dd7-4310-b263-5f7cad4795e0",
-                                    "text": "I don't know that color. Try again."
+                                    "text": "I don't know that color. Try again.",
+                                    "sharing_config": {}
                                 }
                             ],
                             "exits": [
@@ -177,7 +179,11 @@
                                         "category_uuid": "3b400f91-db69-42b9-9fe2-24ad556b067a"
                                     }
                                 ],
-                                "default_category_uuid": "5563a722-9680-419c-a792-b1fa9df92e06"
+                                "default_category_uuid": "5563a722-9680-419c-a792-b1fa9df92e06",
+                                "config": {
+                                    "spell_checker": false,
+                                    "spelling_correction_sensitivity": ""
+                                }
                             },
                             "exits": [
                                 {
@@ -211,7 +217,8 @@
                                 {
                                     "type": "send_msg",
                                     "uuid": "7624633a-01a9-48f0-abca-957e7290df0a",
-                                    "text": "Good choice, I like @results.color.category_localized too! What is your favorite beer?"
+                                    "text": "Good choice, I like @results.color.category_localized too! What is your favorite beer?",
+                                    "sharing_config": {}
                                 }
                             ],
                             "exits": [
@@ -227,7 +234,8 @@
                                 {
                                     "type": "send_msg",
                                     "uuid": "aac779a9-e2a6-4a11-9efa-9670e081a33a",
-                                    "text": "I don't know that one, try again please."
+                                    "text": "I don't know that one, try again please.",
+                                    "sharing_config": {}
                                 }
                             ],
                             "exits": [
@@ -307,7 +315,11 @@
                                         "category_uuid": "2ba89eb6-6981-4c0d-a19d-3cf1fde52a43"
                                     }
                                 ],
-                                "default_category_uuid": "87b850ff-ddc5-4add-8a4f-c395c3a9ac38"
+                                "default_category_uuid": "87b850ff-ddc5-4add-8a4f-c395c3a9ac38",
+                                "config": {
+                                    "spell_checker": false,
+                                    "spelling_correction_sensitivity": ""
+                                }
                             },
                             "exits": [
                                 {
@@ -338,7 +350,8 @@
                                 {
                                     "type": "send_msg",
                                     "uuid": "ada3d96a-a1a2-41eb-aac7-febdb98a9b4c",
-                                    "text": "Mmmmm... delicious @results.beer.category_localized. If only they made @(lower(results.color)) @results.beer.category_localized! Lastly, what is your name?"
+                                    "text": "Mmmmm... delicious @results.beer.category_localized. If only they made @(lower(results.color)) @results.beer.category_localized! Lastly, what is your name?",
+                                    "sharing_config": {}
                                 }
                             ],
                             "exits": [
@@ -365,7 +378,11 @@
                                 ],
                                 "operand": "@input",
                                 "cases": [],
-                                "default_category_uuid": "491f3ed1-9154-4acb-8fdd-0a37567e0574"
+                                "default_category_uuid": "491f3ed1-9154-4acb-8fdd-0a37567e0574",
+                                "config": {
+                                    "spell_checker": false,
+                                    "spelling_correction_sensitivity": ""
+                                }
                             },
                             "exits": [
                                 {
@@ -380,7 +397,8 @@
                                 {
                                     "type": "send_msg",
                                     "uuid": "a602e75e-0814-4034-bb95-770906ddfe34",
-                                    "text": "Thanks @results.name, we are all done!"
+                                    "text": "Thanks @results.name, we are all done!",
+                                    "sharing_config": {}
                                 }
                             ],
                             "exits": [
@@ -395,7 +413,8 @@
                                 {
                                     "type": "send_msg",
                                     "uuid": "cb6fc9b4-d6e9-4ed3-8a11-3f4d19654a48",
-                                    "text": "Sorry you can't participate right now, I'll try again later."
+                                    "text": "Sorry you can't participate right now, I'll try again later.",
+                                    "sharing_config": {}
                                 }
                             ],
                             "exits": [
