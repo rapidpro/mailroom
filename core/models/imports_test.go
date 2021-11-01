@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/excellent/types"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/test"
+	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -66,7 +66,7 @@ func TestContactImports(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	for i, tc := range tcs {
-		importID := testdata.InsertContactImport(t, db, models.Org1)
+		importID := testdata.InsertContactImport(t, db, models.Org1, false)
 		batchID := testdata.InsertContactImportBatch(t, db, importID, tc.Specs)
 
 		batch, err := models.LoadContactImportBatch(ctx, db, batchID)
@@ -148,7 +148,7 @@ func TestContactImportBatch(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	importID := testdata.InsertContactImport(t, db, models.Org1)
+	importID := testdata.InsertContactImport(t, db, models.Org1, false)
 	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
@@ -196,6 +196,28 @@ func TestContactSpecUnmarshal(t *testing.T) {
 	assert.Equal(t, []urns.URN{"tel:+1234567890"}, s.URNs)
 	assert.Equal(t, map[string]string{"age": "39"}, s.Fields)
 	assert.Equal(t, []assets.GroupUUID{"3972dcc2-6749-4761-a896-7880d6165f2c"}, s.Groups)
+}
+
+func TestImportWithCarrierValidation(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	importID := testdata.InsertContactImport(t, db, models.Org1, true)
+	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
+		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
+		{"name": "Leah", "urns": ["tel:+16055740002"]}
+	]`))
+
+	batch, err := models.LoadContactImportBatch(ctx, db, batchID)
+	require.NoError(t, err)
+
+	err = batch.Import(ctx, db, models.Org1)
+	require.NoError(t, err)
+
+	carrierGroups := map[models.CarrierType][]models.ContactID{}
+	jsonx.Unmarshal(batch.CarrierGroups, &carrierGroups)
+	assert.Equal(t, len(carrierGroups), 1)
+	assert.Equal(t, len(carrierGroups["mobile"]), 2)
 }
 
 // utility to load all contacts for the given org and return as slice sorted by ID

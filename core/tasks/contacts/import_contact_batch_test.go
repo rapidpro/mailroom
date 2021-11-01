@@ -20,7 +20,7 @@ func TestImportContactBatch(t *testing.T) {
 
 	mr := &mailroom.Mailroom{Config: config.Mailroom, DB: db, RP: testsuite.RP(), ElasticClient: nil}
 
-	importID := testdata.InsertContactImport(t, db, models.Org1)
+	importID := testdata.InsertContactImport(t, db, models.Org1, false)
 	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}

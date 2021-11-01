@@ -236,8 +236,13 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 		if validateCarrier {
 			carrierTypeField := sa.Fields().Get("carrier_type")
 			carrierNameField := sa.Fields().Get("carrier_name")
-			addModifier(modifiers.NewField(carrierTypeField, string(carrierInfo.CarrierType)))
-			addModifier(modifiers.NewField(carrierNameField, carrierInfo.CarrierName))
+			if carrierTypeField != nil {
+				addModifier(modifiers.NewField(carrierTypeField, string(carrierInfo.CarrierType)))
+			}
+
+			if carrierNameField != nil {
+				addModifier(modifiers.NewField(carrierNameField, carrierInfo.CarrierName))
+			}
 		}
 
 		if len(spec.Groups) > 0 {
