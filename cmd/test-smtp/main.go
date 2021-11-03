@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/nyaruka/ezconf"
 	"github.com/greatnonprofits-nfp/goflow/utils/smtpx"
+	"github.com/nyaruka/ezconf"
 
 	"github.com/sirupsen/logrus"
 )
@@ -34,7 +34,9 @@ func main() {
 		logrus.WithError(err).Fatalf("unable to parse smtp config: %s", options.URL)
 	}
 
-	m := smtpx.NewMessage([]string{options.To}, options.Subject, options.Body, "")
+	var attachments = []string{""}
+
+	m := smtpx.NewMessage([]string{options.To}, options.Subject, options.Body, "", attachments)
 
 	err = smtpx.Send(client, m)
 	if err != nil {
