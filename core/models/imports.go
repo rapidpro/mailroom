@@ -186,7 +186,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			var validatedURNs []urns.URN
 
 			if validateCarrier {
-				carrierInfo, validatedURNs, err = validateURNCarrier(*spec, twilioClient)
+				carrierInfo, validatedURNs, err = ValidateURNCarrier(*spec, twilioClient)
 				if err != nil {
 					return errors.Wrap(err, "error validating urn carrier")
 				}
@@ -493,7 +493,7 @@ func getCarrierType(cType CarrierType) CarrierType {
 	return cType
 }
 
-func validateURNCarrier(spec ContactSpec, twilioClient *twilio.RestClient) (*PhoneNumberLookupOutput, []urns.URN, error) {
+func ValidateURNCarrier(spec ContactSpec, twilioClient *twilio.RestClient) (*PhoneNumberLookupOutput, []urns.URN, error) {
 	var validatedURNs []urns.URN
 	var urn = spec.URNs[0]
 	carrierInfo, err := numberLookUp(twilioClient, fmt.Sprintf("%v", urn))

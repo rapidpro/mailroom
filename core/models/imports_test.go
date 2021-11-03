@@ -198,28 +198,6 @@ func TestContactSpecUnmarshal(t *testing.T) {
 	assert.Equal(t, []assets.GroupUUID{"3972dcc2-6749-4761-a896-7880d6165f2c"}, s.Groups)
 }
 
-func TestImportWithCarrierValidation(t *testing.T) {
-	ctx := testsuite.CTX()
-	db := testsuite.DB()
-
-	importID := testdata.InsertContactImport(t, db, models.Org1, true)
-	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
-		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
-		{"name": "Leah", "urns": ["tel:+16055740002"]}
-	]`))
-
-	batch, err := models.LoadContactImportBatch(ctx, db, batchID)
-	require.NoError(t, err)
-
-	err = batch.Import(ctx, db, models.Org1)
-	require.NoError(t, err)
-
-	carrierGroups := map[models.CarrierType][]models.ContactID{}
-	jsonx.Unmarshal(batch.CarrierGroups, &carrierGroups)
-	assert.Equal(t, len(carrierGroups), 1)
-	assert.Equal(t, len(carrierGroups["mobile"]), 2)
-}
-
 // utility to load all contacts for the given org and return as slice sorted by ID
 func loadAllContacts(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) []*flows.Contact {
 	rows, err := db.Queryx(`SELECT id FROM contacts_contact WHERE org_id = $1`, oa.OrgID())
