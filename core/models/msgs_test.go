@@ -136,17 +136,6 @@ func TestOutgoingMsgs(t *testing.T) {
 	}
 }
 
-func TestGetMessageIDFromUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
-
-	msgIn := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi there", models.MsgStatusHandled)
-
-	msgID, err := models.GetMessageIDFromUUID(ctx, db, msgIn.UUID())
-
-	require.NoError(t, err)
-	assert.Equal(t, models.MsgID(msgIn.ID()), msgID)
-}
-
 func TestLoadMessages(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
