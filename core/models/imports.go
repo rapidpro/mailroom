@@ -155,7 +155,7 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 	}
 
 	if validateCarrier {
-		twilioClient = InitLookup(oa)
+		twilioClient = initLookup(oa)
 	}
 
 	for _, imp := range imports {
@@ -186,7 +186,11 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			var validatedURNs []urns.URN
 
 			if validateCarrier {
-				carrierInfo, validatedURNs, err = ValidateURNCarrier(*spec, twilioClient)
+				testFn := func (PhoneNumber string, params *openapi.FetchPhoneNumberParams) (*openapi.LookupsV1PhoneNumber, error) {
+					return twilioClient.LookupsV1.FetchPhoneNumber(PhoneNumber, params)
+				}
+
+				carrierInfo, validatedURNs, err = ValidateURNCarrier(*spec, testFn)
 				if err != nil {
 					return errors.Wrap(err, "error validating urn carrier")
 				}
@@ -421,58 +425,20 @@ type importError struct {
 
 // Carrier validation functions here
 
-type PhoneNumberLookupOutput struct {
-	CarrierType CarrierType
-	CarrierName string
-	isValid     bool
-}
-
-func InitLookup(oa *OrgAssets) *twilio.RestClient {
-	accountSid := oa.Org().ConfigValue("ACCOUNT_SID", "")
-	authToken := oa.Org().ConfigValue("ACCOUNT_TOKEN", "")
-	client := twilio.NewRestClientWithParams(twilio.RestClientParams{
-		Username: accountSid,
-		Password: authToken,
-	})
-
-	return client
-}
-
-func numberLookUp(client *twilio.RestClient, phoneNumber string) (*PhoneNumberLookupOutput, error) {
-	types := []string{"carrier"}
-	output := &PhoneNumberLookupOutput{}
-
-	params := &openapi.FetchPhoneNumberParams{}
-	params.SetType(types)
-	resp, err := client.LookupsV1.FetchPhoneNumber(phoneNumber, params)
-
-	if err != nil {
-		if !strings.Contains(err.Error(), "404") {
-			return nil, err
-		}
-		// avoid nil pointer
-		output.isValid = false
-		return output, nil
-	}
-	carrierInfo := *resp.Carrier
-
-	if carrierInfo["type"] == nil || carrierInfo["name"] == nil {
-		output.isValid = false
-		return output, nil
-	}
-	typeValue := CarrierType(fmt.Sprintf("%v", carrierInfo["type"]))
-	output.CarrierName = fmt.Sprintf("%v", carrierInfo["name"])
-	output.CarrierType = getCarrierType(typeValue)
-	output.isValid = true
-	return output, nil
-}
-
 var checkValidateCarrierValueSQL = `
 SELECT validate_carrier
 	FROM contacts_contactimport 
 WHERE
 	id = $1 AND is_active = TRUE AND validate_carrier = TRUE
 `
+
+type PhoneNumberLookupOutput struct {
+	CarrierType CarrierType
+	CarrierName string
+	IsValid     bool
+}
+
+type FetchPhoneNumber func (string, *openapi.FetchPhoneNumberParams) (*openapi.LookupsV1PhoneNumber, error)
 
 func checkValidateCarrier(ctx context.Context, db Queryer, id ContactImportID) (bool, error) {
 	result, err := db.ExecContext(ctx, checkValidateCarrierValueSQL, id)
@@ -493,14 +459,54 @@ func getCarrierType(cType CarrierType) CarrierType {
 	return cType
 }
 
-func ValidateURNCarrier(spec ContactSpec, twilioClient *twilio.RestClient) (*PhoneNumberLookupOutput, []urns.URN, error) {
+func initLookup(oa *OrgAssets) *twilio.RestClient {
+	accountSid := oa.Org().ConfigValue("ACCOUNT_SID", "")
+	authToken := oa.Org().ConfigValue("ACCOUNT_TOKEN", "")
+	client := twilio.NewRestClientWithParams(twilio.RestClientParams{
+		Username: accountSid,
+		Password: authToken,
+	})
+
+	return client
+}
+
+func numberLookUp(fn FetchPhoneNumber, phoneNumber string) (*PhoneNumberLookupOutput, error) {
+	types := []string{"carrier"}
+	output := &PhoneNumberLookupOutput{}
+
+	params := &openapi.FetchPhoneNumberParams{}
+	params.SetType(types)
+	resp, err := fn(phoneNumber, params)
+
+	if err != nil {
+		if !strings.Contains(err.Error(), "404") {
+			return nil, err
+		}
+		// avoid nil pointer
+		output.IsValid = false
+		return output, nil
+	}
+	carrierInfo := *resp.Carrier
+
+	if carrierInfo["type"] == nil || carrierInfo["name"] == nil || carrierInfo["type"] == "" || carrierInfo["name"] == "" {
+		output.IsValid = false
+		return output, nil
+	}
+	typeValue := CarrierType(fmt.Sprintf("%v", carrierInfo["type"]))
+	output.CarrierName = fmt.Sprintf("%v", carrierInfo["name"])
+	output.CarrierType = getCarrierType(typeValue)
+	output.IsValid = true
+	return output, nil
+}
+
+func ValidateURNCarrier(spec ContactSpec, fn FetchPhoneNumber) (*PhoneNumberLookupOutput, []urns.URN, error) {
 	var validatedURNs []urns.URN
 	var urn = spec.URNs[0]
-	carrierInfo, err := numberLookUp(twilioClient, fmt.Sprintf("%v", urn))
+	carrierInfo, err := numberLookUp(fn, fmt.Sprintf("%v", urn))
 	if err != nil {
 		return nil, validatedURNs, err
 	}
-	if carrierInfo.isValid {
+	if carrierInfo.IsValid {
 		validatedURNs = append(validatedURNs, urn)
 	}
 
