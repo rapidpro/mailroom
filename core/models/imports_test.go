@@ -3,6 +3,7 @@ package models_test
 import (
 	"context"
 	"encoding/json"
+	openapi "github.com/twilio/twilio-go/rest/lookups/v1"
 	"io/ioutil"
 	"sort"
 	"strings"
@@ -196,6 +197,94 @@ func TestContactSpecUnmarshal(t *testing.T) {
 	assert.Equal(t, []urns.URN{"tel:+1234567890"}, s.URNs)
 	assert.Equal(t, map[string]string{"age": "39"}, s.Fields)
 	assert.Equal(t, []assets.GroupUUID{"3972dcc2-6749-4761-a896-7880d6165f2c"}, s.Groups)
+}
+
+func TestValidateURNCarrier(t *testing.T) {
+	sampleData, err := loadSampleContacts()
+	assert.NoError(t, err)
+	for _, phoneDetails := range sampleData {
+		carrierInfo, _, err := models.ValidateURNCarrier(phoneDetails.Spec, FetchPhoneNumberMock)
+		assert.NoError(t, err)
+		assert.Equal(t, carrierInfo.IsValid, phoneDetails.ValidURN)
+		assert.Equal(t, carrierInfo.CarrierName, phoneDetails.CarrierName)
+		assert.Equal(t, string(carrierInfo.CarrierType), phoneDetails.CarrierType)
+	}
+}
+
+type sampleContact struct {
+	Spec models.ContactSpec `json:"spec"`
+	ValidURN bool			`json:"valid_urn"`
+	CarrierType string		`json:"type"`
+	CarrierName string		`json:"name"`
+}
+
+func loadSampleContacts () (map[string]sampleContact, error) {
+	var sampleData = `{
+		"tel:bad_contact": {
+			"spec": {
+				"uuid": "7fb56e30-fad3-4877-85d8-5477d421f4c6",
+				"name": "",
+				"language": "eng",
+				"urns": ["tel:+bad_contact"],
+				"groups": []
+			},
+			"valid_urn": false,
+			"type": null,
+			"name": null
+		},
+		"tel:+2348067886565": {
+			"spec": {
+				"uuid": "8e879527-7e6d-4bff-abc8-b1d41cd4f702",
+				"name": "Yasir",
+				"language": "eng",
+				"urns": ["tel:+2348067886565"],
+				"fields": {
+					"age": "4"
+				},
+				"groups": ["3972dcc2-6749-4761-a896-7880d6165f2c"]
+			},
+			"valid_urn": true,
+			"type": "mobile",
+			"name": "9mobile Nigeria"
+		},
+		"tel:+2348039529501": {
+			"spec": {
+				"uuid": "28236bb9-2554-4274-8708-dc94b86d8cd7",
+				"name": "Umahani",
+				"language": "eng",
+				"urns": ["tel:+2348039529501"],
+				"fields": {
+					"age": "2"
+				},
+				"groups": ["3972dcc2-6749-4761-a896-7880d6165f2c"]
+			},
+			"valid_urn": true,
+			"type": "mobile",
+			"name": "MTN Nigeria"
+		}
+	}`
+	var sampleContactMap = map[string]sampleContact{}
+	err := jsonx.Unmarshal([]byte(sampleData), &sampleContactMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return sampleContactMap, nil
+}
+
+func FetchPhoneNumberMock(PhoneNumber string, params *openapi.FetchPhoneNumberParams) (*openapi.LookupsV1PhoneNumber, error) {
+	responseSample := make(map[string]interface{})
+	sampleData, _ := loadSampleContacts()
+	if sampleData != nil {
+		data := sampleData[PhoneNumber]
+		responseSample["type"] = data.CarrierType
+		responseSample["name"] = data.CarrierName
+	}
+	var returnValue = &openapi.LookupsV1PhoneNumber{
+		Carrier: &responseSample,
+	}
+
+	return returnValue, nil
 }
 
 // utility to load all contacts for the given org and return as slice sorted by ID
