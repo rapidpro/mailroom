@@ -186,11 +186,9 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 			var validatedURNs []urns.URN
 
 			if validateCarrier {
-				testFn := func (PhoneNumber string, params *openapi.FetchPhoneNumberParams) (*openapi.LookupsV1PhoneNumber, error) {
-					return twilioClient.LookupsV1.FetchPhoneNumber(PhoneNumber, params)
-				}
+				validationTestFn := getValidationFn(twilioClient)
 
-				carrierInfo, validatedURNs, err = ValidateURNCarrier(*spec, testFn)
+				carrierInfo, validatedURNs, err = ValidateURNCarrier(*spec, validationTestFn)
 				if err != nil {
 					return errors.Wrap(err, "error validating urn carrier")
 				}
@@ -436,6 +434,14 @@ type PhoneNumberLookupOutput struct {
 	CarrierType CarrierType
 	CarrierName string
 	IsValid     bool
+}
+
+var getValidationFn = func (twilioClient *twilio.RestClient) FetchPhoneNumber {
+	returnFn := func (PhoneNumber string, params *openapi.FetchPhoneNumberParams) (*openapi.LookupsV1PhoneNumber, error) {
+		return twilioClient.LookupsV1.FetchPhoneNumber(PhoneNumber, params)
+	}
+
+	return returnFn
 }
 
 type FetchPhoneNumber func (string, *openapi.FetchPhoneNumberParams) (*openapi.LookupsV1PhoneNumber, error)
