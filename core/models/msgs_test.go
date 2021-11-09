@@ -2,13 +2,15 @@ package models_test
 
 import (
 	"fmt"
+	"github.com/greatnonprofits-nfp/goflow/flows/events"
+	"github.com/nyaruka/gocommon/jsonx"
 	"testing"
 	"time"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/utils"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -209,4 +211,49 @@ func TestMarkMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	testsuite.AssertQueryCount(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`, nil, 3)
+}
+
+func TestInsertChildBroadcast(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	defer testsuite.Reset()
+
+	bEvent, err := getBroadcastEventFromJSON()
+	assert.NoError(t, err)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshFields|models.RefreshGroups)
+	assert.NoError(t, err)
+
+	broadcast, err := models.NewBroadcastFromEvent(ctx, db, oa, &bEvent)
+	assert.NoError(t, err)
+
+	cloned, err := models.InsertChildBroadcast(ctx, db, broadcast)
+	assert.NoError(t, err)
+
+	assert.Equal(t, broadcast.URNs(), cloned.URNs())
+	assert.NotEqual(t, broadcast.BroadcastID(), cloned.BroadcastID())
+}
+
+func getBroadcastEventFromJSON() (events.BroadcastCreatedEvent, error) {
+	bEventInst := events.BroadcastCreatedEvent{}
+	bEvent := `
+	{
+	    "type": "broadcast_created",
+	    "created_on": "2021-11-07T15:04:05Z",
+	    "translations": {
+	      "eng": {
+	        "text": "hi, what's up"
+	      },
+	      "spa": {
+	        "text": "Que pasa"
+	      }
+	    },
+	    "base_language": "eng",
+	    "urns": [],
+	    "contacts": [{"uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf", "name": "Cathy"}]
+	}
+`
+	err := jsonx.Unmarshal([]byte(bEvent), &bEventInst)
+
+	return bEventInst, err
 }
