@@ -61,19 +61,9 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 	}
 
 	for _, msg := range msgs {
-		// android messages should never get in here
-		if msg.Channel() != nil && msg.Channel().Type() == models.ChannelTypeAndroid {
-			panic("trying to queue android messages to courier")
-		}
-
-		// ignore any message without a channel or already marked as failed (maybe org is suspended)
-		if msg.ChannelUUID() == "" || msg.Status() == models.MsgStatusFailed {
-			continue
-		}
-
-		// nil channel object but have channel UUID? that's an error
-		if msg.Channel() == nil {
-			return errors.Errorf("msg passed in without channel set")
+		// messages without a channel or channel UUID and android messages should never get in here
+		if msg.Channel() == nil || msg.ChannelUUID() == "" || msg.Channel().Type() == models.ChannelTypeAndroid {
+			panic("trying to queue messages to courier without a valid channel")
 		}
 
 		// no contact urn id or urn, also an error

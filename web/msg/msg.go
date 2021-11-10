@@ -43,7 +43,7 @@ func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
-	msgs, err := models.LoadMessages(ctx, rt.DB, request.OrgID, models.DirectionOut, request.MsgIDs)
+	msgs, err := models.GetMessagesByID(ctx, rt.DB, request.OrgID, models.DirectionOut, request.MsgIDs)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error loading messages to resend")
 	}

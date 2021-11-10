@@ -147,7 +147,7 @@ func TestGetMessageIDFromUUID(t *testing.T) {
 	assert.Equal(t, models.MsgID(msgIn.ID()), msgID)
 }
 
-func TestLoadMessages(t *testing.T) {
+func TestGetMessagesByID(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
 	msgIn1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "in 1", models.MsgStatusHandled)
@@ -158,7 +158,7 @@ func TestLoadMessages(t *testing.T) {
 
 	ids := []models.MsgID{models.MsgID(msgIn1.ID()), models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID()), models.MsgID(msgOut3.ID())}
 
-	msgs, err := models.LoadMessages(ctx, db, testdata.Org1.ID, models.DirectionOut, ids)
+	msgs, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, ids)
 
 	// should only return the outgoing messages for this org
 	require.NoError(t, err)
@@ -167,7 +167,7 @@ func TestLoadMessages(t *testing.T) {
 	assert.Equal(t, []utils.Attachment{"image/jpeg:hi.jpg"}, msgs[0].Attachments())
 	assert.Equal(t, "out 2", msgs[1].Text())
 
-	msgs, err = models.LoadMessages(ctx, db, testdata.Org1.ID, models.DirectionIn, ids)
+	msgs, err = models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionIn, ids)
 
 	// should only return the incoming message for this org
 	require.NoError(t, err)
@@ -190,7 +190,7 @@ func TestResendMessages(t *testing.T) {
 	// give Bob's URN an affinity for the Vonage channel
 	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, testdata.VonageChannel.ID, testdata.Bob.URNID)
 
-	msgs, err := models.LoadMessages(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
+	msgs, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
 	require.NoError(t, err)
 
 	now := dates.Now()
@@ -273,6 +273,13 @@ func TestMarkMessages(t *testing.T) {
 	assert.NoError(t, err)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(3)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(1)
+
+	err = models.MarkMessagesQueued(ctx, db, []*models.Msg{msg4})
+	assert.NoError(t, err)
+
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(2)
 }
 
 func TestNonPersistentBroadcasts(t *testing.T) {
