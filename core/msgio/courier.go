@@ -10,7 +10,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -94,15 +93,10 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 	}
 
 	for _, msg := range msgs {
-		// messages without a channel or channel UUID and android messages should never get in here
-		if msg.Channel() == nil || msg.ChannelUUID() == "" || msg.Channel().Type() == models.ChannelTypeAndroid {
-			panic("trying to queue messages to courier without a valid channel")
-		}
-
-		// no contact urn id or urn, also an error
-		if msg.URN() == urns.NilURN || msg.ContactURNID() == nil {
-			return errors.Errorf("msg passed with nil urn: %s", msg.URN())
-		}
+		// sanity check the state of the msg we're about to queue...
+		assert(msg.Channel() != nil && msg.ChannelUUID() != "", "can't queue a message to courier without a channel")
+		assert(msg.Channel().Type() != models.ChannelTypeAndroid, "can't queue an android message to courier")
+		assert(msg.URN() != urns.NilURN && msg.ContactURNID() != nil, "can't queue a message to courier without a URN")
 
 		// same channel? add to batch
 		if msg.Channel() == currentChannel {

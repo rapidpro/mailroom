@@ -19,6 +19,8 @@ func SyncAndroidChannels(fc *fcm.Client, channels []*models.Channel) {
 	}
 
 	for _, channel := range channels {
+		assert(channel.Type() == models.ChannelTypeAndroid, "can't sync a non-android channel")
+
 		// no FCM ID for this channel, noop, we can't trigger a sync
 		fcmID := channel.ConfigValue(models.ChannelConfigFCMID, "")
 		if fcmID == "" {

@@ -80,3 +80,9 @@ func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, f
 		}
 	}
 }
+
+func assert(c bool, m string) {
+	if !c {
+		panic(m)
+	}
+}
