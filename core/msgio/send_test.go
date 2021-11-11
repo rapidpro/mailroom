@@ -14,16 +14,18 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/null"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type msgSpec struct {
-	ChannelID models.ChannelID
-	ContactID models.ContactID
-	URNID     models.URNID
-	Failed    bool
+	ChannelID    models.ChannelID
+	ContactID    models.ContactID
+	URNID        models.URNID
+	Failed       bool
+	HighPriority bool
 }
 
 func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets) *models.Msg {
@@ -47,6 +49,10 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 	msg, err := models.NewOutgoingMsg(rt.Config, oaOrg.Org(), channel, m.ContactID, flowMsg, time.Now())
 	require.NoError(t, err)
 
+	if m.HighPriority {
+		msg.SetResponseTo(models.NilMsgID, null.String("1234"))
+	}
+
 	models.InsertMessages(ctx, rt.DB, []*models.Msg{msg})
 	require.NoError(t, err)
 
@@ -57,6 +63,8 @@ func TestSendMessages(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetData)
 
 	mockFCM := newMockFCMEndpoint("FCMID3")
 	defer mockFCM.Stop()
@@ -79,6 +87,13 @@ func TestSendMessages(t *testing.T) {
 		PendingMsgs     int
 	}{
 		{
+			Description:     "no messages",
+			Msgs:            []msgSpec{},
+			QueueSizes:      map[string][]int{},
+			FCMTokensSynced: []string{},
+			PendingMsgs:     0,
+		},
+		{
 			Description: "2 messages for Courier, and 1 Android",
 			Msgs: []msgSpec{
 				{
@@ -96,9 +111,16 @@ func TestSendMessages(t *testing.T) {
 					ContactID: testdata.Cathy.ID,
 					URNID:     testdata.Cathy.URNID,
 				},
+				{
+					ChannelID:    testdata.TwilioChannel.ID,
+					ContactID:    testdata.Bob.ID,
+					URNID:        testdata.Bob.URNID,
+					HighPriority: true,
+				},
 			},
 			QueueSizes: map[string][]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2},
+				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // 2 default priority messages for Cathy
+				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1}, // 1 high priority message for Bob
 			},
 			FCMTokensSynced: []string{"FCMID1"},
 			PendingMsgs:     0,
