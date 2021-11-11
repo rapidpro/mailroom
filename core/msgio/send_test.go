@@ -149,6 +149,20 @@ func TestSendMessages(t *testing.T) {
 			PendingMsgs:     0,
 		},
 		{
+			Description: "messages with FAILED status ignored",
+			Msgs: []msgSpec{
+				{
+					ChannelID: testdata.TwilioChannel.ID,
+					ContactID: testdata.Cathy.ID,
+					URNID:     testdata.Cathy.URNID,
+					Failed:    true,
+				},
+			},
+			QueueSizes:      map[string][]int{},
+			FCMTokensSynced: []string{},
+			PendingMsgs:     0,
+		},
+		{
 			Description: "messages without channels set to PENDING",
 			Msgs: []msgSpec{
 				{

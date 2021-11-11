@@ -121,8 +121,8 @@ type Msg struct {
 		ResponseToID         MsgID              `db:"response_to_id"  json:"response_to_id"`
 		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
 		IsResend             bool               `                     json:"is_resend,omitempty"`
-		URN                  urns.URN           `                     json:"urn"`
-		URNAuth              null.String        `                     json:"urn_auth,omitempty"`
+		URN                  urns.URN           `db:"urn_urn"         json:"urn"`
+		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"        json:"-"`
 
@@ -426,35 +426,39 @@ func GetMessagesByID(ctx context.Context, db Queryer, orgID OrgID, direction Msg
 
 var loadMessagesForRetrySQL = `
 SELECT 
-	id,
-	broadcast_id,
-	uuid,
-	text,
-	created_on,
-	direction,
-	status,
-	visibility,
-	msg_count,
-	error_count,
-	next_attempt,
-	external_id,
-	attachments,
-	metadata,
-	channel_id,
-	connection_id,
-	contact_id,
-	contact_urn_id,
-	response_to_id,
-	org_id,
-	topup_id
+	m.id,
+	m.broadcast_id,
+	m.uuid,
+	m.text,
+	m.created_on,
+	m.direction,
+	m.status,
+	m.visibility,
+	m.msg_count,
+	m.error_count,
+	m.next_attempt,
+	m.external_id,
+	m.attachments,
+	m.metadata,
+	m.channel_id,
+	m.connection_id,
+	m.contact_id,
+	m.contact_urn_id,
+	m.response_to_id,
+	m.org_id,
+	m.topup_id,
+	u.identity AS "urn_urn",
+	u.auth AS "urn_auth"
 FROM
-	msgs_msg
+	msgs_msg m
+INNER JOIN 
+	contacts_contacturn u ON u.id = m.contact_urn_id
 WHERE
-	direction = 'O' AND
-	status = 'E' AND
-	next_attempt <= NOW()
+	m.direction = 'O' AND
+	m.status = 'E' AND
+	m.next_attempt <= NOW()
 ORDER BY
-    next_attempt ASC, created_on ASC
+    m.next_attempt ASC, m.created_on ASC
 LIMIT 5000`
 
 func GetMessagesForRetry(ctx context.Context, db Queryer) ([]*Msg, error) {

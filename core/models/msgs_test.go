@@ -220,6 +220,8 @@ func TestMarshalMsg(t *testing.T) {
 func TestGetMessagesByID(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
+	defer testsuite.Reset(testsuite.ResetData)
+
 	msgIn1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "in 1", models.MsgStatusHandled)
 	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"}, models.MsgStatusSent)
 	msgOut2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 2", nil, models.MsgStatusSent)
