@@ -546,16 +546,6 @@ WHERE
 	msgs_msg.id = m.id::bigint
 `
 
-// GetMessageIDFromUUID gets the ID of a message from its UUID
-func GetMessageIDFromUUID(ctx context.Context, db Queryer, uuid flows.MsgUUID) (MsgID, error) {
-	var id MsgID
-	err := db.GetContext(ctx, &id, `SELECT id FROM msgs_msg WHERE uuid = $1`, uuid)
-	if err != nil {
-		return NilMsgID, errors.Wrapf(err, "error querying id for msg with uuid '%s'", uuid)
-	}
-	return id, nil
-}
-
 // BroadcastTranslation is the translation for the passed in language
 type BroadcastTranslation struct {
 	Text         string             `json:"text"`
