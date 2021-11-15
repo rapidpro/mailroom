@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -479,7 +478,6 @@ func TicketsChangeTopic(ctx context.Context, db Queryer, oa *OrgAssets, userID U
 	now := dates.Now()
 
 	for _, ticket := range tickets {
-		fmt.Printf("ticket #%d topic=%d\n", ticket.ID(), ticket.TopicID())
 		if ticket.TopicID() != topicID {
 			ids = append(ids, ticket.ID())
 			t := &ticket.t

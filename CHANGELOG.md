@@ -1,3 +1,7 @@
+v7.0.1
+----------
+ * Update to latest goflow
+
 v7.0.0
 ----------
  * Tweak README
