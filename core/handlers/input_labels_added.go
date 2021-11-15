@@ -31,7 +31,7 @@ func handleInputLabelsAdded(ctx context.Context, rt *runtime.Runtime, tx *sqlx.T
 		"labels":       event.Labels,
 	}).Debug("input labels added")
 
-	// if the session has input then we should have be here because of a msg event in which case the msg id is saved on the session
+	// if the sprint had input, then it was started by a msg event and we should have the message ID saved on the session
 	inputMsgID := scene.Session().IncomingMsgID()
 	if inputMsgID == models.NilMsgID {
 		return errors.New("handling input labels added event in session without msg")
