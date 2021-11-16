@@ -38,7 +38,8 @@ func (i *IncidentID) Scan(value interface{}) error {
 type IncidentType string
 
 const (
-	IncidentTypeFlowWebhooks IncidentType = "flow:webhooks"
+	IncidentTypeOrgFlagged        IncidentType = "org:flagged"
+	IncidentTypeWebhooksUnhealthy IncidentType = "webhooks:unhealthy"
 )
 
 type Incident struct {
@@ -48,27 +49,25 @@ type Incident struct {
 	Scope     string       `db:"scope"`
 	StartedOn time.Time    `db:"started_on"`
 	EndedOn   *time.Time   `db:"ended_on"`
-
-	FlowID FlowID `db:"flow_id"`
+	ChannelID ChannelID    `db:"channel_id"`
 }
 
-func GetOrCreateFlowWebhooksIncident(ctx context.Context, db Queryer, oa *OrgAssets, flow *Flow) error {
+func GetOrCreateWebhooksUnhealthyIncident(ctx context.Context, db Queryer, oa *OrgAssets) error {
 	return getOrCreateIncident(ctx, db, oa, &Incident{
 		OrgID:     oa.OrgID(),
-		Type:      IncidentTypeFlowWebhooks,
+		Type:      IncidentTypeWebhooksUnhealthy,
 		StartedOn: dates.Now(),
-		Scope:     string(flow.UUID()),
-		FlowID:    flow.ID(),
+		Scope:     "",
 	})
 }
 
 const insertIncidentSQL = `
-INSERT INTO notifications_incident(org_id, incident_type, scope, started_on) VALUES($1, $2, $3, $4)
+INSERT INTO notifications_incident(org_id, incident_type, scope, started_on, channel_id) VALUES($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING RETURNING id`
 
 func getOrCreateIncident(ctx context.Context, db Queryer, oa *OrgAssets, incident *Incident) error {
 	var incidentID IncidentID
-	err := db.GetContext(ctx, &incidentID, insertIncidentSQL, incident.OrgID, incident.Type, incident.Scope, incident.StartedOn)
+	err := db.GetContext(ctx, &incidentID, insertIncidentSQL, incident.OrgID, incident.Type, incident.Scope, incident.StartedOn, incident.ChannelID)
 	if err != nil {
 		return errors.Wrap(err, "error inserting incident")
 	}

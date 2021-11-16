@@ -61,10 +61,7 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 
 		// if the response time is slower than the healthy limit, record this as an unhealthy webhook too
 		if responseTime > time.Millisecond*time.Duration(rt.Config.WebhooksHealthyResponseLimit) {
-			scene.AppendToEventPreCommitHook(hooks.UnhealthyWebhooks, &hooks.UnhealthyWebhook{
-				Flow:     dbFlow,
-				NodeUUID: step.NodeUUID(),
-			})
+			scene.AppendToEventPreCommitHook(hooks.UnhealthyWebhooks, step.NodeUUID())
 		}
 	}
 
