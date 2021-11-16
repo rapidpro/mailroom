@@ -12,7 +12,9 @@ import (
 )
 
 func TestRetryErroredMessages(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
@@ -26,7 +28,21 @@ func TestRetryErroredMessages(t *testing.T) {
 	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 1, time.Now().Add(-time.Hour))
 	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute))
 
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(3)
+
+	// simulate the celery based task in RapidPro being running
+	rc.Do("SET", "celery-task-lock:retry_errored_messages", "32462346262")
+
 	err := msgs.RetryErroredMessages(ctx, rt)
+	require.NoError(t, err)
+
+	// no change...
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(3)
+
+	rc.Do("DEL", "celery-task-lock:retry_errored_messages")
+
+	// try again...
+	err = msgs.RetryErroredMessages(ctx, rt)
 	require.NoError(t, err)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'D'`).Returns(1)
