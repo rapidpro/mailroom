@@ -31,15 +31,10 @@ func handleInputLabelsAdded(ctx context.Context, rt *runtime.Runtime, tx *sqlx.T
 		"labels":       event.Labels,
 	}).Debug("input labels added")
 
-	// in the case this session was started/resumed from a msg event, we have the msg ID cached on the session
+	// if the sprint had input, then it was started by a msg event and we should have the message ID saved on the session
 	inputMsgID := scene.Session().IncomingMsgID()
-
 	if inputMsgID == models.NilMsgID {
-		var err error
-		inputMsgID, err = models.GetMessageIDFromUUID(ctx, tx, flows.MsgUUID(event.InputUUID))
-		if err != nil {
-			return errors.Wrap(err, "unable to find input message")
-		}
+		return errors.New("handling input labels added event in session without msg")
 	}
 
 	// for each label add an insertion
