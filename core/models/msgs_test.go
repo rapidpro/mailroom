@@ -1,15 +1,18 @@
 package models_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -21,6 +24,11 @@ import (
 
 func TestOutgoingMsgs(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
+
+	defer func() {
+		testsuite.Reset(testsuite.ResetData)
+		db.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
+	}()
 
 	tcs := []struct {
 		ChannelUUID  assets.ChannelUUID
@@ -91,9 +99,6 @@ func TestOutgoingMsgs(t *testing.T) {
 	now := time.Now()
 
 	for _, tc := range tcs {
-		tx, err := db.BeginTxx(ctx, nil)
-		require.NoError(t, err)
-
 		db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, tc.SuspendedOrg, testdata.Org1.ID)
 
 		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
@@ -109,7 +114,7 @@ func TestOutgoingMsgs(t *testing.T) {
 		} else {
 			assert.NoError(t, err)
 
-			err = models.InsertMessages(ctx, tx, []*models.Msg{msg})
+			err = models.InsertMessages(ctx, db, []*models.Msg{msg})
 			assert.NoError(t, err)
 			assert.Equal(t, oa.OrgID(), msg.OrgID())
 			assert.Equal(t, tc.Text, msg.Text())
@@ -131,20 +136,73 @@ func TestOutgoingMsgs(t *testing.T) {
 			assert.True(t, msg.QueuedOn().After(now))
 			assert.True(t, msg.ModifiedOn().After(now))
 		}
-
-		tx.Rollback()
 	}
 }
 
-func TestGetMessageIDFromUUID(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+func TestMarshalMsg(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
 
-	msgIn := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi there", models.MsgStatusHandled)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM orgs_org WHERE is_suspended = TRUE`).Returns(0)
 
-	msgID, err := models.GetMessageIDFromUUID(ctx, db, msgIn.UUID())
-
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.MsgID(msgIn.ID()), msgID)
+	require.False(t, oa.Org().Suspended())
+
+	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
+	flowMsg := flows.NewMsgOut(
+		urn,
+		assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"),
+		"Hi there",
+		[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
+		[]string{"yes", "no"},
+		nil,
+		flows.MsgTopicPurchase,
+	)
+	msg, err := models.NewOutgoingMsg(rt.Config, oa.Org(), channel, testdata.Cathy.ID, flowMsg, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
+	require.NoError(t, err)
+
+	err = models.InsertMessages(ctx, db, []*models.Msg{msg})
+	require.NoError(t, err)
+
+	marshaled, err := json.Marshal(msg)
+	require.NoError(t, err)
+
+	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
+		"attachments": [
+			"image/jpeg:https://dl-foo.com/image.jpg"
+		],
+		"channel_id": 10000,
+		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+		"contact_id": 10000,
+		"contact_urn_id": 10000,
+		"created_on": "2021-11-09T14:03:30Z",
+		"direction": "O",
+		"error_count": 0,
+		"external_id": null,
+		"high_priority": false,
+		"id": %d,
+		"metadata": {
+			"quick_replies": [
+				"yes",
+				"no"
+			],
+			"topic": "purchase"
+		},
+		"modified_on": %s,
+		"next_attempt": null,
+		"org_id": 1,
+		"queued_on": %s,
+		"response_to_external_id": null,
+		"response_to_id": null,
+		"sent_on": null,
+		"status": "Q",
+		"text": "Hi there",
+		"tps_cost": 2,
+		"urn": "tel:+250700000001?id=10000",
+		"uuid": "%s",
+		"visibility": "V"
+	}`, msg.ID(), jsonx.MustMarshal(msg.ModifiedOn()), jsonx.MustMarshal(msg.QueuedOn()), msg.UUID())), marshaled)
 }
 
 func TestLoadMessages(t *testing.T) {

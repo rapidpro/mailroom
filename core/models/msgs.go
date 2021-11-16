@@ -106,7 +106,7 @@ type Msg struct {
 		Direction            MsgDirection       `db:"direction"       json:"direction"`
 		Status               MsgStatus          `db:"status"          json:"status"`
 		Visibility           MsgVisibility      `db:"visibility"      json:"visibility"`
-		MsgType              MsgType            `db:"msg_type"`
+		MsgType              MsgType            `db:"msg_type"        json:"-"`
 		MsgCount             int                `db:"msg_count"       json:"tps_cost"`
 		ErrorCount           int                `db:"error_count"     json:"error_count"`
 		NextAttempt          *time.Time         `db:"next_attempt"    json:"next_attempt"`
@@ -115,7 +115,7 @@ type Msg struct {
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
-		ConnectionID         *ConnectionID      `db:"connection_id"`
+		ConnectionID         *ConnectionID      `db:"connection_id"   json:"-"`
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
 		ResponseToID         MsgID              `db:"response_to_id"  json:"response_to_id"`
@@ -124,7 +124,7 @@ type Msg struct {
 		URN                  urns.URN           `                     json:"urn"`
 		URNAuth              null.String        `                     json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
-		TopupID              TopupID            `db:"topup_id"`
+		TopupID              TopupID            `db:"topup_id"        json:"-"`
 
 		SessionID     SessionID     `json:"session_id,omitempty"`
 		SessionStatus SessionStatus `json:"session_status,omitempty"`
@@ -545,16 +545,6 @@ FROM (
 WHERE
 	msgs_msg.id = m.id::bigint
 `
-
-// GetMessageIDFromUUID gets the ID of a message from its UUID
-func GetMessageIDFromUUID(ctx context.Context, db Queryer, uuid flows.MsgUUID) (MsgID, error) {
-	var id MsgID
-	err := db.GetContext(ctx, &id, `SELECT id FROM msgs_msg WHERE uuid = $1`, uuid)
-	if err != nil {
-		return NilMsgID, errors.Wrapf(err, "error querying id for msg with uuid '%s'", uuid)
-	}
-	return id, nil
-}
 
 // BroadcastTranslation is the translation for the passed in language
 type BroadcastTranslation struct {

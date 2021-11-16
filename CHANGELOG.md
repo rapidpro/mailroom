@@ -1,3 +1,10 @@
+v7.1.0
+----------
+ * Update to latest goflow with expression changes
+ * Make LUA script to queue messages to courier easier to understand
+ * Explicitly exclude msg fields from marshalling that courier doesn't use
+ * Remove unused code for looking up msgs by UUID
+
 v7.0.1
 ----------
  * Update to latest goflow
