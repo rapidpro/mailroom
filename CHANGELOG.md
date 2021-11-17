@@ -1,3 +1,7 @@
+v7.1.1
+----------
+ * Remove notification.channel_id
+
 v7.1.0
 ----------
  * Update to latest goflow with expression changes
