@@ -16,10 +16,9 @@ type NotificationID int
 type NotificationType string
 
 const (
-	NotificationTypeChannelAlert    NotificationType = "channel:alert"
 	NotificationTypeExportFinished  NotificationType = "export:finished"
-	NotificationTypeFlowWebhooks    NotificationType = "flow:webhooks"
 	NotificationTypeImportFinished  NotificationType = "import:finished"
+	NotificationTypeIncidentStarted NotificationType = "incident:started"
 	NotificationTypeTicketsOpened   NotificationType = "tickets:opened"
 	NotificationTypeTicketsActivity NotificationType = "tickets:activity"
 )
@@ -42,7 +41,6 @@ type Notification struct {
 	EmailStatus EmailStatus      `db:"email_status"`
 	CreatedOn   time.Time        `db:"created_on"`
 
-	ChannelID       ChannelID       `db:"channel_id"`
 	ContactImportID ContactImportID `db:"contact_import_id"`
 	IncidentID      IncidentID      `db:"incident_id"`
 }
@@ -58,6 +56,24 @@ func NotifyImportFinished(ctx context.Context, db Queryer, imp *ContactImport) e
 	}
 
 	return insertNotifications(ctx, db, []*Notification{n})
+}
+
+// NotifyIncidentStarted notifies administrators that an incident has started
+func NotifyIncidentStarted(ctx context.Context, db Queryer, oa *OrgAssets, incident *Incident) error {
+	admins := usersWithRoles(oa, []UserRole{UserRoleAdministrator})
+	notifications := make([]*Notification, len(admins))
+
+	for i, admin := range admins {
+		notifications[i] = &Notification{
+			OrgID:      incident.OrgID,
+			Type:       NotificationTypeIncidentStarted,
+			Scope:      strconv.Itoa(int(incident.ID)),
+			UserID:     admin.ID(),
+			IncidentID: incident.ID,
+		}
+	}
+
+	return insertNotifications(ctx, db, notifications)
 }
 
 var ticketAssignableToles = []UserRole{UserRoleAdministrator, UserRoleEditor, UserRoleAgent}
@@ -118,27 +134,9 @@ func NotificationsFromTicketEvents(ctx context.Context, db Queryer, oa *OrgAsset
 	return insertNotifications(ctx, db, notifications)
 }
 
-// NotifyIncidentStarted notifies administrators that an incident has started
-func NotifyIncidentStarted(ctx context.Context, db Queryer, oa *OrgAssets, incident *Incident) error {
-	admins := usersWithRoles(oa, []UserRole{UserRoleAdministrator})
-	notifications := make([]*Notification, len(admins))
-
-	for i, admin := range admins {
-		notifications[i] = &Notification{
-			OrgID:      incident.OrgID,
-			Type:       NotificationTypeFlowWebhooks,
-			Scope:      strconv.Itoa(int(incident.ID)),
-			UserID:     admin.ID(),
-			IncidentID: incident.ID,
-		}
-	}
-
-	return insertNotifications(ctx, db, notifications)
-}
-
 const insertNotificationSQL = `
-INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user_id, is_seen, email_status, created_on,  channel_id,  contact_import_id,  incident_id) 
-                               VALUES(:org_id, :notification_type, :scope, :user_id,   FALSE,          'N',      NOW(), :channel_id, :contact_import_id, :incident_id) 
+INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user_id, is_seen, email_status, created_on,  contact_import_id,  incident_id) 
+                               VALUES(:org_id, :notification_type, :scope, :user_id,   FALSE,          'N',      NOW(), :contact_import_id, :incident_id) 
 							   ON CONFLICT DO NOTHING`
 
 func insertNotifications(ctx context.Context, db Queryer, notifications []*Notification) error {
