@@ -15,7 +15,6 @@ type NotificationID int
 type NotificationType string
 
 const (
-	NotificationTypeChannelAlert    NotificationType = "channel:alert"
 	NotificationTypeExportFinished  NotificationType = "export:finished"
 	NotificationTypeImportFinished  NotificationType = "import:finished"
 	NotificationTypeTicketsOpened   NotificationType = "tickets:opened"
@@ -40,7 +39,6 @@ type Notification struct {
 	EmailStatus EmailStatus      `db:"email_status"`
 	CreatedOn   time.Time        `db:"created_on"`
 
-	ChannelID       ChannelID       `db:"channel_id"`
 	ContactImportID ContactImportID `db:"contact_import_id"`
 }
 
@@ -116,8 +114,8 @@ func NotificationsFromTicketEvents(ctx context.Context, db Queryer, oa *OrgAsset
 }
 
 const insertNotificationSQL = `
-INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user_id, is_seen, email_status, created_on,  channel_id,  contact_import_id) 
-                               VALUES(:org_id, :notification_type, :scope, :user_id,   FALSE,          'N',      NOW(), :channel_id, :contact_import_id) 
+INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user_id, is_seen, email_status, created_on,  contact_import_id) 
+                               VALUES(:org_id, :notification_type, :scope, :user_id,   FALSE,          'N',      NOW(), :contact_import_id) 
 							   ON CONFLICT DO NOTHING`
 
 func insertNotifications(ctx context.Context, db Queryer, notifications []*Notification) error {
