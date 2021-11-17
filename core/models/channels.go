@@ -7,12 +7,12 @@ import (
 	"math"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -124,11 +124,48 @@ func (c *Channel) ChannelReference() *assets.ChannelReference {
 	return assets.NewChannelReference(c.UUID(), c.Name())
 }
 
+// GetChannelsByID fetches channels by ID - NOTE these are "lite" channels and only include fields for sending
+func GetChannelsByID(ctx context.Context, db Queryer, ids []ChannelID) ([]*Channel, error) {
+	rows, err := db.QueryxContext(ctx, selectChannelsByIDSQL, pq.Array(ids))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying channels by id")
+	}
+	defer rows.Close()
+
+	channels := make([]*Channel, 0, 5)
+	for rows.Next() {
+		channel := &Channel{}
+		err := dbutil.ReadJSONRow(rows, &channel.c)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error unmarshalling channel")
+		}
+
+		channels = append(channels, channel)
+	}
+
+	return channels, nil
+}
+
+const selectChannelsByIDSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	c.id as id,
+	c.uuid as uuid,
+	c.name as name,
+	c.channel_type as channel_type,
+	COALESCE(c.tps, 10) as tps,
+	COALESCE(c.config, '{}')::json as config
+FROM 
+	channels_channel c
+WHERE 
+	c.id = ANY($1)
+) r;
+`
+
 // loadChannels loads all the channels for the passed in org
-func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Channel, error) {
+func loadChannels(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Channel, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectChannelsSQL, orgID)
+	rows, err := db.QueryxContext(ctx, selectChannelsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
 	}
