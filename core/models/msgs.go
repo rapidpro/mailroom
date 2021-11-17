@@ -121,8 +121,8 @@ type Msg struct {
 		ResponseToID         MsgID              `db:"response_to_id"  json:"response_to_id"`
 		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
 		IsResend             bool               `                     json:"is_resend,omitempty"`
-		URN                  urns.URN           `                     json:"urn"`
-		URNAuth              null.String        `                     json:"urn_auth,omitempty"`
+		URN                  urns.URN           `db:"urn_urn"         json:"urn"`
+		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"        json:"-"`
 
@@ -170,8 +170,18 @@ func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
 
 func (m *Msg) SetTopup(topupID TopupID)               { m.m.TopupID = topupID }
-func (m *Msg) SetChannelID(channelID ChannelID)       { m.m.ChannelID = channelID }
 func (m *Msg) SetBroadcastID(broadcastID BroadcastID) { m.m.BroadcastID = broadcastID }
+
+func (m *Msg) SetChannel(channel *Channel) {
+	m.channel = channel
+	if channel != nil {
+		m.m.ChannelID = channel.ID()
+		m.m.ChannelUUID = channel.UUID()
+	} else {
+		m.m.ChannelID = NilChannelID
+		m.m.ChannelUUID = ""
+	}
+}
 
 func (m *Msg) SetURN(urn urns.URN) error {
 	// noop for nil urn
@@ -235,12 +245,11 @@ func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, i
 
 	connID := conn.ID()
 	m.ConnectionID = &connID
+	m.ChannelID = conn.ChannelID()
 
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
-
-	msg.SetChannelID(conn.ChannelID())
 
 	// add any attachments
 	for _, a := range in.Attachments() {
@@ -270,6 +279,7 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, o
 
 	connID := conn.ID()
 	m.ConnectionID = &connID
+	m.ChannelID = conn.ChannelID()
 
 	m.URN = out.URN()
 
@@ -277,7 +287,6 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, o
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 	m.SentOn = &createdOn
-	msg.SetChannelID(conn.ChannelID())
 
 	// if we have attachments, add them
 	for _, a := range out.Attachments() {
@@ -310,15 +319,11 @@ func NewOutgoingMsg(cfg *runtime.Config, org *Org, channel *Channel, contactID C
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
+	msg.SetChannel(channel)
+
 	err := msg.SetURN(out.URN())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error setting msg urn")
-	}
-
-	if channel != nil {
-		m.ChannelUUID = channel.UUID()
-		msg.SetChannelID(channel.ID())
-		msg.channel = channel
 	}
 
 	m.MsgCount = 1
@@ -358,9 +363,11 @@ func NewOutgoingMsg(cfg *runtime.Config, org *Org, channel *Channel, contactID C
 // NewIncomingMsg creates a new incoming message for the passed in text and attachment
 func NewIncomingMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactID ContactID, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
-	m := &msg.m
 
+	msg.SetChannel(channel)
 	msg.SetURN(in.URN())
+
+	m := &msg.m
 	m.UUID = in.UUID()
 	m.Text = in.Text()
 	m.Direction = DirectionIn
@@ -368,16 +375,9 @@ func NewIncomingMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactI
 	m.Visibility = VisibilityVisible
 	m.MsgType = MsgTypeFlow
 	m.ContactID = contactID
-
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
-
-	if channel != nil {
-		msg.SetChannelID(channel.ID())
-		m.ChannelUUID = channel.UUID()
-		msg.channel = channel
-	}
 
 	// add any attachments
 	for _, a := range in.Attachments() {
@@ -419,15 +419,63 @@ WHERE
 ORDER BY
 	id ASC`
 
-// LoadMessages loads the given messages for the passed in org
-func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, direction MsgDirection, msgIDs []MsgID) ([]*Msg, error) {
-	rows, err := db.QueryxContext(ctx, loadMessagesSQL, orgID, direction, pq.Array(msgIDs))
+// GetMessagesByID fetches the messages with the given ids
+func GetMessagesByID(ctx context.Context, db Queryer, orgID OrgID, direction MsgDirection, msgIDs []MsgID) ([]*Msg, error) {
+	return loadMessages(ctx, db, loadMessagesSQL, orgID, direction, pq.Array(msgIDs))
+}
+
+var loadMessagesForRetrySQL = `
+SELECT 
+	m.id,
+	m.broadcast_id,
+	m.uuid,
+	m.text,
+	m.created_on,
+	m.direction,
+	m.status,
+	m.visibility,
+	m.msg_count,
+	m.error_count,
+	m.next_attempt,
+	m.external_id,
+	m.attachments,
+	m.metadata,
+	m.channel_id,
+	m.connection_id,
+	m.contact_id,
+	m.contact_urn_id,
+	m.response_to_id,
+	m.org_id,
+	m.topup_id,
+	u.identity AS "urn_urn",
+	u.auth AS "urn_auth"
+FROM
+	msgs_msg m
+INNER JOIN 
+	contacts_contacturn u ON u.id = m.contact_urn_id
+WHERE
+	m.direction = 'O' AND
+	m.status = 'E' AND
+	m.next_attempt <= NOW()
+ORDER BY
+    m.next_attempt ASC, m.created_on ASC
+LIMIT 5000`
+
+func GetMessagesForRetry(ctx context.Context, db Queryer) ([]*Msg, error) {
+	return loadMessages(ctx, db, loadMessagesForRetrySQL)
+}
+
+func loadMessages(ctx context.Context, db Queryer, sql string, params ...interface{}) ([]*Msg, error) {
+	rows, err := db.QueryxContext(ctx, sql, params...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error querying msgs for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying msgs")
 	}
 	defer rows.Close()
 
 	msgs := make([]*Msg, 0)
+	channelIDsSeen := make(map[ChannelID]bool)
+	channelIDs := make([]ChannelID, 0, 5)
+
 	for rows.Next() {
 		msg := &Msg{}
 		err = rows.StructScan(&msg.m)
@@ -436,6 +484,25 @@ func LoadMessages(ctx context.Context, db Queryer, orgID OrgID, direction MsgDir
 		}
 
 		msgs = append(msgs, msg)
+
+		if msg.ChannelID() != NilChannelID && !channelIDsSeen[msg.ChannelID()] {
+			channelIDsSeen[msg.ChannelID()] = true
+			channelIDs = append(channelIDs, msg.ChannelID())
+		}
+	}
+
+	channels, err := GetChannelsByID(ctx, db, channelIDs)
+	if err != nil {
+		return nil, errors.Wrap(err, "error fetching channels for messages")
+	}
+
+	channelsByID := make(map[ChannelID]*Channel)
+	for _, ch := range channels {
+		channelsByID[ch.ID()] = ch
+	}
+
+	for _, msg := range msgs {
+		msg.SetChannel(channelsByID[msg.m.ChannelID])
 	}
 
 	return msgs, nil
@@ -517,9 +584,14 @@ func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status Ms
 	return nil
 }
 
-// MarkMessagesPending marks the passed in messages as pending
+// MarkMessagesPending marks the passed in messages as pending(P)
 func MarkMessagesPending(ctx context.Context, db Queryer, msgs []*Msg) error {
 	return updateMessageStatus(ctx, db, msgs, MsgStatusPending)
+}
+
+// MarkMessagesQueued marks the passed in messages as queued(Q)
+func MarkMessagesQueued(ctx context.Context, db Queryer, msgs []*Msg) error {
+	return updateMessageStatus(ctx, db, msgs, MsgStatusQueued)
 }
 
 func updateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status MsgStatus) error {

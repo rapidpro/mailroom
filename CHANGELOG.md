@@ -1,3 +1,7 @@
+v7.1.2
+----------
+ * Add task to retry errored messages
+
 v7.1.1
 ----------
  * Remove notification.channel_id

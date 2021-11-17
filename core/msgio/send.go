@@ -24,6 +24,11 @@ func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, f
 
 	// walk through our messages, separate by whether they have a channel and if it's Android
 	for _, msg := range msgs {
+		// ignore any message already marked as failed (maybe org is suspended)
+		if msg.Status() == models.MsgStatusFailed {
+			continue
+		}
+
 		channel := msg.Channel()
 		if channel != nil {
 			if channel.Type() == models.ChannelTypeAndroid {
@@ -73,5 +78,11 @@ func SendMessages(ctx context.Context, rt *runtime.Runtime, tx models.Queryer, f
 		if err != nil {
 			log.WithError(err).Error("error marking message as pending")
 		}
+	}
+}
+
+func assert(c bool, m string) {
+	if !c {
+		panic(m)
 	}
 }
