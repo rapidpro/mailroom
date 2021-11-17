@@ -14,6 +14,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	unhealthyResolvedAfter        = 5 * time.Minute
+	unhealthyBecomesIncidentAfter = 20 * time.Minute
+)
+
 var UnhealthyWebhooks models.EventCommitHook = &unhealthyWebhooks{}
 
 type unhealthyWebhooks struct{}
@@ -22,7 +27,8 @@ func (h *unhealthyWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	// extract set of unique node UUIDs
+	// count unhealthy calls and extract set of unique node UUIDs
+	count := 0
 	nodesSeen := make(map[flows.NodeUUID]bool)
 	nodes := make([]flows.NodeUUID, 0, 5)
 	for _, es := range scenes {
@@ -32,17 +38,28 @@ func (h *unhealthyWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *
 				nodesSeen[n] = true
 				nodes = append(nodes, n)
 			}
+			count++
 		}
 	}
 
 	unhealthyStartKey := fmt.Sprintf("webhooks:unhealthy:%d:start", oa.OrgID())
+	unhealthyCountKey := fmt.Sprintf("webhooks:unhealthy:%d:count", oa.OrgID())
 	unhealthyNodesKey := fmt.Sprintf("webhooks:unhealthy:%d:nodes", oa.OrgID())
+	expireKeysSeconds := int(unhealthyResolvedAfter / time.Second)
 
-	// set the key for when this org entered the unhealthy state, or get back the existing start time value
-	unhealthyStartMS, err := redis.Int64(rc.Do("SET", unhealthyStartKey, dates.Now().UnixMilli(), "EX", 60*5, "NX", "GET"))
+	// set the key for when this org entered the unhealthy state if not already set
+	_, err := rc.Do("SET", unhealthyStartKey, dates.Now().Unix(), "NX", "EX", expireKeysSeconds)
 	if err != nil && err != redis.ErrNil {
 		return errors.Wrap(err, "error setting webhooks unhealthy start in redis")
 	}
+
+	unhealthyStartUnix, err := redis.Int64(rc.Do("GET", unhealthyStartKey))
+	if err != nil {
+		return errors.Wrap(err, "error setting webhooks unhealthy start in redis")
+	}
+
+	rc.Do("INCRBY", unhealthyCountKey, count)
+	rc.Do("EXPIRE", unhealthyCountKey, expireKeysSeconds)
 
 	// add these node UUIDs to the set of unhealthy nodes
 	_, err = sadd(rc, unhealthyNodesKey, nodes)
@@ -50,13 +67,15 @@ func (h *unhealthyWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *
 		return errors.Wrap(err, "error setting webhooks unhealthy start in redis")
 	}
 
-	if unhealthyStartMS != 0 {
-		unhealthyStart := time.UnixMilli(unhealthyStartMS)
+	rc.Do("EXPIRE", unhealthyNodesKey, expireKeysSeconds)
+
+	if unhealthyStartUnix != 0 {
+		unhealthyStart := time.Unix(unhealthyStartUnix, 0)
 		unhealthySince := dates.Now().Sub(unhealthyStart)
 
-		// if we've been unhealthy for at least 20 minutes, create an incident
-		if unhealthySince > 20*time.Minute {
-			err = models.GetOrCreateWebhooksUnhealthyIncident(ctx, tx, oa)
+		// if we've been unhealthy for too long, create an incident
+		if unhealthySince > unhealthyBecomesIncidentAfter {
+			err = models.IncidentWebhooksUnhealthy(ctx, tx, oa)
 			if err != nil {
 				return errors.Wrap(err, "error creating unhealthy webhooks incident")
 			}
@@ -65,6 +84,10 @@ func (h *unhealthyWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *
 
 	return nil
 }
+
+/*var recordUnhealthy = redis.NewScript(-1, `
+
+`)*/
 
 // helper to add node UUIDs to a redis set in bulk
 func sadd(rc redis.Conn, key string, uuids []flows.NodeUUID) (int, error) {

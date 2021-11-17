@@ -1,15 +1,24 @@
 package handlers_test
 
 import (
+	"net/http"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/mailroom/core/handlers"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/stretchr/testify/require"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/goflow/flows/engine"
 )
 
 func TestWebhookCalled(t *testing.T) {
@@ -82,4 +91,94 @@ func TestWebhookCalled(t *testing.T) {
 	}
 
 	handlers.RunTestCases(t, ctx, rt, tcs)
+}
+
+// a webhook service which fakes slow responses
+type failingWebhookService struct {
+	delay time.Duration
+}
+
+func (s *failingWebhookService) Call(session flows.Session, request *http.Request) (*flows.WebhookCall, error) {
+	return &flows.WebhookCall{
+		Trace: &httpx.Trace{
+			Request:       request,
+			RequestTrace:  []byte(`GET http://rapidpro.io/`),
+			Response:      nil,
+			ResponseTrace: nil,
+			StartTime:     dates.Now(),
+			EndTime:       dates.Now().Add(s.delay),
+		},
+	}, nil
+}
+
+func TestUnhealthyWebhookCalls(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+	defer dates.SetNowSource(dates.DefaultNowSource)
+
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2021, 11, 17, 7, 0, 0, 0, time.UTC)))
+
+	flowDef, err := os.ReadFile("testdata/webhook_flow.json")
+	require.NoError(t, err)
+
+	testdata.InsertFlow(db, testdata.Org1, flowDef)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
+	require.NoError(t, err)
+
+	env := envs.NewBuilder().Build()
+	_, cathy := testdata.Cathy.Load(db, oa)
+
+	// webhook service with a 2 second delay
+	svc := &failingWebhookService{delay: 2 * time.Second}
+
+	eng := engine.NewBuilder().WithWebhookServiceFactory(func(flows.Session) (flows.WebhookService, error) { return svc, nil }).Build()
+	flowRef := assets.NewFlowReference("bc5d6b7b-3e18-4d7c-8279-50b460e74f7f", "Test")
+
+	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
+
+	testsuite.AssertRedisNotExists(t, rp, "webhooks:unhealthy:1:start")
+	testsuite.AssertRedisNotExists(t, rp, "webhooks:unhealthy:1:count")
+	testsuite.AssertRedisNotExists(t, rp, "webhooks:unhealthy:1:nodes")
+
+	// change webhook service delay to 30 seconds and re-run flow
+	svc.delay = 30 * time.Second
+	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
+
+	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:start", "1637132429")
+	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:count", "1")
+	testsuite.AssertRedisSet(t, rp, "webhooks:unhealthy:1:nodes", []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+
+	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
+
+	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:start", "1637132429") // unchanged
+	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:count", "2")
+	testsuite.AssertRedisSet(t, rp, "webhooks:unhealthy:1:nodes", []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+
+	// still no incident tho..
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident`).Returns(0)
+
+	// tweak start time so it looks like we started being unhealthy 30 mins ago, i.e. 1637132429 - (30 * 60)
+	rc.Do("SET", "webhooks:unhealthy:1:start", "1637130629")
+
+	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
+
+	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:start", "1637130629")
+	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:count", "3")
+	testsuite.AssertRedisSet(t, rp, "webhooks:unhealthy:1:nodes", []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+
+	// now there should be an incident
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident`).Returns(1)
+
+	// running again doesn't create another incident
+	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
+
+	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:start", "1637130629")
+	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:count", "4")
+	testsuite.AssertRedisSet(t, rp, "webhooks:unhealthy:1:nodes", []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident`).Returns(1)
 }

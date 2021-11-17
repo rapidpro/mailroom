@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -253,8 +252,6 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 		err = tx.Commit()
 		assert.NoError(t, err)
 
-		time.Sleep(500 * time.Millisecond)
-
 		// now check our assertions
 		for j, a := range tc.SQLAssertions {
 			testsuite.AssertQuery(t, rt.DB, a.SQL, a.Args...).Returns(a.Count, "%d:%d: mismatch in expected count for query: %s", i, j, a.SQL)
@@ -265,4 +262,33 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 			assert.NoError(t, err, "%d:%d error checking assertion", i, j)
 		}
 	}
+}
+
+func RunFlowAndApplyEvents(t *testing.T, ctx context.Context, rt *runtime.Runtime, env envs.Environment, eng flows.Engine, oa *models.OrgAssets, flowRef *assets.FlowReference, contact *flows.Contact) {
+	trigger := triggers.NewBuilder(env, flowRef, contact).Manual().Build()
+	fs, sprint, err := eng.NewSession(oa.SessionAssets(), trigger)
+	require.NoError(t, err)
+
+	tx, err := rt.DB.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+
+	session, err := models.NewSession(ctx, tx, oa, fs, sprint)
+	require.NoError(t, err)
+
+	err = tx.Commit()
+	require.NoError(t, err)
+
+	scene := models.NewSceneForSession(session)
+
+	tx, err = rt.DB.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+
+	err = models.HandleEvents(ctx, rt, tx, oa, scene, sprint.Events())
+	require.NoError(t, err)
+
+	err = models.ApplyEventPreCommitHooks(ctx, rt, tx, oa, []*models.Scene{scene})
+	require.NoError(t, err)
+
+	err = tx.Commit()
+	require.NoError(t, err)
 }

@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"time"
 
@@ -52,7 +53,7 @@ type Incident struct {
 	ChannelID ChannelID    `db:"channel_id"`
 }
 
-func GetOrCreateWebhooksUnhealthyIncident(ctx context.Context, db Queryer, oa *OrgAssets) error {
+func IncidentWebhooksUnhealthy(ctx context.Context, db Queryer, oa *OrgAssets) error {
 	return getOrCreateIncident(ctx, db, oa, &Incident{
 		OrgID:     oa.OrgID(),
 		Type:      IncidentTypeWebhooksUnhealthy,
@@ -68,7 +69,7 @@ ON CONFLICT DO NOTHING RETURNING id`
 func getOrCreateIncident(ctx context.Context, db Queryer, oa *OrgAssets, incident *Incident) error {
 	var incidentID IncidentID
 	err := db.GetContext(ctx, &incidentID, insertIncidentSQL, incident.OrgID, incident.Type, incident.Scope, incident.StartedOn, incident.ChannelID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return errors.Wrap(err, "error inserting incident")
 	}
 
