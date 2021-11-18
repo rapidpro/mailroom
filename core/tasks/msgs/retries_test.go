@@ -18,6 +18,12 @@ func TestRetryErroredMessages(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
+	// nothing to retry
+	err := msgs.RetryErroredMessages(ctx, rt)
+	require.NoError(t, err)
+
+	testsuite.AssertCourierQueues(t, map[string][]int{})
+
 	// a non-errored outgoing message (should be ignored)
 	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", nil, models.MsgStatusDelivered)
 
@@ -33,7 +39,7 @@ func TestRetryErroredMessages(t *testing.T) {
 	// simulate the celery based task in RapidPro being running
 	rc.Do("SET", "celery-task-lock:retry_errored_messages", "32462346262")
 
-	err := msgs.RetryErroredMessages(ctx, rt)
+	err = msgs.RetryErroredMessages(ctx, rt)
 	require.NoError(t, err)
 
 	// no change...

@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -39,6 +40,8 @@ func RetryErroredMessages(ctx context.Context, rt *runtime.Runtime) error {
 	rc := rt.RP.Get()
 	defer rc.Close()
 
+	start := time.Now()
+
 	// RapidPro has a retry task and until it is removed we need to ensure we're not running on top of it
 	// otherwise errored messages could be retried twice
 	result, err := rc.Do("SET", celeryLock, uuids.New(), "NX")
@@ -54,6 +57,9 @@ func RetryErroredMessages(ctx context.Context, rt *runtime.Runtime) error {
 	if err != nil {
 		return errors.Wrap(err, "error fetching errored messages to retry")
 	}
+	if len(msgs) == 0 {
+		return nil // nothing to retry
+	}
 
 	err = models.MarkMessagesQueued(ctx, rt.DB, msgs)
 	if err != nil {
@@ -61,6 +67,8 @@ func RetryErroredMessages(ctx context.Context, rt *runtime.Runtime) error {
 	}
 
 	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
+
+	logrus.WithField("count", len(msgs)).WithField("elapsed", time.Since(start)).Info("retried errored messages")
 
 	return nil
 }
