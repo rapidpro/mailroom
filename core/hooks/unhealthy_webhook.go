@@ -85,10 +85,6 @@ func (h *unhealthyWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *
 	return nil
 }
 
-/*var recordUnhealthy = redis.NewScript(-1, `
-
-`)*/
-
 // helper to add node UUIDs to a redis set in bulk
 func sadd(rc redis.Conn, key string, uuids []flows.NodeUUID) (int, error) {
 	args := make([]interface{}, len(uuids)+1)
