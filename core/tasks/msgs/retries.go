@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
@@ -17,7 +16,6 @@ import (
 
 const (
 	retryMessagesLock = "retry_errored_messages"
-	celeryLock        = "celery-task-lock:retry_errored_messages"
 )
 
 func init() {
@@ -41,17 +39,6 @@ func RetryErroredMessages(ctx context.Context, rt *runtime.Runtime) error {
 	defer rc.Close()
 
 	start := time.Now()
-
-	// RapidPro has a retry task and until it is removed we need to ensure we're not running on top of it
-	// otherwise errored messages could be retried twice
-	result, err := rc.Do("SET", celeryLock, uuids.New(), "NX")
-	if err != nil {
-		return errors.Wrap(err, "error trying to aquire celery task lock")
-	}
-	if result == nil { // nil result means SET NX failed because celery is currently running that task
-		return nil
-	}
-	defer rc.Do("DEL", celeryLock)
 
 	msgs, err := models.GetMessagesForRetry(ctx, rt.DB)
 	if err != nil {

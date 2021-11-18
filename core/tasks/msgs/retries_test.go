@@ -36,17 +36,6 @@ func TestRetryErroredMessages(t *testing.T) {
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(3)
 
-	// simulate the celery based task in RapidPro being running
-	rc.Do("SET", "celery-task-lock:retry_errored_messages", "32462346262")
-
-	err = msgs.RetryErroredMessages(ctx, rt)
-	require.NoError(t, err)
-
-	// no change...
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(3)
-
-	rc.Do("DEL", "celery-task-lock:retry_errored_messages")
-
 	// try again...
 	err = msgs.RetryErroredMessages(ctx, rt)
 	require.NoError(t, err)
