@@ -3,6 +3,7 @@ package testsuite
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/gomodule/redigo/redis"
@@ -94,6 +95,9 @@ func AssertRedisSet(t *testing.T, rp *redis.Pool, key string, expected []string,
 	defer rc.Close()
 
 	actual, err := redis.Strings(rc.Do("SMEMBERS", key))
+
+	sort.Strings(actual)
+
 	require.NoError(t, err)
 	assert.Equal(t, expected, actual, msgAndArgs...)
 }
