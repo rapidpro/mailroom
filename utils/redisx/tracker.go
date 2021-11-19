@@ -23,15 +23,15 @@ func NewStatesTracker(keyBase string, states []string, interval time.Duration, w
 }
 
 // Record records a result (i.e. one of the states)
-func (t *StatesTracker) Record(rc redis.Conn, s string) error {
+func (t *StatesTracker) Record(rc redis.Conn, state string, count int) error {
 	its := t.getIntervalStart(dates.Now().Unix(), 0)
-	key := t.getCountKey(its, s)
+	key := t.getCountKey(its, state)
 
 	// give count key an expiry which ensures it will be around for at least our window
 	exp := time.Unix(its, 0).Add(-t.window).Add(-time.Second * 10)
 
 	rc.Send("MULTI")
-	rc.Send("INCR", key)
+	rc.Send("INCRBY", key, count)
 	rc.Send("EXPIREAT", key, exp)
 	_, err := rc.Do("EXEC")
 	return err
@@ -120,8 +120,8 @@ func NewBoolTracker(keyBase string, interval time.Duration, window time.Duration
 }
 
 // Record records a bool result
-func (t *BoolTracker) Record(rc redis.Conn, b bool) error {
-	return t.StatesTracker.Record(rc, strconv.FormatBool(b))
+func (t *BoolTracker) Record(rc redis.Conn, b bool, count int) error {
+	return t.StatesTracker.Record(rc, strconv.FormatBool(b), count)
 }
 
 // Current returns the total counts of true and false states, across all intervals within our window

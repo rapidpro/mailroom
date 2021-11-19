@@ -40,7 +40,7 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		scene.AppendToEventPreCommitHook(hooks.UnsubscribeResthookHook, unsub)
 	}
 
-	responseTime := time.Millisecond * time.Duration(event.ElapsedMS)
+	elapsed := time.Millisecond * time.Duration(event.ElapsedMS)
 	run, step := scene.Session().FindStep(e.StepUUID())
 	flow, _ := oa.Flow(run.FlowReference().UUID)
 
@@ -53,17 +53,15 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 			dbFlow.ID(),
 			event.URL, event.StatusCode, event.Request, event.Response,
 			event.Status != flows.CallStatusSuccess,
-			responseTime,
+			elapsed,
 			event.Retries,
 			event.CreatedOn(),
 		)
 		scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, httpLog)
-
-		// if the response time is slower than the healthy limit, record this as an unhealthy webhook too
-		if responseTime > time.Millisecond*time.Duration(rt.Config.WebhooksHealthyResponseLimit) {
-			scene.AppendToEventPreCommitHook(hooks.UnhealthyWebhooks, step.NodeUUID())
-		}
 	}
+
+	// pass node and response time to the hook that monitors webhook health
+	scene.AppendToEventPreCommitHook(hooks.MonitorWebhooks, &hooks.WebhookCall{NodeUUID: step.NodeUUID(), Elapsed: elapsed})
 
 	return nil
 }

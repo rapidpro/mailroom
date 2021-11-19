@@ -27,11 +27,7 @@ func TestStatesTracker(t *testing.T) {
 	// set now to 12:00:03.. so current interval is 12:00:00 (1637236800) <= t < 12:00:10 (1637236810)
 	setNow(time.Date(2021, 11, 18, 12, 0, 3, 234567, time.UTC))
 
-	recordState := func(s string, n int) {
-		for i := 0; i < n; i++ {
-			require.NoError(t, tr.Record(rc, s))
-		}
-	}
+	recordState := func(s string, n int) { require.NoError(t, tr.Record(rc, s, n)) }
 
 	// no counts.. zeros for all
 	totals, err := tr.Current(rc)
@@ -123,11 +119,11 @@ func TestBoolTracker(t *testing.T) {
 	assert.Equal(t, 0, yes)
 	assert.Equal(t, 0, no)
 
-	err = tr.Record(rc, true)
+	err = tr.Record(rc, true, 1)
 	require.NoError(t, err)
 
-	tr.Record(rc, false)
-	tr.Record(rc, true)
+	tr.Record(rc, false, 1)
+	tr.Record(rc, true, 1)
 
 	testsuite.AssertRedisInt(t, rp, "foo:2:1637236800:true", 2)
 	testsuite.AssertRedisInt(t, rp, "foo:2:1637236800:false", 1)
@@ -139,10 +135,8 @@ func TestBoolTracker(t *testing.T) {
 
 	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 0, 13, 234567, time.UTC)))
 
-	tr.Record(rc, false)
-	tr.Record(rc, true)
-	tr.Record(rc, true)
-	tr.Record(rc, true)
+	tr.Record(rc, false, 1)
+	tr.Record(rc, true, 3)
 
 	testsuite.AssertRedisInt(t, rp, "foo:2:1637236800:true", 2)
 	testsuite.AssertRedisInt(t, rp, "foo:2:1637236800:false", 1)
