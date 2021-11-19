@@ -46,6 +46,8 @@ func (t *StatesTracker) Current(rc redis.Conn) (map[string]int, error) {
 	keys := make([]interface{}, 0, 20)
 
 	iEnd := t.getIntervalStart(now, 1) // end of current interval is start of next
+	lastINum := 0
+	lastIScale := 1.0
 
 	for i := 0; ; i-- {
 		iStart := t.getIntervalStart(now, i)
@@ -57,6 +59,13 @@ func (t *StatesTracker) Current(rc redis.Conn) (map[string]int, error) {
 			keys = append(keys, t.getCountKey(iStart, s))
 		}
 
+		// if this is the last interval and it starts before the window, calculate how much of it
+		// is in the window and we'll scale it's counts by that factor.
+		if iStart < wStart {
+			lastIScale = float64(iEnd-wStart) / t.interval.Seconds()
+		}
+
+		lastINum = i
 		iEnd = iStart
 	}
 
@@ -67,11 +76,14 @@ func (t *StatesTracker) Current(rc redis.Conn) (map[string]int, error) {
 
 	totals := make(map[string]int, len(t.states))
 
-	for i := 0; i < len(counts); i += len(t.states) {
-		for j, s := range t.states {
-			// TODO to approximate accurate values for the window we need to decrease weight of totals for
-			// the earliest interval as it potentially starts before the window
-			totals[s] += counts[i+j]
+	for i, j := 0, 0; j < len(counts); i, j = i-1, j+len(t.states) {
+		scale := 1.0
+		if i == lastINum {
+			scale = lastIScale
+		}
+
+		for k, s := range t.states {
+			totals[s] += int(float64(counts[j+k]) * scale)
 		}
 	}
 

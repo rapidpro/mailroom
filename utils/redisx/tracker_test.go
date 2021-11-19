@@ -27,67 +27,83 @@ func TestStatesTracker(t *testing.T) {
 	// set now to 12:00:03.. so current interval is 12:00:00 (1637236800) <= t < 12:00:10 (1637236810)
 	setNow(time.Date(2021, 11, 18, 12, 0, 3, 234567, time.UTC))
 
+	recordState := func(s string, n int) {
+		for i := 0; i < n; i++ {
+			require.NoError(t, tr.Record(rc, s))
+		}
+	}
+
 	// no counts.. zeros for all
 	totals, err := tr.Current(rc)
 	assert.NoError(t, err)
 	assert.Equal(t, map[string]int{"yes": 0, "no": 0, "maybe": 0}, totals)
 
-	require.NoError(t, tr.Record(rc, "yes"))
-	require.NoError(t, tr.Record(rc, "no"))
-	require.NoError(t, tr.Record(rc, "yes"))
+	recordState("yes", 8)
+	recordState("no", 4)
 
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:yes", 2)
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:no", 1)
+	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:yes", 8)
+	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:no", 4)
 	testsuite.AssertRedisNotExists(t, rp, "foo:1:1637236800:maybe")
 
 	// current window is 11:59:33 (1637236773) - 12:00:03 (1637236803) so we'll include counts from intervals..
-	//  0: 12:00:00 (1637236800) <= t < 12:00:10 (1637236810) yes=2 no=1 maybe=0
+	//  0: 12:00:00 (1637236800) <= t < 12:00:10 (1637236810) yes=8 no=4 maybe=0
 	// -1: 11:59:50 (1637236790) <= t < 12:00:00 (1637236800) yes=0 no=0 maybe=0
 	// -2: 11:59:40 (1637236780) <= t < 11:59:50 (1637236790) yes=0 no=0 maybe=0
 	// -3: 11:59:30 (1637236770) <= t < 11:59:40 (1637236780) yes=0 no=0 maybe=0
 	totals, err = tr.Current(rc)
 	assert.NoError(t, err)
-	assert.Equal(t, map[string]int{"yes": 2, "no": 1, "maybe": 0}, totals)
+	assert.Equal(t, map[string]int{"yes": 8, "no": 4, "maybe": 0}, totals)
 
 	// set now to exactly 12:00:10 which falls on the start of a new interval
 	setNow(time.Date(2021, 11, 18, 12, 0, 10, 0, time.UTC))
 
-	tr.Record(rc, "no")
-	tr.Record(rc, "maybe")
-	tr.Record(rc, "yes")
-	tr.Record(rc, "yes")
-	tr.Record(rc, "yes")
+	recordState("yes", 3)
+	recordState("no", 1)
+	recordState("maybe", 1)
 
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:yes", 2)
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:no", 1)
+	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:yes", 8)
+	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:no", 4)
 	testsuite.AssertRedisInt(t, rp, "foo:1:1637236810:yes", 3)
 	testsuite.AssertRedisInt(t, rp, "foo:1:1637236810:no", 1)
 	testsuite.AssertRedisInt(t, rp, "foo:1:1637236810:maybe", 1)
 
 	// current window is 11:40:00 (1637236780) - 12:00:10 (1637236810) so we'll include counts from intervals..
 	//  0: 12:00:10 (1637236810) <= t < 12:00:20 (1637236820) yes=3 no=1 maybe=1
-	// -1: 12:00:00 (1637236800) <= t < 12:00:10 (1637236810) yes=2 no=1 maybe=0
+	// -1: 12:00:00 (1637236800) <= t < 12:00:10 (1637236810) yes=8 no=4 maybe=0
 	// -2: 11:59:50 (1637236790) <= t < 12:00:00 (1637236800) yes=0 no=0 maybe=0
 	// -3: 11:59:40 (1637236780) <= t < 11:59:50 (1637236790) yes=0 no=0 maybe=0
 	totals, err = tr.Current(rc)
 	assert.NoError(t, err)
-	assert.Equal(t, map[string]int{"yes": 5, "no": 2, "maybe": 1}, totals)
+	assert.Equal(t, map[string]int{"yes": 11, "no": 5, "maybe": 1}, totals)
 
 	// set now to 12:00:35
 	setNow(time.Date(2021, 11, 18, 12, 0, 35, 0, time.UTC))
 
-	tr.Record(rc, "no")
-	tr.Record(rc, "yes")
-	tr.Record(rc, "yes")
+	recordState("yes", 2)
+	recordState("no", 1)
 
 	// current window is 12:00:05 (1637236805) - 12:00:35 (1637236835) so we'll include counts from intervals..
-	//  0: 12:00:30 (1637236810) <= t < 12:00:40 (1637236820) yes=2 no=1 maybe=0
-	// -1: 12:00:20 (1637236800) <= t < 12:00:30 (1637236810) yes=0 no=0 maybe=0
-	// -2: 12:00:10 (1637236790) <= t < 12:00:20 (1637236800) yes=3 no=1 maybe=1
-	// -3: 12:00:00 (1637236780) <= t < 12:00:10 (1637236790) yes=2 no=1 maybe=0
+	//  0: 12:00:30 <= t < 12:00:40 yes=2 no=1 maybe=0
+	// -1: 12:00:20 <= t < 12:00:30 yes=0 no=0 maybe=0
+	// -2: 12:00:10 <= t < 12:00:20 yes=3 no=1 maybe=1
+	// -3: 12:00:00 <= t < 12:00:10 yes=8 no=4 maybe=0 (start of window falls halfway thru this interval so they are scaled by 0.5)
 	totals, err = tr.Current(rc)
 	assert.NoError(t, err)
-	assert.Equal(t, map[string]int{"yes": 7, "no": 3, "maybe": 1}, totals)
+	assert.Equal(t, map[string]int{"yes": 9, "no": 4, "maybe": 1}, totals)
+
+	// set now to 12:00:38 - last interval is now only 20% in the window
+	setNow(time.Date(2021, 11, 18, 12, 0, 38, 0, time.UTC))
+
+	totals, err = tr.Current(rc)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]int{"yes": 6, "no": 2, "maybe": 1}, totals)
+
+	// set now to 12:00:40 - that interval is now out of the window
+	setNow(time.Date(2021, 11, 18, 12, 0, 40, 0, time.UTC))
+
+	totals, err = tr.Current(rc)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]int{"yes": 5, "no": 2, "maybe": 1}, totals)
 }
 
 func TestBoolTracker(t *testing.T) {
