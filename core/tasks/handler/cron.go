@@ -12,7 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-	"github.com/nyaruka/mailroom/utils/marker"
+	"github.com/nyaruka/mailroom/utils/redisx"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,8 +20,9 @@ import (
 
 const (
 	retryLock = "retry_msgs"
-	markerKey = "retried_msgs"
 )
+
+var retriedMsgs = redisx.NewMarker("retried_msgs")
 
 func init() {
 	mailroom.AddInitFunction(StartRetryCron)
@@ -85,7 +86,7 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime, lockName string,
 		// our key is built such that we will only retry once an hour
 		key := fmt.Sprintf("%d_%d", msgID, time.Now().Hour())
 
-		dupe, err := marker.HasTask(rc, markerKey, key)
+		dupe, err := retriedMsgs.Contains(rc, key)
 		if err != nil {
 			return errors.Wrapf(err, "error checking for dupe retry")
 		}
@@ -109,7 +110,7 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime, lockName string,
 		}
 
 		// mark it as queued
-		err = marker.AddTask(rc, markerKey, key)
+		err = retriedMsgs.Add(rc, key)
 		if err != nil {
 			return errors.Wrapf(err, "error marking task for retry")
 		}

@@ -13,17 +13,17 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-	"github.com/nyaruka/mailroom/utils/marker"
+	"github.com/nyaruka/mailroom/utils/redisx"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	campaignsLock = "campaign_event"
-
 	maxBatchSize = 100
 )
+
+var campaignsMarker = redisx.NewMarker("campaign_event")
 
 func init() {
 	mailroom.AddInitFunction(StartCampaignCron)
@@ -31,7 +31,7 @@ func init() {
 
 // StartCampaignCron starts our cron job of firing expired campaign events
 func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.StartCron(quit, rt.RP, campaignsLock, time.Second*60,
+	cron.StartCron(quit, rt.RP, "campaign_event", time.Second*60,
 		func(lockName string, lockValue string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
@@ -82,7 +82,7 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime, lockName strin
 
 			// mark each of these fires as queued
 			for _, id := range task.FireIDs {
-				err = marker.AddTask(rc, campaignsLock, fmt.Sprintf("%d", id))
+				err = campaignsMarker.Add(rc, fmt.Sprintf("%d", id))
 				if err != nil {
 					return errors.Wrap(err, "error marking event as queued")
 				}
@@ -107,7 +107,7 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime, lockName strin
 
 		// check whether this event has already been queued to fire
 		taskID := fmt.Sprintf("%d", row.FireID)
-		dupe, err := marker.HasTask(rc, campaignsLock, taskID)
+		dupe, err := campaignsMarker.Contains(rc, taskID)
 		if err != nil {
 			return errors.Wrap(err, "error checking task lock")
 		}
