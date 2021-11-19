@@ -1,3 +1,7 @@
+v7.1.3
+----------
+ * Add logging to msg retry task
+
 v7.1.2
 ----------
  * Add task to retry errored messages

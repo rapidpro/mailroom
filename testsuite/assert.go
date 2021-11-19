@@ -3,6 +3,7 @@ package testsuite
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/gomodule/redigo/redis"
@@ -29,7 +30,7 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 		actual[queueKey] = make([]int, size)
 
 		if size > 0 {
-			results, err := redis.Values(rc.Do("ZPOPMAX", queueKey, size))
+			results, err := redis.Values(rc.Do("ZRANGE", queueKey, 0, -1, "WITHSCORES"))
 			require.NoError(t, err)
 			require.Equal(t, int(size*2), len(results)) // result is (item, score, item, score, ...)
 
@@ -71,6 +72,15 @@ func AssertRedisNotExists(t *testing.T, rp *redis.Pool, key string, msgAndArgs .
 	assert.Equal(t, 0, exists, msgAndArgs...)
 }
 
+func AssertRedisInt(t *testing.T, rp *redis.Pool, key string, expected int, msgAndArgs ...interface{}) {
+	rc := rp.Get()
+	defer rc.Close()
+
+	actual, err := redis.Int(rc.Do("GET", key))
+	require.NoError(t, err)
+	assert.Equal(t, expected, actual, msgAndArgs...)
+}
+
 func AssertRedisString(t *testing.T, rp *redis.Pool, key string, expected string, msgAndArgs ...interface{}) {
 	rc := rp.Get()
 	defer rc.Close()
@@ -85,6 +95,9 @@ func AssertRedisSet(t *testing.T, rp *redis.Pool, key string, expected []string,
 	defer rc.Close()
 
 	actual, err := redis.Strings(rc.Do("SMEMBERS", key))
+
+	sort.Strings(actual)
+
 	require.NoError(t, err)
 	assert.Equal(t, expected, actual, msgAndArgs...)
 }

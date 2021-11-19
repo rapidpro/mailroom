@@ -11,7 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-	"github.com/nyaruka/mailroom/utils/marker"
+	"github.com/nyaruka/mailroom/utils/redisx"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -19,8 +19,9 @@ import (
 
 const (
 	timeoutLock = "sessions_timeouts"
-	markerGroup = "session_timeouts"
 )
+
+var marker = redisx.NewMarker("session_timeouts")
 
 func init() {
 	mailroom.AddInitFunction(StartTimeoutCron)
@@ -65,7 +66,7 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime, lockName string, 
 
 		// check whether we've already queued this
 		taskID := fmt.Sprintf("%d:%s", timeout.SessionID, timeout.TimeoutOn.Format(time.RFC3339))
-		queued, err := marker.HasTask(rc, markerGroup, taskID)
+		queued, err := marker.Contains(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error checking whether task is queued")
 		}
@@ -83,7 +84,7 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime, lockName string, 
 		}
 
 		// and mark it as queued
-		err = marker.AddTask(rc, markerGroup, taskID)
+		err = marker.Add(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking timeout task as queued")
 		}

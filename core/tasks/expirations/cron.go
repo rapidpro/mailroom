@@ -12,7 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-	"github.com/nyaruka/mailroom/utils/marker"
+	"github.com/nyaruka/mailroom/utils/redisx"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,9 +20,10 @@ import (
 
 const (
 	expirationLock  = "run_expirations"
-	markerGroup     = "run_expirations"
 	expireBatchSize = 500
 )
+
+var expirationsMarker = redisx.NewMarker("run_expirations")
 
 func init() {
 	mailroom.AddInitFunction(StartExpirationCron)
@@ -94,7 +95,7 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime, lockName string, lockV
 
 		// need to continue this session and flow, create a task for that
 		taskID := fmt.Sprintf("%d:%s", expiration.RunID, expiration.ExpiresOn.Format(time.RFC3339))
-		queued, err := marker.HasTask(rc, markerGroup, taskID)
+		queued, err := expirationsMarker.Contains(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error checking whether expiration is queued")
 		}
@@ -112,7 +113,7 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime, lockName string, lockV
 		}
 
 		// and mark it as queued
-		err = marker.AddTask(rc, markerGroup, taskID)
+		err = expirationsMarker.Add(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking expiration task as queued")
 		}
