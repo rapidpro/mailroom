@@ -9,10 +9,10 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 )
 
-// StatesTracker is a tracker for bool results
+// StatesTracker is a tracker for counts of different states
 type StatesTracker struct {
-	keyBase  string // e.g. channel:23
-	states   []string
+	keyBase  string        // e.g. channel:23
+	states   []string      // e.g. {"success", "failure"}
 	interval time.Duration // e.g. 5 minutes
 	window   time.Duration // e.g. 30 minutes
 }
@@ -22,11 +22,13 @@ func NewStatesTracker(keyBase string, states []string, interval time.Duration, w
 	return &StatesTracker{keyBase: keyBase, states: states, interval: interval, window: window}
 }
 
-// Record records a bool result
+// Record records a result (i.e. one of the states)
 func (t *StatesTracker) Record(rc redis.Conn, s string) error {
-	its := t.getIntervalStart(dates.Now(), 0)
+	its := t.getIntervalStart(dates.Now().Unix(), 0)
 	key := t.getCountKey(its, s)
-	exp := time.Unix(its, 0).Add(-t.window)
+
+	// give count key an expiry which ensures it will be around for at least our window
+	exp := time.Unix(its, 0).Add(-t.window).Add(-time.Second * 10)
 
 	rc.Send("MULTI")
 	rc.Send("INCR", key)
@@ -35,23 +37,27 @@ func (t *StatesTracker) Record(rc redis.Conn, s string) error {
 	return err
 }
 
-// Current returns the current totals of all states
+// Current returns the total counts of all states, across all intervals within our window
 func (t *StatesTracker) Current(rc redis.Conn) (map[string]int, error) {
-	now := dates.Now()
-	from := now.Add(-t.window).Unix()
+	now := dates.Now().Unix()                   // now as timestamp
+	wStart := now - int64(t.window/time.Second) // start of window as timestamp
 
-	// build a list of keys of each available interval in pairs of ..:yes, ..:no
+	// build a list of count keys of all intervals that fall within our window
 	keys := make([]interface{}, 0, 20)
 
+	iEnd := t.getIntervalStart(now, 1) // end of current interval is start of next
+
 	for i := 0; ; i-- {
-		ts := t.getIntervalStart(now, i)
-		if ts < from {
+		iStart := t.getIntervalStart(now, i)
+		if iEnd < wStart {
 			break
 		}
 
 		for _, s := range t.states {
-			keys = append(keys, t.getCountKey(ts, s))
+			keys = append(keys, t.getCountKey(iStart, s))
 		}
+
+		iEnd = iStart
 	}
 
 	counts, err := redis.Ints(rc.Do("MGET", keys...))
@@ -63,6 +69,8 @@ func (t *StatesTracker) Current(rc redis.Conn) (map[string]int, error) {
 
 	for i := 0; i < len(counts); i += len(t.states) {
 		for j, s := range t.states {
+			// TODO to approximate accurate values for the window we need to decrease weight of totals for
+			// the earliest interval as it potentially starts before the window
 			totals[s] += counts[i+j]
 		}
 	}
@@ -75,12 +83,14 @@ func (t *StatesTracker) getCountKey(ts int64, s string) string {
 }
 
 // gets the timestamp for the start of an interval where 0 is the current, -1 the previous etc
-func (t *StatesTracker) getIntervalStart(now time.Time, delta int) int64 {
+func (t *StatesTracker) getIntervalStart(now int64, delta int) int64 {
 	intervalSecs := int64(t.interval / time.Second)
-	return ((now.Unix() / intervalSecs) + int64(delta)) * intervalSecs
+	return ((now / intervalSecs) + int64(delta)) * intervalSecs
 }
 
-// BoolTracker is a tracker for bool results
+var boolStates = []string{"true", "false"}
+
+// BoolTracker is convenience for tracking two boolean states
 type BoolTracker struct {
 	StatesTracker
 }
@@ -90,7 +100,7 @@ func NewBoolTracker(keyBase string, interval time.Duration, window time.Duration
 	return &BoolTracker{
 		StatesTracker: StatesTracker{
 			keyBase:  keyBase,
-			states:   []string{"true", "false"},
+			states:   boolStates,
 			interval: interval,
 			window:   window,
 		},
@@ -102,7 +112,7 @@ func (t *BoolTracker) Record(rc redis.Conn, b bool) error {
 	return t.StatesTracker.Record(rc, strconv.FormatBool(b))
 }
 
-// Current returns the current totals of true and false results
+// Current returns the total counts of true and false states, across all intervals within our window
 func (t *BoolTracker) Current(rc redis.Conn) (int, int, error) {
 	totals, err := t.StatesTracker.Current(rc)
 	if err != nil {
