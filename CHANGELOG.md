@@ -1,3 +1,10 @@
+v7.1.4
+----------
+ * Rework redis marker and locker code for reusablity
+ * Test with Redis 3.2.4
+ * Add util class to track the state of something in redis over a recent time period
+ * Remove unneeded check for RP's celery task to retry messages
+
 v7.1.3
 ----------
  * Add logging to msg retry task
