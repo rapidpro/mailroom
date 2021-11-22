@@ -3,18 +3,21 @@ package models_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/pkg/errors"
+	openapi "github.com/twilio/twilio-go/rest/lookups/v1"
 	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/excellent/types"
 	"github.com/greatnonprofits-nfp/goflow/flows"
 	"github.com/greatnonprofits-nfp/goflow/test"
+	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -66,7 +69,7 @@ func TestContactImports(t *testing.T) {
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	for i, tc := range tcs {
-		importID := testdata.InsertContactImport(t, db, models.Org1)
+		importID := testdata.InsertContactImport(t, db, models.Org1, false)
 		batchID := testdata.InsertContactImportBatch(t, db, importID, tc.Specs)
 
 		batch, err := models.LoadContactImportBatch(ctx, db, batchID)
@@ -148,7 +151,7 @@ func TestContactImportBatch(t *testing.T) {
 	ctx := testsuite.CTX()
 	db := testsuite.DB()
 
-	importID := testdata.InsertContactImport(t, db, models.Org1)
+	importID := testdata.InsertContactImport(t, db, models.Org1, false)
 	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
@@ -196,6 +199,186 @@ func TestContactSpecUnmarshal(t *testing.T) {
 	assert.Equal(t, []urns.URN{"tel:+1234567890"}, s.URNs)
 	assert.Equal(t, map[string]string{"age": "39"}, s.Fields)
 	assert.Equal(t, []assets.GroupUUID{"3972dcc2-6749-4761-a896-7880d6165f2c"}, s.Groups)
+}
+
+func TestValidateURNCarrier(t *testing.T) {
+	sampleData, err := loadSampleContacts()
+	assert.NoError(t, err)
+	for key, phoneDetails := range sampleData {
+		carrierInfo, validatedURNs, _ := models.ValidateURNCarrier(phoneDetails.Spec, FetchPhoneNumberMock)
+		if key != "tel:bad_contact_1" {
+			assert.Equal(t, carrierInfo.IsValid, phoneDetails.ValidURN)
+			assert.Equal(t, len(validatedURNs), phoneDetails.URNCount)
+			assert.Equal(t, carrierInfo.CarrierName, phoneDetails.CarrierName)
+			assert.Equal(t, string(carrierInfo.CarrierType), phoneDetails.CarrierType)
+		}
+	}
+}
+
+func TestValidateURNCarrierWith404(t *testing.T) {
+	// contact with error 404 from twilio are still processed as failed no6 as error thrown
+	sampleData, err := loadSampleContacts()
+	assert.NoError(t, err)
+	phoneDetails := sampleData["tel:not_found"]
+	carrierInfo, validatedURNs, err := models.ValidateURNCarrier(phoneDetails.Spec, FetchPhoneNumberMock)
+	assert.NoError(t, err)
+	assert.Equal(t, len(validatedURNs), 0)
+	assert.Equal(t, carrierInfo.CarrierName, phoneDetails.CarrierName)
+	assert.Equal(t, string(carrierInfo.CarrierType), phoneDetails.CarrierType)
+}
+
+func TestValidateURNCarrierWithError(t *testing.T) {
+	sampleData, err := loadSampleContacts()
+	assert.NoError(t, err)
+	phoneDetails := sampleData["tel:bad_contact_1"]
+	carrierInfo, validatedURNs, err := models.ValidateURNCarrier(phoneDetails.Spec, FetchPhoneNumberMock)
+	assert.Error(t, err, "contact details does  not exist")
+	assert.Equal(t, len(validatedURNs), 0)
+	assert.Equal(t, (*models.PhoneNumberLookupOutput)(nil), carrierInfo)
+}
+
+func TestImportWithCarrierValidation(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	importID := testdata.InsertContactImport(t, db, models.Org1, true)
+	// 23480395295011 is an invalid number and will not be captured in the final result
+	batchID := testdata.InsertContactImportBatch(t, db, importID, []byte(`[
+		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
+		{"name": "Leah", "urns": ["tel:+16055740002"]},
+		{"name": "Jemila", "urns": ["tel:+23480395295011"]},
+		{"name": "Customer Care", "urns": ["tel:+23412703232"]}
+	]`))
+
+	batch, err := models.LoadContactImportBatch(ctx, db, batchID)
+	require.NoError(t, err)
+
+
+	models.MockFnInitLookup()
+	err = batch.Import(ctx, db, models.Org1)
+	require.NoError(t, err)
+
+	carrierGroups := map[models.CarrierType][]models.ContactID{}
+	jsonx.Unmarshal(batch.CarrierGroups, &carrierGroups)
+	expectedGroups := 2
+	expectedMobile := 2
+	expectedLandlines := 1
+	assert.Equal(t, expectedGroups, len(carrierGroups))
+	assert.Equal(t, expectedMobile, len(carrierGroups["mobile"]))
+	assert.Equal(t, expectedLandlines, len(carrierGroups["landline"]))
+}
+
+type sampleContact struct {
+	Spec models.ContactSpec `json:"spec"`
+	ValidURN bool			`json:"valid_urn"`
+	URNCount int			`json:"urn_count"`
+	CarrierType string		`json:"type"`
+	CarrierName string		`json:"name"`
+}
+
+func loadSampleContacts () (map[string]sampleContact, error) {
+	var sampleData = `{
+		"tel:bad_contact_1": {
+			"spec": {
+				"uuid": "7fb56e30-fad3-4877-85d8-5477d421f4c6",
+				"name": "",
+				"language": "eng",
+				"urns": ["tel:bad_contact_1"],
+				"groups": []
+			},
+			"valid_urn": false,
+			"type": null,
+			"name": null,
+			"urn_count": 0
+		},
+		"tel:not_found": {
+			"spec": {
+				"uuid": "7fb56e30-fad3-4877-85d8-5477d421f4c6",
+				"name": "",
+				"language": "eng",
+				"urns": ["tel:not_found"],
+				"groups": []
+			},
+			"valid_urn": false,
+			"type": null,
+			"name": null,
+			"urn_count": 0
+		},
+		"tel:bad_contact": {
+			"spec": {
+				"uuid": "7fb56e30-fad3-4877-85d8-5477d421f4c6",
+				"name": "",
+				"language": "eng",
+				"urns": ["tel:bad_contact"],
+				"groups": []
+			},
+			"valid_urn": false,
+			"type": null,
+			"name": null,
+			"urn_count": 0
+		},
+		"tel:+2348067886565": {
+			"spec": {
+				"uuid": "8e879527-7e6d-4bff-abc8-b1d41cd4f702",
+				"name": "Yasir",
+				"language": "eng",
+				"urns": ["tel:+2348067886565"],
+				"fields": {
+					"age": "4"
+				},
+				"groups": ["3972dcc2-6749-4761-a896-7880d6165f2c"]
+			},
+			"valid_urn": true,
+			"type": "mobile",
+			"name": "9mobile Nigeria",
+			"urn_count": 1
+		},
+		"tel:+2348039529501": {
+			"spec": {
+				"uuid": "28236bb9-2554-4274-8708-dc94b86d8cd7",
+				"name": "Umahani",
+				"language": "eng",
+				"urns": ["tel:+2348039529501"],
+				"fields": {
+					"age": "2"
+				},
+				"groups": ["3972dcc2-6749-4761-a896-7880d6165f2c"]
+			},
+			"valid_urn": true,
+			"type": "mobile",
+			"name": "MTN Nigeria",
+			"urn_count": 1
+		}
+	}`
+	var sampleContactMap = map[string]sampleContact{}
+	err := jsonx.Unmarshal([]byte(sampleData), &sampleContactMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return sampleContactMap, nil
+}
+
+func FetchPhoneNumberMock(PhoneNumber string, params *openapi.FetchPhoneNumberParams) (*openapi.LookupsV1PhoneNumber, error) {
+	responseSample := make(map[string]interface{})
+	sampleData, _ := loadSampleContacts()
+	if sampleData != nil {
+		data := sampleData[PhoneNumber]
+		responseSample["type"] = data.CarrierType
+		responseSample["name"] = data.CarrierName
+	}
+	var returnValue = &openapi.LookupsV1PhoneNumber{
+		Carrier: &responseSample,
+		PhoneNumber: &PhoneNumber,
+	}
+	if PhoneNumber == "tel:bad_contact_1" {
+		return returnValue, errors.New("error running lookup on number")
+	}
+	if PhoneNumber == "tel:not_found" {
+		return returnValue, fmt.Errorf("the requested resource /PhoneNumbers/%s was not found - 404", PhoneNumber)
+	}
+
+	return returnValue, nil
 }
 
 // utility to load all contacts for the given org and return as slice sorted by ID

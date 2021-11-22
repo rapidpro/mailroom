@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/greatnonprofits-nfp/goflow/assets"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
@@ -137,13 +137,13 @@ func TestDynamicGroups(t *testing.T) {
 			"bob",
 			bobHit,
 			[]models.ContactID{models.BobID},
-			[]models.ContactID{models.BobID},
+			[]models.ContactID{},
 		},
 		{
 			"unchanged",
 			bobHit,
 			[]models.ContactID{models.BobID},
-			[]models.ContactID{models.BobID},
+			[]models.ContactID{},
 		},
 	}
 

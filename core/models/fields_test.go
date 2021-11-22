@@ -45,6 +45,8 @@ func TestFields(t *testing.T) {
 		{"language", "Language", assets.FieldTypeText},
 		{"last_seen_on", "Last Seen On", assets.FieldTypeDatetime},
 		{"name", "Name", assets.FieldTypeText},
+		{"opt_out_datetime", "Opt-Out Timestamp", assets.FieldTypeDatetime},
+		{"opt_out_message", "Opt-Out Message", assets.FieldTypeText},
 	}
 
 	assert.Equal(t, len(expectedSystemFields), len(systemFields))

@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/gocommon/urns"
 	"github.com/greatnonprofits-nfp/goflow/assets"
 	"github.com/greatnonprofits-nfp/goflow/envs"
 	"github.com/greatnonprofits-nfp/goflow/flows"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -201,7 +201,6 @@ func TestGetOrCreateContact(t *testing.T) {
 		ContactID   models.ContactID
 		Created     bool
 		ContactURNs []urns.URN
-		Created     bool
 		ChannelID   models.ChannelID
 		GroupsUUIDs []assets.GroupUUID
 	}{
@@ -211,7 +210,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			models.CathyID,
 			false,
 			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
-			false,
 			models.NilChannelID,
 			[]assets.GroupUUID{models.DoctorsGroupUUID},
 		},
@@ -221,7 +219,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			models.CathyID, // only URN identity is considered
 			false,
 			[]urns.URN{"tel:+16055741111?id=10000&priority=1000"},
-			false,
 			models.NilChannelID,
 			[]assets.GroupUUID{models.DoctorsGroupUUID},
 		},
@@ -231,7 +228,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			newContact(), // creates new contact
 			true,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
-			false,
 			models.TwilioChannelID,
 			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
 		},
@@ -241,7 +237,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			prevContact(), // returns the same created contact
 			false,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
-			true,
 			models.NilChannelID,
 			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
 		},
@@ -251,7 +246,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			prevContact(), // same again as other URNs don't exist
 			false,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
-			false,
 			models.NilChannelID,
 			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
 		},
@@ -261,7 +255,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			prevContact(), // same again as other URNs don't exist
 			false,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
-			false,
 			models.NilChannelID,
 			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
 		},
@@ -271,7 +264,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			prevContact(), // same again as other URNs are orphaned
 			false,
 			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
-			false,
 			models.NilChannelID,
 			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
 		},
@@ -281,7 +273,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			newContact(),
 			true,
 			[]urns.URN{"telegram:100003?id=20124&priority=1000", "telegram:100004?id=20125&priority=999"},
-			true,
 			models.NilChannelID,
 			[]assets.GroupUUID{},
 		},
@@ -291,7 +282,6 @@ func TestGetOrCreateContact(t *testing.T) {
 			newContact(),
 			true,
 			[]urns.URN{"telegram:100005?id=20126&priority=1000", "telegram:200002?id=20122&priority=999"},
-			true,
 			models.NilChannelID,
 			[]assets.GroupUUID{},
 		},

@@ -46,7 +46,7 @@ func TestChannels(t *testing.T) {
 		{
 			NexmoChannelID,
 			NexmoChannelUUID,
-			"Nexmo",
+			"Vonage",
 			"5789",
 			[]string{"tel"},
 			[]assets.ChannelRole{"send", "receive"},
