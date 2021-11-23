@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"testing"
@@ -10,6 +11,8 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/mailroom/utils/redisx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nyaruka/gocommon/dates"
@@ -139,46 +142,43 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	flowRef := assets.NewFlowReference("bc5d6b7b-3e18-4d7c-8279-50b460e74f7f", "Test")
 
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
+	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
-	testsuite.AssertRedisNotExists(t, rp, "webhooks:unhealthy:1:start")
-	testsuite.AssertRedisNotExists(t, rp, "webhooks:unhealthy:1:count")
-	testsuite.AssertRedisNotExists(t, rp, "webhooks:unhealthy:1:nodes")
+	tracker := redisx.NewStatesTracker("webhook:1bff8fe4-0714-433e-96a3-437405bf21cf", []string{"healthy", "unhealthy"}, time.Minute*5, time.Minute*20)
+	current, err := tracker.Current(rc)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]int{"healthy": 2, "unhealthy": 0}, current)
 
-	// change webhook service delay to 30 seconds and re-run flow
+	// change webhook service delay to 30 seconds and re-run flow 9 times
 	svc.delay = 30 * time.Second
-	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
-
-	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:start", "1637132429")
-	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:count", "1")
-	testsuite.AssertRedisSet(t, rp, "webhooks:unhealthy:1:nodes", []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
-
-	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
-
-	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:start", "1637132429") // unchanged
-	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:count", "2")
-	testsuite.AssertRedisSet(t, rp, "webhooks:unhealthy:1:nodes", []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+	for i := 0; i < 9; i++ {
+		handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
+	}
 
 	// still no incident tho..
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident`).Returns(0)
+	current, _ = tracker.Current(rc)
+	assert.Equal(t, map[string]int{"healthy": 2, "unhealthy": 9}, current)
 
-	// tweak start time so it looks like we started being unhealthy 30 mins ago, i.e. 1637132429 - (30 * 60)
-	rc.Do("SET", "webhooks:unhealthy:1:start", "1637130629")
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(0)
 
+	// however 1 more bad call means this node is considered unhealthy
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
-	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:start", "1637130629")
-	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:count", "3")
-	testsuite.AssertRedisSet(t, rp, "webhooks:unhealthy:1:nodes", []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+	current, _ = tracker.Current(rc)
+	assert.Equal(t, map[string]int{"healthy": 2, "unhealthy": 10}, current)
 
-	// now there should be an incident
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident`).Returns(1)
+	// and now we have an incident
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
 
-	// running again doesn't create another incident
+	var incidentID models.IncidentID
+	db.Get(&incidentID, `SELECT id FROM notifications_incident`)
+
+	// and a record of the nodes
+	testsuite.AssertRedisSet(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+
+	// another bad call won't create another incident..
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
-	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:start", "1637130629")
-	testsuite.AssertRedisString(t, rp, "webhooks:unhealthy:1:count", "4")
-	testsuite.AssertRedisSet(t, rp, "webhooks:unhealthy:1:nodes", []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
-
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident`).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
+	testsuite.AssertRedisSet(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
 }

@@ -53,7 +53,7 @@ type Incident struct {
 	ChannelID ChannelID    `db:"channel_id"`
 }
 
-func IncidentWebhooksUnhealthy(ctx context.Context, db Queryer, oa *OrgAssets) error {
+func IncidentWebhooksUnhealthy(ctx context.Context, db Queryer, oa *OrgAssets) (IncidentID, error) {
 	return getOrCreateIncident(ctx, db, oa, &Incident{
 		OrgID:     oa.OrgID(),
 		Type:      IncidentTypeWebhooksUnhealthy,
@@ -66,11 +66,11 @@ const insertIncidentSQL = `
 INSERT INTO notifications_incident(org_id, incident_type, scope, started_on, channel_id) VALUES($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING RETURNING id`
 
-func getOrCreateIncident(ctx context.Context, db Queryer, oa *OrgAssets, incident *Incident) error {
+func getOrCreateIncident(ctx context.Context, db Queryer, oa *OrgAssets, incident *Incident) (IncidentID, error) {
 	var incidentID IncidentID
 	err := db.GetContext(ctx, &incidentID, insertIncidentSQL, incident.OrgID, incident.Type, incident.Scope, incident.StartedOn, incident.ChannelID)
 	if err != nil && err != sql.ErrNoRows {
-		return errors.Wrap(err, "error inserting incident")
+		return NilIncidentID, errors.Wrap(err, "error inserting incident")
 	}
 
 	// if we got back an id, a new incident was actually created
@@ -78,9 +78,14 @@ func getOrCreateIncident(ctx context.Context, db Queryer, oa *OrgAssets, inciden
 		incident.ID = incidentID
 
 		if err := NotifyIncidentStarted(ctx, db, oa, incident); err != nil {
-			return errors.Wrap(err, "error creating notifications for new incident")
+			return NilIncidentID, errors.Wrap(err, "error creating notifications for new incident")
+		}
+	} else {
+		err := db.GetContext(ctx, &incidentID, `SELECT id FROM notifications_incident WHERE org_id = $1 AND incident_type = $2 AND scope = $3`, incident.OrgID, incident.Type, incident.Scope)
+		if err != nil {
+			return NilIncidentID, errors.Wrap(err, "error looking up existing incident")
 		}
 	}
 
-	return nil
+	return incidentID, nil
 }

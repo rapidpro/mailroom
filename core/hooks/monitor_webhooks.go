@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -32,6 +33,7 @@ func (h *monitorWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *sq
 	for _, es := range scenes {
 		for _, e := range es {
 			wc := e.(*WebhookCall)
+			nodes[wc.NodeUUID] = true
 			if wc.Elapsed <= healthyLimit {
 				healthyByNode[wc.NodeUUID]++
 			} else {
@@ -44,7 +46,6 @@ func (h *monitorWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *sq
 	defer rc.Close()
 
 	unhealthyNodes := make(map[flows.NodeUUID]bool)
-
 	for node := range nodes {
 		tracker := redisx.NewStatesTracker(fmt.Sprintf("webhook:%s", node), []string{"healthy", "unhealthy"}, time.Minute*5, time.Minute*20)
 		if healthyByNode[node] > 0 {
@@ -56,18 +57,41 @@ func (h *monitorWebhooks) Apply(ctx context.Context, rt *runtime.Runtime, tx *sq
 			// if we're recording unhealthy calls for this node, check on its current state
 			totals, _ := tracker.Current(rc)
 			totalHealthy, totalUnhealthy := totals["healthy"], totals["unhealthy"]
-			if totalUnhealthy > 10 && totalUnhealthy > totalHealthy { // TODO
+
+			// node is unhealthy if it's made at least 10 unhealthy calls in last 20 minutes and unhealthy percentage is > 25%
+			if totalUnhealthy >= 10 && (100*totalUnhealthy/(totalHealthy+totalUnhealthy)) > 25 {
 				unhealthyNodes[node] = true
 			}
 		}
 	}
 
 	if len(unhealthyNodes) > 0 {
-		err := models.IncidentWebhooksUnhealthy(ctx, tx, oa)
+		incidentID, err := models.IncidentWebhooksUnhealthy(ctx, tx, oa)
 		if err != nil {
 			return errors.Wrap(err, "error creating unhealthy webhooks incident")
+		}
+
+		err = redisSADDNodes(rc, fmt.Sprintf("incident:%d:nodes", incidentID), unhealthyNodes, time.Hour)
+		if err != nil {
+			return errors.Wrap(err, "error recording nodes for webhook incident")
 		}
 	}
 
 	return nil
+}
+
+// utility to bulk add node UUIDs to a redis set
+func redisSADDNodes(rc redis.Conn, key string, uuids map[flows.NodeUUID]bool, expires time.Duration) error {
+	args := make([]interface{}, len(uuids)+1)
+	args[0] = key
+	a := 1
+	for uuid := range uuids {
+		args[a] = uuid
+		a++
+	}
+	rc.Send("MULTI")
+	rc.Send("SADD", args...)
+	rc.Send("EXPIRE", key, int64(expires/time.Second))
+	_, err := rc.Do("EXEC")
+	return err
 }
