@@ -104,9 +104,9 @@ func getRP() *redis.Pool {
 // returns a redis connection, Close() should be called on it when done
 func getRC() redis.Conn {
 	conn, err := redis.Dial("tcp", "localhost:6379")
-	must(err)
+	noError(err)
 	_, err = conn.Do("SELECT", 0)
-	must(err)
+	noError(err)
 	return conn
 }
 
@@ -159,6 +159,11 @@ DELETE FROM tickets_ticketevent;
 DELETE FROM tickets_ticket;
 DELETE FROM channels_channelcount;
 DELETE FROM msgs_msg;
+DELETE FROM flows_flowpathrecentrun;
+DELETE FROM flows_flowrun;
+DELETE FROM flows_flowsession;
+DELETE FROM flows_flowrevision WHERE flow_id >= 30000;
+DELETE FROM flows_flow WHERE id >= 30000;
 DELETE FROM campaigns_eventfire;
 DELETE FROM contacts_contactimportbatch;
 DELETE FROM contacts_contactimport;
@@ -168,6 +173,7 @@ DELETE FROM contacts_contact WHERE id >= 30000;
 DELETE FROM contacts_contactgroupcount WHERE group_id >= 30000;
 DELETE FROM contacts_contactgroup WHERE id >= 30000;
 
+ALTER SEQUENCE flows_flow_id_seq RESTART WITH 30000;
 ALTER SEQUENCE tickets_ticket_id_seq RESTART WITH 1;
 ALTER SEQUENCE msgs_msg_id_seq RESTART WITH 1;
 ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000;
@@ -195,8 +201,18 @@ func mustExec(command string, args ...string) {
 	}
 }
 
+// convenience way to call a func and panic if it errors, e.g. must(foo())
 func must(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// if just checking an error is nil noError(err) reads better than must(err)
+var noError = must
+
+func ReadFile(path string) []byte {
+	d, err := os.ReadFile(path)
+	noError(err)
+	return d
 }
