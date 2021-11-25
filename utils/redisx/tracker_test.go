@@ -5,18 +5,18 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/utils/redisx"
+	"github.com/nyaruka/mailroom/utils/redisx/assertredis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStatesTracker(t *testing.T) {
-	_, _, _, rp := testsuite.Get()
+	rp := assertredis.TestDB()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetRedis)
+	defer assertredis.FlushDB()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	setNow := func(d time.Time) { dates.SetNowSource(dates.NewFixedNowSource(d)) }
@@ -41,9 +41,9 @@ func TestStatesTracker(t *testing.T) {
 	recordState("yes", 8)
 	recordState("no", 4)
 
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:yes", 8)
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:no", 4)
-	testsuite.AssertRedisNotExists(t, rp, "foo:1:1637236800:maybe")
+	assertredis.Int(t, rp, "foo:1:1637236800:yes", 8)
+	assertredis.Int(t, rp, "foo:1:1637236800:no", 4)
+	assertredis.NotExists(t, rp, "foo:1:1637236800:maybe")
 
 	// current window is 11:59:33 (1637236773) - 12:00:03 (1637236803) so we'll include counts from intervals..
 	//  0: 12:00:00 (1637236800) <= t < 12:00:10 (1637236810) yes=8 no=4 maybe=0
@@ -61,11 +61,11 @@ func TestStatesTracker(t *testing.T) {
 	recordState("no", 1)
 	recordState("maybe", 1)
 
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:yes", 8)
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236800:no", 4)
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236810:yes", 3)
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236810:no", 1)
-	testsuite.AssertRedisInt(t, rp, "foo:1:1637236810:maybe", 1)
+	assertredis.Int(t, rp, "foo:1:1637236800:yes", 8)
+	assertredis.Int(t, rp, "foo:1:1637236800:no", 4)
+	assertredis.Int(t, rp, "foo:1:1637236810:yes", 3)
+	assertredis.Int(t, rp, "foo:1:1637236810:no", 1)
+	assertredis.Int(t, rp, "foo:1:1637236810:maybe", 1)
 
 	// current window is 11:40:00 (1637236780) - 12:00:10 (1637236810) so we'll include counts from intervals..
 	//  0: 12:00:10 (1637236810) <= t < 12:00:20 (1637236820) yes=3 no=1 maybe=1
@@ -107,11 +107,11 @@ func TestStatesTracker(t *testing.T) {
 }
 
 func TestBoolTracker(t *testing.T) {
-	_, _, _, rp := testsuite.Get()
+	rp := assertredis.TestDB()
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetRedis)
+	defer assertredis.FlushDB()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 0, 1, 234567, time.UTC)))
@@ -129,8 +129,8 @@ func TestBoolTracker(t *testing.T) {
 	tr.Record(rc, false)
 	tr.Record(rc, true)
 
-	testsuite.AssertRedisInt(t, rp, "foo:2:1637236800:true", 2)
-	testsuite.AssertRedisInt(t, rp, "foo:2:1637236800:false", 1)
+	assertredis.Int(t, rp, "foo:2:1637236800:true", 2)
+	assertredis.Int(t, rp, "foo:2:1637236800:false", 1)
 
 	yes, no, err = tr.Current(rc)
 	assert.NoError(t, err)
@@ -144,10 +144,10 @@ func TestBoolTracker(t *testing.T) {
 	tr.Record(rc, true)
 	tr.Record(rc, true)
 
-	testsuite.AssertRedisInt(t, rp, "foo:2:1637236800:true", 2)
-	testsuite.AssertRedisInt(t, rp, "foo:2:1637236800:false", 1)
-	testsuite.AssertRedisInt(t, rp, "foo:2:1637236810:true", 3)
-	testsuite.AssertRedisInt(t, rp, "foo:2:1637236810:false", 1)
+	assertredis.Int(t, rp, "foo:2:1637236800:true", 2)
+	assertredis.Int(t, rp, "foo:2:1637236800:false", 1)
+	assertredis.Int(t, rp, "foo:2:1637236810:true", 3)
+	assertredis.Int(t, rp, "foo:2:1637236810:false", 1)
 
 	yes, no, err = tr.Current(rc)
 	assert.NoError(t, err)

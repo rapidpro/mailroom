@@ -62,14 +62,14 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 		actualResponse []byte
 	}
 	tcs := make([]TestCase, 0, 20)
-	tcJSON, err := os.ReadFile(truthFile)
-	require.NoError(t, err)
+	tcJSON := testsuite.ReadFile(truthFile)
 
 	for key, value := range substitutions {
 		tcJSON = bytes.ReplaceAll(tcJSON, []byte("$"+key+"$"), []byte(value))
 	}
 
 	jsonx.MustUnmarshal(tcJSON, &tcs)
+	var err error
 
 	for i, tc := range tcs {
 		dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC)))
@@ -130,8 +130,7 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 			expectedIsJSON := false
 
 			if tc.ResponseFile != "" {
-				expectedResponse, err = os.ReadFile(tc.ResponseFile)
-				require.NoError(t, err)
+				expectedResponse = testsuite.ReadFile(tc.ResponseFile)
 
 				expectedIsJSON = strings.HasSuffix(tc.ResponseFile, ".json")
 			} else {
