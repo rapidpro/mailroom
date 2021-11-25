@@ -7,6 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -15,14 +22,6 @@ import (
 	"github.com/nyaruka/mailroom/utils/redisx/assertredis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/actions"
-	"github.com/nyaruka/goflow/flows/engine"
 )
 
 func TestWebhookCalled(t *testing.T) {

@@ -128,7 +128,7 @@ func TestImportNotifications(t *testing.T) {
 }
 
 func TestIncidentNotifications(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
@@ -137,7 +137,7 @@ func TestIncidentNotifications(t *testing.T) {
 
 	t0 := time.Now()
 
-	_, err = models.IncidentWebhooksUnhealthy(ctx, db, oa)
+	_, err = models.IncidentWebhooksUnhealthy(ctx, db, rp, oa, nil)
 	require.NoError(t, err)
 
 	assertNotifications(t, ctx, db, t0, map[*testdata.User][]models.NotificationType{

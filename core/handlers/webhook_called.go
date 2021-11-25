@@ -40,20 +40,17 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		scene.AppendToEventPreCommitHook(hooks.UnsubscribeResthookHook, unsub)
 	}
 
-	elapsed := time.Millisecond * time.Duration(event.ElapsedMS)
 	run, step := scene.Session().FindStep(e.StepUUID())
 	flow, _ := oa.Flow(run.FlowReference().UUID)
 
 	// create an HTTP log
 	if flow != nil {
-		dbFlow := flow.(*models.Flow)
-
 		httpLog := models.NewWebhookCalledLog(
 			oa.OrgID(),
-			dbFlow.ID(),
+			flow.(*models.Flow).ID(),
 			event.URL, event.StatusCode, event.Request, event.Response,
 			event.Status != flows.CallStatusSuccess,
-			elapsed,
+			time.Millisecond*time.Duration(event.ElapsedMS),
 			event.Retries,
 			event.CreatedOn(),
 		)
@@ -61,7 +58,7 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	// pass node and response time to the hook that monitors webhook health
-	scene.AppendToEventPreCommitHook(hooks.MonitorWebhooks, &hooks.WebhookCall{NodeUUID: step.NodeUUID(), Elapsed: elapsed})
+	scene.AppendToEventPreCommitHook(hooks.MonitorWebhooks, &hooks.WebhookCall{NodeUUID: step.NodeUUID(), Event: event})
 
 	return nil
 }
