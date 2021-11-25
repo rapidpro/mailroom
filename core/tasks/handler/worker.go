@@ -22,7 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
-	"github.com/nyaruka/mailroom/utils/redisx"
+	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -60,18 +60,17 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 		return errors.Wrapf(err, "error decoding contact event task")
 	}
 
-	rc := rt.RP.Get()
-	defer rc.Close()
-
 	// acquire the lock for this contact
-	locker := redisx.NewLocker(models.ContactLock(models.OrgID(task.OrgID), eventTask.ContactID), time.Minute*5)
-	lock, err := locker.Grab(rc, time.Second*10)
+	lockID := models.ContactLock(models.OrgID(task.OrgID), eventTask.ContactID)
+	lock, err := locker.GrabLock(rt.RP, lockID, time.Minute*5, time.Second*10)
 	if err != nil {
 		return errors.Wrapf(err, "error acquiring lock for contact %d", eventTask.ContactID)
 	}
 
 	// we didn't get the lock within our timeout, skip and requeue for later
 	if lock == "" {
+		rc := rt.RP.Get()
+		defer rc.Close()
 		err = queueContactTask(rc, models.OrgID(task.OrgID), eventTask.ContactID)
 		if err != nil {
 			return errors.Wrapf(err, "error re-adding contact task after failing to get lock")
@@ -82,7 +81,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 		}).Info("failed to get lock for contact, requeued and skipping")
 		return nil
 	}
-	defer locker.Release(rc, lock)
+	defer locker.ReleaseLock(rt.RP, lockID, lock)
 
 	// read all the events for this contact, one by one
 	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)

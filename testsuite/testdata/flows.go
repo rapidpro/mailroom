@@ -18,6 +18,10 @@ type Flow struct {
 	UUID assets.FlowUUID
 }
 
+func (f *Flow) Reference() *assets.FlowReference {
+	return &assets.FlowReference{UUID: f.UUID, Name: ""}
+}
+
 // InsertFlow inserts a flow
 func InsertFlow(db *sqlx.DB, org *Org, definition []byte) *Flow {
 	uuid, err := jsonparser.GetString(definition, "uuid")

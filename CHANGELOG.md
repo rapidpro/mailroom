@@ -1,3 +1,11 @@
+v7.1.6
+----------
+ * Revert "Rework locker code for reusablity"
+
+v7.1.5
+----------
+ * Pin to go 1.17.2
+
 v7.1.4
 ----------
  * Rework redis marker and locker code for reusablity

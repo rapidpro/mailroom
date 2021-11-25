@@ -46,8 +46,7 @@ func TestContactImports(t *testing.T) {
 	// give our org a country by setting country on a channel
 	db.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, testdata.TwilioChannel.ID)
 
-	testJSON, err := os.ReadFile("testdata/imports.json")
-	require.NoError(t, err)
+	testJSON := testsuite.ReadFile("testdata/imports.json")
 
 	tcs := []struct {
 		Description string                `json:"description"`
@@ -58,8 +57,7 @@ func TestContactImports(t *testing.T) {
 		Errors      json.RawMessage       `json:"errors"`
 		Contacts    []*models.ContactSpec `json:"contacts"`
 	}{}
-	err = jsonx.Unmarshal(testJSON, &tcs)
-	require.NoError(t, err)
+	jsonx.MustUnmarshal(testJSON, &tcs)
 
 	oa, err := models.GetOrgAssets(ctx, rt, 1)
 	require.NoError(t, err)

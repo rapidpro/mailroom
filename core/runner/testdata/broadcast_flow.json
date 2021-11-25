@@ -1,0 +1,54 @@
+{
+    "uuid": "0fad12a0-d53c-4ba0-811c-6bfde03554e2",
+    "name": "Broadcast Test",
+    "revision": 55,
+    "spec_version": "13.1.0",
+    "type": "messaging",
+    "expire_after_minutes": 10080,
+    "language": "eng",
+    "localization": {},
+    "nodes": [
+        {
+            "uuid": "001b4eee-812f-403e-a004-737b948b3c18",
+            "actions": [
+                {
+                    "uuid": "d64f25cf-8b02-4ca9-8df8-3c457ccc1090",
+                    "type": "send_msg",
+                    "attachments": [],
+                    "text": "Hi there",
+                    "quick_replies": []
+                }
+            ],
+            "exits": [
+                {
+                    "uuid": "5fd2e537-0534-4c12-8425-bef87af09d46",
+                    "destination_uuid": "788b904f-dae2-4f78-9e96-468a5b861002"
+                }
+            ]
+        },
+        {
+            "uuid": "788b904f-dae2-4f78-9e96-468a5b861002",
+            "actions": [
+                {
+                    "uuid": "33640e44-6dc9-4aaf-b753-8bf57036cf06",
+                    "type": "send_broadcast",
+                    "legacy_vars": [],
+                    "contacts": [],
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ],
+                    "text": "This is a broadcast!"
+                }
+            ],
+            "exits": [
+                {
+                    "uuid": "0a1fa072-c8be-4b4c-b97a-9dad68807dbf",
+                    "destination_uuid": null
+                }
+            ]
+        }
+    ]
+}
