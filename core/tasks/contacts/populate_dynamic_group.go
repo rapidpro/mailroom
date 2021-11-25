@@ -8,7 +8,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/locker"
+	"github.com/nyaruka/mailroom/utils/redisx"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -36,12 +36,12 @@ func (t *PopulateDynamicGroupTask) Timeout() time.Duration {
 
 // Perform figures out the membership for a query based group then repopulates it
 func (t *PopulateDynamicGroupTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
-	lockKey := fmt.Sprintf(populateLockKey, t.GroupID)
-	lock, err := locker.GrabLock(rt.RP, lockKey, time.Hour, time.Minute*5)
+	locker := redisx.NewLocker(fmt.Sprintf(populateLockKey, t.GroupID), time.Hour)
+	lock, err := locker.Grab(rt.RP, time.Minute*5)
 	if err != nil {
 		return errors.Wrapf(err, "error grabbing lock to repopulate dynamic group: %d", t.GroupID)
 	}
-	defer locker.ReleaseLock(rt.RP, lockKey, lock)
+	defer locker.Release(rt.RP, lock)
 
 	start := time.Now()
 	log := logrus.WithFields(logrus.Fields{
