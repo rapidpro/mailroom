@@ -1085,21 +1085,6 @@ func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitT
 	return nil
 }
 
-// chunks a slice of session IDs.. hurry up go generics
-func chunkSessionIDs(ids []SessionID, chunkSize int) [][]SessionID {
-	chunks := make([][]SessionID, 0, len(ids)/chunkSize+1)
-
-	for i := 0; i < len(ids); i += chunkSize {
-		end := i + chunkSize
-		if end > len(ids) {
-			end = len(ids)
-		}
-		chunks = append(chunks, ids[i:end])
-	}
-
-	return chunks
-}
-
 const exitSessionRunsSQL = `
 UPDATE
 	flows_flowrun
