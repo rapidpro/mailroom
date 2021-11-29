@@ -1,3 +1,48 @@
+v7.0.1
+----------
+ * Update to latest goflow
+
+v7.0.0
+----------
+ * Tweak README
+
+v6.5.43
+----------
+ * Update to latest goflow which adds reverse function
+
+v6.5.42
+----------
+ * Change default resumes per session limit from 500 to 250
+ * Update to latest goflow
+
+v6.5.41
+----------
+ * Update to latest goflow which adds sort function
+
+v6.5.40
+----------
+ * Add config option for maximum resumes per session
+
+v6.5.39
+----------
+ * Add notification.email_status
+
+v6.5.38
+----------
+ * Update to latest goflow which simplifies contactql queries after parsing
+ * Load contacts for flow starts from readonly database
+ * CI testing on PG12 and 13
+
+v6.5.37
+----------
+ * Look for From param if Caller param not found in incoming IVR call request
+ * Update to latest gocommon and go 1.17
+
+v6.5.36
+----------
+ * Drop ticket.subject
+ * Remove no longer used FlowStart.CreatedBy
+
 v6.5.35
 ----------
  * Tweak mailroom startup to show warning if no distinct readonly DB configured

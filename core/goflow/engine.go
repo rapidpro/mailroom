@@ -61,6 +61,7 @@ func Engine(c *runtime.Config) flows.Engine {
 			WithTicketServiceFactory(ticketFactory(c)).
 			WithAirtimeServiceFactory(airtimeFactory(c)).
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
+			WithMaxResumesPerSession(c.MaxResumesPerSession).
 			Build()
 	})
 
@@ -84,6 +85,7 @@ func Simulator(c *runtime.Config) flows.Engine {
 			WithTicketServiceFactory(simulatorTicketServiceFactory).    // and faked tickets
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory).  // and faked airtime transfers
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
+			WithMaxResumesPerSession(c.MaxResumesPerSession).
 			Build()
 	})
 
