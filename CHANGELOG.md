@@ -1,3 +1,10 @@
+v7.1.7
+----------
+ * Fix handling of add label actions after msg resumes in IVR flows
+ * Add cron job to end webhook incidents when nodes are no longer unhealthy
+ * Re-add new locker code but this time don't let locking code hold redis connections for any length of time
+ * Create incident once org has had unhealthy webhooks for 20 minutes
+
 v7.1.6
 ----------
  * Revert "Rework locker code for reusablity"
