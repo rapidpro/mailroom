@@ -1,3 +1,7 @@
+v7.1.8
+----------
+ * Update sessions and runs in batches when exiting
+
 v7.1.7
 ----------
  * Fix handling of add label actions after msg resumes in IVR flows
