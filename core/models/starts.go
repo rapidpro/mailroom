@@ -167,8 +167,6 @@ type FlowStart struct {
 		Extra          null.JSON `json:"extra,omitempty"           db:"extra"`
 		ParentSummary  null.JSON `json:"parent_summary,omitempty"  db:"parent_summary"`
 		SessionHistory null.JSON `json:"session_history,omitempty" db:"session_history"`
-
-		CreatedBy string `json:"created_by"` // TODO deprecated
 	}
 }
 
@@ -362,7 +360,6 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 	b.b.Extra = null.JSON(s.Extra())
 	b.b.IsLast = last
 	b.b.TotalContacts = totalContacts
-	b.b.CreatedBy = s.s.CreatedBy
 	b.b.CreatedByID = s.s.CreatedByID
 	return b
 }

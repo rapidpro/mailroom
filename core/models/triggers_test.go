@@ -124,6 +124,7 @@ func TestFindMatchingMsgTrigger(t *testing.T) {
 
 	joinID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "join", models.MatchFirst, nil, nil)
 	resistID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.SingleMessage, "resist", models.MatchOnly, nil, nil)
+	emojiID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.PickANumber, "👍", models.MatchFirst, nil, nil)
 	doctorsID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.SingleMessage, "resist", models.MatchOnly, []*testdata.Group{testdata.DoctorsGroup}, nil)
 	doctorsAndNotTestersID := testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.SingleMessage, "resist", models.MatchOnly, []*testdata.Group{testdata.DoctorsGroup}, []*testdata.Group{testdata.TestersGroup})
 	doctorsCatchallID := testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.SingleMessage, []*testdata.Group{testdata.DoctorsGroup}, nil)
@@ -147,13 +148,16 @@ func TestFindMatchingMsgTrigger(t *testing.T) {
 		contact           *flows.Contact
 		expectedTriggerID models.TriggerID
 	}{
-		{"join", cathy, joinID},
+		{" join ", cathy, joinID},
 		{"JOIN", cathy, joinID},
 		{"join this", cathy, joinID},
 		{"resist", george, resistID},
 		{"resist", bob, doctorsID},
 		{"resist", cathy, doctorsAndNotTestersID},
 		{"resist this", cathy, doctorsCatchallID},
+		{" 👍 ", george, emojiID},
+		{"👍🏾", george, emojiID}, // is 👍 + 🏾
+		{"😀👍", george, othersAllID},
 		{"other", cathy, doctorsCatchallID},
 		{"other", george, othersAllID},
 		{"", george, othersAllID},

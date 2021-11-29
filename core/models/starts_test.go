@@ -113,7 +113,6 @@ func TestStartsBuilding(t *testing.T) {
 		"UUID": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
 		"contact_ids": [%d, %d],
 		"create_contact": true,
-		"created_by": "",
 		"created_by_id": null,
 		"exclude_group_ids": [%d],
 		"flow_id": %d,

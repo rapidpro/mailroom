@@ -494,7 +494,7 @@ func StartFlow(
 		}
 
 		// load our locked contacts
-		contacts, err := models.LoadContacts(ctx, rt.DB, oa, locked)
+		contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, locked)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading contacts to start")
 		}

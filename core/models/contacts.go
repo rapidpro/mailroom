@@ -467,7 +467,6 @@ type contactEnvelope struct {
 		TicketerID TicketerID       `json:"ticketer_id"`
 		ExternalID string           `json:"external_id"`
 		TopicID    TopicID          `json:"topic_id"`
-		Subject    string           `json:"subject"`
 		Body       string           `json:"body"`
 		AssigneeID UserID           `json:"assignee_id"`
 	} `json:"tickets"`
@@ -532,7 +531,6 @@ LEFT JOIN (
 		array_agg(
 			json_build_object(
 				'uuid', t.uuid,
-				'subject', t.subject,
 				'body', t.body,
 				'external_id', t.external_id,
 				'ticketer_id', t.ticketer_id,
