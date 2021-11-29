@@ -22,6 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -483,6 +484,7 @@ func ResumeIVRFlow(
 	switch res := ivrResume.(type) {
 	case InputResume:
 		resume, svcErr, err = buildMsgResume(ctx, rt, svc, channel, contact, urn, conn, oa, r, res)
+		session.SetIncomingMsg(resume.(*resumes.MsgResume).Msg().ID(), null.NullString)
 
 	case DialResume:
 		resume, svcErr, err = buildDialResume(oa, contact, res)
