@@ -180,7 +180,7 @@ func TestMarkMessages(t *testing.T) {
 
 	insertMsg := func(text string) *models.Msg {
 		urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", models.CathyURNID))
-		flowMsg := flows.NewMsgOut(urn, channel.ChannelReference(), text, nil, nil, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{})
+		flowMsg := flows.NewMsgOut(urn, channel.ChannelReference(), text, nil, nil, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{Text: "hi there"})
 		msg, err := models.NewOutgoingMsg(oa.Org(), channel, models.CathyID, flowMsg, time.Now())
 		require.NoError(t, err)
 
@@ -234,10 +234,96 @@ func TestInsertChildBroadcast(t *testing.T) {
 	assert.NotEqual(t, broadcast.BroadcastID(), cloned.BroadcastID())
 }
 
+func TestNewIncomingIVR(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	defer func() { testsuite.ResetDB() }()
+	msgIn := testdata.InsertIncomingMsg(t, db, models.Org1, models.CathyID, models.CathyURN, models.CathyURNID, "hi there")
+	conn, err := models.InsertIVRConnection(ctx, db, models.Org1, models.TwilioChannelID, models.NilStartID, models.CathyID, models.CathyURNID, models.ConnectionDirectionOut, models.ConnectionStatusPending, "")
+	assert.NoError(t, err)
+	ivrMsgIn := models.NewIncomingIVR(models.Org1, conn, msgIn, time.Now())
+
+	assert.NotEqual(t, ivrMsgIn.ID(), msgIn.ID())
+	assert.Equal(t, ivrMsgIn.UUID(), msgIn.UUID())
+	assert.Equal(t, ivrMsgIn.Direction(), models.DirectionIn)
+}
+
+func TestNewNewOutgoingIVR(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	defer func() { testsuite.ResetDB() }()
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
+	require.NoError(t, err)
+
+	channel := oa.ChannelByUUID(models.TwilioChannelUUID)
+	msgOut := flows.NewMsgOut(models.CathyURN, channel.ChannelReference(), "test msg", nil, nil, nil, flows.NilMsgTopic, "", flows.ShareableIconsConfig{Text: "hi there"})
+
+
+	conn, err := models.InsertIVRConnection(ctx, db, models.Org1, models.TwilioChannelID, models.NilStartID, models.CathyID, models.CathyURNID, models.ConnectionDirectionOut, models.ConnectionStatusPending, "")
+	assert.NoError(t, err)
+
+	ivrMsgOut, err := models.NewOutgoingIVR(models.Org1, conn, msgOut, time.Now())
+	assert.NoError(t, err)
+
+	assert.Equal(t, ivrMsgOut.UUID(), msgOut.UUID())
+	assert.Equal(t, ivrMsgOut.Direction(), models.DirectionOut)
+}
+
+func TestCreateBroadcastMessages(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	rp := testsuite.RP()
+	rc := rp.Get()
+
+	defer func() {
+		testsuite.ResetDB()
+		rc.Close()
+	}()
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, models.Org1, models.RefreshOrg)
+	require.NoError(t, err)
+
+	broadcast, err := getBroadcastFromJSON()
+	assert.NoError(t, err)
+
+	contactIDs := []models.ContactID{models.CathyID, models.BobID}
+	batch := broadcast.CreateBatch(contactIDs)
+
+	messages, err := models.CreateBroadcastMessages(ctx, db, rp, oa, batch)
+	assert.NoError(t, err)
+	for _, msg :=range messages {
+		assert.Equal(t, msg.BroadcastID(), broadcast.BroadcastID())
+		assert.Equal(t, msg.Text(), broadcast.Translations()["eng"].Text)
+	}
+}
+
+func TestMarkBroadcastSent(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+	defer func() { testsuite.ResetDB() }()
+	msgCountSQL := `SELECT COUNT(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`
+	broadcast, err := getBroadcastFromJSON()
+	assert.NoError(t, err)
+
+	cloned, err := models.InsertChildBroadcast(ctx, db, &broadcast)
+	assert.NoError(t, err)
+
+	args := []interface{}{cloned.BroadcastID()}
+	testsuite.AssertQueryCount(t, db, msgCountSQL, args, 0, " mismatch in expected count for query: %s", msgCountSQL)
+
+	assert.NotEqual(t, broadcast.BroadcastID(), cloned.BroadcastID())
+	err = models.MarkBroadcastSent(ctx, db, cloned.BroadcastID())
+	assert.NoError(t, err)
+
+	testsuite.AssertQueryCount(t, db, msgCountSQL, args, 1, " mismatch in expected count for query: %s", msgCountSQL)
+}
+
 func getBroadcastEventFromJSON() (events.BroadcastCreatedEvent, error) {
 	bEventInst := events.BroadcastCreatedEvent{}
 	bEvent := `
 	{
+		"step_uuid": "0dfc2fdb-fdad-4056-9dde-f9122ed51279",
 	    "type": "broadcast_created",
 	    "created_on": "2021-11-07T15:04:05Z",
 	    "translations": {
@@ -256,4 +342,32 @@ func getBroadcastEventFromJSON() (events.BroadcastCreatedEvent, error) {
 	err := jsonx.Unmarshal([]byte(bEvent), &bEventInst)
 
 	return bEventInst, err
+}
+
+func getBroadcastFromJSON() (models.Broadcast, error) {
+	broadcast := models.Broadcast{}
+	broadcastJSON := `
+	{
+	   "translations": {
+		  "eng":{
+			 "text": "hi, what's up"
+		  },
+		  "spa":{
+			 "text": "Que pasa"
+		  }
+	   },
+	   "Text":{
+		  "Map": null
+	   },
+	   "template_state": "evaluated",
+	   "base_language": "eng",
+	   "contact_ids": [
+		  10000,
+          10001
+	   ],
+	   "org_id": 1
+	}
+	`
+	err := broadcast.UnmarshalJSON([]byte(broadcastJSON))
+	return broadcast, err
 }

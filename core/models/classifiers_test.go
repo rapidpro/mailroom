@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/greatnonprofits-nfp/goflow/flows"
 	"testing"
 
 	"github.com/greatnonprofits-nfp/goflow/assets"
@@ -35,4 +36,27 @@ func TestClassifiers(t *testing.T) {
 		assert.Equal(t, tc.Intents, c.Intents())
 	}
 
+}
+
+func TestClassifier_AsService(t *testing.T) {
+	ctx := testsuite.CTX()
+	db := testsuite.DB()
+
+	classifiers, err := loadClassifiers(ctx, db, 1)
+	assert.NoError(t, err)
+	classifier1 := classifiers[0]
+	classifier := &flows.Classifier{Classifier: classifier1}
+
+	c := &Classifier{}
+	cc := &c.c
+	cc.Type = "Fake"
+	_, err = c.AsService(classifier)
+	assert.EqualError(t, err, "unknown classifier type 'Fake' for classifier: ")
+
+	c = classifier1.(*Classifier)
+	classifierService, err := c.AsService(classifier)
+	assert.NoError(t, err)
+	_, ok := classifierService.(flows.ClassificationService)
+
+	assert.True(t, ok)
 }
