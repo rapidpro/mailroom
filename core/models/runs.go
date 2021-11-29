@@ -1046,7 +1046,7 @@ func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (*time.Tim
 }
 
 // ExitSessions marks the passed in sessions as completed, also doing so for all associated runs
-func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitType ExitType, now time.Time) error {
+func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitType ExitType) error {
 	if len(sessionIDs) == 0 {
 		return nil
 	}
@@ -1058,26 +1058,46 @@ func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitT
 		return errors.Errorf("unknown exit type: %s", exitType)
 	}
 
-	// first interrupt our runs
-	start := time.Now()
-	res, err := tx.ExecContext(ctx, exitSessionRunsSQL, pq.Array(sessionIDs), exitType, now, runStatus)
-	if err != nil {
-		return errors.Wrapf(err, "error exiting session runs")
-	}
-	rows, _ := res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session runs")
+	for _, idBatch := range chunkSessionIDs(sessionIDs, 1000) {
+		// first interrupt our runs
+		start := time.Now()
 
-	// then our sessions
-	start = time.Now()
+		res, err := tx.ExecContext(ctx, exitSessionRunsSQL, pq.Array(idBatch), exitType, time.Now(), runStatus)
+		if err != nil {
+			return errors.Wrapf(err, "error exiting session runs")
+		}
 
-	res, err = tx.ExecContext(ctx, exitSessionsSQL, pq.Array(sessionIDs), now, sessionStatus)
-	if err != nil {
-		return errors.Wrapf(err, "error exiting sessions")
+		rows, _ := res.RowsAffected()
+		logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session runs")
+
+		// then our sessions
+		start = time.Now()
+
+		res, err = tx.ExecContext(ctx, exitSessionsSQL, pq.Array(idBatch), time.Now(), sessionStatus)
+		if err != nil {
+			return errors.Wrapf(err, "error exiting sessions")
+		}
+
+		rows, _ = res.RowsAffected()
+		logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited sessions")
 	}
-	rows, _ = res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited sessions")
 
 	return nil
+}
+
+// chunks a slice of session IDs.. hurry up go generics
+func chunkSessionIDs(ids []SessionID, chunkSize int) [][]SessionID {
+	chunks := make([][]SessionID, 0, len(ids)/chunkSize+1)
+
+	for i := 0; i < len(ids); i += chunkSize {
+		end := i + chunkSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunks = append(chunks, ids[i:end])
+	}
+
+	return chunks
 }
 
 const exitSessionRunsSQL = `
