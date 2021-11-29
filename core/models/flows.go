@@ -53,6 +53,7 @@ var flowTypeMapping = map[flows.FlowType]FlowType{
 type Flow struct {
 	f struct {
 		ID             FlowID          `json:"id"`
+		OrgID          OrgID           `json:"org_id"`
 		UUID           assets.FlowUUID `json:"uuid"`
 		Name           string          `json:"name"`
 		Config         null.Map        `json:"config"`
@@ -65,6 +66,9 @@ type Flow struct {
 
 // ID returns the ID for this flow
 func (f *Flow) ID() FlowID { return f.f.ID }
+
+// OrgID returns the Org ID for this flow
+func (f *Flow) OrgID() OrgID { return f.f.OrgID }
 
 // UUID returns the UUID for this flow
 func (f *Flow) UUID() assets.FlowUUID { return f.f.UUID }
@@ -164,6 +168,7 @@ func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg inte
 const selectFlowByUUIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	id, 
+	org_id,
 	uuid, 
 	name,
 	ignore_triggers,
@@ -211,6 +216,7 @@ WHERE
 const selectFlowByIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	id, 
+	org_id,
 	uuid, 
 	name,
 	ignore_triggers,

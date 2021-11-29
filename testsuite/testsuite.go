@@ -154,6 +154,7 @@ func resetStorage() {
 
 var resetDataSQL = `
 DELETE FROM notifications_notification;
+DELETE FROM notifications_incident;
 DELETE FROM request_logs_httplog;
 DELETE FROM tickets_ticketevent;
 DELETE FROM tickets_ticket;
@@ -165,6 +166,10 @@ DELETE FROM flows_flowsession;
 DELETE FROM flows_flowrevision WHERE flow_id >= 30000;
 DELETE FROM flows_flow WHERE id >= 30000;
 DELETE FROM campaigns_eventfire;
+DELETE FROM flows_flowrun;
+DELETE FROM flows_flowsession;
+DELETE FROM flows_flowrevision WHERE id >= 30000;
+DELETE FROM flows_flow WHERE id >= 30000;
 DELETE FROM contacts_contactimportbatch;
 DELETE FROM contacts_contactimport;
 DELETE FROM contacts_contacturn WHERE id >= 30000;

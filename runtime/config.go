@@ -29,16 +29,18 @@ type Config struct {
 	HandlerWorkers       int  `help:"the number of go routines that will be used to handle messages"`
 	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
 
-	WebhooksTimeout        int     `help:"the timeout in milliseconds for webhook calls from engine"`
-	WebhooksMaxRetries     int     `help:"the number of times to retry a failed webhook call"`
-	WebhooksMaxBodyBytes   int     `help:"the maximum size of bytes to a webhook call response body"`
-	WebhooksInitialBackoff int     `help:"the initial backoff in milliseconds when retrying a failed webhook call"`
-	WebhooksBackoffJitter  float64 `help:"the amount of jitter to apply to backoff times"`
-	SMTPServer             string  `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
-	DisallowedNetworks     string  `help:"comma separated list of IP addresses and networks which engine can't make HTTP calls to"`
-	MaxStepsPerSprint      int     `help:"the maximum number of steps allowed per engine sprint"`
-	MaxResumesPerSession   int     `help:"the maximum number of resumes allowed per engine session"`
-	MaxValueLength         int     `help:"the maximum size in characters for contact field values and run result values"`
+	WebhooksTimeout              int     `help:"the timeout in milliseconds for webhook calls from engine"`
+	WebhooksMaxRetries           int     `help:"the number of times to retry a failed webhook call"`
+	WebhooksMaxBodyBytes         int     `help:"the maximum size of bytes to a webhook call response body"`
+	WebhooksInitialBackoff       int     `help:"the initial backoff in milliseconds when retrying a failed webhook call"`
+	WebhooksBackoffJitter        float64 `help:"the amount of jitter to apply to backoff times"`
+	WebhooksHealthyResponseLimit int     `help:"the limit in milliseconds for webhook response to be considered healthy"`
+
+	SMTPServer           string `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
+	DisallowedNetworks   string `help:"comma separated list of IP addresses and networks which engine can't make HTTP calls to"`
+	MaxStepsPerSprint    int    `help:"the maximum number of steps allowed per engine sprint"`
+	MaxResumesPerSession int    `help:"the maximum number of resumes allowed per engine session"`
+	MaxValueLength       int    `help:"the maximum size in characters for contact field values and run result values"`
 
 	S3Endpoint       string `help:"the S3 endpoint we will write attachments to"`
 	S3Region         string `help:"the S3 region we will write attachments to"`
@@ -79,16 +81,18 @@ func NewDefaultConfig() *Config {
 		HandlerWorkers:       32,
 		RetryPendingMessages: true,
 
-		WebhooksTimeout:        15000,
-		WebhooksMaxRetries:     2,
-		WebhooksMaxBodyBytes:   1024 * 1024, // 1MB
-		WebhooksInitialBackoff: 5000,
-		WebhooksBackoffJitter:  0.5,
-		SMTPServer:             "",
-		DisallowedNetworks:     `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fe80::/10`,
-		MaxStepsPerSprint:      100,
-		MaxResumesPerSession:   250,
-		MaxValueLength:         640,
+		WebhooksTimeout:              15000,
+		WebhooksMaxRetries:           2,
+		WebhooksMaxBodyBytes:         1024 * 1024, // 1MB
+		WebhooksInitialBackoff:       5000,
+		WebhooksBackoffJitter:        0.5,
+		WebhooksHealthyResponseLimit: 10000,
+
+		SMTPServer:           "",
+		DisallowedNetworks:   `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fe80::/10`,
+		MaxStepsPerSprint:    100,
+		MaxResumesPerSession: 250,
+		MaxValueLength:       640,
 
 		S3Endpoint:       "https://s3.amazonaws.com",
 		S3Region:         "us-east-1",
