@@ -296,15 +296,62 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, o
 	return msg
 }
 
+var msgRepetitionsScript = redis.NewScript(3, `
+local key, contact_id, text = KEYS[1], KEYS[2], KEYS[3]
+local count = 1
+
+-- try to look up in window
+local record = redis.call("HGET", key, contact_id)
+if record then
+	local record_count = tonumber(string.sub(record, 1, 2))
+	local record_text = string.sub(record, 4, -1)
+
+	if record_text == text then 
+		count = math.min(record_count + 1, 99)
+	else
+		count = 1
+	end		
+end
+
+-- create our new record with our updated count
+record = string.format("%02d:%s", count, text)
+
+-- write our new record with updated count and set expiration
+redis.call("HSET", key, contact_id, record)
+redis.call("EXPIRE", key, 300)
+
+return count
+`)
+
+// GetMsgRepetitions gets the number of repetitions of this msg text for the given contact in the current 5 minute window
+func GetMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgOut) (int, error) {
+	rc := rp.Get()
+	defer rc.Close()
+
+	keyTime := dates.Now().UTC().Round(time.Minute * 5)
+	key := fmt.Sprintf("msg_repetitions:%s", keyTime.Format("2006-01-02T15:04"))
+	return redis.Int(msgRepetitionsScript.Do(rc, key, contactID, msg.Text()))
+}
+
 // NewOutgoingMsg creates an outgoing message for the passed in flow message.
-func NewOutgoingMsg(cfg *runtime.Config, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+func NewOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 
-	// we fail messages for suspended orgs right away
 	status := MsgStatusQueued
 	if org.Suspended() {
+		// we fail messages for suspended orgs right away
 		status = MsgStatusFailed
+	} else {
+		// also fail right away if this looks like a loop
+		repetitions, err := GetMsgRepetitions(rt.RP, contactID, out)
+		if err != nil {
+			return nil, errors.Wrap(err, "error looking up msg repetitions")
+		}
+		if repetitions >= 20 {
+			status = MsgStatusFailed
+			logrus.WithFields(logrus.Fields{"contact_id": contactID, "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
+		}
 	}
 
 	m.UUID = out.UUID()
@@ -321,9 +368,8 @@ func NewOutgoingMsg(cfg *runtime.Config, org *Org, channel *Channel, contactID C
 
 	msg.SetChannel(channel)
 
-	err := msg.SetURN(out.URN())
-	if err != nil {
-		return nil, errors.Wrapf(err, "error setting msg urn")
+	if err := msg.SetURN(out.URN()); err != nil {
+		return nil, errors.Wrapf(err, "error setting msg URN")
 	}
 
 	m.MsgCount = 1
@@ -331,7 +377,7 @@ func NewOutgoingMsg(cfg *runtime.Config, org *Org, channel *Channel, contactID C
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
 		for _, a := range out.Attachments() {
-			m.Attachments = append(m.Attachments, string(NormalizeAttachment(cfg, a)))
+			m.Attachments = append(m.Attachments, string(NormalizeAttachment(rt.Config, a)))
 		}
 	}
 
@@ -1018,7 +1064,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingMsg(rt.Config, oa.Org(), channel, c.ID(), out, time.Now())
+		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now())
 		msg.SetBroadcastID(bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")

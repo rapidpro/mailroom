@@ -46,7 +46,7 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", m.URNID))
 
 	flowMsg := flows.NewMsgOut(urn, channelRef, "Hello", nil, nil, nil, flows.NilMsgTopic)
-	msg, err := models.NewOutgoingMsg(rt.Config, oaOrg.Org(), channel, m.ContactID, flowMsg, time.Now())
+	msg, err := models.NewOutgoingMsg(rt, oaOrg.Org(), channel, m.ContactID, flowMsg, time.Now())
 	require.NoError(t, err)
 
 	if m.HighPriority {
