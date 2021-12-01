@@ -1,3 +1,7 @@
+v7.1.10
+----------
+ * Add redisx.Cacher util
+
 v7.1.9
 ----------
  * Don't include response_to_id in courier payloads
