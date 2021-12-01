@@ -1,3 +1,8 @@
+v7.1.9
+----------
+ * Don't include response_to_id in courier payloads
+ * Add logging for ending webhook incidents
+
 v7.1.8
 ----------
  * Update sessions and runs in batches when exiting
