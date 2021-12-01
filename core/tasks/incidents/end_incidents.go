@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -75,11 +76,16 @@ func checkWebhookIncident(ctx context.Context, rt *runtime.Runtime, incident *mo
 		}
 	}
 
+	log := logrus.WithFields(logrus.Fields{"incident_id": incident.ID, "unhealthy": len(nodeUUIDs) - len(healthyNodeUUIDs), "healthy": len(healthyNodeUUIDs)})
+
 	// if all of the nodes are now healthy the incident has ended
 	if len(healthyNodeUUIDs) == len(nodeUUIDs) {
 		if err := incident.End(ctx, rt.DB); err != nil {
 			return errors.Wrap(err, "error ending incident")
 		}
+		log.Info("ended webhook incident")
+	} else {
+		log.Debug("checked webhook incident")
 	}
 
 	return nil
