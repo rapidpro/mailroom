@@ -180,6 +180,7 @@ func TestMarshalMsg(t *testing.T) {
 		"direction": "O",
 		"error_count": 0,
 		"external_id": null,
+		"response_to_external_id": null,
 		"high_priority": false,
 		"id": %d,
 		"metadata": {
@@ -193,8 +194,6 @@ func TestMarshalMsg(t *testing.T) {
 		"next_attempt": null,
 		"org_id": 1,
 		"queued_on": %s,
-		"response_to_external_id": null,
-		"response_to_id": null,
 		"sent_on": null,
 		"status": "Q",
 		"text": "Hi there",
