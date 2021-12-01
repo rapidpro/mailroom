@@ -118,7 +118,7 @@ type Msg struct {
 		ConnectionID         *ConnectionID      `db:"connection_id"   json:"-"`
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
-		ResponseToID         MsgID              `db:"response_to_id"  json:"response_to_id"`
+		ResponseToID         MsgID              `db:"response_to_id"  json:"-"`
 		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
 		IsResend             bool               `                     json:"is_resend,omitempty"`
 		URN                  urns.URN           `db:"urn_urn"         json:"urn"`
