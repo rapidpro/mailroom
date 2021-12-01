@@ -8,7 +8,7 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 )
 
-var isMemberScript = redis.NewScript(3,
+var markerContainsScript = redis.NewScript(3,
 	`-- KEYS: [TodayKey, YesterdayKey, Value]
 local found = redis.call("SISMEMBER", KEYS[1], KEYS[3])
 if found == 1 then
@@ -31,7 +31,7 @@ func NewMarker(keyBase string) *Marker {
 func (m *Marker) Contains(rc redis.Conn, value string) (bool, error) {
 	todayKey, yesterdayKey := m.keys()
 
-	return redis.Bool(isMemberScript.Do(rc, todayKey, yesterdayKey, value))
+	return redis.Bool(markerContainsScript.Do(rc, todayKey, yesterdayKey, value))
 }
 
 // Add adds the given value
