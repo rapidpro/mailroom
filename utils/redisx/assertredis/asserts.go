@@ -1,12 +1,19 @@
 package assertredis
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/assert"
 )
+
+// Keys asserts that only the given keys exist
+func Keys(t *testing.T, rp *redis.Pool, expected []string, msgAndArgs ...interface{}) {
+	actual, err := redis.Strings(do(rp, "KEYS", "*"))
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, expected, actual, msgAndArgs...)
+}
 
 // Exists asserts that the given key exists
 func Exists(t *testing.T, rp *redis.Pool, key string, msgAndArgs ...interface{}) {
@@ -40,21 +47,17 @@ func String(t *testing.T, rp *redis.Pool, key string, expected string, msgAndArg
 	assert.Equal(t, expected, actual, msgAndArgs...)
 }
 
-// IntSet asserts that the given key contains a set with the given int values
-func IntSet(t *testing.T, rp *redis.Pool, key string, expected []int, msgAndArgs ...interface{}) {
-	actual, err := redis.Ints(do(rp, "SMEMBERS", key))
-
-	sort.Ints(actual)
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, actual, msgAndArgs...)
-}
-
-// StringSet asserts that the given key contains a set with the given string values
-func StringSet(t *testing.T, rp *redis.Pool, key string, expected []string, msgAndArgs ...interface{}) {
+// Set asserts that the given key contains a set with the given values
+func Set(t *testing.T, rp *redis.Pool, key string, expected []string, msgAndArgs ...interface{}) {
 	actual, err := redis.Strings(do(rp, "SMEMBERS", key))
 
-	sort.Strings(actual)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, expected, actual, msgAndArgs...)
+}
+
+// Hash asserts that the given key contains a hash with the given values
+func Hash(t *testing.T, rp *redis.Pool, key string, expected map[string]string, msgAndArgs ...interface{}) {
+	actual, err := redis.StringMap(do(rp, "HGETALL", key))
 
 	assert.NoError(t, err)
 	assert.Equal(t, expected, actual, msgAndArgs...)

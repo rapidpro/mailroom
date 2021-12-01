@@ -174,11 +174,11 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	db.Get(&incidentID, `SELECT id FROM notifications_incident`)
 
 	// and a record of the nodes
-	assertredis.StringSet(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+	assertredis.Set(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
 
 	// another bad call won't create another incident..
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)
-	assertredis.StringSet(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
+	assertredis.Set(t, rp, fmt.Sprintf("incident:%d:nodes", incidentID), []string{"1bff8fe4-0714-433e-96a3-437405bf21cf"})
 }
