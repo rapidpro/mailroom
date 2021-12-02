@@ -1,3 +1,7 @@
+v7.1.11
+----------
+ * Add imports for missing task packages
+
 v7.1.10
 ----------
  * Add redisx.Cacher util
