@@ -99,16 +99,10 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		}
 	}
 
-	msg, err := models.NewOutgoingMsg(rt, oa.Org(), channel, scene.ContactID(), event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, scene.Session(), event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
-
-	// include some information about the session
-	msg.SetSession(scene.Session().ID(), scene.Session().Status())
-
-	// set our reply to as well (will be noop in cases when there is no incoming message)
-	msg.SetResponseTo(scene.Session().IncomingMsgID(), scene.Session().IncomingMsgExternalID())
 
 	// register to have this message committed
 	scene.AppendToEventPreCommitHook(hooks.CommitMessagesHook, msg)
