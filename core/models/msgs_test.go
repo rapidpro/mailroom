@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/mailroom/utils/redisx/assertredis"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,10 +26,7 @@ import (
 func TestOutgoingMsgs(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer func() {
-		testsuite.Reset(testsuite.ResetData)
-		db.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
-	}()
+	defer testsuite.Reset(testsuite.ResetData)
 
 	tcs := []struct {
 		ChannelUUID  assets.ChannelUUID
@@ -107,7 +105,7 @@ func TestOutgoingMsgs(t *testing.T) {
 		channel := oa.ChannelByUUID(tc.ChannelUUID)
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic)
-		msg, err := models.NewOutgoingMsg(rt.Config, oa.Org(), channel, tc.ContactID, flowMsg, now)
+		msg, err := models.NewOutgoingMsg(rt, oa.Org(), channel, tc.ContactID, flowMsg, now)
 
 		if tc.HasError {
 			assert.Error(t, err)
@@ -137,6 +135,34 @@ func TestOutgoingMsgs(t *testing.T) {
 			assert.True(t, msg.ModifiedOn().After(now))
 		}
 	}
+
+	// ensure org is unsuspended
+	db.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
+	require.NoError(t, err)
+	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+
+	// check that msg loop detection triggers after 20 repeats of the same text
+	newOutgoing := func(text string) *models.Msg {
+		flowMsg := flows.NewMsgOut(urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)), assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), text, nil, nil, nil, flows.NilMsgTopic)
+		msg, err := models.NewOutgoingMsg(rt, oa.Org(), channel, testdata.Cathy.ID, flowMsg, now)
+		require.NoError(t, err)
+		return msg
+	}
+
+	for i := 0; i < 19; i++ {
+		msg := newOutgoing("foo")
+		assert.Equal(t, models.MsgStatusQueued, msg.Status())
+	}
+	for i := 0; i < 10; i++ {
+		msg := newOutgoing("foo")
+		assert.Equal(t, models.MsgStatusFailed, msg.Status())
+	}
+	for i := 0; i < 5; i++ {
+		msg := newOutgoing("bar")
+		assert.Equal(t, models.MsgStatusQueued, msg.Status())
+	}
 }
 
 func TestMarshalMsg(t *testing.T) {
@@ -159,7 +185,7 @@ func TestMarshalMsg(t *testing.T) {
 		nil,
 		flows.MsgTopicPurchase,
 	)
-	msg, err := models.NewOutgoingMsg(rt.Config, oa.Org(), channel, testdata.Cathy.ID, flowMsg, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
+	msg, err := models.NewOutgoingMsg(rt, oa.Org(), channel, testdata.Cathy.ID, flowMsg, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
 
 	err = models.InsertMessages(ctx, db, []*models.Msg{msg})
@@ -269,6 +295,45 @@ func TestResendMessages(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(2)
 }
 
+func TestGetMsgRepetitions(t *testing.T) {
+	_, _, _, rp := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetRedis)
+	defer dates.SetNowSource(dates.DefaultNowSource)
+
+	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 13, 3, 234567, time.UTC)))
+
+	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic)
+	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic)
+
+	assertRepetitions := func(m *flows.MsgOut, expected int) {
+		count, err := models.GetMsgRepetitions(rp, testdata.Cathy.ID, m)
+		require.NoError(t, err)
+		assert.Equal(t, expected, count)
+	}
+
+	// keep counts up to 99
+	for i := 0; i < 99; i++ {
+		assertRepetitions(msg1, i+1)
+	}
+	assertredis.Hash(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
+
+	for i := 0; i < 50; i++ {
+		assertRepetitions(msg1, 99)
+	}
+	assertredis.Hash(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
+
+	for i := 0; i < 19; i++ {
+		assertRepetitions(msg2, i+1)
+	}
+	assertredis.Hash(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "19:bar"})
+
+	for i := 0; i < 50; i++ {
+		assertRepetitions(msg2, 20+i)
+	}
+	assertredis.Hash(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "69:bar"})
+}
+
 func TestNormalizeAttachment(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 
@@ -304,7 +369,7 @@ func TestMarkMessages(t *testing.T) {
 	insertMsg := func(text string) *models.Msg {
 		urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
 		flowMsg := flows.NewMsgOut(urn, channel.ChannelReference(), text, nil, nil, nil, flows.NilMsgTopic)
-		msg, err := models.NewOutgoingMsg(rt.Config, oa.Org(), channel, testdata.Cathy.ID, flowMsg, time.Now())
+		msg, err := models.NewOutgoingMsg(rt, oa.Org(), channel, testdata.Cathy.ID, flowMsg, time.Now())
 		require.NoError(t, err)
 
 		err = models.InsertMessages(ctx, db, []*models.Msg{msg})

@@ -99,7 +99,7 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		}
 	}
 
-	msg, err := models.NewOutgoingMsg(rt.Config, oa.Org(), channel, scene.ContactID(), event.Msg, event.CreatedOn())
+	msg, err := models.NewOutgoingMsg(rt, oa.Org(), channel, scene.ContactID(), event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
