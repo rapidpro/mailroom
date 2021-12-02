@@ -1,0 +1,123 @@
+name: Build Rapidpro Mailroom in Shared (Dispatch)
+
+on:
+  workflow_dispatch:
+    inputs:
+
+      source-branch:
+        description: 'Source branch in Mailroom repository (main, staging, develop, fix/sentry etc.)'
+        required: true
+        default: 'main'
+
+      tag-name:
+        description: 'Tag id (v0.0.1-develop, v0.0.2, etc.)'
+        required: true
+
+      destination-env:
+        description: 'Destination environment (develop, production, staging)'
+        required: true
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest 
+    steps:
+
+      - name: Check out the repo
+        uses: actions/checkout@v2
+        with:
+          ref: ${{github.event.inputs.source-branch}}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to ECR
+        uses: docker/login-action@v1
+        with:
+          registry: 869898323958.dkr.ecr.us-east-1.amazonaws.com
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
+
+      - name: Build and push - Mailroom Image
+        id: docker_build1
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          labels: branch=${{github.event.inputs.source-branch}},commit=${{env.GITHUB_SHA}},repository=https://github.com/Ilhasoft/mailroom
+          file: ./docker/Dockerfile
+          push: true
+          tags: 869898323958.dkr.ecr.us-east-1.amazonaws.com/mailroom:${{github.event.inputs.tag-name}}
+          no-cache: true
+
+      - name: Check out Kubernetes Manifests
+        uses: actions/checkout@master
+        with:
+          ref: main
+          repository: Ilhasoft/kubernetes-manifests-platform
+          token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
+          path: ./kubernetes-manifests/
+
+      - name: Set variable tag for jq
+        run: |
+          echo "IMAGE_TAG=869898323958.dkr.ecr.us-east-1.amazonaws.com/mailroom:${{github.event.inputs.tag-name}}" >> $GITHUB_ENV
+
+      - name: Update image on deployment
+        run: |
+            which jq > /dev/null 2>&1 || ( sudo apt update ; sudo apt install -y jq )
+            # Dep: coreutils
+            verlte() {
+              [ "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
+            }
+            verlt(){
+              [ "$1" = "$2" ] && return 1 || verlte $1 $2
+            }
+            export PROJECT_DIR="weni-flows/mailroom" PATCH_TARGET="deployment.json"
+            for e in ${{github.event.inputs.destination-env}}; do
+              echo "Update ${e}:"
+              if [ ! -d "kubernetes-manifests/${PROJECT_DIR}/${e}" ] ; then
+                echo "kubernetes-manifests/${PROJECT_DIR}/${e}: Does not exist, skipping"
+              elif [ ! -r "kubernetes-manifests/${PROJECT_DIR}/${e}/kustomization.yaml" ] ; then
+                echo "kubernetes-manifests/${PROJECT_DIR}/${e}/kustomization.yaml: Does not readable, skipping"
+              elif [ ! -r "kubernetes-manifests/${PROJECT_DIR}/${e}/${PATCH_TARGET}" ] ; then
+                echo "kubernetes-manifests/${PROJECT_DIR}/${e}/${PATCH_TARGET}: Does not readable, skipping"
+              else
+                OLD_IMAGE=$(
+                  cat "kubernetes-manifests/${PROJECT_DIR}/${e}/${PATCH_TARGET}" \
+                    | jq '.[] | select(.path == "/spec/template/spec/containers/0/image") | .value'
+                )
+                echo "Old image to replace: ${OLD_IMAGE}"
+                OLD_VERSION=$(
+                  echo "${OLD_IMAGE}" \
+                    | sed s'/^.*[v:-]\([0-9]*\.[0-9]*\.[0-9]*\).*$/\1/'g \
+                    | head -n1
+                )
+                NEW_VERSION=$(echo ${{github.event.inputs.tag-name}}|grep -o -e '[0-9]*\.[0-9]*\.[0-9]*')
+                echo "Old image version to compare: ${OLD_VERSION}<=${NEW_VERSION}"
+                if verlte "${OLD_VERSION}" "${NEW_VERSION}" ; then
+                  echo 'New configurations:'
+                  new_configuration=$(
+                    cat "kubernetes-manifests/${PROJECT_DIR}/${e}/${PATCH_TARGET}" \
+                      | jq '(..|select(.path == "/spec/template/spec/containers/0/image")?) += {value: "'"${{env.IMAGE_TAG}}"'"}'
+                  )
+                  echo "${new_configuration}"
+                  echo "${new_configuration}" > "kubernetes-manifests/${PROJECT_DIR}/${e}/${PATCH_TARGET}"
+                else
+                  echo "Version in file is greater than build, skiping update yaml"
+                fi
+              fi
+            done
+
+      - name: Commit & Push changes
+        uses: actions-js/push@master
+        with:
+          github_token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
+          repository: Ilhasoft/kubernetes-manifests-platform
+          directory: ./kubernetes-manifests/
+          branch: main
+          message: "From Rapidpro Mailroom Build (Dispatch)"
+
+      - name: Generated Image URL to Copy
+        run: |
+            echo ${{ env.IMAGE_TAG }}
