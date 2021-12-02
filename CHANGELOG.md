@@ -1,3 +1,7 @@
+v7.1.12
+----------
+ * Move msg level loop detection from courier
+
 v7.1.11
 ----------
  * Add imports for missing task packages
