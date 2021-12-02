@@ -23,7 +23,7 @@ const (
 	expireBatchSize = 500
 )
 
-var expirationsMarker = redisx.NewMarker("run_expirations")
+var expirationsMarker = redisx.NewMarker("run_expirations", time.Hour*24)
 
 func init() {
 	mailroom.AddInitFunction(StartExpirationCron)

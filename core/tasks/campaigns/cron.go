@@ -23,7 +23,7 @@ const (
 	maxBatchSize = 100
 )
 
-var campaignsMarker = redisx.NewMarker("campaign_event")
+var campaignsMarker = redisx.NewMarker("campaign_event", time.Hour*24)
 
 func init() {
 	mailroom.AddInitFunction(StartCampaignCron)

@@ -2,7 +2,6 @@ package redisx
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -98,38 +97,4 @@ func (t *StatesTracker) getCountKey(ts int64, s string) string {
 func (t *StatesTracker) getIntervalStart(now int64, delta int) int64 {
 	intervalSecs := int64(t.interval / time.Second)
 	return ((now / intervalSecs) + int64(delta)) * intervalSecs
-}
-
-var boolStates = []string{"true", "false"}
-
-// BoolTracker is convenience for tracking two boolean states
-type BoolTracker struct {
-	StatesTracker
-}
-
-// NewBoolTracker creates a new bool tracker
-func NewBoolTracker(keyBase string, interval time.Duration, window time.Duration) *BoolTracker {
-	return &BoolTracker{
-		StatesTracker: StatesTracker{
-			keyBase:  keyBase,
-			states:   boolStates,
-			interval: interval,
-			window:   window,
-		},
-	}
-}
-
-// Record records a bool result
-func (t *BoolTracker) Record(rc redis.Conn, b bool, count int) error {
-	return t.StatesTracker.Record(rc, strconv.FormatBool(b), count)
-}
-
-// Current returns the total counts of true and false states, across all intervals within our window
-func (t *BoolTracker) Current(rc redis.Conn) (int, int, error) {
-	totals, err := t.StatesTracker.Current(rc)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return totals["true"], totals["false"], nil
 }
