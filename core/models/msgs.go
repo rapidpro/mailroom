@@ -111,6 +111,7 @@ type Msg struct {
 		ErrorCount           int                `db:"error_count"     json:"error_count"`
 		NextAttempt          *time.Time         `db:"next_attempt"    json:"next_attempt"`
 		ExternalID           null.String        `db:"external_id"     json:"external_id"`
+		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
 		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
@@ -118,8 +119,6 @@ type Msg struct {
 		ConnectionID         *ConnectionID      `db:"connection_id"   json:"-"`
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
-		ResponseToID         MsgID              `db:"response_to_id"  json:"-"`
-		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
 		IsResend             bool               `                     json:"is_resend,omitempty"`
 		URN                  urns.URN           `db:"urn_urn"         json:"urn"`
 		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
@@ -366,13 +365,12 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 
 	// if we have a session, set fields on the message from that
 	if session != nil {
-		m.ResponseToID = session.IncomingMsgID()
 		m.ResponseToExternalID = session.IncomingMsgExternalID()
 		m.SessionID = session.ID()
 		m.SessionStatus = session.Status()
 
 		// if we're responding to an incoming message, send as high priority
-		if m.ResponseToID != NilMsgID {
+		if session.IncomingMsgID() != NilMsgID {
 			m.HighPriority = true
 		}
 	}
