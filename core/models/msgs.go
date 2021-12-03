@@ -115,7 +115,6 @@ type Msg struct {
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
-		ConnectionID         *ConnectionID      `db:"connection_id"   json:"-"`
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
 		ResponseToID         MsgID              `db:"response_to_id"  json:"-"`
@@ -160,7 +159,6 @@ func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
 func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
 func (m *Msg) ChannelID() ChannelID             { return m.m.ChannelID }
 func (m *Msg) ChannelUUID() assets.ChannelUUID  { return m.m.ChannelUUID }
-func (m *Msg) ConnectionID() *ConnectionID      { return m.m.ConnectionID }
 func (m *Msg) URN() urns.URN                    { return m.m.URN }
 func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
@@ -231,9 +229,6 @@ func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, i
 
 	urnID := conn.ContactURNID()
 	m.ContactURNID = &urnID
-
-	connID := conn.ID()
-	m.ConnectionID = &connID
 	m.ChannelID = conn.ChannelID()
 
 	m.OrgID = orgID
@@ -265,9 +260,6 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, o
 
 	urnID := conn.ContactURNID()
 	m.ContactURNID = &urnID
-
-	connID := conn.ID()
-	m.ConnectionID = &connID
 	m.ChannelID = conn.ChannelID()
 
 	m.URN = out.URN()
