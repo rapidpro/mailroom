@@ -8,18 +8,18 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 )
 
-// Cacher operates like a hash map but with expiring values
-type Cacher struct {
+// Cache operates like a hash map but with expiring values
+type Cache struct {
 	keyBase  string
 	interval time.Duration
 }
 
-// NewCacher creates a new empty cacher
-func NewCacher(keyBase string, interval time.Duration) *Cacher {
-	return &Cacher{keyBase: keyBase, interval: interval}
+// NewCache creates a new empty cache
+func NewCache(keyBase string, interval time.Duration) *Cache {
+	return &Cache{keyBase: keyBase, interval: interval}
 }
 
-var cacherGetScript = redis.NewScript(2, `
+var cacheGetScript = redis.NewScript(2, `
 local currKey, prevKey, field = KEYS[1], KEYS[2], ARGV[1]
 local value = redis.call("HGET", currKey, field)
 if (value ~= false) then
@@ -29,10 +29,10 @@ return redis.call("HGET", prevKey, field)
 `)
 
 // Get returns the value of the given field
-func (c *Cacher) Get(rc redis.Conn, field string) (string, error) {
+func (c *Cache) Get(rc redis.Conn, field string) (string, error) {
 	currKey, prevKey := c.keys()
 
-	value, err := redis.String(cacherGetScript.Do(rc, currKey, prevKey, field))
+	value, err := redis.String(cacheGetScript.Do(rc, currKey, prevKey, field))
 	if err != nil && err != redis.ErrNil {
 		return "", err
 	}
@@ -40,7 +40,7 @@ func (c *Cacher) Get(rc redis.Conn, field string) (string, error) {
 }
 
 // Sets sets the value of the given field
-func (c *Cacher) Set(rc redis.Conn, field, value string) error {
+func (c *Cache) Set(rc redis.Conn, field, value string) error {
 	currKey, _ := c.keys()
 
 	rc.Send("MULTI")
@@ -51,7 +51,7 @@ func (c *Cacher) Set(rc redis.Conn, field, value string) error {
 }
 
 // Remove removes the given field
-func (c *Cacher) Remove(rc redis.Conn, field string) error {
+func (c *Cache) Remove(rc redis.Conn, field string) error {
 	currKey, prevKey := c.keys()
 
 	rc.Send("MULTI")
@@ -62,7 +62,7 @@ func (c *Cacher) Remove(rc redis.Conn, field string) error {
 }
 
 // ClearAll removes all values
-func (c *Cacher) ClearAll(rc redis.Conn) error {
+func (c *Cache) ClearAll(rc redis.Conn) error {
 	currKey, prevKey := c.keys()
 
 	rc.Send("MULTI")
@@ -73,7 +73,7 @@ func (c *Cacher) ClearAll(rc redis.Conn) error {
 }
 
 // keys returns the keys for the current set and the previous set
-func (c *Cacher) keys() (string, string) {
+func (c *Cache) keys() (string, string) {
 	now := dates.Now()
 	currTimestamp := intervalTimestamp(now, c.interval)
 	prevTimestamp := intervalTimestamp(now.Add(-c.interval), c.interval)
