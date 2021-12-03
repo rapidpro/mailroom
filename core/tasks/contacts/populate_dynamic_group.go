@@ -17,7 +17,7 @@ import (
 // TypePopulateDynamicGroup is the type of the populate group task
 const TypePopulateDynamicGroup = "populate_dynamic_group"
 
-const populateLockKey string = "pop_dyn_group_%d"
+const populateLockKey string = "lock:pop_dyn_group_%d"
 
 func init() {
 	tasks.RegisterType(TypePopulateDynamicGroup, func() tasks.Task { return &PopulateDynamicGroupTask{} })

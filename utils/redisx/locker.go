@@ -1,7 +1,6 @@
 package redisx
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -10,13 +9,13 @@ import (
 )
 
 type Locker struct {
-	name       string
+	key        string
 	expiration time.Duration
 }
 
 // NewLocker creates a new locker with the given name and expiration
-func NewLocker(name string, expiration time.Duration) *Locker {
-	return &Locker{name: name, expiration: expiration}
+func NewLocker(key string, expiration time.Duration) *Locker {
+	return &Locker{key: key, expiration: expiration}
 }
 
 // Grab tries to grab this lock in an atomic operation. It returns the lock value if successful.
@@ -29,7 +28,7 @@ func (l *Locker) Grab(rp *redis.Pool, retry time.Duration) (string, error) {
 	start := time.Now()
 	for {
 		rc := rp.Get()
-		success, err := rc.Do("SET", l.key(), value, "EX", expires, "NX")
+		success, err := rc.Do("SET", l.key, value, "EX", expires, "NX")
 		rc.Close()
 
 		if err != nil {
@@ -65,7 +64,7 @@ func (l *Locker) Release(rp *redis.Pool, value string) error {
 	defer rc.Close()
 
 	// we use lua here because we only want to release the lock if we own it
-	_, err := releaseScript.Do(rc, l.key(), value)
+	_, err := releaseScript.Do(rc, l.key, value)
 	return err
 }
 
@@ -86,12 +85,8 @@ func (l *Locker) Extend(rp *redis.Pool, value string, expiration time.Duration) 
 	seconds := int(expiration / time.Second) // convert our expiration to seconds
 
 	// we use lua here because we only want to set the expiration time if we own it
-	_, err := expireScript.Do(rc, l.key(), value, seconds)
+	_, err := expireScript.Do(rc, l.key, value, seconds)
 	return err
-}
-
-func (l *Locker) key() string {
-	return fmt.Sprintf("lock:%s", l.name)
 }
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

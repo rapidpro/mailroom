@@ -15,7 +15,7 @@ import (
 // TypeScheduleCampaignEvent is the type of the schedule event task
 const TypeScheduleCampaignEvent = "schedule_campaign_event"
 
-const scheduleLockKey string = "schedule_campaign_event_%d"
+const scheduleLockKey string = "lock:schedule_campaign_event_%d"
 
 func init() {
 	tasks.RegisterType(TypeScheduleCampaignEvent, func() tasks.Task { return &ScheduleCampaignEventTask{} })
