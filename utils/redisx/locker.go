@@ -1,7 +1,6 @@
 package redisx
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -10,13 +9,13 @@ import (
 )
 
 type Locker struct {
-	name       string
+	key        string
 	expiration time.Duration
 }
 
-// NewLocker creates a new locker with the given name and expiration
-func NewLocker(name string, expiration time.Duration) *Locker {
-	return &Locker{name: name, expiration: expiration}
+// NewLocker creates a new locker using the given key and expiration
+func NewLocker(key string, expiration time.Duration) *Locker {
+	return &Locker{key: key, expiration: expiration}
 }
 
 // Grab tries to grab this lock in an atomic operation. It returns the lock value if successful.
@@ -29,7 +28,7 @@ func (l *Locker) Grab(rp *redis.Pool, retry time.Duration) (string, error) {
 	start := time.Now()
 	for {
 		rc := rp.Get()
-		success, err := rc.Do("SET", l.key(), value, "EX", expires, "NX")
+		success, err := rc.Do("SET", l.key, value, "EX", expires, "NX")
 		rc.Close()
 
 		if err != nil {
@@ -49,10 +48,11 @@ func (l *Locker) Grab(rp *redis.Pool, retry time.Duration) (string, error) {
 	return value, nil
 }
 
-var releaseScript = redis.NewScript(2, `
--- KEYS: [Key, Value]
-if redis.call("GET", KEYS[1]) == KEYS[2] then
-	return redis.call("DEL", KEYS[1])
+var releaseScript = redis.NewScript(1, `
+local lockKey, lockValue = KEYS[1], ARGV[1]
+
+if redis.call("GET", lockKey) == lockValue then
+	return redis.call("DEL", lockKey)
 else
 	return 0
 end
@@ -65,14 +65,15 @@ func (l *Locker) Release(rp *redis.Pool, value string) error {
 	defer rc.Close()
 
 	// we use lua here because we only want to release the lock if we own it
-	_, err := releaseScript.Do(rc, l.key(), value)
+	_, err := releaseScript.Do(rc, l.key, value)
 	return err
 }
 
-var expireScript = redis.NewScript(3, `
--- KEYS: [Key, Value, Expiration]
-if redis.call("GET", KEYS[1]) == KEYS[2] then
-	return redis.call("EXPIRE", KEYS[1], KEYS[3])
+var expireScript = redis.NewScript(1, `
+local lockKey, lockValue, lockExpire = KEYS[1], ARGV[1], ARGV[2]
+
+if redis.call("GET", lockKey) == lockValue then
+	return redis.call("EXPIRE", lockKey, lockExpire)
 else
 	return 0
 end
@@ -86,12 +87,8 @@ func (l *Locker) Extend(rp *redis.Pool, value string, expiration time.Duration) 
 	seconds := int(expiration / time.Second) // convert our expiration to seconds
 
 	// we use lua here because we only want to set the expiration time if we own it
-	_, err := expireScript.Do(rc, l.key(), value, seconds)
+	_, err := expireScript.Do(rc, l.key, value, seconds)
 	return err
-}
-
-func (l *Locker) key() string {
-	return fmt.Sprintf("lock:%s", l.name)
 }
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

@@ -21,7 +21,7 @@ func TestLocker(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotZero(t, lock1)
 
-	assertredis.Exists(t, rp, "lock:test")
+	assertredis.Exists(t, rp, "test")
 
 	// try to acquire the same lock, should fail
 	lock2, err := locker.Grab(rp, time.Second)
@@ -48,18 +48,18 @@ func TestLocker(t *testing.T) {
 	assert.NoError(t, err)
 
 	// no error but also dooesn't release the lock
-	assertredis.Exists(t, rp, "lock:test")
+	assertredis.Exists(t, rp, "test")
 
 	// release the lock
 	err = locker.Release(rp, lock3)
 	assert.NoError(t, err)
 
-	assertredis.NotExists(t, rp, "lock:test")
+	assertredis.NotExists(t, rp, "test")
 
 	// new grab should work
 	lock5, err := locker.Grab(rp, time.Second*5)
 	assert.NoError(t, err)
 	assert.NotZero(t, lock5)
 
-	assertredis.Exists(t, rp, "lock:test")
+	assertredis.Exists(t, rp, "test")
 }
