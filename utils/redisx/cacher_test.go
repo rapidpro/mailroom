@@ -29,7 +29,7 @@ func TestCacher(t *testing.T) {
 		assert.Equal(t, expected, actual, "expected cache key %s to contain %s", k, expected)
 	}
 
-	// create a 24-hour based cacher1
+	// create a 24-hour based cacher
 	cacher1 := redisx.NewCacher("foos", time.Hour*24)
 	cacher1.Set(rc, "A", "1")
 	cacher1.Set(rc, "B", "2")

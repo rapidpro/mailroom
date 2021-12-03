@@ -23,6 +23,7 @@ func TestMarker(t *testing.T) {
 
 	setNow(time.Date(2021, 11, 18, 12, 0, 3, 234567, time.UTC))
 
+	// create a 24-hour based marker
 	marker1 := redisx.NewMarker("foos", time.Hour*24)
 	marker1.Add(rc, "A")
 	marker1.Add(rc, "B")

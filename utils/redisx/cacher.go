@@ -8,16 +8,7 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 )
 
-var cacherGetScript = redis.NewScript(3, `
-local currKey, prevKey, key = KEYS[1], KEYS[2], KEYS[3]
-local value = redis.call("HGET", currKey, key)
-if (value ~= false) then
-	return value
-end
-return redis.call("HGET", prevKey, key)
-`)
-
-// Cacher operates like a hash map but values are automatically expired
+// Cacher operates like a hash map but with expiring values
 type Cacher struct {
 	keyBase  string
 	interval time.Duration
@@ -28,35 +19,44 @@ func NewCacher(keyBase string, interval time.Duration) *Cacher {
 	return &Cacher{keyBase: keyBase, interval: interval}
 }
 
-// Get returns the value of the given key
-func (c *Cacher) Get(rc redis.Conn, key string) (string, error) {
+var cacherGetScript = redis.NewScript(2, `
+local currKey, prevKey, field = KEYS[1], KEYS[2], ARGV[1]
+local value = redis.call("HGET", currKey, field)
+if (value ~= false) then
+	return value
+end
+return redis.call("HGET", prevKey, field)
+`)
+
+// Get returns the value of the given field
+func (c *Cacher) Get(rc redis.Conn, field string) (string, error) {
 	currKey, prevKey := c.keys()
 
-	value, err := redis.String(cacherGetScript.Do(rc, currKey, prevKey, key))
+	value, err := redis.String(cacherGetScript.Do(rc, currKey, prevKey, field))
 	if err != nil && err != redis.ErrNil {
 		return "", err
 	}
 	return value, nil
 }
 
-// Sets sets the value of the given key
-func (c *Cacher) Set(rc redis.Conn, key, value string) error {
+// Sets sets the value of the given field
+func (c *Cacher) Set(rc redis.Conn, field, value string) error {
 	currKey, _ := c.keys()
 
 	rc.Send("MULTI")
-	rc.Send("HSET", currKey, key, value)
-	rc.Send("EXPIRE", currKey, 60*60*24) // 24 hours
+	rc.Send("HSET", currKey, field, value)
+	rc.Send("EXPIRE", currKey, c.interval/time.Second)
 	_, err := rc.Do("EXEC")
 	return err
 }
 
-// Remove removes the given key
-func (c *Cacher) Remove(rc redis.Conn, key string) error {
+// Remove removes the given field
+func (c *Cacher) Remove(rc redis.Conn, field string) error {
 	currKey, prevKey := c.keys()
 
 	rc.Send("MULTI")
-	rc.Send("HDEL", currKey, key)
-	rc.Send("HDEL", prevKey, key)
+	rc.Send("HDEL", currKey, field)
+	rc.Send("HDEL", prevKey, field)
 	_, err := rc.Do("EXEC")
 	return err
 }

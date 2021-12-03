@@ -8,25 +8,7 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 )
 
-var markerContainsScript = redis.NewScript(5, `
-local currKey, prevKey, value, legacyToday, legacyYesterday = KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5]
-
-local found = redis.call("SISMEMBER", currKey, value)
-if found == 1 then
-	return 1
-end
-found = redis.call("SISMEMBER", prevKey, value)
-if found == 1 then
-	return 1
-end
-found = redis.call("SISMEMBER", legacyToday, value)
-if found == 1 then
-	return 1
-end
-return redis.call("SISMEMBER", legacyYesterday, value)
-`)
-
-// Marker operates like a set but values are automatically expired after 24-48 hours
+// Marker operates like a set but with expiring values
 type Marker struct {
 	keyBase  string
 	interval time.Duration
@@ -37,35 +19,53 @@ func NewMarker(keyBase string, interval time.Duration) *Marker {
 	return &Marker{keyBase: keyBase, interval: interval}
 }
 
+var markerContainsScript = redis.NewScript(4, `
+local currKey, prevKey, legacyToday, legacyYesterday, member = KEYS[1], KEYS[2], KEYS[3], KEYS[4], ARGV[1]
+
+local found = redis.call("SISMEMBER", currKey, member)
+if found == 1 then
+	return 1
+end
+found = redis.call("SISMEMBER", prevKey, member)
+if found == 1 then
+	return 1
+end
+found = redis.call("SISMEMBER", legacyToday, member)
+if found == 1 then
+	return 1
+end
+return redis.call("SISMEMBER", legacyYesterday, member)
+`)
+
 // Contains returns whether we contain the given value
-func (m *Marker) Contains(rc redis.Conn, value string) (bool, error) {
+func (m *Marker) Contains(rc redis.Conn, member string) (bool, error) {
 	currKey, prevKey, legacyToday, legacyYesterday := m.keys()
 
-	return redis.Bool(markerContainsScript.Do(rc, currKey, prevKey, value, legacyToday, legacyYesterday))
+	return redis.Bool(markerContainsScript.Do(rc, currKey, prevKey, legacyToday, legacyYesterday, member))
 }
 
 // Add adds the given value
-func (m *Marker) Add(rc redis.Conn, value string) error {
+func (m *Marker) Add(rc redis.Conn, member string) error {
 	currKey, _, legacyToday, _ := m.keys()
 
 	rc.Send("MULTI")
-	rc.Send("SADD", currKey, value)
-	rc.Send("SADD", legacyToday, value)
-	rc.Send("EXPIRE", currKey, 60*60*24)     // 24 hours
-	rc.Send("EXPIRE", legacyToday, 60*60*24) // 24 hours
+	rc.Send("SADD", currKey, member)
+	rc.Send("SADD", legacyToday, member)
+	rc.Send("EXPIRE", currKey, m.interval/time.Second)
+	rc.Send("EXPIRE", legacyToday, m.interval/time.Second)
 	_, err := rc.Do("EXEC")
 	return err
 }
 
 // Remove removes the given value
-func (m *Marker) Remove(rc redis.Conn, value string) error {
+func (m *Marker) Remove(rc redis.Conn, member string) error {
 	currKey, prevKey, legacyToday, legacyYesterday := m.keys()
 
 	rc.Send("MULTI")
-	rc.Send("SREM", currKey, value)
-	rc.Send("SREM", prevKey, value)
-	rc.Send("SREM", legacyToday, value)
-	rc.Send("SREM", legacyYesterday, value)
+	rc.Send("SREM", currKey, member)
+	rc.Send("SREM", prevKey, member)
+	rc.Send("SREM", legacyToday, member)
+	rc.Send("SREM", legacyYesterday, member)
 	_, err := rc.Do("EXEC")
 	return err
 }
