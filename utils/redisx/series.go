@@ -40,12 +40,25 @@ end
 return values
 `)
 
-// Get gets the value of field in all intervals
+// Get gets the values of field in all intervals
 func (s *Series) Get(rc redis.Conn, field string) ([]int64, error) {
 	keys := s.keys()
 	args := redis.Args{}.Add(len(keys)).AddFlat(keys).Add(field)
 
 	return redis.Int64s(seriesGetScript.Do(rc, args...))
+}
+
+// Total gets the total value of field across all intervals
+func (s *Series) Total(rc redis.Conn, field string) (int64, error) {
+	vals, err := s.Get(rc, field)
+	if err != nil {
+		return 0, err
+	}
+	var total int64
+	for _, v := range vals {
+		total += v
+	}
+	return total, nil
 }
 
 func (s *Series) keys() []string {
