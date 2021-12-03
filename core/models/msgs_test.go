@@ -316,22 +316,22 @@ func TestGetMsgRepetitions(t *testing.T) {
 	for i := 0; i < 99; i++ {
 		assertRepetitions(msg1, i+1)
 	}
-	assertredis.Hash(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
+	assertredis.HGetAll(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
 
 	for i := 0; i < 50; i++ {
 		assertRepetitions(msg1, 99)
 	}
-	assertredis.Hash(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
+	assertredis.HGetAll(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "99:foo"})
 
 	for i := 0; i < 19; i++ {
 		assertRepetitions(msg2, i+1)
 	}
-	assertredis.Hash(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "19:bar"})
+	assertredis.HGetAll(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "19:bar"})
 
 	for i := 0; i < 50; i++ {
 		assertRepetitions(msg2, 20+i)
 	}
-	assertredis.Hash(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "69:bar"})
+	assertredis.HGetAll(t, rp, "msg_repetitions:2021-11-18T12:15", map[string]string{"10000": "69:bar"})
 }
 
 func TestNormalizeAttachment(t *testing.T) {

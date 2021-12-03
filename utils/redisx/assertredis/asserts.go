@@ -31,32 +31,24 @@ func NotExists(t *testing.T, rp *redis.Pool, key string, msgAndArgs ...interface
 	assert.Equal(t, 0, exists, msgAndArgs...)
 }
 
-// Int asserts that the given key contains the given int value
-func Int(t *testing.T, rp *redis.Pool, key string, expected int, msgAndArgs ...interface{}) {
-	actual, err := redis.Int(do(rp, "GET", key))
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, actual, msgAndArgs...)
-}
-
-// String asserts that the given key contains the given string value
-func String(t *testing.T, rp *redis.Pool, key string, expected string, msgAndArgs ...interface{}) {
+// Get asserts that the given key contains the given string value
+func Get(t *testing.T, rp *redis.Pool, key string, expected string, msgAndArgs ...interface{}) {
 	actual, err := redis.String(do(rp, "GET", key))
 
 	assert.NoError(t, err)
 	assert.Equal(t, expected, actual, msgAndArgs...)
 }
 
-// Set asserts that the given key contains a set with the given values
-func Set(t *testing.T, rp *redis.Pool, key string, expected []string, msgAndArgs ...interface{}) {
+// SMembers asserts the result of calling SMembers on the given key
+func SMembers(t *testing.T, rp *redis.Pool, key string, expected []string, msgAndArgs ...interface{}) {
 	actual, err := redis.Strings(do(rp, "SMEMBERS", key))
 
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, expected, actual, msgAndArgs...)
 }
 
-// Hash asserts that the given key contains a hash with the given values
-func Hash(t *testing.T, rp *redis.Pool, key string, expected map[string]string, msgAndArgs ...interface{}) {
+// HGetAll asserts the result of calling HGETALL on the given key
+func HGetAll(t *testing.T, rp *redis.Pool, key string, expected map[string]string, msgAndArgs ...interface{}) {
 	actual, err := redis.StringMap(do(rp, "HGETALL", key))
 
 	assert.NoError(t, err)

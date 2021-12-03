@@ -37,8 +37,8 @@ func TestStatesTracker(t *testing.T) {
 	recordState("yes", 8)
 	recordState("no", 4)
 
-	assertredis.Int(t, rp, "foo:1:1637236800:yes", 8)
-	assertredis.Int(t, rp, "foo:1:1637236800:no", 4)
+	assertredis.Get(t, rp, "foo:1:1637236800:yes", "8")
+	assertredis.Get(t, rp, "foo:1:1637236800:no", "4")
 	assertredis.NotExists(t, rp, "foo:1:1637236800:maybe")
 
 	// current window is 11:59:33 (1637236773) - 12:00:03 (1637236803) so we'll include counts from intervals..
@@ -57,11 +57,11 @@ func TestStatesTracker(t *testing.T) {
 	recordState("no", 1)
 	recordState("maybe", 1)
 
-	assertredis.Int(t, rp, "foo:1:1637236800:yes", 8)
-	assertredis.Int(t, rp, "foo:1:1637236800:no", 4)
-	assertredis.Int(t, rp, "foo:1:1637236810:yes", 3)
-	assertredis.Int(t, rp, "foo:1:1637236810:no", 1)
-	assertredis.Int(t, rp, "foo:1:1637236810:maybe", 1)
+	assertredis.Get(t, rp, "foo:1:1637236800:yes", "8")
+	assertredis.Get(t, rp, "foo:1:1637236800:no", "4")
+	assertredis.Get(t, rp, "foo:1:1637236810:yes", "3")
+	assertredis.Get(t, rp, "foo:1:1637236810:no", "1")
+	assertredis.Get(t, rp, "foo:1:1637236810:maybe", "1")
 
 	// current window is 11:40:00 (1637236780) - 12:00:10 (1637236810) so we'll include counts from intervals..
 	//  0: 12:00:10 (1637236810) <= t < 12:00:20 (1637236820) yes=3 no=1 maybe=1
@@ -100,51 +100,4 @@ func TestStatesTracker(t *testing.T) {
 	totals, err = tr.Current(rc)
 	assert.NoError(t, err)
 	assert.Equal(t, map[string]int{"yes": 5, "no": 2, "maybe": 1}, totals)
-}
-
-func TestBoolTracker(t *testing.T) {
-	rp := assertredis.TestDB()
-	rc := rp.Get()
-	defer rc.Close()
-
-	defer assertredis.FlushDB()
-
-	defer dates.SetNowSource(dates.DefaultNowSource)
-	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 0, 1, 234567, time.UTC)))
-
-	tr := redisx.NewBoolTracker("foo:2", time.Second*10, time.Second*30)
-
-	yes, no, err := tr.Current(rc)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, yes)
-	assert.Equal(t, 0, no)
-
-	err = tr.Record(rc, true, 1)
-	require.NoError(t, err)
-
-	tr.Record(rc, false, 1)
-	tr.Record(rc, true, 1)
-
-	assertredis.Int(t, rp, "foo:2:1637236800:true", 2)
-	assertredis.Int(t, rp, "foo:2:1637236800:false", 1)
-
-	yes, no, err = tr.Current(rc)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, yes)
-	assert.Equal(t, 1, no)
-
-	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 0, 13, 234567, time.UTC)))
-
-	tr.Record(rc, false, 1)
-	tr.Record(rc, true, 3)
-
-	assertredis.Int(t, rp, "foo:2:1637236800:true", 2)
-	assertredis.Int(t, rp, "foo:2:1637236800:false", 1)
-	assertredis.Int(t, rp, "foo:2:1637236810:true", 3)
-	assertredis.Int(t, rp, "foo:2:1637236810:false", 1)
-
-	yes, no, err = tr.Current(rc)
-	assert.NoError(t, err)
-	assert.Equal(t, 5, yes)
-	assert.Equal(t, 2, no)
 }

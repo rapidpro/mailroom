@@ -28,8 +28,8 @@ func TestMarker(t *testing.T) {
 	marker.Add(rc, "B")
 	marker.Add(rc, "C")
 
-	assertredis.Set(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.Set(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
 	assertContains := func(v string) {
 		contains, err := marker.Contains(rc, v)
@@ -53,9 +53,9 @@ func TestMarker(t *testing.T) {
 	marker.Add(rc, "D")
 	marker.Add(rc, "E")
 
-	assertredis.Set(t, rp, "foos_2021_11_19", []string{"D", "E"})
-	assertredis.Set(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.Set(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D", "E"})
+	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
 	assertContains("A")
 	assertContains("B")
@@ -70,10 +70,10 @@ func TestMarker(t *testing.T) {
 	marker.Add(rc, "F")
 	marker.Add(rc, "G")
 
-	assertredis.Set(t, rp, "foos_2021_11_20", []string{"F", "G"})
-	assertredis.Set(t, rp, "foos_2021_11_19", []string{"D", "E"})
-	assertredis.Set(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.Set(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{"F", "G"})
+	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D", "E"})
+	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
 	assertNotContains("A") // too old
 	assertNotContains("B") // too old
@@ -88,8 +88,8 @@ func TestMarker(t *testing.T) {
 	err = marker.Remove(rc, "E") // from yesterday
 	require.NoError(t, err)
 
-	assertredis.Set(t, rp, "foos_2021_11_20", []string{"G"})
-	assertredis.Set(t, rp, "foos_2021_11_19", []string{"D"})
+	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{"G"})
+	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D"})
 
 	assertContains("D")
 	assertNotContains("E")
@@ -99,8 +99,8 @@ func TestMarker(t *testing.T) {
 	err = marker.ClearAll(rc)
 	require.NoError(t, err)
 
-	assertredis.Set(t, rp, "foos_2021_11_20", []string{})
-	assertredis.Set(t, rp, "foos_2021_11_19", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{})
 
 	assertNotContains("D")
 	assertNotContains("E")
