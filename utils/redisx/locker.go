@@ -48,10 +48,11 @@ func (l *Locker) Grab(rp *redis.Pool, retry time.Duration) (string, error) {
 	return value, nil
 }
 
-var releaseScript = redis.NewScript(2, `
--- KEYS: [Key, Value]
-if redis.call("GET", KEYS[1]) == KEYS[2] then
-	return redis.call("DEL", KEYS[1])
+var releaseScript = redis.NewScript(1, `
+local lockKey, lockValue = KEYS[1], ARGV[1]
+
+if redis.call("GET", lockKey) == lockValue then
+	return redis.call("DEL", lockKey)
 else
 	return 0
 end
@@ -68,10 +69,11 @@ func (l *Locker) Release(rp *redis.Pool, value string) error {
 	return err
 }
 
-var expireScript = redis.NewScript(3, `
--- KEYS: [Key, Value, Expiration]
-if redis.call("GET", KEYS[1]) == KEYS[2] then
-	return redis.call("EXPIRE", KEYS[1], KEYS[3])
+var expireScript = redis.NewScript(1, `
+local lockKey, lockValue, lockExpire = KEYS[1], ARGV[1], ARGV[2]
+
+if redis.call("GET", lockKey) == lockValue then
+	return redis.call("EXPIRE", lockKey, lockExpire)
 else
 	return 0
 end
