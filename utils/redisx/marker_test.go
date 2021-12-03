@@ -25,12 +25,12 @@ func TestMarker(t *testing.T) {
 
 	// create a 24-hour based marker
 	marker1 := redisx.NewMarker("foos", time.Hour*24)
-	marker1.Add(rc, "A")
-	marker1.Add(rc, "B")
-	marker1.Add(rc, "C")
+	assert.NoError(t, marker1.Add(rc, "A"))
+	assert.NoError(t, marker1.Add(rc, "B"))
+	assert.NoError(t, marker1.Add(rc, "C"))
 
-	assertredis.Set(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.Set(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
 	assertContains := func(m *redisx.Marker, v string) {
 		contains, err := m.Contains(rc, v)
@@ -54,9 +54,9 @@ func TestMarker(t *testing.T) {
 	marker1.Add(rc, "D")
 	marker1.Add(rc, "E")
 
-	assertredis.Set(t, rp, "foos_2021_11_19", []string{"D", "E"})
-	assertredis.Set(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.Set(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D", "E"})
+	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
 	assertContains(marker1, "A")
 	assertContains(marker1, "B")
@@ -71,10 +71,10 @@ func TestMarker(t *testing.T) {
 	marker1.Add(rc, "F")
 	marker1.Add(rc, "G")
 
-	assertredis.Set(t, rp, "foos_2021_11_20", []string{"F", "G"})
-	assertredis.Set(t, rp, "foos_2021_11_19", []string{"D", "E"})
-	assertredis.Set(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.Set(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{"F", "G"})
+	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D", "E"})
+	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
 	assertNotContains(marker1, "A") // too old
 	assertNotContains(marker1, "B") // too old
@@ -89,8 +89,8 @@ func TestMarker(t *testing.T) {
 	err = marker1.Remove(rc, "E") // from yesterday
 	require.NoError(t, err)
 
-	assertredis.Set(t, rp, "foos_2021_11_20", []string{"G"})
-	assertredis.Set(t, rp, "foos_2021_11_19", []string{"D"})
+	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{"G"})
+	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D"})
 
 	assertContains(marker1, "D")
 	assertNotContains(marker1, "E")
@@ -100,8 +100,8 @@ func TestMarker(t *testing.T) {
 	err = marker1.ClearAll(rc)
 	require.NoError(t, err)
 
-	assertredis.Set(t, rp, "foos_2021_11_20", []string{})
-	assertredis.Set(t, rp, "foos_2021_11_19", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{})
+	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{})
 
 	assertNotContains(marker1, "D")
 	assertNotContains(marker1, "E")
@@ -113,8 +113,8 @@ func TestMarker(t *testing.T) {
 	marker2.Add(rc, "A")
 	marker2.Add(rc, "B")
 
-	assertredis.Set(t, rp, "foos:2021-11-20T12:05", []string{"A", "B"})
-	assertredis.Set(t, rp, "foos:2021-11-20T12:00", []string{})
+	assertredis.SMembers(t, rp, "foos:2021-11-20T12:05", []string{"A", "B"})
+	assertredis.SMembers(t, rp, "foos:2021-11-20T12:00", []string{})
 
 	assertContains(marker2, "A")
 	assertContains(marker2, "B")

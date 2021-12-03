@@ -37,8 +37,8 @@ func TestStatesTracker(t *testing.T) {
 	recordState("yes", 8)
 	recordState("no", 4)
 
-	assertredis.Int(t, rp, "foo:1:1637236800:yes", 8)
-	assertredis.Int(t, rp, "foo:1:1637236800:no", 4)
+	assertredis.Get(t, rp, "foo:1:1637236800:yes", "8")
+	assertredis.Get(t, rp, "foo:1:1637236800:no", "4")
 	assertredis.NotExists(t, rp, "foo:1:1637236800:maybe")
 
 	// current window is 11:59:33 (1637236773) - 12:00:03 (1637236803) so we'll include counts from intervals..
@@ -57,11 +57,11 @@ func TestStatesTracker(t *testing.T) {
 	recordState("no", 1)
 	recordState("maybe", 1)
 
-	assertredis.Int(t, rp, "foo:1:1637236800:yes", 8)
-	assertredis.Int(t, rp, "foo:1:1637236800:no", 4)
-	assertredis.Int(t, rp, "foo:1:1637236810:yes", 3)
-	assertredis.Int(t, rp, "foo:1:1637236810:no", 1)
-	assertredis.Int(t, rp, "foo:1:1637236810:maybe", 1)
+	assertredis.Get(t, rp, "foo:1:1637236800:yes", "8")
+	assertredis.Get(t, rp, "foo:1:1637236800:no", "4")
+	assertredis.Get(t, rp, "foo:1:1637236810:yes", "3")
+	assertredis.Get(t, rp, "foo:1:1637236810:no", "1")
+	assertredis.Get(t, rp, "foo:1:1637236810:maybe", "1")
 
 	// current window is 11:40:00 (1637236780) - 12:00:10 (1637236810) so we'll include counts from intervals..
 	//  0: 12:00:10 (1637236810) <= t < 12:00:20 (1637236820) yes=3 no=1 maybe=1

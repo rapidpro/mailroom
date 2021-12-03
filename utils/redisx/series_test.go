@@ -37,7 +37,7 @@ func TestSeries(t *testing.T) {
 	series1.Record(rc, "A", 7)
 	series1.Record(rc, "B", 4)
 
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:05", map[string]string{"A": "9", "B": "4"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:05", map[string]string{"A": "9", "B": "4"})
 
 	assertGet(series1, "A", []int64{9, 0, 0, 0, 0})
 	assertGet(series1, "B", []int64{4, 0, 0, 0, 0})
@@ -48,8 +48,8 @@ func TestSeries(t *testing.T) {
 	series1.Record(rc, "A", 3)
 	series1.Record(rc, "B", 2)
 
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:10", map[string]string{"A": "3", "B": "2"})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:05", map[string]string{"A": "9", "B": "4"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:10", map[string]string{"A": "3", "B": "2"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:05", map[string]string{"A": "9", "B": "4"})
 
 	assertGet(series1, "A", []int64{3, 9, 0, 0, 0})
 	assertGet(series1, "B", []int64{2, 4, 0, 0, 0})
@@ -60,11 +60,11 @@ func TestSeries(t *testing.T) {
 	series1.Record(rc, "A", 10)
 	series1.Record(rc, "B", 1)
 
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:25", map[string]string{"A": "10", "B": "1"})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:20", map[string]string{})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:15", map[string]string{})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:10", map[string]string{"A": "3", "B": "2"})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:05", map[string]string{"A": "9", "B": "4"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:25", map[string]string{"A": "10", "B": "1"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:20", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:15", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:10", map[string]string{"A": "3", "B": "2"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:05", map[string]string{"A": "9", "B": "4"})
 
 	assertGet(series1, "A", []int64{10, 0, 0, 3, 9})
 	assertGet(series1, "B", []int64{1, 0, 0, 2, 4})
@@ -74,11 +74,11 @@ func TestSeries(t *testing.T) {
 
 	series1.Record(rc, "A", 1)
 
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:30", map[string]string{"A": "1"})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:25", map[string]string{"A": "10", "B": "1"})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:20", map[string]string{})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:15", map[string]string{})
-	assertredis.Hash(t, rp, "foos:2021-11-18T12:10", map[string]string{"A": "3", "B": "2"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:30", map[string]string{"A": "1"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:25", map[string]string{"A": "10", "B": "1"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:20", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:15", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18T12:10", map[string]string{"A": "3", "B": "2"})
 
 	assertGet(series1, "A", []int64{1, 10, 0, 0, 3})
 	assertGet(series1, "B", []int64{0, 1, 0, 0, 2})

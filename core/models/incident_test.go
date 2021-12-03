@@ -31,7 +31,7 @@ func TestIncidentWebhooksUnhealthy(t *testing.T) {
 	assert.NotEqual(t, 0, id1)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident`).Returns(1)
-	assertredis.Set(t, rp, fmt.Sprintf("incident:%d:nodes", id1), []string{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
+	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", id1), []string{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
 
 	// raising same incident doesn't create a new one...
 	id2, err := models.IncidentWebhooksUnhealthy(ctx, db, rp, oa, []flows.NodeUUID{"3b1743cd-bd8b-449e-8e8a-11a3bc479766"})
@@ -40,7 +40,7 @@ func TestIncidentWebhooksUnhealthy(t *testing.T) {
 
 	// but will add new nodes to the incident's node set
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident`).Returns(1)
-	assertredis.Set(t, rp, fmt.Sprintf("incident:%d:nodes", id1), []string{"3b1743cd-bd8b-449e-8e8a-11a3bc479766", "5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
+	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", id1), []string{"3b1743cd-bd8b-449e-8e8a-11a3bc479766", "5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
 
 	// when the incident has ended, a new one can be created
 	db.MustExec(`UPDATE notifications_incident SET ended_on = NOW()`)

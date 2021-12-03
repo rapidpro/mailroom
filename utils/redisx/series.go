@@ -1,11 +1,9 @@
 package redisx
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/nyaruka/gocommon/dates"
 )
 
 // Series returns all values from interval based sets.
@@ -50,13 +48,6 @@ func (s *Series) Get(rc redis.Conn, field string) ([]int64, error) {
 	return redis.Int64s(seriesGetScript.Do(rc, args...))
 }
 
-// keys returns the keys for each interval
 func (s *Series) keys() []string {
-	now := dates.Now()
-	keys := make([]string, s.size)
-	for i := range keys {
-		timestamp := intervalTimestamp(now.Add(-s.interval*time.Duration(i)), s.interval)
-		keys[i] = fmt.Sprintf("%s:%s", s.keyBase, timestamp)
-	}
-	return keys
+	return intervalKeys(s.keyBase, s.interval, s.size)
 }

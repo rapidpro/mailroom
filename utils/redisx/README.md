@@ -4,7 +4,7 @@ redisx is a library of Go utilities built on the [redigo](github.com/gomodule/re
 
 ## Marker
 
-Creating very large numbers of Redis keys can hurt performance, but putting them all in a single set requires that they all have the same expiration. Marker is a way to have multiple sets based on time intervals, accessible like a single set. For example using 2 intervals of 24 hours:
+Creating very large numbers of Redis keys can hurt performance, but putting them all in a single set requires that they all have the same expiration. Marker is a way to have multiple sets based on time intervals, accessible like a single set. You trade accuracy of expiry times for a significantly reduced key space. For example using 2 intervals of 24 hours:
 
 ```go
 marker := NewMarker("foos", time.Hour*24)
@@ -17,8 +17,8 @@ marker.Add(rc, "C")  // time is 2021-12-03T11:00
 Creates 2 Redis sets like:
 
 ```
-foos:2021-12-02 => {"A"}       // expires at 2021-12-03T09:00
-foos:2021-12-03 => {"B", "C"}  // expires at 2021-12-04T11:00
+foos:2021-12-02 => {"A"}       // expires at 2021-12-04T09:00
+foos:2021-12-03 => {"B", "C"}  // expires at 2021-12-05T11:00
 ```
 
 But can be accessed like a single set:
@@ -44,8 +44,8 @@ cache.Set(rc, "C", "3")  // time is 2021-12-02T10:20
 Creates 2 Redis hashes like:
 
 ```
-foos:2021-12-02T09:00 => {"A": "1"}            // expires at 2021-12-02T10:10
-foos:2021-12-02T10:00 => {"B": "2", "C": "3"}  // expires at 2021-12-02T11:20
+foos:2021-12-02T09:00 => {"A": "1"}            // expires at 2021-12-02T11:10
+foos:2021-12-02T10:00 => {"B": "2", "C": "3"}  // expires at 2021-12-02T12:20
 ```
 
 But can be accessed like a single hash:
@@ -89,3 +89,7 @@ series.Get(rc, "A")   // [5, 7, 3]
 series.Get(rc, "B")   // [1, 0, 0]
 series.Get(rc, "C")   // [0, 0, 0]
 ```
+
+## Testing Asserts
+
+The `assertredis` package contains several asserts useful for testing the state of a Redis database.

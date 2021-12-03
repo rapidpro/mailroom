@@ -29,14 +29,14 @@ func TestCache(t *testing.T) {
 		assert.Equal(t, expected, actual, "expected cache key %s to contain %s", k, expected)
 	}
 
-	// create a 24-hour based cache
-	cache1 := redisx.NewCache("foos", time.Hour*24)
-	cache1.Set(rc, "A", "1")
-	cache1.Set(rc, "B", "2")
-	cache1.Set(rc, "C", "3")
+	// create a 24-hour x 2 based cache
+	cache1 := redisx.NewCache("foos", time.Hour*24, 2)
+	assert.NoError(t, cache1.Set(rc, "A", "1"))
+	assert.NoError(t, cache1.Set(rc, "B", "2"))
+	assert.NoError(t, cache1.Set(rc, "C", "3"))
 
-	assertredis.Hash(t, rp, "foos:2021-11-18", map[string]string{"A": "1", "B": "2", "C": "3"})
-	assertredis.Hash(t, rp, "foos:2021-11-17", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18", map[string]string{"A": "1", "B": "2", "C": "3"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-17", map[string]string{})
 
 	assertGet(cache1, "A", "1")
 	assertGet(cache1, "B", "2")
@@ -49,9 +49,9 @@ func TestCache(t *testing.T) {
 	cache1.Set(rc, "A", "5")
 	cache1.Set(rc, "B", "6")
 
-	assertredis.Hash(t, rp, "foos:2021-11-19", map[string]string{"A": "5", "B": "6"})
-	assertredis.Hash(t, rp, "foos:2021-11-18", map[string]string{"A": "1", "B": "2", "C": "3"})
-	assertredis.Hash(t, rp, "foos:2021-11-17", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-19", map[string]string{"A": "5", "B": "6"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18", map[string]string{"A": "1", "B": "2", "C": "3"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-17", map[string]string{})
 
 	assertGet(cache1, "A", "5")
 	assertGet(cache1, "B", "6")
@@ -64,10 +64,10 @@ func TestCache(t *testing.T) {
 	cache1.Set(rc, "A", "7")
 	cache1.Set(rc, "Z", "9")
 
-	assertredis.Hash(t, rp, "foos:2021-11-20", map[string]string{"A": "7", "Z": "9"})
-	assertredis.Hash(t, rp, "foos:2021-11-19", map[string]string{"A": "5", "B": "6"})
-	assertredis.Hash(t, rp, "foos:2021-11-18", map[string]string{"A": "1", "B": "2", "C": "3"})
-	assertredis.Hash(t, rp, "foos:2021-11-17", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-20", map[string]string{"A": "7", "Z": "9"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-19", map[string]string{"A": "5", "B": "6"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18", map[string]string{"A": "1", "B": "2", "C": "3"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-17", map[string]string{})
 
 	assertGet(cache1, "A", "7")
 	assertGet(cache1, "Z", "9")
@@ -80,10 +80,10 @@ func TestCache(t *testing.T) {
 	err = cache1.Remove(rc, "B") // from yesterday
 	require.NoError(t, err)
 
-	assertredis.Hash(t, rp, "foos:2021-11-20", map[string]string{"Z": "9"})
-	assertredis.Hash(t, rp, "foos:2021-11-19", map[string]string{})
-	assertredis.Hash(t, rp, "foos:2021-11-18", map[string]string{"A": "1", "B": "2", "C": "3"})
-	assertredis.Hash(t, rp, "foos:2021-11-17", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-20", map[string]string{"Z": "9"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-19", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-18", map[string]string{"A": "1", "B": "2", "C": "3"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-17", map[string]string{})
 
 	assertGet(cache1, "A", "")
 	assertGet(cache1, "Z", "9")
@@ -94,8 +94,8 @@ func TestCache(t *testing.T) {
 	err = cache1.ClearAll(rc)
 	require.NoError(t, err)
 
-	assertredis.Hash(t, rp, "foos:2021-11-20", map[string]string{})
-	assertredis.Hash(t, rp, "foos:2021-11-19", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-20", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-19", map[string]string{})
 
 	assertGet(cache1, "A", "")
 	assertGet(cache1, "Z", "")
@@ -103,13 +103,13 @@ func TestCache(t *testing.T) {
 	assertGet(cache1, "C", "")
 	assertGet(cache1, "D", "")
 
-	// create a 5 minute based cache
-	cache2 := redisx.NewCache("foos", time.Minute*5)
+	// create a 5 minute x 3 based cache
+	cache2 := redisx.NewCache("foos", time.Minute*5, 3)
 	cache2.Set(rc, "A", "1")
 	cache2.Set(rc, "B", "2")
 
-	assertredis.Hash(t, rp, "foos:2021-11-20T12:05", map[string]string{"A": "1", "B": "2"})
-	assertredis.Hash(t, rp, "foos:2021-11-20T12:00", map[string]string{})
+	assertredis.HGetAll(t, rp, "foos:2021-11-20T12:05", map[string]string{"A": "1", "B": "2"})
+	assertredis.HGetAll(t, rp, "foos:2021-11-20T12:00", map[string]string{})
 
 	assertGet(cache2, "A", "1")
 	assertGet(cache2, "B", "2")
