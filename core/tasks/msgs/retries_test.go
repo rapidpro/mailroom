@@ -25,16 +25,18 @@ func TestRetryErroredMessages(t *testing.T) {
 	testsuite.AssertCourierQueues(t, map[string][]int{})
 
 	// a non-errored outgoing message (should be ignored)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", nil, models.MsgStatusDelivered)
+	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", nil, models.MsgStatusDelivered, false)
 
 	// an errored message with a next-attempt in the future (should be ignored)
-	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 2, time.Now().Add(time.Hour))
+	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 2, time.Now().Add(time.Hour), false)
 
 	// errored messages with a next-attempt in the past
-	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 1, time.Now().Add(-time.Hour))
-	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute))
+	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Hi", 1, time.Now().Add(-time.Hour), false)
+	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
+	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
+	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), true) // high priority
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(3)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(5)
 
 	// try again...
 	err = msgs.RetryErroredMessages(ctx, rt)
@@ -42,10 +44,11 @@ func TestRetryErroredMessages(t *testing.T) {
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'D'`).Returns(1)
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(4)
 
 	testsuite.AssertCourierQueues(t, map[string][]int{
-		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/0": {1},
-		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {1},
+		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {1}, // twilio, bulk priority
+		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/0": {2}, // vonage, bulk priority
+		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/1": {1}, // vonage, high priority
 	})
 }

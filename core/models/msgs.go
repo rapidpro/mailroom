@@ -169,8 +169,7 @@ func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
 
-func (m *Msg) SetTopup(topupID TopupID)               { m.m.TopupID = topupID }
-func (m *Msg) SetBroadcastID(broadcastID BroadcastID) { m.m.BroadcastID = broadcastID }
+func (m *Msg) SetTopup(topupID TopupID) { m.m.TopupID = topupID }
 
 func (m *Msg) SetChannel(channel *Channel) {
 	m.channel = channel
@@ -210,16 +209,6 @@ func (m *Msg) Attachments() []utils.Attachment {
 		attachments[i] = utils.Attachment(m.m.Attachments[i])
 	}
 	return attachments
-}
-
-// SetResponseTo set the incoming message that this session should be associated with in this sprint
-func (m *Msg) SetResponseTo(id MsgID, externalID null.String) {
-	m.m.ResponseToID = id
-	m.m.ResponseToExternalID = externalID
-
-	if id != NilMsgID || externalID != "" {
-		m.m.HighPriority = true
-	}
 }
 
 func (m *Msg) MarshalJSON() ([]byte, error) {
@@ -333,15 +322,36 @@ func GetMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgOut) (
 	return redis.Int(msgRepetitionsScript.Do(rc, key, contactID, msg.Text()))
 }
 
-// NewOutgoingMsg creates an outgoing message for the passed in flow message.
-func NewOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+// NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
+func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
+}
+
+// NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
+func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
+}
+
+func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
+	m.UUID = out.UUID()
+	m.Text = out.Text()
+	m.HighPriority = false
+	m.Direction = DirectionOut
+	m.Status = MsgStatusQueued
+	m.Visibility = VisibilityVisible
+	m.MsgType = MsgTypeFlow
+	m.MsgCount = 1
+	m.ContactID = contactID
+	m.BroadcastID = broadcastID
+	m.OrgID = org.ID()
+	m.TopupID = NilTopupID
+	m.CreatedOn = createdOn
 
-	status := MsgStatusQueued
 	if org.Suspended() {
 		// we fail messages for suspended orgs right away
-		status = MsgStatusFailed
+		m.Status = MsgStatusFailed
 	} else {
 		// also fail right away if this looks like a loop
 		repetitions, err := GetMsgRepetitions(rt.RP, contactID, out)
@@ -349,30 +359,29 @@ func NewOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 			return nil, errors.Wrap(err, "error looking up msg repetitions")
 		}
 		if repetitions >= 20 {
-			status = MsgStatusFailed
+			m.Status = MsgStatusFailed
 			logrus.WithFields(logrus.Fields{"contact_id": contactID, "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
 		}
 	}
 
-	m.UUID = out.UUID()
-	m.Text = out.Text()
-	m.HighPriority = false
-	m.Direction = DirectionOut
-	m.Status = status
-	m.Visibility = VisibilityVisible
-	m.MsgType = MsgTypeFlow
-	m.ContactID = contactID
-	m.OrgID = org.ID()
-	m.TopupID = NilTopupID
-	m.CreatedOn = createdOn
+	// if we have a session, set fields on the message from that
+	if session != nil {
+		m.ResponseToID = session.IncomingMsgID()
+		m.ResponseToExternalID = session.IncomingMsgExternalID()
+		m.SessionID = session.ID()
+		m.SessionStatus = session.Status()
+
+		// if we're responding to an incoming message, send as high priority
+		if m.ResponseToID != NilMsgID {
+			m.HighPriority = true
+		}
+	}
 
 	msg.SetChannel(channel)
 
 	if err := msg.SetURN(out.URN()); err != nil {
 		return nil, errors.Wrapf(err, "error setting msg URN")
 	}
-
-	m.MsgCount = 1
 
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
@@ -396,11 +405,9 @@ func NewOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		m.Metadata = null.NewMap(metadata)
 	}
 
-	// calculate msg count
+	// if we're sending to a phone, message may have to be sent in multiple parts
 	if m.URN.Scheme() == urns.TelScheme {
 		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
-	} else {
-		m.MsgCount = 1
 	}
 
 	return msg, nil
@@ -446,6 +453,7 @@ SELECT
 	msg_count,
 	error_count,
 	next_attempt,
+	coalesce(high_priority, FALSE) as high_priority,
 	external_id,
 	attachments,
 	metadata,
@@ -483,6 +491,7 @@ SELECT
 	m.msg_count,
 	m.error_count,
 	m.next_attempt,
+	m.high_priority,
 	m.external_id,
 	m.attachments,
 	m.metadata,
@@ -571,11 +580,6 @@ func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils
 		}
 	}
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
-}
-
-func (m *Msg) SetSession(id SessionID, status SessionStatus) {
-	m.m.SessionID = id
-	m.m.SessionStatus = status
 }
 
 // SetTimeout sets the timeout for this message
@@ -1064,8 +1068,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now())
-		msg.SetBroadcastID(bcast.BroadcastID())
+		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
