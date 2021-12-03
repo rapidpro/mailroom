@@ -13,7 +13,7 @@ type Locker struct {
 	expiration time.Duration
 }
 
-// NewLocker creates a new locker with the given name and expiration
+// NewLocker creates a new locker using the given key and expiration
 func NewLocker(key string, expiration time.Duration) *Locker {
 	return &Locker{key: key, expiration: expiration}
 }
@@ -50,6 +50,7 @@ func (l *Locker) Grab(rp *redis.Pool, retry time.Duration) (string, error) {
 
 var releaseScript = redis.NewScript(1, `
 local lockKey, lockValue = KEYS[1], ARGV[1]
+
 if redis.call("GET", lockKey) == lockValue then
 	return redis.call("DEL", lockKey)
 else
@@ -70,6 +71,7 @@ func (l *Locker) Release(rp *redis.Pool, value string) error {
 
 var expireScript = redis.NewScript(1, `
 local lockKey, lockValue, lockExpire = KEYS[1], ARGV[1], ARGV[2]
+
 if redis.call("GET", lockKey) == lockValue then
 	return redis.call("EXPIRE", lockKey, lockExpire)
 else
