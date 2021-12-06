@@ -62,12 +62,6 @@ const (
 
 type MsgStatus string
 
-// BroadcastID is our internal type for broadcast ids, which can be null/0
-type BroadcastID null.Int
-
-// NilBroadcastID is our constant for a nil broadcast id
-const NilBroadcastID = BroadcastID(0)
-
 const (
 	MsgStatusInitializing = MsgStatus("I")
 	MsgStatusPending      = MsgStatus("P")
@@ -80,6 +74,22 @@ const (
 	MsgStatusFailed       = MsgStatus("F")
 	MsgStatusResent       = MsgStatus("R")
 )
+
+type MsgFailedReason null.String
+
+const (
+	NilMsgFailedReason  = MsgFailedReason("")
+	MsgFailedSuspended  = MsgFailedReason("S")
+	MsgFailedLooping    = MsgFailedReason("L")
+	MsgFailedErrorLimit = MsgFailedReason("E")
+	MsgFailedTooOld     = MsgFailedReason("O")
+)
+
+// BroadcastID is our internal type for broadcast ids, which can be null/0
+type BroadcastID null.Int
+
+// NilBroadcastID is our constant for a nil broadcast id
+const NilBroadcastID = BroadcastID(0)
 
 // TemplateState represents what state are templates are in, either already evaluated, not evaluated or
 // that they are unevaluated legacy templates
@@ -110,15 +120,15 @@ type Msg struct {
 		MsgCount             int                `db:"msg_count"       json:"tps_cost"`
 		ErrorCount           int                `db:"error_count"     json:"error_count"`
 		NextAttempt          *time.Time         `db:"next_attempt"    json:"next_attempt"`
+		FailedReason         MsgFailedReason    `db:"failed_reason"   json:"-"`
 		ExternalID           null.String        `db:"external_id"     json:"external_id"`
+		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
 		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
-		ResponseToID         MsgID              `db:"response_to_id"  json:"-"`
-		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
 		IsResend             bool               `                     json:"is_resend,omitempty"`
 		URN                  urns.URN           `db:"urn_urn"         json:"urn"`
 		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
@@ -154,6 +164,7 @@ func (m *Msg) Visibility() MsgVisibility        { return m.m.Visibility }
 func (m *Msg) MsgType() MsgType                 { return m.m.MsgType }
 func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
 func (m *Msg) NextAttempt() *time.Time          { return m.m.NextAttempt }
+func (m *Msg) FailedReason() MsgFailedReason    { return m.m.FailedReason }
 func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
 func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
 func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
@@ -344,6 +355,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	if org.Suspended() {
 		// we fail messages for suspended orgs right away
 		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedSuspended
 	} else {
 		// also fail right away if this looks like a loop
 		repetitions, err := GetMsgRepetitions(rt.RP, contactID, out)
@@ -352,19 +364,20 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		}
 		if repetitions >= 20 {
 			m.Status = MsgStatusFailed
+			m.FailedReason = MsgFailedLooping
+
 			logrus.WithFields(logrus.Fields{"contact_id": contactID, "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
 		}
 	}
 
 	// if we have a session, set fields on the message from that
 	if session != nil {
-		m.ResponseToID = session.IncomingMsgID()
 		m.ResponseToExternalID = session.IncomingMsgExternalID()
 		m.SessionID = session.ID()
 		m.SessionStatus = session.Status()
 
 		// if we're responding to an incoming message, send as high priority
-		if m.ResponseToID != NilMsgID {
+		if session.IncomingMsgID() != NilMsgID {
 			m.HighPriority = true
 		}
 	}
@@ -445,6 +458,7 @@ SELECT
 	msg_count,
 	error_count,
 	next_attempt,
+	failed_reason,
 	coalesce(high_priority, FALSE) as high_priority,
 	external_id,
 	attachments,
@@ -452,7 +466,6 @@ SELECT
 	channel_id,
 	contact_id,
 	contact_urn_id,
-	response_to_id,
 	org_id,
 	topup_id
 FROM
@@ -482,6 +495,7 @@ SELECT
 	m.msg_count,
 	m.error_count,
 	m.next_attempt,
+	m.failed_reason,
 	m.high_priority,
 	m.external_id,
 	m.attachments,
@@ -489,7 +503,6 @@ SELECT
 	m.channel_id,
 	m.contact_id,
 	m.contact_urn_id,
-	m.response_to_id,
 	m.org_id,
 	m.topup_id,
 	u.identity AS "urn_urn",
@@ -591,10 +604,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
-		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, response_to_id,
+		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
 		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
-		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :response_to_id,
+		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
 		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id)
 RETURNING 
 	id as id, 
@@ -1130,6 +1143,7 @@ const updateMsgForResendingSQL = `
 		topup_id = r.topup_id::int,
 		status = 'P',
 		error_count = 0,
+		failed_reason = NULL,
 		queued_on = r.queued_on::timestamp with time zone,
 		sent_on = NULL,
 		modified_on = NOW()
@@ -1182,6 +1196,7 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 		msg.m.QueuedOn = dates.Now()
 		msg.m.SentOn = nil
 		msg.m.ErrorCount = 0
+		msg.m.FailedReason = ""
 		msg.m.IsResend = true
 
 		resends[i] = msg.m
@@ -1250,4 +1265,14 @@ func (i BroadcastID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *BroadcastID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
+}
+
+// Value returns the db value, null is returned for ""
+func (s MsgFailedReason) Value() (driver.Value, error) {
+	return null.String(s).Value()
+}
+
+// Scan scans from the db value. null values become ""
+func (s *MsgFailedReason) Scan(value interface{}) error {
+	return null.ScanString(value, (*null.String)(s))
 }
