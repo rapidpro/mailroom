@@ -22,7 +22,7 @@ func init() {
 
 func startEndCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
 	cron.StartCron(quit, rt.RP, "end_incidents", time.Minute*3,
-		func(lockName string, lockValue string) error {
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
 			return EndIncidents(ctx, rt)

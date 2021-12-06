@@ -31,7 +31,7 @@ func TestTimeouts(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our timeouts
-	err := timeoutSessions(ctx, rt, timeoutLock, "foo")
+	err := timeoutSessions(ctx, rt)
 	assert.NoError(t, err)
 
 	// should have created one task

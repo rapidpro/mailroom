@@ -32,10 +32,10 @@ func init() {
 // StartCampaignCron starts our cron job of firing expired campaign events
 func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
 	cron.StartCron(quit, rt.RP, "campaign_event", time.Second*60,
-		func(lockName string, lockValue string) error {
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return fireCampaignEvents(ctx, rt, lockName, lockValue)
+			return fireCampaignEvents(ctx, rt)
 		},
 	)
 
@@ -43,8 +43,8 @@ func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) 
 }
 
 // fireCampaignEvents looks for all expired campaign event fires and queues them to be started
-func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
-	log := logrus.WithField("comp", "campaign_events").WithField("lock", lockValue)
+func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
+	log := logrus.WithField("comp", "campaign_events")
 	start := time.Now()
 
 	// find all events that need to be fired
