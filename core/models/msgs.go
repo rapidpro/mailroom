@@ -459,7 +459,6 @@ SELECT
 	connection_id,
 	contact_id,
 	contact_urn_id,
-	response_to_id,
 	org_id,
 	topup_id
 FROM
@@ -497,7 +496,6 @@ SELECT
 	m.connection_id,
 	m.contact_id,
 	m.contact_urn_id,
-	m.response_to_id,
 	m.org_id,
 	m.topup_id,
 	u.identity AS "urn_urn",
@@ -599,10 +597,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
-		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, connection_id, response_to_id,
+		 visibility, msg_type, msg_count, error_count, next_attempt, channel_id, connection_id,
 		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
-		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :connection_id, :response_to_id,
+		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :channel_id, :connection_id,
 		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id)
 RETURNING 
 	id as id, 
