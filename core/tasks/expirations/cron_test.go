@@ -58,7 +58,7 @@ func TestExpirations(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
 
 	// expire our runs
-	err := expireRuns(ctx, rt, expirationLock, "foo")
+	err := expireRuns(ctx, rt)
 	assert.NoError(t, err)
 
 	// shouldn't have any active runs or sessions

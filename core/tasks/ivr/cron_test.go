@@ -53,7 +53,7 @@ func TestRetries(t *testing.T) {
 	db.MustExec(`UPDATE channels_channelconnection SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
 
 	// fire our retries
-	err = retryCalls(ctx, rt, "retry_test", "retry_test")
+	err = retryCalls(ctx, rt)
 	assert.NoError(t, err)
 
 	// should now be in wired state
@@ -65,7 +65,7 @@ func TestRetries(t *testing.T) {
 	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	models.FlushCache()
-	err = retryCalls(ctx, rt, "retry_test", "retry_test")
+	err = retryCalls(ctx, rt)
 	assert.NoError(t, err)
 
 	// this time should be failed
