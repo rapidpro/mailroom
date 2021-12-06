@@ -169,13 +169,17 @@ func (n *WebhookNode) Record(rt *runtime.Runtime, events []*events.WebhookCalled
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	tracker := n.tracker()
+	healthySeries, unhealthySeries := n.series()
 
-	if err := tracker.Record(rc, "healthy", numHealthy); err != nil {
-		return err
+	if numHealthy > 0 {
+		if err := healthySeries.Record(rc, string(n.UUID), int64(numHealthy)); err != nil {
+			return errors.Wrap(err, "error recording healthy calls")
+		}
 	}
-	if err := tracker.Record(rc, "unhealthy", numUnhealthy); err != nil {
-		return err
+	if numUnhealthy > 0 {
+		if err := unhealthySeries.Record(rc, string(n.UUID), int64(numUnhealthy)); err != nil {
+			return errors.Wrap(err, "error recording unhealthy calls")
+		}
 	}
 
 	return nil
@@ -185,16 +189,20 @@ func (n *WebhookNode) Healthy(rt *runtime.Runtime) (bool, error) {
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	totals, err := n.tracker().Current(rc)
+	healthySeries, unhealthySeries := n.series()
+	healthy, err := healthySeries.Total(rc, string(n.UUID))
 	if err != nil {
-		return false, errors.Wrap(err, "error getting health from tracker")
+		return false, errors.Wrap(err, "error getting healthy series total")
 	}
-	healthy, unhealthy := totals["healthy"], totals["unhealthy"]
+	unhealthy, err := unhealthySeries.Total(rc, string(n.UUID))
+	if err != nil {
+		return false, errors.Wrap(err, "error getting healthy series total")
+	}
 
 	// node is healthy if number of unhealthy calls is less than 10 or unhealthy percentage is < 25%
 	return unhealthy < 10 || (100*unhealthy/(healthy+unhealthy)) < 25, nil
 }
 
-func (n *WebhookNode) tracker() *redisx.StatesTracker {
-	return redisx.NewStatesTracker(fmt.Sprintf("webhook:%s", n.UUID), []string{"healthy", "unhealthy"}, time.Minute*5, time.Minute*20)
+func (n *WebhookNode) series() (*redisx.Series, *redisx.Series) {
+	return redisx.NewSeries("webhooks:healthy", time.Minute*5, 4), redisx.NewSeries("webhooks:unhealthy", time.Minute*5, 4)
 }

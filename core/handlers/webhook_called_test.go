@@ -144,10 +144,16 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
-	tracker := redisx.NewStatesTracker("webhook:1bff8fe4-0714-433e-96a3-437405bf21cf", []string{"healthy", "unhealthy"}, time.Minute*5, time.Minute*20)
-	current, err := tracker.Current(rc)
+	healthySeries := redisx.NewSeries("webhooks:healthy", time.Minute*5, 4)
+	unhealthySeries := redisx.NewSeries("webhooks:unhealthy", time.Minute*5, 4)
+
+	total, err := healthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
 	assert.NoError(t, err)
-	assert.Equal(t, map[string]int{"healthy": 2, "unhealthy": 0}, current)
+	assert.Equal(t, int64(2), total)
+
+	total, err = unhealthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), total)
 
 	// change webhook service delay to 30 seconds and re-run flow 9 times
 	svc.delay = 30 * time.Second
@@ -156,16 +162,20 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	}
 
 	// still no incident tho..
-	current, _ = tracker.Current(rc)
-	assert.Equal(t, map[string]int{"healthy": 2, "unhealthy": 9}, current)
+	total, _ = healthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
+	assert.Equal(t, int64(2), total)
+	total, _ = unhealthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
+	assert.Equal(t, int64(9), total)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(0)
 
 	// however 1 more bad call means this node is considered unhealthy
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
-	current, _ = tracker.Current(rc)
-	assert.Equal(t, map[string]int{"healthy": 2, "unhealthy": 10}, current)
+	total, _ = healthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
+	assert.Equal(t, int64(2), total)
+	total, _ = unhealthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
+	assert.Equal(t, int64(10), total)
 
 	// and now we have an incident
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE incident_type = 'webhooks:unhealthy'`).Returns(1)

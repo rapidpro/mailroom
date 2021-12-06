@@ -1,3 +1,9 @@
+v7.1.13
+----------
+ * Replace trackers with series to determine unhealthy webhooks
+ * Correct use of KEYS vs ARGV in redisx scripts
+ * Rework how we create outgoing messages, and fix retries of high priority messages
+
 v7.1.12
 ----------
  * Move msg level loop detection from courier

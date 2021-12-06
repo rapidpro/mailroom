@@ -24,10 +24,10 @@ func init() {
 // StartAnalyticsCron starts our cron job of posting stats every minute
 func StartAnalyticsCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
 	cron.StartCron(quit, rt.RP, expirationLock, time.Second*60,
-		func(lockName string, lockValue string) error {
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return dumpAnalytics(ctx, rt, lockName, lockValue)
+			return dumpAnalytics(ctx, rt)
 		},
 	)
 	return nil
@@ -39,7 +39,7 @@ var (
 )
 
 // dumpAnalytics calculates a bunch of stats every minute and both logs them and sends them to librato
-func dumpAnalytics(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
+func dumpAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 	// We wait 15 seconds since we fire at the top of the minute, the same as expirations.
 	// That way any metrics related to the size of our queue are a bit more accurate (all expirations can
 	// usually be handled in 15 seconds). Something more complicated would take into account the age of
