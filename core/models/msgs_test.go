@@ -43,34 +43,37 @@ func TestOutgoingMsgs(t *testing.T) {
 		ResponseTo   models.MsgID
 		SuspendedOrg bool
 
-		ExpectedStatus   models.MsgStatus
-		ExpectedMetadata map[string]interface{}
-		ExpectedMsgCount int
-		ExpectedPriority bool
-		HasError         bool
+		ExpectedStatus       models.MsgStatus
+		ExpectedFailedReason models.MsgFailedReason
+		ExpectedMetadata     map[string]interface{}
+		ExpectedMsgCount     int
+		ExpectedPriority     bool
+		HasError             bool
 	}{
 		{
-			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-			Text:             "missing urn id",
-			Contact:          testdata.Cathy,
-			URN:              urns.URN("tel:+250700000001"),
-			URNID:            models.URNID(0),
-			ResponseTo:       models.MsgID(123425),
-			ExpectedStatus:   models.MsgStatusQueued,
-			ExpectedMetadata: map[string]interface{}{},
-			ExpectedMsgCount: 1,
-			ExpectedPriority: true,
-			HasError:         true,
+			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:                 "missing urn id",
+			Contact:              testdata.Cathy,
+			URN:                  urns.URN("tel:+250700000001"),
+			URNID:                models.URNID(0),
+			ResponseTo:           models.MsgID(123425),
+			ExpectedStatus:       models.MsgStatusQueued,
+			ExpectedFailedReason: models.NilMsgFailedReason,
+			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMsgCount:     1,
+			ExpectedPriority:     true,
+			HasError:             true,
 		},
 		{
-			ChannelUUID:    "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-			Text:           "test outgoing",
-			Contact:        testdata.Cathy,
-			URN:            urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
-			URNID:          testdata.Cathy.URNID,
-			QuickReplies:   []string{"yes", "no"},
-			Topic:          flows.MsgTopicPurchase,
-			ExpectedStatus: models.MsgStatusQueued,
+			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:                 "test outgoing",
+			Contact:              testdata.Cathy,
+			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
+			URNID:                testdata.Cathy.URNID,
+			QuickReplies:         []string{"yes", "no"},
+			Topic:                flows.MsgTopicPurchase,
+			ExpectedStatus:       models.MsgStatusQueued,
+			ExpectedFailedReason: models.NilMsgFailedReason,
 			ExpectedMetadata: map[string]interface{}{
 				"quick_replies": []string{"yes", "no"},
 				"topic":         "purchase",
@@ -79,28 +82,30 @@ func TestOutgoingMsgs(t *testing.T) {
 			ExpectedPriority: false,
 		},
 		{
-			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-			Text:             "test outgoing",
-			Contact:          testdata.Cathy,
-			URN:              urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
-			URNID:            testdata.Cathy.URNID,
-			Attachments:      []utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
-			ExpectedStatus:   models.MsgStatusQueued,
-			ExpectedMetadata: map[string]interface{}{},
-			ExpectedMsgCount: 2,
-			ExpectedPriority: false,
+			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:                 "test outgoing",
+			Contact:              testdata.Cathy,
+			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
+			URNID:                testdata.Cathy.URNID,
+			Attachments:          []utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
+			ExpectedStatus:       models.MsgStatusQueued,
+			ExpectedFailedReason: models.NilMsgFailedReason,
+			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMsgCount:     2,
+			ExpectedPriority:     false,
 		},
 		{
-			ChannelUUID:      "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-			Text:             "suspended org",
-			Contact:          testdata.Cathy,
-			URN:              urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
-			URNID:            testdata.Cathy.URNID,
-			SuspendedOrg:     true,
-			ExpectedStatus:   models.MsgStatusFailed,
-			ExpectedMetadata: map[string]interface{}{},
-			ExpectedMsgCount: 1,
-			ExpectedPriority: false,
+			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:                 "suspended org",
+			Contact:              testdata.Cathy,
+			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
+			URNID:                testdata.Cathy.URNID,
+			SuspendedOrg:         true,
+			ExpectedStatus:       models.MsgStatusFailed,
+			ExpectedFailedReason: models.MsgFailedSuspended,
+			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMsgCount:     1,
+			ExpectedPriority:     false,
 		},
 	}
 
@@ -142,6 +147,7 @@ func TestOutgoingMsgs(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.ExpectedStatus, msg.Status())
+			assert.Equal(t, tc.ExpectedFailedReason, msg.FailedReason())
 			assert.Equal(t, tc.ExpectedMetadata, msg.Metadata())
 			assert.Equal(t, tc.ExpectedMsgCount, msg.MsgCount())
 			assert.Equal(t, now, msg.CreatedOn())
@@ -150,6 +156,9 @@ func TestOutgoingMsgs(t *testing.T) {
 			assert.True(t, msg.ModifiedOn().After(now))
 		}
 	}
+
+	// check nil failed reasons are saved as NULLs
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(1)
 
 	// ensure org is unsuspended
 	db.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
@@ -171,14 +180,17 @@ func TestOutgoingMsgs(t *testing.T) {
 	for i := 0; i < 19; i++ {
 		msg := newOutgoing("foo")
 		assert.Equal(t, models.MsgStatusQueued, msg.Status())
+		assert.Equal(t, models.NilMsgFailedReason, msg.FailedReason())
 	}
 	for i := 0; i < 10; i++ {
 		msg := newOutgoing("foo")
 		assert.Equal(t, models.MsgStatusFailed, msg.Status())
+		assert.Equal(t, models.MsgFailedLooping, msg.FailedReason())
 	}
 	for i := 0; i < 5; i++ {
 		msg := newOutgoing("bar")
 		assert.Equal(t, models.MsgStatusQueued, msg.Status())
+		assert.Equal(t, models.NilMsgFailedReason, msg.FailedReason())
 	}
 }
 
