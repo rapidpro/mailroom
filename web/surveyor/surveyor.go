@@ -125,7 +125,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	modifierEvents = append(modifierEvents, sessionEvents...)
 
 	// create our sprint
-	sprint := engine.NewSprint(mods, modifierEvents)
+	sprint := engine.NewSprint(mods, modifierEvents, nil)
 
 	// write our session out
 	tx, err := rt.DB.BeginTxx(ctx, nil)
