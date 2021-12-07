@@ -127,7 +127,6 @@ type Msg struct {
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
-		ConnectionID         *ConnectionID      `db:"connection_id"   json:"-"`
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
 		IsResend             bool               `                     json:"is_resend,omitempty"`
@@ -171,7 +170,6 @@ func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
 func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
 func (m *Msg) ChannelID() ChannelID             { return m.m.ChannelID }
 func (m *Msg) ChannelUUID() assets.ChannelUUID  { return m.m.ChannelUUID }
-func (m *Msg) ConnectionID() *ConnectionID      { return m.m.ConnectionID }
 func (m *Msg) URN() urns.URN                    { return m.m.URN }
 func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
@@ -242,9 +240,6 @@ func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, i
 
 	urnID := conn.ContactURNID()
 	m.ContactURNID = &urnID
-
-	connID := conn.ID()
-	m.ConnectionID = &connID
 	m.ChannelID = conn.ChannelID()
 
 	m.OrgID = orgID
@@ -276,9 +271,6 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, o
 
 	urnID := conn.ContactURNID()
 	m.ContactURNID = &urnID
-
-	connID := conn.ID()
-	m.ConnectionID = &connID
 	m.ChannelID = conn.ChannelID()
 
 	m.URN = out.URN()
@@ -472,7 +464,6 @@ SELECT
 	attachments,
 	metadata,
 	channel_id,
-	connection_id,
 	contact_id,
 	contact_urn_id,
 	org_id,
@@ -510,7 +501,6 @@ SELECT
 	m.attachments,
 	m.metadata,
 	m.channel_id,
-	m.connection_id,
 	m.contact_id,
 	m.contact_urn_id,
 	m.org_id,
@@ -614,10 +604,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
-		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id, connection_id,
+		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
 		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
-		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id, :connection_id,
+		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
 		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id)
 RETURNING 
 	id as id, 
