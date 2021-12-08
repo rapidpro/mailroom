@@ -23,7 +23,7 @@ func TestCron(t *testing.T) {
 	quit := make(chan bool)
 
 	// our cron worker is just going to increment an int on every fire
-	increment := func(lockName string, lockValue string) error {
+	increment := func() error {
 		mutex.Lock()
 		fired++
 		mutex.Unlock()

@@ -70,7 +70,7 @@ func TestCheckSchedules(t *testing.T) {
 	assert.NoError(t, err)
 
 	// run our task
-	err = checkSchedules(ctx, rt, "lock", "lock")
+	err = checkSchedules(ctx, rt)
 	assert.NoError(t, err)
 
 	// should have one flow start added to our DB ready to go

@@ -11,7 +11,7 @@ import (
 )
 
 // Function is the function that will be called on our schedule
-type Function func(lockName string, lockValue string) error
+type Function func() error
 
 // StartCron calls the passed in function every minute, making sure it acquires a
 // lock so that only one process is running at once. Note that across processes
@@ -76,6 +76,7 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 // catching and logging panics
 func fireCron(cronFunc Function, lockName string, lockValue string) error {
 	log := log.WithField("lockValue", lockValue).WithField("func", cronFunc)
+
 	defer func() {
 		// catch any panics and recover
 		panicLog := recover()
@@ -84,7 +85,7 @@ func fireCron(cronFunc Function, lockName string, lockValue string) error {
 		}
 	}()
 
-	return cronFunc(lockName, lockValue)
+	return cronFunc()
 }
 
 // nextFire returns the next time we should fire based on the passed in time and interval

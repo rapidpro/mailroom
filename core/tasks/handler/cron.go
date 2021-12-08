@@ -31,22 +31,22 @@ func init() {
 // StartRetryCron starts our cron job of retrying pending incoming messages
 func StartRetryCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
 	cron.StartCron(quit, rt.RP, retryLock, time.Minute*5,
-		func(lockName string, lockValue string) error {
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return RetryPendingMsgs(ctx, rt, lockName, lockValue)
+			return RetryPendingMsgs(ctx, rt)
 		},
 	)
 	return nil
 }
 
 // RetryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
-func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
+func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime) error {
 	if !rt.Config.RetryPendingMessages {
 		return nil
 	}
 
-	log := logrus.WithField("comp", "handler_retrier").WithField("lock", lockValue)
+	log := logrus.WithField("comp", "handler_retrier")
 	start := time.Now()
 
 	rc := rt.RP.Get()

@@ -30,10 +30,10 @@ func init() {
 // StartTimeoutCron starts our cron job of continuing timed out sessions every minute
 func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
 	cron.StartCron(quit, rt.RP, timeoutLock, time.Second*60,
-		func(lockName string, lockValue string) error {
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return timeoutSessions(ctx, rt, lockName, lockValue)
+			return timeoutSessions(ctx, rt)
 		},
 	)
 	return nil
@@ -41,8 +41,8 @@ func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) e
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue
 // TODO: extend lock
-func timeoutSessions(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
-	log := logrus.WithField("comp", "timeout").WithField("lock", lockValue)
+func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
+	log := logrus.WithField("comp", "timeout")
 	start := time.Now()
 
 	// find all sessions that need to be expired (we exclude IVR runs)

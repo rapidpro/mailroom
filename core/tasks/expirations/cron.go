@@ -32,18 +32,18 @@ func init() {
 // StartExpirationCron starts our cron job of expiring runs every minute
 func StartExpirationCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
 	cron.StartCron(quit, rt.RP, expirationLock, time.Second*60,
-		func(lockName string, lockValue string) error {
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return expireRuns(ctx, rt, lockName, lockValue)
+			return expireRuns(ctx, rt)
 		},
 	)
 	return nil
 }
 
 // expireRuns expires all the runs that have an expiration in the past
-func expireRuns(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
-	log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
+func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
+	log := logrus.WithField("comp", "expirer")
 	start := time.Now()
 
 	rc := rt.RP.Get()
