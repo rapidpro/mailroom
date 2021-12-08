@@ -8,70 +8,89 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 )
 
-var markerContainsScript = redis.NewScript(3,
-	`-- KEYS: [TodayKey, YesterdayKey, Value]
-local found = redis.call("SISMEMBER", KEYS[1], KEYS[3])
-if found == 1 then
-	return 1
-end
-return redis.call("SISMEMBER", KEYS[2], KEYS[3])
-`)
-
-// Marker operates like a set but values are automatically expired after 24-48 hours
+// Marker operates like a set but with expiring values
 type Marker struct {
-	keyBase string
+	keyBase  string
+	interval time.Duration
 }
 
 // NewMarker creates a new empty marker
-func NewMarker(keyBase string) *Marker {
-	return &Marker{keyBase: keyBase}
+func NewMarker(keyBase string, interval time.Duration) *Marker {
+	return &Marker{keyBase: keyBase, interval: interval}
 }
 
-// Contains returns whether we contain the given value
-func (m *Marker) Contains(rc redis.Conn, value string) (bool, error) {
-	todayKey, yesterdayKey := m.keys()
+var markerContainsScript = redis.NewScript(4, `
+local currKey, prevKey, legacyToday, legacyYesterday, member = KEYS[1], KEYS[2], KEYS[3], KEYS[4], ARGV[1]
 
-	return redis.Bool(markerContainsScript.Do(rc, todayKey, yesterdayKey, value))
+local found = redis.call("SISMEMBER", currKey, member)
+if found == 1 then
+	return 1
+end
+found = redis.call("SISMEMBER", prevKey, member)
+if found == 1 then
+	return 1
+end
+found = redis.call("SISMEMBER", legacyToday, member)
+if found == 1 then
+	return 1
+end
+return redis.call("SISMEMBER", legacyYesterday, member)
+`)
+
+// Contains returns whether we contain the given value
+func (m *Marker) Contains(rc redis.Conn, member string) (bool, error) {
+	currKey, prevKey, legacyToday, legacyYesterday := m.keys()
+
+	return redis.Bool(markerContainsScript.Do(rc, currKey, prevKey, legacyToday, legacyYesterday, member))
 }
 
 // Add adds the given value
-func (m *Marker) Add(rc redis.Conn, value string) error {
-	todayKey, _ := m.keys()
+func (m *Marker) Add(rc redis.Conn, member string) error {
+	currKey, _, legacyToday, _ := m.keys()
 
 	rc.Send("MULTI")
-	rc.Send("SADD", todayKey, value)
-	rc.Send("EXPIRE", todayKey, 60*60*24) // 24 hours
+	rc.Send("SADD", currKey, member)
+	rc.Send("SADD", legacyToday, member)
+	rc.Send("EXPIRE", currKey, m.interval/time.Second)
+	rc.Send("EXPIRE", legacyToday, m.interval/time.Second)
 	_, err := rc.Do("EXEC")
 	return err
 }
 
 // Remove removes the given value
-func (m *Marker) Remove(rc redis.Conn, value string) error {
-	todayKey, yesterdayKey := m.keys()
+func (m *Marker) Remove(rc redis.Conn, member string) error {
+	currKey, prevKey, legacyToday, legacyYesterday := m.keys()
 
 	rc.Send("MULTI")
-	rc.Send("SREM", todayKey, value)
-	rc.Send("SREM", yesterdayKey, value)
+	rc.Send("SREM", currKey, member)
+	rc.Send("SREM", prevKey, member)
+	rc.Send("SREM", legacyToday, member)
+	rc.Send("SREM", legacyYesterday, member)
 	_, err := rc.Do("EXEC")
 	return err
 }
 
 // ClearAll removes all values
 func (m *Marker) ClearAll(rc redis.Conn) error {
-	todayKey, yesterdayKey := m.keys()
+	currKey, prevKey, legacyToday, legacyYesterday := m.keys()
 
 	rc.Send("MULTI")
-	rc.Send("DEL", todayKey)
-	rc.Send("DEL", yesterdayKey)
+	rc.Send("DEL", currKey)
+	rc.Send("DEL", prevKey)
+	rc.Send("DEL", legacyToday)
+	rc.Send("DEL", legacyYesterday)
 	_, err := rc.Do("EXEC")
 	return err
 }
 
 // keys returns the keys for the today set and the yesterday set
-func (m *Marker) keys() (string, string) {
+func (m *Marker) keys() (string, string, string, string) {
 	now := dates.Now()
-	today := now.UTC().Format("2006_01_02")
-	yesterday := now.Add(time.Hour * -24).UTC().Format("2006_01_02")
+	currTimestamp := intervalTimestamp(now, m.interval)
+	prevTimestamp := intervalTimestamp(now.Add(-m.interval), m.interval)
 
-	return fmt.Sprintf("%s_%s", m.keyBase, today), fmt.Sprintf("%s_%s", m.keyBase, yesterday)
+	legacyToday := fmt.Sprintf("%s_%s", m.keyBase, now.UTC().Format("2006_01_02"))
+	legacyYesterday := fmt.Sprintf("%s_%s", m.keyBase, now.Add(time.Hour*-24).UTC().Format("2006_01_02"))
+
+	return fmt.Sprintf("%s:%s", m.keyBase, currTimestamp), fmt.Sprintf("%s:%s", m.keyBase, prevTimestamp), legacyToday, legacyYesterday
 }

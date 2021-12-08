@@ -1,3 +1,16 @@
+v7.1.15
+----------
+ * Update goflow
+ * Use new key format with redisx.Marker but also use legacy key format for backwards compatibility
+
+v7.1.14
+----------
+ * Update to latest goflow
+ * Add failed_reason to msg and set when failing messages due to looping or org suspension
+ * Simplify cron functions by not passing lock name and value which aren't used
+ * Stop writing msgs_msg.connection_id
+ * Stop writing msgs_msg.response_to
+
 v7.1.13
 ----------
  * Replace trackers with series to determine unhealthy webhooks
