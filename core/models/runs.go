@@ -693,6 +693,10 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 		return errors.Wrapf(err, "error writing runs")
 	}
 
+	if err := RecordFlowStatistics(ctx, tx, []flows.Session{fs}, []flows.Sprint{sprint}); err != nil {
+		return errors.Wrapf(err, "error saving flow statistics")
+	}
+
 	// apply all our events
 	if s.Status() != SessionStatusFailed {
 		err = HandleEvents(ctx, rt, tx, org, s.scene, sprint.Events())
@@ -861,6 +865,10 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, runs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error writing runs")
+	}
+
+	if err := RecordFlowStatistics(ctx, tx, ss, sprints); err != nil {
+		return nil, errors.Wrapf(err, "error saving flow statistics")
 	}
 
 	// apply our all events for the session
