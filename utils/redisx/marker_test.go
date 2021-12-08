@@ -23,87 +23,100 @@ func TestMarker(t *testing.T) {
 
 	setNow(time.Date(2021, 11, 18, 12, 0, 3, 234567, time.UTC))
 
-	marker := redisx.NewMarker("foos")
-	marker.Add(rc, "A")
-	marker.Add(rc, "B")
-	marker.Add(rc, "C")
+	// create a 24-hour based marker
+	marker1 := redisx.NewMarker("foos", time.Hour*24)
+	assert.NoError(t, marker1.Add(rc, "A"))
+	assert.NoError(t, marker1.Add(rc, "B"))
+	assert.NoError(t, marker1.Add(rc, "C"))
 
 	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
 	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
-	assertContains := func(v string) {
-		contains, err := marker.Contains(rc, v)
+	assertContains := func(m *redisx.Marker, v string) {
+		contains, err := m.Contains(rc, v)
 		assert.NoError(t, err)
 		assert.True(t, contains, "expected marker to contain %s", v)
 	}
-	assertNotContains := func(v string) {
-		contains, err := marker.Contains(rc, v)
+	assertNotContains := func(m *redisx.Marker, v string) {
+		contains, err := m.Contains(rc, v)
 		assert.NoError(t, err)
 		assert.False(t, contains, "expected marker to not contain %s", v)
 	}
 
-	assertContains("A")
-	assertContains("B")
-	assertContains("C")
-	assertNotContains("D")
+	assertContains(marker1, "A")
+	assertContains(marker1, "B")
+	assertContains(marker1, "C")
+	assertNotContains(marker1, "D")
 
 	// move forward a day..
 	setNow(time.Date(2021, 11, 19, 12, 0, 3, 234567, time.UTC))
 
-	marker.Add(rc, "D")
-	marker.Add(rc, "E")
+	marker1.Add(rc, "D")
+	marker1.Add(rc, "E")
 
 	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D", "E"})
 	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
 	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
-	assertContains("A")
-	assertContains("B")
-	assertContains("C")
-	assertContains("D")
-	assertContains("E")
-	assertNotContains("F")
+	assertContains(marker1, "A")
+	assertContains(marker1, "B")
+	assertContains(marker1, "C")
+	assertContains(marker1, "D")
+	assertContains(marker1, "E")
+	assertNotContains(marker1, "F")
 
 	// move forward again..
-	setNow(time.Date(2021, 11, 20, 12, 0, 3, 234567, time.UTC))
+	setNow(time.Date(2021, 11, 20, 12, 7, 3, 234567, time.UTC))
 
-	marker.Add(rc, "F")
-	marker.Add(rc, "G")
+	marker1.Add(rc, "F")
+	marker1.Add(rc, "G")
 
 	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{"F", "G"})
 	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D", "E"})
 	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
 	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
 
-	assertNotContains("A") // too old
-	assertNotContains("B") // too old
-	assertNotContains("C") // too old
-	assertContains("D")
-	assertContains("E")
-	assertContains("F")
-	assertContains("G")
+	assertNotContains(marker1, "A") // too old
+	assertNotContains(marker1, "B") // too old
+	assertNotContains(marker1, "C") // too old
+	assertContains(marker1, "D")
+	assertContains(marker1, "E")
+	assertContains(marker1, "F")
+	assertContains(marker1, "G")
 
-	err := marker.Remove(rc, "F") // from today
+	err := marker1.Remove(rc, "F") // from today
 	require.NoError(t, err)
-	err = marker.Remove(rc, "E") // from yesterday
+	err = marker1.Remove(rc, "E") // from yesterday
 	require.NoError(t, err)
 
 	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{"G"})
 	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D"})
 
-	assertContains("D")
-	assertNotContains("E")
-	assertNotContains("F")
-	assertContains("G")
+	assertContains(marker1, "D")
+	assertNotContains(marker1, "E")
+	assertNotContains(marker1, "F")
+	assertContains(marker1, "G")
 
-	err = marker.ClearAll(rc)
+	err = marker1.ClearAll(rc)
 	require.NoError(t, err)
 
 	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{})
 	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{})
 
-	assertNotContains("D")
-	assertNotContains("E")
-	assertNotContains("F")
-	assertNotContains("G")
+	assertNotContains(marker1, "D")
+	assertNotContains(marker1, "E")
+	assertNotContains(marker1, "F")
+	assertNotContains(marker1, "G")
+
+	// create a 5 minute based marker
+	marker2 := redisx.NewMarker("foos", time.Minute*5)
+	marker2.Add(rc, "A")
+	marker2.Add(rc, "B")
+
+	assertredis.SMembers(t, rp, "foos:2021-11-20T12:05", []string{"A", "B"})
+	assertredis.SMembers(t, rp, "foos:2021-11-20T12:00", []string{})
+
+	assertContains(marker2, "A")
+	assertContains(marker2, "B")
+	assertNotContains(marker2, "C")
 }
