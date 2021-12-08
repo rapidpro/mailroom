@@ -1,3 +1,8 @@
+v7.1.15
+----------
+ * Update goflow
+ * Use new key format with redisx.Marker but also use legacy key format for backwards compatibility
+
 v7.1.14
 ----------
  * Update to latest goflow
