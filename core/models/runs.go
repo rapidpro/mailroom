@@ -693,7 +693,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 		return errors.Wrapf(err, "error writing runs")
 	}
 
-	if err := RecordFlowStatistics(ctx, tx, []flows.Session{fs}, []flows.Sprint{sprint}); err != nil {
+	if err := RecordFlowStatistics(ctx, rt, tx, []flows.Session{fs}, []flows.Sprint{sprint}); err != nil {
 		return errors.Wrapf(err, "error saving flow statistics")
 	}
 
@@ -867,7 +867,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 		return nil, errors.Wrapf(err, "error writing runs")
 	}
 
-	if err := RecordFlowStatistics(ctx, tx, ss, sprints); err != nil {
+	if err := RecordFlowStatistics(ctx, rt, tx, ss, sprints); err != nil {
 		return nil, errors.Wrapf(err, "error saving flow statistics")
 	}
 
