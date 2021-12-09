@@ -41,6 +41,7 @@ func RecordFlowStatistics(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx,
 	rc := rt.RP.Get()
 	defer rc.Close()
 
+	segmentIDs := make([]segmentID, 0, 10)
 	recentBySegment := make(map[segmentID][]segmentValue, 10)
 	nodeTypeCache := make(map[flows.NodeUUID]string)
 
@@ -49,12 +50,18 @@ func RecordFlowStatistics(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx,
 			segID := segmentID{seg.Exit().UUID(), seg.Destination().UUID()}
 			uiNodeType := getNodeUIType(seg.Flow(), seg.Node(), nodeTypeCache)
 			if recentOperandsForTypes[uiNodeType] {
+				if _, seen := recentBySegment[segID]; !seen {
+					segmentIDs = append(segmentIDs, segID)
+				}
+
 				recentBySegment[segID] = append(recentBySegment[segID], segmentValue{seg.Operand(), seg.Time()})
 			}
 		}
 	}
 
-	for segID, recentOperands := range recentBySegment {
+	for _, segID := range segmentIDs {
+		recentOperands := recentBySegment[segID]
+
 		// trim recent values for each segment - no point in trying to add more values than we keep
 		if len(recentOperands) > recentOperandsCap {
 			recentBySegment[segID] = recentOperands[:len(recentOperands)-recentOperandsCap]
