@@ -22,7 +22,7 @@ const (
 	retryLock = "retry_msgs"
 )
 
-var retriedMsgs = redisx.NewMarker("retried_msgs", time.Hour*24)
+var retriedMsgs = redisx.NewIntervalSet("retried_msgs", time.Hour*24, 2)
 
 func init() {
 	mailroom.AddInitFunction(StartRetryCron)

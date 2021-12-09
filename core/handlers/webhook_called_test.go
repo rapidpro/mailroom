@@ -144,8 +144,8 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)
 
-	healthySeries := redisx.NewSeries("webhooks:healthy", time.Minute*5, 4)
-	unhealthySeries := redisx.NewSeries("webhooks:unhealthy", time.Minute*5, 4)
+	healthySeries := redisx.NewIntervalSeries("webhooks:healthy", time.Minute*5, 4)
+	unhealthySeries := redisx.NewIntervalSeries("webhooks:unhealthy", time.Minute*5, 4)
 
 	total, err := healthySeries.Total(rc, "1bff8fe4-0714-433e-96a3-437405bf21cf")
 	assert.NoError(t, err)

@@ -2,10 +2,38 @@ package redisx
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
 )
+
+// StringsWithScores parses an array reply which is alternating pairs of strings and scores (floats)
+func StringsWithScores(reply interface{}, err error) ([]string, []float64, error) {
+	pairs, err := redis.Values(reply, err)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	strings := make([]string, len(pairs)/2)
+	scores := make([]float64, len(pairs)/2)
+
+	for i := 0; i < len(pairs)/2; i++ {
+		rawString := pairs[2*i].([]byte)
+		rawScore := pairs[2*i+1].([]byte)
+
+		score, err := strconv.ParseFloat(string(rawScore), 64)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		strings[i] = string(rawString)
+		scores[i] = score
+	}
+
+	return strings, scores, nil
+}
 
 func intervalTimestamp(t time.Time, interval time.Duration) string {
 	t = t.UTC().Truncate(interval)

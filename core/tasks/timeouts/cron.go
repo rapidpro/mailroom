@@ -21,7 +21,7 @@ const (
 	timeoutLock = "sessions_timeouts"
 )
 
-var marker = redisx.NewMarker("session_timeouts", time.Hour*24)
+var marker = redisx.NewIntervalSet("session_timeouts", time.Hour*24, 2)
 
 func init() {
 	mailroom.AddInitFunction(StartTimeoutCron)

@@ -203,6 +203,6 @@ func (n *WebhookNode) Healthy(rt *runtime.Runtime) (bool, error) {
 	return unhealthy < 10 || (100*unhealthy/(healthy+unhealthy)) < 25, nil
 }
 
-func (n *WebhookNode) series() (*redisx.Series, *redisx.Series) {
-	return redisx.NewSeries("webhooks:healthy", time.Minute*5, 4), redisx.NewSeries("webhooks:unhealthy", time.Minute*5, 4)
+func (n *WebhookNode) series() (*redisx.IntervalSeries, *redisx.IntervalSeries) {
+	return redisx.NewIntervalSeries("webhooks:healthy", time.Minute*5, 4), redisx.NewIntervalSeries("webhooks:unhealthy", time.Minute*5, 4)
 }
