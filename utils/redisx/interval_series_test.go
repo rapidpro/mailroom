@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSeries(t *testing.T) {
+func TestIntervalSeries(t *testing.T) {
 	rp := assertredis.TestDB()
 	rc := rp.Get()
 	defer rc.Close()
@@ -20,12 +20,12 @@ func TestSeries(t *testing.T) {
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	setNow := func(d time.Time) { dates.SetNowSource(dates.NewFixedNowSource(d)) }
 
-	assertGet := func(s *redisx.Series, f string, expected []int64) {
+	assertGet := func(s *redisx.IntervalSeries, f string, expected []int64) {
 		actual, err := s.Get(rc, f)
 		assert.NoError(t, err, "unexpected error getting field %s", f)
 		assert.Equal(t, expected, actual, "expected series field %s to contain %v", f, expected)
 	}
-	assertTotal := func(s *redisx.Series, f string, expected int64) {
+	assertTotal := func(s *redisx.IntervalSeries, f string, expected int64) {
 		actual, err := s.Total(rc, f)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, actual)
@@ -34,7 +34,7 @@ func TestSeries(t *testing.T) {
 	setNow(time.Date(2021, 11, 18, 12, 7, 3, 234567, time.UTC))
 
 	// create a 5 minute x 5 based series
-	series1 := redisx.NewSeries("foos", time.Minute*5, 5)
+	series1 := redisx.NewIntervalSeries("foos", time.Minute*5, 5)
 	series1.Record(rc, "A", 2)
 
 	setNow(time.Date(2021, 11, 18, 12, 9, 3, 234567, time.UTC)) // move time forward but within same interval

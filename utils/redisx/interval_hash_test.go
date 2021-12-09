@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCache(t *testing.T) {
+func TestIntervalHash(t *testing.T) {
 	rp := assertredis.TestDB()
 	rc := rp.Get()
 	defer rc.Close()
@@ -23,14 +23,14 @@ func TestCache(t *testing.T) {
 
 	setNow(time.Date(2021, 11, 18, 12, 7, 3, 234567, time.UTC))
 
-	assertGet := func(c *redisx.Cache, k, expected string) {
+	assertGet := func(c *redisx.IntervalHash, k, expected string) {
 		actual, err := c.Get(rc, k)
 		assert.NoError(t, err, "unexpected error getting key %s", k)
 		assert.Equal(t, expected, actual, "expected cache key %s to contain %s", k, expected)
 	}
 
-	// create a 24-hour x 2 based cache
-	cache1 := redisx.NewCache("foos", time.Hour*24, 2)
+	// create a 24-hour x 2 based hash
+	cache1 := redisx.NewIntervalHash("foos", time.Hour*24, 2)
 	assert.NoError(t, cache1.Set(rc, "A", "1"))
 	assert.NoError(t, cache1.Set(rc, "B", "2"))
 	assert.NoError(t, cache1.Set(rc, "C", "3"))
@@ -103,8 +103,8 @@ func TestCache(t *testing.T) {
 	assertGet(cache1, "C", "")
 	assertGet(cache1, "D", "")
 
-	// create a 5 minute x 3 based cache
-	cache2 := redisx.NewCache("foos", time.Minute*5, 3)
+	// create a 5 minute x 3 based hash
+	cache2 := redisx.NewIntervalHash("foos", time.Minute*5, 3)
 	cache2.Set(rc, "A", "1")
 	cache2.Set(rc, "B", "2")
 

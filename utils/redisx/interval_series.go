@@ -6,20 +6,20 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-// Series returns all values from interval based sets.
-type Series struct {
+// IntervalSeries returns all values from interval based hashes.
+type IntervalSeries struct {
 	keyBase  string
 	interval time.Duration // e.g. 5 minutes
 	size     int           // number of intervals
 }
 
-// NewSeries creates a new empty series
-func NewSeries(keyBase string, interval time.Duration, size int) *Series {
-	return &Series{keyBase: keyBase, interval: interval, size: size}
+// NewIntervalSeries creates a new empty series
+func NewIntervalSeries(keyBase string, interval time.Duration, size int) *IntervalSeries {
+	return &IntervalSeries{keyBase: keyBase, interval: interval, size: size}
 }
 
 // Record increments the value of field by value in the current interval
-func (s *Series) Record(rc redis.Conn, field string, value int64) error {
+func (s *IntervalSeries) Record(rc redis.Conn, field string, value int64) error {
 	currKey := s.keys()[0]
 
 	rc.Send("MULTI")
@@ -29,7 +29,7 @@ func (s *Series) Record(rc redis.Conn, field string, value int64) error {
 	return err
 }
 
-var seriesGetScript = redis.NewScript(-1, `
+var iseriesGetScript = redis.NewScript(-1, `
 local field = ARGV[1]
 
 local values = {}
@@ -41,15 +41,15 @@ return values
 `)
 
 // Get gets the values of field in all intervals
-func (s *Series) Get(rc redis.Conn, field string) ([]int64, error) {
+func (s *IntervalSeries) Get(rc redis.Conn, field string) ([]int64, error) {
 	keys := s.keys()
 	args := redis.Args{}.Add(len(keys)).AddFlat(keys).Add(field)
 
-	return redis.Int64s(seriesGetScript.Do(rc, args...))
+	return redis.Int64s(iseriesGetScript.Do(rc, args...))
 }
 
 // Total gets the total value of field across all intervals
-func (s *Series) Total(rc redis.Conn, field string) (int64, error) {
+func (s *IntervalSeries) Total(rc redis.Conn, field string) (int64, error) {
 	vals, err := s.Get(rc, field)
 	if err != nil {
 		return 0, err
@@ -61,6 +61,6 @@ func (s *Series) Total(rc redis.Conn, field string) (int64, error) {
 	return total, nil
 }
 
-func (s *Series) keys() []string {
+func (s *IntervalSeries) keys() []string {
 	return intervalKeys(s.keyBase, s.interval, s.size)
 }

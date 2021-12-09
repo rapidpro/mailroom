@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarker(t *testing.T) {
+func TestIntervalSet(t *testing.T) {
 	rp := assertredis.TestDB()
 	rc := rp.Get()
 	defer rc.Close()
@@ -23,21 +23,21 @@ func TestMarker(t *testing.T) {
 
 	setNow(time.Date(2021, 11, 18, 12, 0, 3, 234567, time.UTC))
 
-	// create a 24-hour based marker
-	marker1 := redisx.NewMarker("foos", time.Hour*24)
+	// create a 24-hour x 2 based set
+	marker1 := redisx.NewIntervalSet("foos", time.Hour*24, 2)
 	assert.NoError(t, marker1.Add(rc, "A"))
 	assert.NoError(t, marker1.Add(rc, "B"))
 	assert.NoError(t, marker1.Add(rc, "C"))
 
-	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos:2021-11-18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos:2021-11-17", []string{})
 
-	assertContains := func(m *redisx.Marker, v string) {
+	assertContains := func(m *redisx.IntervalSet, v string) {
 		contains, err := m.Contains(rc, v)
 		assert.NoError(t, err)
 		assert.True(t, contains, "expected marker to contain %s", v)
 	}
-	assertNotContains := func(m *redisx.Marker, v string) {
+	assertNotContains := func(m *redisx.IntervalSet, v string) {
 		contains, err := m.Contains(rc, v)
 		assert.NoError(t, err)
 		assert.False(t, contains, "expected marker to not contain %s", v)
@@ -54,9 +54,9 @@ func TestMarker(t *testing.T) {
 	marker1.Add(rc, "D")
 	marker1.Add(rc, "E")
 
-	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D", "E"})
-	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos:2021-11-19", []string{"D", "E"})
+	assertredis.SMembers(t, rp, "foos:2021-11-18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos:2021-11-17", []string{})
 
 	assertContains(marker1, "A")
 	assertContains(marker1, "B")
@@ -71,10 +71,10 @@ func TestMarker(t *testing.T) {
 	marker1.Add(rc, "F")
 	marker1.Add(rc, "G")
 
-	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{"F", "G"})
-	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D", "E"})
-	assertredis.SMembers(t, rp, "foos_2021_11_18", []string{"A", "B", "C"})
-	assertredis.SMembers(t, rp, "foos_2021_11_17", []string{})
+	assertredis.SMembers(t, rp, "foos:2021-11-20", []string{"F", "G"})
+	assertredis.SMembers(t, rp, "foos:2021-11-19", []string{"D", "E"})
+	assertredis.SMembers(t, rp, "foos:2021-11-18", []string{"A", "B", "C"})
+	assertredis.SMembers(t, rp, "foos:2021-11-17", []string{})
 
 	assertNotContains(marker1, "A") // too old
 	assertNotContains(marker1, "B") // too old
@@ -89,8 +89,8 @@ func TestMarker(t *testing.T) {
 	err = marker1.Remove(rc, "E") // from yesterday
 	require.NoError(t, err)
 
-	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{"G"})
-	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{"D"})
+	assertredis.SMembers(t, rp, "foos:2021-11-20", []string{"G"})
+	assertredis.SMembers(t, rp, "foos:2021-11-19", []string{"D"})
 
 	assertContains(marker1, "D")
 	assertNotContains(marker1, "E")
@@ -100,16 +100,16 @@ func TestMarker(t *testing.T) {
 	err = marker1.ClearAll(rc)
 	require.NoError(t, err)
 
-	assertredis.SMembers(t, rp, "foos_2021_11_20", []string{})
-	assertredis.SMembers(t, rp, "foos_2021_11_19", []string{})
+	assertredis.SMembers(t, rp, "foos:2021-11-20", []string{})
+	assertredis.SMembers(t, rp, "foos:2021-11-19", []string{})
 
 	assertNotContains(marker1, "D")
 	assertNotContains(marker1, "E")
 	assertNotContains(marker1, "F")
 	assertNotContains(marker1, "G")
 
-	// create a 5 minute based marker
-	marker2 := redisx.NewMarker("foos", time.Minute*5)
+	// create a 5 minute x 3 based marker
+	marker2 := redisx.NewIntervalSet("foos", time.Minute*5, 3)
 	marker2.Add(rc, "A")
 	marker2.Add(rc, "B")
 
