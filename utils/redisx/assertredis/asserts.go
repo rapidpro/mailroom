@@ -55,6 +55,14 @@ func HGetAll(t *testing.T, rp *redis.Pool, key string, expected map[string]strin
 	assert.Equal(t, expected, actual, msgAndArgs...)
 }
 
+// ZRange asserts the result of calling ZRANGE on the given key
+func ZRange(t *testing.T, rp *redis.Pool, key string, min, max int, expected []string, msgAndArgs ...interface{}) {
+	actual, err := redis.Strings(do(rp, "ZRANGE", key, min, max))
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, actual, msgAndArgs...)
+}
+
 func do(rp *redis.Pool, commandName string, args ...interface{}) (reply interface{}, err error) {
 	rc := rp.Get()
 	defer rc.Close()

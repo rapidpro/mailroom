@@ -23,8 +23,8 @@ func TestIntervalHash(t *testing.T) {
 
 	setNow(time.Date(2021, 11, 18, 12, 7, 3, 234567, time.UTC))
 
-	assertGet := func(c *redisx.IntervalHash, k, expected string) {
-		actual, err := c.Get(rc, k)
+	assertGet := func(h *redisx.IntervalHash, k, expected string) {
+		actual, err := h.Get(rc, k)
 		assert.NoError(t, err, "unexpected error getting key %s", k)
 		assert.Equal(t, expected, actual, "expected cache key %s to contain %s", k, expected)
 	}

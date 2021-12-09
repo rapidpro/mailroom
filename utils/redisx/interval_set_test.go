@@ -32,13 +32,13 @@ func TestIntervalSet(t *testing.T) {
 	assertredis.SMembers(t, rp, "foos:2021-11-18", []string{"A", "B", "C"})
 	assertredis.SMembers(t, rp, "foos:2021-11-17", []string{})
 
-	assertContains := func(m *redisx.IntervalSet, v string) {
-		contains, err := m.Contains(rc, v)
+	assertContains := func(s *redisx.IntervalSet, v string) {
+		contains, err := s.Contains(rc, v)
 		assert.NoError(t, err)
 		assert.True(t, contains, "expected marker to contain %s", v)
 	}
-	assertNotContains := func(m *redisx.IntervalSet, v string) {
-		contains, err := m.Contains(rc, v)
+	assertNotContains := func(s *redisx.IntervalSet, v string) {
+		contains, err := s.Contains(rc, v)
 		assert.NoError(t, err)
 		assert.False(t, contains, "expected marker to not contain %s", v)
 	}

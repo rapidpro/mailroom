@@ -56,14 +56,14 @@ cache.Get(rc, "B")   // "2"
 cache.Get(rc, "D")   // ""
 ```
 
-## Series
+## IntervalSeries
 
-When getting a value from Cache you're getting the newest value by looking back through the intervals. Series however lets you get an accumulated value from each interval.
+When getting a value from an `IntervalHash` you're getting the newest value by looking back through the intervals. `IntervalSeries` however lets you get an accumulated value from each interval.
 
 For example using 3 intervals of 1 hour:
 
 ```go
-series := NewSeries("foos", time.Hour, 3)
+series := NewIntervalSeries("foos", time.Hour, 3)
 series.Record(rc, "A", 1)  // time is 2021-12-02T09:10
 series.Record(rc, "A", 2)  // time is 2021-12-02T09:15
 ...
@@ -88,6 +88,20 @@ But lets us retrieve values across intervals:
 series.Get(rc, "A")   // [5, 7, 3]
 series.Get(rc, "B")   // [1, 0, 0]
 series.Get(rc, "C")   // [0, 0, 0]
+```
+
+## CappedZSet
+
+The `CappedZSet` type is based on a sorted set but enforces a cap on size, by only retaining the highest ranked members.
+
+```go
+cset := NewCappedZSet("foos", 3, time.Hour*24)
+cset.Add(rc, "A", 1) 
+cset.Add(rc, "C", 3) 
+cset.Add(rc, "D", 4)
+cset.Add(rc, "B", 2) 
+cset.Add(rc, "E", 5) 
+cset.Members(rc)      // ["C", "D", "E"] / [3, 4, 5]
 ```
 
 ## Testing Asserts
