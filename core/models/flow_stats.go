@@ -16,7 +16,7 @@ import (
 
 const (
 	recentOperandsCap    = 5
-	recentOperandsExpire = time.Hour * 24
+	recentOperandsExpire = time.Hour * 48
 	recentOperandsKey    = "recent_operands:%s"
 )
 
