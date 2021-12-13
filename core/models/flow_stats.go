@@ -72,8 +72,9 @@ func RecordFlowStatistics(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx,
 		for _, recent := range recentOperands {
 			// set members need to be unique, so prefix operand with a random UUID
 			value := fmt.Sprintf("%s|%s", uuids.New(), recent.operand)
+			score := float64(recent.time.UnixNano()) / float64(1e9) // score is UNIX time as floating point
 
-			err := recentSet.Add(rc, value, float64(recent.time.UnixMilli()))
+			err := recentSet.Add(rc, value, score)
 			if err != nil {
 				return errors.Wrap(err, "error adding recent operand to set")
 			}
