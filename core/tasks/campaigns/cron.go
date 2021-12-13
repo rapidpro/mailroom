@@ -31,7 +31,7 @@ func init() {
 
 // StartCampaignCron starts our cron job of firing expired campaign events
 func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.StartCron(quit, rt.RP, "campaign_event", time.Second*60,
+	cron.Start(quit, rt, "campaign_event", time.Second*60, false,
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()

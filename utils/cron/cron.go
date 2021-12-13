@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/redisx"
 	"github.com/sirupsen/logrus"
 )
@@ -13,12 +13,18 @@ import (
 // Function is the function that will be called on our schedule
 type Function func() error
 
-// StartCron calls the passed in function every minute, making sure it acquires a
+// Start calls the passed in function every interval, making sure it acquires a
 // lock so that only one process is running at once. Note that across processes
 // crons may be called more often than duration as there is no inter-process
 // coordination of cron fires. (this might be a worthy addition)
-func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Duration, cronFunc Function) {
-	lockName := fmt.Sprintf("lock:%s_lock", name)
+func Start(quit chan bool, rt *runtime.Runtime, name string, interval time.Duration, allInstances bool, cronFunc Function) {
+	lockName := fmt.Sprintf("lock:%s_lock", name) // for historical reasons...
+
+	// for jobs that run on all instances, the lock key is specific to this instance
+	if allInstances {
+		lockName = fmt.Sprintf("%s:%s", lockName, rt.Config.InstanceName)
+	}
+
 	locker := redisx.NewLocker(lockName, time.Minute*5)
 
 	wait := time.Duration(0)
@@ -29,7 +35,6 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 	go func() {
 		defer log.Info("cron exiting")
 
-		// we run expiration every minute on the minute
 		for {
 			select {
 			case <-quit:
@@ -37,10 +42,10 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 				return
 
 			case <-time.After(wait):
-				// try to insert our expiring lock to redis
 				lastFire = time.Now()
 
-				lock, err := locker.Grab(rp, 0)
+				// try to get lock but don't retry - if lock is taken then task is still running or running on another instance
+				lock, err := locker.Grab(rt.RP, 0)
 				if err != nil {
 					break
 				}
@@ -58,14 +63,14 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 				}
 
 				// release our lock
-				err = locker.Release(rp, lock)
+				err = locker.Release(rt.RP, lock)
 				if err != nil {
 					log.WithError(err).Error("error releasing lock")
 				}
 			}
 
 			// calculate our next fire time
-			nextFire := nextFire(lastFire, interval)
+			nextFire := NextFire(lastFire, interval)
 			wait = time.Until(nextFire)
 			if wait < time.Duration(0) {
 				wait = time.Duration(0)
@@ -90,8 +95,8 @@ func fireCron(cronFunc Function, lockName string, lockValue string) error {
 	return cronFunc()
 }
 
-// nextFire returns the next time we should fire based on the passed in time and interval
-func nextFire(last time.Time, interval time.Duration) time.Time {
+// NextFire returns the next time we should fire based on the passed in time and interval
+func NextFire(last time.Time, interval time.Duration) time.Time {
 	if interval >= time.Second && interval < time.Minute {
 		normalizedInterval := interval - ((time.Duration(last.Second()) * time.Second) % interval)
 		return last.Add(normalizedInterval)

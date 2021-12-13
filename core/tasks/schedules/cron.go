@@ -24,7 +24,7 @@ func init() {
 
 // StartCheckSchedules starts our cron job of firing schedules every minute
 func StartCheckSchedules(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.StartCron(quit, rt.RP, scheduleLock, time.Minute*1,
+	cron.Start(quit, rt, scheduleLock, time.Minute*1, false,
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
