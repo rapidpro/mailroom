@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
@@ -71,10 +72,13 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 	}).Debug("msg created event")
 
 	// messages in messaging flows must have urn id set on them, if not, go look it up
-	if scene.Session().SessionType() == models.FlowTypeMessaging {
+	if scene.Session().SessionType() == models.FlowTypeMessaging && event.Msg.URN() != urns.NilURN {
 		urn := event.Msg.URN()
 		if models.GetURNInt(urn, "id") == 0 {
-			urn, _ := models.GetOrCreateURN(ctx, tx, oa, scene.ContactID(), event.Msg.URN())
+			urn, err := models.GetOrCreateURN(ctx, tx, oa, scene.ContactID(), event.Msg.URN())
+			if err != nil {
+				return errors.Wrapf(err, "unable to get or create URN: %s", event.Msg.URN())
+			}
 			// update our Msg with our full URN
 			event.Msg.SetURN(urn)
 		}
@@ -84,6 +88,9 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 	var channel *models.Channel
 	if event.Msg.Channel() != nil {
 		channel = oa.ChannelByUUID(event.Msg.Channel().UUID)
+		if channel == nil {
+			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
+		}
 	}
 
 	msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, scene.Session(), event.Msg, event.CreatedOn())

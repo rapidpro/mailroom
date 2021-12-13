@@ -78,13 +78,12 @@ const (
 type MsgFailedReason null.String
 
 const (
-	NilMsgFailedReason  = MsgFailedReason("")
-	MsgFailedSuspended  = MsgFailedReason("S")
-	MsgFailedLooping    = MsgFailedReason("L")
-	MsgFailedErrorLimit = MsgFailedReason("E")
-	MsgFailedTooOld     = MsgFailedReason("O")
-	MsgFailedChannel    = MsgFailedReason("C")
-	MsgFailedURN        = MsgFailedReason("U")
+	NilMsgFailedReason   = MsgFailedReason("")
+	MsgFailedSuspended   = MsgFailedReason("S")
+	MsgFailedLooping     = MsgFailedReason("L")
+	MsgFailedErrorLimit  = MsgFailedReason("E")
+	MsgFailedTooOld      = MsgFailedReason("O")
+	MsgFailedDestination = MsgFailedReason("D")
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
@@ -386,18 +385,13 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 
 	msg.SetChannel(channel)
 
-	if err := msg.SetURN(out.URN()); err != nil {
-		msg.SetURN(urns.NilURN)
+	if out.URN() != urns.NilURN {
+		msg.SetURN(out.URN())
 	}
 
-	if msg.URN() == urns.NilURN {
+	if msg.URN() == urns.NilURN || channel == nil {
 		m.Status = MsgStatusFailed
-		m.FailedReason = MsgFailedURN
-	}
-
-	if channel == nil {
-		m.Status = MsgStatusFailed
-		m.FailedReason = MsgFailedChannel
+		m.FailedReason = MsgFailedDestination
 	}
 
 	// if we have attachments, add them
