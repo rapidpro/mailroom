@@ -6,7 +6,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
-	"github.com/nyaruka/mailroom/utils/locker"
+	"github.com/nyaruka/mailroom/utils/redisx"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,7 +18,9 @@ type Function func() error
 // crons may be called more often than duration as there is no inter-process
 // coordination of cron fires. (this might be a worthy addition)
 func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Duration, cronFunc Function) {
-	lockName := fmt.Sprintf("%s_lock", name)
+	lockName := fmt.Sprintf("lock:%s_lock", name)
+	locker := redisx.NewLocker(lockName, time.Minute*5)
+
 	wait := time.Duration(0)
 	lastFire := time.Now()
 
@@ -38,7 +40,7 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 				// try to insert our expiring lock to redis
 				lastFire = time.Now()
 
-				lock, err := locker.GrabLock(rp, lockName, time.Minute*5, 0)
+				lock, err := locker.Grab(rp, 0)
 				if err != nil {
 					break
 				}
@@ -56,7 +58,7 @@ func StartCron(quit chan bool, rp *redis.Pool, name string, interval time.Durati
 				}
 
 				// release our lock
-				err = locker.ReleaseLock(rp, lockName, lock)
+				err = locker.Release(rp, lock)
 				if err != nil {
 					log.WithError(err).Error("error releasing lock")
 				}
