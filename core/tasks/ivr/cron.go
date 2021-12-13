@@ -27,7 +27,7 @@ func init() {
 
 // StartIVRCron starts our cron job of retrying errored calls
 func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.StartCron(quit, rt.RP, retryIVRLock, time.Minute,
+	cron.Start(quit, rt, retryIVRLock, time.Minute, false,
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
@@ -35,7 +35,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		},
 	)
 
-	cron.StartCron(quit, rt.RP, expireIVRLock, time.Minute,
+	cron.Start(quit, rt, expireIVRLock, time.Minute, false,
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()

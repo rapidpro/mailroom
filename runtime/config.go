@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"io"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/nyaruka/goflow/utils"
@@ -60,13 +61,16 @@ type Config struct {
 	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
 	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 
-	LogLevel string `help:"the logging level courier should use"`
-	UUIDSeed int    `help:"seed to use for UUID generation in a testing environment"`
-	Version  string `help:"the version of this mailroom install"`
+	InstanceName string `help:"the unique name of this instance used for analytics"`
+	LogLevel     string `help:"the logging level courier should use"`
+	UUIDSeed     int    `help:"seed to use for UUID generation in a testing environment"`
+	Version      string `help:"the version of this mailroom install"`
 }
 
 // NewDefaultConfig returns a new default configuration object
 func NewDefaultConfig() *Config {
+	hostname, _ := os.Hostname()
+
 	return &Config{
 		DB:         "postgres://temba:temba@localhost/temba?sslmode=disable&Timezone=UTC",
 		ReadonlyDB: "",
@@ -106,9 +110,10 @@ func NewDefaultConfig() *Config {
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",
 
-		LogLevel: "error",
-		UUIDSeed: 0,
-		Version:  "Dev",
+		InstanceName: hostname,
+		LogLevel:     "error",
+		UUIDSeed:     0,
+		Version:      "Dev",
 	}
 }
 
