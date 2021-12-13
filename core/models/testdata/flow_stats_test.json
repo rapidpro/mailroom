@@ -11,13 +11,14 @@
             "localization": {},
             "nodes": [
                 {
+                    "uuid": "001b4eee-812f-403e-a004-737b948b3c18",
                     "actions": [
                         {
+                            "uuid": "d64f25cf-8b02-4ca9-8df8-3c457ccc1090",
+                            "type": "send_msg",
                             "attachments": [],
                             "text": "Hi there! What's your favorite color?",
-                            "type": "send_msg",
-                            "quick_replies": [],
-                            "uuid": "d64f25cf-8b02-4ca9-8df8-3c457ccc1090"
+                            "quick_replies": []
                         }
                     ],
                     "exits": [
@@ -25,18 +26,17 @@
                             "uuid": "5fd2e537-0534-4c12-8425-bef87af09d46",
                             "destination_uuid": "072b95b3-61c3-4e0e-8dd1-eb7481083f94"
                         }
-                    ],
-                    "uuid": "001b4eee-812f-403e-a004-737b948b3c18"
+                    ]
                 },
                 {
                     "uuid": "8712db6b-25ff-4789-892c-581f24eeeb95",
                     "actions": [
                         {
+                            "uuid": "1e65bf7a-fae7-4bac-94ae-662da02dfab8",
+                            "type": "send_msg",
                             "attachments": [],
                             "text": "I'm sorry I don't know that color",
-                            "type": "send_msg",
-                            "quick_replies": [],
-                            "uuid": "1e65bf7a-fae7-4bac-94ae-662da02dfab8"
+                            "quick_replies": []
                         }
                     ],
                     "exits": [

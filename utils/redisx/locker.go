@@ -1,7 +1,6 @@
 package redisx
 
 import (
-	"math/rand"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -22,7 +21,7 @@ func NewLocker(key string, expiration time.Duration) *Locker {
 // It will retry every second until the retry period has ended, returning empty string if not
 // acquired in that time.
 func (l *Locker) Grab(rp *redis.Pool, retry time.Duration) (string, error) {
-	value := makeRandom(10)                    // generate our lock value
+	value := RandomBase64(10)                  // generate our lock value
 	expires := int(l.expiration / time.Second) // convert our expiration to seconds
 
 	start := time.Now()
@@ -89,15 +88,4 @@ func (l *Locker) Extend(rp *redis.Pool, value string, expiration time.Duration) 
 	// we use lua here because we only want to set the expiration time if we own it
 	_, err := expireScript.Do(rc, l.key, value, seconds)
 	return err
-}
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-// makeRandom creates a random key of the length passed in
-func makeRandom(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }
