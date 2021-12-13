@@ -83,6 +83,8 @@ const (
 	MsgFailedLooping    = MsgFailedReason("L")
 	MsgFailedErrorLimit = MsgFailedReason("E")
 	MsgFailedTooOld     = MsgFailedReason("O")
+	MsgFailedChannel    = MsgFailedReason("C")
+	MsgFailedURN        = MsgFailedReason("U")
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
@@ -385,7 +387,17 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	msg.SetChannel(channel)
 
 	if err := msg.SetURN(out.URN()); err != nil {
-		return nil, errors.Wrapf(err, "error setting msg URN")
+		msg.SetURN(urns.NilURN)
+	}
+
+	if msg.URN() == urns.NilURN {
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedURN
+	}
+
+	if channel == nil {
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedChannel
 	}
 
 	// if we have attachments, add them
