@@ -78,12 +78,12 @@ const (
 type MsgFailedReason null.String
 
 const (
-	NilMsgFailedReason   = MsgFailedReason("")
-	MsgFailedSuspended   = MsgFailedReason("S")
-	MsgFailedLooping     = MsgFailedReason("L")
-	MsgFailedErrorLimit  = MsgFailedReason("E")
-	MsgFailedTooOld      = MsgFailedReason("O")
-	MsgFailedDestination = MsgFailedReason("D")
+	NilMsgFailedReason     = MsgFailedReason("")
+	MsgFailedSuspended     = MsgFailedReason("S")
+	MsgFailedLooping       = MsgFailedReason("L")
+	MsgFailedErrorLimit    = MsgFailedReason("E")
+	MsgFailedTooOld        = MsgFailedReason("O")
+	MsgFailedNoDestination = MsgFailedReason("D")
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
@@ -353,10 +353,17 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
+	msg.SetChannel(channel)
+	msg.SetURN(out.URN())
+
 	if org.Suspended() {
 		// we fail messages for suspended orgs right away
 		m.Status = MsgStatusFailed
 		m.FailedReason = MsgFailedSuspended
+	} else if msg.URN() == urns.NilURN || channel == nil {
+		// if msg is missing the URN or channel, we also fail it
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedNoDestination
 	} else {
 		// also fail right away if this looks like a loop
 		repetitions, err := GetMsgRepetitions(rt.RP, contactID, out)
@@ -381,17 +388,6 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		if session.IncomingMsgID() != NilMsgID {
 			m.HighPriority = true
 		}
-	}
-
-	msg.SetChannel(channel)
-
-	if out.URN() != urns.NilURN {
-		msg.SetURN(out.URN())
-	}
-
-	if msg.URN() == urns.NilURN || channel == nil {
-		m.Status = MsgStatusFailed
-		m.FailedReason = MsgFailedDestination
 	}
 
 	// if we have attachments, add them
