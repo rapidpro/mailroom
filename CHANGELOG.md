@@ -1,3 +1,12 @@
+v7.1.16
+----------
+ * Record recent contacts for all segments
+ * Allow cron jobs to declare that they can run on all instances at same time - needed for analytics job
+ * Write failed messages when missing channel or URNs
+ * Switch to redisx.Locker for cron job locking
+ * Update goflow
+ * Rename redisx structs and remove legacy support from IntervalSet
+
 v7.1.15
 ----------
  * Update goflow
