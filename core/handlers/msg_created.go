@@ -71,14 +71,8 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		"urn":          event.Msg.URN(),
 	}).Debug("msg created event")
 
-	// ignore events that don't have a channel or URN set
-	// TODO: maybe we should create these messages in a failed state?
-	if scene.Session().SessionType() == models.FlowTypeMessaging && (event.Msg.URN() == urns.NilURN || event.Msg.Channel() == nil) {
-		return nil
-	}
-
 	// messages in messaging flows must have urn id set on them, if not, go look it up
-	if scene.Session().SessionType() == models.FlowTypeMessaging {
+	if scene.Session().SessionType() == models.FlowTypeMessaging && event.Msg.URN() != urns.NilURN {
 		urn := event.Msg.URN()
 		if models.GetURNInt(urn, "id") == 0 {
 			urn, err := models.GetOrCreateURN(ctx, tx, oa, scene.ContactID(), event.Msg.URN())

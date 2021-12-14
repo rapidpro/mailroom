@@ -62,7 +62,6 @@ func TestOutgoingMsgs(t *testing.T) {
 			ExpectedMetadata:     map[string]interface{}{},
 			ExpectedMsgCount:     1,
 			ExpectedPriority:     true,
-			HasError:             true,
 		},
 		{
 			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
@@ -103,6 +102,32 @@ func TestOutgoingMsgs(t *testing.T) {
 			SuspendedOrg:         true,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedSuspended,
+			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMsgCount:     1,
+			ExpectedPriority:     false,
+		},
+		{
+			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:                 "missing URN",
+			Contact:              testdata.Cathy,
+			URN:                  urns.NilURN,
+			URNID:                models.URNID(0),
+			SuspendedOrg:         false,
+			ExpectedStatus:       models.MsgStatusFailed,
+			ExpectedFailedReason: models.MsgFailedDestination,
+			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMsgCount:     1,
+			ExpectedPriority:     false,
+		},
+		{
+			ChannelUUID:          "",
+			Text:                 "missing Channel",
+			Contact:              testdata.Cathy,
+			URN:                  urns.NilURN,
+			URNID:                models.URNID(0),
+			SuspendedOrg:         false,
+			ExpectedStatus:       models.MsgStatusFailed,
+			ExpectedFailedReason: models.MsgFailedDestination,
 			ExpectedMetadata:     map[string]interface{}{},
 			ExpectedMsgCount:     1,
 			ExpectedPriority:     false,
@@ -158,7 +183,7 @@ func TestOutgoingMsgs(t *testing.T) {
 	}
 
 	// check nil failed reasons are saved as NULLs
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(3)
 
 	// ensure org is unsuspended
 	db.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
