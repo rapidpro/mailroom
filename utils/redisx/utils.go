@@ -7,6 +7,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/random"
 )
 
 // StringsWithScores parses an array reply which is alternating pairs of strings and scores (floats)
@@ -51,4 +52,15 @@ func intervalKeys(keyBase string, interval time.Duration, size int) []string {
 		keys[i] = fmt.Sprintf("%s:%s", keyBase, timestamp)
 	}
 	return keys
+}
+
+const base64Charset = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/`
+
+// RandomBase64 creates a random string of the length passed in
+func RandomBase64(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = base64Charset[random.IntN(64)]
+	}
+	return string(b)
 }
