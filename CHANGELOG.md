@@ -1,3 +1,7 @@
+v7.1.17
+----------
+ * Include segments in simulation responses
+
 v7.1.16
 ----------
  * Record recent contacts for all segments
