@@ -16,7 +16,7 @@ import (
 
 const (
 	recentContactsCap    = 5              // number of recent contacts we keep per segment
-	recentContactsExpire = time.Hour * 48 // how long we keep recent contacts
+	recentContactsExpire = time.Hour * 24 // how long we keep recent contacts
 	recentContactsKey    = "recent_contacts:%s"
 )
 
