@@ -9,7 +9,12 @@ import (
 
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
+	"gopkg.in/go-playground/validator.v9"
 )
+
+func init() {
+	utils.RegisterValidatorAlias("session_storage", "eq=db|eq=s3", func(e validator.FieldError) string { return "is not a valid session storage mode" })
+}
 
 // Config is our top level configuration object
 type Config struct {
@@ -42,6 +47,7 @@ type Config struct {
 	MaxStepsPerSprint    int    `help:"the maximum number of steps allowed per engine sprint"`
 	MaxResumesPerSession int    `help:"the maximum number of resumes allowed per engine session"`
 	MaxValueLength       int    `help:"the maximum size in characters for contact field values and run result values"`
+	SessionStorage       string `validate:"omitempty,session_storage"         help:"where to store session output (s3|db)"`
 
 	S3Endpoint       string `help:"the S3 endpoint we will write attachments to"`
 	S3Region         string `help:"the S3 region we will write attachments to"`
@@ -97,6 +103,7 @@ func NewDefaultConfig() *Config {
 		MaxStepsPerSprint:    100,
 		MaxResumesPerSession: 250,
 		MaxValueLength:       640,
+		SessionStorage:       "db",
 
 		S3Endpoint:       "https://s3.amazonaws.com",
 		S3Region:         "us-east-1",

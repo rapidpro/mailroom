@@ -629,8 +629,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 	updateSQL := updateSessionSQL
 
 	// if writing to S3, do so
-	sessionMode := org.Org().SessionStorageMode()
-	if sessionMode == S3Sessions {
+	if rt.Config.SessionStorage == "s3" {
 		err := WriteSessionOutputsToStorage(ctx, rt, []*Session{s})
 		if err != nil {
 			logrus.WithError(err).Error("error writing session to s3")
@@ -820,8 +819,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	insertIncompleteSQL := insertIncompleteSessionSQL
 
 	// if writing our sessions to S3, do so
-	sessionMode := org.Org().SessionStorageMode()
-	if sessionMode == S3Sessions {
+	if rt.Config.SessionStorage == "s3" {
 		err := WriteSessionOutputsToStorage(ctx, rt, sessions)
 		if err != nil {
 			// for now, continue on for errors, we are still reading from the DB
