@@ -1,3 +1,8 @@
+v7.1.18
+----------
+ * Fix not logging details of query errors
+ * CI with go 1.17.5
+
 v7.1.17
 ----------
  * Include segments in simulation responses
