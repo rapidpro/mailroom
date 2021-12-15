@@ -172,7 +172,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			})
 
 			if qerr := dbutil.AsQueryError(err); qerr != nil {
-				log.WithFields(qerr.Fields())
+				log = log.WithFields(qerr.Fields())
 			}
 
 			contactEvent.ErrorCount++
