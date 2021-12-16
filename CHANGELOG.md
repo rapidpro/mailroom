@@ -1,3 +1,7 @@
+v7.1.19
+----------
+ * Update to latest goflow
+
 v7.1.18
 ----------
  * Fix not logging details of query errors
