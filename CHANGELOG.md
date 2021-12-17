@@ -1,3 +1,7 @@
+v7.1.20
+----------
+ * Update to latest gocommon and goflow to get fix for random.IntN concurrency
+
 v7.1.19
 ----------
  * Update to latest goflow
