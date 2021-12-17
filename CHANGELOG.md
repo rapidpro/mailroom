@@ -1,3 +1,7 @@
+v7.1.21
+----------
+ * Update to latest gocommon to get instagram scheme
+
 v7.1.20
 ----------
  * Update to latest gocommon and goflow to get fix for random.IntN concurrency
