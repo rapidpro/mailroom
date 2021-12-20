@@ -76,7 +76,7 @@ func TestCampaignStarts(t *testing.T) {
 
 	testsuite.AssertQuery(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
+		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
 		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 		 AND session_id IS NOT NULL`,
 		pq.Array(contacts), testdata.CampaignFlow.ID).Returns(2, "expected only two runs to be created")
@@ -156,7 +156,7 @@ func TestBatchStart(t *testing.T) {
 
 		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
+			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 			AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
 			Returns(tc.TotalCount, "%d: unexpected number of runs", i)
