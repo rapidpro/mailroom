@@ -257,6 +257,10 @@ func TestStartFlowConcurrency(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
+	// check everything works with big ids
+	db.MustExec(`ALTER SEQUENCE flows_flowrun_id_seq RESTART WITH 5000000000;`)
+	db.MustExec(`ALTER SEQUENCE flows_flowsession_id_seq RESTART WITH 5000000000;`)
+
 	// create a flow which has a send_broadcast action which will mean handlers grabbing redis connections
 	flow := testdata.InsertFlow(db, testdata.Org1, testsuite.ReadFile("testdata/broadcast_flow.json"))
 
