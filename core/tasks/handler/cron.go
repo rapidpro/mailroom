@@ -12,7 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-	"github.com/nyaruka/mailroom/utils/redisx"
+	"github.com/nyaruka/redisx"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

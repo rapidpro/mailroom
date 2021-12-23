@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/utils/redisx/assertredis"
+	"github.com/nyaruka/redisx/assertredis"
 	"github.com/stretchr/testify/require"
 )
 

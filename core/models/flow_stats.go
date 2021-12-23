@@ -10,7 +10,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/redisx"
+	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 )
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/redisx"
+	"github.com/nyaruka/redisx"
 	"github.com/sirupsen/logrus"
 )
 
