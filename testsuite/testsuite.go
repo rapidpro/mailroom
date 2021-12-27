@@ -184,6 +184,8 @@ DELETE FROM contacts_contactgroup WHERE id >= 30000;
 ALTER SEQUENCE flows_flow_id_seq RESTART WITH 30000;
 ALTER SEQUENCE tickets_ticket_id_seq RESTART WITH 1;
 ALTER SEQUENCE msgs_msg_id_seq RESTART WITH 1;
+ALTER SEQUENCE flows_flowrun_id_seq RESTART WITH 1;
+ALTER SEQUENCE flows_flowsession_id_seq RESTART WITH 1;
 ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000;
 ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 30000;
 ALTER SEQUENCE contacts_contactgroup_id_seq RESTART WITH 30000;`
