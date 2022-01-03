@@ -1,3 +1,9 @@
+v7.1.22
+----------
+ * Replace redisx package with new dependency
+ * Update test database to use big ids for flow run and session ids
+ * Move session storage mode to the runtime.Config instead of an org config value
+
 v7.1.21
 ----------
  * Update to latest gocommon to get instagram scheme
