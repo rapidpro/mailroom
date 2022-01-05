@@ -601,6 +601,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	// set our sprint, wait and step finder
 	s.sprint = sprint
 	s.findStep = fs.FindStep
+	s.s.CurrentFlowID = NilFlowID
 
 	// run through our runs to figure out our current flow
 	for _, r := range fs.Runs() {
@@ -1122,7 +1123,8 @@ SET
 	ended_on = $2,
 	wait_started_on = NULL,
 	wait_expires_on = NULL,
-	timeout_on = NULL
+	timeout_on = NULL,
+	current_flow_id = NULL
 WHERE
 	id = ANY ($1) AND status = 'W'
 `
@@ -1178,7 +1180,8 @@ SET
 	ended_on = $3,
 	wait_started_on = NULL,
 	wait_expires_on = NULL,
-	timeout_on = NULL
+	timeout_on = NULL,
+	current_flow_id = NULL
 WHERE
 	id = ANY (SELECT id FROM flows_flowsession WHERE session_type = $1 AND contact_id = ANY($2) AND status = 'W')
 `
@@ -1224,7 +1227,8 @@ const expireSessionsSQL = `
 		ended_on = NOW(),
 		wait_started_on = NULL,
 		wait_expires_on = NULL,
-		timeout_on = NULL
+		timeout_on = NULL,
+		current_flow_id = NULL
 	WHERE
 		id = ANY($1)
 `

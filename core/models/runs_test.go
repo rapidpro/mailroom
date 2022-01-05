@@ -27,7 +27,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	flowJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[0]")
 	require.NoError(t, err)
-	testdata.InsertFlow(db, testdata.Org1, flowJSON)
+	flow := testdata.InsertFlow(db, testdata.Org1, flowJSON)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
@@ -54,6 +54,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.Equal(t, models.FlowTypeMessaging, session.SessionType())
 	assert.Equal(t, testdata.Bob.ID, session.ContactID())
 	assert.Equal(t, models.SessionStatusWaiting, session.Status())
+	assert.Equal(t, flow.ID, session.CurrentFlowID())
 	assert.NotNil(t, session.CreatedOn())
 	assert.Nil(t, session.EndedOn())
 	assert.False(t, session.Responded())
@@ -76,6 +77,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	require.NoError(t, tx.Commit())
 
 	assert.Equal(t, models.SessionStatusWaiting, session.Status())
+	assert.Equal(t, flow.ID, session.CurrentFlowID())
 	assert.True(t, session.Responded())
 	assert.NotNil(t, session.WaitStartedOn())
 	assert.NotNil(t, session.WaitExpiresOn())
@@ -96,6 +98,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	require.NoError(t, tx.Commit())
 
 	assert.Equal(t, models.SessionStatusCompleted, session.Status())
+	assert.Equal(t, models.NilFlowID, session.CurrentFlowID()) // no longer "in" a flow
 	assert.True(t, session.Responded())
 	assert.NotNil(t, session.CreatedOn())
 	assert.Nil(t, session.WaitStartedOn())
@@ -141,6 +144,7 @@ func TestSingleSprintSession(t *testing.T) {
 	assert.Equal(t, models.FlowTypeMessaging, session.SessionType())
 	assert.Equal(t, testdata.Bob.ID, session.ContactID())
 	assert.Equal(t, models.SessionStatusCompleted, session.Status())
+	assert.Equal(t, models.NilFlowID, session.CurrentFlowID())
 	assert.NotNil(t, session.CreatedOn())
 	assert.NotNil(t, session.EndedOn())
 	assert.False(t, session.Responded())
