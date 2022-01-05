@@ -204,7 +204,7 @@ func TestResume(t *testing.T) {
 
 	tcs := []struct {
 		Message       string
-		SessionStatus flows.SessionStatus
+		SessionStatus models.SessionStatus
 		RunStatus     models.RunStatus
 		Substring     string
 		PathLength    int
