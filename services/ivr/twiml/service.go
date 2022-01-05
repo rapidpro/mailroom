@@ -19,7 +19,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/ivr"
@@ -365,7 +364,7 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// get our response
-	response, err := ResponseForSprint(rt.Config, number, resumeURL, session.Wait(), sprint.Events(), true)
+	response, err := ResponseForSprint(rt.Config, number, resumeURL, sprint.Events(), true)
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -445,9 +444,10 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 
 // TWIML building utilities
 
-func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, w flows.ActivatedWait, es []flows.Event, indent bool) (string, error) {
+func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, es []flows.Event, indent bool) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
+	hasWait := false
 
 	for _, e := range es {
 		switch event := e.(type) {
@@ -467,14 +467,10 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, w
 					commands = append(commands, Play{URL: a.URL()})
 				}
 			}
-		}
-	}
 
-	if w != nil {
-		switch wait := w.(type) {
-
-		case *waits.ActivatedMsgWait:
-			switch hint := wait.Hint().(type) {
+		case *events.MsgWaitEvent:
+			hasWait = true
+			switch hint := event.Hint.(type) {
 			case *hints.DigitsHint:
 				resumeURL = resumeURL + "&wait_type=gather"
 				gather := &Gather{
@@ -496,21 +492,18 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, w
 				r.Commands = commands
 
 			default:
-				return "", errors.Errorf("unable to use hint in IVR call, unknow type: %s", wait.Hint().Type())
+				return "", errors.Errorf("unable to use hint in IVR call, unknown type: %s", event.Hint.Type())
 			}
 
-		case *waits.ActivatedDialWait:
-			dial := Dial{Action: resumeURL + "&wait_type=dial", Number: wait.URN().Path()}
-			if w.TimeoutSeconds() != nil {
-				dial.Timeout = *w.TimeoutSeconds()
-			}
+		case *events.DialWaitEvent:
+			hasWait = true
+			dial := Dial{Action: resumeURL + "&wait_type=dial", Number: event.URN.Path()}
 			commands = append(commands, dial)
 			r.Commands = commands
-
-		default:
-			return "", fmt.Errorf("unable to use wait type in Twilio call: %x", w)
 		}
-	} else {
+	}
+
+	if !hasWait {
 		// no wait? call is over, hang up
 		commands = append(commands, Hangup{})
 		r.Commands = commands

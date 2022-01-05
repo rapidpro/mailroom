@@ -138,9 +138,6 @@ type Session struct {
 	// the scene for our event hooks
 	scene *Scene
 
-	// we also keep around a reference to the wait (if any)
-	wait flows.ActivatedWait
-
 	findStep func(flows.StepUUID) (flows.FlowRun, flows.Step)
 }
 
@@ -229,11 +226,6 @@ func (s *Session) Runs() []*FlowRun {
 // Sprint returns the sprint associated with this session
 func (s *Session) Sprint() flows.Sprint {
 	return s.sprint
-}
-
-// Wait returns the wait associated with this session (if any)
-func (s *Session) Wait() flows.ActivatedWait {
-	return s.wait
 }
 
 // FindStep finds the run and step with the given UUID
@@ -390,7 +382,6 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	session.scene = NewSceneForSession(session)
 
 	session.sprint = sprint
-	session.wait = fs.Wait()
 	session.findStep = fs.FindStep
 
 	// now build up our runs
@@ -414,7 +405,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	}
 
 	// calculate our timeout if any
-	session.calculateTimeout(fs, sprint)
+	session.updateWait(sprint.Events())
 
 	return session, nil
 }
@@ -536,22 +527,25 @@ func (s *Session) FlowSession(cfg *runtime.Config, sa flows.SessionAssets, env e
 	return session, nil
 }
 
-// calculates the timeout value for this session based on our waits
-func (s *Session) calculateTimeout(fs flows.Session, sprint flows.Sprint) {
-	// if we are on a wait and it has a timeout
-	if fs.Wait() != nil && fs.Wait().TimeoutSeconds() != nil {
-		now := time.Now()
-		s.s.WaitStartedOn = &now
+// looks for a wait event and updates wait fields if one exists
+func (s *Session) updateWait(evts []flows.Event) {
+	s.s.WaitStartedOn = nil
+	s.s.TimeoutOn = nil
+	s.timeout = nil
 
-		seconds := time.Duration(*fs.Wait().TimeoutSeconds()) * time.Second
-		s.timeout = &seconds
+	for _, e := range evts {
+		switch typed := e.(type) {
+		case *events.MsgWaitEvent:
+			if typed.TimeoutSeconds != nil {
+				now := time.Now()
+				seconds := time.Duration(*typed.TimeoutSeconds) * time.Second
+				timeoutOn := now.Add(seconds)
 
-		timeoutOn := now.Add(seconds)
-		s.s.TimeoutOn = &timeoutOn
-	} else {
-		s.s.WaitStartedOn = nil
-		s.s.TimeoutOn = nil
-		s.timeout = nil
+				s.s.WaitStartedOn = &now
+				s.s.TimeoutOn = &timeoutOn
+				s.timeout = &seconds
+			}
+		}
 	}
 }
 
@@ -586,12 +580,11 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 		s.runs = append(s.runs, run)
 	}
 
-	// calculate our new timeout
-	s.calculateTimeout(fs, sprint)
+	// update wait related fields
+	s.updateWait(sprint.Events())
 
 	// set our sprint, wait and step finder
 	s.sprint = sprint
-	s.wait = fs.Wait()
 	s.findStep = fs.FindStep
 
 	// run through our runs to figure out our current flow
