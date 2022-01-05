@@ -62,6 +62,10 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.NotNil(t, session.WaitExpiresOn())
 	assert.NotNil(t, session.Timeout())
 
+	// check that matches what is in the db
+	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on FROM flows_flowsession`).
+		Columns(map[string]interface{}{"status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "responded": false, "ended_on": nil})
+
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
 
@@ -105,6 +109,10 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.Nil(t, session.WaitExpiresOn())
 	assert.Nil(t, session.Timeout())
 	assert.NotNil(t, session.EndedOn())
+
+	// check that matches what is in the db
+	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
+		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": true})
 }
 
 func TestSingleSprintSession(t *testing.T) {
@@ -151,4 +159,8 @@ func TestSingleSprintSession(t *testing.T) {
 	assert.Nil(t, session.WaitStartedOn())
 	assert.Nil(t, session.WaitExpiresOn())
 	assert.Nil(t, session.Timeout())
+
+	// check that matches what is in the db
+	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
+		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": false})
 }

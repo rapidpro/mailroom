@@ -223,7 +223,7 @@ func TestMsgEvents(t *testing.T) {
 	previous := time.Now()
 
 	// and should have failed previous session
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F' and current_flow_id = $2`, testdata.Org2Contact.ID, testdata.Org2Favorites.ID).Returns(2)
+	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F'`, testdata.Org2Contact.ID).Returns(2)
 
 	// trigger should also not start a new session
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start")
