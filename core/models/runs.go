@@ -38,11 +38,11 @@ type FlowRunID int64
 const NilFlowRunID = FlowRunID(0)
 
 const (
-	SessionStatusWaiting     = "W"
-	SessionStatusCompleted   = "C"
-	SessionStatusExpired     = "X"
-	SessionStatusInterrupted = "I"
-	SessionStatusFailed      = "F"
+	SessionStatusWaiting     SessionStatus = "W"
+	SessionStatusCompleted   SessionStatus = "C"
+	SessionStatusExpired     SessionStatus = "X"
+	SessionStatusInterrupted SessionStatus = "I"
+	SessionStatusFailed      SessionStatus = "F"
 )
 
 var sessionStatusMap = map[flows.SessionStatus]SessionStatus{
@@ -54,12 +54,12 @@ var sessionStatusMap = map[flows.SessionStatus]SessionStatus{
 type RunStatus string
 
 const (
-	RunStatusActive      = "A"
-	RunStatusWaiting     = "W"
-	RunStatusCompleted   = "C"
-	RunStatusExpired     = "X"
-	RunStatusInterrupted = "I"
-	RunStatusFailed      = "F"
+	RunStatusActive      RunStatus = "A"
+	RunStatusWaiting     RunStatus = "W"
+	RunStatusCompleted   RunStatus = "C"
+	RunStatusExpired     RunStatus = "X"
+	RunStatusInterrupted RunStatus = "I"
+	RunStatusFailed      RunStatus = "F"
 )
 
 var runStatusMap = map[flows.RunStatus]RunStatus{
@@ -72,7 +72,7 @@ var runStatusMap = map[flows.RunStatus]RunStatus{
 
 type ExitType = null.String
 
-var (
+const (
 	ExitInterrupted = ExitType("I")
 	ExitCompleted   = ExitType("C")
 	ExitExpired     = ExitType("E")
@@ -378,6 +378,11 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	s.OrgID = org.OrgID()
 	s.CreatedOn = fs.Runs()[0].CreatedOn()
 
+	if s.Status != SessionStatusWaiting {
+		now := time.Now()
+		s.EndedOn = &now
+	}
+
 	session.contact = fs.Contact()
 	session.scene = NewSceneForSession(session)
 
@@ -549,8 +554,8 @@ func (s *Session) updateWait(evts []flows.Event) {
 	}
 }
 
-// WriteUpdatedSession updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
-func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
+// Update updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
+func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
 	// make sure we have our seen runs
 	if s.seenRuns == nil {
 		return errors.Errorf("missing seen runs, cannot update session")
@@ -568,6 +573,11 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 		return errors.Errorf("unknown session status: %s", fs.Status())
 	}
 	s.s.Status = status
+
+	if s.s.Status != SessionStatusWaiting {
+		now := time.Now()
+		s.s.EndedOn = &now
+	}
 
 	// now build up our runs
 	for _, r := range fs.Runs() {
@@ -713,7 +723,7 @@ SET
 	output = :output, 
 	output_url = :output_url,
 	status = :status, 
-	ended_on = CASE WHEN :status = 'W' THEN NULL ELSE NOW() END,
+	ended_on = :ended_on,
 	responded = :responded,
 	current_flow_id = :current_flow_id,
 	timeout_on = :timeout_on,
@@ -728,7 +738,7 @@ UPDATE
 SET 
 	output_url = :output_url,
 	status = :status, 
-	ended_on = CASE WHEN :status = 'W' THEN NULL ELSE NOW() END,
+	ended_on = :ended_on,
 	responded = :responded,
 	current_flow_id = :current_flow_id,
 	timeout_on = :timeout_on,
@@ -865,7 +875,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	// apply our all events for the session
 	scenes := make([]*Scene, 0, len(ss))
 	for i := range sessions {
-		if ss[i].Status() == SessionStatusFailed {
+		if ss[i].Status() == flows.SessionStatusFailed {
 			continue
 		}
 
