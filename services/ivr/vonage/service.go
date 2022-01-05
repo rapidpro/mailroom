@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
@@ -388,7 +389,7 @@ func (s *service) RequestCall(number urns.URN, resumeURL string, statusURL strin
 	}
 
 	if trace.Response.StatusCode != http.StatusCreated {
-		return ivr.NilCallID, trace, errors.Errorf("received non 200 status for call start: %d", trace.Response.StatusCode)
+		return ivr.NilCallID, trace, errors.Errorf("received non 201 status for call start: %d", trace.Response.StatusCode)
 	}
 
 	// parse out our call sid
@@ -652,11 +653,7 @@ func (s *service) MakeEmptyResponseBody(msg string) []byte {
 }
 
 func (s *service) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
-	bb, err := json.Marshal(body)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error json encoding request")
-	}
-
+	bb := jsonx.MustMarshal(body)
 	req, _ := http.NewRequest(method, sendURL, bytes.NewReader(bb))
 	token, err := s.generateToken()
 	if err != nil {

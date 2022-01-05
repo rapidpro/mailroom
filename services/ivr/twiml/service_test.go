@@ -94,6 +94,12 @@ func TestResponseForSprint(t *testing.T) {
 			},
 			`<Response><Say>say something</Say><Record action="http://temba.io/resume?session=1&amp;wait_type=record" maxLength="600"></Record><Redirect>http://temba.io/resume?session=1&amp;wait_type=record&amp;empty=true</Redirect></Response>`,
 		},
+		{
+			[]flows.Event{
+				events.NewDialWait(urns.URN(`tel:+1234567890`)),
+			},
+			`<Response><Dial action="http://temba.io/resume?session=1&amp;wait_type=dial">+1234567890</Dial></Response>`,
+		},
 	}
 
 	for i, tc := range tcs {

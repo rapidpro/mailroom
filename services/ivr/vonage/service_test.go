@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -16,15 +17,22 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResponseForSprint(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	rc := rp.Get()
-	defer rc.Close()
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://api.nexmo.com/v1/calls": {
+			httpx.NewMockResponse(201, nil, `{"uuid": "63f61863-4a51-4f6b-86e1-46edebcf9356", "status": "started", "direction": "outbound"}`),
+		},
+	}))
 
 	urn := urns.URN("tel:+12067799294")
 	channelRef := assets.NewChannelReference(testdata.VonageChannel.UUID, "Vonage Channel")
@@ -41,15 +49,18 @@ func TestResponseForSprint(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(0))
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	channel := oa.ChannelByUUID(testdata.VonageChannel.UUID)
 	assert.NotNil(t, channel)
 
 	p, err := NewServiceFromChannel(http.DefaultClient, channel)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	provider := p.(*service)
+
+	conn, err := models.InsertIVRConnection(ctx, db, testdata.Org1.ID, testdata.VonageChannel.ID, models.NilStartID, testdata.Bob.ID, testdata.Bob.URNID, models.ConnectionDirectionOut, models.ConnectionStatusInProgress, "EX123")
+	require.NoError(t, err)
 
 	indentMarshal = false
 
@@ -103,10 +114,16 @@ func TestResponseForSprint(t *testing.T) {
 			},
 			`[{"action":"talk","text":"say something"},{"action":"record","endOnKey":"#","timeOut":600,"endOnSilence":5,"eventUrl":["http://temba.io/resume?session=1\u0026wait_type=recording_url\u0026recording_uuid=f3ede2d6-becc-4ea3-ae5e-88526a9f4a57\u0026sig=Am9z7fXyU3SPCZagkSpddZSi6xY%3D"],"eventMethod":"POST"},{"action":"input","submitOnHash":true,"timeOut":1,"eventUrl":["http://temba.io/resume?session=1\u0026wait_type=record\u0026recording_uuid=f3ede2d6-becc-4ea3-ae5e-88526a9f4a57\u0026sig=fX1RhjcJNN4xYaiojVYakaz5F%2Fk%3D"],"eventMethod":"POST"}]`,
 		},
+		{
+			[]flows.Event{
+				events.NewDialWait(urns.URN(`tel:+1234567890`)),
+			},
+			`[{"action":"conversation","name":"8bcb9ef2-d4a6-4314-b68d-6d299761ea9e"}]`,
+		},
 	}
 
 	for i, tc := range tcs {
-		response, err := provider.responseForSprint(ctx, rp, channel, nil, resumeURL, tc.events)
+		response, err := provider.responseForSprint(ctx, rp, channel, conn, resumeURL, tc.events)
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, tc.expected, response, "%d: unexpected response", i)
 	}
