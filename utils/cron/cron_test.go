@@ -48,7 +48,7 @@ func TestCron(t *testing.T) {
 	cron.Start(quit, rt, "test1", time.Millisecond*250, false, createCronFunc(&running, &fired, map[int]time.Duration{}, time.Millisecond*100))
 
 	// wait a bit, should only have fired three times (initial time + three repeats)
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Millisecond * 875) // time for 3 delays between tasks plus half of another delay
 	assert.Equal(t, 4, fired)
 
 	// tell the job to quit and check we don't see more fires
@@ -66,7 +66,7 @@ func TestCron(t *testing.T) {
 	// simulate the job taking 400ms to run on the second fire, thus skipping the third fire
 	cron.Start(quit, rt, "test2", time.Millisecond*250, false, createCronFunc(&running, &fired, map[int]time.Duration{1: time.Millisecond * 400}, time.Millisecond*100))
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Millisecond * 875)
 	assert.Equal(t, 3, fired)
 
 	close(quit)
@@ -92,7 +92,7 @@ func TestCron(t *testing.T) {
 	cron.Start(quit, &rt2, "test3", time.Millisecond*250, false, createCronFunc(&running, &fired2, map[int]time.Duration{}, time.Millisecond*100))
 
 	// same number of fires as if only a single instance was running it...
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Millisecond * 875)
 	assert.Equal(t, 4, fired1+fired2) // can't say which instances will run the 4 fires
 
 	close(quit)
@@ -110,7 +110,7 @@ func TestCron(t *testing.T) {
 	cron.Start(quit, &rt2, "test4", time.Millisecond*250, true, createCronFunc(&running2, &fired2, map[int]time.Duration{}, time.Millisecond*100))
 
 	// now both instances fire 4 times
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Millisecond * 875)
 	assert.Equal(t, 4, fired1)
 	assert.Equal(t, 4, fired2)
 

@@ -14,12 +14,10 @@ msgstr ""
 msgid "All Responses"
 msgstr ""
 
-#: Favorites/8d2e259c-bc3c-464f-8c15-985bc736e212/arguments:0
 #: Favorites/baf07ebb-8a2a-4e63-aa08-d19aa408cd45/name:0
 msgid "Blue"
 msgstr ""
 
-#: Favorites/3e2dcf45-ffc0-4197-b5ab-25ed974ea612/arguments:0
 #: Favorites/6e367c0c-65ab-479a-82e3-c597d8e35eef/name:0
 msgid "Cyan"
 msgstr ""
@@ -28,7 +26,6 @@ msgstr ""
 msgid "Good choice, I like @results.color.category_localized too! What is your favorite beer?"
 msgstr ""
 
-#: Favorites/34a421ac-34cb-49d8-a2a5-534f52c60851/arguments:0
 #: Favorites/c102acfc-8cc5-41fa-89ed-41cbfa362ba6/name:0
 msgid "Green"
 msgstr ""
@@ -45,13 +42,8 @@ msgstr ""
 msgid "Mmmmm... delicious @results.beer.category_localized. If only they made @(lower(results.color)) @results.beer.category_localized! Lastly, what is your name?"
 msgstr ""
 
-#: Favorites/a03dceb1-7ac1-491d-93ef-23d3e099633b/arguments:0
 #: Favorites/b9d718d3-b5e0-4d26-998e-2da31b24f2f9/name:0
 msgid "Mutzig"
-msgstr ""
-
-#: Favorites/3b400f91-db69-42b9-9fe2-24ad556b067a/arguments:0
-msgid "Navy"
 msgstr ""
 
 #: Favorites/7624633a-01a9-48f0-abca-957e7290df0a/name:0
@@ -63,18 +55,15 @@ msgstr ""
 msgid "Other"
 msgstr ""
 
-#: Favorites/58119801-ed31-4538-888d-23779a01707f/arguments:0
 #: Favorites/f1ca9ac8-d0aa-4758-a969-195be7330267/name:0
 msgid "Primus"
 msgstr ""
 
 #: Favorites/58284598-805a-4740-8966-dcb09e3b670a/name:0
-#: Favorites/b0c29972-6fd4-485e-83c2-057a3f7a04da/arguments:0
 msgid "Red"
 msgstr ""
 
 #: Favorites/52d7a9ab-52b7-4e82-ba7f-672fb8d6ec91/name:0
-#: Favorites/ada3d96a-a1a2-41eb-aac7-febdb98a9b4c/arguments:0
 msgid "Skol"
 msgstr ""
 
@@ -86,7 +75,6 @@ msgstr ""
 msgid "Thanks @results.name, we are all done!"
 msgstr ""
 
-#: Favorites/2ba89eb6-6981-4c0d-a19d-3cf1fde52a43/arguments:0
 #: Favorites/dbc3b9d2-e6ce-4ebe-9552-8ddce482c1d1/name:0
 msgid "Turbo King"
 msgstr ""
