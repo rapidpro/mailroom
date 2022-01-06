@@ -27,7 +27,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	flowJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[0]")
 	require.NoError(t, err)
-	testdata.InsertFlow(db, testdata.Org1, flowJSON)
+	flow := testdata.InsertFlow(db, testdata.Org1, flowJSON)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
@@ -54,11 +54,17 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.Equal(t, models.FlowTypeMessaging, session.SessionType())
 	assert.Equal(t, testdata.Bob.ID, session.ContactID())
 	assert.Equal(t, models.SessionStatusWaiting, session.Status())
+	assert.Equal(t, flow.ID, session.CurrentFlowID())
 	assert.NotNil(t, session.CreatedOn())
 	assert.Nil(t, session.EndedOn())
 	assert.False(t, session.Responded())
 	assert.NotNil(t, session.WaitStartedOn())
+	assert.NotNil(t, session.WaitExpiresOn())
 	assert.NotNil(t, session.Timeout())
+
+	// check that matches what is in the db
+	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on FROM flows_flowsession`).
+		Columns(map[string]interface{}{"status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "responded": false, "ended_on": nil})
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
@@ -75,8 +81,10 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	require.NoError(t, tx.Commit())
 
 	assert.Equal(t, models.SessionStatusWaiting, session.Status())
+	assert.Equal(t, flow.ID, session.CurrentFlowID())
 	assert.True(t, session.Responded())
-	assert.Nil(t, session.WaitStartedOn())
+	assert.NotNil(t, session.WaitStartedOn())
+	assert.NotNil(t, session.WaitExpiresOn())
 	assert.Nil(t, session.Timeout()) // this wait doesn't have a timeout
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
@@ -94,9 +102,17 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	require.NoError(t, tx.Commit())
 
 	assert.Equal(t, models.SessionStatusCompleted, session.Status())
+	assert.Equal(t, models.NilFlowID, session.CurrentFlowID()) // no longer "in" a flow
 	assert.True(t, session.Responded())
 	assert.NotNil(t, session.CreatedOn())
+	assert.Nil(t, session.WaitStartedOn())
+	assert.Nil(t, session.WaitExpiresOn())
+	assert.Nil(t, session.Timeout())
 	assert.NotNil(t, session.EndedOn())
+
+	// check that matches what is in the db
+	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
+		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": true})
 }
 
 func TestSingleSprintSession(t *testing.T) {
@@ -136,9 +152,15 @@ func TestSingleSprintSession(t *testing.T) {
 	assert.Equal(t, models.FlowTypeMessaging, session.SessionType())
 	assert.Equal(t, testdata.Bob.ID, session.ContactID())
 	assert.Equal(t, models.SessionStatusCompleted, session.Status())
+	assert.Equal(t, models.NilFlowID, session.CurrentFlowID())
 	assert.NotNil(t, session.CreatedOn())
 	assert.NotNil(t, session.EndedOn())
 	assert.False(t, session.Responded())
 	assert.Nil(t, session.WaitStartedOn())
+	assert.Nil(t, session.WaitExpiresOn())
 	assert.Nil(t, session.Timeout())
+
+	// check that matches what is in the db
+	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
+		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": false})
 }

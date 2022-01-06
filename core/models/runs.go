@@ -114,6 +114,7 @@ type Session struct {
 		EndedOn       *time.Time        `db:"ended_on"`
 		TimeoutOn     *time.Time        `db:"timeout_on"`
 		WaitStartedOn *time.Time        `db:"wait_started_on"`
+		WaitExpiresOn *time.Time        `db:"wait_expires_on"`
 		CurrentFlowID FlowID            `db:"current_flow_id"`
 		ConnectionID  *ConnectionID     `db:"connection_id"`
 	}
@@ -155,6 +156,7 @@ func (s *Session) EndedOn() *time.Time                { return s.s.EndedOn }
 func (s *Session) TimeoutOn() *time.Time              { return s.s.TimeoutOn }
 func (s *Session) ClearTimeoutOn()                    { s.s.TimeoutOn = nil }
 func (s *Session) WaitStartedOn() *time.Time          { return s.s.WaitStartedOn }
+func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
@@ -490,29 +492,29 @@ LIMIT 1
 
 const insertCompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded, output, output_url, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
-               VALUES(:uuid,:session_type,:status,:responded,:output,:output_url,:contact_id,:org_id, NOW(),      NOW(),    NULL,           :connection_id)
+	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, ended_on, connection_id)
+               VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),      NOW(),   :connection_id)
 RETURNING id
 `
 
 const insertIncompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded, output, output_url, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
-               VALUES(:uuid,:session_type,:status,:responded,:output,:output_url,:contact_id,:org_id, NOW(),     :current_flow_id,:timeout_on,:wait_started_on,:connection_id)
+	flows_flowsession( uuid, session_type, status, responded,  output,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :connection_id)
 RETURNING id
 `
 
 const insertCompleteSessionSQLNoOutput = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded, output_url, contact_id, org_id, created_on, ended_on, wait_started_on, connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output_url,:contact_id,:org_id, NOW(),      NOW(),    NULL,           :connection_id)
+	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, ended_on,  connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),      NOW(),    :connection_id)
 RETURNING id
 `
 
 const insertIncompleteSessionSQLNoOutput = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded,  output_url, contact_id, org_id, created_on, current_flow_id, timeout_on, wait_started_on, connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output_url,:contact_id,:org_id, NOW(),     :current_flow_id,:timeout_on,:wait_started_on,:connection_id)
+	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :connection_id)
 RETURNING id
 `
 
@@ -535,18 +537,21 @@ func (s *Session) FlowSession(cfg *runtime.Config, sa flows.SessionAssets, env e
 // looks for a wait event and updates wait fields if one exists
 func (s *Session) updateWait(evts []flows.Event) {
 	s.s.WaitStartedOn = nil
+	s.s.WaitExpiresOn = nil
 	s.s.TimeoutOn = nil
 	s.timeout = nil
 
 	for _, e := range evts {
 		switch typed := e.(type) {
 		case *events.MsgWaitEvent:
+			now := time.Now()
+			s.s.WaitStartedOn = &now
+			s.s.WaitExpiresOn = typed.ExpiresOn
+
 			if typed.TimeoutSeconds != nil {
-				now := time.Now()
 				seconds := time.Duration(*typed.TimeoutSeconds) * time.Second
 				timeoutOn := now.Add(seconds)
 
-				s.s.WaitStartedOn = &now
 				s.s.TimeoutOn = &timeoutOn
 				s.timeout = &seconds
 			}
@@ -596,6 +601,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	// set our sprint, wait and step finder
 	s.sprint = sprint
 	s.findStep = fs.FindStep
+	s.s.CurrentFlowID = NilFlowID
 
 	// run through our runs to figure out our current flow
 	for _, r := range fs.Runs() {
@@ -726,8 +732,9 @@ SET
 	ended_on = :ended_on,
 	responded = :responded,
 	current_flow_id = :current_flow_id,
-	timeout_on = :timeout_on,
-	wait_started_on = :wait_started_on
+	wait_started_on = :wait_started_on,
+	wait_expires_on = :wait_expires_on,
+	timeout_on = :timeout_on
 WHERE 
 	id = :id
 `
@@ -741,8 +748,9 @@ SET
 	ended_on = :ended_on,
 	responded = :responded,
 	current_flow_id = :current_flow_id,
-	timeout_on = :timeout_on,
-	wait_started_on = :wait_started_on
+	wait_started_on = :wait_started_on,
+	wait_expires_on = :wait_expires_on,
+	timeout_on = :timeout_on
 WHERE 
 	id = :id
 `
@@ -1111,11 +1119,14 @@ const exitSessionsSQL = `
 UPDATE
 	flows_flowsession
 SET
+	status = $3,
 	ended_on = $2,
-	status = $3
+	wait_started_on = NULL,
+	wait_expires_on = NULL,
+	timeout_on = NULL,
+	current_flow_id = NULL
 WHERE
-	id = ANY ($1) AND
-	status = 'W'
+	id = ANY ($1) AND status = 'W'
 `
 
 // InterruptContactRuns interrupts all runs and sesions that exist for the passed in list of contacts
@@ -1166,7 +1177,11 @@ UPDATE
 	flows_flowsession
 SET
 	status = 'I',
-	ended_on = $3
+	ended_on = $3,
+	wait_started_on = NULL,
+	wait_expires_on = NULL,
+	timeout_on = NULL,
+	current_flow_id = NULL
 WHERE
 	id = ANY (SELECT id FROM flows_flowsession WHERE session_type = $1 AND contact_id = ANY($2) AND status = 'W')
 `
@@ -1208,9 +1223,12 @@ const expireSessionsSQL = `
 	UPDATE
 		flows_flowsession s
 	SET
-		timeout_on = NULL,
+		status = 'X',
 		ended_on = NOW(),
-		status = 'X'
+		wait_started_on = NULL,
+		wait_expires_on = NULL,
+		timeout_on = NULL,
+		current_flow_id = NULL
 	WHERE
 		id = ANY($1)
 `
