@@ -77,8 +77,7 @@ func TestCampaignStarts(t *testing.T) {
 	testsuite.AssertQuery(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
 		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
-		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-		 AND session_id IS NOT NULL`,
+		 AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`,
 		pq.Array(contacts), testdata.CampaignFlow.ID).Returns(2, "expected only two runs to be created")
 
 	testsuite.AssertQuery(t, db,
@@ -157,8 +156,7 @@ func TestBatchStart(t *testing.T) {
 		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
 			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
-			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-			AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
+			AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
 			Returns(tc.TotalCount, "%d: unexpected number of runs", i)
 
 		testsuite.AssertQuery(t, db,
@@ -208,11 +206,10 @@ func TestResume(t *testing.T) {
 		RunStatus     models.RunStatus
 		Substring     string
 		PathLength    int
-		EventLength   int
 	}{
-		{"Red", models.SessionStatusWaiting, models.RunStatusWaiting, "%I like Red too%", 4, 3},
-		{"Mutzig", models.SessionStatusWaiting, models.RunStatusWaiting, "%they made red Mutzig%", 6, 5},
-		{"Luke", models.SessionStatusCompleted, models.RunStatusCompleted, "%Thanks Luke%", 7, 7},
+		{"Red", models.SessionStatusWaiting, models.RunStatusWaiting, "%I like Red too%", 4},
+		{"Mutzig", models.SessionStatusWaiting, models.RunStatusWaiting, "%they made red Mutzig%", 6},
+		{"Luke", models.SessionStatusCompleted, models.RunStatusCompleted, "%Thanks Luke%", 7},
 	}
 
 	session := sessions[0]
@@ -235,8 +232,7 @@ func TestResume(t *testing.T) {
 
 		runQuery := `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
 		 AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
-		 AND json_array_length(path::json) = $5 AND json_array_length(events::json) = $6 
-		 AND session_id IS NOT NULL`
+		 AND json_array_length(path::json) = $5 AND session_id IS NOT NULL`
 
 		if runIsActive {
 			runQuery += ` AND expires_on IS NOT NULL`
@@ -244,7 +240,7 @@ func TestResume(t *testing.T) {
 			runQuery += ` AND expires_on IS NULL`
 		}
 
-		testsuite.AssertQuery(t, db, runQuery, contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength, tc.EventLength).
+		testsuite.AssertQuery(t, db, runQuery, contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength).
 			Returns(1, "%d: didn't find expected run", i)
 
 		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, contact.ID(), tc.Substring).
