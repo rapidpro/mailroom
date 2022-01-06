@@ -1,3 +1,10 @@
+v7.1.23
+----------
+ * Session.CurrentFlowID whould be cleared when session exits
+ * Start writing FlowSession.wait_expires_on
+ * Update to latest goflow which removes activated waits
+ * Clamp flow expiration values to valid ranges when loading flows
+
 v7.1.22
 ----------
  * Replace redisx package with new dependency
