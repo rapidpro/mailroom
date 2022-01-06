@@ -37,6 +37,9 @@ func TestCron(t *testing.T) {
 	quit := make(chan bool)
 	running := false
 
+	untilNextSecond := time.Nanosecond * time.Duration(1_000_000_000-time.Now().Nanosecond()) // time until next second boundary
+	time.Sleep(untilNextSecond + time.Millisecond*5)                                          // wait until test 5 millis after second boundary
+
 	// start a job that takes ~100 ms and runs every 250ms
 	cron.Start(quit, rt, "test1", time.Millisecond*250, false, createCronFunc(&running, &fired, map[int]time.Duration{}, time.Millisecond*100))
 
