@@ -15,6 +15,11 @@ func TestCron(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetRedis)
 
+	align := func() {
+		untilNextSecond := time.Nanosecond * time.Duration(1_000_000_000-time.Now().Nanosecond()) // time until next second boundary
+		time.Sleep(untilNextSecond)                                                               // wait until after second boundary
+	}
+
 	createCronFunc := func(running *bool, fired *int, delays map[int]time.Duration, defaultDelay time.Duration) cron.Function {
 		return func() error {
 			if *running {
@@ -37,8 +42,7 @@ func TestCron(t *testing.T) {
 	quit := make(chan bool)
 	running := false
 
-	untilNextSecond := time.Nanosecond * time.Duration(1_000_000_000-time.Now().Nanosecond()) // time until next second boundary
-	time.Sleep(untilNextSecond + time.Millisecond*5)                                          // wait until test 5 millis after second boundary
+	align()
 
 	// start a job that takes ~100 ms and runs every 250ms
 	cron.Start(quit, rt, "test1", time.Millisecond*250, false, createCronFunc(&running, &fired, map[int]time.Duration{}, time.Millisecond*100))
@@ -56,6 +60,8 @@ func TestCron(t *testing.T) {
 	fired = 0
 	quit = make(chan bool)
 	running = false
+
+	align()
 
 	// simulate the job taking 400ms to run on the second fire, thus skipping the third fire
 	cron.Start(quit, rt, "test2", time.Millisecond*250, false, createCronFunc(&running, &fired, map[int]time.Duration{1: time.Millisecond * 400}, time.Millisecond*100))
@@ -80,6 +86,8 @@ func TestCron(t *testing.T) {
 	quit = make(chan bool)
 	running = false
 
+	align()
+
 	cron.Start(quit, &rt1, "test3", time.Millisecond*250, false, createCronFunc(&running, &fired1, map[int]time.Duration{}, time.Millisecond*100))
 	cron.Start(quit, &rt2, "test3", time.Millisecond*250, false, createCronFunc(&running, &fired2, map[int]time.Duration{}, time.Millisecond*100))
 
@@ -94,6 +102,8 @@ func TestCron(t *testing.T) {
 	quit = make(chan bool)
 	running1 := false
 	running2 := false
+
+	align()
 
 	// unless we start the cron with allInstances = true
 	cron.Start(quit, &rt1, "test4", time.Millisecond*250, true, createCronFunc(&running1, &fired1, map[int]time.Duration{}, time.Millisecond*100))
