@@ -152,8 +152,8 @@ func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
-func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
-	ticketer := org.TicketerByID(t.t.TicketerID)
+func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
+	ticketer := oa.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
 	}
