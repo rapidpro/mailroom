@@ -854,7 +854,7 @@ INSERT INTO
 `
 
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
-func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
+func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
 	// converst our translations to our type
 	translations := make(map[envs.Language]*BroadcastTranslation)
 	for l, t := range event.Translations {
@@ -866,7 +866,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 	}
 
 	// resolve our contact references
-	contactIDs, err := GetContactIDsFromReferences(ctx, tx, org.OrgID(), event.Contacts)
+	contactIDs, err := GetContactIDsFromReferences(ctx, tx, oa.OrgID(), event.Contacts)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error resolving contact references")
 	}
@@ -874,13 +874,13 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 	// and our groups
 	groupIDs := make([]GroupID, 0, len(event.Groups))
 	for i := range event.Groups {
-		group := org.GroupByUUID(event.Groups[i].UUID)
+		group := oa.GroupByUUID(event.Groups[i].UUID)
 		if group != nil {
 			groupIDs = append(groupIDs, group.ID())
 		}
 	}
 
-	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID), nil
+	return NewBroadcast(oa.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {

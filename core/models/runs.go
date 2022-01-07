@@ -134,7 +134,7 @@ type Session struct {
 	// the scene for our event hooks
 	scene *Scene
 
-	findStep func(flows.StepUUID) (flows.FlowRun, flows.Step)
+	findStep func(flows.StepUUID) (flows.Run, flows.Step)
 }
 
 func (s *Session) ID() SessionID                      { return s.s.ID }
@@ -226,7 +226,7 @@ func (s *Session) Sprint() flows.Sprint {
 }
 
 // FindStep finds the run and step with the given UUID
-func (s *Session) FindStep(uuid flows.StepUUID) (flows.FlowRun, flows.Step) {
+func (s *Session) FindStep(uuid flows.StepUUID) (flows.Run, flows.Step) {
 	return s.findStep(uuid)
 }
 
@@ -302,8 +302,8 @@ type FlowRun struct {
 		ConnectionID    *ConnectionID   `db:"connection_id"`
 	}
 
-	// we keep a reference to model run as well
-	run flows.FlowRun
+	// we keep a reference to the engine's run
+	run flows.Run
 }
 
 func (r *FlowRun) SetSessionID(sessionID SessionID)     { r.r.SessionID = sessionID }
@@ -332,7 +332,7 @@ type Step struct {
 
 // NewSession a session objects from the passed in flow session. It does NOT
 // commit said session to the database.
-func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session, error) {
+func NewSession(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, fs flows.Session, sprint flows.Sprint) (*Session, error) {
 	output, err := json.Marshal(fs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error marshalling flow session")
@@ -369,7 +369,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 	s.Responded = false
 	s.Output = null.String(output)
 	s.ContactID = ContactID(fs.Contact().ID())
-	s.OrgID = org.OrgID()
+	s.OrgID = oa.OrgID()
 	s.CreatedOn = fs.Runs()[0].CreatedOn()
 
 	if s.Status != SessionStatusWaiting {
@@ -385,7 +385,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 
 	// now build up our runs
 	for _, r := range fs.Runs() {
-		run, err := newRun(ctx, tx, org, session, r)
+		run, err := newRun(ctx, tx, oa, session, r)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating run: %s", r.UUID())
 		}
@@ -395,7 +395,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 
 		// if this run is waiting, save it as the current flow
 		if r.Status() == flows.RunStatusWaiting {
-			flowID, err := FlowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
+			flowID, err := FlowIDForUUID(ctx, tx, oa, r.FlowReference().UUID)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error loading current flow for UUID: %s", r.FlowReference().UUID)
 			}
@@ -410,7 +410,7 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, fs flows.Sessi
 }
 
 // ActiveSessionForContact returns the active session for the passed in contact, if any
-func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, st storage.Storage, org *OrgAssets, sessionType FlowType, contact *flows.Contact) (*Session, error) {
+func ActiveSessionForContact(ctx context.Context, db *sqlx.DB, st storage.Storage, oa *OrgAssets, sessionType FlowType, contact *flows.Contact) (*Session, error) {
 	rows, err := db.QueryxContext(ctx, selectLastSessionSQL, sessionType, contact.ID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error selecting active session")
@@ -552,7 +552,7 @@ func (s *Session) updateWait(evts []flows.Event) {
 }
 
 // Update updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
-func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
+func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
 	// make sure we have our seen runs
 	if s.seenRuns == nil {
 		return errors.Errorf("missing seen runs, cannot update session")
@@ -578,7 +578,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 
 	// now build up our runs
 	for _, r := range fs.Runs() {
-		run, err := newRun(ctx, tx, org, s, r)
+		run, err := newRun(ctx, tx, oa, s, r)
 		if err != nil {
 			return errors.Wrapf(err, "error creating run: %s", r.UUID())
 		}
@@ -599,7 +599,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	for _, r := range fs.Runs() {
 		// if this run is waiting, save it as the current flow
 		if r.Status() == flows.RunStatusWaiting {
-			flowID, err := FlowIDForUUID(ctx, tx, org, r.FlowReference().UUID)
+			flowID, err := FlowIDForUUID(ctx, tx, oa, r.FlowReference().UUID)
 			if err != nil {
 				return errors.Wrapf(err, "error loading flow: %s", r.FlowReference().UUID)
 			}
@@ -620,7 +620,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 
 	// apply all our pre write events
 	for _, e := range sprint.Events() {
-		err := ApplyPreWriteEvent(ctx, rt, tx, org, s.scene, e)
+		err := ApplyPreWriteEvent(ctx, rt, tx, oa, s.scene, e)
 		if err != nil {
 			return errors.Wrapf(err, "error applying event: %v", e)
 		}
@@ -674,7 +674,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 
 	// call our global pre commit hook if present
 	if hook != nil {
-		err := hook(ctx, tx, rt.RP, org, []*Session{s})
+		err := hook(ctx, tx, rt.RP, oa, []*Session{s})
 		if err != nil {
 			return errors.Wrapf(err, "error calling commit hook: %v", hook)
 		}
@@ -699,14 +699,14 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 
 	// apply all our events
 	if s.Status() != SessionStatusFailed {
-		err = HandleEvents(ctx, rt, tx, org, s.scene, sprint.Events())
+		err = HandleEvents(ctx, rt, tx, oa, s.scene, sprint.Events())
 		if err != nil {
 			return errors.Wrapf(err, "error applying events: %d", s.ID())
 		}
 	}
 
 	// gather all our pre commit events, group them by hook and apply them
-	err = ApplyEventPreCommitHooks(ctx, rt, tx, org, []*Scene{s.scene})
+	err = ApplyEventPreCommitHooks(ctx, rt, tx, oa, []*Scene{s.scene})
 	if err != nil {
 		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
@@ -771,7 +771,7 @@ WHERE
 
 // WriteSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
+func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
 	if len(ss) == 0 {
 		return nil, nil
 	}
@@ -782,7 +782,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	incompleteSessionsI := make([]interface{}, 0, len(ss))
 	completedConnectionIDs := make([]ConnectionID, 0, 1)
 	for i, s := range ss {
-		session, err := NewSession(ctx, tx, org, s, sprints[i])
+		session, err := NewSession(ctx, tx, oa, s, sprints[i])
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating session objects")
 		}
@@ -801,7 +801,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	// apply all our pre write events
 	for i := range ss {
 		for _, e := range sprints[i].Events() {
-			err := ApplyPreWriteEvent(ctx, rt, tx, org, sessions[i].scene, e)
+			err := ApplyPreWriteEvent(ctx, rt, tx, oa, sessions[i].scene, e)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error applying event: %v", e)
 			}
@@ -810,7 +810,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 
 	// call our global pre commit hook if present
 	if hook != nil {
-		err := hook(ctx, tx, rt.RP, org, sessions)
+		err := hook(ctx, tx, rt.RP, oa, sessions)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error calling commit hook: %v", hook)
 		}
@@ -878,7 +878,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 			continue
 		}
 
-		err = HandleEvents(ctx, rt, tx, org, sessions[i].Scene(), sprints[i].Events())
+		err = HandleEvents(ctx, rt, tx, oa, sessions[i].Scene(), sprints[i].Events())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error applying events for session: %d", sessions[i].ID())
 		}
@@ -888,7 +888,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	}
 
 	// gather all our pre commit events, group them by hook
-	err = ApplyEventPreCommitHooks(ctx, rt, tx, org, scenes)
+	err = ApplyEventPreCommitHooks(ctx, rt, tx, oa, scenes)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
@@ -908,7 +908,7 @@ RETURNING id
 
 // newRun writes the passed in flow run to our database, also applying any events in those runs as
 // appropriate. (IE, writing db messages etc..)
-func newRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session, fr flows.FlowRun) (*FlowRun, error) {
+func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, fr flows.Run) (*FlowRun, error) {
 	// build our path elements
 	path := make([]Step, len(fr.Path()))
 	for i, p := range fr.Path() {
@@ -922,7 +922,7 @@ func newRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session, 
 		return nil, err
 	}
 
-	flowID, err := FlowIDForUUID(ctx, tx, org, fr.FlowReference().UUID)
+	flowID, err := FlowIDForUUID(ctx, tx, oa, fr.FlowReference().UUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load flow with uuid: %s", fr.FlowReference().UUID)
 	}
@@ -940,7 +940,7 @@ func newRun(ctx context.Context, tx *sqlx.Tx, org *OrgAssets, session *Session, 
 	r.FlowID = flowID
 	r.SessionID = session.ID()
 	r.StartID = NilStartID
-	r.OrgID = org.OrgID()
+	r.OrgID = oa.OrgID()
 	r.Path = string(pathJSON)
 	if len(path) > 0 {
 		r.CurrentNodeUUID = null.String(path[len(path)-1].NodeUUID)
