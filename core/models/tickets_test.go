@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -111,7 +112,7 @@ func TestTickets(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check all tickets were created
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE status = 'O' AND closed_on IS NULL`).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE status = 'O' AND closed_on IS NULL`).Returns(3)
 
 	// can lookup a ticket by UUID
 	tk1, err := models.LookupTicketByUUID(ctx, db, "2ef57efc-d85f-4291-b330-e4afe68af5fe")
@@ -143,16 +144,16 @@ func TestUpdateTicketConfig(t *testing.T) {
 	modelTicket := ticket.Load(db)
 
 	// empty configs are null
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE config IS NULL AND id = $1`, ticket.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE config IS NULL AND id = $1`, ticket.ID).Returns(1)
 
 	models.UpdateTicketConfig(ctx, db, modelTicket, map[string]string{"foo": "2352", "bar": "abc"})
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "2352", "bar": "abc"}'::jsonb AND id = $1`, ticket.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "2352", "bar": "abc"}'::jsonb AND id = $1`, ticket.ID).Returns(1)
 
 	// updates are additive
 	models.UpdateTicketConfig(ctx, db, modelTicket, map[string]string{"foo": "6547", "zed": "xyz"})
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "6547", "bar": "abc", "zed": "xyz"}'::jsonb AND id = $1`, ticket.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE config='{"foo": "6547", "bar": "abc", "zed": "xyz"}'::jsonb AND id = $1`, ticket.ID).Returns(1)
 }
 
 func TestUpdateTicketLastActivity(t *testing.T) {
@@ -172,7 +173,7 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 
 	assert.Equal(t, now, modelTicket.LastActivityOn())
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
 
 }
 
@@ -199,13 +200,13 @@ func TestTicketsAssign(t *testing.T) {
 	assert.Equal(t, models.TicketEventTypeAssigned, evts[modelTicket2].EventType())
 
 	// check tickets are now assigned
-	testsuite.AssertQuery(t, db, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket1.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
-	testsuite.AssertQuery(t, db, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket2.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
+	assertdb.Query(t, db, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket1.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
+	assertdb.Query(t, db, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket2.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
 
 	// and there are new assigned events
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A' AND note = 'please handle these'`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A' AND note = 'please handle these'`).Returns(2)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_notification WHERE user_id = $1 AND notification_type = 'tickets:activity'`, testdata.Agent.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM notifications_notification WHERE user_id = $1 AND notification_type = 'tickets:activity'`, testdata.Agent.ID).Returns(1)
 }
 
 func TestTicketsAddNote(t *testing.T) {
@@ -231,9 +232,9 @@ func TestTicketsAddNote(t *testing.T) {
 	assert.Equal(t, models.TicketEventTypeNoteAdded, evts[modelTicket2].EventType())
 
 	// check there are new note events
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'N' AND note = 'spam'`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'N' AND note = 'spam'`).Returns(2)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_notification WHERE user_id = $1 AND notification_type = 'tickets:activity'`, testdata.Agent.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM notifications_notification WHERE user_id = $1 AND notification_type = 'tickets:activity'`, testdata.Agent.ID).Returns(1)
 }
 
 func TestTicketsChangeTopic(t *testing.T) {
@@ -262,8 +263,8 @@ func TestTicketsChangeTopic(t *testing.T) {
 	assert.Equal(t, models.TicketEventTypeTopicChanged, evts[modelTicket3].EventType())
 
 	// check tickets are updated and we have events
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE topic_id = $1`, testdata.SupportTopic.ID).Returns(3)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'T' AND topic_id = $1`, testdata.SupportTopic.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE topic_id = $1`, testdata.SupportTopic.ID).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'T' AND topic_id = $1`, testdata.SupportTopic.ID).Returns(2)
 }
 
 func TestCloseTickets(t *testing.T) {
@@ -307,16 +308,16 @@ func TestCloseTickets(t *testing.T) {
 	assert.Equal(t, models.TicketEventTypeClosed, evts[modelTicket1].EventType())
 
 	// check ticket #1 is now closed
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'C' AND closed_on IS NOT NULL`, ticket1.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'C' AND closed_on IS NOT NULL`, ticket1.ID).Returns(1)
 
 	// and there's closed event for it
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'C'`,
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'C'`,
 		[]interface{}{testdata.Org1.ID, ticket1.ID}, 1)
 
 	// and the logger has an http log it can insert for that ticketer
 	require.NoError(t, logger.Insert(ctx, db))
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, testdata.Mailgun.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, testdata.Mailgun.ID).Returns(1)
 
 	// reload Cathy and check they're no longer in the tickets group
 	_, cathy = testdata.Cathy.Load(db, oa)
@@ -324,7 +325,7 @@ func TestCloseTickets(t *testing.T) {
 	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
 
 	// but no events for ticket #2 which was already closed
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, ticket2.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, ticket2.ID).Returns(0)
 
 	// can close tickets without a user
 	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
@@ -335,7 +336,7 @@ func TestCloseTickets(t *testing.T) {
 	assert.Equal(t, 1, len(evts))
 	assert.Equal(t, models.TicketEventTypeClosed, evts[modelTicket3].EventType())
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C' AND created_by_id IS NULL`, ticket3.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C' AND created_by_id IS NULL`, ticket3.ID).Returns(1)
 }
 
 func TestReopenTickets(t *testing.T) {
@@ -371,18 +372,18 @@ func TestReopenTickets(t *testing.T) {
 	assert.Equal(t, models.TicketEventTypeReopened, evts[modelTicket1].EventType())
 
 	// check ticket #1 is now closed
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'O' AND closed_on IS NULL`, ticket1.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND status = 'O' AND closed_on IS NULL`, ticket1.ID).Returns(1)
 
 	// and there's reopened event for it
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'R'`, testdata.Org1.ID, ticket1.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE org_id = $1 AND ticket_id = $2 AND event_type = 'R'`, testdata.Org1.ID, ticket1.ID).Returns(1)
 
 	// and the logger has an http log it can insert for that ticketer
 	require.NoError(t, logger.Insert(ctx, db))
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, testdata.Mailgun.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM request_logs_httplog WHERE ticketer_id = $1`, testdata.Mailgun.ID).Returns(1)
 
 	// but no events for ticket #2 which waas already open
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, ticket2.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, ticket2.ID).Returns(0)
 
 	// check Cathy is now in the two tickets group
 	_, cathy := testdata.Cathy.Load(db, oa)

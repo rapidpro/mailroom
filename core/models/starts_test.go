@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
@@ -64,8 +65,8 @@ func TestStarts(t *testing.T) {
 	err = models.MarkStartStarted(ctx, db, startID, 2, []models.ContactID{testdata.George.ID})
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'S' AND contact_count = 2`, startID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowstart_contacts WHERE flowstart_id = $1`, startID).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'S' AND contact_count = 2`, startID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart_contacts WHERE flowstart_id = $1`, startID).Returns(3)
 
 	batch := start.CreateBatch([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, false, 3)
 	assert.Equal(t, startID, batch.StartID())
@@ -92,7 +93,7 @@ func TestStarts(t *testing.T) {
 	err = models.MarkStartComplete(ctx, db, startID)
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'C'`, startID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart WHERE id = $1 AND status = 'C'`, startID).Returns(1)
 }
 
 func TestStartsBuilding(t *testing.T) {

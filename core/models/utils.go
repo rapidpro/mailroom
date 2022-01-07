@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/mailroom/utils/dbutil"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

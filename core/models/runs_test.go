@@ -8,6 +8,7 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
@@ -63,7 +64,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.NotNil(t, session.Timeout())
 
 	// check that matches what is in the db
-	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on FROM flows_flowsession`).
+	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on FROM flows_flowsession`).
 		Columns(map[string]interface{}{"status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "responded": false, "ended_on": nil})
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
@@ -111,7 +112,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.NotNil(t, session.EndedOn())
 
 	// check that matches what is in the db
-	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
+	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
 		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": true})
 }
 
@@ -161,6 +162,6 @@ func TestSingleSprintSession(t *testing.T) {
 	assert.Nil(t, session.Timeout())
 
 	// check that matches what is in the db
-	testsuite.AssertQuery(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
+	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
 		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": false})
 }

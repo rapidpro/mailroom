@@ -3,6 +3,7 @@ package models_test
 import (
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 
@@ -35,8 +36,8 @@ func TestBulkQueryBatches(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, foo1.ID)
 	assert.Equal(t, 2, foo2.ID)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo WHERE name = 'A' AND age = 30`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo WHERE name = 'B' AND age = 31`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM foo WHERE name = 'A' AND age = 30`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM foo WHERE name = 'B' AND age = 31`).Returns(1)
 
 	// test when multiple batches are required
 	foo3 := &foo{Name: "C", Age: 32}
@@ -51,10 +52,10 @@ func TestBulkQueryBatches(t *testing.T) {
 	assert.Equal(t, 5, foo5.ID)
 	assert.Equal(t, 6, foo6.ID)
 	assert.Equal(t, 7, foo7.ID)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo WHERE name = 'C' AND age = 32`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo WHERE name = 'D' AND age = 33`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo WHERE name = 'E' AND age = 34`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo WHERE name = 'F' AND age = 35`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo WHERE name = 'G' AND age = 36`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM foo `).Returns(7)
+	assertdb.Query(t, db, `SELECT count(*) FROM foo WHERE name = 'C' AND age = 32`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM foo WHERE name = 'D' AND age = 33`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM foo WHERE name = 'E' AND age = 34`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM foo WHERE name = 'F' AND age = 35`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM foo WHERE name = 'G' AND age = 36`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM foo `).Returns(7)
 }

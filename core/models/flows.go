@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -155,7 +155,7 @@ func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg inte
 		return nil, nil
 	}
 
-	err = dbutil.ReadJSONRow(rows, &flow.f)
+	err = dbutil.ScanJSON(rows, &flow.f)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading flow definition by: %s", arg)
 	}

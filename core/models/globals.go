@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -44,7 +44,7 @@ func loadGlobals(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Gl
 	globals := make([]assets.Global, 0)
 	for rows.Next() {
 		global := &Global{}
-		err = dbutil.ReadJSONRow(rows, &global.g)
+		err = dbutil.ScanAndValidateJSON(rows, &global.g)
 		if err != nil {
 			return nil, errors.Wrap(err, "error reading global row")
 		}

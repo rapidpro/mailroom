@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -36,15 +37,15 @@ func TestRetryErroredMessages(t *testing.T) {
 	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), false)
 	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), true) // high priority
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(5)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(5)
 
 	// try again...
 	err = msgs.RetryErroredMessages(ctx, rt)
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'D'`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(4)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'D'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'E'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(4)
 
 	testsuite.AssertCourierQueues(t, map[string][]int{
 		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {1}, // twilio, bulk priority

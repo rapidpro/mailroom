@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -76,7 +76,7 @@ func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	templates := make([]assets.Template, 0)
 	for rows.Next() {
 		template := &Template{}
-		err = dbutil.ReadJSONRow(rows, &template.t)
+		err = dbutil.ScanAndValidateJSON(rows, &template.t)
 		if err != nil {
 			return nil, errors.Wrap(err, "error reading group row")
 		}

@@ -8,8 +8,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -74,7 +74,7 @@ func loadTopics(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Top
 	topics := make([]assets.Topic, 0, 2)
 	for rows.Next() {
 		topic := &Topic{}
-		err := dbutil.ReadJSONRow(rows, &topic.t)
+		err := dbutil.ScanJSON(rows, &topic.t)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling topic")
 		}

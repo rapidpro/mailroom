@@ -3,6 +3,7 @@ package schedules
 import (
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -74,23 +75,23 @@ func TestCheckSchedules(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should have one flow start added to our DB ready to go
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowstart WHERE flow_id = $1 AND start_type = 'T' AND status = 'P'`, testdata.Favorites.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart WHERE flow_id = $1 AND start_type = 'T' AND status = 'P'`, testdata.Favorites.ID).Returns(1)
 
 	// with the right count of groups and contacts
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowstart_contacts WHERE flowstart_id = 1`).Returns(2)
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowstart_groups WHERE flowstart_id = 1`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowstart_contacts WHERE flowstart_id = 1`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowstart_groups WHERE flowstart_id = 1`).Returns(1)
 
 	// and one broadcast as well
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 AND parent_id = $2 
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 AND parent_id = $2 
 		AND text = hstore(ARRAY['eng','Test message', 'fra', 'Un Message']) AND status = 'Q' AND base_language = 'eng'`, testdata.Org1.ID, b1).Returns(1)
 
 	// with the right count of groups, contacts, urns
-	testsuite.AssertQuery(t, db, `SELECT count(*) from msgs_broadcast_urns WHERE broadcast_id = 2`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) from msgs_broadcast_contacts WHERE broadcast_id = 2`).Returns(2)
-	testsuite.AssertQuery(t, db, `SELECT count(*) from msgs_broadcast_groups WHERE broadcast_id = 2`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from msgs_broadcast_urns WHERE broadcast_id = 2`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from msgs_broadcast_contacts WHERE broadcast_id = 2`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) from msgs_broadcast_groups WHERE broadcast_id = 2`).Returns(1)
 
 	// we shouldn't have any pending schedules since there were all one time fires, but all should have last fire
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM schedules_schedule WHERE next_fire IS NULL and last_fire < NOW();`).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM schedules_schedule WHERE next_fire IS NULL and last_fire < NOW();`).Returns(3)
 
 	// check the tasks created
 	task, err := queue.PopNextTask(rc, queue.BatchQueue)

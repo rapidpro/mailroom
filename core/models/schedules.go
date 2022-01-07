@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nyaruka/mailroom/utils/dbutil"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/pkg/errors"
@@ -306,7 +306,7 @@ func GetUnfiredSchedules(ctx context.Context, db Queryer) ([]*Schedule, error) {
 	unfired := make([]*Schedule, 0, 10)
 	for rows.Next() {
 		s := &Schedule{}
-		err := dbutil.ReadJSONRow(rows, &s.s)
+		err := dbutil.ScanJSON(rows, &s.s)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading schedule")
 		}

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
@@ -150,23 +151,23 @@ func TestMsgEvents(t *testing.T) {
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// check that message is marked as handled with expected type
-		testsuite.AssertQuery(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		assertdb.Query(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
 			Columns(map[string]interface{}{"msg_type": string(tc.ExpectedType), "status": "H"}, "%d: msg state mismatch", i)
 
 		// if we are meant to have a reply, check it
 		if tc.ExpectedReply != "" {
-			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
+			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
 				Returns(tc.ExpectedReply, "%d: response mismatch", i)
 		}
 
 		// check any open tickets for this contact where updated
 		numOpenTickets := len(openTickets[tc.Contact])
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'O' AND last_activity_on > $2`, tc.Contact.ID, last).
+		assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'O' AND last_activity_on > $2`, tc.Contact.ID, last).
 			Returns(numOpenTickets, "%d: updated open ticket mismatch", i)
 
 		// check any closed tickets are unchanged
 		numClosedTickets := len(closedTickets[tc.Contact])
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'C' AND last_activity_on = '2021-01-01T00:00:00Z'`, tc.Contact.ID).
+		assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'C' AND last_activity_on = '2021-01-01T00:00:00Z'`, tc.Contact.ID).
 			Returns(numClosedTickets, "%d: unchanged closed ticket mismatch", i)
 
 		last = time.Now()
@@ -185,8 +186,8 @@ func TestMsgEvents(t *testing.T) {
 	})
 
 	// Fred's sessions should not have a timeout because courier will set them
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1`, testdata.Org2Contact.ID).Returns(6)
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL`, testdata.Org2Contact.ID).Returns(6)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1`, testdata.Org2Contact.ID).Returns(6)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL`, testdata.Org2Contact.ID).Returns(6)
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, testdata.Org2Contact.ID)
@@ -219,11 +220,11 @@ func TestMsgEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should get our catch all trigger
-	testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID).Returns("Hey, how are you?")
+	assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID).Returns("Hey, how are you?")
 	previous := time.Now()
 
 	// and should have failed previous session
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F'`, testdata.Org2Contact.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F'`, testdata.Org2Contact.ID).Returns(2)
 
 	// trigger should also not start a new session
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start")
@@ -232,7 +233,7 @@ func TestMsgEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
 }
 
 func TestChannelEvents(t *testing.T) {
@@ -293,7 +294,7 @@ func TestChannelEvents(t *testing.T) {
 
 		// if we are meant to have a response
 		if tc.Response != "" {
-			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
+			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
 				Returns(tc.Response, "%d: response mismatch", i)
 		}
 
@@ -330,7 +331,7 @@ func TestTicketEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestStopEvent(t *testing.T) {
@@ -365,15 +366,15 @@ func TestStopEvent(t *testing.T) {
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
-	testsuite.AssertQuery(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.Cathy.ID).Returns(0)
-	testsuite.AssertQuery(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.George.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.George.ID).Returns(1)
 
 	// that cathy is stopped
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
 
 	// and has no upcoming events
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Cathy.ID).Returns(0)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.George.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.George.ID).Returns(1)
 }
 
 func TestTimedEvents(t *testing.T) {
@@ -487,7 +488,7 @@ func TestTimedEvents(t *testing.T) {
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		if tc.Response != "" {
-			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
+			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
 				Returns(tc.Response, "%d: response: mismatch", i)
 		}
 
@@ -536,6 +537,6 @@ func TestTimedEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, runID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'F' AND id = $1`, sessionID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, runID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'F' AND id = $1`, sessionID).Returns(1)
 }
