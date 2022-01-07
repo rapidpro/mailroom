@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -54,8 +55,8 @@ func TestEndIncidents(t *testing.T) {
 	err = incidents.EndIncidents(ctx, rt)
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE id = $1 AND ended_on IS NULL`, id1).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM notifications_incident WHERE id = $1 AND ended_on IS NOT NULL`, id2).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident WHERE id = $1 AND ended_on IS NULL`, id1).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM notifications_incident WHERE id = $1 AND ended_on IS NOT NULL`, id2).Returns(1)
 
 	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", id1), []string{"3c703019-8c92-4d28-9be0-a926a934486b"})
 	assertredis.SMembers(t, rp, fmt.Sprintf("incident:%d:nodes", id2), []string{}) // healthy node removed

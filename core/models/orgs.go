@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/envs"
@@ -22,10 +24,7 @@ import (
 	"github.com/nyaruka/goflow/utils/smtpx"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -239,7 +238,7 @@ func LoadOrg(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, orgID Or
 		return nil, errors.Errorf("no org with id: %d", orgID)
 	}
 
-	err = dbutil.ReadJSONRow(rows, org)
+	err = dbutil.ScanJSON(rows, org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling org")
 	}

@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,30 +48,30 @@ func TestExpirations(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Cathy.ID).Returns(2)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Cathy.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Cathy.ID).Returns(0)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.George.ID).Returns(2)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.George.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.George.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.George.ID).Returns(0)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Bob.ID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Bob.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
 
 	// expire our runs
 	err := expireRuns(ctx, rt)
 	assert.NoError(t, err)
 
 	// shouldn't have any active runs or sessions
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Cathy.ID).Returns(0)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Cathy.ID).Returns(1)
 
 	// should still have two active runs for George as it needs to continue
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.George.ID).Returns(2)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.George.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.George.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.George.ID).Returns(0)
 
 	// runs without expires_on won't be expired
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Bob.ID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Bob.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
 
 	// should have created one task
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)

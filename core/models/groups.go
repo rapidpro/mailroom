@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -62,7 +62,7 @@ func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, e
 	groups := make([]assets.Group, 0, 10)
 	for rows.Next() {
 		group := &Group{}
-		err = dbutil.ReadJSONRow(rows, &group.g)
+		err = dbutil.ScanJSON(rows, &group.g)
 		if err != nil {
 			return nil, errors.Wrap(err, "error reading group row")
 		}

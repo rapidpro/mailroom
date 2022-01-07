@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -135,7 +134,7 @@ func GetChannelsByID(ctx context.Context, db Queryer, ids []ChannelID) ([]*Chann
 	channels := make([]*Channel, 0, 5)
 	for rows.Next() {
 		channel := &Channel{}
-		err := dbutil.ReadJSONRow(rows, &channel.c)
+		err := dbutil.ScanJSON(rows, &channel.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling channel")
 		}
@@ -174,7 +173,7 @@ func loadChannels(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Channe
 	channels := make([]assets.Channel, 0, 2)
 	for rows.Next() {
 		channel := &Channel{}
-		err := dbutil.ReadJSONRow(rows, &channel.c)
+		err := dbutil.ScanJSON(rows, &channel.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling channel")
 		}

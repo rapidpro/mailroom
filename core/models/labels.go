@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -45,7 +45,7 @@ func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Lab
 	labels := make([]assets.Label, 0, 10)
 	for rows.Next() {
 		label := &Label{}
-		err = dbutil.ReadJSONRow(rows, &label.l)
+		err = dbutil.ScanJSON(rows, &label.l)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning label row")
 		}

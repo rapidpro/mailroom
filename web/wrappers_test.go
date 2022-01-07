@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -60,5 +61,5 @@ func TestWithHTTPLogs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check HTTP logs were created
-	testsuite.AssertQuery(t, db, `select count(*) from request_logs_httplog where ticketer_id = $1;`, testdata.Mailgun.ID).Returns(2)
+	assertdb.Query(t, db, `select count(*) from request_logs_httplog where ticketer_id = $1;`, testdata.Mailgun.ID).Returns(2)
 }

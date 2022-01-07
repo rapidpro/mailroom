@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -126,7 +126,7 @@ func loadUsers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.User
 	users := make([]assets.User, 0, 10)
 	for rows.Next() {
 		user := &User{}
-		err := dbutil.ReadJSONRow(rows, &user.u)
+		err := dbutil.ScanJSON(rows, &user.u)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling user")
 		}

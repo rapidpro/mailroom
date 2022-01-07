@@ -3,6 +3,7 @@ package interrupts
 import (
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/uuids"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -113,7 +114,7 @@ func TestInterrupts(t *testing.T) {
 			assert.Equal(t, tc.StatusesAfter[j], status, "%d: status mismatch for session #%d", i, j)
 
 			// check for runs with a different status to the session
-			testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE session_id = $1 AND status != $2`, sID, tc.StatusesAfter[j]).
+			assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE session_id = $1 AND status != $2`, sID, tc.StatusesAfter[j]).
 				Returns(0, "%d: unexpected un-interrupted runs for session #%d", i, j)
 		}
 	}

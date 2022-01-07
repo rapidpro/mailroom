@@ -8,6 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -21,7 +22,6 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -172,7 +172,8 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			})
 
 			if qerr := dbutil.AsQueryError(err); qerr != nil {
-				log = log.WithFields(qerr.Fields())
+				query, params := qerr.Query()
+				log = log.WithFields(logrus.Fields{"sql": query, "sql_params": params})
 			}
 
 			contactEvent.ErrorCount++

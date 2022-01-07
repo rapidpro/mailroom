@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
@@ -183,7 +184,7 @@ func TestOutgoingMsgs(t *testing.T) {
 	}
 
 	// check nil failed reasons are saved as NULLs
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(3)
 
 	// ensure org is unsuspended
 	db.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
@@ -224,7 +225,7 @@ func TestMarshalMsg(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM orgs_org WHERE is_suspended = TRUE`).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM orgs_org WHERE is_suspended = TRUE`).Returns(0)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -401,7 +402,7 @@ func TestResendMessages(t *testing.T) {
 	assert.Equal(t, testdata.VonageChannel.ID, msgs[1].ChannelID())
 	assert.Equal(t, models.TopupID(1), msgs[1].TopupID())
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(2)
 }
 
 func TestGetMsgRepetitions(t *testing.T) {
@@ -484,7 +485,7 @@ func TestMarkMessages(t *testing.T) {
 
 	models.MarkMessagesPending(ctx, db, []*models.Msg{msg1, msg2})
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
 
 	// try running on database with BIGINT message ids
 	db.MustExec(`ALTER SEQUENCE "msgs_msg_id_seq" AS bigint;`)
@@ -500,14 +501,14 @@ func TestMarkMessages(t *testing.T) {
 	err = models.MarkMessagesPending(ctx, db, []*models.Msg{msg4})
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(3)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(1)
 
 	err = models.MarkMessagesQueued(ctx, db, []*models.Msg{msg4})
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'Q'`).Returns(2)
 }
 
 func TestNonPersistentBroadcasts(t *testing.T) {
@@ -561,10 +562,10 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	assert.Equal(t, 2, len(msgs))
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`).Returns(2)
 
 	// test ticket was updated
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
 }
 
 func TestNewOutgoingIVR(t *testing.T) {
@@ -591,7 +592,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 	err = models.InsertMessages(ctx, db, []*models.Msg{dbMsg})
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]interface{}{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
+	assertdb.Query(t, db, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]interface{}{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
 }
 
 func insertTestSession(t *testing.T, ctx context.Context, rt *runtime.Runtime, org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow) *models.Session {
