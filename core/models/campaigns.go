@@ -6,15 +6,14 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -270,7 +269,7 @@ func loadCampaigns(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]*Campai
 	campaigns := make([]*Campaign, 0, 2)
 	for rows.Next() {
 		campaign := &Campaign{}
-		err := dbutil.ReadJSONRow(rows, &campaign.c)
+		err := dbutil.ScanJSON(rows, &campaign.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling campaign")
 		}

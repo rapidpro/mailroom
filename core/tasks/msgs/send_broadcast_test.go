@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -112,7 +113,7 @@ func TestBroadcastEvents(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
 		lastNow = time.Now()
@@ -258,18 +259,18 @@ func TestBroadcastTask(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
 		// make sure our broadcast is marked as sent
 		if tc.BroadcastID != models.NilBroadcastID {
-			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
+			assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
 				Returns(1, "%d: broadcast not marked as sent", i)
 		}
 
 		// if we had a ticket, make sure its last_activity_on was updated
 		if tc.TicketID != models.NilTicketID {
-			testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, tc.TicketID, modelTicket.LastActivityOn()).
+			assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on > $2`, tc.TicketID, modelTicket.LastActivityOn()).
 				Returns(1, "%d: ticket last_activity_on not updated", i)
 		}
 

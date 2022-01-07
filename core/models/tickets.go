@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -15,7 +16,6 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -786,7 +786,7 @@ func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerU
 	}
 
 	ticketer := &Ticketer{}
-	err = dbutil.ReadJSONRow(rows, &ticketer.t)
+	err = dbutil.ScanJSON(rows, &ticketer.t)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling ticketer")
 	}
@@ -825,7 +825,7 @@ func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	ticketers := make([]assets.Ticketer, 0, 2)
 	for rows.Next() {
 		ticketer := &Ticketer{}
-		err := dbutil.ReadJSONRow(rows, &ticketer.t)
+		err := dbutil.ScanJSON(rows, &ticketer.t)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling ticketer")
 		}
