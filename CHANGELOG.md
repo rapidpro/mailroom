@@ -1,3 +1,8 @@
+v7.1.24
+----------
+ * Switch to dbutil package in gocommon
+ * Always exclude router arguments from PO file extraction
+
 v7.1.23
 ----------
  * Session.CurrentFlowID whould be cleared when session exits
