@@ -1,3 +1,8 @@
+v7.1.25
+----------
+ * Update to latest gocommon
+ * Stop writing events on flow runs
+
 v7.1.24
 ----------
  * Switch to dbutil package in gocommon
