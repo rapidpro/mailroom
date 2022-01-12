@@ -105,7 +105,7 @@ func FireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 		// and create a new one based on this row
 		orgID = row.OrgID
 		task = &FireCampaignEventTask{
-			FireIDs:      []int64{row.FireID},
+			FireIDs:      []models.FireID{row.FireID},
 			EventID:      row.EventID,
 			EventUUID:    row.EventUUID,
 			FlowUUID:     row.FlowUUID,
@@ -155,7 +155,7 @@ func queueFiresTask(rp *redis.Pool, orgID models.OrgID, task *FireCampaignEventT
 }
 
 type eventFireRow struct {
-	FireID       int64           `db:"fire_id"`
+	FireID       models.FireID   `db:"fire_id"`
 	EventID      int64           `db:"event_id"`
 	EventUUID    string          `db:"event_uuid"`
 	FlowUUID     assets.FlowUUID `db:"flow_uuid"`

@@ -19,7 +19,7 @@ import (
 )
 
 // FireID is our id for our event fires
-type FireID int
+type FireID int64
 
 // CampaignID is our type for campaign ids
 type CampaignID int
@@ -403,7 +403,7 @@ type EventFire struct {
 }
 
 // LoadEventFires loads all the event fires with the passed in ids
-func LoadEventFires(ctx context.Context, db Queryer, ids []int64) ([]*EventFire, error) {
+func LoadEventFires(ctx context.Context, db Queryer, ids []FireID) ([]*EventFire, error) {
 	start := time.Now()
 
 	q, vs, err := sqlx.In(loadEventFireSQL, ids)
