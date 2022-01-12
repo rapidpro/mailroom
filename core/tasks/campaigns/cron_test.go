@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -13,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/campaigns"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/redisx/assertredis"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +29,7 @@ func TestCampaigns(t *testing.T) {
 	err := campaigns.FireCampaignEvents(ctx, rt)
 	assert.NoError(t, err)
 
-	assertZCard(t, rp, "batch:active", 0)
+	assertredis.ZCard(t, rp, "batch:active", 0)
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
@@ -40,7 +40,7 @@ func TestCampaigns(t *testing.T) {
 	err = campaigns.FireCampaignEvents(ctx, rt)
 	assert.NoError(t, err)
 
-	assertZCard(t, rp, "batch:active", 1)
+	assertredis.ZCard(t, rp, "batch:active", 1)
 
 	// then actually work on the event
 	task, err := queue.PopNextTask(rc, queue.BatchQueue)
@@ -57,16 +57,6 @@ func TestCampaigns(t *testing.T) {
 	// should now have a flow run for that contact and flow
 	assertdb.Query(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, testdata.Cathy.ID, testdata.Favorites.ID).Returns(1)
 	assertdb.Query(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, testdata.George.ID, testdata.Favorites.ID).Returns(1)
-}
-
-func assertZCard(t *testing.T, rp *redis.Pool, key string, expected int, msgAndArgs ...interface{}) {
-	rc := rp.Get()
-	defer rc.Close()
-
-	actual, err := redis.Int(rc.Do("ZCARD", key))
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, actual, msgAndArgs...)
 }
 
 func TestIVRCampaigns(t *testing.T) {
