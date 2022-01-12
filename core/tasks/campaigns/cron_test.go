@@ -1,14 +1,16 @@
-package campaigns
+package campaigns_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/core/tasks/campaigns"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -21,7 +23,13 @@ func TestCampaigns(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+
+	// try with zero fires
+	err := campaigns.FireCampaignEvents(ctx, rt)
+	assert.NoError(t, err)
+
+	assertZCard(t, rp, "batch:active", 0)
 
 	// let's create a campaign event fire for one of our contacts (for now this is totally hacked, they aren't in the group and
 	// their relative to date isn't relative, but this still tests execution)
@@ -29,8 +37,10 @@ func TestCampaigns(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our campaign to be started
-	err := fireCampaignEvents(ctx, rt)
+	err = campaigns.FireCampaignEvents(ctx, rt)
 	assert.NoError(t, err)
+
+	assertZCard(t, rp, "batch:active", 1)
 
 	// then actually work on the event
 	task, err := queue.PopNextTask(rc, queue.BatchQueue)
@@ -49,6 +59,16 @@ func TestCampaigns(t *testing.T) {
 	assertdb.Query(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, testdata.George.ID, testdata.Favorites.ID).Returns(1)
 }
 
+func assertZCard(t *testing.T, rp *redis.Pool, key string, expected int, msgAndArgs ...interface{}) {
+	rc := rp.Get()
+	defer rc.Close()
+
+	actual, err := redis.Int(rc.Do("ZCARD", key))
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, actual, msgAndArgs...)
+}
+
 func TestIVRCampaigns(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
@@ -63,7 +83,7 @@ func TestIVRCampaigns(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// schedule our campaign to be started
-	err := fireCampaignEvents(ctx, rt)
+	err := campaigns.FireCampaignEvents(ctx, rt)
 	assert.NoError(t, err)
 
 	// then actually work on the event
