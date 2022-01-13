@@ -1,3 +1,10 @@
+v7.1.26
+----------
+ * Add testdata functions for testing campaigns and events
+ * Use models.FireID consistently
+ * Replace broken redigo dep version and anything that was depending on it
+ * Simplify how we queue event fire tasks and improve logging
+
 v7.1.25
 ----------
  * Update to latest gocommon
