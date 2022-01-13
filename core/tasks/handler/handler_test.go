@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
@@ -103,7 +104,7 @@ func TestMsgEvents(t *testing.T) {
 	}
 
 	makeMsgTask := func(org *testdata.Org, channel *testdata.Channel, contact *testdata.Contact, text string) *queue.Task {
-		event := &handler.MsgEvent{
+		return &queue.Task{Type: handler.MsgEventType, OrgID: int(org.ID), Task: jsonx.MustMarshal(&handler.MsgEvent{
 			ContactID: contact.ID,
 			OrgID:     org.ID,
 			ChannelID: channel.ID,
@@ -112,18 +113,7 @@ func TestMsgEvents(t *testing.T) {
 			URN:       contact.URN,
 			URNID:     contact.URNID,
 			Text:      text,
-		}
-
-		eventJSON, err := json.Marshal(event)
-		assert.NoError(t, err)
-
-		task := &queue.Task{
-			Type:  handler.MsgEventType,
-			OrgID: int(org.ID),
-			Task:  eventJSON,
-		}
-
-		return task
+		})}
 	}
 
 	last := time.Now()
@@ -174,6 +164,9 @@ func TestMsgEvents(t *testing.T) {
 	}
 
 	// should have one remaining IVR task to handle for Bob
+	orgTasks := testsuite.CurrentOrgTasks(t, rp)
+	assert.Equal(t, 1, len(orgTasks[testdata.Org1.ID]))
+
 	task, err := queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
@@ -190,7 +183,7 @@ func TestMsgEvents(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL`, testdata.Org2Contact.ID).Returns(6)
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
-	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, testdata.Org2Contact.ID)
+	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE, status = 'C' WHERE contact_id = $1`, testdata.Org2Contact.ID)
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "red")
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 
