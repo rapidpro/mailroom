@@ -135,6 +135,7 @@ type Msg struct {
 		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"        json:"-"`
+		FlowID               FlowID             `db:"flow_id"`
 
 		SessionID     SessionID     `json:"session_id,omitempty"`
 		SessionStatus SessionStatus `json:"session_status,omitempty"`
@@ -175,6 +176,7 @@ func (m *Msg) URN() urns.URN                    { return m.m.URN }
 func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
 func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
+func (m *Msg) FlowID() FlowID                   { return m.m.FlowID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
@@ -327,19 +329,24 @@ func GetMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgOut) (
 }
 
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
-func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
+func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, flow.ID(), NilBroadcastID)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
+	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, NilFlowID, broadcastID)
 }
 
-func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
+func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, flowID FlowID, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = out.UUID()
+	m.OrgID = org.ID()
+	m.ContactID = contactID
+	m.FlowID = flowID
+	m.BroadcastID = broadcastID
+	m.TopupID = NilTopupID
 	m.Text = out.Text()
 	m.HighPriority = false
 	m.Direction = DirectionOut
@@ -347,10 +354,6 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	m.Visibility = VisibilityVisible
 	m.MsgType = MsgTypeFlow
 	m.MsgCount = 1
-	m.ContactID = contactID
-	m.BroadcastID = broadcastID
-	m.OrgID = org.ID()
-	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
 	msg.SetChannel(channel)
@@ -607,10 +610,10 @@ const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
-		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id)
+		 contact_id, contact_urn_id, org_id, topup_id, flow_id, broadcast_id)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
-		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id)
+		 :contact_id, :contact_urn_id, :org_id, :topup_id, :flow_id, :broadcast_id)
 RETURNING 
 	id as id, 
 	now() as modified_on,

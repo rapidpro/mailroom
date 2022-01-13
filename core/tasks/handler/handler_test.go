@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
@@ -103,7 +104,7 @@ func TestMsgEvents(t *testing.T) {
 	}
 
 	makeMsgTask := func(org *testdata.Org, channel *testdata.Channel, contact *testdata.Contact, text string) *queue.Task {
-		event := &handler.MsgEvent{
+		return &queue.Task{Type: handler.MsgEventType, OrgID: int(org.ID), Task: jsonx.MustMarshal(&handler.MsgEvent{
 			ContactID: contact.ID,
 			OrgID:     org.ID,
 			ChannelID: channel.ID,
@@ -112,18 +113,7 @@ func TestMsgEvents(t *testing.T) {
 			URN:       contact.URN,
 			URNID:     contact.URNID,
 			Text:      text,
-		}
-
-		eventJSON, err := json.Marshal(event)
-		assert.NoError(t, err)
-
-		task := &queue.Task{
-			Type:  handler.MsgEventType,
-			OrgID: int(org.ID),
-			Task:  eventJSON,
-		}
-
-		return task
+		})}
 	}
 
 	last := time.Now()
