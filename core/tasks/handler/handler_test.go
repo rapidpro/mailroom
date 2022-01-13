@@ -342,7 +342,8 @@ func TestStopEvent(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// schedule an event for cathy and george
-	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, testdata.Cathy.ID, testdata.George.ID, testdata.RemindersEvent1.ID)
+	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now())
+	testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now())
 
 	// and george to doctors group, cathy is already part of it
 	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, testdata.DoctorsGroup.ID, testdata.George.ID)

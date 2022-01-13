@@ -25,7 +25,7 @@ func init() {
 
 // FireCampaignEventTask is the task to handle firing campaign events
 type FireCampaignEventTask struct {
-	FireIDs      []int64         `json:"fire_ids"`
+	FireIDs      []models.FireID `json:"fire_ids"`
 	EventID      int64           `json:"event_id"`
 	EventUUID    string          `json:"event_uuid"`
 	FlowUUID     assets.FlowUUID `json:"flow_uuid"`
