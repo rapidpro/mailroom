@@ -36,15 +36,15 @@ func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) 
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return FireCampaignEvents(ctx, rt)
+			return QueueEventFires(ctx, rt)
 		},
 	)
 
 	return nil
 }
 
-// FireCampaignEvents looks for all expired campaign event fires and queues them to be started
-func FireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
+// QueueEventFires looks for all due campaign event fires and queues them to be started
+func QueueEventFires(ctx context.Context, rt *runtime.Runtime) error {
 	log := logrus.WithField("comp", "campaign_events")
 	start := time.Now()
 

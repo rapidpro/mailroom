@@ -12,15 +12,6 @@ type Classifier struct {
 	UUID assets.ClassifierUUID
 }
 
-type Campaign struct {
-	ID   models.CampaignID
-	UUID models.CampaignUUID
-}
-
-type CampaignEvent struct {
-	ID models.CampaignEventID
-}
-
 var Org1 = &Org{1, "bf0514a5-9407-44c9-b0f9-3f36f9c18414"}
 var Admin = &User{3, "admin1@nyaruka.com"}
 var Editor = &User{4, "editor1@nyaruka.com"}

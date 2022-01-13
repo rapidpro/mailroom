@@ -35,7 +35,9 @@ func TestCampaignStarts(t *testing.T) {
 
 	// create our event fires
 	now := time.Now()
-	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, testdata.RemindersEvent2.ID, now, testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID)
+	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent2, now)
+	testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent2, now)
+	testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent2, now)
 
 	// create an active session for Alexandria to test skipping
 	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, testdata.Alexandria.ID, testdata.PickANumber.ID)

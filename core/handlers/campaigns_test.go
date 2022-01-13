@@ -21,18 +21,10 @@ func TestCampaigns(t *testing.T) {
 	joined := assets.NewFieldReference("joined", "Joined")
 
 	// insert an event on our campaign that is based on created_on
-	db.MustExec(
-		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
-											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
-									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
-		uuids.New(), testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.CreatedOnField.ID)
+	testdata.InsertCampaignFlowEvent(db, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 1000, "W")
 
 	// insert an event on our campaign that is based on last_seen_on
-	db.MustExec(
-		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
-											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
-									   VALUES(TRUE, NOW(), NOW(), $1, 2, 'D', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
-		uuids.New(), testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.LastSeenOnField.ID)
+	testdata.InsertCampaignFlowEvent(db, testdata.RemindersCampaign, testdata.Favorites, testdata.LastSeenOnField, 2, "D")
 
 	// init their values
 	db.MustExec(
