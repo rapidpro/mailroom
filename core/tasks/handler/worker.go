@@ -499,7 +499,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// contact has been deleted, ignore this message but mark it as handled
 	if len(contacts) == 0 {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
 		if err != nil {
 			return errors.Wrapf(err, "error updating message for deleted contact")
 		}
@@ -527,7 +527,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
 	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking blocked or nil channel message as handled")
 		}
@@ -599,14 +599,14 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 		sessions[0].SetIncomingMsg(event.MsgID, event.MsgExternalID)
 
-		return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
+		return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
 		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) {
 		// load our flow
-		flow, err := oa.FlowByID(trigger.FlowID())
+		flow, err = oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
 			return errors.Wrapf(err, "error loading flow for trigger")
 		}
@@ -616,7 +616,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 			if flow.FlowType() == models.FlowTypeVoice {
 				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
-					return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
+					return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
 				}
 				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
 				if err != nil {
@@ -762,12 +762,19 @@ func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsset
 		return errors.Wrap(err, "error handling inbox message events")
 	}
 
-	return markMsgHandled(ctx, rt.DB, contact, msg, models.MsgTypeInbox, topupID, tickets)
+	return markMsgHandled(ctx, rt.DB, contact, msg, nil, topupID, tickets)
 }
 
 // utility to mark as message as handled and update any open contact tickets
-func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, msgType models.MsgType, topupID models.TopupID, tickets []*models.Ticket) error {
-	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, topupID)
+func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, topupID models.TopupID, tickets []*models.Ticket) error {
+	msgType := models.MsgTypeInbox
+	flowID := models.NilFlowID
+	if flow != nil {
+		msgType = models.MsgTypeFlow
+		flowID = flow.ID()
+	}
+
+	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}

@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOutgoingMsgs(t *testing.T) {
+func TestNewOutgoingFlowMsg(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
@@ -41,6 +41,7 @@ func TestOutgoingMsgs(t *testing.T) {
 		Attachments  []utils.Attachment
 		QuickReplies []string
 		Topic        flows.MsgTopic
+		Flow         *testdata.Flow
 		ResponseTo   models.MsgID
 		SuspendedOrg bool
 
@@ -49,7 +50,6 @@ func TestOutgoingMsgs(t *testing.T) {
 		ExpectedMetadata     map[string]interface{}
 		ExpectedMsgCount     int
 		ExpectedPriority     bool
-		HasError             bool
 	}{
 		{
 			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
@@ -57,6 +57,7 @@ func TestOutgoingMsgs(t *testing.T) {
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN("tel:+250700000001"),
 			URNID:                models.URNID(0),
+			Flow:                 testdata.Favorites,
 			ResponseTo:           models.MsgID(123425),
 			ExpectedStatus:       models.MsgStatusQueued,
 			ExpectedFailedReason: models.NilMsgFailedReason,
@@ -72,6 +73,7 @@ func TestOutgoingMsgs(t *testing.T) {
 			URNID:                testdata.Cathy.URNID,
 			QuickReplies:         []string{"yes", "no"},
 			Topic:                flows.MsgTopicPurchase,
+			Flow:                 testdata.SingleMessage,
 			ExpectedStatus:       models.MsgStatusQueued,
 			ExpectedFailedReason: models.NilMsgFailedReason,
 			ExpectedMetadata: map[string]interface{}{
@@ -88,6 +90,7 @@ func TestOutgoingMsgs(t *testing.T) {
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
 			URNID:                testdata.Cathy.URNID,
 			Attachments:          []utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
+			Flow:                 testdata.Favorites,
 			ExpectedStatus:       models.MsgStatusQueued,
 			ExpectedFailedReason: models.NilMsgFailedReason,
 			ExpectedMetadata:     map[string]interface{}{},
@@ -100,6 +103,7 @@ func TestOutgoingMsgs(t *testing.T) {
 			Contact:              testdata.Cathy,
 			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
 			URNID:                testdata.Cathy.URNID,
+			Flow:                 testdata.Favorites,
 			SuspendedOrg:         true,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedSuspended,
@@ -113,6 +117,7 @@ func TestOutgoingMsgs(t *testing.T) {
 			Contact:              testdata.Cathy,
 			URN:                  urns.NilURN,
 			URNID:                models.URNID(0),
+			Flow:                 testdata.Favorites,
 			SuspendedOrg:         false,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedNoDestination,
@@ -126,6 +131,7 @@ func TestOutgoingMsgs(t *testing.T) {
 			Contact:              testdata.Cathy,
 			URN:                  urns.NilURN,
 			URNID:                models.URNID(0),
+			Flow:                 testdata.Favorites,
 			SuspendedOrg:         false,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedNoDestination,
@@ -144,6 +150,7 @@ func TestOutgoingMsgs(t *testing.T) {
 		require.NoError(t, err)
 
 		channel := oa.ChannelByUUID(tc.ChannelUUID)
+		flow, _ := oa.FlowByID(tc.Flow.ID)
 
 		session := insertTestSession(t, ctx, rt, testdata.Org1, testdata.Cathy, testdata.Favorites)
 		if tc.ResponseTo != models.NilMsgID {
@@ -151,36 +158,33 @@ func TestOutgoingMsgs(t *testing.T) {
 		}
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic)
-		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flowMsg, now)
+		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg, now)
 
-		if tc.HasError {
-			assert.Error(t, err)
+		assert.NoError(t, err)
+
+		err = models.InsertMessages(ctx, db, []*models.Msg{msg})
+		assert.NoError(t, err)
+		assert.Equal(t, oa.OrgID(), msg.OrgID())
+		assert.Equal(t, tc.Text, msg.Text())
+		assert.Equal(t, tc.Contact.ID, msg.ContactID())
+		assert.Equal(t, channel, msg.Channel())
+		assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
+		assert.Equal(t, tc.URN, msg.URN())
+		if tc.URNID != models.NilURNID {
+			assert.Equal(t, tc.URNID, *msg.ContactURNID())
 		} else {
-			assert.NoError(t, err)
-
-			err = models.InsertMessages(ctx, db, []*models.Msg{msg})
-			assert.NoError(t, err)
-			assert.Equal(t, oa.OrgID(), msg.OrgID())
-			assert.Equal(t, tc.Text, msg.Text())
-			assert.Equal(t, tc.Contact.ID, msg.ContactID())
-			assert.Equal(t, channel, msg.Channel())
-			assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
-			assert.Equal(t, tc.URN, msg.URN())
-			if tc.URNID != models.NilURNID {
-				assert.Equal(t, tc.URNID, *msg.ContactURNID())
-			} else {
-				assert.Nil(t, msg.ContactURNID())
-			}
-
-			assert.Equal(t, tc.ExpectedStatus, msg.Status())
-			assert.Equal(t, tc.ExpectedFailedReason, msg.FailedReason())
-			assert.Equal(t, tc.ExpectedMetadata, msg.Metadata())
-			assert.Equal(t, tc.ExpectedMsgCount, msg.MsgCount())
-			assert.Equal(t, now, msg.CreatedOn())
-			assert.True(t, msg.ID() > 0)
-			assert.True(t, msg.QueuedOn().After(now))
-			assert.True(t, msg.ModifiedOn().After(now))
+			assert.Nil(t, msg.ContactURNID())
 		}
+		assert.Equal(t, tc.Flow.ID, msg.FlowID())
+
+		assert.Equal(t, tc.ExpectedStatus, msg.Status())
+		assert.Equal(t, tc.ExpectedFailedReason, msg.FailedReason())
+		assert.Equal(t, tc.ExpectedMetadata, msg.Metadata())
+		assert.Equal(t, tc.ExpectedMsgCount, msg.MsgCount())
+		assert.Equal(t, now, msg.CreatedOn())
+		assert.True(t, msg.ID() > 0)
+		assert.True(t, msg.QueuedOn().After(now))
+		assert.True(t, msg.ModifiedOn().After(now))
 	}
 
 	// check nil failed reasons are saved as NULLs
@@ -193,12 +197,13 @@ func TestOutgoingMsgs(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+	flow, _ := oa.FlowByID(testdata.Favorites.ID)
 	session := insertTestSession(t, ctx, rt, testdata.Org1, testdata.Cathy, testdata.Favorites)
 
 	// check that msg loop detection triggers after 20 repeats of the same text
 	newOutgoing := func(text string) *models.Msg {
 		flowMsg := flows.NewMsgOut(urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)), assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), text, nil, nil, nil, flows.NilMsgTopic)
-		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flowMsg, now)
+		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg, now)
 		require.NoError(t, err)
 		return msg
 	}
@@ -232,6 +237,7 @@ func TestMarshalMsg(t *testing.T) {
 	require.False(t, oa.Org().Suspended())
 
 	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+	flow, _ := oa.FlowByID(testdata.Favorites.ID)
 	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
 	flowMsg1 := flows.NewMsgOut(
 		urn,
@@ -245,7 +251,7 @@ func TestMarshalMsg(t *testing.T) {
 
 	// create a non-priority flow message.. i.e. the session isn't responding to an incoming message
 	session := insertTestSession(t, ctx, rt, testdata.Org1, testdata.Cathy, testdata.Favorites)
-	msg1, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flowMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
+	msg1, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
 
 	err = models.InsertMessages(ctx, db, []*models.Msg{msg1})
@@ -301,7 +307,7 @@ func TestMarshalMsg(t *testing.T) {
 	)
 	in1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
 	session.SetIncomingMsg(flows.MsgID(in1.ID()), null.String("EX123"))
-	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flowMsg2, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
+	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg2, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
 
 	err = models.InsertMessages(ctx, db, []*models.Msg{msg2})
