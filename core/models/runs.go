@@ -275,23 +275,16 @@ func (s *Session) UnmarshalJSON(b []byte) error {
 // FlowRun is the mailroom type for a FlowRun
 type FlowRun struct {
 	r struct {
-		ID         FlowRunID     `db:"id"`
-		UUID       flows.RunUUID `db:"uuid"`
-		Status     RunStatus     `db:"status"`
-		IsActive   bool          `db:"is_active"`
-		CreatedOn  time.Time     `db:"created_on"`
-		ModifiedOn time.Time     `db:"modified_on"`
-		ExitedOn   *time.Time    `db:"exited_on"`
-		ExitType   ExitType      `db:"exit_type"`
-		ExpiresOn  *time.Time    `db:"expires_on"`
-		Responded  bool          `db:"responded"`
-
-		// TODO: should this be a complex object that can read / write iself to the DB as JSON?
-		Results string `db:"results"`
-
-		// TODO: should this be a complex object that can read / write iself to the DB as JSON?
-		Path string `db:"path"`
-
+		ID              FlowRunID       `db:"id"`
+		UUID            flows.RunUUID   `db:"uuid"`
+		Status          RunStatus       `db:"status"`
+		CreatedOn       time.Time       `db:"created_on"`
+		ModifiedOn      time.Time       `db:"modified_on"`
+		ExitedOn        *time.Time      `db:"exited_on"`
+		ExpiresOn       *time.Time      `db:"expires_on"`
+		Responded       bool            `db:"responded"`
+		Results         string          `db:"results"`
+		Path            string          `db:"path"`
 		CurrentNodeUUID null.String     `db:"current_node_uuid"`
 		ContactID       flows.ContactID `db:"contact_id"`
 		FlowID          FlowID          `db:"flow_id"`
@@ -300,6 +293,10 @@ type FlowRun struct {
 		SessionID       SessionID       `db:"session_id"`
 		StartID         StartID         `db:"start_id"`
 		ConnectionID    *ConnectionID   `db:"connection_id"`
+
+		// deprecated
+		IsActive bool     `db:"is_active"`
+		ExitType ExitType `db:"exit_type"`
 	}
 
 	// we keep a reference to the engine's run
@@ -1030,10 +1027,10 @@ WHERE
 	fs.contact_id = ANY($2)
 `
 
-// RunExpiration looks up the run expiration for the passed in run, can return nil if the run is no longer active
+// RunExpiration looks up the run expiration for the passed in run, can return nil if the run is no longer waiting
 func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (*time.Time, error) {
 	var expiration time.Time
-	err := db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE id = $1 AND is_active = TRUE`, runID)
+	err := db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE id = $1 AND status = 'W'`, runID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -1093,7 +1090,7 @@ SET
 	status = $4,
 	modified_on = NOW()
 WHERE
-	id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND is_active = TRUE)
+	id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND status IN ('A', 'W'))
 `
 
 const exitSessionsSQL = `
@@ -1140,17 +1137,15 @@ SET
 	status = 'I',
 	modified_on = NOW()
 WHERE
-	id = ANY (
+	id IN (
 		SELECT 
-		  fr.id 
+			fr.id 
 		FROM 
-		  flows_flowrun fr
-		  JOIN flows_flow ff ON fr.flow_id = ff.id
+			flows_flowrun fr
+			JOIN flows_flow ff ON fr.flow_id = ff.id
 		WHERE 
-		  fr.contact_id = ANY($2) AND 
-		  fr.is_active = TRUE AND
-		  ff.flow_type = $1
-		)
+		  	fr.contact_id = ANY($2) AND fr.status IN ('A', 'W') AND ff.flow_type = $1
+	)
 `
 
 const interruptContactSessionsSQL = `
