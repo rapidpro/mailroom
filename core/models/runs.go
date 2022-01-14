@@ -107,8 +107,8 @@ type Session struct {
 		OrgID         OrgID             `db:"org_id"`
 		CreatedOn     time.Time         `db:"created_on"`
 		EndedOn       *time.Time        `db:"ended_on"`
-		TimeoutOn     *time.Time        `db:"timeout_on"`
 		WaitStartedOn *time.Time        `db:"wait_started_on"`
+		WaitTimeoutOn *time.Time        `db:"timeout_on"`
 		WaitExpiresOn *time.Time        `db:"wait_expires_on"`
 		CurrentFlowID FlowID            `db:"current_flow_id"`
 		ConnectionID  *ConnectionID     `db:"connection_id"`
@@ -148,10 +148,10 @@ func (s *Session) ContactID() ContactID               { return s.s.ContactID }
 func (s *Session) OrgID() OrgID                       { return s.s.OrgID }
 func (s *Session) CreatedOn() time.Time               { return s.s.CreatedOn }
 func (s *Session) EndedOn() *time.Time                { return s.s.EndedOn }
-func (s *Session) TimeoutOn() *time.Time              { return s.s.TimeoutOn }
-func (s *Session) ClearTimeoutOn()                    { s.s.TimeoutOn = nil }
 func (s *Session) WaitStartedOn() *time.Time          { return s.s.WaitStartedOn }
+func (s *Session) WaitTimeoutOn() *time.Time          { return s.s.WaitTimeoutOn }
 func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
+func (s *Session) ClearTimeoutOn()                    { s.s.WaitTimeoutOn = nil }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
@@ -529,8 +529,8 @@ func (s *Session) FlowSession(cfg *runtime.Config, sa flows.SessionAssets, env e
 // looks for a wait event and updates wait fields if one exists
 func (s *Session) updateWait(evts []flows.Event) {
 	s.s.WaitStartedOn = nil
+	s.s.WaitTimeoutOn = nil
 	s.s.WaitExpiresOn = nil
-	s.s.TimeoutOn = nil
 	s.timeout = nil
 
 	for _, e := range evts {
@@ -544,7 +544,7 @@ func (s *Session) updateWait(evts []flows.Event) {
 				seconds := time.Duration(*typed.TimeoutSeconds) * time.Second
 				timeoutOn := now.Add(seconds)
 
-				s.s.TimeoutOn = &timeoutOn
+				s.s.WaitTimeoutOn = &timeoutOn
 				s.timeout = &seconds
 			}
 		}
