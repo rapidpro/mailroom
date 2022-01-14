@@ -164,6 +164,9 @@ func TestMsgEvents(t *testing.T) {
 	}
 
 	// should have one remaining IVR task to handle for Bob
+	orgTasks := testsuite.CurrentOrgTasks(t, rp)
+	assert.Equal(t, 1, len(orgTasks[testdata.Org1.ID]))
+
 	task, err := queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
@@ -180,7 +183,7 @@ func TestMsgEvents(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL`, testdata.Org2Contact.ID).Returns(6)
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
-	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, testdata.Org2Contact.ID)
+	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE, status = 'C' WHERE contact_id = $1`, testdata.Org2Contact.ID)
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "red")
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 
