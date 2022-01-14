@@ -620,20 +620,20 @@ RETURNING
 	now() as queued_on
 `
 
-// UpdateMessage updates the passed in message status, visibility and msg type
-func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, topup TopupID) error {
-	_, err := tx.ExecContext(
-		ctx,
+// UpdateMessage updates a message after handling
+func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID, topup TopupID) error {
+	_, err := tx.ExecContext(ctx,
 		`UPDATE 
 			msgs_msg 
 		SET 
 			status = $2,
 			visibility = $3,
 			msg_type = $4,
-			topup_id = $5
+			flow_id = $5,
+			topup_id = $6
 		WHERE
 			id = $1`,
-		msgID, status, visibility, msgType, topup)
+		msgID, status, visibility, msgType, flow, topup)
 
 	if err != nil {
 		return errors.Wrapf(err, "error updating msg: %d", msgID)
