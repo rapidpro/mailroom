@@ -267,13 +267,13 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		resume = resumes.NewRunExpiration(oa.Env(), contact)
 
 	case TimeoutEventType:
-		if session.TimeoutOn() == nil {
+		if session.WaitTimeoutOn() == nil {
 			log.WithField("session_id", session.ID()).Info("ignoring session timeout, has no timeout set")
 			return nil
 		}
 
 		// check that the timeout is the same
-		timeout := *session.TimeoutOn()
+		timeout := *session.WaitTimeoutOn()
 		if !timeout.Equal(event.Time) {
 			log.WithField("event_timeout", event.Time).WithField("session_timeout", timeout).Info("ignoring timeout, has been updated")
 			return nil
