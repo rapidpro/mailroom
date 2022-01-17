@@ -27,5 +27,7 @@ func handleContactNameChanged(ctx context.Context, rt *runtime.Runtime, tx *sqlx
 	}).Debug("changing contact name")
 
 	scene.AppendToEventPreCommitHook(hooks.CommitNameChangesHook, event)
+	scene.AppendToEventPostCommitHook(hooks.ContactModifiedHook, event)
+
 	return nil
 }

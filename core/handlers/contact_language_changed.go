@@ -27,5 +27,7 @@ func handleContactLanguageChanged(ctx context.Context, rt *runtime.Runtime, tx *
 	}).Debug("changing contact language")
 
 	scene.AppendToEventPreCommitHook(hooks.CommitLanguageChangesHook, event)
+	scene.AppendToEventPostCommitHook(hooks.ContactModifiedHook, event)
+
 	return nil
 }

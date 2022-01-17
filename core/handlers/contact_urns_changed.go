@@ -33,9 +33,8 @@ func handleContactURNsChanged(ctx context.Context, rt *runtime.Runtime, tx *sqlx
 		URNs:      event.URNs,
 	}
 
-	// add our callback
 	scene.AppendToEventPreCommitHook(hooks.CommitURNChangesHook, change)
-	scene.AppendToEventPreCommitHook(hooks.ContactModifiedHook, scene.ContactID())
+	scene.AppendToEventPostCommitHook(hooks.ContactModifiedHook, event)
 
 	return nil
 }
