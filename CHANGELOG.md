@@ -1,3 +1,9 @@
+v7.1.27
+----------
+ * Always read run status instead of is_active
+ * Rename Session.TimeoutOn to WaitTimeoutOn
+ * Add flow_id to msg and record for flow messages
+
 v7.1.26
 ----------
  * Add testdata functions for testing campaigns and events
