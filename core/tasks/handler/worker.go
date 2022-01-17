@@ -8,6 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -21,7 +22,6 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -119,7 +119,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling stop event: %s", event)
 			}
-			err = handleStopEvent(ctx, rt.DB, rt.RP, evt)
+			err = handleStopEvent(ctx, rt, evt)
 
 		case NewConversationEventType, ReferralEventType, MOMissEventType, WelcomeMessageEventType:
 			evt := &models.ChannelEvent{}
@@ -172,7 +172,8 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			})
 
 			if qerr := dbutil.AsQueryError(err); qerr != nil {
-				log.WithFields(qerr.Fields())
+				query, params := qerr.Query()
+				log = log.WithFields(logrus.Fields{"sql": query, "sql_params": params})
 			}
 
 			contactEvent.ErrorCount++
@@ -202,13 +203,13 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		"run_id":     event.RunID,
 		"session_id": event.SessionID,
 	})
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
@@ -235,7 +236,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 	// if we didn't find a session or it is another session then this flow got interrupted and this is a race, fail it
 	if session == nil || session.ID() != event.SessionID {
 		log.Error("expiring run with mismatched session, session for run no longer active, failing runs and session")
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{event.SessionID}, models.ExitFailed, time.Now())
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{event.SessionID}, models.ExitFailed)
 		if err != nil {
 			return errors.Wrapf(err, "error failing expired runs for session that is no longer active")
 		}
@@ -266,13 +267,13 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		resume = resumes.NewRunExpiration(oa.Env(), contact)
 
 	case TimeoutEventType:
-		if session.TimeoutOn() == nil {
+		if session.WaitTimeoutOn() == nil {
 			log.WithField("session_id", session.ID()).Info("ignoring session timeout, has no timeout set")
 			return nil
 		}
 
 		// check that the timeout is the same
-		timeout := *session.TimeoutOn()
+		timeout := *session.WaitTimeoutOn()
 		if !timeout.Equal(event.Time) {
 			log.WithField("event_timeout", event.Time).WithField("session_timeout", timeout).Info("ignoring timeout, has been updated")
 			return nil
@@ -295,7 +296,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 
 // HandleChannelEvent is called for channel events
 func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
 	}
@@ -308,7 +309,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID()})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID()})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contact")
 	}
@@ -364,7 +365,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	}
 
 	if event.IsNewContact() {
-		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, contact)
+		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to initialize new contact")
 		}
@@ -452,8 +453,8 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 }
 
 // handleStopEvent is called when a contact is stopped by courier
-func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *StopEvent) error {
-	tx, err := db.BeginTxx(ctx, nil)
+func handleStopEvent(ctx context.Context, rt *runtime.Runtime, event *StopEvent) error {
+	tx, err := rt.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "unable to start transaction for stopping contact")
 	}
@@ -479,7 +480,7 @@ func handleStopEvent(ctx context.Context, db *sqlx.DB, rp *redis.Pool, event *St
 
 // handleMsgEvent is called when a new message arrives from a contact
 func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) error {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
@@ -491,14 +492,14 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
 
 	// contact has been deleted, ignore this message but mark it as handled
 	if len(contacts) == 0 {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
 		if err != nil {
 			return errors.Wrapf(err, "error updating message for deleted contact")
 		}
@@ -526,7 +527,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
 	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking blocked or nil channel message as handled")
 		}
@@ -546,7 +547,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if this is a new contact, we need to calculate dynamic groups and campaigns
 	if newContact {
-		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, contact)
+		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
 		if err != nil {
 			return errors.Wrapf(err, "unable to initialize new contact")
 		}
@@ -558,7 +559,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return errors.Wrapf(err, "unable to look up open tickets for contact")
 	}
 	for _, ticket := range tickets {
-		ticket.ForwardIncoming(ctx, rt.DB, oa, event.MsgUUID, event.Text, event.Attachments)
+		ticket.ForwardIncoming(ctx, rt, oa, event.MsgUUID, event.Text, event.Attachments)
 	}
 
 	// find any matching triggers
@@ -577,7 +578,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 		// flow this session is in is gone, interrupt our session and reset it
 		if err == models.ErrNotFound {
-			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed, time.Now())
+			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed)
 			session = nil
 		}
 
@@ -598,14 +599,14 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 		sessions[0].SetIncomingMsg(event.MsgID, event.MsgExternalID)
 
-		return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
+		return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
 		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) {
 		// load our flow
-		flow, err := oa.FlowByID(trigger.FlowID())
+		flow, err = oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
 			return errors.Wrapf(err, "error loading flow for trigger")
 		}
@@ -615,7 +616,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 			if flow.FlowType() == models.FlowTypeVoice {
 				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
-					return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
+					return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
 				}
 				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
 				if err != nil {
@@ -645,7 +646,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
-	err = handleAsInbox(ctx, rt.DB, rt.RP, oa, contact, msgIn, topupID, tickets)
+	err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
 	}
@@ -653,7 +654,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 }
 
 func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.TicketEvent) error {
-	oa, err := models.GetOrgAssets(ctx, rt.DB, event.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID())
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
 	}
@@ -671,7 +672,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 	modelTicket := tickets[0]
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{modelTicket.ContactID()})
+	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{modelTicket.ContactID()})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
@@ -749,24 +750,31 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 }
 
 // handles a message as an inbox message
-func handleAsInbox(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID, tickets []*models.Ticket) error {
+func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID, tickets []*models.Ticket) error {
 	// usually last_seen_on is updated by handling the msg_received event in the engine sprint, but since this is an inbox
 	// message we manually create that event and handle it
 	msgEvent := events.NewMsgReceived(msg)
 	contact.SetLastSeenOn(msgEvent.CreatedOn())
 	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
 
-	err := models.HandleAndCommitEvents(ctx, db, rp, oa, contactEvents)
+	err := models.HandleAndCommitEvents(ctx, rt, oa, contactEvents)
 	if err != nil {
 		return errors.Wrap(err, "error handling inbox message events")
 	}
 
-	return markMsgHandled(ctx, db, contact, msg, models.MsgTypeInbox, topupID, tickets)
+	return markMsgHandled(ctx, rt.DB, contact, msg, nil, topupID, tickets)
 }
 
 // utility to mark as message as handled and update any open contact tickets
-func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, msgType models.MsgType, topupID models.TopupID, tickets []*models.Ticket) error {
-	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, topupID)
+func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, topupID models.TopupID, tickets []*models.Ticket) error {
+	msgType := models.MsgTypeInbox
+	flowID := models.NilFlowID
+	if flow != nil {
+		msgType = models.MsgTypeFlow
+		flowID = flow.ID()
+	}
+
+	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}

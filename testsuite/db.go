@@ -38,7 +38,7 @@ func (d *MockDB) check(funcName string) error {
 }
 
 func (d *MockDB) Rebind(query string) string {
-	return d.Rebind(query)
+	return d.real.Rebind(query)
 }
 
 func (d *MockDB) QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {

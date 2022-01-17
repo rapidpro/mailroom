@@ -3,29 +3,31 @@ package main
 import (
 	"os"
 	"os/signal"
-	"runtime"
+	goruntime "runtime"
 	"syscall"
 
 	"github.com/nyaruka/ezconf"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/logrus_sentry"
 	"github.com/nyaruka/mailroom"
-	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/runtime"
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	_ "github.com/nyaruka/mailroom/core/hooks"
-	_ "github.com/nyaruka/mailroom/core/ivr/twiml"
-	_ "github.com/nyaruka/mailroom/core/ivr/vonage"
-	_ "github.com/nyaruka/mailroom/core/tasks/broadcasts"
+	_ "github.com/nyaruka/mailroom/core/tasks/analytics"
 	_ "github.com/nyaruka/mailroom/core/tasks/campaigns"
 	_ "github.com/nyaruka/mailroom/core/tasks/contacts"
 	_ "github.com/nyaruka/mailroom/core/tasks/expirations"
+	_ "github.com/nyaruka/mailroom/core/tasks/handler"
+	_ "github.com/nyaruka/mailroom/core/tasks/incidents"
 	_ "github.com/nyaruka/mailroom/core/tasks/interrupts"
 	_ "github.com/nyaruka/mailroom/core/tasks/ivr"
+	_ "github.com/nyaruka/mailroom/core/tasks/msgs"
 	_ "github.com/nyaruka/mailroom/core/tasks/schedules"
 	_ "github.com/nyaruka/mailroom/core/tasks/starts"
-	_ "github.com/nyaruka/mailroom/core/tasks/stats"
 	_ "github.com/nyaruka/mailroom/core/tasks/timeouts"
+	_ "github.com/nyaruka/mailroom/services/ivr/twiml"
+	_ "github.com/nyaruka/mailroom/services/ivr/vonage"
 	_ "github.com/nyaruka/mailroom/services/tickets/intern"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/rocketchat"
@@ -49,7 +51,7 @@ import (
 var version = "Dev"
 
 func main() {
-	config := config.Mailroom
+	config := runtime.NewDefaultConfig()
 	loader := ezconf.NewLoader(
 		config,
 		"mailroom", "Mailroom - flow event handler for RapidPro",
@@ -114,7 +116,7 @@ func handleSignals(mr *mailroom.Mailroom) {
 		switch sig {
 		case syscall.SIGQUIT:
 			buf := make([]byte, 1<<20)
-			stacklen := runtime.Stack(buf, true)
+			stacklen := goruntime.Stack(buf, true)
 			logrus.WithField("comp", "main").WithField("signal", sig).Info("received quit signal, dumping stack")
 			logrus.Printf("\n%s", buf[:stacklen])
 		case syscall.SIGINT, syscall.SIGTERM:

@@ -11,18 +11,17 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-	"github.com/nyaruka/mailroom/utils/marker"
+	"github.com/nyaruka/redisx"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 const (
 	timeoutLock = "sessions_timeouts"
-	markerGroup = "session_timeouts"
 )
+
+var marker = redisx.NewIntervalSet("session_timeouts", time.Hour*24, 2)
 
 func init() {
 	mailroom.AddInitFunction(StartTimeoutCron)
@@ -30,11 +29,11 @@ func init() {
 
 // StartTimeoutCron starts our cron job of continuing timed out sessions every minute
 func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.StartCron(quit, rt.RP, timeoutLock, time.Second*60,
-		func(lockName string, lockValue string) error {
+	cron.Start(quit, rt, timeoutLock, time.Second*60, false,
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return timeoutSessions(ctx, rt.DB, rt.RP, lockName, lockValue)
+			return timeoutSessions(ctx, rt)
 		},
 	)
 	return nil
@@ -42,18 +41,18 @@ func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) e
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue
 // TODO: extend lock
-func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
-	log := logrus.WithField("comp", "timeout").WithField("lock", lockValue)
+func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
+	log := logrus.WithField("comp", "timeout")
 	start := time.Now()
 
 	// find all sessions that need to be expired (we exclude IVR runs)
-	rows, err := db.QueryxContext(ctx, timedoutSessionsSQL)
+	rows, err := rt.DB.QueryxContext(ctx, timedoutSessionsSQL)
 	if err != nil {
 		return errors.Wrapf(err, "error selecting timed out sessions")
 	}
 	defer rows.Close()
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// add a timeout task for each run
@@ -67,7 +66,7 @@ func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName 
 
 		// check whether we've already queued this
 		taskID := fmt.Sprintf("%d:%s", timeout.SessionID, timeout.TimeoutOn.Format(time.RFC3339))
-		queued, err := marker.HasTask(rc, markerGroup, taskID)
+		queued, err := marker.Contains(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error checking whether task is queued")
 		}
@@ -85,7 +84,7 @@ func timeoutSessions(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName 
 		}
 
 		// and mark it as queued
-		err = marker.AddTask(rc, markerGroup, taskID)
+		err = marker.Add(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking timeout task as queued")
 		}

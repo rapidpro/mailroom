@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -16,7 +16,7 @@ var InsertHTTPLogsHook models.EventCommitHook = &insertHTTPLogsHook{}
 type insertHTTPLogsHook struct{}
 
 // Apply inserts all the classifier logs that were created
-func (h *insertHTTPLogsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertHTTPLogsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our logs
 	logs := make([]*models.HTTPLog, 0, len(scenes))
 	for _, ls := range scenes {

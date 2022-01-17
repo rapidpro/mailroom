@@ -2,61 +2,52 @@ package msgio_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
-	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type msgSpec struct {
-	ChannelID models.ChannelID
-	ContactID models.ContactID
-	URNID     models.URNID
-	Failed    bool
+	Channel      *testdata.Channel
+	Contact      *testdata.Contact
+	Failed       bool
+	HighPriority bool
 }
 
-func (m *msgSpec) createMsg(t *testing.T, db *sqlx.DB, oa *models.OrgAssets) *models.Msg {
-	// Only way to create a failed outgoing message is to suspend the org and reload the org.
-	// However the channels have to be fetched from the same org assets thus why this uses its
-	// own org assets instance.
-	ctx := context.Background()
-	db.MustExec(`UPDATE orgs_org SET is_suspended = $1 WHERE id = $2`, m.Failed, testdata.Org1.ID)
-	oaOrg, _ := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
-
-	var channel *models.Channel
-	var channelRef *assets.ChannelReference
-
-	if m.ChannelID != models.NilChannelID {
-		channel = oa.ChannelByID(m.ChannelID)
-		channelRef = channel.ChannelReference()
+func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets) *models.Msg {
+	status := models.MsgStatusQueued
+	if m.Failed {
+		status = models.MsgStatusFailed
 	}
-	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", m.URNID))
 
-	flowMsg := flows.NewMsgOut(urn, channelRef, "Hello", nil, nil, nil, flows.NilMsgTopic)
-	msg, err := models.NewOutgoingMsg(oaOrg.Org(), channel, m.ContactID, flowMsg, time.Now())
+	flowMsg := testdata.InsertOutgoingMsg(rt.DB, testdata.Org1, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority)
+	msgs, err := models.GetMessagesByID(context.Background(), rt.DB, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(flowMsg.ID())})
 	require.NoError(t, err)
 
-	models.InsertMessages(ctx, db, []*models.Msg{msg})
-	require.NoError(t, err)
+	msg := msgs[0]
+	msg.SetURN(m.Contact.URN)
 
+	// use the channel instances in org assets so they're shared between msg instances
+	if msg.ChannelID() != models.NilChannelID {
+		msg.SetChannel(oa.ChannelByID(msg.ChannelID()))
+	}
 	return msg
 }
 
 func TestSendMessages(t *testing.T) {
-	ctx, _, db, rp := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetData)
 
 	mockFCM := newMockFCMEndpoint("FCMID3")
 	defer mockFCM.Stop()
@@ -68,7 +59,7 @@ func TestSendMessages(t *testing.T) {
 	androidChannel2 := testdata.InsertChannel(db, testdata.Org1, "A", "Android 2", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID2"})
 	testdata.InsertChannel(db, testdata.Org1, "A", "Android 3", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID3"})
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshChannels)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -79,26 +70,36 @@ func TestSendMessages(t *testing.T) {
 		PendingMsgs     int
 	}{
 		{
+			Description:     "no messages",
+			Msgs:            []msgSpec{},
+			QueueSizes:      map[string][]int{},
+			FCMTokensSynced: []string{},
+			PendingMsgs:     0,
+		},
+		{
 			Description: "2 messages for Courier, and 1 Android",
 			Msgs: []msgSpec{
 				{
-					ChannelID: testdata.TwilioChannel.ID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
+					Channel: testdata.TwilioChannel,
+					Contact: testdata.Cathy,
 				},
 				{
-					ChannelID: androidChannel1.ID,
-					ContactID: testdata.Bob.ID,
-					URNID:     testdata.Bob.URNID,
+					Channel: androidChannel1,
+					Contact: testdata.Bob,
 				},
 				{
-					ChannelID: testdata.TwilioChannel.ID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
+					Channel: testdata.TwilioChannel,
+					Contact: testdata.Cathy,
+				},
+				{
+					Channel:      testdata.TwilioChannel,
+					Contact:      testdata.Bob,
+					HighPriority: true,
 				},
 			},
 			QueueSizes: map[string][]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2},
+				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // 2 default priority messages for Cathy
+				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1}, // 1 high priority message for Bob
 			},
 			FCMTokensSynced: []string{"FCMID1"},
 			PendingMsgs:     0,
@@ -107,19 +108,16 @@ func TestSendMessages(t *testing.T) {
 			Description: "each Android channel synced once",
 			Msgs: []msgSpec{
 				{
-					ChannelID: androidChannel1.ID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
+					Channel: androidChannel1,
+					Contact: testdata.Cathy,
 				},
 				{
-					ChannelID: androidChannel2.ID,
-					ContactID: testdata.Bob.ID,
-					URNID:     testdata.Bob.URNID,
+					Channel: androidChannel2,
+					Contact: testdata.Bob,
 				},
 				{
-					ChannelID: androidChannel1.ID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
+					Channel: androidChannel1,
+					Contact: testdata.Cathy,
 				},
 			},
 			QueueSizes:      map[string][]int{},
@@ -127,12 +125,24 @@ func TestSendMessages(t *testing.T) {
 			PendingMsgs:     0,
 		},
 		{
+			Description: "messages with FAILED status ignored",
+			Msgs: []msgSpec{
+				{
+					Channel: testdata.TwilioChannel,
+					Contact: testdata.Cathy,
+					Failed:  true,
+				},
+			},
+			QueueSizes:      map[string][]int{},
+			FCMTokensSynced: []string{},
+			PendingMsgs:     0,
+		},
+		{
 			Description: "messages without channels set to PENDING",
 			Msgs: []msgSpec{
 				{
-					ChannelID: models.NilChannelID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
+					Channel: nil,
+					Contact: testdata.Cathy,
 				},
 			},
 			QueueSizes:      map[string][]int{},
@@ -144,13 +154,13 @@ func TestSendMessages(t *testing.T) {
 	for _, tc := range tests {
 		msgs := make([]*models.Msg, len(tc.Msgs))
 		for i, ms := range tc.Msgs {
-			msgs[i] = ms.createMsg(t, db, oa)
+			msgs[i] = ms.createMsg(t, rt, oa)
 		}
 
 		rc.Do("FLUSHDB")
 		mockFCM.Messages = nil
 
-		msgio.SendMessages(ctx, db, rp, fc, msgs)
+		msgio.SendMessages(ctx, rt, db, fc, msgs)
 
 		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 
@@ -162,6 +172,6 @@ func TestSendMessages(t *testing.T) {
 
 		assert.Equal(t, tc.FCMTokensSynced, actualTokens, "FCM tokens mismatch in '%s'", tc.Description)
 
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(tc.PendingMsgs, `pending messages mismatch in '%s'`, tc.Description)
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(tc.PendingMsgs, `pending messages mismatch in '%s'`, tc.Description)
 	}
 }

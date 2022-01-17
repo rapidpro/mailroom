@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -62,7 +62,7 @@ func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, e
 	groups := make([]assets.Group, 0, 10)
 	for rows.Next() {
 		group := &Group{}
-		err = dbutil.ReadJSONRow(rows, &group.g)
+		err = dbutil.ScanJSON(rows, &group.g)
 		if err != nil {
 			return nil, errors.Wrap(err, "error reading group row")
 		}
@@ -192,7 +192,7 @@ func UpdateGroupStatus(ctx context.Context, db Queryer, groupID GroupID, status 
 
 // RemoveContactsFromGroupAndCampaigns removes the passed in contacts from the passed in group, taking care of also
 // removing them from any associated campaigns
-func RemoveContactsFromGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAssets, groupID GroupID, contactIDs []ContactID) error {
+func RemoveContactsFromGroupAndCampaigns(ctx context.Context, db *sqlx.DB, oa *OrgAssets, groupID GroupID, contactIDs []ContactID) error {
 	removeBatch := func(batch []ContactID) error {
 		tx, err := db.BeginTxx(ctx, nil)
 
@@ -215,7 +215,7 @@ func RemoveContactsFromGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *
 		}
 
 		// remove from any campaign events
-		err = DeleteUnfiredEventsForGroupRemoval(ctx, tx, org, batch, groupID)
+		err = DeleteUnfiredEventsForGroupRemoval(ctx, tx, oa, batch, groupID)
 		if err != nil {
 			tx.Rollback()
 			return errors.Wrapf(err, "error removing contacts from unfired campaign events for group: %d", groupID)
@@ -254,7 +254,7 @@ func RemoveContactsFromGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *
 
 // AddContactsToGroupAndCampaigns takes care of adding the passed in contacts to the passed in group, updating any
 // associated campaigns as needed
-func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAssets, groupID GroupID, contactIDs []ContactID) error {
+func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, oa *OrgAssets, groupID GroupID, contactIDs []ContactID) error {
 	// we need session assets in order to recalculate campaign events
 	addBatch := func(batch []ContactID) error {
 		tx, err := db.BeginTxx(ctx, nil)
@@ -278,7 +278,7 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 		}
 
 		// now load our contacts and add update their campaign events
-		contacts, err := LoadContacts(ctx, tx, org, batch)
+		contacts, err := LoadContacts(ctx, tx, oa, batch)
 		if err != nil {
 			tx.Rollback()
 			return errors.Wrapf(err, "error loading contacts when adding to group: %d", groupID)
@@ -287,7 +287,7 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 		// convert to flow contacts
 		fcs := make([]*flows.Contact, len(contacts))
 		for i, c := range contacts {
-			fcs[i], err = c.FlowContact(org)
+			fcs[i], err = c.FlowContact(oa)
 			if err != nil {
 				tx.Rollback()
 				return errors.Wrapf(err, "error converting contact to flow contact: %s", c.UUID())
@@ -295,7 +295,7 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 		}
 
 		// schedule any upcoming events that were affected by this group
-		err = AddCampaignEventsForGroupAddition(ctx, tx, org, fcs, groupID)
+		err = AddCampaignEventsForGroupAddition(ctx, tx, oa, fcs, groupID)
 		if err != nil {
 			tx.Rollback()
 			return errors.Wrapf(err, "error calculating new campaign events during group addition: %d", groupID)
@@ -334,7 +334,7 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, org *OrgAs
 
 // PopulateDynamicGroup calculates which members should be part of a group and populates the contacts
 // for that group by performing the minimum number of inserts / deletes.
-func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, org *OrgAssets, groupID GroupID, query string) (int, error) {
+func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, oa *OrgAssets, groupID GroupID, query string) (int, error) {
 	err := UpdateGroupStatus(ctx, db, groupID, GroupStatusEvaluating)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error marking dynamic group as evaluating")
@@ -345,9 +345,9 @@ func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, 
 	// we have a bit of a race with the indexer process.. we want to make sure that any contacts that changed
 	// before this group was updated but after the last index are included, so if a contact was modified
 	// more recently than 10 seconds ago, we wait that long before starting in populating our group
-	newest, err := GetNewestContactModifiedOn(ctx, db, org)
+	newest, err := GetNewestContactModifiedOn(ctx, db, oa)
 	if err != nil {
-		return 0, errors.Wrapf(err, "error getting most recent contact modified_on for org: %d", org.OrgID())
+		return 0, errors.Wrapf(err, "error getting most recent contact modified_on for org: %d", oa.OrgID())
 	}
 	if newest != nil {
 		n := *newest
@@ -371,7 +371,7 @@ func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, 
 	}
 
 	// calculate new set of ids
-	new, err := ContactIDsForQuery(ctx, es, org, query)
+	new, err := ContactIDsForQuery(ctx, es, oa, query)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error performing query: %s for group: %d", query, groupID)
 	}
@@ -392,13 +392,13 @@ func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, 
 	}
 
 	// first remove all the contacts
-	err = RemoveContactsFromGroupAndCampaigns(ctx, db, org, groupID, removals)
+	err = RemoveContactsFromGroupAndCampaigns(ctx, db, oa, groupID, removals)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error removing contacts from group: %d", groupID)
 	}
 
 	// then add them all
-	err = AddContactsToGroupAndCampaigns(ctx, db, org, groupID, adds)
+	err = AddContactsToGroupAndCampaigns(ctx, db, oa, groupID, adds)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error adding contacts to group: %d", groupID)
 	}

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/mailroom/config"
+	"github.com/nyaruka/mailroom/runtime"
 )
 
 var httpInit sync.Once
@@ -17,7 +17,7 @@ var httpRetries *httpx.RetryConfig
 var httpAccess *httpx.AccessConfig
 
 // HTTP returns the configuration objects for HTTP calls from the engine and its services
-func HTTP(cfg *config.Config) (*http.Client, *httpx.RetryConfig, *httpx.AccessConfig) {
+func HTTP(cfg *runtime.Config) (*http.Client, *httpx.RetryConfig, *httpx.AccessConfig) {
 	httpInit.Do(func() {
 		// customize the default golang transport
 		t := http.DefaultTransport.(*http.Transport).Clone()

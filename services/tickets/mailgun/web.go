@@ -88,7 +88,7 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 	}
 
 	// look up the ticket and ticketer
-	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, rt.DB, flows.TicketUUID(match[0][1]), typeMailgun)
+	ticket, ticketer, svc, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(match[0][1]), typeMailgun)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
@@ -104,14 +104,14 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 		return &receiveResponse{Action: "rejected", TicketUUID: ticket.UUID()}, http.StatusOK, nil
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt.DB, ticket.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		err = tickets.CloseTicket(ctx, rt, oa, ticket, true, l)
+		err = tickets.Close(ctx, rt, oa, ticket, true, l)
 		if err != nil {
 			return errors.Wrapf(err, "error closing ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 		}
@@ -127,7 +127,7 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 
 	// reopen ticket if necessary
 	if ticket.Status() != models.TicketStatusOpen {
-		err = tickets.ReopenTicket(ctx, rt, oa, ticket, false, nil)
+		err = tickets.Reopen(ctx, rt, oa, ticket, false, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error reopening ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 		}

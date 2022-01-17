@@ -7,12 +7,11 @@ import (
 	"math"
 	"time"
 
+	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -54,6 +53,7 @@ type Channel struct {
 		Roles              []assets.ChannelRole     `json:"roles"`
 		MatchPrefixes      []string                 `json:"match_prefixes"`
 		AllowInternational bool                     `json:"allow_international"`
+		MachineDetection   bool                     `json:"machine_detection"`
 		Config             map[string]interface{}   `json:"config"`
 	}
 }
@@ -91,6 +91,9 @@ func (c *Channel) MatchPrefixes() []string { return c.c.MatchPrefixes }
 // AllowInternational returns whether this channel allows sending internationally (only applies to TEL schemes)
 func (c *Channel) AllowInternational() bool { return c.c.AllowInternational }
 
+// MachineDetection returns whether this channel should do answering machine detection (only applies to IVR)
+func (c *Channel) MachineDetection() bool { return c.c.MachineDetection }
+
 // Parent returns a reference to the parent channel of this channel (if any)
 func (c *Channel) Parent() *assets.ChannelReference { return c.c.Parent }
 
@@ -120,11 +123,48 @@ func (c *Channel) ChannelReference() *assets.ChannelReference {
 	return assets.NewChannelReference(c.UUID(), c.Name())
 }
 
+// GetChannelsByID fetches channels by ID - NOTE these are "lite" channels and only include fields for sending
+func GetChannelsByID(ctx context.Context, db Queryer, ids []ChannelID) ([]*Channel, error) {
+	rows, err := db.QueryxContext(ctx, selectChannelsByIDSQL, pq.Array(ids))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying channels by id")
+	}
+	defer rows.Close()
+
+	channels := make([]*Channel, 0, 5)
+	for rows.Next() {
+		channel := &Channel{}
+		err := dbutil.ScanJSON(rows, &channel.c)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error unmarshalling channel")
+		}
+
+		channels = append(channels, channel)
+	}
+
+	return channels, nil
+}
+
+const selectChannelsByIDSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	c.id as id,
+	c.uuid as uuid,
+	c.name as name,
+	c.channel_type as channel_type,
+	COALESCE(c.tps, 10) as tps,
+	COALESCE(c.config, '{}')::json as config
+FROM 
+	channels_channel c
+WHERE 
+	c.id = ANY($1)
+) r;
+`
+
 // loadChannels loads all the channels for the passed in org
-func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Channel, error) {
+func loadChannels(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Channel, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectChannelsSQL, orgID)
+	rows, err := db.QueryxContext(ctx, selectChannelsSQL, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying channels for org: %d", orgID)
 	}
@@ -133,7 +173,7 @@ func loadChannels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.C
 	channels := make([]assets.Channel, 0, 2)
 	for rows.Next() {
 		channel := &Channel{}
-		err := dbutil.ReadJSONRow(rows, &channel.c)
+		err := dbutil.ScanJSON(rows, &channel.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling channel")
 		}
@@ -169,7 +209,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		FROM unnest(regexp_split_to_array(c.role,'')) as r)
 	) as roles,
 	JSON_EXTRACT_PATH(c.config::json, 'matching_prefixes') as match_prefixes,
-	JSON_EXTRACT_PATH(c.config::json, 'allow_international') as allow_international
+	JSON_EXTRACT_PATH(c.config::json, 'allow_international') as allow_international,
+	JSON_EXTRACT_PATH(c.config::json, 'machine_detection') as machine_detection
 FROM 
 	channels_channel c
 WHERE 

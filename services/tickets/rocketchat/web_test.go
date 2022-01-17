@@ -9,11 +9,12 @@ import (
 )
 
 func TestEventCallback(t *testing.T) {
-	testsuite.Reset()
-	db := testsuite.DB()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
 	// create a rocketchat ticket for Cathy
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.RocketChat, "Need help", "Have you seen my cookies?", "1234", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.RocketChat, testdata.DefaultTopic, "Have you seen my cookies?", "1234", nil)
 
-	web.RunWebTests(t, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
+	web.RunWebTests(t, ctx, rt, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }

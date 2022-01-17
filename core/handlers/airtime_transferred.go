@@ -8,8 +8,8 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
@@ -20,7 +20,7 @@ func init() {
 }
 
 // handleAirtimeTransferred is called for each airtime transferred event
-func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleAirtimeTransferred(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.AirtimeTransferredEvent)
 
 	status := models.AirtimeTransferStatusSuccess
@@ -55,10 +55,12 @@ func handleAirtimeTransferred(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, 
 		transfer.AddLog(models.NewAirtimeTransferredLog(
 			oa.OrgID(),
 			httpLog.URL,
+			httpLog.StatusCode,
 			httpLog.Request,
 			httpLog.Response,
 			httpLog.Status != flows.CallStatusSuccess,
 			time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+			httpLog.Retries,
 			httpLog.CreatedOn,
 		))
 	}

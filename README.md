@@ -5,7 +5,7 @@
 
 # About
 
-Mailroom is the [RapidPro](https://github.com/rapidpro/rapidpro) component responsible for the execution of
+Mailroom is the [RapidPro](https://github.com/rapidpro/rapidpro) components which does the heavy lifting of running flow starts, campaigns etc.
 flows. It interacts directly with the RapidPro database and sends and receives messages with [Courier](https://github.com/nyaruka/courier) for handling via Redis.
 
 # Deploying

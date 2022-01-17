@@ -7,9 +7,9 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/assets/static/types"
+	"github.com/nyaruka/goflow/assets/static"
 	"github.com/nyaruka/goflow/excellent/tools"
-	xtypes "github.com/nyaruka/goflow/excellent/types"
+	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
@@ -39,7 +39,7 @@ type sessionRequest struct {
 	OrgID  models.OrgID     `json:"org_id"  validate:"required"`
 	Flows  []flowDefinition `json:"flows"`
 	Assets struct {
-		Channels []*types.Channel `json:"channels"`
+		Channels []*static.Channel `json:"channels"`
 	} `json:"assets"`
 }
 
@@ -60,24 +60,25 @@ func (r *sessionRequest) channels() []assets.Channel {
 }
 
 type simulationResponse struct {
-	Session flows.Session   `json:"session"`
-	Events  []flows.Event   `json:"events"`
-	Context *xtypes.XObject `json:"context,omitempty"`
+	Session  flows.Session   `json:"session"`
+	Events   []flows.Event   `json:"events"`
+	Segments []flows.Segment `json:"segments"`
+	Context  *types.XObject  `json:"context,omitempty"`
 }
 
 func newSimulationResponse(session flows.Session, sprint flows.Sprint) *simulationResponse {
-	var context *xtypes.XObject
+	var context *types.XObject
 	if session != nil {
 		context = session.CurrentContext()
 
 		// include object defaults which are not marshaled by default
 		if context != nil {
-			tools.ContextWalkObjects(context, func(o *xtypes.XObject) {
+			tools.ContextWalkObjects(context, func(o *types.XObject) {
 				o.SetMarshalDefault(true)
 			})
 		}
 	}
-	return &simulationResponse{Session: session, Events: sprint.Events(), Context: context}
+	return &simulationResponse{Session: session, Events: sprint.Events(), Segments: sprint.Segments(), Context: context}
 }
 
 // Starts a new engine session
@@ -125,13 +126,13 @@ func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (int
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to load org assets")
 	}
 
 	// create clone of assets for simulation
-	oa, err = oa.CloneForSimulation(ctx, rt.DB, request.flows(), request.channels())
+	oa, err = oa.CloneForSimulation(ctx, rt, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "unable to clone org")
 	}
@@ -188,13 +189,13 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
 
 	// create clone of assets for simulation
-	oa, err = oa.CloneForSimulation(ctx, rt.DB, request.flows(), request.channels())
+	oa, err = oa.CloneForSimulation(ctx, rt, request.flows(), request.channels())
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

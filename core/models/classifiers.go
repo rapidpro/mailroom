@@ -5,17 +5,17 @@ import (
 	"database/sql/driver"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/classification/bothub"
 	"github.com/nyaruka/goflow/services/classification/luis"
 	"github.com/nyaruka/goflow/services/classification/wit"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/utils/dbutil"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -42,19 +42,21 @@ const (
 	BothubConfigAccessToken = "access_token"
 
 	// LUIS config options
-	LuisConfigAppID       = "app_id"
-	LuisConfigVersion     = "version"
-	LuisConfigEndpointURL = "endpoint_url"
-	LuisConfigPrimaryKey  = "primary_key"
+	LuisConfigAppID              = "app_id"
+	LuisConfigPredictionEndpoint = "prediction_endpoint"
+	LuisConfigPredictionKey      = "prediction_key"
+	LuisConfigSlot               = "slot"
 )
 
 // Register a classification service factory with the engine
 func init() {
-	goflow.RegisterClassificationServiceFactory(
-		func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
-			return classifier.Asset().(*Classifier).AsService(classifier)
-		},
-	)
+	goflow.RegisterClassificationServiceFactory(classificationServiceFactory)
+}
+
+func classificationServiceFactory(c *runtime.Config) engine.ClassificationServiceFactory {
+	return func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
+		return classifier.Asset().(*Classifier).AsService(c, classifier)
+	}
 }
 
 // Classifier is our type for a classifier
@@ -90,8 +92,8 @@ func (c *Classifier) Intents() []string { return c.c.intentNames }
 func (c *Classifier) Type() string { return c.c.Type }
 
 // AsService builds the corresponding ClassificationService for the passed in Classifier
-func (c *Classifier) AsService(classifier *flows.Classifier) (flows.ClassificationService, error) {
-	httpClient, httpRetries, httpAccess := goflow.HTTP(config.Mailroom)
+func (c *Classifier) AsService(cfg *runtime.Config, classifier *flows.Classifier) (flows.ClassificationService, error) {
+	httpClient, httpRetries, httpAccess := goflow.HTTP(cfg)
 
 	switch c.Type() {
 	case ClassifierTypeWit:
@@ -102,14 +104,15 @@ func (c *Classifier) AsService(classifier *flows.Classifier) (flows.Classificati
 		return wit.NewService(httpClient, httpRetries, classifier, accessToken), nil
 
 	case ClassifierTypeLuis:
-		endpoint := c.c.Config[LuisConfigEndpointURL]
 		appID := c.c.Config[LuisConfigAppID]
-		key := c.c.Config[LuisConfigPrimaryKey]
-		if endpoint == "" || appID == "" || key == "" {
-			return nil, errors.Errorf("missing %s, %s or %s on LUIS classifier: %s",
-				LuisConfigEndpointURL, LuisConfigAppID, LuisConfigPrimaryKey, c.UUID())
+		endpoint := c.c.Config[LuisConfigPredictionEndpoint]
+		key := c.c.Config[LuisConfigPredictionKey]
+		slot := c.c.Config[LuisConfigSlot]
+		if endpoint == "" || appID == "" || key == "" || slot == "" {
+			return nil, errors.Errorf("missing %s, %s, %s or %s on LUIS classifier: %s",
+				LuisConfigAppID, LuisConfigPredictionEndpoint, LuisConfigPredictionKey, LuisConfigSlot, c.UUID())
 		}
-		return luis.NewService(httpClient, httpRetries, httpAccess, classifier, endpoint, appID, key), nil
+		return luis.NewService(httpClient, httpRetries, httpAccess, classifier, endpoint, appID, key, slot), nil
 
 	case ClassifierTypeBothub:
 		accessToken := c.c.Config[BothubConfigAccessToken]
@@ -136,7 +139,7 @@ func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]asset
 	classifiers := make([]assets.Classifier, 0, 2)
 	for rows.Next() {
 		classifier := &Classifier{}
-		err := dbutil.ReadJSONRow(rows, &classifier.c)
+		err := dbutil.ScanJSON(rows, &classifier.c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling classifier")
 		}

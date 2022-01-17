@@ -3,8 +3,8 @@ package msgio
 import (
 	"time"
 
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 
 	"github.com/edganiukov/fcm"
@@ -19,6 +19,8 @@ func SyncAndroidChannels(fc *fcm.Client, channels []*models.Channel) {
 	}
 
 	for _, channel := range channels {
+		assert(channel.Type() == models.ChannelTypeAndroid, "can't sync a non-android channel")
+
 		// no FCM ID for this channel, noop, we can't trigger a sync
 		fcmID := channel.ConfigValue(models.ChannelConfigFCMID, "")
 		if fcmID == "" {
@@ -45,7 +47,7 @@ func SyncAndroidChannels(fc *fcm.Client, channels []*models.Channel) {
 }
 
 // CreateFCMClient creates an FCM client based on the configured FCM API key
-func CreateFCMClient(cfg *config.Config) *fcm.Client {
+func CreateFCMClient(cfg *runtime.Config) *fcm.Client {
 	if cfg.FCMKey == "" {
 		return nil
 	}

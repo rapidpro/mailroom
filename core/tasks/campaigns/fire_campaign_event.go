@@ -11,7 +11,6 @@ import (
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/marker"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -26,7 +25,7 @@ func init() {
 
 // FireCampaignEventTask is the task to handle firing campaign events
 type FireCampaignEventTask struct {
-	FireIDs      []int64         `json:"fire_ids"`
+	FireIDs      []models.FireID `json:"fire_ids"`
 	EventID      int64           `json:"event_id"`
 	EventUUID    string          `json:"event_uuid"`
 	FlowUUID     assets.FlowUUID `json:"flow_uuid"`
@@ -58,7 +57,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 		// unmark all these fires as fires so they can retry
 		rc := rp.Get()
 		for _, id := range t.FireIDs {
-			rerr := marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", id))
+			rerr := campaignsMarker.Remove(rc, fmt.Sprintf("%d", id))
 			if rerr != nil {
 				log.WithError(rerr).WithField("fire_id", id).Error("error unmarking campaign fire")
 			}
@@ -93,7 +92,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 	if len(contactMap) > 0 {
 		rc := rp.Get()
 		for _, failed := range contactMap {
-			rerr := marker.RemoveTask(rc, campaignsLock, fmt.Sprintf("%d", failed.FireID))
+			rerr := campaignsMarker.Remove(rc, fmt.Sprintf("%d", failed.FireID))
 			if rerr != nil {
 				log.WithError(rerr).WithField("fire_id", failed.FireID).Error("error unmarking campaign fire")
 			}

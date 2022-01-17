@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -14,13 +15,18 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
+	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
-
-	"github.com/jmoiron/sqlx"
 )
 
 // ContactImportID is the type for contact import IDs
-type ContactImportID int64
+type ContactImportID null.Int
+
+func (i ContactImportID) MarshalJSON() ([]byte, error)  { return null.Int(i).MarshalJSON() }
+func (i *ContactImportID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, (*null.Int)(i)) }
+func (i ContactImportID) Value() (driver.Value, error)  { return null.Int(i).Value() }
+func (i *ContactImportID) Scan(value interface{}) error { return null.ScanInt(value, (*null.Int)(i)) }
 
 // ContactImportBatchID is the type for contact import batch IDs
 type ContactImportBatchID int64
@@ -35,6 +41,63 @@ const (
 	ContactImportStatusComplete   ContactImportStatus = "C"
 	ContactImportStatusFailed     ContactImportStatus = "F"
 )
+
+type ContactImport struct {
+	ID          ContactImportID     `db:"id"`
+	OrgID       OrgID               `db:"org_id"`
+	Status      ContactImportStatus `db:"status"`
+	CreatedByID UserID              `db:"created_by_id"`
+	FinishedOn  *time.Time          `db:"finished_on"`
+
+	// we fetch unique batch statuses concatenated as a string, see https://github.com/jmoiron/sqlx/issues/168
+	BatchStatuses string `db:"batch_statuses"`
+}
+
+var loadContactImportSQL = `
+SELECT 
+	i.id AS "id",
+  	i.org_id AS "org_id",
+  	i.status AS "status",
+  	i.created_by_id AS "created_by_id",
+	i.finished_on AS "finished_on",
+	array_to_string(array_agg(DISTINCT b.status), '') AS "batch_statuses"
+FROM
+	contacts_contactimport i
+LEFT OUTER JOIN
+	contacts_contactimportbatch b ON b.contact_import_id = i.id
+WHERE
+	i.id = $1
+GROUP BY
+	i.id`
+
+// LoadContactImport loads a contact import by ID
+func LoadContactImport(ctx context.Context, db Queryer, id ContactImportID) (*ContactImport, error) {
+	i := &ContactImport{}
+	err := db.GetContext(ctx, i, loadContactImportSQL, id)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading contact import id=%d", id)
+	}
+	return i, nil
+}
+
+var markContactImportFinishedSQL = `
+UPDATE
+	contacts_contactimport
+SET
+	status = $2,
+	finished_on = $3
+WHERE 
+	id = $1
+`
+
+func (i *ContactImport) MarkFinished(ctx context.Context, db Queryer, status ContactImportStatus) error {
+	now := dates.Now()
+	i.Status = status
+	i.FinishedOn = &now
+
+	_, err := db.ExecContext(ctx, markContactImportFinishedSQL, i.ID, i.Status, i.FinishedOn)
+	return errors.Wrap(err, "error marking import as finished")
+}
 
 // ContactImportBatch is a batch of contacts within a larger import
 type ContactImportBatch struct {
@@ -56,10 +119,10 @@ type ContactImportBatch struct {
 }
 
 // Import does the actual import of this batch
-func (b *ContactImportBatch) Import(ctx context.Context, db *sqlx.DB, orgID OrgID) error {
+func (b *ContactImportBatch) Import(ctx context.Context, rt *runtime.Runtime, orgID OrgID) error {
 	// if any error occurs this batch should be marked as failed
-	if err := b.tryImport(ctx, db, orgID); err != nil {
-		b.markFailed(ctx, db)
+	if err := b.tryImport(ctx, rt, orgID); err != nil {
+		b.markFailed(ctx, rt.DB)
 		return err
 	}
 	return nil
@@ -76,13 +139,13 @@ type importContact struct {
 	errors      []string
 }
 
-func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID OrgID) error {
-	if err := b.markProcessing(ctx, db); err != nil {
+func (b *ContactImportBatch) tryImport(ctx context.Context, rt *runtime.Runtime, orgID OrgID) error {
+	if err := b.markProcessing(ctx, rt.DB); err != nil {
 		return errors.Wrap(err, "error marking as processing")
 	}
 
 	// grab our org assets
-	oa, err := GetOrgAssetsWithRefresh(ctx, db, orgID, RefreshFields|RefreshGroups)
+	oa, err := GetOrgAssetsWithRefresh(ctx, rt, orgID, RefreshFields|RefreshGroups)
 	if err != nil {
 		return errors.Wrap(err, "error loading org assets")
 	}
@@ -99,7 +162,7 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID O
 		imports[i] = &importContact{record: b.RecordStart + i, spec: specs[i]}
 	}
 
-	if err := b.getOrCreateContacts(ctx, db, oa, imports); err != nil {
+	if err := b.getOrCreateContacts(ctx, rt.DB, oa, imports); err != nil {
 		return errors.Wrap(err, "error getting and creating contacts")
 	}
 
@@ -113,12 +176,12 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, db *sqlx.DB, orgID O
 	}
 
 	// and apply in bulk
-	_, err = ApplyModifiers(ctx, db, nil, oa, modifiersByContact)
+	_, err = ApplyModifiers(ctx, rt, oa, modifiersByContact)
 	if err != nil {
 		return errors.Wrap(err, "error applying modifiers")
 	}
 
-	if err := b.markComplete(ctx, db, imports); err != nil {
+	if err := b.markComplete(ctx, rt.DB, imports); err != nil {
 		return errors.Wrap(err, "unable to mark as complete")
 	}
 

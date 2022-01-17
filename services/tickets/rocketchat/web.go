@@ -41,7 +41,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 
 	// look up ticketer
-	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt.DB, ticketerUUID, typeRocketChat)
+	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt, ticketerUUID, typeRocketChat)
 	if err != nil {
 		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
@@ -58,9 +58,14 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	// look up ticket
-	ticket, _, _, err := tickets.FromTicketUUID(ctx, rt.DB, flows.TicketUUID(request.TicketID), typeRocketChat)
+	ticket, _, _, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(request.TicketID), typeRocketChat)
 	if err != nil {
 		return errors.Errorf("no such ticket %s", request.TicketID), http.StatusNotFound, nil
+	}
+
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
+	if err != nil {
+		return err, http.StatusBadRequest, nil
 	}
 
 	// handle event callback
@@ -93,7 +98,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files)
 
 	case "close-room":
-		err = tickets.CloseTicket(ctx, rt, nil, ticket, false, l)
+		err = tickets.Close(ctx, rt, oa, ticket, false, l)
 
 	default:
 		err = errors.New("invalid event type")

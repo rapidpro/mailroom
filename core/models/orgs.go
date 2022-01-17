@@ -5,58 +5,56 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/airtime/dtone"
 	"github.com/nyaruka/goflow/services/email/smtp"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/smtpx"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/utils/dbutil"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-var emailRetries = smtpx.NewFixedRetries(time.Second*3, time.Second*6)
-
 // Register a airtime service factory with the engine
 func init() {
+	goflow.RegisterEmailServiceFactory(emailServiceFactory)
+	goflow.RegisterAirtimeServiceFactory(airtimeServiceFactory)
+}
+
+func emailServiceFactory(c *runtime.Config) engine.EmailServiceFactory {
+	var emailRetries = smtpx.NewFixedRetries(time.Second*3, time.Second*6)
+
+	return func(session flows.Session) (flows.EmailService, error) {
+		return orgFromSession(session).EmailService(c, emailRetries)
+	}
+}
+
+func airtimeServiceFactory(c *runtime.Config) engine.AirtimeServiceFactory {
 	// give airtime transfers an extra long timeout
 	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
 	airtimeHTTPRetries := httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
-	goflow.RegisterEmailServiceFactory(
-		func(session flows.Session) (flows.EmailService, error) {
-			return orgFromSession(session).EmailService(http.DefaultClient)
-		},
-	)
-
-	goflow.RegisterAirtimeServiceFactory(
-		func(session flows.Session) (flows.AirtimeService, error) {
-			return orgFromSession(session).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
-		},
-	)
+	return func(session flows.Session) (flows.AirtimeService, error) {
+		return orgFromSession(session).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
+	}
 }
 
 // OrgID is our type for orgs ids
 type OrgID int
-
-// SessionStorageMode is our type for how we persist our sessions
-type SessionStorageMode string
 
 const (
 	// NilOrgID is the id 0 considered as nil org id
@@ -65,12 +63,6 @@ const (
 	configSMTPServer  = "smtp_server"
 	configDTOneKey    = "dtone_key"
 	configDTOneSecret = "dtone_secret"
-
-	configSessionStorageMode = "session_storage_mode"
-
-	DBSessions      = SessionStorageMode("db")
-	S3Sessions      = SessionStorageMode("s3")
-	S3WriteSessions = SessionStorageMode("s3_write")
 )
 
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
@@ -92,10 +84,6 @@ func (o *Org) Suspended() bool { return o.o.Suspended }
 
 // UsesTopups returns whether the org uses topups
 func (o *Org) UsesTopups() bool { return o.o.UsesTopups }
-
-func (o *Org) SessionStorageMode() SessionStorageMode {
-	return SessionStorageMode(o.ConfigValue(configSessionStorageMode, string(DBSessions)))
-}
 
 // DateFormat returns the date format for this org
 func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
@@ -161,13 +149,13 @@ func (o *Org) ConfigValue(key string, def string) string {
 }
 
 // EmailService returns the email service for this org
-func (o *Org) EmailService(httpClient *http.Client) (flows.EmailService, error) {
-	connectionURL := o.ConfigValue(configSMTPServer, config.Mailroom.SMTPServer)
+func (o *Org) EmailService(c *runtime.Config, retries *smtpx.RetryConfig) (flows.EmailService, error) {
+	connectionURL := o.ConfigValue(configSMTPServer, c.SMTPServer)
 
 	if connectionURL == "" {
 		return nil, errors.New("missing SMTP configuration")
 	}
-	return smtp.NewService(connectionURL, emailRetries)
+	return smtp.NewService(connectionURL, retries)
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
@@ -182,11 +170,11 @@ func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryCo
 }
 
 // StoreAttachment saves an attachment to storage
-func (o *Org) StoreAttachment(ctx context.Context, s storage.Storage, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
-	prefix := config.Mailroom.S3MediaPrefix
+func (o *Org) StoreAttachment(ctx context.Context, rt *runtime.Runtime, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
+	prefix := rt.Config.S3MediaPrefix
 
 	// read the content
-	contentBytes, err := ioutil.ReadAll(content)
+	contentBytes, err := io.ReadAll(content)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to read attachment content")
 	}
@@ -199,7 +187,7 @@ func (o *Org) StoreAttachment(ctx context.Context, s storage.Storage, filename s
 
 	path := o.attachmentPath(prefix, filename)
 
-	url, err := s.Put(ctx, path, contentType, contentBytes)
+	url, err := rt.MediaStorage.Put(ctx, path, contentType, contentBytes)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to store attachment content")
 	}
@@ -237,7 +225,7 @@ func orgFromSession(session flows.Session) *Org {
 }
 
 // LoadOrg loads the org for the passed in id, returning any error encountered
-func LoadOrg(ctx context.Context, cfg *config.Config, db sqlx.Queryer, orgID OrgID) (*Org, error) {
+func LoadOrg(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, orgID OrgID) (*Org, error) {
 	start := time.Now()
 
 	org := &Org{}
@@ -250,7 +238,7 @@ func LoadOrg(ctx context.Context, cfg *config.Config, db sqlx.Queryer, orgID Org
 		return nil, errors.Errorf("no org with id: %d", orgID)
 	}
 
-	err = dbutil.ReadJSONRow(rows, org)
+	err = dbutil.ScanJSON(rows, org)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling org")
 	}

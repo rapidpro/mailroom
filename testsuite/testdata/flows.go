@@ -3,6 +3,7 @@ package testdata
 import (
 	"time"
 
+	"github.com/buger/jsonparser"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
@@ -15,6 +16,29 @@ import (
 type Flow struct {
 	ID   models.FlowID
 	UUID assets.FlowUUID
+}
+
+func (f *Flow) Reference() *assets.FlowReference {
+	return &assets.FlowReference{UUID: f.UUID, Name: ""}
+}
+
+// InsertFlow inserts a flow
+func InsertFlow(db *sqlx.DB, org *Org, definition []byte) *Flow {
+	uuid, err := jsonparser.GetString(definition, "uuid")
+	if err != nil {
+		panic(err)
+	}
+
+	var id models.FlowID
+	must(db.Get(&id,
+		`INSERT INTO flows_flow(uuid, org_id, name, flow_type, version_number, expires_after_minutes, ignore_triggers, has_issues, is_active, is_archived, is_system, created_by_id, created_on, modified_by_id, modified_on, saved_on, saved_by_id) 
+		VALUES($1, $2, 'Test', 'M', 1, 10, FALSE, FALSE, TRUE, FALSE, FALSE, $3, NOW(), $3, NOW(), NOW(), $3) RETURNING id`, uuid, org.ID, Admin.ID,
+	))
+
+	db.MustExec(`INSERT INTO flows_flowrevision(flow_id, definition, spec_version, revision, is_active, created_by_id, created_on, modified_by_id, modified_on) 
+	VALUES($1, $2, '13.1.0', 1, TRUE, $3, NOW(), $3, NOW())`, id, definition, Admin.ID)
+
+	return &Flow{ID: id, UUID: assets.FlowUUID(uuid)}
 }
 
 // InsertFlowStart inserts a flow start

@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -16,7 +16,7 @@ var InsertTicketsHook models.EventCommitHook = &insertTicketsHook{}
 type insertTicketsHook struct{}
 
 // Apply inserts all the airtime transfers that were created
-func (h *insertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *insertTicketsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// gather all our tickets
 	tickets := make([]*models.Ticket, 0, len(scenes))
 
@@ -34,14 +34,23 @@ func (h *insertTicketsHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Po
 
 	// generate opened events for each ticket
 	openEvents := make([]*models.TicketEvent, len(tickets))
+	eventsByTicket := make(map[*models.Ticket]*models.TicketEvent, len(tickets))
 	for i, ticket := range tickets {
-		openEvents[i] = models.NewTicketOpenedEvent(ticket, models.NilUserID, ticket.AssigneeID())
+		evt := models.NewTicketOpenedEvent(ticket, models.NilUserID, ticket.AssigneeID())
+		openEvents[i] = evt
+		eventsByTicket[ticket] = evt
 	}
 
 	// and insert those too
 	err = models.InsertTicketEvents(ctx, tx, openEvents)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting ticket opened events")
+	}
+
+	// and insert logs/notifications for those
+	err = models.NotificationsFromTicketEvents(ctx, tx, oa, eventsByTicket)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting notifications")
 	}
 
 	return nil

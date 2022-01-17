@@ -4,25 +4,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/uuids"
-
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRetryMsgs(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Reset()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
+	defer testsuite.Reset(testsuite.ResetAll)
+
 	// noop does nothing
-	err := handler.RetryPendingMsgs(ctx, db, rp, "test", "test")
+	err := handler.RetryPendingMsgs(ctx, rt)
 	assert.NoError(t, err)
 
 	testMsgs := []struct {
@@ -42,7 +43,7 @@ func TestRetryMsgs(t *testing.T) {
 			uuids.New(), testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
 	}
 
-	err = handler.RetryPendingMsgs(ctx, db, rp, "test", "test")
+	err = handler.RetryPendingMsgs(ctx, rt)
 	assert.NoError(t, err)
 
 	// should have one message requeued
@@ -52,7 +53,7 @@ func TestRetryMsgs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// message should be handled now
-	testsuite.AssertQuery(t, db, `SELECT count(*) from msgs_msg WHERE text = 'pending' AND status = 'H'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from msgs_msg WHERE text = 'pending' AND status = 'H'`).Returns(1)
 
 	// only one message was queued
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)

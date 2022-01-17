@@ -10,8 +10,8 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 
 	"github.com/pkg/errors"
@@ -83,7 +83,7 @@ type service struct {
 }
 
 // NewService creates a new mailgun email-based ticket service
-func NewService(rtCfg *config.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	domain := config[configDomain]
 	apiKey := config[configAPIKey]
 	toAddress := config[configToAddress]
@@ -107,15 +107,15 @@ func NewService(rtCfg *config.Config, httpClient *http.Client, httpRetries *http
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
-func (s *service) Open(session flows.Session, subject, body string, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
-	ticket := flows.OpenTicket(s.ticketer, subject, body)
+func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contactDisplay := tickets.GetContactDisplay(session.Environment(), session.Contact())
 
 	from := s.ticketAddress(contactDisplay, ticket.UUID())
-	context := s.templateContext(subject, body, "", string(session.Contact().UUID()), contactDisplay)
+	context := s.templateContext(body, "", string(session.Contact().UUID()), contactDisplay)
 	fullBody := evaluateTemplate(openBodyTemplate, context)
 
-	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subject, fullBody, nil, nil)
+	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subjectFromBody(body), fullBody, nil, nil)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -128,7 +128,7 @@ func (s *service) Open(session flows.Session, subject, body string, logHTTP flow
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
-	context := s.templateContext(ticket.Subject(), ticket.Body(), text, ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
+	context := s.templateContext(ticket.Body(), text, ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
 	body := evaluateTemplate(forwardBodyTemplate, context)
 
 	_, err := s.sendInTicket(ticket, body, attachments, logHTTP)
@@ -137,7 +137,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, ticket := range tickets {
-		context := s.templateContext(ticket.Subject(), ticket.Body(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
+		context := s.templateContext(ticket.Body(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
 		body := evaluateTemplate(closedBodyTemplate, context)
 
 		_, err := s.sendInTicket(ticket, body, nil, logHTTP)
@@ -150,7 +150,7 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, ticket := range tickets {
-		context := s.templateContext(ticket.Subject(), ticket.Body(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
+		context := s.templateContext(ticket.Body(), "", ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
 		body := evaluateTemplate(reopenedBodyTemplate, context)
 
 		_, err := s.sendInTicket(ticket, body, nil, logHTTP)
@@ -174,7 +174,7 @@ func (s *service) sendInTicket(ticket *models.Ticket, text string, attachments [
 	}
 	from := s.ticketAddress(contactDisplay, ticket.UUID())
 
-	return s.send(from, s.toAddress, ticket.Subject(), text, attachments, headers, logHTTP)
+	return s.send(from, s.toAddress, subjectFromBody(ticket.Body()), text, attachments, headers, logHTTP)
 }
 
 func (s *service) send(from, to, subject, text string, attachments []utils.Attachment, headers map[string]string, logHTTP flows.HTTPLogCallback) (string, error) {
@@ -208,10 +208,10 @@ func (s *service) noReplyAddress() string {
 	return fmt.Sprintf("no-reply@%s", s.client.domain)
 }
 
-func (s *service) templateContext(subject, body, message, contactUUID, contactDisplay string) map[string]string {
+func (s *service) templateContext(body, message, contactUUID, contactDisplay string) map[string]string {
 	return map[string]string{
 		"brand":       s.brandName,                                                // rapidpro brand
-		"subject":     subject,                                                    // original ticket subject
+		"subject":     subjectFromBody(body),                                      // portion of body used as subject
 		"body":        body,                                                       // original ticket body
 		"message":     message,                                                    // new message if this is a forward
 		"contact":     contactDisplay,                                             // display name contact
@@ -227,4 +227,8 @@ func evaluateTemplate(t *template.Template, c map[string]string) string {
 	b := &strings.Builder{}
 	t.Execute(b, c)
 	return b.String()
+}
+
+func subjectFromBody(body string) string {
+	return utils.Truncate(strings.ReplaceAll(body, "\n", ""), 64)
 }

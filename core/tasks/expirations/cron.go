@@ -12,19 +12,18 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-	"github.com/nyaruka/mailroom/utils/marker"
+	"github.com/nyaruka/redisx"
 
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 const (
 	expirationLock  = "run_expirations"
-	markerGroup     = "run_expirations"
 	expireBatchSize = 500
 )
+
+var expirationsMarker = redisx.NewIntervalSet("run_expirations", time.Hour*24, 2)
 
 func init() {
 	mailroom.AddInitFunction(StartExpirationCron)
@@ -32,22 +31,22 @@ func init() {
 
 // StartExpirationCron starts our cron job of expiring runs every minute
 func StartExpirationCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.StartCron(quit, rt.RP, expirationLock, time.Second*60,
-		func(lockName string, lockValue string) error {
+	cron.Start(quit, rt, expirationLock, time.Second*60, false,
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return expireRuns(ctx, rt.DB, rt.RP, lockName, lockValue)
+			return expireRuns(ctx, rt)
 		},
 	)
 	return nil
 }
 
 // expireRuns expires all the runs that have an expiration in the past
-func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName string, lockValue string) error {
-	log := logrus.WithField("comp", "expirer").WithField("lock", lockValue)
+func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
+	log := logrus.WithField("comp", "expirer")
 	start := time.Now()
 
-	rc := rp.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	// we expire runs and sessions that have no continuation in batches
@@ -55,7 +54,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 	expiredSessions := make([]models.SessionID, 0, expireBatchSize)
 
 	// select our expired runs
-	rows, err := db.QueryxContext(ctx, selectExpiredRunsSQL)
+	rows, err := rt.DB.QueryxContext(ctx, selectExpiredRunsSQL)
 	if err != nil {
 		return errors.Wrapf(err, "error querying for expired runs")
 	}
@@ -83,7 +82,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 			// batch is full? commit it
 			if len(expiredRuns) == expireBatchSize {
-				err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
+				err = models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
 				if err != nil {
 					return errors.Wrapf(err, "error expiring runs and sessions")
 				}
@@ -96,7 +95,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 		// need to continue this session and flow, create a task for that
 		taskID := fmt.Sprintf("%d:%s", expiration.RunID, expiration.ExpiresOn.Format(time.RFC3339))
-		queued, err := marker.HasTask(rc, markerGroup, taskID)
+		queued, err := expirationsMarker.Contains(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error checking whether expiration is queued")
 		}
@@ -114,7 +113,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 		}
 
 		// and mark it as queued
-		err = marker.AddTask(rc, markerGroup, taskID)
+		err = expirationsMarker.Add(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking expiration task as queued")
 		}
@@ -122,7 +121,7 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 	// commit any stragglers
 	if len(expiredRuns) > 0 {
-		err = models.ExpireRunsAndSessions(ctx, db, expiredRuns, expiredSessions)
+		err = models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
 		if err != nil {
 			return errors.Wrapf(err, "error expiring runs and sessions")
 		}

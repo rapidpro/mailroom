@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -46,7 +46,7 @@ func loadResthooks(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	resthooks := make([]assets.Resthook, 0, 10)
 	for rows.Next() {
 		resthook := &Resthook{}
-		err = dbutil.ReadJSONRow(rows, &resthook.r)
+		err = dbutil.ScanJSON(rows, &resthook.r)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning resthook row")
 		}

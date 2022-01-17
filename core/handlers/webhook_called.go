@@ -4,13 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,7 +18,7 @@ func init() {
 }
 
 // handleWebhookCalled is called for each webhook call in a scene
-func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.WebhookCalledEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
@@ -28,6 +27,7 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 		"status":       event.Status,
 		"elapsed_ms":   event.ElapsedMS,
 		"resthook":     event.Resthook,
+		"extraction":   event.Extraction,
 	}).Debug("webhook called")
 
 	// if this was a resthook and the status was 410, that means we should remove it
@@ -41,20 +41,25 @@ func handleWebhookCalled(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *m
 		scene.AppendToEventPreCommitHook(hooks.UnsubscribeResthookHook, unsub)
 	}
 
-	// if this is a connection error, use that as our response
-	response := event.Response
-	if event.Status == flows.CallStatusConnectionError {
-		response = "connection error"
+	run, step := scene.Session().FindStep(e.StepUUID())
+	flow, _ := oa.Flow(run.FlowReference().UUID)
+
+	// create an HTTP log
+	if flow != nil {
+		httpLog := models.NewWebhookCalledLog(
+			oa.OrgID(),
+			flow.(*models.Flow).ID(),
+			event.URL, event.StatusCode, event.Request, event.Response,
+			event.Status != flows.CallStatusSuccess,
+			time.Millisecond*time.Duration(event.ElapsedMS),
+			event.Retries,
+			event.CreatedOn(),
+		)
+		scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, httpLog)
 	}
 
-	// create a result for this call
-	result := models.NewWebhookResult(
-		oa.OrgID(), scene.ContactID(),
-		event.URL, event.Request,
-		event.StatusCode, response,
-		time.Millisecond*time.Duration(event.ElapsedMS), event.CreatedOn(),
-	)
-	scene.AppendToEventPreCommitHook(hooks.InsertWebhookResultHook, result)
+	// pass node and response time to the hook that monitors webhook health
+	scene.AppendToEventPreCommitHook(hooks.MonitorWebhooks, &hooks.WebhookCall{NodeUUID: step.NodeUUID(), Event: event})
 
 	return nil
 }

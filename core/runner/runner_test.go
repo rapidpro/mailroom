@@ -1,11 +1,16 @@
 package runner_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
@@ -14,6 +19,7 @@ import (
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/mailroom/utils/test"
 
 	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -21,13 +27,17 @@ import (
 )
 
 func TestCampaignStarts(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(testdata.RemindersCampaign.UUID), "Doctor Reminders")
 
 	// create our event fires
 	now := time.Now()
-	db.MustExec(`INSERT INTO campaigns_eventfire(event_id, scheduled, contact_id) VALUES($1, $2, $3),($1, $2, $4),($1, $2, $5);`, testdata.RemindersEvent2.ID, now, testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID)
+	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent2, now)
+	testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent2, now)
+	testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent2, now)
 
 	// create an active session for Alexandria to test skipping
 	db.MustExec(`INSERT INTO flows_flowsession(uuid, session_type, org_id, contact_id, status, responded, created_on, current_flow_id) VALUES($1, 'M', $2, $3, 'W', FALSE, NOW(), $4);`, uuids.New(), testdata.Org1.ID, testdata.Alexandria.ID, testdata.PickANumber.ID)
@@ -63,40 +73,41 @@ func TestCampaignStarts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
 
-	testsuite.AssertQuery(t, db,
+	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`, pq.Array(contacts)).
 		Returns(2, "expected only two sessions to be created")
 
-	testsuite.AssertQuery(t, db,
+	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
-		 AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-		 AND session_id IS NOT NULL`,
+		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
+		 AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`,
 		pq.Array(contacts), testdata.CampaignFlow.ID).Returns(2, "expected only two runs to be created")
 
-	testsuite.AssertQuery(t, db,
+	assertdb.Query(t, db,
 		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
 		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
 		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $2`,
 		pq.Array(contacts), testdata.TwilioChannel.ID).Returns(2, "expected only two messages to be sent")
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`).
+	assertdb.Query(t, db, `SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`).
 		Returns(0, "expected all events to be fired")
 
-	testsuite.AssertQuery(t, db,
+	assertdb.Query(t, db,
 		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, testdata.Cathy.ID, testdata.Bob.ID, testdata.RemindersEvent2.ID).
 		Returns(2, "expected bob and cathy to have their event sent to fired")
 
-	testsuite.AssertQuery(t, db,
+	assertdb.Query(t, db,
 		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, testdata.Alexandria.ID, testdata.RemindersEvent2.ID).
 		Returns(1, "expected alexandria to have her event set to skipped")
 
-	testsuite.AssertQuery(t, db,
+	assertdb.Query(t, db,
 		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestBatchStart(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create a start object
 	testdata.InsertFlowStart(db, testdata.Org1, testdata.SingleMessage, nil)
@@ -140,19 +151,18 @@ func TestBatchStart(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
 
-		testsuite.AssertQuery(t, db,
+		assertdb.Query(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
 			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
 			Returns(tc.Count, "%d: unexpected number of sessions", i)
 
-		testsuite.AssertQuery(t, db,
+		assertdb.Query(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND parent_id IS NULL AND exit_type = 'C' AND status = 'C'
-			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
-			AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
+			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
+			AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
 			Returns(tc.TotalCount, "%d: unexpected number of runs", i)
 
-		testsuite.AssertQuery(t, db,
+		assertdb.Query(t, db,
 			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = $2 AND org_id = 1 AND status = 'Q' 
 			AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $3`,
 			pq.Array(contactIDs), tc.Msg, testdata.TwilioChannel.ID).
@@ -163,15 +173,14 @@ func TestBatchStart(t *testing.T) {
 }
 
 func TestResume(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.ResetStorage()
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
-	// write sessions to storage as well
-	db.MustExec(`UPDATE orgs_org set config = '{"session_storage_mode": "s3"}' WHERE id = 1`)
-	defer testsuite.ResetDB()
+	// write sessions to s3 storage
+	rt.Config.SessionStorage = "s3"
 
-	oa, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshOrg)
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
 
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
@@ -184,27 +193,26 @@ func TestResume(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
-	testsuite.AssertQuery(t, db,
+	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`, contact.ID(), flow.ID()).Returns(1)
+		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NULL`, contact.ID(), flow.ID()).Returns(1)
 
-	testsuite.AssertQuery(t, db,
+	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
 		 AND is_active = TRUE AND responded = FALSE AND org_id = 1`, contact.ID(), flow.ID()).Returns(1)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, contact.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, contact.ID()).Returns(1)
 
 	tcs := []struct {
 		Message       string
-		SessionStatus flows.SessionStatus
+		SessionStatus models.SessionStatus
 		RunStatus     models.RunStatus
 		Substring     string
 		PathLength    int
-		EventLength   int
 	}{
-		{"Red", models.SessionStatusWaiting, models.RunStatusWaiting, "%I like Red too%", 4, 3},
-		{"Mutzig", models.SessionStatusWaiting, models.RunStatusWaiting, "%they made red Mutzig%", 6, 5},
-		{"Luke", models.SessionStatusCompleted, models.RunStatusCompleted, "%Thanks Luke%", 7, 7},
+		{"Red", models.SessionStatusWaiting, models.RunStatusWaiting, "%I like Red too%", 4},
+		{"Mutzig", models.SessionStatusWaiting, models.RunStatusWaiting, "%they made red Mutzig%", 6},
+		{"Luke", models.SessionStatusCompleted, models.RunStatusCompleted, "%Thanks Luke%", 7},
 	}
 
 	session := sessions[0]
@@ -218,17 +226,16 @@ func TestResume(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 
-		testsuite.AssertQuery(t, db,
-			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-			 AND status = $3 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND output_url IS NOT NULL`, contact.ID(), flow.ID(), tc.SessionStatus).
+		assertdb.Query(t, db,
+			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1
+			 AND status = $2 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, contact.ID(), tc.SessionStatus).
 			Returns(1, "%d: didn't find expected session", i)
 
 		runIsActive := tc.RunStatus == models.RunStatusActive || tc.RunStatus == models.RunStatusWaiting
 
 		runQuery := `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
 		 AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
-		 AND json_array_length(path::json) = $5 AND json_array_length(events::json) = $6 
-		 AND session_id IS NOT NULL`
+		 AND json_array_length(path::json) = $5 AND session_id IS NOT NULL`
 
 		if runIsActive {
 			runQuery += ` AND expires_on IS NOT NULL`
@@ -236,10 +243,56 @@ func TestResume(t *testing.T) {
 			runQuery += ` AND expires_on IS NULL`
 		}
 
-		testsuite.AssertQuery(t, db, runQuery, contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength, tc.EventLength).
+		assertdb.Query(t, db, runQuery, contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength).
 			Returns(1, "%d: didn't find expected run", i)
 
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, contact.ID(), tc.Substring).
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, contact.ID(), tc.Substring).
 			Returns(1, "%d: didn't find expected message", i)
 	}
+}
+
+func TestStartFlowConcurrency(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+
+	// check everything works with big ids
+	db.MustExec(`ALTER SEQUENCE flows_flowrun_id_seq RESTART WITH 5000000000;`)
+	db.MustExec(`ALTER SEQUENCE flows_flowsession_id_seq RESTART WITH 5000000000;`)
+
+	// create a flow which has a send_broadcast action which will mean handlers grabbing redis connections
+	flow := testdata.InsertFlow(db, testdata.Org1, testsuite.ReadFile("testdata/broadcast_flow.json"))
+
+	oa := testdata.Org1.Load(rt)
+
+	dbFlow, err := oa.FlowByID(flow.ID)
+	require.NoError(t, err)
+	flowRef := testdata.Favorites.Reference()
+
+	// create a lot of contacts...
+	contacts := make([]*testdata.Contact, 100)
+	for i := range contacts {
+		contacts[i] = testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", envs.NilLanguage)
+	}
+
+	options := &runner.StartOptions{
+		RestartParticipants: true,
+		IncludeActive:       true,
+		TriggerBuilder: func(contact *flows.Contact) flows.Trigger {
+			return triggers.NewBuilder(oa.Env(), flowRef, contact).Manual().Build()
+		},
+		CommitHook: func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, session []*models.Session) error {
+			return nil
+		},
+	}
+
+	// start each contact in the flow at the same time...
+	test.RunConcurrently(len(contacts), func(i int) {
+		sessions, err := runner.StartFlow(ctx, rt, oa, dbFlow, []models.ContactID{contacts[i].ID}, options)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(sessions))
+	})
+
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun`).Returns(len(contacts))
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession`).Returns(len(contacts))
 }

@@ -7,9 +7,9 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,12 +20,21 @@ func init() {
 }
 
 // handleTicketOpened is called for each ticket opened event
-func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
+func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.TicketOpenedEvent)
 
 	ticketer := oa.TicketerByUUID(event.Ticket.Ticketer.UUID)
 	if ticketer == nil {
 		return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticket.Ticketer.UUID)
+	}
+
+	var topicID models.TopicID
+	if event.Ticket.Topic != nil {
+		topic := oa.TopicByUUID(event.Ticket.Topic.UUID)
+		if topic == nil {
+			return errors.Errorf("unable to find topic with UUID: %s", event.Ticket.Topic.UUID)
+		}
+		topicID = topic.ID()
 	}
 
 	var assigneeID models.UserID
@@ -43,7 +52,7 @@ func handleTicketOpened(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *mo
 		scene.ContactID(),
 		ticketer.ID(),
 		event.Ticket.ExternalID,
-		event.Ticket.Subject,
+		topicID,
 		event.Ticket.Body,
 		assigneeID,
 		map[string]interface{}{

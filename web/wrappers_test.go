@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -17,7 +18,9 @@ import (
 )
 
 func TestWithHTTPLogs(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer db.MustExec(`DELETE FROM request_logs_httplog`)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
@@ -58,5 +61,5 @@ func TestWithHTTPLogs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check HTTP logs were created
-	testsuite.AssertQuery(t, testsuite.DB(), `select count(*) from request_logs_httplog where ticketer_id = $1;`, testdata.Mailgun.ID).Returns(2)
+	assertdb.Query(t, db, `select count(*) from request_logs_httplog where ticketer_id = $1;`, testdata.Mailgun.ID).Returns(2)
 }

@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -53,6 +53,7 @@ var flowTypeMapping = map[flows.FlowType]FlowType{
 type Flow struct {
 	f struct {
 		ID             FlowID          `json:"id"`
+		OrgID          OrgID           `json:"org_id"`
 		UUID           assets.FlowUUID `json:"uuid"`
 		Name           string          `json:"name"`
 		Config         null.Map        `json:"config"`
@@ -65,6 +66,9 @@ type Flow struct {
 
 // ID returns the ID for this flow
 func (f *Flow) ID() FlowID { return f.f.ID }
+
+// OrgID returns the Org ID for this flow
+func (f *Flow) OrgID() OrgID { return f.f.OrgID }
 
 // UUID returns the UUID for this flow
 func (f *Flow) UUID() assets.FlowUUID { return f.f.UUID }
@@ -151,7 +155,7 @@ func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg inte
 		return nil, nil
 	}
 
-	err = dbutil.ReadJSONRow(rows, &flow.f)
+	err = dbutil.ScanJSON(rows, &flow.f)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading flow definition by: %s", arg)
 	}
@@ -164,6 +168,7 @@ func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg inte
 const selectFlowByUUIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	id, 
+	org_id,
 	uuid, 
 	name,
 	ignore_triggers,
@@ -174,8 +179,13 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 		jsonb_build_object(
 			'name', f.name,
 			'uuid', f.uuid,
-			'flow_type', f.flow_type, 
-			'expire_after_minutes', f.expires_after_minutes,
+			'flow_type', f.flow_type,
+			'expire_after_minutes', 
+				CASE f.flow_type 
+				WHEN 'M' THEN GREATEST(5, LEAST(f.expires_after_minutes, 43200))
+				WHEN 'V' THEN GREATEST(1, LEAST(f.expires_after_minutes, 15))
+				ELSE 0
+				END,
 			'metadata', jsonb_build_object(
 				'uuid', f.uuid, 
 				'id', f.id,
@@ -211,6 +221,7 @@ WHERE
 const selectFlowByIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	id, 
+	org_id,
 	uuid, 
 	name,
 	ignore_triggers,
@@ -222,7 +233,12 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 			'name', f.name,
 			'uuid', f.uuid,
 			'flow_type', f.flow_type, 
-			'expire_after_minutes', f.expires_after_minutes,
+			'expire_after_minutes', 
+				CASE f.flow_type 
+				WHEN 'M' THEN GREATEST(5, LEAST(f.expires_after_minutes, 43200))
+				WHEN 'V' THEN GREATEST(1, LEAST(f.expires_after_minutes, 15))
+				ELSE 0
+				END,
 			'metadata', jsonb_build_object(
 				'uuid', f.uuid, 
 				'id', f.id,

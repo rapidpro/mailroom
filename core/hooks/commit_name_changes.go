@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 )
 
@@ -17,7 +17,7 @@ var CommitNameChangesHook models.EventCommitHook = &commitNameChangesHook{}
 type commitNameChangesHook struct{}
 
 // Apply commits our contact name changes as a bulk update for the passed in map of scene
-func (h *commitNameChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitNameChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and contact name
 	updates := make([]interface{}, 0, len(scenes))
 	for s, e := range scenes {

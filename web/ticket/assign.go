@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/assign", web.RequireAuthToken(web.WithHTTPLogs(handleAssign)))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/ticket/assign", web.RequireAuthToken(handleAssign))
 }
 
 type assignRequest struct {
@@ -32,14 +32,14 @@ type assignRequest struct {
 //     "note": "please look at these"
 //   }
 //
-func handleAssign(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+func handleAssign(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &assignRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
 	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt.DB, request.OrgID)
+	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
@@ -49,7 +49,7 @@ func handleAssign(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	evts, err := models.AssignTickets(ctx, rt.DB, oa, request.UserID, tickets, request.AssigneeID, request.Note)
+	evts, err := models.TicketsAssign(ctx, rt.DB, oa, request.UserID, tickets, request.AssigneeID, request.Note)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error assigning tickets")
 	}

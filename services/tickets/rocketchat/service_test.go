@@ -9,7 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/assets/static/types"
+	"github.com/nyaruka/goflow/assets/static"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/test"
@@ -24,7 +24,7 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
@@ -47,7 +47,7 @@ func TestOpenAndForward(t *testing.T) {
 		},
 	}))
 
-	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
 
 	_, err = rocketchat.NewService(
 		rt.Config,
@@ -70,21 +70,25 @@ func TestOpenAndForward(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
+
 	logger := &flows.HTTPLogger{}
-	_, err = svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
+	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.EqualError(t, err, "error calling RocketChat: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
-	ticket, err := svc.Open(session, "Need help", "Where are my cookies?", logger.Log)
+	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
-	assert.Equal(t, "Need help", ticket.Subject())
+	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, "Where are my cookies?", ticket.Body())
 	assert.Equal(t, "uiF7ybjsv7PSJGSw6", ticket.ExternalID())
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "", "Need help", "Where are my cookies?", models.NilUserID, map[string]interface{}{
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
 		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})
@@ -119,7 +123,7 @@ func TestCloseAndReopen(t *testing.T) {
 		},
 	}))
 
-	ticketer := flows.NewTicketer(types.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
 	svc, err := rocketchat.NewService(
 		rt.Config,
 		http.DefaultClient,
@@ -132,8 +136,8 @@ func TestCloseAndReopen(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "X5gwXeaxbnGDaq8Q3", "New ticket", "Where my cookies?", models.NilUserID, nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.RocketChat.ID, "cq7AokJHKkGhAMoBK", "Second ticket", "Where my shoes?", models.NilUserID, nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "X5gwXeaxbnGDaq8Q3", testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.RocketChat.ID, "cq7AokJHKkGhAMoBK", testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
 
 	logger := &flows.HTTPLogger{}
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)

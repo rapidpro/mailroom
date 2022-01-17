@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
@@ -14,26 +15,25 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/utils/test"
-
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestContacts(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Problem!", "Where are my shoes?", "1234", testdata.Agent)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Another Problem!", "Where are my pants?", "2345", nil)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Urgent", "His name is Bob", "", testdata.Editor)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Where are my shoes?", "1234", testdata.Agent)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SalesTopic, "Where are my pants?", "2345", nil)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "His name is Bob", "", testdata.Editor)
 
 	// delete mailgun ticketer
 	db.MustExec(`UPDATE tickets_ticketer SET is_active = false WHERE id = $1`, testdata.Mailgun.ID)
 
-	org, err := models.GetOrgAssetsWithRefresh(ctx, db, testdata.Org1.ID, models.RefreshAll)
+	org, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
 	assert.NoError(t, err)
 
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.George.ID)
@@ -63,9 +63,9 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, 2, cathy.Tickets().Count())
 
 	cathyTickets := cathy.Tickets().All()
-	assert.Equal(t, "Problem!", cathyTickets[0].Subject())
+	assert.Equal(t, "Support", cathyTickets[0].Topic().Name())
 	assert.Equal(t, "agent1@nyaruka.com", cathyTickets[0].Assignee().Email())
-	assert.Equal(t, "Another Problem!", cathyTickets[1].Subject())
+	assert.Equal(t, "Sales", cathyTickets[1].Topic().Name())
 	assert.Nil(t, cathyTickets[1].Assignee())
 
 	assert.Equal(t, "Yobe", cathy.Fields()["state"].QueryValue())
@@ -77,7 +77,7 @@ func TestContacts(t *testing.T) {
 	assert.NotNil(t, bob.Fields()["joined"].QueryValue())
 	assert.Equal(t, 2, len(bob.URNs()))
 	assert.Equal(t, "tel:+16055742222?id=10001&priority=1000", bob.URNs()[0].String())
-	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=999", bob.URNs()[1].String())
 	assert.Equal(t, 0, bob.Groups().Count())
 	assert.Equal(t, 0, bob.Tickets().Count()) // because ticketer no longer exists
 
@@ -95,7 +95,7 @@ func TestContacts(t *testing.T) {
 	bob, err = modelContacts[1].FlowContact(org)
 	assert.NoError(t, err)
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=1000", bob.URNs()[0].String())
-	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=999", bob.URNs()[1].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=999", bob.URNs()[1].String())
 
 	// add another tel urn to bob
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, urns.URN("tel:+250788373373"), 10)
@@ -105,47 +105,47 @@ func TestContacts(t *testing.T) {
 	assert.NoError(t, err)
 
 	// set our preferred channel again
-	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(20122), channel)
+	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(30001), channel)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
-	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
+	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
-	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=998", bob.URNs()[2].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=998", bob.URNs()[2].String())
 
 	// no op this time
-	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(20122), channel)
+	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(30001), channel)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
-	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
+	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
-	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=998", bob.URNs()[2].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=998", bob.URNs()[2].String())
 
 	// calling with no channel is a noop on the channel
-	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(20122), nil)
+	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(30001), nil)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[0].FlowContact(org)
 	assert.NoError(t, err)
-	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20122&priority=1000", bob.URNs()[0].String())
+	assert.Equal(t, "tel:+250788373373?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30001&priority=1000", bob.URNs()[0].String())
 	assert.Equal(t, "tel:+16055742222?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=10001&priority=999", bob.URNs()[1].String())
-	assert.Equal(t, "whatsapp:250788373373?id=20121&priority=998", bob.URNs()[2].String())
+	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=998", bob.URNs()[2].String())
 }
 
 func TestCreateContact(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetData)
 
 	testdata.InsertContactGroup(db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Kinyarwanda", "language = kin")
 
 	// add an orphaned URN
 	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	contact, flowContact, err := models.CreateContact(ctx, db, oa, models.UserID(1), "Rich", envs.Language(`kin`), []urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:200002")})
@@ -153,11 +153,11 @@ func TestCreateContact(t *testing.T) {
 
 	assert.Equal(t, "Rich", contact.Name())
 	assert.Equal(t, envs.Language(`kin`), contact.Language())
-	assert.Equal(t, []urns.URN{"telegram:200001?id=20122&priority=1000", "telegram:200002?id=20121&priority=999"}, contact.URNs())
+	assert.Equal(t, []urns.URN{"telegram:200001?id=30001&priority=1000", "telegram:200002?id=30000&priority=999"}, contact.URNs())
 
 	assert.Equal(t, "Rich", flowContact.Name())
 	assert.Equal(t, envs.Language(`kin`), flowContact.Language())
-	assert.Equal(t, []urns.URN{"telegram:200001?id=20122&priority=1000", "telegram:200002?id=20121&priority=999"}, flowContact.URNs().RawURNs())
+	assert.Equal(t, []urns.URN{"telegram:200001?id=30001&priority=1000", "telegram:200002?id=30000&priority=999"}, flowContact.URNs().RawURNs())
 	assert.Len(t, flowContact.Groups().All(), 1)
 	assert.Equal(t, assets.GroupUUID("d636c966-79c1-4417-9f1c-82ad629773a2"), flowContact.Groups().All()[0].UUID())
 
@@ -166,11 +166,11 @@ func TestCreateContact(t *testing.T) {
 }
 
 func TestCreateContactRace(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
@@ -195,22 +195,21 @@ func TestCreateContactRace(t *testing.T) {
 }
 
 func TestGetOrCreateContact(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetData)
 
-	testdata.InsertContactGroup(db, testdata.Org1, "d636c966-79c1-4417-9f1c-82ad629773a2", "Telegrammer", `telegram = 100001`)
+	testdata.InsertContactGroup(db, testdata.Org1, "dcc16d85-8274-4d19-a3c2-152d4ee99380", "Telegrammer", `telegram = 100001`)
 
 	// add some orphaned URNs
 	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
 	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200002"), 100)
 
-	var maxContactID models.ContactID
-	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
-	newContact := func() models.ContactID { maxContactID++; return maxContactID }
-	prevContact := func() models.ContactID { return maxContactID }
+	contactIDSeq := models.ContactID(30000)
+	newContact := func() models.ContactID { id := contactIDSeq; contactIDSeq++; return id }
+	prevContact := func() models.ContactID { return contactIDSeq - 1 }
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -245,52 +244,52 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:100001")},
 			newContact(), // creates new contact
 			true,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			testdata.TwilioChannel.ID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
 			[]urns.URN{urns.URN("telegram:100001")},
 			prevContact(), // returns the same created contact
 			false,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
 			[]urns.URN{urns.URN("telegram:100001"), urns.URN("telegram:100002")},
 			prevContact(), // same again as other URNs don't exist
 			false,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
 			[]urns.URN{urns.URN("telegram:100002"), urns.URN("telegram:100001")},
 			prevContact(), // same again as other URNs don't exist
 			false,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
 			[]urns.URN{urns.URN("telegram:200001"), urns.URN("telegram:100001")},
 			prevContact(), // same again as other URNs are orphaned
 			false,
-			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=20123&priority=1000"},
+			[]urns.URN{"telegram:100001?channel=74729f45-7f29-4868-9dc4-90e491e3c7d8&id=30002&priority=1000"},
 			models.NilChannelID,
-			[]assets.GroupUUID{"d636c966-79c1-4417-9f1c-82ad629773a2"},
+			[]assets.GroupUUID{"dcc16d85-8274-4d19-a3c2-152d4ee99380"},
 		},
 		{
 			testdata.Org1.ID,
 			[]urns.URN{urns.URN("telegram:100003"), urns.URN("telegram:100004")}, // 2 new URNs
 			newContact(),
 			true,
-			[]urns.URN{"telegram:100003?id=20124&priority=1000", "telegram:100004?id=20125&priority=999"},
+			[]urns.URN{"telegram:100003?id=30003&priority=1000", "telegram:100004?id=30004&priority=999"},
 			models.NilChannelID,
 			[]assets.GroupUUID{},
 		},
@@ -299,7 +298,7 @@ func TestGetOrCreateContact(t *testing.T) {
 			[]urns.URN{urns.URN("telegram:100005"), urns.URN("telegram:200002")}, // 1 new, 1 orphaned
 			newContact(),
 			true,
-			[]urns.URN{"telegram:100005?id=20126&priority=1000", "telegram:200002?id=20122&priority=999"},
+			[]urns.URN{"telegram:100005?id=30005&priority=1000", "telegram:200002?id=30001&priority=999"},
 			models.NilChannelID,
 			[]assets.GroupUUID{},
 		},
@@ -323,11 +322,11 @@ func TestGetOrCreateContact(t *testing.T) {
 }
 
 func TestGetOrCreateContactRace(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetData)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
@@ -352,19 +351,18 @@ func TestGetOrCreateContactRace(t *testing.T) {
 }
 
 func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetData)
 
 	// add an orphaned URN
 	testdata.InsertContactURN(db, testdata.Org1, nil, urns.URN("telegram:200001"), 100)
 
-	var maxContactID models.ContactID
-	db.Get(&maxContactID, `SELECT max(id) FROM contacts_contact`)
-	newContact := func() models.ContactID { maxContactID++; return maxContactID }
-	prevContact := func() models.ContactID { return maxContactID }
+	contactIDSeq := models.ContactID(30000)
+	newContact := func() models.ContactID { id := contactIDSeq; contactIDSeq++; return id }
+	prevContact := func() models.ContactID { return contactIDSeq - 1 }
 
-	org, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	org, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	tcs := []struct {
@@ -410,9 +408,11 @@ func TestGetOrCreateContactIDsFromURNs(t *testing.T) {
 }
 
 func TestGetOrCreateContactIDsFromURNsRace(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	defer testsuite.Reset(testsuite.ResetData)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	mdb := testsuite.NewMockDB(db, func(funcName string, call int) error {
@@ -452,25 +452,25 @@ func TestGetContactIDsFromReferences(t *testing.T) {
 func TestStopContact(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// stop kathy
 	err := models.StopContact(ctx, db, testdata.Org1.ID, testdata.Cathy.ID)
 	assert.NoError(t, err)
 
 	// verify she's only in the stopped group
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = $1`, testdata.Cathy.ID).Returns(1)
 
 	// verify she's stopped
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S' AND is_active = TRUE`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S' AND is_active = TRUE`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	t0 := time.Now()
@@ -478,7 +478,7 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	err = models.UpdateContactModifiedOn(ctx, db, []models.ContactID{testdata.Cathy.ID})
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, t0).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on IS NULL`, t0).Returns(1)
 
 	t1 := time.Now().Truncate(time.Millisecond)
 	time.Sleep(time.Millisecond * 5)
@@ -486,7 +486,7 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	err = models.UpdateContactLastSeenOn(ctx, db, testdata.Cathy.ID, t1)
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on = $1`, t1).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE modified_on > $1 AND last_seen_on = $1`, t1).Returns(1)
 
 	cathy, err := models.LoadContact(ctx, db, oa, testdata.Cathy.ID)
 	require.NoError(t, err)
@@ -512,34 +512,34 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 func TestUpdateContactModifiedBy(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	err := models.UpdateContactModifiedBy(ctx, db, []models.ContactID{}, models.UserID(0))
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = NULL`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = NULL`, testdata.Cathy.ID).Returns(0)
 
 	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{testdata.Cathy.ID}, models.UserID(0))
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = NULL`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = NULL`, testdata.Cathy.ID).Returns(0)
 
 	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{testdata.Cathy.ID}, models.UserID(1))
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = 1`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = 1`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestUpdateContactStatus(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	err := models.UpdateContactStatus(ctx, db, []*models.ContactStatusChange{})
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, testdata.Cathy.ID).Returns(0)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(0)
 
 	changes := make([]*models.ContactStatusChange, 0, 1)
 	changes = append(changes, &models.ContactStatusChange{testdata.Cathy.ID, flows.ContactStatusBlocked})
@@ -547,8 +547,8 @@ func TestUpdateContactStatus(t *testing.T) {
 	err = models.UpdateContactStatus(ctx, db, changes)
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, testdata.Cathy.ID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(0)
 
 	changes = make([]*models.ContactStatusChange, 0, 1)
 	changes = append(changes, &models.ContactStatusChange{testdata.Cathy.ID, flows.ContactStatusStopped})
@@ -556,17 +556,17 @@ func TestUpdateContactStatus(t *testing.T) {
 	err = models.UpdateContactStatus(ctx, db, changes)
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, testdata.Cathy.ID).Returns(0)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
 
 }
 
 func TestUpdateContactURNs(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
 	numInitialURNs := 0
@@ -597,15 +597,15 @@ func TestUpdateContactURNs(t *testing.T) {
 	assert.NoError(t, err)
 
 	assertContactURNs(testdata.Bob.ID, []string{"tel:+16055742222", "tel:+16055700002"})
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`).Returns(0) // shouldn't be any orphan URNs
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 2)         // but 2 new URNs
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`).Returns(0) // shouldn't be any orphan URNs
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 2)         // but 2 new URNs
 
 	// remove a URN from Cathy
 	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001"}}})
 	assert.NoError(t, err)
 
 	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055700001"})
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`).Returns(1) // now orphaned
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`).Returns(1) // now orphaned
 
 	// steal a URN from Bob
 	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", "tel:+16055700002"}}})
@@ -626,5 +626,5 @@ func TestUpdateContactURNs(t *testing.T) {
 	assertContactURNs(testdata.Bob.ID, []string{"tel:+16055742222", "tel:+16055700002"})
 	assertContactURNs(testdata.George.ID, []string{"tel:+16055743333"})
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 3)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 3)
 }

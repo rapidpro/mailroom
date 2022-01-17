@@ -3,7 +3,7 @@ package surveyor
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -23,12 +22,14 @@ import (
 )
 
 func TestSurveyor(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
+	defer testsuite.Reset(testsuite.ResetAll)
+
 	wg := &sync.WaitGroup{}
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -112,8 +113,7 @@ func TestSurveyor(t *testing.T) {
 	for i, tc := range tcs {
 		testID := fmt.Sprintf("%s[token=%s]", tc.File, tc.Token)
 		path := filepath.Join("testdata", tc.File)
-		submission, err := ioutil.ReadFile(path)
-		assert.NoError(t, err)
+		submission := testsuite.ReadFile(path)
 
 		url := "http://localhost:8090/mr/surveyor/submit"
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(submission))
@@ -128,7 +128,7 @@ func TestSurveyor(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, tc.StatusCode, resp.StatusCode, "unexpected status code for %s", testID)
 
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		assert.Containsf(t, string(body), tc.Contains, "%s does not contain expected body", testID)
 
 		id, _ := jsonparser.GetInt(body, "contact", "id")

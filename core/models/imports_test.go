@@ -3,11 +3,12 @@ package models_test
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
@@ -26,11 +27,16 @@ import (
 )
 
 func TestContactImports(t *testing.T) {
-	ctx, _, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset()
+	defer testsuite.Reset(testsuite.ResetAll)
 
-	testdata.DeleteContactsAndURNs(db)
+	// start with no contacts or URNs
+	db.MustExec(`DELETE FROM contacts_contacturn`)
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts`)
+	db.MustExec(`DELETE FROM contacts_contact`)
+	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 10000`)
+	db.MustExec(`ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 10000`)
 
 	// add contact in other org to make sure we can't update it
 	testdata.InsertContact(db, testdata.Org2, "f7a8016d-69a6-434b-aae7-5142ce4a98ba", "Xavier", "spa")
@@ -41,8 +47,7 @@ func TestContactImports(t *testing.T) {
 	// give our org a country by setting country on a channel
 	db.MustExec(`UPDATE channels_channel SET country = 'US' WHERE id = $1`, testdata.TwilioChannel.ID)
 
-	testJSON, err := ioutil.ReadFile("testdata/imports.json")
-	require.NoError(t, err)
+	testJSON := testsuite.ReadFile("testdata/imports.json")
 
 	tcs := []struct {
 		Description string                `json:"description"`
@@ -53,23 +58,22 @@ func TestContactImports(t *testing.T) {
 		Errors      json.RawMessage       `json:"errors"`
 		Contacts    []*models.ContactSpec `json:"contacts"`
 	}{}
-	err = jsonx.Unmarshal(testJSON, &tcs)
-	require.NoError(t, err)
+	jsonx.MustUnmarshal(testJSON, &tcs)
 
-	oa, err := models.GetOrgAssets(ctx, db, 1)
+	oa, err := models.GetOrgAssets(ctx, rt, 1)
 	require.NoError(t, err)
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
 	for i, tc := range tcs {
-		importID := testdata.InsertContactImport(db, testdata.Org1)
+		importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
 		batchID := testdata.InsertContactImportBatch(db, importID, tc.Specs)
 
 		batch, err := models.LoadContactImportBatch(ctx, db, batchID)
 		require.NoError(t, err)
 
-		err = batch.Import(ctx, db, testdata.Org1.ID)
+		err = batch.Import(ctx, rt, testdata.Org1.ID)
 		require.NoError(t, err)
 
 		results := &struct {
@@ -136,33 +140,55 @@ func TestContactImports(t *testing.T) {
 		testJSON, err = jsonx.MarshalPretty(tcs)
 		require.NoError(t, err)
 
-		err = ioutil.WriteFile("testdata/imports.json", testJSON, 0600)
+		err = os.WriteFile("testdata/imports.json", testJSON, 0600)
 		require.NoError(t, err)
 	}
 }
 
-func TestContactImportBatch(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+func TestLoadContactImport(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
 
-	importID := testdata.InsertContactImport(db, testdata.Org1)
-	batchID := testdata.InsertContactImportBatch(db, importID, []byte(`[
+	defer testsuite.Reset(testsuite.ResetData)
+
+	importID := testdata.InsertContactImport(db, testdata.Org1, testdata.Admin)
+	batch1ID := testdata.InsertContactImportBatch(db, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
 	]`))
+	testdata.InsertContactImportBatch(db, importID, []byte(`[
+		{"name": "Rowan", "language": "spa", "urns": ["tel:+16055740003"]}
+	]`))
 
-	batch, err := models.LoadContactImportBatch(ctx, db, batchID)
+	imp, err := models.LoadContactImport(ctx, db, importID)
 	require.NoError(t, err)
 
-	assert.Equal(t, importID, batch.ImportID)
-	assert.Equal(t, models.ContactImportStatus("P"), batch.Status)
-	assert.NotNil(t, batch.Specs)
-	assert.Equal(t, 0, batch.RecordStart)
-	assert.Equal(t, 2, batch.RecordEnd)
+	assert.Equal(t, testdata.Org1.ID, imp.OrgID)
+	assert.Equal(t, testdata.Admin.ID, imp.CreatedByID)
+	assert.Equal(t, models.ContactImportStatusProcessing, imp.Status)
+	assert.Nil(t, imp.FinishedOn)
+	assert.Equal(t, "P", imp.BatchStatuses)
 
-	err = batch.Import(ctx, db, testdata.Org1.ID)
+	batch1, err := models.LoadContactImportBatch(ctx, db, batch1ID)
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`).Returns(1)
+	assert.Equal(t, importID, batch1.ImportID)
+	assert.Equal(t, models.ContactImportStatusPending, batch1.Status)
+	assert.NotNil(t, batch1.Specs)
+	assert.Equal(t, 0, batch1.RecordStart)
+	assert.Equal(t, 2, batch1.RecordEnd)
+
+	err = batch1.Import(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	imp, err = models.LoadContactImport(ctx, db, importID)
+	require.NoError(t, err)
+
+	batchStatuses := strings.Split(imp.BatchStatuses, "")
+	sort.Strings(batchStatuses)
+	assert.Equal(t, []string{"C", "P"}, batchStatuses)
+
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'C' AND finished_on IS NOT NULL`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contactimportbatch WHERE status = 'P' AND finished_on IS NULL`).Returns(1)
 }
 
 func TestContactSpecUnmarshal(t *testing.T) {

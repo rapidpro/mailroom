@@ -1,7 +1,7 @@
 package testsuite
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 )
@@ -42,7 +42,7 @@ func NewMockElasticServer() *MockElasticServer {
 		}
 
 		// otherwise read our next body and return our next response
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		mock.LastBody = string(body)
 
 		w.WriteHeader(200)

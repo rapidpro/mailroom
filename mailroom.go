@@ -2,18 +2,16 @@ package mailroom
 
 import (
 	"context"
-	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/nyaruka/gocommon/storage"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
+	"github.com/pkg/errors"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -58,7 +56,7 @@ type Mailroom struct {
 }
 
 // NewMailroom creates and returns a new mailroom instance
-func NewMailroom(config *config.Config) *Mailroom {
+func NewMailroom(config *runtime.Config) *Mailroom {
 	mr := &Mailroom{
 		rt:   &runtime.Runtime{Config: config},
 		quit: make(chan bool),
@@ -75,50 +73,155 @@ func NewMailroom(config *config.Config) *Mailroom {
 func (mr *Mailroom) Start() error {
 	c := mr.rt.Config
 
-	log := logrus.WithFields(logrus.Fields{
-		"state": "starting",
-	})
+	log := logrus.WithFields(logrus.Fields{"state": "starting"})
 
-	// parse and test our db config
-	dbURL, err := url.Parse(c.DB)
+	var err error
+	mr.rt.DB, err = openAndCheckDBConnection(c.DB, c.DBPoolSize)
 	if err != nil {
-		return fmt.Errorf("unable to parse DB URL '%s': %s", c.DB, err)
-	}
-
-	if dbURL.Scheme != "postgres" {
-		return fmt.Errorf("invalid DB URL: '%s', only postgres is supported", c.DB)
-	}
-
-	// build our db
-	db, err := sqlx.Open("postgres", c.DB)
-	if err != nil {
-		return fmt.Errorf("unable to open DB with config: '%s': %s", c.DB, err)
-	}
-
-	// configure our pool
-	db.SetMaxIdleConns(8)
-	db.SetMaxOpenConns(c.DBPoolSize)
-	db.SetConnMaxLifetime(time.Minute * 30)
-	mr.rt.DB = db
-
-	// try connecting
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	err = db.PingContext(ctx)
-	cancel()
-	if err != nil {
-		log.Error("db not reachable")
+		log.WithError(err).Error("db not reachable")
 	} else {
 		log.Info("db ok")
 	}
 
-	// parse and test our redis config
-	redisURL, err := url.Parse(mr.rt.Config.Redis)
-	if err != nil {
-		return fmt.Errorf("unable to parse Redis URL '%s': %s", c.Redis, err)
+	if c.ReadonlyDB != "" {
+		mr.rt.ReadonlyDB, err = openAndCheckDBConnection(c.ReadonlyDB, c.DBPoolSize)
+		if err != nil {
+			log.WithError(err).Error("readonly db not reachable")
+		} else {
+			log.Info("readonly db ok")
+		}
+	} else {
+		// if readonly DB not specified, just use default DB again
+		mr.rt.ReadonlyDB = mr.rt.DB
+		log.Warn("no distinct readonly db configured")
 	}
 
-	// create our pool
-	redisPool := &redis.Pool{
+	mr.rt.RP, err = openAndCheckRedisPool(c.Redis)
+	if err != nil {
+		log.WithError(err).Error("redis not reachable")
+	} else {
+		log.Info("redis ok")
+	}
+
+	// create our storage (S3 or file system)
+	if mr.rt.Config.AWSAccessKeyID != "" {
+		s3Client, err := storage.NewS3Client(&storage.S3Options{
+			AWSAccessKeyID:     c.AWSAccessKeyID,
+			AWSSecretAccessKey: c.AWSSecretAccessKey,
+			Endpoint:           c.S3Endpoint,
+			Region:             c.S3Region,
+			DisableSSL:         c.S3DisableSSL,
+			ForcePathStyle:     c.S3ForcePathStyle,
+			MaxRetries:         3,
+		})
+		if err != nil {
+			return err
+		}
+		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, 32)
+		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, 32)
+	} else {
+		mr.rt.MediaStorage = storage.NewFS("_storage")
+		mr.rt.SessionStorage = storage.NewFS("_storage")
+	}
+
+	// test our media storage
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	err = mr.rt.MediaStorage.Test(ctx)
+	cancel()
+
+	if err != nil {
+		log.WithError(err).Error(mr.rt.MediaStorage.Name() + " media storage not available")
+	} else {
+		log.Info(mr.rt.MediaStorage.Name() + " media storage ok")
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+	err = mr.rt.SessionStorage.Test(ctx)
+	cancel()
+
+	if err != nil {
+		log.WithError(err).Warn(mr.rt.SessionStorage.Name() + " session storage not available")
+	} else {
+		log.Info(mr.rt.SessionStorage.Name() + " session storage ok")
+	}
+
+	// initialize our elastic client
+	mr.rt.ES, err = newElasticClient(c.Elastic)
+	if err != nil {
+		log.WithError(err).Error("elastic search not available")
+	} else {
+		log.Info("elastic ok")
+	}
+
+	// warn if we won't be doing FCM syncing
+	if c.FCMKey == "" {
+		logrus.Error("fcm not configured, no syncing of android channels")
+	}
+
+	for _, initFunc := range initFunctions {
+		initFunc(mr.rt, mr.wg, mr.quit)
+	}
+
+	// if we have a librato token, configure it
+	if c.LibratoToken != "" {
+		librato.Configure(c.LibratoUsername, c.LibratoToken, c.InstanceName, time.Second, mr.wg)
+		librato.Start()
+	}
+
+	// init our foremen and start it
+	mr.batchForeman.Start()
+	mr.handlerForeman.Start()
+
+	// start our web server
+	mr.webserver = web.NewServer(mr.ctx, mr.rt, mr.wg)
+	mr.webserver.Start()
+
+	logrus.WithField("domain", c.Domain).Info("mailroom started")
+
+	return nil
+}
+
+// Stop stops the mailroom service
+func (mr *Mailroom) Stop() error {
+	logrus.Info("mailroom stopping")
+	mr.batchForeman.Stop()
+	mr.handlerForeman.Stop()
+	librato.Stop()
+	close(mr.quit)
+	mr.cancel()
+
+	// stop our web server
+	mr.webserver.Stop()
+
+	mr.wg.Wait()
+	mr.rt.ES.Stop()
+	logrus.Info("mailroom stopped")
+	return nil
+}
+
+func openAndCheckDBConnection(url string, maxOpenConns int) (*sqlx.DB, error) {
+	db, err := sqlx.Open("postgres", url)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to open database connection: '%s'", url)
+	}
+
+	// configure our pool
+	db.SetMaxIdleConns(8)
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetConnMaxLifetime(time.Minute * 30)
+
+	// ping database...
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	err = db.PingContext(ctx)
+	cancel()
+
+	return db, err
+}
+
+func openAndCheckRedisPool(redisUrl string) (*redis.Pool, error) {
+	redisURL, _ := url.Parse(redisUrl)
+
+	rp := &redis.Pool{
 		Wait:        true,              // makes callers wait for a connection
 		MaxActive:   36,                // only open this many concurrent connections at once
 		MaxIdle:     4,                 // only keep up to this many idle
@@ -145,112 +248,13 @@ func (mr *Mailroom) Start() error {
 			return conn, err
 		},
 	}
-	mr.rt.RP = redisPool
 
-	// test our redis connection
-	conn := redisPool.Get()
+	// test the connection
+	conn := rp.Get()
 	defer conn.Close()
-	_, err = conn.Do("PING")
-	if err != nil {
-		log.WithError(err).Error("redis not reachable")
-	} else {
-		log.Info("redis ok")
-	}
+	_, err := conn.Do("PING")
 
-	// create our storage (S3 or file system)
-	if mr.rt.Config.AWSAccessKeyID != "" {
-		s3Client, err := storage.NewS3Client(&storage.S3Options{
-			AWSAccessKeyID:     c.AWSAccessKeyID,
-			AWSSecretAccessKey: c.AWSSecretAccessKey,
-			Endpoint:           c.S3Endpoint,
-			Region:             c.S3Region,
-			DisableSSL:         c.S3DisableSSL,
-			ForcePathStyle:     c.S3ForcePathStyle,
-		})
-		if err != nil {
-			return err
-		}
-		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, 32)
-		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, 32)
-	} else {
-		mr.rt.MediaStorage = storage.NewFS("_storage")
-		mr.rt.SessionStorage = storage.NewFS("_storage")
-	}
-
-	// test our media storage
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
-	err = mr.rt.MediaStorage.Test(ctx)
-	cancel()
-
-	if err != nil {
-		log.WithError(err).Error(mr.rt.MediaStorage.Name() + " media storage not available")
-	} else {
-		log.Info(mr.rt.MediaStorage.Name() + " media storage ok")
-	}
-
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
-	err = mr.rt.SessionStorage.Test(ctx)
-	cancel()
-
-	if err != nil {
-		log.WithError(err).Warn(mr.rt.SessionStorage.Name() + " session storage not available")
-	} else {
-		log.Info(mr.rt.SessionStorage.Name() + " session storage ok")
-	}
-
-	// initialize our elastic client
-	mr.rt.ES, err = newElasticClient(c.Elastic)
-	if err != nil {
-		log.WithError(err).Error("unable to connect to elastic, check configuration")
-	} else {
-		log.Info("elastic ok")
-	}
-
-	// warn if we won't be doing FCM syncing
-	if c.FCMKey == "" {
-		logrus.Error("fcm not configured, no syncing of android channels")
-	}
-
-	for _, initFunc := range initFunctions {
-		initFunc(mr.rt, mr.wg, mr.quit)
-	}
-
-	// if we have a librato token, configure it
-	if c.LibratoToken != "" {
-		host, _ := os.Hostname()
-		librato.Configure(c.LibratoUsername, c.LibratoToken, host, time.Second, mr.wg)
-		librato.Start()
-	}
-
-	// init our foremen and start it
-	mr.batchForeman.Start()
-	mr.handlerForeman.Start()
-
-	// start our web server
-	mr.webserver = web.NewServer(mr.ctx, c, mr.rt.DB, mr.rt.RP, mr.rt.MediaStorage, mr.rt.ES, mr.wg)
-	mr.webserver.Start()
-
-	logrus.Info("mailroom started")
-
-	return nil
-}
-
-// Stop stops the mailroom service
-func (mr *Mailroom) Stop() error {
-	logrus.Info("mailroom stopping")
-	mr.batchForeman.Stop()
-	mr.handlerForeman.Stop()
-	librato.Stop()
-	close(mr.quit)
-	mr.cancel()
-
-	// stop our web server
-	mr.webserver.Stop()
-
-	mr.wg.Wait()
-	mr.rt.ES.Stop()
-	logrus.Info("mailroom stopped")
-	return nil
+	return rp, err
 }
 
 func newElasticClient(url string) (*elastic.Client, error) {

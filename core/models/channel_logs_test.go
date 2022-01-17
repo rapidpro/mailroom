@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestChannelLogs(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer db.MustExec(`DELETE FROM channels_channellog`)
 
@@ -24,7 +25,7 @@ func TestChannelLogs(t *testing.T) {
 		"http://rapidpro.io/new": {httpx.NewMockResponse(200, nil, "OK")},
 	}))
 
-	oa, err := models.GetOrgAssets(ctx, db, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	channel := oa.ChannelByID(testdata.TwilioChannel.ID)
@@ -48,8 +49,8 @@ func TestChannelLogs(t *testing.T) {
 	err = models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log1, log2, log3})
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog`).Returns(3)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io/bad' AND is_error = TRUE AND channel_id = $1`, channel.ID()).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'https://rapidpro.io/old' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog`).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io/bad' AND is_error = TRUE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'https://rapidpro.io/old' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
 }

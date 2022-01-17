@@ -3,10 +3,10 @@ package hooks
 import (
 	"context"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 )
 
@@ -16,7 +16,7 @@ var CommitLanguageChangesHook models.EventCommitHook = &commitLanguageChangesHoo
 type commitLanguageChangesHook struct{}
 
 // Apply applies our contact language change before our commit
-func (h *commitLanguageChangesHook) Apply(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
+func (h *commitLanguageChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and language name
 	updates := make([]interface{}, 0, len(scenes))
 	for s, e := range scenes {

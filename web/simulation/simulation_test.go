@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -199,11 +197,13 @@ const (
 )
 
 func TestServer(t *testing.T) {
-	ctx, _, db, rp := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
 
 	wg := &sync.WaitGroup{}
 
-	server := web.NewServer(ctx, config.Mailroom, db, rp, nil, nil, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 
 	// give our server time to start
@@ -266,7 +266,7 @@ func TestServer(t *testing.T) {
 
 		assert.Equal(t, tc.ExpectedStatus, resp.StatusCode, "%d: unexpected status", i)
 
-		content, err := ioutil.ReadAll(resp.Body)
+		content, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
 
 		// if this was a success, save our session

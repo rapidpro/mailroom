@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
@@ -21,9 +23,11 @@ import (
 )
 
 func TestMsgEvents(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Reset()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.IVRFlow, "ivr", models.MatchOnly, nil, nil)
@@ -34,16 +38,16 @@ func TestMsgEvents(t *testing.T) {
 	// give Cathy and Bob some tickets...
 	openTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Hi there", "Ok", "", nil),
-			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, "Hi again", "Ok", "", nil),
+			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", nil),
+			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Ok", "", nil),
 		},
 	}
 	closedTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Old", "", "", nil),
+			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil),
 		},
 		testdata.Bob: {
-			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, "Hi there", "Ok", "", nil),
+			testdata.InsertClosedTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", nil),
 		},
 	}
 
@@ -58,49 +62,201 @@ func TestMsgEvents(t *testing.T) {
 	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "", models.MsgStatusPending)
 
 	tcs := []struct {
-		Hook          func()
-		Org           *testdata.Org
-		Channel       *testdata.Channel
-		Contact       *testdata.Contact
-		Text          string
-		ExpectedReply string
-		ExpectedType  models.MsgType
+		preHook       func()
+		org           *testdata.Org
+		channel       *testdata.Channel
+		contact       *testdata.Contact
+		text          string
+		expectedReply string
+		expectedType  models.MsgType
+		expectedFlow  *testdata.Flow
 	}{
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "noop", "", models.MsgTypeInbox},
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "start other", "", models.MsgTypeInbox},
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "start", "What is your favorite color?", models.MsgTypeFlow},
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "purple", "I don't know that color. Try again.", models.MsgTypeFlow},
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "blue", "Good choice, I like Blue too! What is your favorite beer?", models.MsgTypeFlow},
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "MUTZIG", "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?", models.MsgTypeFlow},
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "Cathy", "Thanks Cathy, we are all done!", models.MsgTypeFlow},
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Cathy, "noop", "", models.MsgTypeInbox},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "noop",
+			expectedReply: "",
+			expectedType:  models.MsgTypeInbox,
+		},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "start other",
+			expectedReply: "",
+			expectedType:  models.MsgTypeInbox,
+		},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "start",
+			expectedReply: "What is your favorite color?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "purple",
+			expectedReply: "I don't know that color. Try again.",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "blue",
+			expectedReply: "Good choice, I like Blue too! What is your favorite beer?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "MUTZIG",
+			expectedReply: "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "Cathy",
+			expectedReply: "Thanks Cathy, we are all done!",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "noop",
+			expectedReply: "",
+			expectedType:  models.MsgTypeInbox,
+		},
 
-		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "other", "Hey, how are you?", models.MsgTypeFlow},
-		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start", "What is your favorite color?", models.MsgTypeFlow},
-		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "green", "Good choice, I like Green too! What is your favorite beer?", models.MsgTypeFlow},
-		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "primus", "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?", models.MsgTypeFlow},
-		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "george", "Thanks george, we are all done!", models.MsgTypeFlow},
-		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "blargh", "Hey, how are you?", models.MsgTypeFlow},
+		{
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "other",
+			expectedReply: "Hey, how are you?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2SingleMessage,
+		},
+		{
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "start",
+			expectedReply: "What is your favorite color?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2Favorites,
+		},
+		{
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "green",
+			expectedReply: "Good choice, I like Green too! What is your favorite beer?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2Favorites,
+		},
+		{
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "primus",
+			expectedReply: "Mmmmm... delicious Primus. If only they made green Primus! Lastly, what is your name?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2Favorites,
+		},
+		{
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "george",
+			expectedReply: "Thanks george, we are all done!",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2Favorites,
+		},
+		{
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "blargh",
+			expectedReply: "Hey, how are you?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2SingleMessage,
+		},
 
-		{nil, testdata.Org1, testdata.TwitterChannel, testdata.Bob, "ivr", "", models.MsgTypeFlow},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Bob,
+			text:          "ivr",
+			expectedReply: "",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.IVRFlow,
+		},
 
 		// no URN on contact but handle event, session gets started but no message created
-		{nil, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria, "start", "", models.MsgTypeFlow},
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwilioChannel,
+			contact:       testdata.Alexandria,
+			text:          "start",
+			expectedReply: "",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
 
 		// start Fred back in our favorite flow, then make it inactive, will be handled by catch-all
-		{nil, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start", "What is your favorite color?", models.MsgTypeFlow},
-		{func() {
-			db.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Org2Favorites.ID)
-		}, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "red", "Hey, how are you?", models.MsgTypeFlow},
+		{
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "start",
+			expectedReply: "What is your favorite color?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2Favorites,
+		},
+		{
+			preHook: func() {
+				db.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Org2Favorites.ID)
+			},
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "red",
+			expectedReply: "Hey, how are you?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2SingleMessage,
+		},
 
 		// start Fred back in our favorites flow to test retries
-		{func() {
-			db.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, testdata.Org2Favorites.ID)
-		}, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start", "What is your favorite color?", models.MsgTypeFlow},
+		{
+			preHook: func() {
+				db.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, testdata.Org2Favorites.ID)
+			},
+			org:           testdata.Org2,
+			channel:       testdata.Org2Channel,
+			contact:       testdata.Org2Contact,
+			text:          "start",
+			expectedReply: "What is your favorite color?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Org2Favorites,
+		},
 	}
 
 	makeMsgTask := func(org *testdata.Org, channel *testdata.Channel, contact *testdata.Contact, text string) *queue.Task {
-		event := &handler.MsgEvent{
+		return &queue.Task{Type: handler.MsgEventType, OrgID: int(org.ID), Task: jsonx.MustMarshal(&handler.MsgEvent{
 			ContactID: contact.ID,
 			OrgID:     org.ID,
 			ChannelID: channel.ID,
@@ -109,18 +265,7 @@ func TestMsgEvents(t *testing.T) {
 			URN:       contact.URN,
 			URNID:     contact.URNID,
 			Text:      text,
-		}
-
-		eventJSON, err := json.Marshal(event)
-		assert.NoError(t, err)
-
-		task := &queue.Task{
-			Type:  handler.MsgEventType,
-			OrgID: int(org.ID),
-			Task:  eventJSON,
-		}
-
-		return task
+		})}
 	}
 
 	last := time.Now()
@@ -131,14 +276,14 @@ func TestMsgEvents(t *testing.T) {
 		// reset our dummy db message into an unhandled state
 		db.MustExec(`UPDATE msgs_msg SET status = 'P', msg_type = NULL WHERE id = $1`, dbMsg.ID())
 
-		// run our hook if we have one
-		if tc.Hook != nil {
-			tc.Hook()
+		// run our setup hook if we have one
+		if tc.preHook != nil {
+			tc.preHook()
 		}
 
-		task := makeMsgTask(tc.Org, tc.Channel, tc.Contact, tc.Text)
+		task := makeMsgTask(tc.org, tc.channel, tc.contact, tc.text)
 
-		err := handler.QueueHandleTask(rc, tc.Contact.ID, task)
+		err := handler.QueueHandleTask(rc, tc.contact.ID, task)
 		assert.NoError(t, err, "%d: error adding task", i)
 
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
@@ -147,30 +292,38 @@ func TestMsgEvents(t *testing.T) {
 		err = handler.HandleEvent(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
+		var expectedFlowID interface{}
+		if tc.expectedFlow != nil {
+			expectedFlowID = int64(tc.expectedFlow.ID)
+		}
+
 		// check that message is marked as handled with expected type
-		testsuite.AssertQuery(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
-			Columns(map[string]interface{}{"msg_type": string(tc.ExpectedType), "status": "H"}, "%d: msg state mismatch", i)
+		assertdb.Query(t, db, `SELECT status, msg_type, flow_id FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+			Columns(map[string]interface{}{"status": "H", "msg_type": string(tc.expectedType), "flow_id": expectedFlowID}, "%d: msg state mismatch", i)
 
 		// if we are meant to have a reply, check it
-		if tc.ExpectedReply != "" {
-			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
-				Returns(tc.ExpectedReply, "%d: response mismatch", i)
+		if tc.expectedReply != "" {
+			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.contact.ID, last).
+				Returns(tc.expectedReply, "%d: response mismatch", i)
 		}
 
 		// check any open tickets for this contact where updated
-		numOpenTickets := len(openTickets[tc.Contact])
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'O' AND last_activity_on > $2`, tc.Contact.ID, last).
+		numOpenTickets := len(openTickets[tc.contact])
+		assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'O' AND last_activity_on > $2`, tc.contact.ID, last).
 			Returns(numOpenTickets, "%d: updated open ticket mismatch", i)
 
 		// check any closed tickets are unchanged
-		numClosedTickets := len(closedTickets[tc.Contact])
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'C' AND last_activity_on = '2021-01-01T00:00:00Z'`, tc.Contact.ID).
+		numClosedTickets := len(closedTickets[tc.contact])
+		assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE contact_id = $1 AND status = 'C' AND last_activity_on = '2021-01-01T00:00:00Z'`, tc.contact.ID).
 			Returns(numClosedTickets, "%d: unchanged closed ticket mismatch", i)
 
 		last = time.Now()
 	}
 
 	// should have one remaining IVR task to handle for Bob
+	orgTasks := testsuite.CurrentOrgTasks(t, rp)
+	assert.Equal(t, 1, len(orgTasks[testdata.Org1.ID]))
+
 	task, err := queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
@@ -183,10 +336,11 @@ func TestMsgEvents(t *testing.T) {
 	})
 
 	// Fred's sessions should not have a timeout because courier will set them
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL AND wait_started_on IS NOT NULL`, testdata.Org2Contact.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1`, testdata.Org2Contact.ID).Returns(6)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and timeout_on IS NULL`, testdata.Org2Contact.ID).Returns(6)
 
 	// force an error by marking our run for fred as complete (our session is still active so this will blow up)
-	db.MustExec(`UPDATE flows_flowrun SET is_active = FALSE WHERE contact_id = $1`, testdata.Org2Contact.ID)
+	db.MustExec(`UPDATE flows_flowrun SET status = 'C' WHERE contact_id = $1`, testdata.Org2Contact.ID)
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "red")
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 
@@ -216,11 +370,11 @@ func TestMsgEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should get our catch all trigger
-	testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID).Returns("Hey, how are you?")
+	assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdata.Org2Contact.ID).Returns("Hey, how are you?")
 	previous := time.Now()
 
 	// and should have failed previous session
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F' and current_flow_id = $2`, testdata.Org2Contact.ID, testdata.Org2Favorites.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession where contact_id = $1 and status = 'F'`, testdata.Org2Contact.ID).Returns(2)
 
 	// trigger should also not start a new session
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start")
@@ -229,13 +383,15 @@ func TestMsgEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
 }
 
 func TestChannelEvents(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Reset()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add some channel event triggers
 	testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwitterChannel)
@@ -288,7 +444,7 @@ func TestChannelEvents(t *testing.T) {
 
 		// if we are meant to have a response
 		if tc.Response != "" {
-			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
+			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND contact_urn_id = $2 AND created_on > $3 ORDER BY id DESC LIMIT 1`, tc.ContactID, tc.URNID, start).
 				Returns(tc.Response, "%d: response mismatch", i)
 		}
 
@@ -302,14 +458,16 @@ func TestChannelEvents(t *testing.T) {
 }
 
 func TestTicketEvents(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Reset()
+	ctx, rt, db, _ := testsuite.Get()
 	rc := rt.RP.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// add a ticket closed trigger
 	testdata.InsertTicketClosedTrigger(rt.DB, testdata.Org1, testdata.Favorites)
 
-	ticket := testdata.InsertClosedTicket(rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, "Problem", "Where are my shoes?", "", nil)
+	ticket := testdata.InsertClosedTicket(rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where are my shoes?", "", nil)
 	modelTicket := ticket.Load(db)
 
 	event := models.NewTicketClosedEvent(modelTicket, testdata.Admin.ID)
@@ -323,16 +481,19 @@ func TestTicketEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestStopEvent(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Reset()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
 
+	defer testsuite.Reset(testsuite.ResetAll)
+
 	// schedule an event for cathy and george
-	db.MustExec(`INSERT INTO campaigns_eventfire(scheduled, contact_id, event_id) VALUES (NOW(), $1, $3), (NOW(), $2, $3);`, testdata.Cathy.ID, testdata.George.ID, testdata.RemindersEvent1.ID)
+	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now())
+	testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now())
 
 	// and george to doctors group, cathy is already part of it
 	db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2);`, testdata.DoctorsGroup.ID, testdata.George.ID)
@@ -356,21 +517,23 @@ func TestStopEvent(t *testing.T) {
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
-	testsuite.AssertQuery(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.Cathy.ID).Returns(0)
-	testsuite.AssertQuery(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.George.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) from contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, testdata.DoctorsGroup.ID, testdata.George.ID).Returns(1)
 
 	// that cathy is stopped
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'`, testdata.Cathy.ID).Returns(1)
 
 	// and has no upcoming events
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Cathy.ID).Returns(0)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.George.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.George.ID).Returns(1)
 }
 
 func TestTimedEvents(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Reset()
+	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	// start to start our favorites flow
 	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
@@ -476,7 +639,7 @@ func TestTimedEvents(t *testing.T) {
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		if tc.Response != "" {
-			testsuite.AssertQuery(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
+			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.Contact.ID, last).
 				Returns(tc.Response, "%d: response: mismatch", i)
 		}
 
@@ -525,8 +688,6 @@ func TestTimedEvents(t *testing.T) {
 	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, runID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'F' AND id = $1`, sessionID).Returns(1)
-
-	testsuite.ResetDB()
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, runID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'F' AND id = $1`, sessionID).Returns(1)
 }

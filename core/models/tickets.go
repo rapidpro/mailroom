@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/utils/dbutil"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 
 	"github.com/jmoiron/sqlx"
@@ -58,11 +59,13 @@ const (
 
 // Register a ticket service factory with the engine
 func init() {
-	goflow.RegisterTicketServiceFactory(
-		func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-			return ticketer.Asset().(*Ticketer).AsService(config.Mailroom, ticketer)
-		},
-	)
+	goflow.RegisterTicketServiceFactory(ticketServiceFactory)
+}
+
+func ticketServiceFactory(c *runtime.Config) engine.TicketServiceFactory {
+	return func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
+		return ticketer.Asset().(*Ticketer).AsService(c, ticketer)
+	}
 }
 
 type Ticket struct {
@@ -74,7 +77,7 @@ type Ticket struct {
 		TicketerID     TicketerID       `db:"ticketer_id"`
 		ExternalID     null.String      `db:"external_id"`
 		Status         TicketStatus     `db:"status"`
-		Subject        string           `db:"subject"`
+		TopicID        TopicID          `db:"topic_id"`
 		Body           string           `db:"body"`
 		AssigneeID     UserID           `db:"assignee_id"`
 		Config         null.Map         `db:"config"`
@@ -86,7 +89,7 @@ type Ticket struct {
 }
 
 // NewTicket creates a new open ticket
-func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID, subject, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
+func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID string, topicID TopicID, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
 	t := &Ticket{}
 	t.t.UUID = uuid
 	t.t.OrgID = orgID
@@ -94,7 +97,7 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketer
 	t.t.TicketerID = ticketerID
 	t.t.ExternalID = null.String(externalID)
 	t.t.Status = TicketStatusOpen
-	t.t.Subject = subject
+	t.t.TopicID = topicID
 	t.t.Body = body
 	t.t.AssigneeID = assigneeID
 	t.t.Config = null.NewMap(config)
@@ -108,7 +111,7 @@ func (t *Ticket) ContactID() ContactID      { return t.t.ContactID }
 func (t *Ticket) TicketerID() TicketerID    { return t.t.TicketerID }
 func (t *Ticket) ExternalID() null.String   { return t.t.ExternalID }
 func (t *Ticket) Status() TicketStatus      { return t.t.Status }
-func (t *Ticket) Subject() string           { return t.t.Subject }
+func (t *Ticket) TopicID() TopicID          { return t.t.TopicID }
 func (t *Ticket) Body() string              { return t.t.Body }
 func (t *Ticket) AssigneeID() UserID        { return t.t.AssigneeID }
 func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
@@ -122,32 +125,40 @@ func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
 		return nil, errors.New("unable to load ticketer with id %d")
 	}
 
-	var flowUser *flows.User
+	var topic *flows.Topic
+	if t.TopicID() != NilTopicID {
+		dbTopic := oa.TopicByID(t.TopicID())
+		if dbTopic != nil {
+			topic = oa.SessionAssets().Topics().Get(dbTopic.UUID())
+		}
+	}
+
+	var assignee *flows.User
 	if t.AssigneeID() != NilUserID {
 		user := oa.UserByID(t.AssigneeID())
 		if user != nil {
-			flowUser = oa.SessionAssets().Users().Get(user.Email())
+			assignee = oa.SessionAssets().Users().Get(user.Email())
 		}
 	}
 
 	return flows.NewTicket(
 		t.UUID(),
 		oa.SessionAssets().Ticketers().Get(modelTicketer.UUID()),
-		t.Subject(),
+		topic,
 		t.Body(),
 		string(t.ExternalID()),
-		flowUser,
+		assignee,
 	), nil
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
-func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
-	ticketer := org.TicketerByID(t.t.TicketerID)
+func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
+	ticketer := oa.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
 	}
 
-	service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+	service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 	if err != nil {
 		return err
 	}
@@ -155,7 +166,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, db Queryer, org *OrgAssets
 	logger := &HTTPLogger{}
 	err = service.Forward(t, msgUUID, text, attachments, logger.Ticketer(ticketer))
 
-	logger.Insert(ctx, db)
+	logger.Insert(ctx, rt.DB)
 
 	return err
 }
@@ -169,7 +180,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
-  t.subject AS subject,
+  t.topic_id AS topic_id,
   t.body AS body,
   t.assignee_id AS assignee_id,
   t.config AS config,
@@ -198,7 +209,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
-  t.subject AS subject,
+  t.topic_id AS topic_id,
   t.body AS body,
   t.assignee_id AS assignee_id,
   t.config AS config,
@@ -246,7 +257,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
-  t.subject AS subject,
+  t.topic_id AS topic_id,
   t.body AS body,
   t.assignee_id AS assignee_id,
   t.config AS config,
@@ -274,7 +285,7 @@ SELECT
   t.ticketer_id AS ticketer_id,
   t.external_id AS external_id,
   t.status AS status,
-  t.subject AS subject,
+  t.topic_id AS topic_id,
   t.body AS body,
   t.assignee_id AS assignee_id,
   t.config AS config,
@@ -316,8 +327,8 @@ func lookupTicket(ctx context.Context, db Queryer, query string, params ...inter
 
 const insertTicketSQL = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  subject,  body,  assignee_id,  config,  opened_on, modified_on, last_activity_on)
-  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :subject, :body, :assignee_id, :config, NOW(),     NOW()      , NOW())
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  topic_id,  body,  assignee_id,  config,  opened_on, modified_on, last_activity_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :topic_id, :body, :assignee_id, :config, NOW(),     NOW()      , NOW())
 RETURNING
   id
 `
@@ -368,7 +379,7 @@ func updateTicketLastActivity(ctx context.Context, db Queryer, ids []TicketID, n
 	return Exec(ctx, "update ticket last activity", db, `UPDATE tickets_ticket SET last_activity_on = $2 WHERE id = ANY($1)`, pq.Array(ids), now)
 }
 
-const assignTicketSQL = `
+const ticketsAssignSQL = `
 UPDATE
   tickets_ticket
 SET
@@ -379,8 +390,8 @@ WHERE
   id = ANY($1)
 `
 
-// AssignTickets assigns the passed in tickets
-func AssignTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID, note string) (map[*Ticket]*TicketEvent, error) {
+// TicketsAssign assigns the passed in tickets
+func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, assigneeID UserID, note string) (map[*Ticket]*TicketEvent, error) {
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
@@ -401,26 +412,31 @@ func AssignTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 	}
 
 	// mark the tickets as assigned in the db
-	err := Exec(ctx, "assign tickets", db, assignTicketSQL, pq.Array(ids), assigneeID, now)
+	err := Exec(ctx, "assign tickets", db, ticketsAssignSQL, pq.Array(ids), assigneeID, now)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error updating tickets")
+		return nil, errors.Wrap(err, "error updating tickets")
 	}
 
 	err = InsertTicketEvents(ctx, db, events)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting ticket events")
+		return nil, errors.Wrap(err, "error inserting ticket events")
+	}
+
+	err = NotificationsFromTicketEvents(ctx, db, oa, eventsByTicket)
+	if err != nil {
+		return nil, errors.Wrap(err, "error inserting notifications")
 	}
 
 	return eventsByTicket, nil
 }
 
-// NoteTickets adds a note to the passed in tickets
-func NoteTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, note string) (map[*Ticket]*TicketEvent, error) {
+// TicketsAddNote adds a note to the passed in tickets
+func TicketsAddNote(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, note string) (map[*Ticket]*TicketEvent, error) {
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 
 	for _, ticket := range tickets {
-		e := NewTicketNoteEvent(ticket, userID, note)
+		e := NewTicketNoteAddedEvent(ticket, userID, note)
 		events = append(events, e)
 		eventsByTicket[ticket] = e
 	}
@@ -428,6 +444,57 @@ func NoteTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, 
 	err := UpdateTicketLastActivity(ctx, db, tickets)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating ticket activity")
+	}
+
+	err = InsertTicketEvents(ctx, db, events)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	err = NotificationsFromTicketEvents(ctx, db, oa, eventsByTicket)
+	if err != nil {
+		return nil, errors.Wrap(err, "error inserting notifications")
+	}
+
+	return eventsByTicket, nil
+}
+
+const ticketsChangeTopicSQL = `
+UPDATE
+  tickets_ticket
+SET
+  topic_id = $2,
+  modified_on = $3,
+  last_activity_on = $3
+WHERE
+  id = ANY($1)
+`
+
+// TicketsChangeTopic changes the topic of the passed in tickets
+func TicketsChangeTopic(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, topicID TopicID) (map[*Ticket]*TicketEvent, error) {
+	ids := make([]TicketID, 0, len(tickets))
+	events := make([]*TicketEvent, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	now := dates.Now()
+
+	for _, ticket := range tickets {
+		if ticket.TopicID() != topicID {
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.TopicID = topicID
+			t.ModifiedOn = now
+			t.LastActivityOn = now
+
+			e := NewTicketTopicChangedEvent(ticket, userID, topicID)
+			events = append(events, e)
+			eventsByTicket[ticket] = e
+		}
+	}
+
+	// mark the tickets as assigned in the db
+	err := Exec(ctx, "change tickets topic", db, ticketsChangeTopicSQL, pq.Array(ids), topicID, now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
 	}
 
 	err = InsertTicketEvents(ctx, db, events)
@@ -451,11 +518,12 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, tickets []*Ticket, externally, force bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	contactIDs := make(map[ContactID]bool, len(tickets))
 	now := dates.Now()
 
 	for _, ticket := range tickets {
@@ -471,6 +539,7 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 			e := NewTicketClosedEvent(ticket, userID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
+			contactIDs[ticket.ContactID()] = true
 		}
 	}
 
@@ -478,13 +547,13 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 		for ticketerID, ticketerTickets := range byTicketer {
 			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 				if err != nil {
 					return nil, err
 				}
 
 				err = service.Close(ticketerTickets, logger.Ticketer(ticketer))
-				if err != nil {
+				if err != nil && !force {
 					return nil, err
 				}
 			}
@@ -492,14 +561,17 @@ func CloseTickets(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID,
 	}
 
 	// mark the tickets as closed in the db
-	err := Exec(ctx, "close tickets", db, closeTicketSQL, pq.Array(ids), now)
+	err := Exec(ctx, "close tickets", rt.DB, closeTicketSQL, pq.Array(ids), now)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
 
-	err = InsertTicketEvents(ctx, db, events)
-	if err != nil {
+	if err := InsertTicketEvents(ctx, rt.DB, events); err != nil {
 		return nil, errors.Wrapf(err, "error inserting ticket events")
+	}
+
+	if err := recalcGroupsForTicketChanges(ctx, rt.DB, oa, contactIDs); err != nil {
+		return nil, errors.Wrapf(err, "error recalculting groups")
 	}
 
 	return eventsByTicket, nil
@@ -518,11 +590,12 @@ WHERE
 `
 
 // ReopenTickets reopens the passed in tickets
-func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+func ReopenTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, tickets []*Ticket, externally bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	contactIDs := make(map[ContactID]bool, len(tickets))
 	now := dates.Now()
 
 	for _, ticket := range tickets {
@@ -538,14 +611,15 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserI
 			e := NewTicketReopenedEvent(ticket, userID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
+			contactIDs[ticket.ContactID()] = true
 		}
 	}
 
 	if externally {
 		for ticketerID, ticketerTickets := range byTicketer {
-			ticketer := org.TicketerByID(ticketerID)
+			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(config.Mailroom, flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
 				if err != nil {
 					return nil, err
 				}
@@ -559,17 +633,44 @@ func ReopenTickets(ctx context.Context, db Queryer, org *OrgAssets, userID UserI
 	}
 
 	// mark the tickets as opened in the db
-	err := Exec(ctx, "reopen tickets", db, reopenTicketSQL, pq.Array(ids), now)
+	err := Exec(ctx, "reopen tickets", rt.DB, reopenTicketSQL, pq.Array(ids), now)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
 
-	err = InsertTicketEvents(ctx, db, events)
+	err = InsertTicketEvents(ctx, rt.DB, events)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting ticket events")
 	}
 
+	if err := recalcGroupsForTicketChanges(ctx, rt.DB, oa, contactIDs); err != nil {
+		return nil, errors.Wrapf(err, "error recalculting groups")
+	}
+
 	return eventsByTicket, nil
+}
+
+// because groups can be based on "tickets" need to recalculate after closing/reopening tickets
+func recalcGroupsForTicketChanges(ctx context.Context, db Queryer, oa *OrgAssets, contactIDs map[ContactID]bool) error {
+	ids := make([]ContactID, 0, len(contactIDs))
+	for cid := range contactIDs {
+		ids = append(ids, cid)
+	}
+
+	contacts, err := LoadContacts(ctx, db, oa, ids)
+	if err != nil {
+		return errors.Wrap(err, "error loading contacts with ticket changes")
+	}
+
+	flowContacts := make([]*flows.Contact, len(contacts))
+	for i, contact := range contacts {
+		flowContacts[i], err = contact.FlowContact(oa)
+		if err != nil {
+			return errors.Wrap(err, "error loading flow contact")
+		}
+	}
+
+	return CalculateDynamicGroups(ctx, db, oa, flowContacts)
 }
 
 // Ticketer is our type for a ticketer asset
@@ -608,7 +709,7 @@ func (t *Ticketer) Reference() *assets.TicketerReference {
 }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(cfg *config.Config, ticketer *flows.Ticketer) (TicketService, error) {
+func (t *Ticketer) AsService(cfg *runtime.Config, ticketer *flows.Ticketer) (TicketService, error) {
 	httpClient, httpRetries, _ := goflow.HTTP(cfg)
 
 	initFunc := ticketServices[t.Type()]
@@ -647,7 +748,7 @@ type TicketService interface {
 }
 
 // TicketServiceFunc is a func which creates a ticket service
-type TicketServiceFunc func(*config.Config, *http.Client, *httpx.RetryConfig, *flows.Ticketer, map[string]string) (TicketService, error)
+type TicketServiceFunc func(*runtime.Config, *http.Client, *httpx.RetryConfig, *flows.Ticketer, map[string]string) (TicketService, error)
 
 var ticketServices = map[string]TicketServiceFunc{}
 
@@ -685,7 +786,7 @@ func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerU
 	}
 
 	ticketer := &Ticketer{}
-	err = dbutil.ReadJSONRow(rows, &ticketer.t)
+	err = dbutil.ScanJSON(rows, &ticketer.t)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling ticketer")
 	}
@@ -724,7 +825,7 @@ func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	ticketers := make([]assets.Ticketer, 0, 2)
 	for rows.Next() {
 		ticketer := &Ticketer{}
-		err := dbutil.ReadJSONRow(rows, &ticketer.t)
+		err := dbutil.ScanJSON(rows, &ticketer.t)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling ticketer")
 		}

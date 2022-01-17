@@ -10,6 +10,7 @@ type bulkTicketRequest struct {
 	OrgID     models.OrgID      `json:"org_id"      validate:"required"`
 	UserID    models.UserID     `json:"user_id"      validate:"required"`
 	TicketIDs []models.TicketID `json:"ticket_ids"`
+	Force     bool              `json:"force"`
 }
 
 type bulkTicketResponse struct {
