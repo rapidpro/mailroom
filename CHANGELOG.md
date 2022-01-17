@@ -1,3 +1,8 @@
+v7.1.28
+----------
+ * Include redis stats in analytics cron job
+ * Update wait_resume_on_expire on session writes
+
 v7.1.27
 ----------
  * Always read run status instead of is_active
