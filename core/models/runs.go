@@ -96,22 +96,23 @@ var exitToRunStatusMap = map[ExitType]RunStatus{
 // Session is the mailroom type for a FlowSession
 type Session struct {
 	s struct {
-		ID            SessionID         `db:"id"`
-		UUID          flows.SessionUUID `db:"uuid"`
-		SessionType   FlowType          `db:"session_type"`
-		Status        SessionStatus     `db:"status"`
-		Responded     bool              `db:"responded"`
-		Output        null.String       `db:"output"`
-		OutputURL     null.String       `db:"output_url"`
-		ContactID     ContactID         `db:"contact_id"`
-		OrgID         OrgID             `db:"org_id"`
-		CreatedOn     time.Time         `db:"created_on"`
-		EndedOn       *time.Time        `db:"ended_on"`
-		WaitStartedOn *time.Time        `db:"wait_started_on"`
-		WaitTimeoutOn *time.Time        `db:"timeout_on"`
-		WaitExpiresOn *time.Time        `db:"wait_expires_on"`
-		CurrentFlowID FlowID            `db:"current_flow_id"`
-		ConnectionID  *ConnectionID     `db:"connection_id"`
+		ID                 SessionID         `db:"id"`
+		UUID               flows.SessionUUID `db:"uuid"`
+		SessionType        FlowType          `db:"session_type"`
+		Status             SessionStatus     `db:"status"`
+		Responded          bool              `db:"responded"`
+		Output             null.String       `db:"output"`
+		OutputURL          null.String       `db:"output_url"`
+		ContactID          ContactID         `db:"contact_id"`
+		OrgID              OrgID             `db:"org_id"`
+		CreatedOn          time.Time         `db:"created_on"`
+		EndedOn            *time.Time        `db:"ended_on"`
+		WaitStartedOn      *time.Time        `db:"wait_started_on"`
+		WaitTimeoutOn      *time.Time        `db:"timeout_on"`
+		WaitExpiresOn      *time.Time        `db:"wait_expires_on"`
+		WaitResumeOnExpire *bool             `db:"wait_resume_on_expire"`
+		CurrentFlowID      FlowID            `db:"current_flow_id"`
+		ConnectionID       *ConnectionID     `db:"connection_id"`
 	}
 
 	incomingMsgID      MsgID
@@ -151,6 +152,7 @@ func (s *Session) EndedOn() *time.Time                { return s.s.EndedOn }
 func (s *Session) WaitStartedOn() *time.Time          { return s.s.WaitStartedOn }
 func (s *Session) WaitTimeoutOn() *time.Time          { return s.s.WaitTimeoutOn }
 func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
+func (s *Session) WaitResumeOnExpire() *bool          { return s.s.WaitResumeOnExpire }
 func (s *Session) ClearTimeoutOn()                    { s.s.WaitTimeoutOn = nil }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
@@ -466,6 +468,8 @@ SELECT
 	ended_on,
 	timeout_on,
 	wait_started_on,
+	wait_expires_on,
+	wait_resume_on_expire,
 	current_flow_id,
 	connection_id
 FROM 
@@ -488,22 +492,22 @@ RETURNING id
 
 const insertIncompleteSessionSQL = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded,  output,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :connection_id)
+	flows_flowsession( uuid, session_type, status, responded,  output,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :connection_id)
 RETURNING id
 `
 
 const insertCompleteSessionSQLNoOutput = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, ended_on,  connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),      NOW(),    :connection_id)
+	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, ended_on, connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),      NOW(),   :connection_id)
 RETURNING id
 `
 
 const insertIncompleteSessionSQLNoOutput = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :connection_id)
+	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :connection_id)
 RETURNING id
 `
 
@@ -528,14 +532,20 @@ func (s *Session) updateWait(evts []flows.Event) {
 	s.s.WaitStartedOn = nil
 	s.s.WaitTimeoutOn = nil
 	s.s.WaitExpiresOn = nil
+	s.s.WaitResumeOnExpire = nil
 	s.timeout = nil
 
 	for _, e := range evts {
 		switch typed := e.(type) {
 		case *events.MsgWaitEvent:
+			run, _ := s.findStep(e.StepUUID())
+
 			now := time.Now()
+			hasParent := run.ParentInSession() != nil
+
 			s.s.WaitStartedOn = &now
 			s.s.WaitExpiresOn = typed.ExpiresOn
+			s.s.WaitResumeOnExpire = &hasParent
 
 			if typed.TimeoutSeconds != nil {
 				seconds := time.Duration(*typed.TimeoutSeconds) * time.Second
@@ -584,13 +594,13 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		s.runs = append(s.runs, run)
 	}
 
-	// update wait related fields
-	s.updateWait(sprint.Events())
-
 	// set our sprint, wait and step finder
 	s.sprint = sprint
 	s.findStep = fs.FindStep
 	s.s.CurrentFlowID = NilFlowID
+
+	// update wait related fields
+	s.updateWait(sprint.Events())
 
 	// run through our runs to figure out our current flow
 	for _, r := range fs.Runs() {
@@ -723,6 +733,7 @@ SET
 	current_flow_id = :current_flow_id,
 	wait_started_on = :wait_started_on,
 	wait_expires_on = :wait_expires_on,
+	wait_resume_on_expire = :wait_resume_on_expire,
 	timeout_on = :timeout_on
 WHERE 
 	id = :id
@@ -739,6 +750,7 @@ SET
 	current_flow_id = :current_flow_id,
 	wait_started_on = :wait_started_on,
 	wait_expires_on = :wait_expires_on,
+	wait_resume_on_expire = :wait_resume_on_expire,
 	timeout_on = :timeout_on
 WHERE 
 	id = :id
