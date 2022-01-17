@@ -529,10 +529,12 @@ func (s *Session) FlowSession(cfg *runtime.Config, sa flows.SessionAssets, env e
 
 // looks for a wait event and updates wait fields if one exists
 func (s *Session) updateWait(evts []flows.Event) {
+	boolPtr := func(b bool) *bool { return &b }
+
 	s.s.WaitStartedOn = nil
 	s.s.WaitTimeoutOn = nil
 	s.s.WaitExpiresOn = nil
-	s.s.WaitResumeOnExpire = nil
+	s.s.WaitResumeOnExpire = boolPtr(false)
 	s.timeout = nil
 
 	for _, e := range evts {
@@ -541,11 +543,10 @@ func (s *Session) updateWait(evts []flows.Event) {
 			run, _ := s.findStep(e.StepUUID())
 
 			now := time.Now()
-			hasParent := run.ParentInSession() != nil
 
 			s.s.WaitStartedOn = &now
 			s.s.WaitExpiresOn = typed.ExpiresOn
-			s.s.WaitResumeOnExpire = &hasParent
+			s.s.WaitResumeOnExpire = boolPtr(run.ParentInSession() != nil)
 
 			if typed.TimeoutSeconds != nil {
 				seconds := time.Duration(*typed.TimeoutSeconds) * time.Second

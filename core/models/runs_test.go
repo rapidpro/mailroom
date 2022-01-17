@@ -112,6 +112,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.NotNil(t, session.CreatedOn())
 	assert.Nil(t, session.WaitStartedOn())
 	assert.Nil(t, session.WaitExpiresOn())
+	assert.False(t, *session.WaitResumeOnExpire()) // stays false
 	assert.Nil(t, session.Timeout())
 	assert.NotNil(t, session.EndedOn())
 
