@@ -61,11 +61,14 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.False(t, session.Responded())
 	assert.NotNil(t, session.WaitStartedOn())
 	assert.NotNil(t, session.WaitExpiresOn())
+	assert.False(t, *session.WaitResumeOnExpire())
 	assert.NotNil(t, session.Timeout())
 
 	// check that matches what is in the db
-	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on FROM flows_flowsession`).
-		Columns(map[string]interface{}{"status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "responded": false, "ended_on": nil})
+	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on, wait_resume_on_expire FROM flows_flowsession`).
+		Columns(map[string]interface{}{
+			"status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "responded": false, "ended_on": nil, "wait_resume_on_expire": false,
+		})
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
@@ -86,6 +89,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.True(t, session.Responded())
 	assert.NotNil(t, session.WaitStartedOn())
 	assert.NotNil(t, session.WaitExpiresOn())
+	assert.False(t, *session.WaitResumeOnExpire())
 	assert.Nil(t, session.Timeout()) // this wait doesn't have a timeout
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
