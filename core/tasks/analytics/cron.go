@@ -45,10 +45,6 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 	// the items in our queues.
 	time.Sleep(time.Second * 15)
 
-	// get our DB status
-	dbStats := rt.DB.Stats()
-	redisStats := rt.RP.Stats()
-
 	rc := rt.RP.Get()
 	defer rc.Close()
 
@@ -64,6 +60,10 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 		logrus.WithError(err).Error("error calculating handler queue size")
 	}
 
+	// get our DB and redis stats
+	dbStats := rt.DB.Stats()
+	redisStats := rt.RP.Stats()
+
 	dbWaitDurationInPeriod := dbStats.WaitDuration - dbWaitDuration
 	dbWaitCountInPeriod := dbStats.WaitCount - dbWaitCount
 	redisWaitDurationInPeriod := redisStats.WaitDuration - redisWaitDuration
@@ -73,6 +73,15 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 	dbWaitCount = dbStats.WaitCount
 	redisWaitDuration = redisStats.WaitDuration
 	redisWaitCount = redisStats.WaitCount
+
+	librato.Gauge("mr.db_busy", float64(dbStats.InUse))
+	librato.Gauge("mr.db_idle", float64(dbStats.Idle))
+	librato.Gauge("mr.db_wait_ms", float64(dbWaitDurationInPeriod/time.Millisecond))
+	librato.Gauge("mr.db_wait_count", float64(dbWaitCountInPeriod))
+	librato.Gauge("mr.redis_wait_ms", float64(redisWaitDurationInPeriod/time.Millisecond))
+	librato.Gauge("mr.redis_wait_count", float64(redisWaitCountInPeriod))
+	librato.Gauge("mr.handler_queue", float64(handlerSize))
+	librato.Gauge("mr.batch_queue", float64(batchSize))
 
 	logrus.WithFields(logrus.Fields{
 		"db_busy":          dbStats.InUse,
@@ -84,15 +93,6 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 		"handler_size":     handlerSize,
 		"batch_size":       batchSize,
 	}).Info("current analytics")
-
-	librato.Gauge("mr.db_busy", float64(dbStats.InUse))
-	librato.Gauge("mr.db_idle", float64(dbStats.Idle))
-	librato.Gauge("mr.db_wait_ms", float64(dbWaitDurationInPeriod/time.Millisecond))
-	librato.Gauge("mr.db_wait_count", float64(dbWaitCountInPeriod))
-	librato.Gauge("mr.redis_wait_ms", float64(redisWaitDurationInPeriod/time.Millisecond))
-	librato.Gauge("mr.redis_wait_count", float64(redisWaitCountInPeriod))
-	librato.Gauge("mr.handler_queue", float64(handlerSize))
-	librato.Gauge("mr.batch_queue", float64(batchSize))
 
 	return nil
 }
