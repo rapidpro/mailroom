@@ -1,3 +1,8 @@
+v7.1.29
+----------
+ * Update to latest goflow (fixes allowing bad URNs in start_session actions and adds @trigger.campaign)
+ * Commit modified_on changes outside of transaction
+
 v7.1.28
 ----------
  * Include redis stats in analytics cron job
