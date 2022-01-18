@@ -122,9 +122,9 @@ type Msg struct {
 		ErrorCount           int                `db:"error_count"     json:"error_count"`
 		NextAttempt          *time.Time         `db:"next_attempt"    json:"next_attempt"`
 		FailedReason         MsgFailedReason    `db:"failed_reason"   json:"-"`
-		ExternalID           null.String        `db:"external_id"     json:"external_id"`
-		ResponseToExternalID null.String        `                     json:"response_to_external_id"`
-		Attachments          pq.StringArray     `db:"attachments"     json:"attachments"`
+		ExternalID           null.String        `db:"external_id"     json:"-"`
+		ResponseToExternalID null.String        `                     json:"response_to_external_id,omitempty"`
+		Attachments          pq.StringArray     `db:"attachments"     json:"attachments,omitempty"`
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
@@ -137,8 +137,10 @@ type Msg struct {
 		TopupID              TopupID            `db:"topup_id"        json:"-"`
 		FlowID               FlowID             `db:"flow_id"         json:"-"`
 
-		SessionID     SessionID     `json:"session_id,omitempty"`
-		SessionStatus SessionStatus `json:"session_status,omitempty"`
+		// extra data from handling added to the courier payload
+		SessionID     SessionID             `json:"session_id,omitempty"`
+		SessionStatus SessionStatus         `json:"session_status,omitempty"`
+		Flow          *assets.FlowReference `json:"flow,omitempty"`
 
 		// These fields are set on the last outgoing message in a session's sprint. In the case
 		// of the session being at a wait with a timeout then the timeout will be set. It is up to
@@ -330,21 +332,20 @@ func GetMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgOut) (
 
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, flow.ID(), NilBroadcastID)
+	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, flow, NilBroadcastID)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, NilFlowID, broadcastID)
+	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, nil, broadcastID)
 }
 
-func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, flowID FlowID, broadcastID BroadcastID) (*Msg, error) {
+func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = out.UUID()
 	m.OrgID = org.ID()
 	m.ContactID = contactID
-	m.FlowID = flowID
 	m.BroadcastID = broadcastID
 	m.TopupID = NilTopupID
 	m.Text = out.Text()
@@ -386,6 +387,11 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		m.ResponseToExternalID = session.IncomingMsgExternalID()
 		m.SessionID = session.ID()
 		m.SessionStatus = session.Status()
+
+		if flow != nil {
+			m.FlowID = flow.ID()
+			m.Flow = flow.Reference()
+		}
 
 		// if we're responding to an incoming message, send as high priority
 		if session.IncomingMsgID() != NilMsgID {
