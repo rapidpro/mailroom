@@ -292,8 +292,7 @@ func TestMarshalMsg(t *testing.T) {
 		"text": "Hi there",
 		"tps_cost": 2,
 		"urn": "tel:+250700000001?id=10000",
-		"uuid": "%s",
-		"visibility": "V"
+		"uuid": "%s"
 	}`, msg1.ID(), jsonx.MustMarshal(msg1.ModifiedOn()), jsonx.MustMarshal(msg1.QueuedOn()), session.ID(), msg1.UUID())), marshaled)
 
 	// create a priority flow message.. i.e. the session is responding to an incoming message
@@ -339,8 +338,7 @@ func TestMarshalMsg(t *testing.T) {
 		"text": "Hi there",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
-		"uuid": "%s",
-		"visibility": "V"
+		"uuid": "%s"
 	}`, msg2.ID(), jsonx.MustMarshal(msg2.ModifiedOn()), jsonx.MustMarshal(msg2.QueuedOn()), session.ID(), msg2.UUID())), marshaled)
 
 	// try a broadcast message which won't have session and flow fields set
@@ -376,8 +374,7 @@ func TestMarshalMsg(t *testing.T) {
 		"text": "Blast",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
-		"uuid": "%s",
-		"visibility": "V"
+		"uuid": "%s"
 	}`, bcastID, msg3.ID(), jsonx.MustMarshal(msg3.ModifiedOn()), jsonx.MustMarshal(msg3.QueuedOn()), msg3.UUID())), marshaled)
 }
 

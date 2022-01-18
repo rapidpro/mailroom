@@ -116,7 +116,7 @@ type Msg struct {
 		QueuedOn             time.Time          `db:"queued_on"       json:"queued_on"`
 		Direction            MsgDirection       `db:"direction"       json:"direction"`
 		Status               MsgStatus          `db:"status"          json:"status"`
-		Visibility           MsgVisibility      `db:"visibility"      json:"visibility"`
+		Visibility           MsgVisibility      `db:"visibility"      json:"-"`
 		MsgType              MsgType            `db:"msg_type"        json:"-"`
 		MsgCount             int                `db:"msg_count"       json:"tps_cost"`
 		ErrorCount           int                `db:"error_count"     json:"error_count"`
