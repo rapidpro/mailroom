@@ -1,3 +1,9 @@
+v7.1.30
+----------
+ * Remove deprecated fields on search endpoint
+ * Include flow reference when queuing messages
+ * Tweak coureier payload to not include unused fields
+
 v7.1.29
 ----------
  * Update to latest goflow (fixes allowing bad URNs in start_session actions and adds @trigger.campaign)
