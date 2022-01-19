@@ -414,14 +414,14 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	switch eventType {
 
 	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
 			WithParams(params).
 			Build()
 
 	case models.MOCallEventType:
 		urn := contacts[0].URNForID(event.URNID())
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
 			WithConnection(urn).
 			Build()
@@ -626,7 +626,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
+			trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
 			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, flowMsgHook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
@@ -735,7 +735,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 
 	switch event.EventType() {
 	case models.TicketEventTypeClosed:
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Ticket(ticket, triggers.TicketEventTypeClosed).
 			Build()
 	default:

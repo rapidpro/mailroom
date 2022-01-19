@@ -271,8 +271,7 @@ func TestMarshalMsg(t *testing.T) {
 		"created_on": "2021-11-09T14:03:30Z",
 		"direction": "O",
 		"error_count": 0,
-		"external_id": null,
-		"response_to_external_id": null,
+		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"high_priority": false,
 		"id": %d,
 		"metadata": {
@@ -293,8 +292,7 @@ func TestMarshalMsg(t *testing.T) {
 		"text": "Hi there",
 		"tps_cost": 2,
 		"urn": "tel:+250700000001?id=10000",
-		"uuid": "%s",
-		"visibility": "V"
+		"uuid": "%s"
 	}`, msg1.ID(), jsonx.MustMarshal(msg1.ModifiedOn()), jsonx.MustMarshal(msg1.QueuedOn()), session.ID(), msg1.UUID())), marshaled)
 
 	// create a priority flow message.. i.e. the session is responding to an incoming message
@@ -317,7 +315,6 @@ func TestMarshalMsg(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
-		"attachments": null,
 		"channel_id": 10000,
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
 		"contact_id": 10000,
@@ -325,7 +322,7 @@ func TestMarshalMsg(t *testing.T) {
 		"created_on": "2021-11-09T14:03:30Z",
 		"direction": "O",
 		"error_count": 0,
-		"external_id": null,
+		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"response_to_external_id": "EX123",
 		"high_priority": true,
 		"id": %d,
@@ -341,9 +338,44 @@ func TestMarshalMsg(t *testing.T) {
 		"text": "Hi there",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
-		"uuid": "%s",
-		"visibility": "V"
+		"uuid": "%s"
 	}`, msg2.ID(), jsonx.MustMarshal(msg2.ModifiedOn()), jsonx.MustMarshal(msg2.QueuedOn()), session.ID(), msg2.UUID())), marshaled)
+
+	// try a broadcast message which won't have session and flow fields set
+	bcastID := testdata.InsertBroadcast(db, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
+	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic)
+	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, testdata.Cathy.ID, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), bcastID)
+	require.NoError(t, err)
+
+	err = models.InsertMessages(ctx, db, []*models.Msg{msg2})
+	require.NoError(t, err)
+
+	marshaled, err = json.Marshal(msg3)
+	assert.NoError(t, err)
+
+	test.AssertEqualJSON(t, []byte(fmt.Sprintf(`{
+		"broadcast_id": %d,
+		"channel_id": 10000,
+		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+		"contact_id": 10000,
+		"contact_urn_id": 10000,
+		"created_on": "2021-11-09T14:03:30Z",
+		"direction": "O",
+		"error_count": 0,
+		"high_priority": false,
+		"id": %d,
+		"metadata": null,
+		"modified_on": %s,
+		"next_attempt": null,
+		"org_id": 1,
+		"queued_on": %s,
+		"sent_on": null,
+		"status": "Q",
+		"text": "Blast",
+		"tps_cost": 1,
+		"urn": "tel:+250700000001?id=10000",
+		"uuid": "%s"
+	}`, bcastID, msg3.ID(), jsonx.MustMarshal(msg3.ModifiedOn()), jsonx.MustMarshal(msg3.QueuedOn()), msg3.UUID())), marshaled)
 }
 
 func TestGetMessagesByID(t *testing.T) {

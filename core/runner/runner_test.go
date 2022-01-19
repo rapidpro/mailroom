@@ -188,7 +188,7 @@ func TestResume(t *testing.T) {
 
 	_, contact := testdata.Cathy.Load(db, oa)
 
-	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual().Build()
+	trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Manual().Build()
 	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)

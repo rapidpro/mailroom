@@ -106,8 +106,8 @@ func (f *Flow) IVRRetryWait() *time.Duration {
 // IgnoreTriggers returns whether this flow ignores triggers
 func (f *Flow) IgnoreTriggers() bool { return f.f.IgnoreTriggers }
 
-// FlowReference return a flow reference for this flow
-func (f *Flow) FlowReference() *assets.FlowReference {
+// Reference return a flow reference for this flow
+func (f *Flow) Reference() *assets.FlowReference {
 	return assets.NewFlowReference(f.UUID(), f.Name())
 }
 

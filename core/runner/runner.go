@@ -204,14 +204,14 @@ func StartFlowBatch(
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
 		if batch.ParentSummary() != nil {
-			tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).FlowAction(history, batch.ParentSummary())
+			tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).FlowAction(history, batch.ParentSummary())
 			if batchStart {
 				tb = tb.AsBatch()
 			}
 			return tb.Build()
 		}
 
-		tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual()
+		tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Manual()
 		if batch.Extra() != nil {
 			tb = tb.WithParams(params)
 		}
