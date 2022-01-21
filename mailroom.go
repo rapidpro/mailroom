@@ -194,7 +194,12 @@ func (mr *Mailroom) Stop() error {
 	mr.webserver.Stop()
 
 	mr.wg.Wait()
-	mr.rt.ES.Stop()
+
+	// stop ES client if we have one
+	if mr.rt.ES != nil {
+		mr.rt.ES.Stop()
+	}
+
 	logrus.Info("mailroom stopped")
 	return nil
 }
