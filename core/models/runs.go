@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -70,6 +71,7 @@ var runStatusMap = map[flows.RunStatus]RunStatus{
 	flows.RunStatusFailed:    RunStatusFailed,
 }
 
+// ExitType still needs to be set on runs until database triggers are updated to only look at status
 type ExitType = null.String
 
 const (
@@ -79,18 +81,11 @@ const (
 	ExitFailed      = ExitType("F")
 )
 
-var exitToSessionStatusMap = map[ExitType]SessionStatus{
-	ExitInterrupted: SessionStatusInterrupted,
-	ExitCompleted:   SessionStatusCompleted,
-	ExitExpired:     SessionStatusExpired,
-	ExitFailed:      SessionStatusFailed,
-}
-
-var exitToRunStatusMap = map[ExitType]RunStatus{
-	ExitInterrupted: RunStatusInterrupted,
-	ExitCompleted:   RunStatusCompleted,
-	ExitExpired:     RunStatusExpired,
-	ExitFailed:      RunStatusFailed,
+var runStatusToExitType = map[RunStatus]ExitType{
+	RunStatusInterrupted: ExitInterrupted,
+	RunStatusCompleted:   ExitCompleted,
+	RunStatusExpired:     ExitExpired,
+	RunStatusFailed:      ExitFailed,
 }
 
 // Session is the mailroom type for a FlowSession
@@ -927,10 +922,6 @@ func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, f
 		path[i].ArrivedOn = p.ArrivedOn()
 		path[i].ExitUUID = p.ExitUUID()
 	}
-	pathJSON, err := json.Marshal(path)
-	if err != nil {
-		return nil, err
-	}
 
 	flowID, err := FlowIDForUUID(ctx, tx, oa, fr.FlowReference().UUID)
 	if err != nil {
@@ -951,20 +942,17 @@ func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, f
 	r.SessionID = session.ID()
 	r.StartID = NilStartID
 	r.OrgID = oa.OrgID()
-	r.Path = string(pathJSON)
+	r.Path = string(jsonx.MustMarshal(path))
+	r.Results = string(jsonx.MustMarshal(fr.Results()))
+
 	if len(path) > 0 {
 		r.CurrentNodeUUID = null.String(path[len(path)-1].NodeUUID)
 	}
 	run.run = fr
 
-	// set our exit type if we exited
-	// TODO: audit exit types
+	// TODO remove once we no longer need to write is_active or exit_type
 	if fr.Status() != flows.RunStatusActive && fr.Status() != flows.RunStatusWaiting {
-		if fr.Status() == flows.RunStatusFailed {
-			r.ExitType = ExitInterrupted
-		} else {
-			r.ExitType = ExitCompleted
-		}
+		r.ExitType = runStatusToExitType[r.Status]
 		r.IsActive = false
 	} else {
 		r.IsActive = true
@@ -977,13 +965,6 @@ func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, f
 			break
 		}
 	}
-
-	// write our results out
-	resultsJSON, err := json.Marshal(fr.Results())
-	if err != nil {
-		return nil, errors.Wrapf(err, "error marshalling results for run: %s", run.UUID())
-	}
-	r.Results = string(resultsJSON)
 
 	// set our parent UUID if we have a parent
 	if fr.Parent() != nil {
@@ -1054,17 +1035,13 @@ func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (*time.Tim
 }
 
 // ExitSessions marks the passed in sessions as completed, also doing so for all associated runs
-func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitType ExitType) error {
+func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, status SessionStatus) error {
 	if len(sessionIDs) == 0 {
 		return nil
 	}
 
-	// map exit type to statuses for sessions and runs
-	sessionStatus := exitToSessionStatusMap[exitType]
-	runStatus, found := exitToRunStatusMap[exitType]
-	if !found {
-		return errors.Errorf("unknown exit type: %s", exitType)
-	}
+	runStatus := RunStatus(status)             // session status codes are subset of run status codes
+	exitType := runStatusToExitType[runStatus] // for compatibility
 
 	for _, idBatch := range chunkSessionIDs(sessionIDs, 1000) {
 		// first interrupt our runs
@@ -1081,7 +1058,7 @@ func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitT
 		// then our sessions
 		start = time.Now()
 
-		res, err = tx.ExecContext(ctx, exitSessionsSQL, pq.Array(idBatch), time.Now(), sessionStatus)
+		res, err = tx.ExecContext(ctx, exitSessionsSQL, pq.Array(idBatch), time.Now(), status)
 		if err != nil {
 			return errors.Wrapf(err, "error exiting sessions")
 		}
