@@ -119,7 +119,7 @@ func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime
 	}
 
 	// interrupt all sessions and their associated runs
-	err := models.ExitSessions(ctx, db, uniqueSessionIDs, models.ExitInterrupted)
+	err := models.ExitSessions(ctx, db, uniqueSessionIDs, models.SessionStatusInterrupted)
 	if err != nil {
 		return errors.Wrapf(err, "error interrupting sessions")
 	}

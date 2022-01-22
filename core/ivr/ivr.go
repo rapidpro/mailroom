@@ -434,7 +434,7 @@ func ResumeIVRFlow(
 
 	// check if connection has been marked as errored - it maybe have been updated by status callback
 	if conn.Status() == models.ConnectionStatusErrored || conn.Status() == models.ConnectionStatusFailed {
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitInterrupted)
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.SessionStatusInterrupted)
 		if err != nil {
 			logrus.WithError(err).Error("error interrupting session")
 		}
@@ -515,7 +515,7 @@ func ResumeIVRFlow(
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}
 	} else {
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitCompleted)
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.SessionStatusCompleted)
 		if err != nil {
 			logrus.WithError(err).Error("error closing session")
 		}
