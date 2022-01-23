@@ -38,16 +38,6 @@ WHERE
 	cc.channel_id = ANY($1);
 `
 
-const activeSessionIDsForContactsSQL = `
-SELECT 
-	id
-FROM 
-	flows_flowsession fs
-WHERE
-	fs.status = 'W' AND
-	fs.contact_id = ANY($1);
-`
-
 const activeSessionIDsForFlowsSQL = `
 SELECT 
 	id
@@ -66,6 +56,12 @@ func (t *InterruptSessionsTask) Timeout() time.Duration {
 func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	db := rt.DB
 
+	if len(t.ContactIDs) > 0 {
+		if err := models.InterruptContactSessions(ctx, db, t.ContactIDs); err != nil {
+			return err
+		}
+	}
+
 	sessionIDs := make(map[models.SessionID]bool)
 	for _, sid := range t.SessionIDs {
 		sessionIDs[sid] = true
@@ -81,20 +77,6 @@ func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime
 		}
 
 		for _, sid := range channelSessionIDs {
-			sessionIDs[sid] = true
-		}
-	}
-
-	// if we have contact ids, explode those to session ids
-	if len(t.ContactIDs) > 0 {
-		contactSessionIDs := make([]models.SessionID, 0, len(t.ContactIDs))
-
-		err := db.SelectContext(ctx, &contactSessionIDs, activeSessionIDsForContactsSQL, pq.Array(t.ContactIDs))
-		if err != nil {
-			return errors.Wrapf(err, "error selecting sessions for contacts")
-		}
-
-		for _, sid := range contactSessionIDs {
 			sessionIDs[sid] = true
 		}
 	}

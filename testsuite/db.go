@@ -62,6 +62,13 @@ func (d *MockDB) NamedExecContext(ctx context.Context, query string, arg interfa
 	return d.real.NamedExecContext(ctx, query, arg)
 }
 
+func (d *MockDB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	if err := d.check("SelectContext"); err != nil {
+		return err
+	}
+	return d.real.SelectContext(ctx, dest, query, args...)
+}
+
 func (d *MockDB) GetContext(ctx context.Context, value interface{}, query string, args ...interface{}) error {
 	if err := d.check("GetContext"); err != nil {
 		return err
