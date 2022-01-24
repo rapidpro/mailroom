@@ -23,9 +23,9 @@ func TestExpirations(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// create a few sessions
-	s1 := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.SessionStatusWaiting, nil)
-	s2 := testdata.InsertFlowSession(db, testdata.Org1, testdata.George, models.SessionStatusWaiting, nil)
-	s3 := testdata.InsertFlowSession(db, testdata.Org1, testdata.Bob, models.SessionStatusWaiting, nil)
+	s1 := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, nil)
+	s2 := testdata.InsertFlowSession(db, testdata.Org1, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, nil)
+	s3 := testdata.InsertFlowSession(db, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, nil)
 
 	// simple run, no parent
 	r1ExpiresOn := time.Now()

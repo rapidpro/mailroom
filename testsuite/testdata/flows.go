@@ -57,11 +57,20 @@ func InsertFlowStart(db *sqlx.DB, org *Org, flow *Flow, contacts []*Contact) mod
 }
 
 // InsertFlowSession inserts a flow session
-func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, status models.SessionStatus, timeoutOn *time.Time) models.SessionID {
+func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, status models.SessionStatus, timeoutOn *time.Time) models.SessionID {
+	now := time.Now()
+	tomorrow := now.Add(time.Hour * 24)
+
+	var waitStartedOn, waitExpiresOn *time.Time
+	if status == models.SessionStatusWaiting {
+		waitStartedOn = &now
+		waitExpiresOn = &tomorrow
+	}
+
 	var id models.SessionID
 	must(db.Get(&id,
-		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, responded, created_on, timeout_on, session_type) 
-		 VALUES($1, $2, $3, $4, TRUE, NOW(), $5, 'M') RETURNING id`, uuids.New(), org.ID, contact.ID, status, timeoutOn,
+		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, responded, created_on, session_type, timeout_on, wait_started_on, wait_expires_on, wait_resume_on_expire) 
+		 VALUES($1, $2, $3, $4, TRUE, NOW(), $5, $6, $7, $8, FALSE) RETURNING id`, uuids.New(), org.ID, contact.ID, status, sessionType, timeoutOn, waitStartedOn, waitExpiresOn,
 	))
 	return id
 }

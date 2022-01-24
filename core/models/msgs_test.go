@@ -634,7 +634,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 }
 
 func insertTestSession(t *testing.T, ctx context.Context, rt *runtime.Runtime, org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow) *models.Session {
-	testdata.InsertFlowSession(rt.DB, org, contact, models.SessionStatusWaiting, nil)
+	testdata.InsertFlowSession(rt.DB, org, contact, models.FlowTypeMessaging, models.SessionStatusWaiting, nil)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
