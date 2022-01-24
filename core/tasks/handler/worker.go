@@ -227,8 +227,8 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
-	// get the active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
+	// look for a waiting session for this contact
+	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}
@@ -565,8 +565,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// find any matching triggers
 	trigger := models.FindMatchingMsgTrigger(oa, contact, event.Text)
 
-	// get any active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
+	// look for a waiting session for this contact
+	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}

@@ -641,7 +641,7 @@ func insertTestSession(t *testing.T, ctx context.Context, rt *runtime.Runtime, o
 
 	_, flowContact := contact.Load(rt.DB, oa)
 
-	session, err := models.ActiveSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, flowContact)
+	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, flowContact)
 	require.NoError(t, err)
 
 	return session
