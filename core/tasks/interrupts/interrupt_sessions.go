@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/lib/pq"
 	"github.com/pkg/errors"
 )
 
@@ -27,16 +26,6 @@ type InterruptSessionsTask struct {
 	FlowIDs    []models.FlowID    `json:"flow_ids,omitempty"`
 }
 
-const activeSessionIDsForFlowsSQL = `
-SELECT 
-	id
-FROM 
-	flows_flowsession fs
-WHERE
-	fs.status = 'W' AND
-	fs.current_flow_id = ANY($1);
-`
-
 // Timeout is the maximum amount of time the task can run for
 func (t *InterruptSessionsTask) Timeout() time.Duration {
 	return time.Hour
@@ -46,44 +35,25 @@ func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime
 	db := rt.DB
 
 	if len(t.ContactIDs) > 0 {
-		if err := models.InterruptContactSessions(ctx, db, t.ContactIDs); err != nil {
+		if err := models.InterruptSessionsForContacts(ctx, db, t.ContactIDs); err != nil {
 			return err
 		}
 	}
 	if len(t.ChannelIDs) > 0 {
-		if err := models.InterruptChannelSessions(ctx, db, t.ChannelIDs); err != nil {
+		if err := models.InterruptSessionsForChannels(ctx, db, t.ChannelIDs); err != nil {
 			return err
 		}
 	}
-
-	sessionIDs := make(map[models.SessionID]bool)
-	for _, sid := range t.SessionIDs {
-		sessionIDs[sid] = true
-	}
-
-	// if we have flow ids, explode those to session ids
 	if len(t.FlowIDs) > 0 {
-		flowSessionIDs := make([]models.SessionID, 0, len(t.FlowIDs))
-
-		err := db.SelectContext(ctx, &flowSessionIDs, activeSessionIDsForFlowsSQL, pq.Array(t.FlowIDs))
-		if err != nil {
-			return errors.Wrapf(err, "error selecting sessions for flows")
+		if err := models.InterruptSessionsForFlows(ctx, db, t.FlowIDs); err != nil {
+			return err
 		}
-
-		for _, sid := range flowSessionIDs {
-			sessionIDs[sid] = true
+	}
+	if len(t.SessionIDs) > 0 {
+		if err := models.ExitSessions(ctx, db, t.SessionIDs, models.SessionStatusInterrupted); err != nil {
+			return errors.Wrapf(err, "error interrupting sessions")
 		}
 	}
 
-	uniqueSessionIDs := make([]models.SessionID, 0, len(sessionIDs))
-	for id := range sessionIDs {
-		uniqueSessionIDs = append(uniqueSessionIDs, id)
-	}
-
-	// interrupt all sessions and their associated runs
-	err := models.ExitSessions(ctx, db, uniqueSessionIDs, models.SessionStatusInterrupted)
-	if err != nil {
-		return errors.Wrapf(err, "error interrupting sessions")
-	}
 	return nil
 }
