@@ -49,8 +49,7 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	// we expire runs and sessions that have no continuation in batches
-	expiredRuns := make([]models.FlowRunID, 0, expireBatchSize)
+	// we expire sessions that have no continuation in batches
 	expiredSessions := make([]models.SessionID, 0, expireBatchSize)
 
 	// select our expired runs
@@ -70,9 +69,8 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 
 		count++
 
-		// no parent id? we can add this to our batch
-		if expiration.ParentUUID == nil || expiration.SessionID == nil {
-			expiredRuns = append(expiredRuns, expiration.RunID)
+		// no parent? we can add this to our batch
+		if expiration.ParentUUID == nil {
 
 			if expiration.SessionID != nil {
 				expiredSessions = append(expiredSessions, *expiration.SessionID)
@@ -81,12 +79,11 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 			}
 
 			// batch is full? commit it
-			if len(expiredRuns) == expireBatchSize {
-				err = models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
+			if len(expiredSessions) == expireBatchSize {
+				err = models.ExitSessions(ctx, rt.DB, expiredSessions, models.SessionStatusExpired)
 				if err != nil {
 					return errors.Wrapf(err, "error expiring runs and sessions")
 				}
-				expiredRuns = expiredRuns[:0]
 				expiredSessions = expiredSessions[:0]
 			}
 
@@ -120,8 +117,8 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 	}
 
 	// commit any stragglers
-	if len(expiredRuns) > 0 {
-		err = models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
+	if len(expiredSessions) > 0 {
+		err = models.ExitSessions(ctx, rt.DB, expiredSessions, models.SessionStatusExpired)
 		if err != nil {
 			return errors.Wrapf(err, "error expiring runs and sessions")
 		}
