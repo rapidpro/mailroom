@@ -253,6 +253,8 @@ func TestSessionWithSubflows(t *testing.T) {
 func TestInterruptSessionsForContacts(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
+	defer testsuite.Reset(testsuite.ResetData)
+
 	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
 	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
@@ -282,13 +284,19 @@ func TestInterruptSessionsForContacts(t *testing.T) {
 func TestInterruptSessionsOfTypeForContacts(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
+	defer testsuite.Reset(testsuite.ResetData)
+
 	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
 	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 
-	err := models.InterruptSessionsOfTypeForContacts(ctx, db, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID}, models.FlowTypeMessaging)
+	tx := db.MustBegin()
+
+	err := models.InterruptSessionsOfTypeForContacts(ctx, tx, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID}, models.FlowTypeMessaging)
 	require.NoError(t, err)
+
+	require.NoError(t, tx.Commit())
 
 	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted) // wasn't waiting
 	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusInterrupted)
@@ -301,6 +309,8 @@ func TestInterruptSessionsOfTypeForContacts(t *testing.T) {
 
 func TestInterruptSessionsForChannels(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
 
 	cathy1ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
 	cathy2ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
@@ -335,6 +345,8 @@ func TestInterruptSessionsForChannels(t *testing.T) {
 
 func TestInterruptSessionsForFlows(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
 
 	cathy1ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
 	cathy2ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)

@@ -61,8 +61,8 @@ func TestExpirations(t *testing.T) {
 	err := expireRuns(ctx, rt)
 	assert.NoError(t, err)
 
-	// shouldn't have any active runs or sessions
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Cathy.ID).Returns(0)
+	// shouldn't have any active runs or sessions (except the sessionless run)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE is_active = TRUE AND contact_id = $1;`, testdata.Cathy.ID).Returns(1)
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Cathy.ID).Returns(1)
 
 	// should still have two active runs for George as it needs to continue

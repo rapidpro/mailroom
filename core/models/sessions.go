@@ -803,6 +803,31 @@ func WriteSessionOutputsToStorage(ctx context.Context, rt *runtime.Runtime, sess
 	return nil
 }
 
+// ExitSessions exits sessions and their runs. It batches the given session ids and exits each batch in a transaction.
+func ExitSessions(ctx context.Context, db *sqlx.DB, sessionIDs []SessionID, status SessionStatus) error {
+	if len(sessionIDs) == 0 {
+		return nil
+	}
+
+	// split into batches and exit each batch in a transaction
+	for _, idBatch := range chunkSessionIDs(sessionIDs, 1000) {
+		tx, err := db.BeginTxx(ctx, nil)
+		if err != nil {
+			return errors.Wrapf(err, "error starting transaction to exit sessions")
+		}
+
+		if err := exitSessionBatch(ctx, tx, idBatch, status); err != nil {
+			return errors.Wrapf(err, "error exiting batch of sessions")
+		}
+
+		if err := tx.Commit(); err != nil {
+			return errors.Wrapf(err, "error committing session exits")
+		}
+	}
+
+	return nil
+}
+
 const sqlExitSessions = `
 UPDATE
 	flows_flowsession
@@ -830,72 +855,63 @@ WHERE
 	id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND status IN ('A', 'W'))
 `
 
-// ExitSessions marks the passed in sessions as completed, also doing so for all associated runs
-func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, status SessionStatus) error {
-	if len(sessionIDs) == 0 {
-		return nil
-	}
-
+// exits sessions and their runs inside the given transaction
+func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, status SessionStatus) error {
 	runStatus := RunStatus(status)             // session status codes are subset of run status codes
 	exitType := runStatusToExitType[runStatus] // for compatibility
 
-	for _, idBatch := range chunkSessionIDs(sessionIDs, 1000) {
-		// first interrupt our runs
-		start := time.Now()
+	// first interrupt our runs
+	start := time.Now()
 
-		res, err := tx.ExecContext(ctx, sqlExitSessionRuns, pq.Array(idBatch), exitType, time.Now(), runStatus)
-		if err != nil {
-			return errors.Wrapf(err, "error exiting session runs")
-		}
-
-		rows, _ := res.RowsAffected()
-		logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session runs")
-
-		// then our sessions
-		start = time.Now()
-
-		res, err = tx.ExecContext(ctx, sqlExitSessions, pq.Array(idBatch), time.Now(), status)
-		if err != nil {
-			return errors.Wrapf(err, "error exiting sessions")
-		}
-
-		rows, _ = res.RowsAffected()
-		logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited sessions")
+	res, err := tx.ExecContext(ctx, sqlExitSessionRuns, pq.Array(sessionIDs), exitType, time.Now(), runStatus)
+	if err != nil {
+		return errors.Wrapf(err, "error exiting session runs")
 	}
+
+	rows, _ := res.RowsAffected()
+	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session runs")
+
+	// then our sessions
+	start = time.Now()
+
+	res, err = tx.ExecContext(ctx, sqlExitSessions, pq.Array(sessionIDs), time.Now(), status)
+	if err != nil {
+		return errors.Wrapf(err, "error exiting sessions")
+	}
+
+	rows, _ = res.RowsAffected()
+	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited sessions")
 
 	return nil
 }
 
 // InterruptSessionsForContacts interrupts any waiting sessions for the given contacts
-func InterruptSessionsForContacts(ctx context.Context, tx Queryer, contactIDs []ContactID) error {
-	return interruptSessionsForContacts(ctx, tx, contactIDs, "")
-}
-
-// InterruptSessionsOfTypeForContacts interrupts any waiting sessions of the given type for the given contacts
-func InterruptSessionsOfTypeForContacts(ctx context.Context, tx Queryer, contactIDs []ContactID, sessionType FlowType) error {
-	return interruptSessionsForContacts(ctx, tx, contactIDs, sessionType)
-}
-
-func interruptSessionsForContacts(ctx context.Context, tx Queryer, contactIDs []ContactID, sessionType FlowType) error {
-	if len(contactIDs) == 0 {
-		return nil
-	}
-
+func InterruptSessionsForContacts(ctx context.Context, db *sqlx.DB, contactIDs []ContactID) error {
 	sessionIDs := make([]SessionID, 0, len(contactIDs))
-	sql := `SELECT id FROM flows_flowsession WHERE status = 'W' AND contact_id = ANY($1)`
-	params := []interface{}{pq.Array(contactIDs)}
 
-	if sessionType != "" {
-		sql += ` AND session_type = $2;`
-		params = append(params, sessionType)
-	}
-
-	err := tx.SelectContext(ctx, &sessionIDs, sql, params...)
+	err := db.SelectContext(ctx, &sessionIDs, `SELECT id FROM flows_flowsession WHERE status = 'W' AND contact_id = ANY($1)`, pq.Array(contactIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error selecting waiting sessions for contacts")
 	}
 
-	return errors.Wrapf(ExitSessions(ctx, tx, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
+	return errors.Wrapf(ExitSessions(ctx, db, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
+}
+
+const sqlWaitingSessionIDsOfTypeForContacts = `
+SELECT id 
+  FROM flows_flowsession 
+ WHERE status = 'W' AND contact_id = ANY($1) AND session_type = $2;`
+
+// InterruptSessionsOfTypeForContacts interrupts any waiting sessions of the given type for the given contacts
+func InterruptSessionsOfTypeForContacts(ctx context.Context, tx *sqlx.Tx, contactIDs []ContactID, sessionType FlowType) error {
+	sessionIDs := make([]SessionID, 0, len(contactIDs))
+
+	err := tx.SelectContext(ctx, &sessionIDs, sqlWaitingSessionIDsOfTypeForContacts, pq.Array(contactIDs), sessionType)
+	if err != nil {
+		return errors.Wrapf(err, "error selecting waiting sessions for contacts")
+	}
+
+	return errors.Wrapf(exitSessionBatch(ctx, tx, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
 }
 
 const sqlWaitingSessionIDsForChannels = `
@@ -905,19 +921,19 @@ SELECT fs.id
  WHERE fs.status = 'W' AND cc.channel_id = ANY($1);`
 
 // InterruptSessionsForChannels interrupts any waiting sessions with connections on the given channels
-func InterruptSessionsForChannels(ctx context.Context, tx Queryer, channelIDs []ChannelID) error {
+func InterruptSessionsForChannels(ctx context.Context, db *sqlx.DB, channelIDs []ChannelID) error {
 	if len(channelIDs) == 0 {
 		return nil
 	}
 
 	sessionIDs := make([]SessionID, 0, len(channelIDs))
 
-	err := tx.SelectContext(ctx, &sessionIDs, sqlWaitingSessionIDsForChannels, pq.Array(channelIDs))
+	err := db.SelectContext(ctx, &sessionIDs, sqlWaitingSessionIDsForChannels, pq.Array(channelIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error selecting waiting sessions for channels")
 	}
 
-	return errors.Wrapf(ExitSessions(ctx, tx, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
+	return errors.Wrapf(ExitSessions(ctx, db, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
 }
 
 const sqlWaitingSessionIDsForFlows = `
@@ -926,17 +942,17 @@ SELECT id
  WHERE status = 'W' AND current_flow_id = ANY($1);`
 
 // InterruptSessionsForFlows interrupts any waiting sessions currently in the given flows
-func InterruptSessionsForFlows(ctx context.Context, tx Queryer, flowIDs []FlowID) error {
+func InterruptSessionsForFlows(ctx context.Context, db *sqlx.DB, flowIDs []FlowID) error {
 	if len(flowIDs) == 0 {
 		return nil
 	}
 
 	sessionIDs := make([]SessionID, 0, len(flowIDs))
 
-	err := tx.SelectContext(ctx, &sessionIDs, sqlWaitingSessionIDsForFlows, pq.Array(flowIDs))
+	err := db.SelectContext(ctx, &sessionIDs, sqlWaitingSessionIDsForFlows, pq.Array(flowIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error selecting waiting sessions for flows")
 	}
 
-	return errors.Wrapf(ExitSessions(ctx, tx, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
+	return errors.Wrapf(ExitSessions(ctx, db, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
 }

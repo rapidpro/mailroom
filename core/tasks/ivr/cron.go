@@ -128,7 +128,6 @@ func expireCalls(ctx context.Context, rt *runtime.Runtime) error {
 	}
 	defer rows.Close()
 
-	expiredRuns := make([]models.FlowRunID, 0, 100)
 	expiredSessions := make([]models.SessionID, 0, 100)
 
 	for rows.Next() {
@@ -138,8 +137,7 @@ func expireCalls(ctx context.Context, rt *runtime.Runtime) error {
 			return errors.Wrapf(err, "error scanning expired run")
 		}
 
-		// add the run and session to those we need to expire
-		expiredRuns = append(expiredRuns, exp.RunID)
+		// add the session to those we need to expire
 		expiredSessions = append(expiredSessions, exp.SessionID)
 
 		// load our connection
@@ -157,12 +155,12 @@ func expireCalls(ctx context.Context, rt *runtime.Runtime) error {
 	}
 
 	// now expire our runs and sessions
-	if len(expiredRuns) > 0 {
-		err := models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
+	if len(expiredSessions) > 0 {
+		err := models.ExitSessions(ctx, rt.DB, expiredSessions, models.SessionStatusExpired)
 		if err != nil {
-			log.WithError(err).Error("error expiring runs and sessions for expired calls")
+			log.WithError(err).Error("error expiring sessions for expired calls")
 		}
-		log.WithField("count", len(expiredRuns)).WithField("elapsed", time.Since(start)).Info("expired and hung up on channel connections")
+		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on channel connections")
 	}
 
 	return nil
