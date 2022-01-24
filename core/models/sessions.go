@@ -43,3 +43,31 @@ func interruptContactSessions(ctx context.Context, tx Queryer, contactIDs []Cont
 
 	return nil
 }
+
+const activeSessionIDsForChannelsSQL = `
+SELECT fs.id
+  FROM flows_flowsession fs
+  JOIN channels_channelconnection cc ON fs.connection_id = cc.id
+ WHERE fs.status = 'W' AND cc.channel_id = ANY($1);
+`
+
+// InterruptContactSessions interrupts any waiting sessions with connections on the given channels
+func InterruptChannelSessions(ctx context.Context, tx Queryer, channelIDs []ChannelID) error {
+	if len(channelIDs) == 0 {
+		return nil
+	}
+
+	sessionIDs := make([]SessionID, 0, len(channelIDs))
+
+	err := tx.SelectContext(ctx, &sessionIDs, activeSessionIDsForChannelsSQL, pq.Array(channelIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error selecting waiting sessions for channels")
+	}
+
+	err = ExitSessions(ctx, tx, sessionIDs, SessionStatusInterrupted)
+	if err != nil {
+		return errors.Wrapf(err, "error exiting sessions")
+	}
+
+	return nil
+}

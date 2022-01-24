@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
-	"github.com/nyaruka/gocommon/uuids"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -18,29 +17,11 @@ func TestInterrupts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	insertConnection := func(orgID models.OrgID, channelID models.ChannelID, contactID models.ContactID, urnID models.URNID) models.ConnectionID {
-		var connectionID models.ConnectionID
-		err := db.Get(&connectionID,
-			`INSERT INTO channels_channelconnection(created_on, modified_on, external_id, status, direction, connection_type, error_count, org_id, channel_id, contact_id, contact_urn_id) 
- 						VALUES(NOW(), NOW(), 'ext1', 'I', 'I', 'V', 0, $1, $2, $3, $4) RETURNING id`,
-			orgID, channelID, contactID, urnID,
-		)
-		assert.NoError(t, err)
-		return connectionID
-	}
+	insertSession := func(org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow, connectionID models.ConnectionID) models.SessionID {
+		sessionID := testdata.InsertFlowSession(db, org, contact, models.FlowTypeMessaging, models.SessionStatusWaiting, flow, connectionID, nil)
 
-	insertSession := func(orgID models.OrgID, contactID models.ContactID, connectionID models.ConnectionID, currentFlowID models.FlowID) models.SessionID {
-		var sessionID models.SessionID
-		err := db.Get(&sessionID,
-			`INSERT INTO flows_flowsession(uuid, status, responded, created_on, org_id, contact_id, connection_id, current_flow_id, session_type)
-									VALUES($1, 'W', false, NOW(), $2, $3, $4, $5, 'M') RETURNING id`,
-			uuids.New(), orgID, contactID, connectionID, currentFlowID)
-		assert.NoError(t, err)
-
-		// give session one active run too
-		db.MustExec(`INSERT INTO flows_flowrun(uuid, is_active, status, created_on, modified_on, responded, contact_id, flow_id, session_id, org_id)
-			                            VALUES($1, TRUE, 'W', now(), now(), FALSE, $2, $3, $4, 1);`, uuids.New(), contactID, currentFlowID, sessionID)
-
+		// give session one waiting run too
+		testdata.InsertFlowRun(db, org, sessionID, contact, flow, models.RunStatusWaiting, "", nil)
 		return sessionID
 	}
 
@@ -81,18 +62,18 @@ func TestInterrupts(t *testing.T) {
 		db.MustExec(`UPDATE flows_flowsession SET status='C', ended_on=NOW() WHERE status = 'W';`)
 
 		// twilio connection
-		twilioConnectionID := insertConnection(testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Alexandria.ID, testdata.Alexandria.URNID)
+		twilioConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
 
 		sessionIDs := make([]models.SessionID, 5)
 
 		// insert our dummy contact sessions
-		sessionIDs[0] = insertSession(testdata.Org1.ID, testdata.Cathy.ID, models.NilConnectionID, testdata.Favorites.ID)
-		sessionIDs[1] = insertSession(testdata.Org1.ID, testdata.George.ID, models.NilConnectionID, testdata.Favorites.ID)
-		sessionIDs[2] = insertSession(testdata.Org1.ID, testdata.Alexandria.ID, twilioConnectionID, testdata.Favorites.ID)
-		sessionIDs[3] = insertSession(testdata.Org1.ID, testdata.Bob.ID, models.NilConnectionID, testdata.PickANumber.ID)
+		sessionIDs[0] = insertSession(testdata.Org1, testdata.Cathy, testdata.Favorites, models.NilConnectionID)
+		sessionIDs[1] = insertSession(testdata.Org1, testdata.George, testdata.Favorites, models.NilConnectionID)
+		sessionIDs[2] = insertSession(testdata.Org1, testdata.Alexandria, testdata.Favorites, twilioConnectionID)
+		sessionIDs[3] = insertSession(testdata.Org1, testdata.Bob, testdata.PickANumber, models.NilConnectionID)
 
 		// a session we always end explicitly
-		sessionIDs[4] = insertSession(testdata.Org1.ID, testdata.Bob.ID, models.NilConnectionID, testdata.Favorites.ID)
+		sessionIDs[4] = insertSession(testdata.Org1, testdata.Bob, testdata.Favorites, models.NilConnectionID)
 
 		// create our task
 		task := &InterruptSessionsTask{
