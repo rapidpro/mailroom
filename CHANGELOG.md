@@ -1,3 +1,7 @@
+v7.1.32
+----------
+ * Rework expirations to use ExitSessions
+
 v7.1.31
 ----------
  * Consolidate how we interrupt sessions
