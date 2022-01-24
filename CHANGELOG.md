@@ -1,3 +1,8 @@
+v7.1.31
+----------
+ * Consolidate how we interrupt sessions
+ * Tweak mailroom shutdown to only stop ES client if there is one
+
 v7.1.30
 ----------
  * Remove deprecated fields on search endpoint
