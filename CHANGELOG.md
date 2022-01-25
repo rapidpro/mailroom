@@ -1,3 +1,10 @@
+v7.1.33
+----------
+ * Set wait fields on sessions for dial waits as well
+ * Create completed sessions with wait_resume_on_expire = false
+ * Reduce exit sessions batch size to 100
+ * Clear contact.current_flow_id when exiting sessions
+
 v7.1.32
 ----------
  * Rework expirations to use ExitSessions
