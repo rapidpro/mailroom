@@ -3,6 +3,7 @@ package vonage
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
@@ -35,6 +36,7 @@ func TestResponseForSprint(t *testing.T) {
 	}))
 
 	urn := urns.URN("tel:+12067799294")
+	expiresOn := time.Now().Add(time.Hour)
 	channelRef := assets.NewChannelReference(testdata.VonageChannel.UUID, "Vonage Channel")
 
 	resumeURL := "http://temba.io/resume?session=1"
@@ -116,7 +118,7 @@ func TestResponseForSprint(t *testing.T) {
 		},
 		{
 			[]flows.Event{
-				events.NewDialWait(urns.URN(`tel:+1234567890`)),
+				events.NewDialWait(urns.URN(`tel:+1234567890`), &expiresOn),
 			},
 			`[{"action":"conversation","name":"8bcb9ef2-d4a6-4314-b68d-6d299761ea9e"}]`,
 		},
