@@ -810,7 +810,7 @@ func ExitSessions(ctx context.Context, db *sqlx.DB, sessionIDs []SessionID, stat
 	}
 
 	// split into batches and exit each batch in a transaction
-	for _, idBatch := range chunkSessionIDs(sessionIDs, 1000) {
+	for _, idBatch := range chunkSessionIDs(sessionIDs, 100) {
 		tx, err := db.BeginTxx(ctx, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error starting transaction to exit sessions")
@@ -829,39 +829,40 @@ func ExitSessions(ctx context.Context, db *sqlx.DB, sessionIDs []SessionID, stat
 }
 
 const sqlExitSessions = `
-UPDATE
-	flows_flowsession
-SET
-	status = $3,
-	ended_on = $2,
-	wait_started_on = NULL,
-	wait_expires_on = NULL,
-	timeout_on = NULL,
-	current_flow_id = NULL
-WHERE
-	id = ANY ($1) AND status = 'W'
-`
+   UPDATE flows_flowsession
+      SET status = $3, ended_on = $2, wait_started_on = NULL, wait_expires_on = NULL, timeout_on = NULL, current_flow_id = NULL
+    WHERE id = ANY ($1) AND status = 'W'
+RETURNING contact_id`
 
 const sqlExitSessionRuns = `
-UPDATE
-	flows_flowrun
-SET
-	is_active = FALSE,
-	exit_type = $2,
-	exited_on = $3,
-	status = $4,
-	modified_on = NOW()
-WHERE
-	id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND status IN ('A', 'W'))
-`
+UPDATE flows_flowrun
+   SET is_active = FALSE, exit_type = $2, exited_on = $3, status = $4, modified_on = NOW()
+ WHERE id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND status IN ('A', 'W'))`
+
+const sqlExitSessionContacts = `
+ UPDATE contacts_contact 
+    SET current_flow_id = NULL, modified_on = NOW() 
+  WHERE id = ANY($1)`
 
 // exits sessions and their runs inside the given transaction
 func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, status SessionStatus) error {
 	runStatus := RunStatus(status)             // session status codes are subset of run status codes
 	exitType := runStatusToExitType[runStatus] // for compatibility
 
-	// first interrupt our runs
+	contactIDs := make([]SessionID, 0, len(sessionIDs))
+
+	// first update the sessions themselves and get the contact ids
 	start := time.Now()
+
+	err := tx.SelectContext(ctx, &contactIDs, sqlExitSessions, pq.Array(sessionIDs), time.Now(), status)
+	if err != nil {
+		return errors.Wrapf(err, "error exiting sessions")
+	}
+
+	logrus.WithField("count", len(contactIDs)).WithField("elapsed", time.Since(start)).Debug("exited session batch")
+
+	// then the runs that belong to these sessions
+	start = time.Now()
 
 	res, err := tx.ExecContext(ctx, sqlExitSessionRuns, pq.Array(sessionIDs), exitType, time.Now(), runStatus)
 	if err != nil {
@@ -869,18 +870,18 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 	}
 
 	rows, _ := res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session runs")
+	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session batch runs")
 
-	// then our sessions
+	// and finally the contacts from each session
 	start = time.Now()
 
-	res, err = tx.ExecContext(ctx, sqlExitSessions, pq.Array(sessionIDs), time.Now(), status)
+	res, err = tx.ExecContext(ctx, sqlExitSessionContacts, pq.Array(contactIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error exiting sessions")
 	}
 
 	rows, _ = res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited sessions")
+	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session batch contacts")
 
 	return nil
 }
