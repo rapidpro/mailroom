@@ -546,8 +546,8 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, fs flows.Sessio
 
 const sqlInsertCompleteSession = `
 INSERT INTO
-	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, ended_on, connection_id)
-               VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),      NOW(),   :connection_id)
+	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, connection_id)
+               VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :connection_id)
 RETURNING id
 `
 
@@ -560,8 +560,8 @@ RETURNING id
 
 const sqlInsertCompleteSessionNoOutput = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, ended_on, connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),      NOW(),   :connection_id)
+	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, connection_id)
+               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :connection_id)
 RETURNING id
 `
 
