@@ -810,7 +810,7 @@ func ExitSessions(ctx context.Context, db *sqlx.DB, sessionIDs []SessionID, stat
 	}
 
 	// split into batches and exit each batch in a transaction
-	for _, idBatch := range chunkSessionIDs(sessionIDs, 1000) {
+	for _, idBatch := range chunkSessionIDs(sessionIDs, 100) {
 		tx, err := db.BeginTxx(ctx, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error starting transaction to exit sessions")
@@ -851,7 +851,7 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 
 	contactIDs := make([]SessionID, 0, len(sessionIDs))
 
-	// first update the sessions themselves
+	// first update the sessions themselves and get the contact ids
 	start := time.Now()
 
 	err := tx.SelectContext(ctx, &contactIDs, sqlExitSessions, pq.Array(sessionIDs), time.Now(), status)
@@ -873,6 +873,8 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session batch runs")
 
 	// and finally the contacts from each session
+	start = time.Now()
+
 	res, err = tx.ExecContext(ctx, sqlExitSessionContacts, pq.Array(contactIDs))
 	if err != nil {
 		return errors.Wrapf(err, "error exiting sessions")
