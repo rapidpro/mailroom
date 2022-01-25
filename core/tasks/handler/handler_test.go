@@ -667,7 +667,7 @@ func TestTimedEvents(t *testing.T) {
 	// set both to be active (this requires us to disable the path change trigger for a bit which asserts flows can't cross back into active status)
 	db.MustExec(`ALTER TABLE flows_flowrun DISABLE TRIGGER temba_flowrun_path_change`)
 	db.MustExec(`UPDATE flows_flowrun SET is_active = TRUE, status = 'W', expires_on = $2 WHERE id = $1`, runID, expiration)
-	db.MustExec(`UPDATE flows_flowsession SET status = 'W' WHERE id = $1`, sessionID)
+	db.MustExec(`UPDATE flows_flowsession SET status = 'W', wait_started_on = NOW(), wait_expires_on = NOW() WHERE id = $1`, sessionID)
 	db.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_path_change`)
 
 	// try to expire the run

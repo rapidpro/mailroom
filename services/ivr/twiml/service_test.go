@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
@@ -24,6 +25,7 @@ func TestResponseForSprint(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 
 	urn := urns.URN("tel:+12067799294")
+	expiresOn := time.Now().Add(time.Hour)
 	channelRef := assets.NewChannelReference(assets.ChannelUUID(uuids.New()), "Twilio Channel")
 
 	resumeURL := "http://temba.io/resume?session=1"
@@ -96,7 +98,7 @@ func TestResponseForSprint(t *testing.T) {
 		},
 		{
 			[]flows.Event{
-				events.NewDialWait(urns.URN(`tel:+1234567890`)),
+				events.NewDialWait(urns.URN(`tel:+1234567890`), &expiresOn),
 			},
 			`<Response><Dial action="http://temba.io/resume?session=1&amp;wait_type=dial">+1234567890</Dial></Response>`,
 		},

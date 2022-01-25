@@ -213,12 +213,12 @@ func (s *Session) updateWait(evts []flows.Event) {
 	s.s.WaitResumeOnExpire = boolPtr(false)
 	s.timeout = nil
 
+	now := time.Now()
+
 	for _, e := range evts {
 		switch typed := e.(type) {
 		case *events.MsgWaitEvent:
 			run, _ := s.findStep(e.StepUUID())
-
-			now := time.Now()
 
 			s.s.WaitStartedOn = &now
 			s.s.WaitExpiresOn = typed.ExpiresOn
@@ -231,6 +231,12 @@ func (s *Session) updateWait(evts []flows.Event) {
 				s.s.WaitTimeoutOn = &timeoutOn
 				s.timeout = &seconds
 			}
+		case *events.DialWaitEvent:
+			run, _ := s.findStep(e.StepUUID())
+
+			s.s.WaitStartedOn = &now
+			s.s.WaitExpiresOn = typed.ExpiresOn
+			s.s.WaitResumeOnExpire = boolPtr(run.ParentInSession() != nil)
 		}
 	}
 }
