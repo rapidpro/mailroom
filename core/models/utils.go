@@ -105,3 +105,17 @@ func chunkSessionIDs(ids []SessionID, size int) [][]SessionID {
 	}
 	return chunks
 }
+
+// chunks a slice of contact IDs.. hurry up go generics
+func chunkContactIDs(ids []ContactID, size int) [][]ContactID {
+	chunks := make([][]ContactID, 0, len(ids)/size+1)
+
+	for i := 0; i < len(ids); i += size {
+		end := i + size
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunks = append(chunks, ids[i:end])
+	}
+	return chunks
+}
