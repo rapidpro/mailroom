@@ -524,5 +524,68 @@
                 ]
             }
         ]
+    },
+    {
+        "description": "Skip rows without UUID, name or URNs",
+        "specs": [
+            {
+                "uuid": "",
+                "urns": []
+
+            }
+        ],
+        "num_created": 0,
+        "num_updated": 0,
+        "num_errored": 1,
+        "errors": [
+            {
+                "record": 0,
+                "message": "Unable to import row without UUID, name or URNs"
+            }
+        ],
+        "contacts": [
+            {
+                "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+                "name": "Anne",
+                "language": "",
+                "urns": [
+                    "tel:+16055700001?id=10000&priority=1000",
+                    "tel:+16055700002?id=10001&priority=999",
+                    "tel:+16055700005?id=10006&priority=998"
+                ],
+                "fields": {},
+                "groups": []
+            },
+            {
+                "uuid": "e7187099-7d38-4f60-955c-325957214c42",
+                "name": "Bob",
+                "language": "kin",
+                "urns": [
+                    "tel:+593979000002?id=10004&priority=999"
+                ],
+                "fields": {
+                    "age": "28",
+                    "joined": "2020-01-01T10:45:30.000000Z"
+                },
+                "groups": []
+            },
+            {
+                "uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+                "name": "Cat",
+                "language": "spa",
+                "urns": [
+                    "tel:+16055700003?id=10002&priority=1000",
+                    "tel:+593979000001?id=10003&priority=999"
+                ],
+                "fields": {
+                    "age": "39",
+                    "joined": "2020-02-01T17:15:30.000000Z"
+                },
+                "groups": [
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                    "c153e265-f7c9-4539-9dbc-9b358714b638"
+                ]
+            }
+        ]
     }
 ]

@@ -204,6 +204,12 @@ func (b *ContactImportBatch) getOrCreateContacts(ctx context.Context, db Queryer
 		spec := imp.spec
 
 		uuid := spec.UUID
+
+		if uuid == "" && spec.Name == nil && len(spec.URNs) == 0 {
+			addError("Unable to import row without UUID, name or URNs")
+			continue
+		}
+
 		if uuid != "" {
 			imp.contact = contactsByUUID[uuid]
 			if imp.contact == nil {
