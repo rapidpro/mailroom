@@ -65,7 +65,7 @@ type Session struct {
 		WaitStartedOn      *time.Time        `db:"wait_started_on"`
 		WaitTimeoutOn      *time.Time        `db:"timeout_on"`
 		WaitExpiresOn      *time.Time        `db:"wait_expires_on"`
-		WaitResumeOnExpire *bool             `db:"wait_resume_on_expire"`
+		WaitResumeOnExpire bool              `db:"wait_resume_on_expire"`
 		CurrentFlowID      FlowID            `db:"current_flow_id"`
 		ConnectionID       *ConnectionID     `db:"connection_id"`
 	}
@@ -107,7 +107,7 @@ func (s *Session) EndedOn() *time.Time                { return s.s.EndedOn }
 func (s *Session) WaitStartedOn() *time.Time          { return s.s.WaitStartedOn }
 func (s *Session) WaitTimeoutOn() *time.Time          { return s.s.WaitTimeoutOn }
 func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
-func (s *Session) WaitResumeOnExpire() *bool          { return s.s.WaitResumeOnExpire }
+func (s *Session) WaitResumeOnExpire() bool           { return s.s.WaitResumeOnExpire }
 func (s *Session) ClearTimeoutOn()                    { s.s.WaitTimeoutOn = nil }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
@@ -206,12 +206,15 @@ func (s *Session) FlowSession(cfg *runtime.Config, sa flows.SessionAssets, env e
 
 // looks for a wait event and updates wait fields if one exists
 func (s *Session) updateWait(evts []flows.Event) {
-	boolPtr := func(b bool) *bool { return &b }
+	canResume := func(r flows.Run) bool {
+		// a session can be resumed on a wait expiration if there's a parent and it's a messaging flow
+		return r.ParentInSession() != nil && r.Flow().Type() == flows.FlowTypeMessaging
+	}
 
 	s.s.WaitStartedOn = nil
 	s.s.WaitTimeoutOn = nil
 	s.s.WaitExpiresOn = nil
-	s.s.WaitResumeOnExpire = boolPtr(false)
+	s.s.WaitResumeOnExpire = false
 	s.timeout = nil
 
 	now := time.Now()
@@ -223,7 +226,7 @@ func (s *Session) updateWait(evts []flows.Event) {
 
 			s.s.WaitStartedOn = &now
 			s.s.WaitExpiresOn = typed.ExpiresOn
-			s.s.WaitResumeOnExpire = boolPtr(run.ParentInSession() != nil)
+			s.s.WaitResumeOnExpire = canResume(run)
 
 			if typed.TimeoutSeconds != nil {
 				seconds := time.Duration(*typed.TimeoutSeconds) * time.Second
@@ -237,7 +240,7 @@ func (s *Session) updateWait(evts []flows.Event) {
 
 			s.s.WaitStartedOn = &now
 			s.s.WaitExpiresOn = typed.ExpiresOn
-			s.s.WaitResumeOnExpire = boolPtr(run.ParentInSession() != nil)
+			s.s.WaitResumeOnExpire = canResume(run)
 		}
 	}
 }

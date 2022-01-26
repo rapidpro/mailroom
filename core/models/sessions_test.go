@@ -62,7 +62,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.False(t, session.Responded())
 	assert.NotNil(t, session.WaitStartedOn())
 	assert.NotNil(t, session.WaitExpiresOn())
-	assert.False(t, *session.WaitResumeOnExpire())
+	assert.False(t, session.WaitResumeOnExpire())
 	assert.NotNil(t, session.Timeout())
 
 	// check that matches what is in the db
@@ -90,7 +90,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.True(t, session.Responded())
 	assert.NotNil(t, session.WaitStartedOn())
 	assert.NotNil(t, session.WaitExpiresOn())
-	assert.False(t, *session.WaitResumeOnExpire())
+	assert.False(t, session.WaitResumeOnExpire())
 	assert.Nil(t, session.Timeout()) // this wait doesn't have a timeout
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
@@ -113,7 +113,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.NotNil(t, session.CreatedOn())
 	assert.Nil(t, session.WaitStartedOn())
 	assert.Nil(t, session.WaitExpiresOn())
-	assert.False(t, *session.WaitResumeOnExpire()) // stays false
+	assert.False(t, session.WaitResumeOnExpire()) // stays false
 	assert.Nil(t, session.Timeout())
 	assert.NotNil(t, session.EndedOn())
 
@@ -219,7 +219,7 @@ func TestSessionWithSubflows(t *testing.T) {
 	assert.False(t, session.Responded())
 	assert.NotNil(t, session.WaitStartedOn())
 	assert.NotNil(t, session.WaitExpiresOn())
-	assert.True(t, *session.WaitResumeOnExpire()) // because we have a parent
+	assert.True(t, session.WaitResumeOnExpire()) // because we have a parent
 	assert.Nil(t, session.Timeout())
 
 	// check that matches what is in the db
@@ -247,7 +247,7 @@ func TestSessionWithSubflows(t *testing.T) {
 	assert.True(t, session.Responded())
 	assert.Nil(t, session.WaitStartedOn())
 	assert.Nil(t, session.WaitExpiresOn())
-	assert.False(t, *session.WaitResumeOnExpire())
+	assert.False(t, session.WaitResumeOnExpire())
 	assert.Nil(t, session.Timeout())
 }
 
