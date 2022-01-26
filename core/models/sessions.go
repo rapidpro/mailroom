@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"crypto/md5"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -807,6 +808,38 @@ func WriteSessionOutputsToStorage(ctx context.Context, rt *runtime.Runtime, sess
 
 	logrus.WithField("elapsed", time.Since(start)).WithField("count", len(sessions)).Debug("wrote sessions to s3")
 	return nil
+}
+
+const sqlSelectWaitingSessionOverlap = `
+SELECT DISTINCT(contact_id)
+  FROM flows_flowsession fs 
+  JOIN flows_flow ff ON fs.current_flow_id = ff.id
+ WHERE fs.status = 'W' AND ff.is_active = TRUE AND ff.is_archived = FALSE AND ff.flow_type = $1 AND fs.contact_id = ANY($2)`
+
+// FindActiveSessionOverlap returns the list of contact ids which overlap with those passed in which are active in any other flows
+func FindActiveSessionOverlap(ctx context.Context, db *sqlx.DB, flowType FlowType, contacts []ContactID) ([]ContactID, error) {
+	// background flows should look at messaging flows when determing overlap (background flows can't be active by definition)
+	if flowType == FlowTypeBackground {
+		flowType = FlowTypeMessaging
+	}
+
+	var overlap []ContactID
+	err := db.SelectContext(ctx, &overlap, sqlSelectWaitingSessionOverlap, flowType, pq.Array(contacts))
+	return overlap, err
+}
+
+// GetSessionWaitExpiresOn looks up the wait expiration for the passed in session and will return nil if the
+// session is no longer waiting
+func GetSessionWaitExpiresOn(ctx context.Context, db *sqlx.DB, sessionID SessionID) (*time.Time, error) {
+	var expiresOn time.Time
+	err := db.Get(&expiresOn, `SELECT wait_expires_on FROM flows_flowsession WHERE id = $1 AND status = 'W'`, sessionID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "error selecting wait_expires_on for session #%d", sessionID)
+	}
+	return &expiresOn, nil
 }
 
 // ExitSessions exits sessions and their runs. It batches the given session ids and exits each batch in a transaction.
