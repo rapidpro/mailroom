@@ -1,3 +1,8 @@
+v7.1.34
+----------
+ * Update modified_on for contacts in batches of 100
+ * Rework expiring messaging sessions to be session based
+
 v7.1.33
 ----------
  * Set wait fields on sessions for dial waits as well
