@@ -63,7 +63,6 @@ type FlowRun struct {
 		CreatedOn       time.Time       `db:"created_on"`
 		ModifiedOn      time.Time       `db:"modified_on"`
 		ExitedOn        *time.Time      `db:"exited_on"`
-		ExpiresOn       *time.Time      `db:"expires_on"`
 		Responded       bool            `db:"responded"`
 		Results         string          `db:"results"`
 		Path            string          `db:"path"`
@@ -71,14 +70,15 @@ type FlowRun struct {
 		ContactID       flows.ContactID `db:"contact_id"`
 		FlowID          FlowID          `db:"flow_id"`
 		OrgID           OrgID           `db:"org_id"`
-		ParentUUID      *flows.RunUUID  `db:"parent_uuid"`
 		SessionID       SessionID       `db:"session_id"`
 		StartID         StartID         `db:"start_id"`
-		ConnectionID    *ConnectionID   `db:"connection_id"`
 
 		// deprecated
-		IsActive bool     `db:"is_active"`
-		ExitType ExitType `db:"exit_type"`
+		IsActive     bool           `db:"is_active"`
+		ExitType     ExitType       `db:"exit_type"`
+		ExpiresOn    *time.Time     `db:"expires_on"`
+		ParentUUID   *flows.RunUUID `db:"parent_uuid"`
+		ConnectionID *ConnectionID  `db:"connection_id"`
 	}
 
 	// we keep a reference to the engine's run
