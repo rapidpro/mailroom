@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
@@ -17,7 +18,6 @@ import (
 )
 
 const (
-	expirationLock  = "run_expirations"
 	expireBatchSize = 500
 )
 
@@ -29,17 +29,26 @@ func init() {
 
 // StartExpirationCron starts our cron job of expiring runs every minute
 func StartExpirationCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, expirationLock, time.Second*60, false,
+	cron.Start(quit, rt, "run_expirations", time.Minute, false,
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
 			return HandleWaitExpirations(ctx, rt)
 		},
 	)
+
+	cron.Start(quit, rt, "expire_ivr_calls", time.Minute, false,
+		func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+			defer cancel()
+			return ExpireVoiceSessions(ctx, rt)
+		},
+	)
+
 	return nil
 }
 
-// HandleWaitExpirations handles waiting sessions whose waits have expired, resuming those that can be resumed,
+// HandleWaitExpirations handles waiting messaging sessions whose waits have expired, resuming those that can be resumed,
 // and expiring those that can't
 func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 	log := logrus.WithField("comp", "expirer")
@@ -135,4 +144,70 @@ type ExpiredWait struct {
 	ContactID models.ContactID `db:"contact_id"`
 	ExpiresOn time.Time        `db:"wait_expires_on"`
 	CanResume bool             `db:"wait_resume_on_expire"`
+}
+
+// ExpireVoiceSessions looks for voice sessions that should be expired and ends them
+func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
+	log := logrus.WithField("comp", "ivr_cron_expirer")
+	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+
+	// select voice sessions with expired waits
+	rows, err := rt.DB.QueryxContext(ctx, sqlSelectExpiredVoiceWaits)
+	if err != nil {
+		return errors.Wrapf(err, "error querying for expired waits")
+	}
+	defer rows.Close()
+
+	expiredSessions := make([]models.SessionID, 0, 100)
+
+	for rows.Next() {
+		expiredWait := &ExpiredVoiceWait{}
+		err := rows.StructScan(expiredWait)
+		if err != nil {
+			return errors.Wrapf(err, "error scanning expired wait")
+		}
+
+		// add the session to those we need to expire
+		expiredSessions = append(expiredSessions, expiredWait.SessionID)
+
+		// load our connection
+		conn, err := models.SelectChannelConnection(ctx, rt.DB, expiredWait.ConnectionID)
+		if err != nil {
+			log.WithError(err).WithField("connection_id", expiredWait.ConnectionID).Error("unable to load connection")
+			continue
+		}
+
+		// hang up our call
+		err = ivr.HangupCall(ctx, rt, conn)
+		if err != nil {
+			log.WithError(err).WithField("connection_id", conn.ID()).Error("error hanging up call")
+		}
+	}
+
+	// now expire our runs and sessions
+	if len(expiredSessions) > 0 {
+		err := models.ExitSessions(ctx, rt.DB, expiredSessions, models.SessionStatusExpired)
+		if err != nil {
+			log.WithError(err).Error("error expiring sessions for expired calls")
+		}
+		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on channel connections")
+	}
+
+	return nil
+}
+
+const sqlSelectExpiredVoiceWaits = `
+  SELECT id, connection_id, wait_expires_on
+    FROM flows_flowsession
+   WHERE session_type = 'V' AND status = 'W' AND wait_expires_on <= NOW()
+ORDER BY wait_expires_on ASC
+   LIMIT 100`
+
+type ExpiredVoiceWait struct {
+	SessionID    models.SessionID    `db:"id"`
+	ConnectionID models.ConnectionID `db:"connection_id"`
+	ExpiresOn    time.Time           `db:"wait_expires_on"`
 }

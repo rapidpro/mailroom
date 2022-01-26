@@ -82,3 +82,43 @@ func TestExpirations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, task)
 }
+
+func TestExpireVoiceSessions(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+
+	// create voice session for Cathy
+	conn1ID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, conn1ID, time.Now(), time.Now(), false, nil)
+	r1ID := testdata.InsertFlowRun(db, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting, "", nil)
+
+	// create voice session for Bob with expiration in future
+	conn2ID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
+	s2ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.IVRFlow, conn2ID, time.Now(), time.Now().Add(time.Hour), false, nil)
+	r2ID := testdata.InsertFlowRun(db, testdata.Org1, s2ID, testdata.Bob, testdata.IVRFlow, models.RunStatusWaiting, "", nil)
+
+	// create a messaging session for Alexandria
+	s3ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, nil)
+	r3ID := testdata.InsertFlowRun(db, testdata.Org1, s3ID, testdata.Alexandria, testdata.Favorites, models.RunStatusWaiting, "", nil)
+
+	time.Sleep(5 * time.Millisecond)
+
+	// expire our sessions...
+	err := expirations.ExpireVoiceSessions(ctx, rt)
+	assert.NoError(t, err)
+
+	// Cathy's session should be expired along with its runs
+	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s1ID).Columns(map[string]interface{}{"status": "X"})
+	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r1ID).Columns(map[string]interface{}{"status": "X"})
+
+	// Bob's session and run should be unchanged
+	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s2ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r2ID).Columns(map[string]interface{}{"status": "W"})
+
+	// Alexandria's session and run should be unchanged because message expirations are handled separately
+	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s3ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r3ID).Columns(map[string]interface{}{"status": "W"})
+}
