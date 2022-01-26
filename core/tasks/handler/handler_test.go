@@ -620,13 +620,7 @@ func TestTimedEvents(t *testing.T) {
 				expiration = time.Now().Add(time.Hour * 24)
 			}
 
-			task = handler.NewExpirationTask(
-				tc.OrgID,
-				tc.Contact.ID,
-				sessionID,
-				runID,
-				expiration,
-			)
+			task = handler.NewExpirationTask(tc.OrgID, tc.Contact.ID, sessionID, expiration)
 		}
 
 		err := handler.QueueHandleTask(rc, tc.Contact.ID, task)
@@ -671,13 +665,7 @@ func TestTimedEvents(t *testing.T) {
 	db.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_path_change`)
 
 	// try to expire the run
-	task := handler.NewExpirationTask(
-		testdata.Org1.ID,
-		testdata.Cathy.ID,
-		sessionID,
-		runID,
-		expiration,
-	)
+	task := handler.NewExpirationTask(testdata.Org1.ID, testdata.Cathy.ID, sessionID, expiration)
 
 	err = handler.QueueHandleTask(rc, testdata.Cathy.ID, task)
 	assert.NoError(t, err)

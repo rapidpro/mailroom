@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/buger/jsonparser"
 	"github.com/gomodule/redigo/redis"
@@ -384,9 +385,29 @@ func TestInterruptSessionsForFlows(t *testing.T) {
 	assertdb.Query(t, db, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, testdata.Cathy.ID).Returns(nil)
 }
 
+func TestGetSessionWaitExpiresOn(t *testing.T) {
+	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	s1Expires := time.Date(2022, 1, 26, 13, 28, 30, 0, time.UTC)
+	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), s1Expires, true, nil)
+
+	s1Actual, err := models.GetSessionWaitExpiresOn(ctx, db, s1ID)
+	assert.NoError(t, err)
+	assert.Equal(t, s1Expires, *s1Actual)
+
+	// for a non-waiting session, should return nil
+	s2ID := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
+
+	s2Actual, err := models.GetSessionWaitExpiresOn(ctx, db, s2ID)
+	assert.NoError(t, err)
+	assert.Nil(t, s2Actual)
+}
+
 func insertSessionAndRun(db *sqlx.DB, contact *testdata.Contact, sessionType models.FlowType, status models.SessionStatus, flow *testdata.Flow, connID models.ConnectionID) (models.SessionID, models.FlowRunID) {
 	// create session and add a run with same status
-	sessionID := testdata.InsertFlowSession(db, testdata.Org1, contact, sessionType, status, flow, connID, nil)
+	sessionID := testdata.InsertFlowSession(db, testdata.Org1, contact, sessionType, status, flow, connID)
 	runID := testdata.InsertFlowRun(db, testdata.Org1, sessionID, contact, flow, models.RunStatus(status), "", nil)
 
 	// mark contact as being in that flow

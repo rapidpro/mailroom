@@ -6,14 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/redisx"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -35,54 +33,50 @@ func StartExpirationCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return expireRuns(ctx, rt)
+			return HandleWaitExpirations(ctx, rt)
 		},
 	)
 	return nil
 }
 
-// expireRuns expires all the runs that have an expiration in the past
-func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
+// HandleWaitExpirations handles waiting sessions whose waits have expired, resuming those that can be resumed,
+// and expiring those that can't
+func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 	log := logrus.WithField("comp", "expirer")
 	start := time.Now()
 
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	// we expire sessions that have no continuation in batches
+	// we expire sessions that can't be resumed in batches
 	expiredSessions := make([]models.SessionID, 0, expireBatchSize)
 
-	// select our expired runs
-	rows, err := rt.DB.QueryxContext(ctx, selectExpiredRunsSQL)
+	// select messaging sessions with expired waits
+	rows, err := rt.DB.QueryxContext(ctx, sqlSelectExpiredWaits)
 	if err != nil {
-		return errors.Wrapf(err, "error querying for expired runs")
+		return errors.Wrapf(err, "error querying for expired waits")
 	}
 	defer rows.Close()
 
 	count := 0
 	for rows.Next() {
-		expiration := &RunExpiration{}
-		err := rows.StructScan(expiration)
+		expiredWait := &ExpiredWait{}
+		err := rows.StructScan(expiredWait)
 		if err != nil {
-			return errors.Wrapf(err, "error scanning expired run")
+			return errors.Wrapf(err, "error scanning expired wait")
 		}
 
 		count++
 
-		// no parent? we can add this to our batch
-		if expiration.ParentUUID == nil {
-
-			if expiration.SessionID != nil {
-				expiredSessions = append(expiredSessions, *expiration.SessionID)
-			} else {
-				log.WithField("run_id", expiration.RunID).WithField("org_id", expiration.OrgID).Warn("expiring active run with no session")
-			}
+		// if it can't be resumed, add to batch to be expired
+		if !expiredWait.CanResume {
+			expiredSessions = append(expiredSessions, expiredWait.SessionID)
 
 			// batch is full? commit it
 			if len(expiredSessions) == expireBatchSize {
 				err = models.ExitSessions(ctx, rt.DB, expiredSessions, models.SessionStatusExpired)
 				if err != nil {
-					return errors.Wrapf(err, "error expiring runs and sessions")
+					return errors.Wrapf(err, "error expiring batch of sessions")
 				}
 				expiredSessions = expiredSessions[:0]
 			}
@@ -90,8 +84,8 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 			continue
 		}
 
-		// need to continue this session and flow, create a task for that
-		taskID := fmt.Sprintf("%d:%s", expiration.RunID, expiration.ExpiresOn.Format(time.RFC3339))
+		// create a contact task to resume this session
+		taskID := fmt.Sprintf("%d:%s", expiredWait.SessionID, expiredWait.ExpiresOn.Format(time.RFC3339))
 		queued, err := expirationsMarker.Contains(rc, taskID)
 		if err != nil {
 			return errors.Wrapf(err, "error checking whether expiration is queued")
@@ -103,8 +97,8 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 		}
 
 		// ok, queue this task
-		task := handler.NewExpirationTask(expiration.OrgID, expiration.ContactID, *expiration.SessionID, expiration.RunID, expiration.ExpiresOn)
-		err = handler.QueueHandleTask(rc, expiration.ContactID, task)
+		task := handler.NewExpirationTask(expiredWait.OrgID, expiredWait.ContactID, expiredWait.SessionID, expiredWait.ExpiresOn)
+		err = handler.QueueHandleTask(rc, expiredWait.ContactID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error adding new expiration task")
 		}
@@ -128,33 +122,17 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 	return nil
 }
 
-const selectExpiredRunsSQL = `
-	SELECT
-		fr.org_id as org_id,
-		fr.flow_id as flow_id,
-		fr.contact_id as contact_id,
-		fr.id as run_id,
-		fr.parent_uuid as parent_uuid,
-		fr.session_id as session_id,
-		fr.expires_on as expires_on
-	FROM
-		flows_flowrun fr
-		JOIN orgs_org o ON fr.org_id = o.id
-	WHERE
-		fr.is_active = TRUE AND
-		fr.expires_on < NOW() AND
-		fr.connection_id IS NULL
-	ORDER BY
-		expires_on ASC
-	LIMIT 25000
-`
+const sqlSelectExpiredWaits = `
+  SELECT id, org_id, contact_id, wait_expires_on, wait_resume_on_expire 
+    FROM flows_flowsession
+   WHERE session_type = 'M' AND status = 'W' AND wait_expires_on <= NOW()
+ORDER BY wait_expires_on ASC
+   LIMIT 25000`
 
-type RunExpiration struct {
-	OrgID      models.OrgID      `db:"org_id"`
-	FlowID     models.FlowID     `db:"flow_id"`
-	ContactID  models.ContactID  `db:"contact_id"`
-	RunID      models.FlowRunID  `db:"run_id"`
-	ParentUUID *flows.RunUUID    `db:"parent_uuid"`
-	SessionID  *models.SessionID `db:"session_id"`
-	ExpiresOn  time.Time         `db:"expires_on"`
+type ExpiredWait struct {
+	SessionID models.SessionID `db:"id"`
+	OrgID     models.OrgID     `db:"org_id"`
+	ContactID models.ContactID `db:"contact_id"`
+	ExpiresOn time.Time        `db:"wait_expires_on"`
+	CanResume bool             `db:"wait_resume_on_expire"`
 }

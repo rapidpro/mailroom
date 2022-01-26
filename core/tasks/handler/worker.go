@@ -197,12 +197,8 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 // handleTimedEvent is called for timeout events
 func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string, event *TimedEvent) error {
 	start := time.Now()
-	log := logrus.WithFields(logrus.Fields{
-		"event_type": eventType,
-		"contact_id": event.ContactID,
-		"run_id":     event.RunID,
-		"session_id": event.SessionID,
-	})
+	log := logrus.WithFields(logrus.Fields{"event_type": eventType, "contact_id": event.ContactID, "session_id": event.SessionID})
+
 	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -249,18 +245,18 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 
 	case ExpirationEventType:
 		// check that our expiration is still the same
-		expiration, err := models.RunExpiration(ctx, rt.DB, event.RunID)
+		expiresOn, err := models.GetSessionWaitExpiresOn(ctx, rt.DB, event.SessionID)
 		if err != nil {
 			return errors.Wrapf(err, "unable to load expiration for run")
 		}
 
-		if expiration == nil {
-			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, run no longer active")
+		if expiresOn == nil {
+			log.WithField("event_expiration", event.Time).Info("ignoring expiration, session no longer waiting")
 			return nil
 		}
 
-		if expiration != nil && !expiration.Equal(event.Time) {
-			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, has been updated")
+		if expiresOn != nil && !expiresOn.Equal(event.Time) {
+			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiresOn).Info("ignoring expiration, has been updated")
 			return nil
 		}
 
@@ -797,7 +793,6 @@ type TimedEvent struct {
 	ContactID models.ContactID `json:"contact_id"`
 	OrgID     models.OrgID     `json:"org_id"`
 	SessionID models.SessionID `json:"session_id"`
-	RunID     models.FlowRunID `json:"run_id,omitempty"`
 	Time      time.Time        `json:"time"`
 }
 
@@ -823,12 +818,11 @@ type StopEvent struct {
 }
 
 // creates a new event task for the passed in timeout event
-func newTimedTask(eventType string, orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, eventTime time.Time) *queue.Task {
+func newTimedTask(eventType string, orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, eventTime time.Time) *queue.Task {
 	event := &TimedEvent{
 		OrgID:     orgID,
 		ContactID: contactID,
 		SessionID: sessionID,
-		RunID:     runID,
 		Time:      eventTime,
 	}
 	eventJSON, err := json.Marshal(event)
@@ -848,10 +842,10 @@ func newTimedTask(eventType string, orgID models.OrgID, contactID models.Contact
 
 // NewTimeoutTask creates a new event task for the passed in timeout event
 func NewTimeoutTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
-	return newTimedTask(TimeoutEventType, orgID, contactID, sessionID, models.NilFlowRunID, time)
+	return newTimedTask(TimeoutEventType, orgID, contactID, sessionID, time)
 }
 
 // NewExpirationTask creates a new event task for the passed in expiration event
-func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
-	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, runID, time)
+func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
+	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, time)
 }

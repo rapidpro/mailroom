@@ -175,6 +175,7 @@ DELETE FROM flows_flowcategorycount;
 DELETE FROM flows_flowsession;
 DELETE FROM flows_flowrevision WHERE flow_id >= 30000;
 DELETE FROM flows_flow WHERE id >= 30000;
+DELETE FROM channels_channelconnection;
 DELETE FROM campaigns_eventfire;
 DELETE FROM campaigns_campaignevent WHERE id >= 30000;
 DELETE FROM campaigns_campaign WHERE id >= 30000;

@@ -40,10 +40,10 @@ func TestCampaignStarts(t *testing.T) {
 	testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent2, now)
 
 	// create an waiting session for Alexandria to test skipping
-	testdata.InsertFlowSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.PickANumber, models.NilConnectionID, nil)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.PickANumber, models.NilConnectionID, time.Now(), time.Now(), false, nil)
 
 	// create an active voice call for Cathy to make sure it doesn't get interrupted or cause skipping
-	testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.IVRFlow, models.NilConnectionID, nil)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, models.NilConnectionID, time.Now(), time.Now(), false, nil)
 
 	// set our event to skip
 	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, testdata.RemindersEvent2.ID)

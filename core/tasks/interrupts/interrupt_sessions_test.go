@@ -2,6 +2,7 @@ package interrupts
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	_ "github.com/nyaruka/mailroom/core/handlers"
@@ -15,10 +16,10 @@ import (
 func TestInterrupts(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData)
 
 	insertSession := func(org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow, connectionID models.ConnectionID) models.SessionID {
-		sessionID := testdata.InsertFlowSession(db, org, contact, models.FlowTypeMessaging, models.SessionStatusWaiting, flow, connectionID, nil)
+		sessionID := testdata.InsertWaitingSession(db, org, contact, models.FlowTypeMessaging, flow, connectionID, time.Now(), time.Now(), false, nil)
 
 		// give session one waiting run too
 		testdata.InsertFlowRun(db, org, sessionID, contact, flow, models.RunStatusWaiting, "", nil)
