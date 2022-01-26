@@ -230,15 +230,16 @@ WHERE
 	fs.contact_id = ANY($2)
 `
 
-// RunExpiration looks up the run expiration for the passed in run, can return nil if the run is no longer waiting
-func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (*time.Time, error) {
-	var expiration time.Time
-	err := db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE id = $1 AND status = 'W'`, runID)
+// GetSessionWaitExpiresOn looks up the wait expiration for the passed in session and will return nil if the
+// session is no longer waiting
+func GetSessionWaitExpiresOn(ctx context.Context, db *sqlx.DB, sessionID SessionID) (*time.Time, error) {
+	var expiresOn time.Time
+	err := db.Get(&expiresOn, `SELECT wait_expires_on FROM flows_flowsession WHERE id = $1 AND status = 'W'`, sessionID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to select expiration for run: %d", runID)
+		return nil, errors.Wrapf(err, "error selecting wait_expires_on for session #%d", sessionID)
 	}
-	return &expiration, nil
+	return &expiresOn, nil
 }

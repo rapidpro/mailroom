@@ -103,7 +103,7 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 		}
 
 		// ok, queue this task
-		task := handler.NewExpirationTask(expiration.OrgID, expiration.ContactID, *expiration.SessionID, expiration.RunID, expiration.ExpiresOn)
+		task := handler.NewExpirationTask(expiration.OrgID, expiration.ContactID, *expiration.SessionID, expiration.ExpiresOn)
 		err = handler.QueueHandleTask(rc, expiration.ContactID, task)
 		if err != nil {
 			return errors.Wrapf(err, "error adding new expiration task")
