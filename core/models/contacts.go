@@ -1133,16 +1133,21 @@ func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urn
 
 	urn, err = urns.NewURNFromParts(urn.Scheme(), urn.Path(), query.Encode(), urn.Display())
 	if err != nil {
-		return urns.NilURN, errors.Wrapf(err, "unable to create new urn")
+		return urns.NilURN, errors.Wrap(err, "unable to create new urn")
 	}
 
 	return urn, nil
 }
 
-// UpdateContactModifiedOn updates modified on on the passed in contact
+// UpdateContactModifiedOn updates modified_on the passed in contacts
 func UpdateContactModifiedOn(ctx context.Context, db Queryer, contactIDs []ContactID) error {
-	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(contactIDs))
-	return err
+	for _, idBatch := range chunkContactIDs(contactIDs, 100) {
+		_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(idBatch))
+		if err != nil {
+			return errors.Wrap(err, "error updating modified_on for contact batch")
+		}
+	}
+	return nil
 }
 
 // UpdateContactLastSeenOn updates last seen on (and modified on) on the passed in contact
