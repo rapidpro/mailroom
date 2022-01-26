@@ -36,14 +36,14 @@ func TestExpirations(t *testing.T) {
 	s3ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now().Add(time.Hour), true, nil)
 	r4ID := testdata.InsertFlowRun(db, testdata.Org1, s3ID, testdata.Bob, testdata.Favorites, models.RunStatusWaiting, "", nil)
 
-	// create an IVR session for Alexandria with expiration in future
+	// create an IVR session for Alexandria
 	conn := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
 	s4ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeVoice, testdata.IVRFlow, conn, time.Now(), time.Now(), false, nil)
 	r5ID := testdata.InsertFlowRun(db, testdata.Org1, s4ID, testdata.Alexandria, testdata.IVRFlow, models.RunStatusWaiting, "", nil)
 
 	time.Sleep(5 * time.Millisecond)
 
-	// expire our runs
+	// expire our sessions...
 	err := expirations.HandleWaitExpirations(ctx, rt)
 	assert.NoError(t, err)
 
@@ -56,7 +56,7 @@ func TestExpirations(t *testing.T) {
 	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r2ID).Columns(map[string]interface{}{"status": "A"})
 	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r3ID).Columns(map[string]interface{}{"status": "W"})
 
-	// Bob's session and run should be unchanged
+	// George's session and run should be unchanged
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s3ID).Columns(map[string]interface{}{"status": "W"})
 	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r4ID).Columns(map[string]interface{}{"status": "W"})
 

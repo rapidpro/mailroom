@@ -5,13 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -31,7 +29,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return retryCalls(ctx, rt)
+			return RetryCalls(ctx, rt)
 		},
 	)
 
@@ -39,15 +37,15 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return expireCalls(ctx, rt)
+			return ExpireVoiceSessions(ctx, rt)
 		},
 	)
 
 	return nil
 }
 
-// retryCalls looks for calls that need to be retried and retries them
-func retryCalls(ctx context.Context, rt *runtime.Runtime) error {
+// RetryCalls looks for calls that need to be retried and retries them
+func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	log := logrus.WithField("comp", "ivr_cron_retryer")
 	start := time.Now()
 
@@ -113,37 +111,37 @@ func retryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	return nil
 }
 
-// expireCalls looks for calls that should be expired and ends them
-func expireCalls(ctx context.Context, rt *runtime.Runtime) error {
+// ExpireVoiceSessions looks for voice sessions that should be expired and ends them
+func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 	log := logrus.WithField("comp", "ivr_cron_expirer")
 	start := time.Now()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	// select our expired runs
-	rows, err := rt.DB.QueryxContext(ctx, selectExpiredRunsSQL)
+	// select voice sessions with expired waits
+	rows, err := rt.DB.QueryxContext(ctx, sqlSelectExpiredWaits)
 	if err != nil {
-		return errors.Wrapf(err, "error querying for expired runs")
+		return errors.Wrapf(err, "error querying for expired waits")
 	}
 	defer rows.Close()
 
 	expiredSessions := make([]models.SessionID, 0, 100)
 
 	for rows.Next() {
-		exp := &RunExpiration{}
-		err := rows.StructScan(exp)
+		expiredWait := &ExpiredWait{}
+		err := rows.StructScan(expiredWait)
 		if err != nil {
-			return errors.Wrapf(err, "error scanning expired run")
+			return errors.Wrapf(err, "error scanning expired wait")
 		}
 
 		// add the session to those we need to expire
-		expiredSessions = append(expiredSessions, exp.SessionID)
+		expiredSessions = append(expiredSessions, expiredWait.SessionID)
 
 		// load our connection
-		conn, err := models.SelectChannelConnection(ctx, rt.DB, exp.ConnectionID)
+		conn, err := models.SelectChannelConnection(ctx, rt.DB, expiredWait.ConnectionID)
 		if err != nil {
-			log.WithError(err).WithField("connection_id", exp.ConnectionID).Error("unable to load connection")
+			log.WithError(err).WithField("connection_id", expiredWait.ConnectionID).Error("unable to load connection")
 			continue
 		}
 
@@ -166,36 +164,15 @@ func expireCalls(ctx context.Context, rt *runtime.Runtime) error {
 	return nil
 }
 
-const selectExpiredRunsSQL = `
-	SELECT
-		fr.id as run_id,	
-		fr.org_id as org_id,
-		fr.flow_id as flow_id,
-		fr.contact_id as contact_id,
-		fr.session_id as session_id,
-		fr.expires_on as expires_on,
-		cc.id as connection_id
-	FROM
-		flows_flowrun fr
-		JOIN orgs_org o ON fr.org_id = o.id
-		JOIN channels_channelconnection cc ON fr.connection_id = cc.id
-	WHERE
-		fr.is_active = TRUE AND
-		fr.expires_on < NOW() AND
-		fr.connection_id IS NOT NULL AND
-		fr.session_id IS NOT NULL AND
-        cc.connection_type = 'V'
-	ORDER BY
-		expires_on ASC
-	LIMIT 100
-`
+const sqlSelectExpiredWaits = `
+  SELECT id, connection_id, wait_expires_on
+    FROM flows_flowsession
+   WHERE session_type = 'V' AND status = 'W' AND wait_expires_on <= NOW()
+ORDER BY wait_expires_on ASC
+   LIMIT 100`
 
-type RunExpiration struct {
-	OrgID        models.OrgID        `db:"org_id"`
-	FlowID       models.FlowID       `db:"flow_id"`
-	ContactID    flows.ContactID     `db:"contact_id"`
-	RunID        models.FlowRunID    `db:"run_id"`
-	SessionID    models.SessionID    `db:"session_id"`
-	ExpiresOn    time.Time           `db:"expires_on"`
+type ExpiredWait struct {
+	SessionID    models.SessionID    `db:"id"`
 	ConnectionID models.ConnectionID `db:"connection_id"`
+	ExpiresOn    time.Time           `db:"wait_expires_on"`
 }
