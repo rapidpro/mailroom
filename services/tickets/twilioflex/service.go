@@ -1,6 +1,7 @@
 package twilioflex
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -58,7 +59,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
 	chatUser := &CreateChatUserParams{
-		Identity:     string(contact.UUID()),
+		Identity:     fmt.Sprint(contact.ID()),
 		FriendlyName: contact.Name(),
 	}
 	contactUser, trace, err := s.restClient.GetUser(chatUser.Identity)
@@ -80,7 +81,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	flexChannelParams := &CreateFlexChannelParams{
 		FlexFlowSid:          s.restClient.flexFlowSid,
-		Identity:             string(contact.UUID()),
+		Identity:             fmt.Sprint(contact.ID()),
 		ChatUserFriendlyName: contact.Name(),
 		ChatFriendlyName:     contact.Name(),
 	}
@@ -92,9 +93,15 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "failed to create twilio flex chat channel")
 	}
 
+	callbackURL := fmt.Sprintf(
+		"https://723c-186-235-156-219.ngrok.io/mr/tickets/types/twilioflex/event_callback/%s/%s",
+		s.ticketer.UUID(),
+		ticket.UUID(),
+	)
+
 	channelWebhook := &CreateChatChannelWebhookParams{
-		ConfigurationUrl:        "https://webhook.site/34e495f6-25e9-4b1e-9629-346054be0d13",
-		ConfigurationFilters:    []string{"onMessageSent"},
+		ConfigurationUrl:        callbackURL,
+		ConfigurationFilters:    []string{"onMessageSent", "onChannelUpdated"},
 		ConfigurationMethod:     "POST",
 		ConfigurationRetryCount: 1,
 		Type:                    "webhook",
@@ -107,12 +114,25 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "failed to create channel webhook")
 	}
 
-	ticket.SetExternalID(newFlexChannel.TaskSid)
+	ticket.SetExternalID(newFlexChannel.Sid)
 	return ticket, nil
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
-	// TODO: Forward
+	identity := fmt.Sprint(ticket.ContactID())
+	msg := &ChatMessage{
+		From:       identity,
+		Body:       text,
+		ChannelSid: string(ticket.ExternalID()),
+	}
+	// TODO: attachments
+	_, trace, err := s.restClient.CreateMessage(msg)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if err != nil {
+		return errors.Wrap(err, "error calling Twilio")
+	}
 	return nil
 }
 
