@@ -74,22 +74,18 @@ type FlowRun struct {
 		StartID         StartID         `db:"start_id"`
 
 		// deprecated
-		IsActive     bool           `db:"is_active"`
-		ExitType     ExitType       `db:"exit_type"`
-		ExpiresOn    *time.Time     `db:"expires_on"`
-		ParentUUID   *flows.RunUUID `db:"parent_uuid"`
-		ConnectionID *ConnectionID  `db:"connection_id"`
+		IsActive bool     `db:"is_active"`
+		ExitType ExitType `db:"exit_type"`
 	}
 
 	// we keep a reference to the engine's run
 	run flows.Run
 }
 
-func (r *FlowRun) SetSessionID(sessionID SessionID)     { r.r.SessionID = sessionID }
-func (r *FlowRun) SetConnectionID(connID *ConnectionID) { r.r.ConnectionID = connID }
-func (r *FlowRun) SetStartID(startID StartID)           { r.r.StartID = startID }
-func (r *FlowRun) UUID() flows.RunUUID                  { return r.r.UUID }
-func (r *FlowRun) ModifiedOn() time.Time                { return r.r.ModifiedOn }
+func (r *FlowRun) SetSessionID(sessionID SessionID) { r.r.SessionID = sessionID }
+func (r *FlowRun) SetStartID(startID StartID)       { r.r.StartID = startID }
+func (r *FlowRun) UUID() flows.RunUUID              { return r.r.UUID }
+func (r *FlowRun) ModifiedOn() time.Time            { return r.r.ModifiedOn }
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
 func (r *FlowRun) MarshalJSON() ([]byte, error) {
@@ -111,10 +107,10 @@ type Step struct {
 
 const insertRunSQL = `
 INSERT INTO
-flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, status, expires_on, responded, results, path, 
-	          current_node_uuid, contact_id, flow_id, org_id, session_id, start_id, parent_uuid, connection_id)
-	   VALUES(:uuid, :is_active, :created_on, NOW(), :exited_on, :exit_type, :status, :expires_on, :responded, :results, :path,
-	          :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id, :start_id, :parent_uuid, :connection_id)
+flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, status, responded, results, path, 
+	          current_node_uuid, contact_id, flow_id, org_id, session_id, start_id)
+	   VALUES(:uuid, :is_active, :created_on, NOW(), :exited_on, :exit_type, :status, :responded, :results, :path,
+	          :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id, :start_id)
 RETURNING id
 `
 
@@ -142,7 +138,6 @@ func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, f
 	r.Status = runStatusMap[fr.Status()]
 	r.CreatedOn = fr.CreatedOn()
 	r.ExitedOn = fr.ExitedOn()
-	r.ExpiresOn = fr.ExpiresOn()
 	r.ModifiedOn = fr.ModifiedOn()
 	r.ContactID = fr.Contact().ID()
 	r.FlowID = flowID
@@ -171,12 +166,6 @@ func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, f
 			r.Responded = true
 			break
 		}
-	}
-
-	// set our parent UUID if we have a parent
-	if fr.Parent() != nil {
-		uuid := fr.Parent().UUID()
-		r.ParentUUID = &uuid
 	}
 
 	return run, nil

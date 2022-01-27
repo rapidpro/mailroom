@@ -22,7 +22,7 @@ func TestInterrupts(t *testing.T) {
 		sessionID := testdata.InsertWaitingSession(db, org, contact, models.FlowTypeMessaging, flow, connectionID, time.Now(), time.Now(), false, nil)
 
 		// give session one waiting run too
-		testdata.InsertFlowRun(db, org, sessionID, contact, flow, models.RunStatusWaiting, "", nil)
+		testdata.InsertFlowRun(db, org, sessionID, contact, flow, models.RunStatusWaiting)
 		return sessionID
 	}
 

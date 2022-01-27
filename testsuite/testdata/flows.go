@@ -4,13 +4,11 @@ import (
 	"time"
 
 	"github.com/buger/jsonparser"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
 )
 
 type Flow struct {
@@ -86,13 +84,13 @@ func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType m
 }
 
 // InsertFlowRun inserts a flow run
-func InsertFlowRun(db *sqlx.DB, org *Org, sessionID models.SessionID, contact *Contact, flow *Flow, status models.RunStatus, parent flows.RunUUID, expiresOn *time.Time) models.FlowRunID {
+func InsertFlowRun(db *sqlx.DB, org *Org, sessionID models.SessionID, contact *Contact, flow *Flow, status models.RunStatus) models.FlowRunID {
 	isActive := status == models.RunStatusActive || status == models.RunStatusWaiting
 
 	var id models.FlowRunID
 	must(db.Get(&id,
-		`INSERT INTO flows_flowrun(uuid, org_id, session_id, contact_id, flow_id, status, is_active, parent_uuid, responded, created_on, modified_on, expires_on) 
-		 VALUES($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), NOW(), $9) RETURNING id`, uuids.New(), org.ID, null.Int(sessionID), contact.ID, flow.ID, status, isActive, null.String(parent), expiresOn,
+		`INSERT INTO flows_flowrun(uuid, org_id, session_id, contact_id, flow_id, status, is_active, responded, created_on, modified_on) 
+		 VALUES($1, $2, $3, $4, $5, $6, $7, TRUE, NOW(), NOW()) RETURNING id`, uuids.New(), org.ID, null.Int(sessionID), contact.ID, flow.ID, status, isActive,
 	))
 	return id
 }

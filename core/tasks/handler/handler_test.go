@@ -611,8 +611,8 @@ func TestTimedEvents(t *testing.T) {
 			if tc.Message == "bad" {
 				expiration = time.Now()
 			} else if tc.Message == "child" {
-				db.Get(&expiration, `SELECT expires_on FROM flows_flowrun WHERE session_id = $1 AND is_active = FALSE`, sessionID)
-				db.Get(&runID, `SELECT id FROM flows_flowrun WHERE session_id = $1 AND is_active = FALSE`, sessionID)
+				db.Get(&expiration, `SELECT wait_expires_on FROM flows_flowsession WHERE id = $1 AND status != 'W'`, sessionID)
+				db.Get(&runID, `SELECT id FROM flows_flowrun WHERE session_id = $1 AND status NOT IN ('A', 'W')`, sessionID)
 			} else if runExpiration != nil {
 				expiration = *runExpiration
 			} else {
