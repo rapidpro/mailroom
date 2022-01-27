@@ -1,3 +1,7 @@
+v7.1.36
+----------
+ * Remove expires_on, parent_uuid and connection_id fields from FlowRun
+
 v7.1.35
 ----------
  * Use sessions only for voice session expiration
