@@ -130,7 +130,7 @@ func (c *Classifier) AsService(cfg *runtime.Config, classifier *flows.Classifier
 func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Classifier, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectClassifiersSQL, orgID)
+	rows, err := db.Queryx(sqlSelectClassifiers, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying classifiers for org: %d", orgID)
 	}
@@ -158,7 +158,7 @@ func loadClassifiers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]asset
 	return classifiers, nil
 }
 
-const selectClassifiersSQL = `
+const sqlSelectClassifiers = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	c.id as id,
 	c.uuid as uuid,

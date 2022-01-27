@@ -340,10 +340,10 @@ func MarkEventsFired(ctx context.Context, db Queryer, fires []*EventFire, fired 
 		updates = append(updates, f)
 	}
 
-	return BulkQuery(ctx, "mark events fired", db, markEventsFired, updates)
+	return BulkQuery(ctx, "mark events fired", db, sqlMarkEventsFired, updates)
 }
 
-const markEventsFired = `
+const sqlMarkEventsFired = `
 UPDATE 
 	campaigns_eventfire f
 SET
@@ -365,7 +365,7 @@ func DeleteEventFires(ctx context.Context, db Queryer, fires []*EventFire) error
 		ids = append(ids, f.FireID)
 	}
 
-	_, err := db.ExecContext(ctx, deleteEventFires, pq.Array(ids))
+	_, err := db.ExecContext(ctx, sqlDeleteEventFires, pq.Array(ids))
 	if err != nil {
 		return errors.Wrapf(err, "error deleting fires for inactive event")
 	}
@@ -373,13 +373,9 @@ func DeleteEventFires(ctx context.Context, db Queryer, fires []*EventFire) error
 	return nil
 }
 
-const deleteEventFires = `
-DELETE FROM 
-	campaigns_eventfire
-WHERE
-	id = ANY($1) AND
-	fired IS NULL
-`
+const sqlDeleteEventFires = `
+DELETE FROM campaigns_eventfire
+      WHERE id = ANY($1) AND fired IS NULL`
 
 // EventFireResult represents how a event fire was fired
 type EventFireResult = null.String
@@ -406,7 +402,7 @@ type EventFire struct {
 func LoadEventFires(ctx context.Context, db Queryer, ids []FireID) ([]*EventFire, error) {
 	start := time.Now()
 
-	q, vs, err := sqlx.In(loadEventFireSQL, ids)
+	q, vs, err := sqlx.In(sqlSelectEventFires, ids)
 	if err != nil {
 		return nil, errors.Wrap(err, "error rebinding campaign fire query")
 	}
@@ -433,19 +429,10 @@ func LoadEventFires(ctx context.Context, db Queryer, ids []FireID) ([]*EventFire
 	return fires, nil
 }
 
-const loadEventFireSQL = `
-SELECT 
-	f.id as fire_id,
-	f.event_id as event_id,
-	f.contact_id as contact_id,
-	f.scheduled as scheduled,
-	f.fired as fired
-FROM 
-	campaigns_eventfire f
-WHERE 
-	f.id IN(?) AND
-	f.fired IS NULL
-`
+const sqlSelectEventFires = `
+SELECT f.id as fire_id, f.event_id as event_id, f.contact_id as contact_id, f.scheduled as scheduled, f.fired as fired
+  FROM campaigns_eventfire f
+ WHERE f.id IN(?) AND f.fired IS NULL`
 
 // DeleteUnfiredEventFires removes event fires for the passed in event and contact
 func DeleteUnfiredEventFires(ctx context.Context, tx Queryer, removes []*FireDelete) error {
@@ -458,10 +445,10 @@ func DeleteUnfiredEventFires(ctx context.Context, tx Queryer, removes []*FireDel
 	for i := range removes {
 		is[i] = removes[i]
 	}
-	return BulkQuery(ctx, "removing campaign event fires", tx, removeUnfiredFiresSQL, is)
+	return BulkQuery(ctx, "removing campaign event fires", tx, sqlRemoveUnfiredFires, is)
 }
 
-const removeUnfiredFiresSQL = `
+const sqlRemoveUnfiredFires = `
 DELETE FROM
 	campaigns_eventfire
 WHERE 
@@ -493,7 +480,7 @@ func DeleteUnfiredContactEvents(ctx context.Context, tx Queryer, contactIDs []Co
 	return nil
 }
 
-const insertEventFiresSQL = `
+const sqlInsertEventFires = `
 INSERT INTO campaigns_eventfire(contact_id,  event_id,  scheduled)
                          VALUES(:contact_id, :event_id, :scheduled)
 ON CONFLICT DO NOTHING
@@ -516,7 +503,7 @@ func AddEventFires(ctx context.Context, tx Queryer, adds []*FireAdd) error {
 	for i := range adds {
 		is[i] = adds[i]
 	}
-	return BulkQueryBatches(ctx, "adding campaign event fires", tx, insertEventFiresSQL, 1000, is)
+	return BulkQueryBatches(ctx, "adding campaign event fires", tx, sqlInsertEventFires, 1000, is)
 }
 
 // DeleteUnfiredEventsForGroupRemoval deletes any unfired events for all campaigns that are

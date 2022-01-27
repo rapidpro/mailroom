@@ -3,10 +3,9 @@ package models
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 

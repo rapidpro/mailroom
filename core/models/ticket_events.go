@@ -95,7 +95,7 @@ func (e *TicketEvent) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, &e.e)
 }
 
-const insertTicketEventsSQL = `
+const sqlInsertTicketEvents = `
 INSERT INTO
 	tickets_ticketevent(org_id,  contact_id,  ticket_id,  event_type,  note,  topic_id,  assignee_id,  created_on,  created_by_id)
 	            VALUES(:org_id, :contact_id, :ticket_id, :event_type, :note, :topic_id, :assignee_id, :created_on, :created_by_id)
@@ -110,5 +110,5 @@ func InsertTicketEvents(ctx context.Context, db Queryer, evts []*TicketEvent) er
 		is[i] = &evts[i].e
 	}
 
-	return BulkQuery(ctx, "inserting ticket events", db, insertTicketEventsSQL, is)
+	return BulkQuery(ctx, "inserting ticket events", db, sqlInsertTicketEvents, is)
 }

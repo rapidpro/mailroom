@@ -433,7 +433,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	// insert all new runs at once
-	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, newRuns)
+	err = BulkQuery(ctx, "insert runs", tx, sqlInsertRun, newRuns)
 	if err != nil {
 		return errors.Wrapf(err, "error writing runs")
 	}
@@ -576,9 +576,9 @@ INSERT INTO
 RETURNING id
 `
 
-// WriteSessions writes the passed in session to our database, writes any runs that need to be created
+// InsertSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
+func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
 	if len(ss) == 0 {
 		return nil, nil
 	}
@@ -669,7 +669,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *Or
 	}
 
 	// insert all runs
-	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, runs)
+	err = BulkQuery(ctx, "insert runs", tx, sqlInsertRun, runs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error writing runs")
 	}

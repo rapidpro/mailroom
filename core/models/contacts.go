@@ -249,7 +249,7 @@ func LoadContact(ctx context.Context, db Queryer, oa *OrgAssets, id ContactID) (
 func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactID) ([]*Contact, error) {
 	start := time.Now()
 
-	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids), oa.OrgID())
+	rows, err := db.QueryxContext(ctx, sqlSelectContact, pq.Array(ids), oa.OrgID())
 	if err != nil {
 		return nil, errors.Wrap(err, "error selecting contacts")
 	}
@@ -474,7 +474,7 @@ type contactEnvelope struct {
 	LastSeenOn *time.Time `json:"last_seen_on"`
 }
 
-const selectContactSQL = `
+const sqlSelectContact = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	id,
 	org_id,
@@ -878,7 +878,7 @@ func GetOrCreateURN(ctx context.Context, db Queryer, oa *OrgAssets, contactID Co
 		OrgID:     oa.OrgID(),
 	}
 
-	_, err := db.NamedExecContext(ctx, insertContactURNsSQL, insert)
+	_, err := db.NamedExecContext(ctx, sqlInsertContactURN, insert)
 	if err != nil {
 		return urns.NilURN, errors.Wrapf(err, "error inserting new urn: %s", u)
 	}
@@ -1005,26 +1005,26 @@ func CalculateDynamicGroups(ctx context.Context, db Queryer, oa *OrgAssets, cont
 // their state to stopped.
 func StopContact(ctx context.Context, db Queryer, orgID OrgID, contactID ContactID) error {
 	// delete the contact from all groups
-	_, err := db.ExecContext(ctx, deleteAllContactGroupsSQL, orgID, contactID)
+	_, err := db.ExecContext(ctx, sqlDeleteAllContactGroups, orgID, contactID)
 	if err != nil {
 		return errors.Wrapf(err, "error removing stopped contact from groups")
 	}
 
 	// remove all unfired campaign event fires
-	_, err = db.ExecContext(ctx, deleteUnfiredEventsSQL, contactID)
+	_, err = db.ExecContext(ctx, sqlDeleteUnfiredEvents, contactID)
 	if err != nil {
 		return errors.Wrapf(err, "error deleting unfired event fires")
 	}
 
 	// remove the contact from any triggers
 	// TODO: this could leave a trigger with no contacts or groups
-	_, err = db.ExecContext(ctx, deleteAllContactTriggersSQL, contactID)
+	_, err = db.ExecContext(ctx, sqlDeleteAllContactTriggers, contactID)
 	if err != nil {
 		return errors.Wrapf(err, "error removing contact from triggers")
 	}
 
 	// mark as stopped
-	_, err = db.ExecContext(ctx, markContactStoppedSQL, contactID)
+	_, err = db.ExecContext(ctx, sqlMarkContactStopped, contactID)
 	if err != nil {
 		return errors.Wrapf(err, "error marking contact as stopped")
 	}
@@ -1032,38 +1032,22 @@ func StopContact(ctx context.Context, db Queryer, orgID OrgID, contactID Contact
 	return nil
 }
 
-const deleteAllContactGroupsSQL = `
-DELETE FROM
-	contacts_contactgroup_contacts
-WHERE
-	contact_id = $2 AND
-	contactgroup_id = ANY(SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type = 'U')
-`
+const sqlDeleteAllContactGroups = `
+DELETE FROM contacts_contactgroup_contacts
+      WHERE contact_id = $2 AND contactgroup_id = ANY(SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type = 'U')`
 
-const deleteAllContactTriggersSQL = `
-DELETE FROM
-	triggers_trigger_contacts
-WHERE
-	contact_id = $1
-`
+const sqlDeleteAllContactTriggers = `
+DELETE FROM triggers_trigger_contacts
+      WHERE contact_id = $1`
 
-const deleteUnfiredEventsSQL = `
-DELETE FROM
-	campaigns_eventfire
-WHERE
-	contact_id = $1 AND
-	fired IS NULL
-`
+const sqlDeleteUnfiredEvents = `
+DELETE FROM campaigns_eventfire
+      WHERE contact_id = $1 AND fired IS NULL`
 
-const markContactStoppedSQL = `
-UPDATE
-	contacts_contact
-SET
-	status = 'S',
-	modified_on = NOW()
-WHERE 
-	id = $1
-`
+const sqlMarkContactStopped = `
+UPDATE contacts_contact
+   SET status = 'S', modified_on = NOW()
+ WHERE id = $1`
 
 func GetURNInt(urn urns.URN, key string) int {
 	values, err := urn.Query()
@@ -1216,7 +1200,7 @@ func UpdateContactURNs(ctx context.Context, db Queryer, oa *OrgAssets, changes [
 	}
 
 	// first update existing URNs
-	err := BulkQuery(ctx, "updating contact urns", db, updateContactURNsSQL, updates)
+	err := BulkQuery(ctx, "updating contact urns", db, sqlUpdateContactURNs, updates)
 	if err != nil {
 		return errors.Wrapf(err, "error updating urns")
 	}
@@ -1241,7 +1225,7 @@ func UpdateContactURNs(ctx context.Context, db Queryer, oa *OrgAssets, changes [
 
 		// then insert new urns, we do these one by one since we have to deal with conflicts
 		for _, insert := range inserts {
-			_, err := db.NamedExecContext(ctx, insertContactURNsSQL, insert)
+			_, err := db.NamedExecContext(ctx, sqlInsertContactURN, insert)
 			if err != nil {
 				return errors.Wrapf(err, "error inserting new urns")
 			}
@@ -1267,7 +1251,7 @@ type urnUpdate struct {
 	Priority  int       `db:"priority"`
 }
 
-const updateContactURNsSQL = `
+const sqlUpdateContactURNs = `
 UPDATE 
 	contacts_contacturn u
 SET
@@ -1293,7 +1277,7 @@ type urnInsert struct {
 	OrgID     OrgID       `db:"org_id"`
 }
 
-const insertContactURNsSQL = `
+const sqlInsertContactURN = `
 INSERT INTO
 	contacts_contacturn(contact_id, identity, path, display, auth, scheme, priority, org_id)
 				 VALUES(:contact_id, :identity, :path, :display, :auth, :scheme, :priority, :org_id)
@@ -1408,7 +1392,7 @@ func UpdateContactStatus(ctx context.Context, db Queryer, changes []*ContactStat
 	}
 
 	// do our status update
-	err = BulkQuery(ctx, "updating contact statuses", db, updateContactStatusSQL, statusUpdates)
+	err = BulkQuery(ctx, "updating contact statuses", db, sqlUpdateContactStatus, statusUpdates)
 	if err != nil {
 		return errors.Wrapf(err, "error updating contact statuses")
 	}
@@ -1416,16 +1400,16 @@ func UpdateContactStatus(ctx context.Context, db Queryer, changes []*ContactStat
 	return err
 }
 
-const updateContactStatusSQL = `
-	UPDATE
-		contacts_contact c
-	SET
-		status = r.status,
-		modified_on = NOW()
-	FROM (
-		VALUES(:id, :status)
-	) AS
-		r(id, status)
-	WHERE
-		c.id = r.id::int
+const sqlUpdateContactStatus = `
+UPDATE
+	contacts_contact c
+SET
+	status = r.status,
+	modified_on = NOW()
+FROM (
+	VALUES(:id, :status)
+) AS
+	r(id, status)
+WHERE
+	c.id = r.id::int
 `

@@ -132,7 +132,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for session write")
 	}
-	sessions, err := models.WriteSessions(ctx, rt, tx, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
+	sessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
 	if err == nil && len(sessions) == 0 {
 		err = errors.Errorf("no sessions written")
 	}

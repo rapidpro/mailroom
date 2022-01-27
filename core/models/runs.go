@@ -105,7 +105,7 @@ type Step struct {
 	ExitUUID  flows.ExitUUID `json:"exit_uuid,omitempty"`
 }
 
-const insertRunSQL = `
+const sqlInsertRun = `
 INSERT INTO
 flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, status, responded, results, path, 
 	          current_node_uuid, contact_id, flow_id, org_id, session_id, start_id)

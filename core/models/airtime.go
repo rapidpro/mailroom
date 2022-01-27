@@ -7,7 +7,6 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/null"
-
 	"github.com/shopspring/decimal"
 )
 
@@ -69,7 +68,7 @@ func (t *AirtimeTransfer) AddLog(l *HTTPLog) {
 	t.Logs = append(t.Logs, l)
 }
 
-const insertAirtimeTransfersSQL = `
+const sqlInsertAirtimeTransfers = `
 INSERT INTO airtime_airtimetransfer(org_id,  status,  contact_id,  sender,  recipient,  currency,  desired_amount,  actual_amount,  created_on)
 					        VALUES(:org_id, :status, :contact_id, :sender, :recipient, :currency, :desired_amount, :actual_amount, :created_on)
 RETURNING id
@@ -86,7 +85,7 @@ func InsertAirtimeTransfers(ctx context.Context, db Queryer, transfers []*Airtim
 		ts[i] = &transfers[i].t
 	}
 
-	return BulkQuery(ctx, "inserted airtime transfers", db, insertAirtimeTransfersSQL, ts)
+	return BulkQuery(ctx, "inserted airtime transfers", db, sqlInsertAirtimeTransfers, ts)
 }
 
 // MarshalJSON marshals into JSON. 0 values will become null

@@ -596,7 +596,7 @@ func StartFlowForContacts(
 	}
 
 	// write our session to the db
-	dbSessions, err := models.WriteSessions(txCTX, rt, tx, oa, sessions, sprints, hook)
+	dbSessions, err := models.InsertSessions(txCTX, rt, tx, oa, sessions, sprints, hook)
 	if err == nil {
 		// commit it at once
 		commitStart := time.Now()
@@ -636,7 +636,7 @@ func StartFlowForContacts(
 				}
 			}
 
-			dbSession, err := models.WriteSessions(txCTX, rt, tx, oa, []flows.Session{session}, []flows.Sprint{sprint}, hook)
+			dbSession, err := models.InsertSessions(txCTX, rt, tx, oa, []flows.Session{session}, []flows.Sprint{sprint}, hook)
 			if err != nil {
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")

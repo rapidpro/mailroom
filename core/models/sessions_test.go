@@ -45,7 +45,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 		return nil
 	}
 
-	modelSessions, err := models.WriteSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
+	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 1, hookCalls)
 
@@ -148,7 +148,7 @@ func TestSingleSprintSession(t *testing.T) {
 		return nil
 	}
 
-	modelSessions, err := models.WriteSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
+	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 1, hookCalls)
 
@@ -202,7 +202,7 @@ func TestSessionWithSubflows(t *testing.T) {
 		return nil
 	}
 
-	modelSessions, err := models.WriteSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
+	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 1, hookCalls)
 

@@ -48,7 +48,7 @@ func (f *Field) System() bool { return f.f.System }
 func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Field, []assets.Field, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectFieldsSQL, orgID)
+	rows, err := db.Queryx(sqlSelectFields, orgID)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error querying fields for org: %d", orgID)
 	}
@@ -76,7 +76,7 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 	return userFields, systemFields, nil
 }
 
-const selectFieldsSQL = `
+const sqlSelectFields = `
 SELECT ROW_TO_JSON(f) FROM (SELECT
 	id,
 	uuid,

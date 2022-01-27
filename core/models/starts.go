@@ -10,7 +10,6 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/null"
-
 	"github.com/pkg/errors"
 )
 
@@ -282,7 +281,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our starts
-	err := BulkQuery(ctx, "inserting flow start", db, insertStartSQL, is)
+	err := BulkQuery(ctx, "inserting flow start", db, sqlInsertStart, is)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow starts")
 	}
@@ -299,7 +298,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our contacts
-	err = BulkQuery(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
+	err = BulkQuery(ctx, "inserting flow start contacts", db, sqlInsertStartContact, contacts)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow start contacts for flow")
 	}
@@ -316,7 +315,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our groups
-	err = BulkQuery(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
+	err = BulkQuery(ctx, "inserting flow start groups", db, sqlInsertStartGroup, groups)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow start groups for flow")
 	}
@@ -324,7 +323,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	return nil
 }
 
-const insertStartSQL = `
+const sqlInsertStart = `
 INSERT INTO
 	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary,  session_history)
 			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary, :session_history)
@@ -332,17 +331,11 @@ RETURNING
 	id
 `
 
-const insertStartContactsSQL = `
-INSERT INTO
-	flows_flowstart_contacts( flowstart_id,  contact_id)
-	                  VALUES(:start_id,     :contact_id)
-`
+const sqlInsertStartContact = `
+INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES(:start_id, :contact_id)`
 
-const insertStartGroupsSQL = `
-INSERT INTO
-	flows_flowstart_groups( flowstart_id,  contactgroup_id)
-	                VALUES(:start_id,     :contactgroup_id)
-`
+const sqlInsertStartGroup = `
+INSERT INTO flows_flowstart_groups(flowstart_id, contactgroup_id) VALUES(:start_id, :contactgroup_id)`
 
 // CreateBatch creates a batch for this start using the passed in contact ids
 func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {
