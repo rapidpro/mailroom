@@ -526,10 +526,11 @@
         ]
     },
     {
-        "description": "Skip rows without UUID, name or URNs",
+        "description": "Skip rows without UUID or URNs",
         "specs": [
             {
                 "uuid": "",
+                "name": "Foo",
                 "urns": []
 
             }
@@ -540,7 +541,7 @@
         "errors": [
             {
                 "record": 0,
-                "message": "Unable to import row without UUID, name or URNs"
+                "message": "Unable to import row without UUID or URNs"
             }
         ],
         "contacts": [
