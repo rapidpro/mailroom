@@ -1,3 +1,8 @@
+v7.1.35
+----------
+ * Use sessions only for voice session expiration
+ * FlowSession.wait_resume_on_expire now non-null and don't set to true for IVR flows
+
 v7.1.34
 ----------
  * Update modified_on for contacts in batches of 100
