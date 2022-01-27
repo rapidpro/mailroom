@@ -237,12 +237,6 @@ func TestResume(t *testing.T) {
 		 AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
 		 AND json_array_length(path::json) = $5 AND session_id IS NOT NULL`
 
-		if runIsActive {
-			runQuery += ` AND expires_on IS NOT NULL`
-		} else {
-			runQuery += ` AND expires_on IS NULL`
-		}
-
 		assertdb.Query(t, db, runQuery, contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength).
 			Returns(1, "%d: didn't find expected run", i)
 
@@ -270,7 +264,7 @@ func TestStartFlowConcurrency(t *testing.T) {
 	flowRef := testdata.Favorites.Reference()
 
 	// create a lot of contacts...
-	contacts := make([]*testdata.Contact, 100)
+	contacts := make([]*testdata.Contact, 50)
 	for i := range contacts {
 		contacts[i] = testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", envs.NilLanguage)
 	}

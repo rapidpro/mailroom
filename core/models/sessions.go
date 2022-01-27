@@ -177,11 +177,6 @@ func (s *Session) SetChannelConnection(cc *ChannelConnection) {
 	connID := cc.ID()
 	s.s.ConnectionID = &connID
 	s.channelConnection = cc
-
-	// also set it on all our runs
-	for _, r := range s.runs {
-		r.SetConnectionID(&connID)
-	}
 }
 
 func (s *Session) ChannelConnection() *ChannelConnection {
@@ -288,16 +283,15 @@ SET
 	exit_type = r.exit_type,
 	status = r.status,
 	exited_on = r.exited_on::timestamp with time zone,
-	expires_on = r.expires_on::timestamp with time zone,
 	responded = r.responded::bool,
 	results = r.results,
 	path = r.path::jsonb,
 	current_node_uuid = r.current_node_uuid::uuid,
 	modified_on = NOW()
 FROM (
-	VALUES(:uuid, :is_active, :exit_type, :status, :exited_on, :expires_on, :responded, :results, :path, :current_node_uuid)
+	VALUES(:uuid, :is_active, :exit_type, :status, :exited_on, :responded, :results, :path, :current_node_uuid)
 ) AS
-	r(uuid, is_active, exit_type, status, exited_on, expires_on, responded, results, path, current_node_uuid)
+	r(uuid, is_active, exit_type, status, exited_on, responded, results, path, current_node_uuid)
 WHERE
 	fr.uuid = r.uuid::uuid
 `

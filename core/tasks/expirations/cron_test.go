@@ -25,21 +25,21 @@ func TestExpirations(t *testing.T) {
 
 	// create single run session for Cathy, no parent to resume
 	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, nil)
-	r1ID := testdata.InsertFlowRun(db, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting, "", nil)
+	r1ID := testdata.InsertFlowRun(db, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting)
 
 	// create parent/child session for George, can resume
 	s2ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), true, nil)
-	r2ID := testdata.InsertFlowRun(db, testdata.Org1, s2ID, testdata.George, testdata.Favorites, models.RunStatusActive, "", nil)
-	r3ID := testdata.InsertFlowRun(db, testdata.Org1, s2ID, testdata.George, testdata.Favorites, models.RunStatusWaiting, "", nil)
+	r2ID := testdata.InsertFlowRun(db, testdata.Org1, s2ID, testdata.George, testdata.Favorites, models.RunStatusActive)
+	r3ID := testdata.InsertFlowRun(db, testdata.Org1, s2ID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
 
 	// create session for Bob with expiration in future
 	s3ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now().Add(time.Hour), true, nil)
-	r4ID := testdata.InsertFlowRun(db, testdata.Org1, s3ID, testdata.Bob, testdata.Favorites, models.RunStatusWaiting, "", nil)
+	r4ID := testdata.InsertFlowRun(db, testdata.Org1, s3ID, testdata.Bob, testdata.Favorites, models.RunStatusWaiting)
 
 	// create an IVR session for Alexandria
 	conn := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
 	s4ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeVoice, testdata.IVRFlow, conn, time.Now(), time.Now(), false, nil)
-	r5ID := testdata.InsertFlowRun(db, testdata.Org1, s4ID, testdata.Alexandria, testdata.IVRFlow, models.RunStatusWaiting, "", nil)
+	r5ID := testdata.InsertFlowRun(db, testdata.Org1, s4ID, testdata.Alexandria, testdata.IVRFlow, models.RunStatusWaiting)
 
 	time.Sleep(5 * time.Millisecond)
 
@@ -93,16 +93,16 @@ func TestExpireVoiceSessions(t *testing.T) {
 	// create voice session for Cathy
 	conn1ID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
 	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, conn1ID, time.Now(), time.Now(), false, nil)
-	r1ID := testdata.InsertFlowRun(db, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting, "", nil)
+	r1ID := testdata.InsertFlowRun(db, testdata.Org1, s1ID, testdata.Cathy, testdata.Favorites, models.RunStatusWaiting)
 
 	// create voice session for Bob with expiration in future
 	conn2ID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
 	s2ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.IVRFlow, conn2ID, time.Now(), time.Now().Add(time.Hour), false, nil)
-	r2ID := testdata.InsertFlowRun(db, testdata.Org1, s2ID, testdata.Bob, testdata.IVRFlow, models.RunStatusWaiting, "", nil)
+	r2ID := testdata.InsertFlowRun(db, testdata.Org1, s2ID, testdata.Bob, testdata.IVRFlow, models.RunStatusWaiting)
 
 	// create a messaging session for Alexandria
 	s3ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, nil)
-	r3ID := testdata.InsertFlowRun(db, testdata.Org1, s3ID, testdata.Alexandria, testdata.Favorites, models.RunStatusWaiting, "", nil)
+	r3ID := testdata.InsertFlowRun(db, testdata.Org1, s3ID, testdata.Alexandria, testdata.Favorites, models.RunStatusWaiting)
 
 	time.Sleep(5 * time.Millisecond)
 
