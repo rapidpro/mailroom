@@ -6,13 +6,15 @@
                 "name": "Ann",
                 "urns": [
                     "tel:+1 605 570 0001"
-                ]
+                ],
+                "_import_row": 1
             },
             {
                 "name": "Bob",
                 "urns": [
                     "tel:+16055700002"
-                ]
+                ],
+                "_import_row": 2
             }
         ],
         "num_created": 2,
@@ -58,7 +60,8 @@
                 "groups": [
                     "c153e265-f7c9-4539-9dbc-9b358714b638",
                     "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
-                ]
+                ],
+                "_import_row": 1
             }
         ],
         "num_created": 1,
@@ -116,7 +119,8 @@
                 ],
                 "fields": {
                     "age": "28"
-                }
+                },
+                "_import_row": 1
             },
             {
                 "name": "Cat",
@@ -125,7 +129,8 @@
                 ],
                 "fields": {
                     "age": "39"
-                }
+                },
+                "_import_row": 2
             }
         ],
         "num_created": 0,
@@ -185,7 +190,8 @@
                 ],
                 "fields": {
                     "joined": "2020-01-01T10:45:30Z"
-                }
+                },
+                "_import_row": 1
             },
             {
                 "name": "Bob",
@@ -195,7 +201,8 @@
                 ],
                 "fields": {
                     "joined": "2020-01-01T10:45:30Z"
-                }
+                },
+                "_import_row": 2
             },
             {
                 "name": "Cat",
@@ -205,7 +212,8 @@
                 ],
                 "fields": {
                     "joined": "2020-02-01T17:15:30Z"
-                }
+                },
+                "_import_row": 3
             }
         ],
         "num_created": 0,
@@ -214,6 +222,7 @@
         "errors": [
             {
                 "record": 0,
+                "row": 1,
                 "message": "Unable to find or create contact with URNs tel:+16055700001, tel:+593979000001"
             }
         ],
@@ -266,18 +275,21 @@
         "specs": [
             {
                 "uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
-                "name": "Anne"
+                "name": "Anne",
+                "_import_row": 1
             },
             {
                 "uuid": "e7187099-7d38-4f60-955c-325957214c42",
                 "language": "kin",
                 "urns": [
                     "tel:+16055700002"
-                ]
+                ],
+                "_import_row": 2
             },
             {
                 "uuid": "68dc10e7-19ce-4052-b202-7c1b49e69ba0",
-                "name": "Jim"
+                "name": "Jim",
+                "_import_row": 4
             }
         ],
         "num_created": 0,
@@ -286,6 +298,7 @@
         "errors": [
             {
                 "record": 2,
+                "row": 4,
                 "message": "Unable to find contact with UUID '68dc10e7-19ce-4052-b202-7c1b49e69ba0'"
             }
         ],
@@ -341,7 +354,8 @@
                 "name": "Anne",
                 "urns": [
                     "tel:+16055700002"
-                ]
+                ],
+                "_import_row": 1
             }
         ],
         "num_created": 0,
@@ -398,7 +412,8 @@
             {
                 "uuid": "f7a8016d-69a6-434b-aae7-5142ce4a98ba",
                 "name": "Xavier",
-                "language": "eng"
+                "language": "eng",
+                "_import_row": 1
             }
         ],
         "num_created": 0,
@@ -407,6 +422,7 @@
         "errors": [
             {
                 "record": 0,
+                "row": 1,
                 "message": "Unable to find contact with UUID 'f7a8016d-69a6-434b-aae7-5142ce4a98ba'"
             }
         ],
@@ -462,13 +478,15 @@
                 "urns": [
                     "tel:6055700001",
                     "tel:6055700005"
-                ]
+                ],
+                "_import_row": 1
             },
             {
                 "name": "Xavier",
                 "urns": [
                     "xyz:1234567"
-                ]
+                ],
+                "_import_row": 2
             }
         ],
         "num_created": 0,
@@ -477,6 +495,7 @@
         "errors": [
             {
                 "record": 1,
+                "row": 2,
                 "message": "Unable to find or create contact with URNs xyz:1234567"
             }
         ],
