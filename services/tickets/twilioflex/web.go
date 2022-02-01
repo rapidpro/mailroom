@@ -2,7 +2,7 @@ package twilioflex
 
 import (
 	"context"
-	"log"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
@@ -63,25 +64,33 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		return errors.Errorf("no such ticket %s", ticketUUID)
 	}
 
-	// oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
-	// if err != nil {
-	// 	return err
-	// }
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
+	if err != nil {
+		return err
+	}
 
 	switch request.EventType {
 	case "onMessageSent":
 		// TODO: Attachments
 		_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{})
+		if err != nil {
+			return err
+		}
 	case "onChannelUpdated":
-		log.Println(request)
-
-		// err = tickets.Close(ctx, rt, oa, ticket, false, nil)
-	default:
-		log.Println(request)
-		err = nil
-	}
-	if err != nil {
-		return err
+		jsonMap := make(map[string]interface{})
+		err = json.Unmarshal([]byte(request.Attributes), &jsonMap)
+		if err != nil {
+			return err
+		}
+		if jsonMap["status"] == "INACTIVE" {
+			err = tickets.Close(ctx, rt, oa, ticket, false, nil)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+type EventAttributes struct {
 }
