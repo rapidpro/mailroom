@@ -19,8 +19,6 @@ const (
 	configurationAccountSid     = "account_sid"
 	configurationChatServiceSid = "chat_service_sid"
 	configurationWorkspaceSid   = "workspace_sid"
-	configurationWorkflowSid    = "workflow_sid"
-	configurationTaskChannelSid = "task_channel_sid"
 	configurationFlexFlowSid    = "flex_flow_sid"
 )
 
@@ -30,7 +28,7 @@ func init() {
 
 type service struct {
 	rtConfig   *runtime.Config
-	restClient *RESTClient
+	restClient *Client
 	ticketer   *flows.Ticketer
 	redactor   utils.Redactor
 }
@@ -41,14 +39,12 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	accountSid := config[configurationAccountSid]
 	chatServiceSid := config[configurationChatServiceSid]
 	workspaceSid := config[configurationWorkspaceSid]
-	workflowSid := config[configurationWorkflowSid]
-	taskChannelSid := config[configurationTaskChannelSid]
 	flexFlowSid := config[configurationFlexFlowSid]
-	if authToken != "" && accountSid != "" && chatServiceSid != "" && workspaceSid != "" && workflowSid != "" && taskChannelSid != "" {
+	if authToken != "" && accountSid != "" && chatServiceSid != "" && workspaceSid != "" {
 		return &service{
 			rtConfig:   rtCfg,
 			ticketer:   ticketer,
-			restClient: NewRestClient(httpClient, httpRetries, authToken, accountSid, chatServiceSid, workspaceSid, workflowSid, taskChannelSid, flexFlowSid),
+			restClient: NewClient(httpClient, httpRetries, authToken, accountSid, chatServiceSid, workspaceSid, flexFlowSid),
 			redactor:   utils.NewRedactor(flows.RedactionMask, authToken, accountSid, chatServiceSid, workspaceSid),
 		}, nil
 	}
@@ -62,7 +58,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		Identity:     fmt.Sprint(contact.ID()),
 		FriendlyName: contact.Name(),
 	}
-	contactUser, trace, err := s.restClient.GetUser(chatUser.Identity)
+	contactUser, trace, err := s.restClient.FetchUser(chatUser.Identity)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -94,7 +90,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	callbackURL := fmt.Sprintf(
-		"https://723c-186-235-156-219.ngrok.io/mr/tickets/types/twilioflex/event_callback/%s/%s",
+		"https://%s/mr/tickets/types/twilioflex/event_callback/%s/%s",
+		s.rtConfig.Domain,
 		s.ticketer.UUID(),
 		ticket.UUID(),
 	)
@@ -137,11 +134,26 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 }
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO: Close
+	for _, t := range tickets {
+		flexChannel, trace, err := s.restClient.FetchFlexChannel(string(t.ExternalID()))
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return errors.Wrap(err, "error calling Twilio API")
+		}
+
+		_, trace, err = s.restClient.CompleteTask(flexChannel.TaskSid)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return errors.Wrap(err, "error calling Twilio API")
+		}
+	}
 	return nil
 }
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
-	// TODO: Reopen
-	return nil
+	return errors.New("Twilio Flex ticket type doesn't support reopening")
 }
