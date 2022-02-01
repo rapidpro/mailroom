@@ -580,7 +580,6 @@ func TestTimedEvents(t *testing.T) {
 	last := time.Now()
 	var sessionID models.SessionID
 	var runID models.FlowRunID
-	var runExpiration *time.Time
 
 	for i, tc := range tcs {
 		time.Sleep(50 * time.Millisecond)
@@ -608,15 +607,13 @@ func TestTimedEvents(t *testing.T) {
 			}
 		} else if tc.EventType == handler.ExpirationEventType {
 			var expiration time.Time
+
 			if tc.Message == "bad" {
 				expiration = time.Now()
 			} else if tc.Message == "child" {
 				db.Get(&expiration, `SELECT wait_expires_on FROM flows_flowsession WHERE id = $1 AND status != 'W'`, sessionID)
 				db.Get(&runID, `SELECT id FROM flows_flowrun WHERE session_id = $1 AND status NOT IN ('A', 'W')`, sessionID)
-			} else if runExpiration != nil {
-				expiration = *runExpiration
 			} else {
-				// exited runs no longer have expiration set so just fake a value - the task will ignore inactive runs anyway
 				expiration = time.Now().Add(time.Hour * 24)
 			}
 
@@ -643,9 +640,6 @@ func TestTimedEvents(t *testing.T) {
 		err = db.Get(&runID, `SELECT id FROM flows_flowrun WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
 		assert.NoError(t, err)
 
-		err = db.Get(&runExpiration, `SELECT expires_on FROM flows_flowrun WHERE contact_id = $1 ORDER BY created_on DESC LIMIT 1`, tc.Contact.ID)
-		assert.NoError(t, err)
-
 		last = time.Now()
 	}
 
@@ -660,8 +654,8 @@ func TestTimedEvents(t *testing.T) {
 
 	// set both to be active (this requires us to disable the path change trigger for a bit which asserts flows can't cross back into active status)
 	db.MustExec(`ALTER TABLE flows_flowrun DISABLE TRIGGER temba_flowrun_path_change`)
-	db.MustExec(`UPDATE flows_flowrun SET is_active = TRUE, status = 'W', expires_on = $2 WHERE id = $1`, runID, expiration)
-	db.MustExec(`UPDATE flows_flowsession SET status = 'W', wait_started_on = NOW(), wait_expires_on = NOW() WHERE id = $1`, sessionID)
+	db.MustExec(`UPDATE flows_flowrun SET status = 'W' WHERE id = $1`, runID)
+	db.MustExec(`UPDATE flows_flowsession SET status = 'W', wait_started_on = NOW(), wait_expires_on = $2 WHERE id = $1`, sessionID, expiration)
 	db.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_path_change`)
 
 	// try to expire the run
