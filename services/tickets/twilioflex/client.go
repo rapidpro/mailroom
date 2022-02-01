@@ -15,28 +15,24 @@ import (
 )
 
 type baseClient struct {
-	httpClient     *http.Client
-	httpRetries    *httpx.RetryConfig
-	authToken      string
-	accountSid     string
-	serviceSid     string
-	workspaceSid   string
-	workflowSid    string
-	taskChannelSid string
-	flexFlowSid    string
+	httpClient   *http.Client
+	httpRetries  *httpx.RetryConfig
+	authToken    string
+	accountSid   string
+	serviceSid   string
+	workspaceSid string
+	flexFlowSid  string
 }
 
-func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, authToken, accountSid, serviceSid, workspaceSid, workflowSid, taskChannelSid, flexFlowSid string) baseClient {
+func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid string) baseClient {
 	return baseClient{
-		httpClient:     httpClient,
-		httpRetries:    httpRetries,
-		authToken:      authToken,
-		accountSid:     accountSid,
-		serviceSid:     serviceSid,
-		workspaceSid:   workspaceSid,
-		workflowSid:    workflowSid,
-		taskChannelSid: taskChannelSid,
-		flexFlowSid:    flexFlowSid,
+		httpClient:   httpClient,
+		httpRetries:  httpRetries,
+		authToken:    authToken,
+		accountSid:   accountSid,
+		serviceSid:   serviceSid,
+		workspaceSid: workspaceSid,
+		flexFlowSid:  flexFlowSid,
 	}
 }
 
@@ -78,29 +74,23 @@ func (c *baseClient) post(url string, payload url.Values, response interface{}) 
 	return c.request("POST", url, payload, response)
 }
 
-func (c *baseClient) put(url string, payload url.Values, response interface{}) (*httpx.Trace, error) {
-	return c.request("PUT", url, payload, response)
-}
-
-func (c *baseClient) delete(url string, payload url.Values, response interface{}) (*httpx.Trace, error) {
-	return c.request("DELETE", url, payload, response)
-}
-
 func (c *baseClient) get(url string, payload url.Values, response interface{}) (*httpx.Trace, error) {
 	return c.request("GET", url, payload, response)
 }
 
-type RESTClient struct {
+type Client struct {
 	baseClient
 }
 
-func NewRestClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, authToken, accountSid, serviceSid, workspaceSid, workflowSid, taskChannelSid, flexFlowSid string) *RESTClient {
-	return &RESTClient{
-		baseClient: newBaseClient(httpClient, httpRetries, authToken, accountSid, serviceSid, workspaceSid, workflowSid, taskChannelSid, flexFlowSid),
+// NewClient returns a new twilio api client.
+func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid string) *Client {
+	return &Client{
+		baseClient: newBaseClient(httpClient, httpRetries, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid),
 	}
 }
 
-func (c *RESTClient) CreateUser(user *CreateChatUserParams) (*ChatUser, *httpx.Trace, error) {
+// CreateUser creates a new twilio chat User.
+func (c *Client) CreateUser(user *CreateChatUserParams) (*ChatUser, *httpx.Trace, error) {
 	requestUrl := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users", c.serviceSid)
 	response := &ChatUser{}
 	data, err := query.Values(user)
@@ -114,7 +104,8 @@ func (c *RESTClient) CreateUser(user *CreateChatUserParams) (*ChatUser, *httpx.T
 	return response, trace, nil
 }
 
-func (c *RESTClient) GetUser(userSid string) (*ChatUser, *httpx.Trace, error) {
+// FetchUser fetch a twilio chat User by sid.
+func (c *Client) FetchUser(userSid string) (*ChatUser, *httpx.Trace, error) {
 	requestUrl := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users/%s", c.serviceSid, userSid)
 	response := &ChatUser{}
 	trace, err := c.post(requestUrl, url.Values{}, response)
@@ -122,10 +113,10 @@ func (c *RESTClient) GetUser(userSid string) (*ChatUser, *httpx.Trace, error) {
 		return nil, trace, err
 	}
 	return response, trace, nil
-
 }
 
-func (c *RESTClient) CreateFlexChannel(channel *CreateFlexChannelParams) (*FlexChannel, *httpx.Trace, error) {
+// CreateFlexChannel creates a new twilio flex Channel.
+func (c *Client) CreateFlexChannel(channel *CreateFlexChannelParams) (*FlexChannel, *httpx.Trace, error) {
 	url := "https://flex-api.twilio.com/v1/Channels"
 	response := &FlexChannel{}
 	data, err := query.Values(channel)
@@ -140,7 +131,20 @@ func (c *RESTClient) CreateFlexChannel(channel *CreateFlexChannelParams) (*FlexC
 	return response, trace, err
 }
 
-func (c *RESTClient) CreateFlexChannelWebhook(channelWebhook *CreateChatChannelWebhookParams, channelSid string) (*ChatChannelWebhook, *httpx.Trace, error) {
+// FetchFlexChannel fetch a twilio flex Channel by sid.
+func (c *Client) FetchFlexChannel(channelSid string) (*FlexChannel, *httpx.Trace, error) {
+	fetchUrl := fmt.Sprintf("https://flex-api.twilio.com/v1/Channels/%s", channelSid)
+	response := &FlexChannel{}
+	data := url.Values{}
+	trace, err := c.get(fetchUrl, data, response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, err
+}
+
+// CreateFlexChannelWebhook create a webhook target that is specific to a Channel.
+func (c *Client) CreateFlexChannelWebhook(channelWebhook *CreateChatChannelWebhookParams, channelSid string) (*ChatChannelWebhook, *httpx.Trace, error) {
 	requestUrl := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Webhooks", c.serviceSid, channelSid)
 	response := &ChatChannelWebhook{}
 	data := url.Values{
@@ -157,7 +161,8 @@ func (c *RESTClient) CreateFlexChannelWebhook(channelWebhook *CreateChatChannelW
 	return response, trace, err
 }
 
-func (c *RESTClient) CreateMessage(message *ChatMessage) (*ChatMessage, *httpx.Trace, error) {
+// CreateMessage create a message in chat channel.
+func (c *Client) CreateMessage(message *ChatMessage) (*ChatMessage, *httpx.Trace, error) {
 	url := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Messages", c.serviceSid, message.ChannelSid)
 	response := &ChatMessage{}
 	data, err := query.Values(message)
@@ -172,6 +177,27 @@ func (c *RESTClient) CreateMessage(message *ChatMessage) (*ChatMessage, *httpx.T
 	return response, trace, nil
 }
 
+// CompleteTask updates a twilio taskrouter Task as completed.
+func (c *Client) CompleteTask(taskSid string) (*TaskrouterTask, *httpx.Trace, error) {
+	url := fmt.Sprintf("https://taskrouter.twilio.com/v1/Workspaces/%s/Tasks/%s", c.workspaceSid, taskSid)
+	response := &TaskrouterTask{}
+	task := &TaskrouterTask{
+		AssignmentStatus: "completed",
+		Reason:           "resolved",
+	}
+	data, err := query.Values(task)
+	if err != nil {
+		return nil, nil, err
+	}
+	data = removeEmpties(data)
+	trace, err := c.post(url, data, response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, nil
+}
+
+// https://www.twilio.com/docs/chat/rest/user-resource#user-properties
 type ChatUser struct {
 	AccountSid   string                 `json:"account_sid,omitempty"`
 	Attributes   string                 `json:"attributes,omitempty"`
@@ -186,6 +212,7 @@ type ChatUser struct {
 	Url          string                 `json:"url,omitempty"`
 }
 
+// https://www.twilio.com/docs/chat/rest/user-resource#create-a-user-resource
 type CreateChatUserParams struct {
 	XTwilioWebhookEnabled string `json:"X-Twilio-Webhook-Enabled,omitempty"`
 	Attributes            string `json:"Attributes,omitempty"`
@@ -194,6 +221,7 @@ type CreateChatUserParams struct {
 	RoleSid               string `json:"RoleSid,omitempty"`
 }
 
+// https://www.twilio.com/docs/chat/rest/channel-resource#channel-properties
 type ChatChannel struct {
 	AccountSid    string                 `json:"account_sid,omitempty"`
 	Attributes    string                 `json:"attributes,omitempty"`
@@ -210,6 +238,7 @@ type ChatChannel struct {
 	UniqueName    string                 `json:"unique_name,omitempty"`
 }
 
+// https://www.twilio.com/docs/flex/developer/messaging/api/chat-channel#channel-properties
 type FlexChannel struct {
 	AccountSid  string     `json:"account_sid,omitempty"`
 	DateCreated *time.Time `json:"date_created,omitempty"`
@@ -221,6 +250,7 @@ type FlexChannel struct {
 	UserSid     string     `json:"user_sid,omitempty"`
 }
 
+// https://www.twilio.com/docs/flex/developer/messaging/api/chat-channel#create-a-channel-resource
 type CreateFlexChannelParams struct {
 	ChatFriendlyName     string `json:"ChatFriendlyName,omitempty"`
 	ChatUniqueName       string `json:"ChatUniqueName,omitempty"`
@@ -234,21 +264,7 @@ type CreateFlexChannelParams struct {
 	TaskSid              string `json:"TaskSid,omitempty"`
 }
 
-type ChatMember struct {
-	AccountSid               string     `json:"account_sid,omitempty"`
-	Attributes               string     `json:"attributes,omitempty"`
-	ChannelSid               string     `json:"channel_sid,omitempty"`
-	DateCreated              *time.Time `json:"date_created,omitempty"`
-	DateUpdated              *time.Time `json:"date_updated,omitempty"`
-	Identity                 string     `json:"identity,omitempty"`
-	LastConsumedMessageIndex int        `json:"last_consumed_message_index,omitempty"`
-	LastConsumptionTimestamp *time.Time `json:"last_consumption_timestamp,omitempty"`
-	RoleSid                  string     `json:"role_sid,omitempty"`
-	ServiceSid               string     `json:"service_sid,omitempty"`
-	Sid                      string     `json:"sid,omitempty"`
-	Url                      string     `json:"url,omitempty"`
-}
-
+// https://www.twilio.com/docs/chat/rest/message-resource#message-properties
 type ChatMessage struct {
 	AccountSid    string                 `json:"account_sid,omitempty"`
 	Attributes    string                 `json:"attributes,omitempty"`
@@ -268,6 +284,7 @@ type ChatMessage struct {
 	WasEdited     bool                   `json:"was_edited,omitempty"`
 }
 
+// https://www.twilio.com/docs/chat/rest/channel-webhook-resource#channelwebhook-properties
 type ChatChannelWebhook struct {
 	AccountSid    string                 `json:"account_sid,omitempty"`
 	ChannelSid    string                 `json:"channel_sid,omitempty"`
@@ -280,6 +297,7 @@ type ChatChannelWebhook struct {
 	Url           string                 `json:"url,omitempty"`
 }
 
+// https://www.twilio.com/docs/chat/rest/channel-webhook-resource#create-a-channelwebhook-resource
 type CreateChatChannelWebhookParams struct {
 	ConfigurationFilters    []string `json:"Configuration.Filters,omitempty"`
 	ConfigurationFlowSid    string   `json:"Configuration.FlowSid,omitempty"`
@@ -290,6 +308,7 @@ type CreateChatChannelWebhookParams struct {
 	Type                    string   `json:"Type,omitempty"`
 }
 
+// https://www.twilio.com/docs/taskrouter/api/task#task-properties
 type TaskrouterTask struct {
 	AccountSid            string                 `json:"account_sid,omitempty"`
 	Addons                string                 `json:"addons,omitempty"`
@@ -314,6 +333,7 @@ type TaskrouterTask struct {
 	WorkspaceSid          string                 `json:"workspace_sid,omitempty"`
 }
 
+// removeEmpties remove empty values from url.Values
 func removeEmpties(uv url.Values) url.Values {
 	for k, v := range uv {
 		if len(v) == 0 || len(v[0]) == 0 {
