@@ -1,3 +1,8 @@
+v7.1.37
+----------
+ * Update to goflow 0.149.1
+ * Add _import_row to contact spec so that we can reliably generate import errors with row numbers
+
 v7.1.36
 ----------
  * Remove expires_on, parent_uuid and connection_id fields from FlowRun
