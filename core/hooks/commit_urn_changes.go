@@ -23,7 +23,7 @@ func (h *commitURNChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, t
 		changes = append(changes, sessionChanges[len(sessionChanges)-1].(*models.ContactURNsChanged))
 	}
 
-	err := models.UpdateContactURNs(ctx, tx, oa, changes)
+	err := models.UpdateContactURNs(ctx, rt, tx, oa, changes)
 	if err != nil {
 		return errors.Wrapf(err, "error updating contact urns")
 	}

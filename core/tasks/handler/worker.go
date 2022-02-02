@@ -325,7 +325,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	}
 
 	// make sure this URN is our highest priority (this is usually a noop)
-	err = modelContact.UpdatePreferredURN(ctx, rt.DB, oa, event.URNID(), channel)
+	err = modelContact.UpdatePreferredURN(ctx, rt, oa, event.URNID(), channel)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error changing primary URN")
 	}
@@ -509,7 +509,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if we have URNs make sure the message URN is our highest priority (this is usually a noop)
 	if len(modelContact.URNs()) > 0 {
-		err = modelContact.UpdatePreferredURN(ctx, rt.DB, oa, event.URNID, channel)
+		err = modelContact.UpdatePreferredURN(ctx, rt, oa, event.URNID, channel)
 		if err != nil {
 			return errors.Wrapf(err, "error changing primary URN")
 		}

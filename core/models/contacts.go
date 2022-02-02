@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -126,7 +127,7 @@ func (c *Contact) UpdateLastSeenOn(ctx context.Context, db Queryer, lastSeenOn t
 
 // UpdatePreferredURN updates the URNs for the contact (if needbe) to have the passed in URN as top priority
 // with the passed in channel as the preferred channel
-func (c *Contact) UpdatePreferredURN(ctx context.Context, db Queryer, oa *OrgAssets, urnID URNID, channel *Channel) error {
+func (c *Contact) UpdatePreferredURN(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, urnID URNID, channel *Channel) error {
 	// no urns? that's an error
 	if len(c.urns) == 0 {
 		return errors.Errorf("can't set preferred URN on contact with no URNs")
@@ -177,12 +178,12 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, db Queryer, oa *OrgAss
 	}
 
 	// write our new state to the db
-	err := UpdateContactURNs(ctx, db, oa, []*ContactURNsChanged{change})
+	err := UpdateContactURNs(ctx, rt, rt.DB, oa, []*ContactURNsChanged{change})
 	if err != nil {
 		return errors.Wrapf(err, "error updating urns for contact")
 	}
 
-	err = UpdateContactModifiedOn(ctx, db, []ContactID{c.ID()})
+	err = UpdateContactModifiedOn(ctx, rt.DB, []ContactID{c.ID()})
 	if err != nil {
 		return errors.Wrapf(err, "error updating modified on on contact")
 	}
@@ -1141,7 +1142,7 @@ func UpdateContactLastSeenOn(ctx context.Context, db Queryer, contactID ContactI
 }
 
 // UpdateContactURNs updates the contact urns in our database to match the passed in changes
-func UpdateContactURNs(ctx context.Context, db Queryer, oa *OrgAssets, changes []*ContactURNsChanged) error {
+func UpdateContactURNs(ctx context.Context, rt *runtime.Runtime, db Queryer, oa *OrgAssets, changes []*ContactURNsChanged) error {
 	// keep track of all our inserts
 	inserts := make([]interface{}, 0, len(changes))
 
@@ -1218,7 +1219,7 @@ func UpdateContactURNs(ctx context.Context, db Queryer, oa *OrgAssets, changes [
 
 	if len(inserts) > 0 {
 		// find the unique ids of the contacts that may be affected by our URN inserts
-		orphanedIDs, err := queryContactIDs(ctx, db, `SELECT contact_id FROM contacts_contacturn WHERE identity = ANY($1) AND org_id = $2 AND contact_id IS NOT NULL`, pq.Array(identities), oa.OrgID())
+		orphanedIDs, err := queryContactIDs(ctx, rt.ReadonlyDB, `SELECT contact_id FROM contacts_contacturn WHERE identity = ANY($1) AND org_id = $2 AND contact_id IS NOT NULL`, pq.Array(identities), oa.OrgID())
 		if err != nil {
 			return errors.Wrapf(err, "error finding contacts for URNs")
 		}
@@ -1240,7 +1241,6 @@ func UpdateContactURNs(ctx context.Context, db Queryer, oa *OrgAssets, changes [
 		}
 	}
 
-	// NOTE: caller needs to update modified on for this contact
 	return nil
 }
 

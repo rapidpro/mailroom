@@ -89,7 +89,7 @@ func TestContacts(t *testing.T) {
 
 	// change bob to have a preferred URN and channel of our telephone
 	channel := org.ChannelByID(testdata.TwilioChannel.ID)
-	err = modelContacts[1].UpdatePreferredURN(ctx, db, org, testdata.Bob.URNID, channel)
+	err = modelContacts[1].UpdatePreferredURN(ctx, rt, org, testdata.Bob.URNID, channel)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[1].FlowContact(org)
@@ -105,7 +105,7 @@ func TestContacts(t *testing.T) {
 	assert.NoError(t, err)
 
 	// set our preferred channel again
-	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(30001), channel)
+	err = modelContacts[0].UpdatePreferredURN(ctx, rt, org, models.URNID(30001), channel)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[0].FlowContact(org)
@@ -115,7 +115,7 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=998", bob.URNs()[2].String())
 
 	// no op this time
-	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(30001), channel)
+	err = modelContacts[0].UpdatePreferredURN(ctx, rt, org, models.URNID(30001), channel)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[0].FlowContact(org)
@@ -125,7 +125,7 @@ func TestContacts(t *testing.T) {
 	assert.Equal(t, "whatsapp:250788373373?id=30000&priority=998", bob.URNs()[2].String())
 
 	// calling with no channel is a noop on the channel
-	err = modelContacts[0].UpdatePreferredURN(ctx, db, org, models.URNID(30001), nil)
+	err = modelContacts[0].UpdatePreferredURN(ctx, rt, org, models.URNID(30001), nil)
 	assert.NoError(t, err)
 
 	bob, err = modelContacts[0].FlowContact(org)
@@ -587,13 +587,13 @@ func TestUpdateContactURNs(t *testing.T) {
 	bobURN := urns.URN(fmt.Sprintf("tel:+16055742222?id=%d", testdata.Bob.URNID))
 
 	// give Cathy a new higher priority URN
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", cathyURN}}})
+	err = models.UpdateContactURNs(ctx, rt, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", cathyURN}}})
 	assert.NoError(t, err)
 
 	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055700001", "tel:+16055741111"})
 
 	// give Bob a new lower priority URN
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Bob.ID, testdata.Org1.ID, []urns.URN{bobURN, "tel:+16055700002"}}})
+	err = models.UpdateContactURNs(ctx, rt, db, oa, []*models.ContactURNsChanged{{testdata.Bob.ID, testdata.Org1.ID, []urns.URN{bobURN, "tel:+16055700002"}}})
 	assert.NoError(t, err)
 
 	assertContactURNs(testdata.Bob.ID, []string{"tel:+16055742222", "tel:+16055700002"})
@@ -601,21 +601,21 @@ func TestUpdateContactURNs(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 2)         // but 2 new URNs
 
 	// remove a URN from Cathy
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001"}}})
+	err = models.UpdateContactURNs(ctx, rt, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001"}}})
 	assert.NoError(t, err)
 
 	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055700001"})
 	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contacturn WHERE contact_id IS NULL`).Returns(1) // now orphaned
 
 	// steal a URN from Bob
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", "tel:+16055700002"}}})
+	err = models.UpdateContactURNs(ctx, rt, db, oa, []*models.ContactURNsChanged{{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", "tel:+16055700002"}}})
 	assert.NoError(t, err)
 
 	assertContactURNs(testdata.Cathy.ID, []string{"tel:+16055700001", "tel:+16055700002"})
 	assertContactURNs(testdata.Bob.ID, []string{"tel:+16055742222"})
 
 	// steal the URN back from Cathy whilst simulataneously adding new URN to Cathy and not-changing anything for George
-	err = models.UpdateContactURNs(ctx, db, oa, []*models.ContactURNsChanged{
+	err = models.UpdateContactURNs(ctx, rt, db, oa, []*models.ContactURNsChanged{
 		{testdata.Bob.ID, testdata.Org1.ID, []urns.URN{"tel:+16055742222", "tel:+16055700002"}},
 		{testdata.Cathy.ID, testdata.Org1.ID, []urns.URN{"tel:+16055700001", "tel:+16055700003"}},
 		{testdata.George.ID, testdata.Org1.ID, []urns.URN{"tel:+16055743333"}},
