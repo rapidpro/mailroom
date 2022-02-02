@@ -450,6 +450,8 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		}
 	}
 
+	// TODO if contact's current flow has changed, add hooks to update that and modified_on
+
 	// gather all our pre commit events, group them by hook and apply them
 	err = ApplyEventPreCommitHooks(ctx, rt, tx, oa, []*Scene{s.scene})
 	if err != nil {
@@ -689,6 +691,8 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 		if err != nil {
 			return nil, errors.Wrapf(err, "error applying events for session: %d", sessions[i].ID())
 		}
+
+		// TODO if contact's current flow has changed, add hooks to update that and modified_on
 
 		scene := sessions[i].Scene()
 		scenes = append(scenes, scene)

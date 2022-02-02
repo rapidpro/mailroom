@@ -71,18 +71,19 @@ var contactToFlowStatus = map[ContactStatus]flows.ContactStatus{
 
 // Contact is our mailroom struct that represents a contact
 type Contact struct {
-	id         ContactID
-	uuid       flows.ContactUUID
-	name       string
-	language   envs.Language
-	status     ContactStatus
-	fields     map[string]*flows.Value
-	groups     []*Group
-	urns       []urns.URN
-	tickets    []*Ticket
-	createdOn  time.Time
-	modifiedOn time.Time
-	lastSeenOn *time.Time
+	id          ContactID
+	uuid        flows.ContactUUID
+	name        string
+	language    envs.Language
+	status      ContactStatus
+	fields      map[string]*flows.Value
+	groups      []*Group
+	urns        []urns.URN
+	tickets     []*Ticket
+	createdOn   time.Time
+	modifiedOn  time.Time
+	lastSeenOn  *time.Time
+	currentFlow *Flow
 }
 
 func (c *Contact) ID() ContactID                   { return c.id }
@@ -96,6 +97,7 @@ func (c *Contact) URNs() []urns.URN                { return c.urns }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) LastSeenOn() *time.Time          { return c.lastSeenOn }
+func (c *Contact) CurrentFlow() *Flow              { return c.currentFlow }
 
 // URNForID returns the flow URN for the passed in URN, return NilURN if not found
 func (c *Contact) URNForID(urnID URNID) urns.URN {
@@ -326,6 +328,9 @@ func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactI
 		}
 		contact.tickets = tickets
 
+		currentFlow, _ := oa.FlowByID(e.CurrentFlowID)
+		contact.currentFlow = currentFlow
+
 		contacts = append(contacts, contact)
 	}
 
@@ -469,9 +474,10 @@ type contactEnvelope struct {
 		Body       string           `json:"body"`
 		AssigneeID UserID           `json:"assignee_id"`
 	} `json:"tickets"`
-	CreatedOn  time.Time  `json:"created_on"`
-	ModifiedOn time.Time  `json:"modified_on"`
-	LastSeenOn *time.Time `json:"last_seen_on"`
+	CreatedOn     time.Time  `json:"created_on"`
+	ModifiedOn    time.Time  `json:"modified_on"`
+	LastSeenOn    *time.Time `json:"last_seen_on"`
+	CurrentFlowID FlowID     `json:"current_flow_id"`
 }
 
 const sqlSelectContact = `
@@ -486,6 +492,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	created_on,
 	modified_on,
 	last_seen_on,
+	current_flow_id,
 	fields,
 	g.groups AS group_ids,
 	u.urns AS urns,
