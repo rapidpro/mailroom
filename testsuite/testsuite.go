@@ -28,6 +28,8 @@ import (
 	"tickets_ticketer": "6487a4aed61e16c3aa0d6cf117f58de3",
 }*/
 
+var _db *sqlx.DB
+
 const MediaStorageDir = "_test_media_storage"
 const SessionStorageDir = "_test_session_storage"
 
@@ -88,7 +90,17 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 
 // returns an open test database pool
 func getDB() *sqlx.DB {
-	return sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
+	if _db == nil {
+		_db = sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
+
+		// check if we have tables and if not load test database dump
+		_, err := _db.Exec("SELECT * from orgs_org")
+		if err != nil {
+			loadTestDump()
+			return getDB()
+		}
+	}
+	return _db
 }
 
 // returns a redis pool to our test database
@@ -123,9 +135,12 @@ func getRC() redis.Conn {
 //   % cp mailroom_test.dump ../mailroom
 func resetDB() {
 	db := getDB()
-	defer db.Close()
-
 	db.MustExec("drop owned by mailroom_test cascade")
+
+	loadTestDump()
+}
+
+func loadTestDump() {
 	dir, _ := os.Getwd()
 
 	// our working directory is set to the directory of the module being tested, we want to get just
@@ -135,6 +150,12 @@ func resetDB() {
 	}
 
 	mustExec("pg_restore", "-h", "localhost", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
+
+	// force re-connection
+	if _db != nil {
+		_db.Close()
+		_db = nil
+	}
 }
 
 // resets our redis database
@@ -202,8 +223,6 @@ ALTER SEQUENCE campaigns_campaignevent_id_seq RESTART WITH 30000;`
 // undo changes made to the contact data in the test database dump.
 func resetData() {
 	db := getDB()
-	defer db.Close()
-
 	db.MustExec(resetDataSQL)
 
 	// because groups have changed

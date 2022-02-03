@@ -264,7 +264,7 @@ func TestStartFlowConcurrency(t *testing.T) {
 	flowRef := testdata.Favorites.Reference()
 
 	// create a lot of contacts...
-	contacts := make([]*testdata.Contact, 50)
+	contacts := make([]*testdata.Contact, 100)
 	for i := range contacts {
 		contacts[i] = testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Jim", envs.NilLanguage)
 	}
