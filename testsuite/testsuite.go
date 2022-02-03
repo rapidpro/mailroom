@@ -135,7 +135,7 @@ func getRC() redis.Conn {
 //   % cp mailroom_test.dump ../mailroom
 func resetDB() {
 	db := getDB()
-	db.MustExec("drop owned by mailroom_test cascade")
+	db.MustExec("DROP OWNED BY mailroom_test CASCADE")
 
 	loadTestDump()
 }
