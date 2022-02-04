@@ -229,13 +229,8 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		return errors.Wrapf(err, "error loading waiting session for contact")
 	}
 
-	// if we didn't find a session or it is another session then this flow got interrupted and this is a race, fail it
+	// if we didn't find a session or it is another session then this session has already been interrupted
 	if session == nil || session.ID() != event.SessionID {
-		log.Error("failing expiring session because it is no longer the waiting session")
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{event.SessionID}, models.SessionStatusFailed)
-		if err != nil {
-			return errors.Wrapf(err, "error failing expired session")
-		}
 		return nil
 	}
 

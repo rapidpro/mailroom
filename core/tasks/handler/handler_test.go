@@ -643,6 +643,10 @@ func TestTimedEvents(t *testing.T) {
 		last = time.Now()
 	}
 
+	// should only have a single waiting session/run per contact
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowrun WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
+
 	// test the case of a run and session no longer being the most recent but somehow still active, expiration should still work
 	r, err := db.QueryContext(ctx, `SELECT id, session_id from flows_flowrun WHERE contact_id = $1 and is_active = FALSE order by created_on asc limit 1`, testdata.Cathy.ID)
 	assert.NoError(t, err)
@@ -669,7 +673,4 @@ func TestTimedEvents(t *testing.T) {
 
 	err = handler.HandleEvent(ctx, rt, task)
 	assert.NoError(t, err)
-
-	assertdb.Query(t, db, `SELECT count(*) from flows_flowrun WHERE is_active = FALSE AND status = 'F' AND id = $1`, runID).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'F' AND id = $1`, sessionID).Returns(1)
 }
