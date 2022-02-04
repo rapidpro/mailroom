@@ -226,16 +226,11 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 	// look for a waiting session for this contact
 	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
-		return errors.Wrapf(err, "error loading active session for contact")
+		return errors.Wrapf(err, "error loading waiting session for contact")
 	}
 
-	// if we didn't find a session or it is another session then this flow got interrupted and this is a race, fail it
+	// if we didn't find a session or it is another session then this session has already been interrupted
 	if session == nil || session.ID() != event.SessionID {
-		log.Error("expiring run with mismatched session, session for run no longer active, failing runs and session")
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{event.SessionID}, models.SessionStatusFailed)
-		if err != nil {
-			return errors.Wrapf(err, "error failing expired runs for session that is no longer active")
-		}
 		return nil
 	}
 

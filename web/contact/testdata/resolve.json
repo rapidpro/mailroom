@@ -19,6 +19,26 @@
         ]
     },
     {
+        "label": "error if URN not valid",
+        "method": "POST",
+        "path": "/mr/contact/resolve",
+        "body": {
+            "org_id": 1,
+            "channel_id": 10000,
+            "urn": "tel:*"
+        },
+        "status": 400,
+        "response": {
+            "error": "URN failed validation: scheme or path cannot be empty"
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "count": 0
+            }
+        ]
+    },
+    {
         "label": "fetches existing contact using normalized URN identity",
         "method": "POST",
         "path": "/mr/contact/resolve",
