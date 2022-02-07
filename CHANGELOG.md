@@ -1,3 +1,9 @@
+v7.1.38
+----------
+ * Update to latest goflow that fixes group removal on contact stop and resuming with wrong type of resume
+ * Resolve endpoint should return error if given invalid URN
+ * If handling timed event finds different session, don't fail event session as it should have already been interrupted
+
 v7.1.37
 ----------
  * Update to goflow 0.149.1
