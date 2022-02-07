@@ -34,6 +34,8 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
+	modelContact, _ := testdata.Bob.Load(db, oa)
+
 	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("c49daa28-cf70-407a-a767-a4c1360f4b01").
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Bob.ID), "Bob", "eng", "").MustBuild()
 
@@ -45,7 +47,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 		return nil
 	}
 
-	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
+	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, []*models.Contact{modelContact}, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 1, hookCalls)
 
@@ -79,7 +81,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	tx = db.MustBegin()
 
-	err = session.Update(ctx, rt, tx, oa, flowSession, sprint2, hook)
+	err = session.Update(ctx, rt, tx, oa, flowSession, sprint2, modelContact, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 2, hookCalls)
 
@@ -101,7 +103,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	tx = db.MustBegin()
 
-	err = session.Update(ctx, rt, tx, oa, flowSession, sprint3, hook)
+	err = session.Update(ctx, rt, tx, oa, flowSession, sprint3, modelContact, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 3, hookCalls)
 
@@ -137,6 +139,8 @@ func TestSingleSprintSession(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
+	modelContact, _ := testdata.Bob.Load(db, oa)
+
 	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("8b1b02a0-e217-4d59-8ecb-3b20bec69cf4").
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Bob.ID), "Bob", "eng", "").MustBuild()
 
@@ -148,7 +152,7 @@ func TestSingleSprintSession(t *testing.T) {
 		return nil
 	}
 
-	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
+	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, []*models.Contact{modelContact}, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 1, hookCalls)
 
@@ -191,6 +195,8 @@ func TestSessionWithSubflows(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
+	modelContact, _ := testdata.Cathy.Load(db, oa)
+
 	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("f128803a-9027-42b1-a707-f1dbe4cf88bd").
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
 
@@ -202,7 +208,7 @@ func TestSessionWithSubflows(t *testing.T) {
 		return nil
 	}
 
-	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, hook)
+	modelSessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{flowSession}, []flows.Sprint{sprint1}, []*models.Contact{modelContact}, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 1, hookCalls)
 
@@ -236,7 +242,7 @@ func TestSessionWithSubflows(t *testing.T) {
 
 	tx = db.MustBegin()
 
-	err = session.Update(ctx, rt, tx, oa, flowSession, sprint2, hook)
+	err = session.Update(ctx, rt, tx, oa, flowSession, sprint2, modelContact, hook)
 	require.NoError(t, err)
 	assert.Equal(t, 2, hookCalls)
 

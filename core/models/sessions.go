@@ -297,7 +297,7 @@ WHERE
 `
 
 // Update updates the session based on the state passed in from our engine session, this also takes care of applying any event hooks
-func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, fs flows.Session, sprint flows.Sprint, hook SessionCommitHook) error {
+func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, fs flows.Session, sprint flows.Sprint, contact *Contact, hook SessionCommitHook) error {
 	// make sure we have our seen runs
 	if s.seenRuns == nil {
 		return errors.Errorf("missing seen runs, cannot update session")
@@ -580,7 +580,7 @@ RETURNING id
 
 // InsertSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
-func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, ss []flows.Session, sprints []flows.Sprint, hook SessionCommitHook) ([]*Session, error) {
+func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *OrgAssets, ss []flows.Session, sprints []flows.Sprint, contacts []*Contact, hook SessionCommitHook) ([]*Session, error) {
 	if len(ss) == 0 {
 		return nil, nil
 	}

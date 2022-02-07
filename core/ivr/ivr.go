@@ -386,7 +386,7 @@ func StartIVRFlow(
 	}
 
 	// start our flow
-	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{c}, []flows.Trigger{trigger}, hook, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow")
 	}
@@ -503,7 +503,7 @@ func ResumeIVRFlow(
 		return svc.WriteErrorResponse(w, fmt.Errorf("no resume found, ending call"))
 	}
 
-	session, err = runner.ResumeFlow(ctx, rt, oa, session, resume, hook)
+	session, err = runner.ResumeFlow(ctx, rt, oa, session, c, resume, hook)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming ivr flow")
 	}

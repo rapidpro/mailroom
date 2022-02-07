@@ -63,7 +63,7 @@ type StartOptions struct {
 type TriggerBuilder func(contact *flows.Contact) flows.Trigger
 
 // ResumeFlow resumes the passed in session using the passed in session
-func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, session *models.Session, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
+func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, session *models.Session, contact *models.Contact, resume flows.Resume, hook models.SessionCommitHook) (*models.Session, error) {
 	start := time.Now()
 	sa := oa.SessionAssets()
 
@@ -104,7 +104,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	}
 
 	// write our updated session and runs
-	err = session.Update(txCTX, rt, tx, oa, fs, sprint, hook)
+	err = session.Update(txCTX, rt, tx, oa, fs, sprint, contact, hook)
 	if err != nil {
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error updating session for resume")
@@ -510,7 +510,7 @@ func StartFlow(
 			triggers = append(triggers, trigger)
 		}
 
-		ss, err := StartFlowForContacts(ctx, rt, oa, flow, triggers, options.CommitHook, options.Interrupt)
+		ss, err := StartFlowForContacts(ctx, rt, oa, flow, contacts, triggers, options.CommitHook, options.Interrupt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error starting flow for contacts")
 		}
@@ -535,7 +535,7 @@ func StartFlow(
 // StartFlowForContacts runs the passed in flow for the passed in contact
 func StartFlowForContacts(
 	ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
-	flow *models.Flow, triggers []flows.Trigger, hook models.SessionCommitHook, interrupt bool) ([]*models.Session, error) {
+	flow *models.Flow, contacts []*models.Contact, triggers []flows.Trigger, hook models.SessionCommitHook, interrupt bool) ([]*models.Session, error) {
 	sa := oa.SessionAssets()
 
 	// no triggers? nothing to do
@@ -596,7 +596,7 @@ func StartFlowForContacts(
 	}
 
 	// write our session to the db
-	dbSessions, err := models.InsertSessions(txCTX, rt, tx, oa, sessions, sprints, hook)
+	dbSessions, err := models.InsertSessions(txCTX, rt, tx, oa, sessions, sprints, contacts, hook)
 	if err == nil {
 		// commit it at once
 		commitStart := time.Now()
@@ -617,6 +617,7 @@ func StartFlowForContacts(
 		for i := range sessions {
 			session := sessions[i]
 			sprint := sprints[i]
+			contact := contacts[i]
 
 			txCTX, cancel := context.WithTimeout(ctx, commitTimeout)
 			defer cancel()
@@ -636,7 +637,7 @@ func StartFlowForContacts(
 				}
 			}
 
-			dbSession, err := models.InsertSessions(txCTX, rt, tx, oa, []flows.Session{session}, []flows.Sprint{sprint}, hook)
+			dbSession, err := models.InsertSessions(txCTX, rt, tx, oa, []flows.Session{session}, []flows.Sprint{sprint}, []*models.Contact{contact}, hook)
 			if err != nil {
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error writing session to db")
