@@ -922,30 +922,33 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 	return nil
 }
 
-// InterruptSessionsForContacts interrupts any waiting sessions for the given contacts
-func InterruptSessionsForContacts(ctx context.Context, db *sqlx.DB, contactIDs []ContactID) error {
+func getWaitingSessionsForContacts(ctx context.Context, db Queryer, contactIDs []ContactID) ([]SessionID, error) {
 	sessionIDs := make([]SessionID, 0, len(contactIDs))
 
 	err := db.SelectContext(ctx, &sessionIDs, `SELECT id FROM flows_flowsession WHERE status = 'W' AND contact_id = ANY($1)`, pq.Array(contactIDs))
 	if err != nil {
-		return errors.Wrapf(err, "error selecting waiting sessions for contacts")
+		return nil, errors.Wrapf(err, "error selecting waiting sessions for contacts")
+	}
+
+	return sessionIDs, nil
+}
+
+// InterruptSessionsForContacts interrupts any waiting sessions for the given contacts
+func InterruptSessionsForContacts(ctx context.Context, db *sqlx.DB, contactIDs []ContactID) error {
+	sessionIDs, err := getWaitingSessionsForContacts(ctx, db, contactIDs)
+	if err != nil {
+		return err
 	}
 
 	return errors.Wrapf(ExitSessions(ctx, db, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
 }
 
-const sqlWaitingSessionIDsOfTypeForContacts = `
-SELECT id 
-  FROM flows_flowsession 
- WHERE status = 'W' AND contact_id = ANY($1) AND session_type = $2;`
-
-// InterruptSessionsOfTypeForContacts interrupts any waiting sessions of the given type for the given contacts
-func InterruptSessionsOfTypeForContacts(ctx context.Context, tx *sqlx.Tx, contactIDs []ContactID, sessionType FlowType) error {
-	sessionIDs := make([]SessionID, 0, len(contactIDs))
-
-	err := tx.SelectContext(ctx, &sessionIDs, sqlWaitingSessionIDsOfTypeForContacts, pq.Array(contactIDs), sessionType)
+// InterruptSessionsForContactsTx interrupts any waiting sessions for the given contacts inside the given transaction.
+// This version is used for interrupting during flow starts where contacts are already batched and we have an open transaction.
+func InterruptSessionsForContactsTx(ctx context.Context, tx *sqlx.Tx, contactIDs []ContactID) error {
+	sessionIDs, err := getWaitingSessionsForContacts(ctx, tx, contactIDs)
 	if err != nil {
-		return errors.Wrapf(err, "error selecting waiting sessions for contacts")
+		return err
 	}
 
 	return errors.Wrapf(exitSessionBatch(ctx, tx, sessionIDs, SessionStatusInterrupted), "error exiting sessions")

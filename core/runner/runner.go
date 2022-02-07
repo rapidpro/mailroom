@@ -588,7 +588,7 @@ func StartFlowForContacts(
 
 	// interrupt all our contacts if desired
 	if interrupt {
-		err = models.InterruptSessionsOfTypeForContacts(txCTX, tx, contactIDs, flow.FlowType())
+		err = models.InterruptSessionsForContactsTx(txCTX, tx, contactIDs)
 		if err != nil {
 			tx.Rollback()
 			return nil, errors.Wrap(err, "error interrupting contacts")
@@ -628,7 +628,7 @@ func StartFlowForContacts(
 
 			// interrupt this contact if appropriate
 			if interrupt {
-				err = models.InterruptSessionsOfTypeForContacts(txCTX, tx, []models.ContactID{models.ContactID(session.Contact().ID())}, flow.FlowType())
+				err = models.InterruptSessionsForContactsTx(txCTX, tx, []models.ContactID{models.ContactID(session.Contact().ID())})
 				if err != nil {
 					tx.Rollback()
 					log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error interrupting contact")
