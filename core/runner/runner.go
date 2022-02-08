@@ -434,7 +434,7 @@ func StartFlow(
 	// filter out our list of contacts to only include those that should be started
 	if !options.IncludeActive {
 		// find all participants active in any flow
-		active, err := models.FindActiveSessionOverlap(ctx, rt.DB, flow.FlowType(), contactIDs)
+		active, err := models.FilterByWaitingSession(ctx, rt.DB, contactIDs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error finding other active flow: %d", flow.ID())
 		}

@@ -807,21 +807,10 @@ func WriteSessionOutputsToStorage(ctx context.Context, rt *runtime.Runtime, sess
 	return nil
 }
 
-const sqlSelectWaitingSessionOverlap = `
-SELECT DISTINCT(contact_id)
-  FROM flows_flowsession fs 
-  JOIN flows_flow ff ON fs.current_flow_id = ff.id
- WHERE fs.status = 'W' AND ff.is_active = TRUE AND ff.is_archived = FALSE AND ff.flow_type = $1 AND fs.contact_id = ANY($2)`
-
-// FindActiveSessionOverlap returns the list of contact ids which overlap with those passed in which are active in any other flows
-func FindActiveSessionOverlap(ctx context.Context, db *sqlx.DB, flowType FlowType, contacts []ContactID) ([]ContactID, error) {
-	// background flows should look at messaging flows when determing overlap (background flows can't be active by definition)
-	if flowType == FlowTypeBackground {
-		flowType = FlowTypeMessaging
-	}
-
+// FilterByWaitingSession takes contact ids and returns those who have waiting sessions
+func FilterByWaitingSession(ctx context.Context, db *sqlx.DB, contacts []ContactID) ([]ContactID, error) {
 	var overlap []ContactID
-	err := db.SelectContext(ctx, &overlap, sqlSelectWaitingSessionOverlap, flowType, pq.Array(contacts))
+	err := db.SelectContext(ctx, &overlap, `SELECT DISTINCT(contact_id) FROM flows_flowsession WHERE status = 'W' AND contact_id = ANY($1)`, pq.Array(contacts))
 	return overlap, err
 }
 
