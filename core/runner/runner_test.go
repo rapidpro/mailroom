@@ -193,8 +193,8 @@ func TestBatchStart(t *testing.T) {
 
 	tcs := []struct {
 		Flow          models.FlowID
-		Restart       models.RestartParticipants
-		IncludeActive models.IncludeActive
+		Restart       bool
+		IncludeActive bool
 		Extra         json.RawMessage
 		Msg           string
 		Count         int
@@ -346,8 +346,8 @@ func TestStartFlowConcurrency(t *testing.T) {
 	}
 
 	options := &runner.StartOptions{
-		RestartParticipants: true,
-		IncludeActive:       true,
+		ExcludeReruns:  false,
+		ExcludeWaiting: false,
 		TriggerBuilder: func(contact *flows.Contact) flows.Trigger {
 			return triggers.NewBuilder(oa.Env(), flowRef, contact).Manual().Build()
 		},

@@ -52,8 +52,8 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, testdata.SingleMessage.ID, start.FlowID())
 	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
 	assert.Equal(t, "", start.Query())
-	assert.Equal(t, models.DoRestartParticipants, start.RestartParticipants())
-	assert.Equal(t, models.DoIncludeActive, start.IncludeActive())
+	assert.True(t, start.RestartParticipants())
+	assert.True(t, start.IncludeActive())
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, start.ContactIDs())
 	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs())
 	assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.ExcludeGroupIDs())
@@ -73,8 +73,8 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, models.StartTypeManual, batch.StartType())
 	assert.Equal(t, testdata.SingleMessage.ID, batch.FlowID())
 	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, batch.ContactIDs())
-	assert.Equal(t, models.DoRestartParticipants, batch.RestartParticipants())
-	assert.Equal(t, models.DoIncludeActive, batch.IncludeActive())
+	assert.True(t, batch.RestartParticipants())
+	assert.True(t, batch.IncludeActive())
 	assert.Equal(t, testdata.Admin.ID, batch.CreatedByID())
 	assert.False(t, batch.IsLast())
 	assert.Equal(t, 3, batch.TotalContacts())
@@ -100,7 +100,7 @@ func TestStartsBuilding(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, testdata.Favorites.ID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, testdata.Favorites.ID, true, true).
 		WithGroupIDs([]models.GroupID{testdata.DoctorsGroup.ID}).
 		WithExcludeGroupIDs([]models.GroupID{testdata.TestersGroup.ID}).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}).
