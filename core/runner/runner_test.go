@@ -8,6 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
@@ -20,8 +21,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/utils/test"
-
-	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,79 +28,108 @@ import (
 func TestCampaignStarts(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(testdata.RemindersCampaign.UUID), "Doctor Reminders")
 
-	// create our event fires
+	// create event fires for event #3 (Pick A Number, start mode SKIP)
 	now := time.Now()
-	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent2, now)
-	testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent2, now)
-	testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent2, now)
+	fire1ID := testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent3, now)
+	fire2ID := testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent3, now)
+	fire3ID := testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent3, now)
 
 	// create an waiting session for Alexandria to test skipping
-	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.PickANumber, models.NilConnectionID, time.Now(), time.Now(), false, nil)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, nil)
 
 	// create an active voice call for Cathy to make sure it doesn't get interrupted or cause skipping
 	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeVoice, testdata.IVRFlow, models.NilConnectionID, time.Now(), time.Now(), false, nil)
 
-	// set our event to skip
-	db.MustExec(`UPDATE campaigns_campaignevent SET start_mode = 'S' WHERE id= $1`, testdata.RemindersEvent2.ID)
-
-	contacts := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
 	fires := []*models.EventFire{
 		{
-			FireID:    1,
+			FireID:    fire1ID,
+			EventID:   testdata.RemindersEvent3.ID,
+			ContactID: testdata.Cathy.ID,
+			Scheduled: now,
+		},
+		{
+			FireID:    fire2ID,
+			EventID:   testdata.RemindersEvent3.ID,
+			ContactID: testdata.Bob.ID,
+			Scheduled: now,
+		},
+		{
+			FireID:    fire3ID,
+			EventID:   testdata.RemindersEvent3.ID,
+			ContactID: testdata.Alexandria.ID,
+			Scheduled: now,
+		},
+	}
+	sessions, err := runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.PickANumber.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent3.UUID))
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(sessions))
+
+	// cathy has two waiting sessions (one voice, one messaging from the campaign event)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Cathy.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT fired_result from campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent3.ID).Returns("F")
+
+	// bob has one waiting session from the campaign event
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Bob.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT current_flow_id FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Bob.ID).Returns(int64(testdata.PickANumber.ID))
+	assertdb.Query(t, db, `SELECT fired_result from campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Bob.ID, testdata.RemindersEvent3.ID).Returns("F")
+
+	// alexandria only has her existing waiting session because event skipped her
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Alexandria.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT current_flow_id FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Alexandria.ID).Returns(int64(testdata.Favorites.ID))
+	assertdb.Query(t, db, `SELECT fired_result from campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Alexandria.ID, testdata.RemindersEvent3.ID).Returns("S")
+
+	// all event fires fired
+	assertdb.Query(t, db, `SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`).Returns(0)
+
+	// create event fires for event #2 (message, start mode PASSIVE)
+	now = time.Now()
+	fire4ID := testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent2, now)
+	fire5ID := testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent2, now)
+	fire6ID := testdata.InsertEventFire(rt.DB, testdata.Alexandria, testdata.RemindersEvent2, now)
+
+	fires = []*models.EventFire{
+		{
+			FireID:    fire4ID,
 			EventID:   testdata.RemindersEvent2.ID,
 			ContactID: testdata.Cathy.ID,
 			Scheduled: now,
 		},
 		{
-			FireID:    2,
+			FireID:    fire5ID,
 			EventID:   testdata.RemindersEvent2.ID,
 			ContactID: testdata.Bob.ID,
 			Scheduled: now,
 		},
 		{
-			FireID:    3,
+			FireID:    fire6ID,
 			EventID:   testdata.RemindersEvent2.ID,
 			ContactID: testdata.Alexandria.ID,
 			Scheduled: now,
 		},
 	}
-	sessions, err := runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, "e68f4c70-9db1-44c8-8498-602d6857235e")
+
+	sessions, err = runner.FireCampaignEvents(ctx, rt, testdata.Org1.ID, fires, testdata.CampaignFlow.UUID, campaign, triggers.CampaignEventUUID(testdata.RemindersEvent2.UUID))
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(sessions), "expected only two sessions to be created")
+	assert.Equal(t, 3, len(sessions))
 
-	assertdb.Query(t, db,
-		`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL`, pq.Array(contacts)).
-		Returns(2, "expected only two sessions to be created")
+	// cathy still has two waiting sessions (one voice, one messaging from the campaign event) and now a completed one
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Cathy.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT fired_result from campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent2.ID).Returns("F")
 
-	assertdb.Query(t, db,
-		`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-		 AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
-		 AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`,
-		pq.Array(contacts), testdata.CampaignFlow.ID).Returns(2, "expected only two runs to be created")
+	// bob still has one waiting session from the previous campaign event and now a completed one
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Bob.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Bob.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT fired_result from campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Bob.ID, testdata.RemindersEvent2.ID).Returns("F")
 
-	assertdb.Query(t, db,
-		`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) 
-		 AND text like '% it is time to consult with your patients.' AND org_id = 1 AND status = 'Q' 
-		 AND queued_on IS NOT NULL AND direction = 'O' AND topup_id IS NOT NULL AND msg_type = 'F' AND channel_id = $2`,
-		pq.Array(contacts), testdata.TwilioChannel.ID).Returns(2, "expected only two messages to be sent")
-
-	assertdb.Query(t, db, `SELECT count(*) from campaigns_eventfire WHERE fired IS NULL`).
-		Returns(0, "expected all events to be fired")
-
-	assertdb.Query(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1,$2) AND event_id = $3 AND fired_result = 'F'`, testdata.Cathy.ID, testdata.Bob.ID, testdata.RemindersEvent2.ID).
-		Returns(2, "expected bob and cathy to have their event sent to fired")
-
-	assertdb.Query(t, db,
-		`SELECT count(*) from campaigns_eventfire WHERE fired IS NOT NULL AND contact_id IN ($1) AND event_id = $2 AND fired_result = 'S'`, testdata.Alexandria.ID, testdata.RemindersEvent2.ID).
-		Returns(1, "expected alexandria to have her event set to skipped")
-
-	assertdb.Query(t, db,
-		`SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1 AND session_type = 'V'`, testdata.Cathy.ID).Returns(1)
+	// alexandria still has her existing waiting session and now a completed one
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, testdata.Alexandria.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Alexandria.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT fired_result from campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Alexandria.ID, testdata.RemindersEvent2.ID).Returns("F")
 }
 
 func TestBatchStart(t *testing.T) {
