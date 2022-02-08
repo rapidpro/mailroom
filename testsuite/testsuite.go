@@ -60,7 +60,7 @@ func Reset(what ResetFlag) {
 	}
 
 	models.FlushCache()
-	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetLevel(logrus.InfoLevel)
 }
 
 // Get returns the various runtime things a test might need
@@ -76,6 +76,8 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 		SessionStorage: storage.NewFS(SessionStorageDir),
 		Config:         runtime.NewDefaultConfig(),
 	}
+
+	logrus.SetLevel(logrus.InfoLevel)
 
 	/*for name, expected := range tableHashes {
 		var actual string

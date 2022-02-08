@@ -68,7 +68,7 @@ func TestCampaigns(t *testing.T) {
 				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{testdata.Bob.ID},
-					Count: 3,
+					Count: 4,
 				},
 				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
