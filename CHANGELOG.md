@@ -1,3 +1,8 @@
+v7.1.39
+----------
+ * Change StartOption fields to match excludes that we use in RP UI
+ * Skipping or interrupting waiting sessions should happen across all flow types
+
 v7.1.38
 ----------
  * Update to latest goflow that fixes group removal on contact stop and resuming with wrong type of resume
