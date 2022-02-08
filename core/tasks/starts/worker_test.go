@@ -55,8 +55,8 @@ func TestStarts(t *testing.T) {
 		createContact        bool
 		query                string
 		queryResponse        string
-		restartParticipants  models.RestartParticipants
-		includeActive        models.IncludeActive
+		restartParticipants  bool
+		includeActive        bool
 		queue                string
 		expectedContactCount int
 		expectedBatchCount   int
