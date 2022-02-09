@@ -60,7 +60,6 @@ func Reset(what ResetFlag) {
 	}
 
 	models.FlushCache()
-	logrus.SetLevel(logrus.InfoLevel)
 }
 
 // Get returns the various runtime things a test might need
@@ -77,7 +76,7 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 		Config:         runtime.NewDefaultConfig(),
 	}
 
-	logrus.SetLevel(logrus.InfoLevel)
+	logrus.SetLevel(logrus.DebugLevel)
 
 	/*for name, expected := range tableHashes {
 		var actual string
@@ -180,6 +179,8 @@ func resetStorage() {
 }
 
 var resetDataSQL = `
+UPDATE contacts_contact SET current_flow_id = NULL;
+
 DELETE FROM notifications_notification;
 DELETE FROM notifications_incident;
 DELETE FROM request_logs_httplog;

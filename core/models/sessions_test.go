@@ -73,6 +73,10 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 			"status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "responded": false, "ended_on": nil, "wait_resume_on_expire": false,
 		})
 
+	// reload contact and check current flow is set
+	modelContact, _ = testdata.Bob.Load(db, oa)
+	assert.Equal(t, flow.ID, modelContact.CurrentFlowID())
+
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
 
@@ -115,13 +119,19 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.NotNil(t, session.CreatedOn())
 	assert.Nil(t, session.WaitStartedOn())
 	assert.Nil(t, session.WaitExpiresOn())
-	assert.False(t, session.WaitResumeOnExpire()) // stays false
+	assert.False(t, session.WaitResumeOnExpire())
 	assert.Nil(t, session.Timeout())
 	assert.NotNil(t, session.EndedOn())
 
 	// check that matches what is in the db
 	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
 		Columns(map[string]interface{}{"status": "C", "session_type": "M", "current_flow_id": nil, "responded": true})
+
+	assertdb.Query(t, db, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, testdata.Bob.ID).Returns(nil)
+
+	// reload contact and check current flow is cleared
+	modelContact, _ = testdata.Bob.Load(db, oa)
+	assert.Equal(t, models.NilFlowID, modelContact.CurrentFlowID())
 }
 
 func TestSingleSprintSession(t *testing.T) {

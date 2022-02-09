@@ -442,15 +442,23 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		return errors.Wrapf(err, "error saving flow statistics")
 	}
 
-	// apply all our events
+	var eventsToHandle []flows.Event
+
+	// if session didn't fail, we need to handle this sprint's events
 	if s.Status() != SessionStatusFailed {
-		err = HandleEvents(ctx, rt, tx, oa, s.scene, sprint.Events())
-		if err != nil {
-			return errors.Wrapf(err, "error applying events: %d", s.ID())
-		}
+		eventsToHandle = append(eventsToHandle, sprint.Events()...)
 	}
 
-	// TODO if contact's current flow has changed, add hooks to update that and modified_on
+	// if contact's current flow has changed, add pseudo event to handle that
+	if s.SessionType().Interrupts() && contact.CurrentFlowID() != s.CurrentFlowID() {
+		eventsToHandle = append(eventsToHandle, NewContactFlowChangedEvent(s.CurrentFlowID()))
+	}
+
+	// apply all our events to generate hooks
+	err = HandleEvents(ctx, rt, tx, oa, s.scene, eventsToHandle)
+	if err != nil {
+		return errors.Wrapf(err, "error applying events: %d", s.ID())
+	}
 
 	// gather all our pre commit events, group them by hook and apply them
 	err = ApplyEventPreCommitHooks(ctx, rt, tx, oa, []*Scene{s.scene})
@@ -682,20 +690,25 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 
 	// apply our all events for the session
 	scenes := make([]*Scene, 0, len(ss))
-	for i := range sessions {
-		if ss[i].Status() == flows.SessionStatusFailed {
-			continue
+	for i, s := range sessions {
+		var eventsToHandle []flows.Event
+
+		// if session didn't fail, we need to handle this sprint's events
+		if s.Status() != SessionStatusFailed {
+			eventsToHandle = append(eventsToHandle, sprints[i].Events()...)
 		}
 
-		err = HandleEvents(ctx, rt, tx, oa, sessions[i].Scene(), sprints[i].Events())
+		// if contact's current flow has changed, add pseudo event to handle that
+		if s.SessionType().Interrupts() && contacts[i].CurrentFlowID() != s.CurrentFlowID() {
+			eventsToHandle = append(eventsToHandle, NewContactFlowChangedEvent(s.CurrentFlowID()))
+		}
+
+		err = HandleEvents(ctx, rt, tx, oa, s.Scene(), eventsToHandle)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error applying events for session: %d", sessions[i].ID())
+			return nil, errors.Wrapf(err, "error applying events for session: %d", s.ID())
 		}
 
-		// TODO if contact's current flow has changed, add hooks to update that and modified_on
-
-		scene := sessions[i].Scene()
-		scenes = append(scenes, scene)
+		scenes = append(scenes, s.Scene())
 	}
 
 	// gather all our pre commit events, group them by hook
