@@ -263,7 +263,7 @@ func TestInterruptSessionsForContacts(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
-	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
+	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 
@@ -290,19 +290,32 @@ func TestInterruptSessionsForContacts(t *testing.T) {
 	assertdb.Query(t, db, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, testdata.Cathy.ID).Returns(nil)
 }
 
-func TestInterruptSessionsOfTypeForContacts(t *testing.T) {
+func TestInterruptSessionsForContactsTx(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
 
 	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
-	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
+	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 
 	tx := db.MustBegin()
 
-	err := models.InterruptSessionsOfTypeForContacts(ctx, tx, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID}, models.FlowTypeMessaging)
+	// noop if no contacts
+	err := models.InterruptSessionsForContactsTx(ctx, tx, []models.ContactID{})
+	require.NoError(t, err)
+
+	require.NoError(t, tx.Commit())
+
+	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted)
+	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusWaiting)
+	assertSessionAndRunStatus(t, db, session3ID, models.SessionStatusWaiting)
+	assertSessionAndRunStatus(t, db, session4ID, models.SessionStatusWaiting)
+
+	tx = db.MustBegin()
+
+	err = models.InterruptSessionsForContactsTx(ctx, tx, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})
 	require.NoError(t, err)
 
 	require.NoError(t, tx.Commit())
@@ -310,10 +323,11 @@ func TestInterruptSessionsOfTypeForContacts(t *testing.T) {
 	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted) // wasn't waiting
 	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusInterrupted)
 	assertSessionAndRunStatus(t, db, session3ID, models.SessionStatusInterrupted)
-	assertSessionAndRunStatus(t, db, session4ID, models.SessionStatusWaiting) // wrong type
+	assertSessionAndRunStatus(t, db, session4ID, models.SessionStatusWaiting) // contact not included
 
-	// check other columns are correct on interrupted session and contact
+	// check other columns are correct on interrupted session, run and contact
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE ended_on IS NOT NULL AND wait_started_on IS NULL AND wait_expires_on IS NULL AND timeout_on IS NULL AND current_flow_id IS NULL AND id = $1`, session2ID).Returns(1)
+	assertdb.Query(t, db, `SELECT is_active, exit_type FROM flows_flowrun WHERE id = $1`, run2ID).Columns(map[string]interface{}{"exit_type": "I", "is_active": false})
 	assertdb.Query(t, db, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, testdata.Cathy.ID).Returns(nil)
 }
 

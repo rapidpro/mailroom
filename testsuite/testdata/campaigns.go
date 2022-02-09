@@ -14,7 +14,8 @@ type Campaign struct {
 }
 
 type CampaignEvent struct {
-	ID models.CampaignEventID
+	ID   models.CampaignEventID
+	UUID models.CampaignEventUUID
 }
 
 func InsertCampaign(db *sqlx.DB, org *Org, name string, group *Group) *Campaign {
@@ -40,7 +41,7 @@ func InsertCampaignFlowEvent(db *sqlx.DB, campaign *Campaign, flow *Flow, relati
 		) RETURNING id`,
 		uuid, campaign.ID, flow.ID, relativeTo.ID, offset, unit,
 	))
-	return &CampaignEvent{id}
+	return &CampaignEvent{id, uuid}
 }
 
 func InsertEventFire(db *sqlx.DB, contact *Contact, event *CampaignEvent, scheduled time.Time) models.FireID {

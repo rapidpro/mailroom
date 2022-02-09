@@ -31,23 +31,13 @@ var startTypeToOrigin = map[models.StartType]string{
 	models.StartTypeAPIZapier: "zapier",
 }
 
-// NewStartOptions creates and returns the default start options to be used for flow starts
-func NewStartOptions() *StartOptions {
-	start := &StartOptions{
-		RestartParticipants: true,
-		IncludeActive:       true,
-		Interrupt:           true,
-	}
-	return start
-}
-
 // StartOptions define the various parameters that can be used when starting a flow
 type StartOptions struct {
-	// RestartParticipants should be true if the flow start should restart participants already in this flow
-	RestartParticipants models.RestartParticipants
+	// ExcludeWaiting excludes contacts with waiting sessions which would otherwise have to be interrupted
+	ExcludeWaiting bool
 
-	// IncludeActive should be true if we want to interrupt people active in other flows (including this one)
-	IncludeActive models.IncludeActive
+	// ExcludeReruns excludes contacts who have been in this flow previously (at least as long as we have runs for)
+	ExcludeReruns bool
 
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
@@ -57,6 +47,15 @@ type StartOptions struct {
 
 	// TriggerBuilder is the builder that will be used to build a trigger for each contact started in the flow
 	TriggerBuilder TriggerBuilder
+}
+
+// NewStartOptions creates and returns the default start options to be used for flow starts
+func NewStartOptions() *StartOptions {
+	return &StartOptions{
+		ExcludeWaiting: false,
+		ExcludeReruns:  false,
+		Interrupt:      true,
+	}
 }
 
 // TriggerBuilder defines the interface for building a trigger for the passed in contact
@@ -234,8 +233,8 @@ func StartFlowBatch(
 
 	// options for our flow start
 	options := NewStartOptions()
-	options.RestartParticipants = batch.RestartParticipants()
-	options.IncludeActive = batch.IncludeActive()
+	options.ExcludeReruns = !batch.RestartParticipants()
+	options.ExcludeWaiting = !batch.IncludeActive()
 	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
@@ -309,16 +308,16 @@ func FireCampaignEvents(
 	options := NewStartOptions()
 	switch dbEvent.StartMode() {
 	case models.StartModeInterrupt:
-		options.IncludeActive = true
-		options.RestartParticipants = true
+		options.ExcludeWaiting = false
+		options.ExcludeReruns = false
 		options.Interrupt = true
 	case models.StartModePassive:
-		options.IncludeActive = true
-		options.RestartParticipants = true
+		options.ExcludeWaiting = false
+		options.ExcludeReruns = false
 		options.Interrupt = false
 	case models.StartModeSkip:
-		options.IncludeActive = false
-		options.RestartParticipants = true
+		options.ExcludeWaiting = true
+		options.ExcludeReruns = false
 		options.Interrupt = true
 	default:
 		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())
@@ -420,7 +419,7 @@ func StartFlow(
 	exclude := make(map[models.ContactID]bool, 5)
 
 	// filter out anybody who has has a flow run in this flow if appropriate
-	if !options.RestartParticipants {
+	if options.ExcludeReruns {
 		// find all participants that have been in this flow
 		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, flow.ID(), contactIDs)
 		if err != nil {
@@ -432,9 +431,9 @@ func StartFlow(
 	}
 
 	// filter out our list of contacts to only include those that should be started
-	if !options.IncludeActive {
+	if options.ExcludeWaiting {
 		// find all participants active in any flow
-		active, err := models.FindActiveSessionOverlap(ctx, rt.DB, flow.FlowType(), contactIDs)
+		active, err := models.FilterByWaitingSession(ctx, rt.DB, contactIDs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error finding other active flow: %d", flow.ID())
 		}
@@ -588,7 +587,7 @@ func StartFlowForContacts(
 
 	// interrupt all our contacts if desired
 	if interrupt {
-		err = models.InterruptSessionsOfTypeForContacts(txCTX, tx, contactIDs, flow.FlowType())
+		err = models.InterruptSessionsForContactsTx(txCTX, tx, contactIDs)
 		if err != nil {
 			tx.Rollback()
 			return nil, errors.Wrap(err, "error interrupting contacts")
@@ -629,7 +628,7 @@ func StartFlowForContacts(
 
 			// interrupt this contact if appropriate
 			if interrupt {
-				err = models.InterruptSessionsOfTypeForContacts(txCTX, tx, []models.ContactID{models.ContactID(session.Contact().ID())}, flow.FlowType())
+				err = models.InterruptSessionsForContactsTx(txCTX, tx, []models.ContactID{models.ContactID(session.Contact().ID())})
 				if err != nil {
 					tx.Rollback()
 					log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error interrupting contact")
@@ -721,7 +720,7 @@ func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	tx, _ := rt.DB.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID, models.DoRestartParticipants, models.DoIncludeActive).
+	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID, true, true).
 		WithContactIDs(contactIDs)
 
 	// insert it
