@@ -276,7 +276,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		return errors.Errorf("unknown event type: %s", eventType)
 	}
 
-	_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, nil)
+	_, err = runner.ResumeFlow(ctx, rt, oa, session, modelContact, resume, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming flow for timeout")
 	}
@@ -433,7 +433,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{flowTrigger}, hook, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -618,7 +618,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 			// otherwise build the trigger and start the flow directly
 			trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
-			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, flowMsgHook, true)
+			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trigger}, flowMsgHook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -629,7 +629,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// if there is a session, resume it
 	if session != nil && flow != nil {
 		resume := resumes.NewMsg(oa.Env(), contact, msgIn)
-		_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, flowMsgHook)
+		_, err = runner.ResumeFlow(ctx, rt, oa, session, modelContact, resume, flowMsgHook)
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
 		}
@@ -733,7 +733,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 		return errors.Errorf("unknown ticket event type: %s", event.EventType())
 	}
 
-	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{flowTrigger}, nil, true)
+	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{flowTrigger}, nil, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow for contact")
 	}

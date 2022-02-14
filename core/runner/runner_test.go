@@ -262,22 +262,22 @@ func TestResume(t *testing.T) {
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	require.NoError(t, err)
 
-	_, contact := testdata.Cathy.Load(db, oa)
+	modelContact, flowContact := testdata.Cathy.Load(db, oa)
 
-	trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Manual().Build()
-	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, nil, true)
+	trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), flowContact).Manual().Build()
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trigger}, nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, sessions)
 
 	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NULL`, contact.ID(), flow.ID()).Returns(1)
+		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NULL`, modelContact.ID(), flow.ID()).Returns(1)
 
 	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-		 AND is_active = TRUE AND responded = FALSE AND org_id = 1`, contact.ID(), flow.ID()).Returns(1)
+		 AND is_active = TRUE AND responded = FALSE AND org_id = 1`, modelContact.ID(), flow.ID()).Returns(1)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, contact.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, modelContact.ID()).Returns(1)
 
 	tcs := []struct {
 		Message       string
@@ -296,15 +296,15 @@ func TestResume(t *testing.T) {
 		// answer our first question
 		msg := flows.NewMsgIn(flows.MsgUUID(uuids.New()), testdata.Cathy.URN, nil, tc.Message, nil)
 		msg.SetID(10)
-		resume := resumes.NewMsg(oa.Env(), contact, msg)
+		resume := resumes.NewMsg(oa.Env(), flowContact, msg)
 
-		session, err = runner.ResumeFlow(ctx, rt, oa, session, resume, nil)
+		session, err = runner.ResumeFlow(ctx, rt, oa, session, modelContact, resume, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 
 		assertdb.Query(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1
-			 AND status = $2 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, contact.ID(), tc.SessionStatus).
+			 AND status = $2 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, modelContact.ID(), tc.SessionStatus).
 			Returns(1, "%d: didn't find expected session", i)
 
 		runIsActive := tc.RunStatus == models.RunStatusActive || tc.RunStatus == models.RunStatusWaiting
@@ -313,10 +313,10 @@ func TestResume(t *testing.T) {
 		 AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
 		 AND json_array_length(path::json) = $5 AND session_id IS NOT NULL`
 
-		assertdb.Query(t, db, runQuery, contact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength).
+		assertdb.Query(t, db, runQuery, modelContact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength).
 			Returns(1, "%d: didn't find expected run", i)
 
-		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, contact.ID(), tc.Substring).
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, modelContact.ID(), tc.Substring).
 			Returns(1, "%d: didn't find expected message", i)
 	}
 }

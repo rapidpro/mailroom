@@ -5,6 +5,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 )
@@ -257,4 +258,20 @@ func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, mod
 	}
 
 	return eventsByContact, nil
+}
+
+// TypeContactFlowChanged is the type of our event that the contact flow changed
+const TypeContactFlowChanged string = "contact_flow_changed"
+
+type ContactFlowChangedEvent struct {
+	events.BaseEvent
+
+	FlowID FlowID
+}
+
+func NewContactFlowChangedEvent(flowID FlowID) *ContactFlowChangedEvent {
+	return &ContactFlowChangedEvent{
+		BaseEvent: events.NewBaseEvent(TypeContactFlowChanged),
+		FlowID:    flowID,
+	}
 }

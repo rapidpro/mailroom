@@ -35,7 +35,7 @@ const (
 
 // Interrupts returns whether this flow type interrupts existing sessions
 func (t FlowType) Interrupts() bool {
-	return t != FlowTypeBackground
+	return t != FlowTypeBackground && t != FlowTypeSurveyor
 }
 
 const (
