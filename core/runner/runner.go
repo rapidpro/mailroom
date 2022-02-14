@@ -291,7 +291,7 @@ func FireCampaignEvents(
 	}
 
 	// try to load our flow
-	flow, err := oa.Flow(flowUUID)
+	flow, err := oa.FlowByUUID(flowUUID)
 	if err == models.ErrNotFound {
 		err := models.DeleteEventFires(ctx, rt.DB, fires)
 		if err != nil {

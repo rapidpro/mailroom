@@ -42,7 +42,7 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	run, step := scene.Session().FindStep(e.StepUUID())
-	flow, _ := oa.Flow(run.FlowReference().UUID)
+	flow, _ := oa.FlowByUUID(run.FlowReference().UUID)
 
 	// create an HTTP log
 	if flow != nil {

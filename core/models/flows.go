@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
@@ -120,7 +121,7 @@ func (f *Flow) cloneWithNewDefinition(def []byte) *Flow {
 
 func FlowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID assets.FlowUUID) (FlowID, error) {
 	// first try to look up in our assets
-	flow, _ := oa.Flow(flowUUID)
+	flow, _ := oa.FlowByUUID(flowUUID)
 	if flow != nil {
 		return flow.(*Flow).ID(), nil
 	}
@@ -132,11 +133,15 @@ func FlowIDForUUID(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, flowUUID ass
 }
 
 func LoadFlowByUUID(ctx context.Context, db Queryer, orgID OrgID, flowUUID assets.FlowUUID) (*Flow, error) {
-	return loadFlow(ctx, db, selectFlowByUUIDSQL, orgID, flowUUID)
+	return loadFlow(ctx, db, sqlSelectFlowByUUID, orgID, flowUUID)
+}
+
+func LoadFlowByName(ctx context.Context, db Queryer, orgID OrgID, name string) (*Flow, error) {
+	return loadFlow(ctx, db, sqlSelectFlowByName, orgID, name)
 }
 
 func LoadFlowByID(ctx context.Context, db Queryer, orgID OrgID, flowID FlowID) (*Flow, error) {
-	return loadFlow(ctx, db, selectFlowByIDSQL, orgID, flowID)
+	return loadFlow(ctx, db, sqlSelectFlowByID, orgID, flowID)
 }
 
 // loads the flow with the passed in UUID
@@ -146,7 +151,7 @@ func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg inte
 
 	rows, err := db.QueryxContext(ctx, sql, orgID, arg)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error querying flow by: %s", arg)
+		return nil, errors.Wrapf(err, "error querying flow by: %v", arg)
 	}
 	defer rows.Close()
 
@@ -165,111 +170,56 @@ func loadFlow(ctx context.Context, db Queryer, sql string, orgID OrgID, arg inte
 	return flow, nil
 }
 
-const selectFlowByUUIDSQL = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	id, 
-	org_id,
-	uuid, 
-	name,
-	ignore_triggers,
-	flow_type,
-	fr.spec_version as version,
-	coalesce(metadata, '{}')::jsonb as config,
-	definition::jsonb || 
-		jsonb_build_object(
-			'name', f.name,
-			'uuid', f.uuid,
-			'flow_type', f.flow_type,
-			'expire_after_minutes', 
-				CASE f.flow_type 
-				WHEN 'M' THEN GREATEST(5, LEAST(f.expires_after_minutes, 43200))
-				WHEN 'V' THEN GREATEST(1, LEAST(f.expires_after_minutes, 15))
-				ELSE 0
-				END,
-			'metadata', jsonb_build_object(
-				'uuid', f.uuid, 
-				'id', f.id,
+const baseSqlSelectFlow = `
+SELECT ROW_TO_JSON(r) FROM (
+	SELECT
+		f.id, 
+		f.org_id,
+		f.uuid, 
+		f.name,
+		f.ignore_triggers,
+		f.flow_type,
+		fr.spec_version as version,
+		coalesce(f.metadata, '{}')::jsonb as config,
+		definition::jsonb || 
+			jsonb_build_object(
 				'name', f.name,
-				'revision', revision, 
-				'expires', f.expires_after_minutes
-			)
-	) as definition
-FROM
-	flows_flow f
-LEFT JOIN (
-	SELECT 
-		flow_id,
-		spec_version, 
-		definition, 
-		revision
-	FROM 
-		flows_flowrevision
+				'uuid', f.uuid,
+				'flow_type', f.flow_type,
+				'expire_after_minutes', 
+					CASE f.flow_type 
+					WHEN 'M' THEN GREATEST(5, LEAST(f.expires_after_minutes, 43200))
+					WHEN 'V' THEN GREATEST(1, LEAST(f.expires_after_minutes, 15))
+					ELSE 0
+					END,
+				'metadata', jsonb_build_object(
+					'uuid', f.uuid, 
+					'id', f.id,
+					'name', f.name,
+					'revision', revision, 
+					'expires', f.expires_after_minutes
+				)
+		) as definition
+	FROM
+		flows_flow f
+	INNER JOIN LATERAL (
+		SELECT 
+			flow_id, spec_version, definition, revision
+		FROM 
+			flows_flowrevision
+		WHERE
+			flow_id = f.id AND is_active = TRUE
+		ORDER BY 
+			revision DESC
+		LIMIT 1
+	) fr ON fr.flow_id = f.id
 	WHERE
-		flow_id = ANY(SELECT id FROM flows_flow WHERE uuid = $2) AND
-		is_active = TRUE
-	ORDER BY 
-		revision DESC
-	LIMIT 1
-) fr ON fr.flow_id = f.id
-WHERE
-    org_id = $1 AND
-	uuid = $2 AND
-	is_active = TRUE AND
-	is_archived = FALSE
+		%s
 ) r;`
 
-const selectFlowByIDSQL = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	id, 
-	org_id,
-	uuid, 
-	name,
-	ignore_triggers,
-	flow_type,
-	fr.spec_version as version,
-	coalesce(metadata, '{}')::jsonb as config,
-	definition::jsonb || 
-		jsonb_build_object(
-			'name', f.name,
-			'uuid', f.uuid,
-			'flow_type', f.flow_type, 
-			'expire_after_minutes', 
-				CASE f.flow_type 
-				WHEN 'M' THEN GREATEST(5, LEAST(f.expires_after_minutes, 43200))
-				WHEN 'V' THEN GREATEST(1, LEAST(f.expires_after_minutes, 15))
-				ELSE 0
-				END,
-			'metadata', jsonb_build_object(
-				'uuid', f.uuid, 
-				'id', f.id,
-				'name', f.name,
-				'revision', revision, 
-				'expires', f.expires_after_minutes
-			)
-	) as definition
-FROM
-	flows_flow f
-LEFT JOIN (
-	SELECT 
-		flow_id, 
-		spec_version,
-		definition, 
-		revision
-	FROM 
-		flows_flowrevision
-	WHERE
-		flow_id = $2 AND
-		is_active = TRUE
-	ORDER BY 
-		revision DESC
-	LIMIT 1
-) fr ON fr.flow_id = f.id
-WHERE
-    org_id = $1 AND
-	id = $2 AND
-	is_active = TRUE AND
-	is_archived = FALSE
-) r;`
+var sqlSelectFlowByUUID = fmt.Sprintf(baseSqlSelectFlow, `org_id = $1 AND uuid = $2 AND is_active = TRUE AND is_archived = FALSE`)
+var sqlSelectFlowByName = fmt.Sprintf(baseSqlSelectFlow, `org_id = $1 AND LOWER(name) = LOWER($2) AND is_active = TRUE AND is_archived = FALSE`)
+var sqlSelectFlowByID = fmt.Sprintf(baseSqlSelectFlow, `org_id = $1 AND id = $2 AND is_active = TRUE AND is_archived = FALSE`)
 
 // MarshalJSON marshals into JSON. 0 values will become null
 func (i FlowID) MarshalJSON() ([]byte, error) {

@@ -219,7 +219,7 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 			var flow *models.Flow
 			for _, r := range session.Runs() {
 				if r.Status() == flows.RunStatusWaiting {
-					f, _ := oa.Flow(r.FlowReference().UUID)
+					f, _ := oa.FlowByUUID(r.FlowReference().UUID)
 					if f != nil {
 						flow = f.(*models.Flow)
 					}
