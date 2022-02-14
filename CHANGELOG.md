@@ -1,3 +1,7 @@
+v7.1.40
+----------
+ * Implement setting contact.current_flow_id as pseudo event and hook
+
 v7.1.39
 ----------
  * Change StartOption fields to match excludes that we use in RP UI
