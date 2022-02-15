@@ -174,7 +174,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 		oa, err = oa.CloneForSimulation(ctx, rt, map[assets.FlowUUID]json.RawMessage{flowUUID: flowDef}, nil)
 		assert.NoError(t, err)
 
-		flow, err := oa.Flow(flowUUID)
+		flow, err := oa.FlowByUUID(flowUUID)
 		require.NoError(t, err)
 
 		options := runner.NewStartOptions()

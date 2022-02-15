@@ -31,9 +31,9 @@ func TestLoadFlows(t *testing.T) {
 
 	type testcase struct {
 		org                *testdata.Org
-		flowID             models.FlowID
-		flowUUID           assets.FlowUUID
-		expectedName       string
+		id                 models.FlowID
+		uuid               assets.FlowUUID
+		name               string
 		expectedType       models.FlowType
 		expectedEngineType flows.FlowType
 		expectedExpire     int
@@ -94,21 +94,20 @@ func TestLoadFlows(t *testing.T) {
 	}
 
 	assertFlow := func(tc *testcase, dbFlow *models.Flow) {
-		desc := fmt.Sprintf("flow id=%d uuid=%s", tc.flowID, tc.flowUUID)
+		desc := fmt.Sprintf("flow id=%d uuid=%s name=%s", tc.id, tc.uuid, tc.name)
 
 		// check properties of flow model
-		assert.Equal(t, tc.flowID, dbFlow.ID())
-		assert.Equal(t, tc.flowUUID, dbFlow.UUID())
-		assert.Equal(t, tc.expectedName, dbFlow.Name(), "db name mismatch for %s", desc)
+		assert.Equal(t, tc.id, dbFlow.ID())
+		assert.Equal(t, tc.uuid, dbFlow.UUID())
+		assert.Equal(t, tc.name, dbFlow.Name(), "db name mismatch for %s", desc)
 		assert.Equal(t, tc.expectedIVRRetry, dbFlow.IVRRetryWait(), "db IVR retry mismatch for %s", desc)
 
 		// load as engine flow and check that too
 		flow, err := goflow.ReadFlow(rt.Config, dbFlow.Definition())
-		assert.NoError(t, err)
+		assert.NoError(t, err, "read flow failed for %s", desc)
 
-		assert.Equal(t, tc.flowUUID, flow.UUID(), "engine UUID mismatch for %s", desc)
-		assert.Equal(t, tc.flowUUID, flow.UUID(), "engine UUID mismatch for %s", desc)
-		assert.Equal(t, tc.expectedName, flow.Name(), "engine name mismatch for %s", desc)
+		assert.Equal(t, tc.uuid, flow.UUID(), "engine UUID mismatch for %s", desc)
+		assert.Equal(t, tc.name, flow.Name(), "engine name mismatch for %s", desc)
 		assert.Equal(t, tc.expectedEngineType, flow.Type(), "engine type mismatch for %s", desc)
 		assert.Equal(t, tc.expectedExpire, flow.ExpireAfterMinutes(), "engine expire mismatch for %s", desc)
 
@@ -116,12 +115,17 @@ func TestLoadFlows(t *testing.T) {
 
 	for _, tc := range tcs {
 		// test loading by UUID
-		dbFlow, err := models.LoadFlowByUUID(ctx, db, tc.org.ID, tc.flowUUID)
+		dbFlow, err := models.LoadFlowByUUID(ctx, db, tc.org.ID, tc.uuid)
+		assert.NoError(t, err)
+		assertFlow(&tc, dbFlow)
+
+		// test loading by name
+		dbFlow, err = models.LoadFlowByName(ctx, db, tc.org.ID, tc.name)
 		assert.NoError(t, err)
 		assertFlow(&tc, dbFlow)
 
 		// test loading by ID
-		dbFlow, err = models.LoadFlowByID(ctx, db, tc.org.ID, tc.flowID)
+		dbFlow, err = models.LoadFlowByID(ctx, db, tc.org.ID, tc.id)
 		assert.NoError(t, err)
 		assertFlow(&tc, dbFlow)
 	}
