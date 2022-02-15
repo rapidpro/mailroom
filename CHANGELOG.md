@@ -1,3 +1,7 @@
+v7.1.41
+----------
+ * Add support for querying by flow
+
 v7.1.40
 ----------
  * Implement setting contact.current_flow_id as pseudo event and hook
