@@ -213,13 +213,17 @@ SELECT ROW_TO_JSON(r) FROM (
 			revision DESC
 		LIMIT 1
 	) fr ON fr.flow_id = f.id
-	WHERE
-		%s
+	%s
 ) r;`
 
-var sqlSelectFlowByUUID = fmt.Sprintf(baseSqlSelectFlow, `org_id = $1 AND uuid = $2 AND is_active = TRUE AND is_archived = FALSE`)
-var sqlSelectFlowByName = fmt.Sprintf(baseSqlSelectFlow, `org_id = $1 AND LOWER(name) = LOWER($2) AND is_active = TRUE AND is_archived = FALSE`)
-var sqlSelectFlowByID = fmt.Sprintf(baseSqlSelectFlow, `org_id = $1 AND id = $2 AND is_active = TRUE AND is_archived = FALSE`)
+var sqlSelectFlowByUUID = fmt.Sprintf(baseSqlSelectFlow, `WHERE org_id = $1 AND uuid = $2 AND is_active = TRUE AND is_archived = FALSE`)
+var sqlSelectFlowByName = fmt.Sprintf(baseSqlSelectFlow,
+	`WHERE 
+	    org_id = $1 AND LOWER(name) = LOWER($2) AND is_active = TRUE AND is_archived = FALSE 
+	ORDER BY 
+	    saved_on DESC LIMIT 1`,
+)
+var sqlSelectFlowByID = fmt.Sprintf(baseSqlSelectFlow, `WHERE org_id = $1 AND id = $2 AND is_active = TRUE AND is_archived = FALSE`)
 
 // MarshalJSON marshals into JSON. 0 values will become null
 func (i FlowID) MarshalJSON() ([]byte, error) {

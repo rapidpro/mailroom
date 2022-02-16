@@ -26,11 +26,15 @@ func InsertFlow(db *sqlx.DB, org *Org, definition []byte) *Flow {
 	if err != nil {
 		panic(err)
 	}
+	name, err := jsonparser.GetString(definition, "name")
+	if err != nil {
+		panic(err)
+	}
 
 	var id models.FlowID
 	must(db.Get(&id,
-		`INSERT INTO flows_flow(uuid, org_id, name, flow_type, version_number, expires_after_minutes, ignore_triggers, has_issues, is_active, is_archived, is_system, created_by_id, created_on, modified_by_id, modified_on, saved_on, saved_by_id) 
-		VALUES($1, $2, 'Test', 'M', 1, 10, FALSE, FALSE, TRUE, FALSE, FALSE, $3, NOW(), $3, NOW(), NOW(), $3) RETURNING id`, uuid, org.ID, Admin.ID,
+		`INSERT INTO flows_flow(org_id, uuid, name, flow_type, version_number, expires_after_minutes, ignore_triggers, has_issues, is_active, is_archived, is_system, created_by_id, created_on, modified_by_id, modified_on, saved_on, saved_by_id) 
+		VALUES($1, $2, $3, 'M', 1, 10, FALSE, FALSE, TRUE, FALSE, FALSE, $4, NOW(), $4, NOW(), NOW(), $4) RETURNING id`, org.ID, uuid, name, Admin.ID,
 	))
 
 	db.MustExec(`INSERT INTO flows_flowrevision(flow_id, definition, spec_version, revision, is_active, created_by_id, created_on, modified_by_id, modified_on) 
