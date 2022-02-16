@@ -1,3 +1,7 @@
+v7.1.42
+----------
+ * When fetching flows by name, prefer latest saved
+
 v7.1.41
 ----------
  * Add support for querying by flow
