@@ -8,15 +8,18 @@ import (
 
 // MockElasticServer is a mock HTTP server/endpoint that can be used to test elastic queries
 type MockElasticServer struct {
-	Server       *httptest.Server
-	LastBody     string
-	NextResponse string
+	Server          *httptest.Server
+	LastRequestURL  string
+	LastRequestBody string
+	NextResponse    string
 }
 
 // NewMockElasticServer creates a new mock elastic server
 func NewMockElasticServer() *MockElasticServer {
-	mock := &MockElasticServer{}
-	mock.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	m := &MockElasticServer{}
+	m.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m.LastRequestURL = r.URL.String()
+
 		// scrolling of results, we are always one page, so return empty hits
 		if r.URL.String() == "/_search/scroll" {
 			w.WriteHeader(200)
@@ -43,13 +46,13 @@ func NewMockElasticServer() *MockElasticServer {
 
 		// otherwise read our next body and return our next response
 		body, _ := io.ReadAll(r.Body)
-		mock.LastBody = string(body)
+		m.LastRequestBody = string(body)
 
 		w.WriteHeader(200)
-		w.Write([]byte(mock.NextResponse))
-		mock.NextResponse = ""
+		w.Write([]byte(m.NextResponse))
+		m.NextResponse = ""
 	}))
-	return mock
+	return m
 }
 
 // Close closes our HTTP server

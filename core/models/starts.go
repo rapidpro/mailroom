@@ -159,6 +159,7 @@ type FlowStart struct {
 
 func (s *FlowStart) ID() StartID         { return s.s.ID }
 func (s *FlowStart) OrgID() OrgID        { return s.s.OrgID }
+func (s *FlowStart) Type() StartType     { return s.s.StartType }
 func (s *FlowStart) CreatedByID() UserID { return s.s.CreatedByID }
 func (s *FlowStart) FlowID() FlowID      { return s.s.FlowID }
 func (s *FlowStart) FlowType() FlowType  { return s.s.FlowType }

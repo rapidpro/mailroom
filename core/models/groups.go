@@ -371,7 +371,7 @@ func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, 
 	}
 
 	// calculate new set of ids
-	new, err := ContactIDsForQuery(ctx, es, oa, query)
+	new, err := GetContactIDsForQuery(ctx, es, oa, query, -1)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error performing query: %s for group: %d", query, groupID)
 	}
