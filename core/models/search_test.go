@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestContactIDsForQueryPage(t *testing.T) {
+func TestGetContactIDsForQueryPage(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
 	es := testsuite.NewMockElasticServer()
@@ -237,7 +237,7 @@ func TestContactIDsForQueryPage(t *testing.T) {
 	for i, tc := range tcs {
 		es.NextResponse = tc.MockedESResponse
 
-		_, ids, total, err := models.ContactIDsForQueryPage(ctx, client, oa, tc.Group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
+		_, ids, total, err := models.GetContactIDsForQueryPage(ctx, client, oa, tc.Group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
 
 		if tc.ExpectedError != "" {
 			assert.EqualError(t, err, tc.ExpectedError)
@@ -246,12 +246,12 @@ func TestContactIDsForQueryPage(t *testing.T) {
 			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
 			assert.Equal(t, tc.ExpectedTotal, total, "%d: total mismatch", i)
 
-			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: ES request mismatch", i)
+			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastRequestBody), "%d: ES request mismatch", i)
 		}
 	}
 }
 
-func TestContactIDsForQuery(t *testing.T) {
+func TestGetContactIDsForQuery(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
 	es := testsuite.NewMockElasticServer()
@@ -268,15 +268,19 @@ func TestContactIDsForQuery(t *testing.T) {
 	require.NoError(t, err)
 
 	tcs := []struct {
-		Query             string
-		ExpectedESRequest string
-		MockedESResponse  string
-		ExpectedContacts  []models.ContactID
-		ExpectedError     string
+		query               string
+		limit               int
+		expectedRequestURL  string
+		expectedRequestBody string
+		mockedESResponse    string
+		expectedContacts    []models.ContactID
+		expectedError       string
 	}{
 		{
-			Query: "george",
-			ExpectedESRequest: `{
+			query:              "george",
+			limit:              -1,
+			expectedRequestURL: "/_search/scroll",
+			expectedRequestBody: `{
 				"_source":false,
 				"query": {
 					"bool": {
@@ -308,7 +312,7 @@ func TestContactIDsForQuery(t *testing.T) {
 				},
 				"sort":["_doc"]
 			}`,
-			MockedESResponse: fmt.Sprintf(`{
+			mockedESResponse: fmt.Sprintf(`{
 				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
 				"took": 2,
 				"timed_out": false,
@@ -335,10 +339,12 @@ func TestContactIDsForQuery(t *testing.T) {
 				  ]
 				}
 			}`, testdata.George.ID),
-			ExpectedContacts: []models.ContactID{testdata.George.ID},
+			expectedContacts: []models.ContactID{testdata.George.ID},
 		}, {
-			Query: "nobody",
-			ExpectedESRequest: `{
+			query:              "nobody",
+			limit:              -1,
+			expectedRequestURL: "/contacts/_search?routing=1&scroll=15m&size=10000",
+			expectedRequestBody: `{
 				"_source":false,
 				"query": {
 					"bool": {
@@ -370,7 +376,7 @@ func TestContactIDsForQuery(t *testing.T) {
 				},
 				"sort":["_doc"]
 			}`,
-			MockedESResponse: `{
+			mockedESResponse: `{
 				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
 				"took": 2,
 				"timed_out": false,
@@ -386,26 +392,85 @@ func TestContactIDsForQuery(t *testing.T) {
 				  "hits": []
 				}
 			}`,
-			ExpectedContacts: []models.ContactID{},
+			expectedContacts: []models.ContactID{},
 		},
 		{
-			Query:         "goats > 2", // no such contact field
-			ExpectedError: "error parsing query: goats > 2: can't resolve 'goats' to attribute, scheme or field",
+			query:              "george",
+			limit:              1,
+			expectedRequestURL: "/contacts/_search?routing=1",
+			expectedRequestBody: `{
+				"_source": false,
+				"from": 0,
+				"query": {
+					"bool": {
+						"must": [
+							{
+								"term": {
+									"org_id": 1
+								}
+							},
+							{
+								"term": {
+									"is_active": true
+								}
+							},
+							{
+								"term": {
+									"status": "A"
+								}
+							},
+							{
+								"match": {
+									"name": {
+										"query": "george"
+									}
+								}
+							}
+						]
+					}
+				},
+				"size": 1
+			}`,
+			mockedESResponse: fmt.Sprintf(`{
+				"hits": {
+					"total": 1,
+					"max_score": null,
+					"hits": [
+						{
+							"_index": "contacts",
+							"_type": "_doc",
+							"_id": "%d",
+							"_score": null,
+							"_routing": "1",
+							"sort": [
+							15124352
+							]
+						}
+					]
+				}
+			}`, testdata.George.ID),
+			expectedContacts: []models.ContactID{testdata.George.ID},
+		},
+		{
+			query:         "goats > 2", // no such contact field
+			limit:         -1,
+			expectedError: "error parsing query: goats > 2: can't resolve 'goats' to attribute, scheme or field",
 		},
 	}
 
 	for i, tc := range tcs {
-		es.NextResponse = tc.MockedESResponse
+		es.NextResponse = tc.mockedESResponse
 
-		ids, err := models.ContactIDsForQuery(ctx, client, oa, tc.Query)
+		ids, err := models.GetContactIDsForQuery(ctx, client, oa, tc.query, tc.limit)
 
-		if tc.ExpectedError != "" {
-			assert.EqualError(t, err, tc.ExpectedError)
+		if tc.expectedError != "" {
+			assert.EqualError(t, err, tc.expectedError)
 		} else {
 			assert.NoError(t, err, "%d: error encountered performing query", i)
-			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
+			assert.Equal(t, tc.expectedContacts, ids, "%d: ids mismatch", i)
 
-			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "%d: request mismatch", i)
+			assert.Equal(t, tc.expectedRequestURL, es.LastRequestURL, "%d: request URL mismatch", i)
+			test.AssertEqualJSON(t, []byte(tc.expectedRequestBody), []byte(es.LastRequestBody), "%d: request body mismatch", i)
 		}
 	}
 }

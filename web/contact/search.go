@@ -79,7 +79,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, rt.ES, oa,
+	parsed, hits, total, err := models.GetContactIDsForQueryPage(ctx, rt.ES, oa,
 		request.GroupUUID, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {

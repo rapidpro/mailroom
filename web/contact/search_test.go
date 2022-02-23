@@ -251,7 +251,7 @@ func TestSearch(t *testing.T) {
 			}
 
 			if tc.expectedESRequest != "" {
-				test.AssertEqualJSON(t, []byte(tc.expectedESRequest), []byte(es.LastBody), "elastic request mismatch")
+				test.AssertEqualJSON(t, []byte(tc.expectedESRequest), []byte(es.LastRequestBody), "elastic request mismatch")
 			}
 		} else {
 			r := &web.ErrorResponse{}
