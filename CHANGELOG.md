@@ -1,3 +1,8 @@
+v7.1.43
+----------
+ * Flow starts from start_session actions in flows should only match single contacts
+ * Fix panic when resuming IVR flow
+
 v7.1.42
 ----------
  * When fetching flows by name, prefer latest saved
