@@ -72,10 +72,6 @@ type FlowRun struct {
 		OrgID           OrgID           `db:"org_id"`
 		SessionID       SessionID       `db:"session_id"`
 		StartID         StartID         `db:"start_id"`
-
-		// deprecated
-		IsActive bool     `db:"is_active"`
-		ExitType ExitType `db:"exit_type"`
 	}
 
 	// we keep a reference to the engine's run
@@ -107,9 +103,9 @@ type Step struct {
 
 const sqlInsertRun = `
 INSERT INTO
-flows_flowrun(uuid, is_active, created_on, modified_on, exited_on, exit_type, status, responded, results, path, 
+flows_flowrun(uuid, created_on, modified_on, exited_on, status, responded, results, path, 
 	          current_node_uuid, contact_id, flow_id, org_id, session_id, start_id)
-	   VALUES(:uuid, :is_active, :created_on, NOW(), :exited_on, :exit_type, :status, :responded, :results, :path,
+	   VALUES(:uuid, :created_on, NOW(), :exited_on, :status, :responded, :results, :path,
 	          :current_node_uuid, :contact_id, :flow_id, :org_id, :session_id, :start_id)
 RETURNING id
 `
@@ -151,14 +147,6 @@ func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, f
 		r.CurrentNodeUUID = null.String(path[len(path)-1].NodeUUID)
 	}
 	run.run = fr
-
-	// TODO remove once we no longer need to write is_active or exit_type
-	if fr.Status() != flows.RunStatusActive && fr.Status() != flows.RunStatusWaiting {
-		r.ExitType = runStatusToExitType[r.Status]
-		r.IsActive = false
-	} else {
-		r.IsActive = true
-	}
 
 	// mark ourselves as responded if we received a message
 	for _, e := range fr.Events() {

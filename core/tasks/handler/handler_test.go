@@ -648,7 +648,7 @@ func TestTimedEvents(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) from flows_flowrun WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
 
 	// test the case of a run and session no longer being the most recent but somehow still active, expiration should still work
-	r, err := db.QueryContext(ctx, `SELECT id, session_id from flows_flowrun WHERE contact_id = $1 and is_active = FALSE order by created_on asc limit 1`, testdata.Cathy.ID)
+	r, err := db.QueryContext(ctx, `SELECT id, session_id from flows_flowrun WHERE contact_id = $1 and status = 'I' order by created_on asc limit 1`, testdata.Cathy.ID)
 	assert.NoError(t, err)
 	defer r.Close()
 	r.Next()
@@ -656,11 +656,11 @@ func TestTimedEvents(t *testing.T) {
 
 	expiration := time.Now()
 
-	// set both to be active (this requires us to disable the path change trigger for a bit which asserts flows can't cross back into active status)
-	db.MustExec(`ALTER TABLE flows_flowrun DISABLE TRIGGER temba_flowrun_path_change`)
+	// set both to be active (this requires us to disable the status change trigger for a bit which asserts flows can't cross back into active status)
+	db.MustExec(`ALTER TABLE flows_flowrun DISABLE TRIGGER temba_flowrun_status_change`)
 	db.MustExec(`UPDATE flows_flowrun SET status = 'W' WHERE id = $1`, runID)
 	db.MustExec(`UPDATE flows_flowsession SET status = 'W', wait_started_on = NOW(), wait_expires_on = $2 WHERE id = $1`, sessionID, expiration)
-	db.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_path_change`)
+	db.MustExec(`ALTER TABLE flows_flowrun ENABLE TRIGGER temba_flowrun_status_change`)
 
 	// try to expire the run
 	task := handler.NewExpirationTask(testdata.Org1.ID, testdata.Cathy.ID, sessionID, expiration)

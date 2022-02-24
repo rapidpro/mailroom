@@ -279,8 +279,6 @@ const sqlUpdateRun = `
 UPDATE
 	flows_flowrun fr
 SET
-	is_active = r.is_active::bool,
-	exit_type = r.exit_type,
 	status = r.status,
 	exited_on = r.exited_on::timestamp with time zone,
 	responded = r.responded::bool,
@@ -289,9 +287,9 @@ SET
 	current_node_uuid = r.current_node_uuid::uuid,
 	modified_on = NOW()
 FROM (
-	VALUES(:uuid, :is_active, :exit_type, :status, :exited_on, :responded, :results, :path, :current_node_uuid)
+	VALUES(:uuid, :status, :exited_on, :responded, :results, :path, :current_node_uuid)
 ) AS
-	r(uuid, is_active, exit_type, status, exited_on, responded, results, path, current_node_uuid)
+	r(uuid, status, exited_on, responded, results, path, current_node_uuid)
 WHERE
 	fr.uuid = r.uuid::uuid
 `
@@ -878,7 +876,7 @@ RETURNING contact_id`
 
 const sqlExitSessionRuns = `
 UPDATE flows_flowrun
-   SET is_active = FALSE, exit_type = $2, exited_on = $3, status = $4, modified_on = NOW()
+   SET exited_on = $2, status = $3, modified_on = NOW()
  WHERE id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND status IN ('A', 'W'))`
 
 const sqlExitSessionContacts = `
@@ -888,9 +886,7 @@ const sqlExitSessionContacts = `
 
 // exits sessions and their runs inside the given transaction
 func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, status SessionStatus) error {
-	runStatus := RunStatus(status)             // session status codes are subset of run status codes
-	exitType := runStatusToExitType[runStatus] // for compatibility
-
+	runStatus := RunStatus(status) // session status codes are subset of run status codes
 	contactIDs := make([]SessionID, 0, len(sessionIDs))
 
 	// first update the sessions themselves and get the contact ids
@@ -906,7 +902,7 @@ func exitSessionBatch(ctx context.Context, tx *sqlx.Tx, sessionIDs []SessionID, 
 	// then the runs that belong to these sessions
 	start = time.Now()
 
-	res, err := tx.ExecContext(ctx, sqlExitSessionRuns, pq.Array(sessionIDs), exitType, time.Now(), runStatus)
+	res, err := tx.ExecContext(ctx, sqlExitSessionRuns, pq.Array(sessionIDs), time.Now(), runStatus)
 	if err != nil {
 		return errors.Wrapf(err, "error exiting session runs")
 	}
