@@ -234,7 +234,7 @@ func TestBatchStart(t *testing.T) {
 
 		assertdb.Query(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
-			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
+			AND responded = FALSE AND org_id = 1 AND status = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
 			Returns(tc.TotalCount, "%d: unexpected number of runs", i)
 
@@ -275,7 +275,7 @@ func TestResume(t *testing.T) {
 
 	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-		 AND is_active = TRUE AND responded = FALSE AND org_id = 1`, modelContact.ID(), flow.ID()).Returns(1)
+		 AND status = 'W' AND responded = FALSE AND org_id = 1`, modelContact.ID(), flow.ID()).Returns(1)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, modelContact.ID()).Returns(1)
 
@@ -307,13 +307,11 @@ func TestResume(t *testing.T) {
 			 AND status = $2 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, modelContact.ID(), tc.SessionStatus).
 			Returns(1, "%d: didn't find expected session", i)
 
-		runIsActive := tc.RunStatus == models.RunStatusActive || tc.RunStatus == models.RunStatusWaiting
-
 		runQuery := `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-		 AND status = $3 AND is_active = $4 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
-		 AND json_array_length(path::json) = $5 AND session_id IS NOT NULL`
+		 AND status = $3 AND responded = TRUE AND org_id = 1 AND current_node_uuid IS NOT NULL
+		 AND json_array_length(path::json) = $4 AND session_id IS NOT NULL`
 
-		assertdb.Query(t, db, runQuery, modelContact.ID(), flow.ID(), tc.RunStatus, runIsActive, tc.PathLength).
+		assertdb.Query(t, db, runQuery, modelContact.ID(), flow.ID(), tc.RunStatus, tc.PathLength).
 			Returns(1, "%d: didn't find expected run", i)
 
 		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like $2`, modelContact.ID(), tc.Substring).

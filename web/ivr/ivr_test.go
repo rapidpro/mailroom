@@ -623,8 +623,7 @@ func TestVonageIVR(t *testing.T) {
 
 	// check our final state of sessions, runs, msgs, connections
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
-
-	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND is_active = FALSE`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`, testdata.Cathy.ID).Returns(1)
 

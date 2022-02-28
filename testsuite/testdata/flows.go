@@ -89,12 +89,10 @@ func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType m
 
 // InsertFlowRun inserts a flow run
 func InsertFlowRun(db *sqlx.DB, org *Org, sessionID models.SessionID, contact *Contact, flow *Flow, status models.RunStatus) models.FlowRunID {
-	isActive := status == models.RunStatusActive || status == models.RunStatusWaiting
-
 	var id models.FlowRunID
 	must(db.Get(&id,
-		`INSERT INTO flows_flowrun(uuid, org_id, session_id, contact_id, flow_id, status, is_active, responded, created_on, modified_on) 
-		 VALUES($1, $2, $3, $4, $5, $6, $7, TRUE, NOW(), NOW()) RETURNING id`, uuids.New(), org.ID, null.Int(sessionID), contact.ID, flow.ID, status, isActive,
+		`INSERT INTO flows_flowrun(uuid, org_id, session_id, contact_id, flow_id, status, responded, created_on, modified_on) 
+		 VALUES($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW()) RETURNING id`, uuids.New(), org.ID, null.Int(sessionID), contact.ID, flow.ID, status,
 	))
 	return id
 }
