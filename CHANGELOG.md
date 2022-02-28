@@ -1,3 +1,7 @@
+v7.1.44
+----------
+ * Remove references to flows_flowrun.exit_type and is_active which are no longer used
+
 v7.1.43
 ----------
  * Flow starts from start_session actions in flows should only match single contacts
