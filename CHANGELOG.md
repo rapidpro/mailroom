@@ -1,3 +1,7 @@
+v7.1.45
+----------
+ * Update to latest goflow
+
 v7.1.44
 ----------
  * Remove references to flows_flowrun.exit_type and is_active which are no longer used
