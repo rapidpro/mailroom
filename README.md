@@ -36,6 +36,7 @@ For use with RapidPro, you will want to configure these settings:
 - `MAILROOM_AUTH_TOKEN`: the token clients will need to authenticate web requests (should match setting in RapidPro)
 - `MAILROOM_ATTACHMENT_DOMAIN`: the domain that will be used for relative attachments in flows
 - `MAILROOM_DB`: URL describing how to connect to the RapidPro database (default "postgres://temba:temba@localhost/temba?sslmode=disable")
+- `MAILROOM_READONLY_DB`: URL for an additional database connection for read-only operations (optional)
 - `MAILROOM_REDIS`: URL describing how to connect to Redis (default "redis://localhost:6379/15")
 - `MAILROOM_ELASTIC`: URL describing how to connect to ElasticSearch (default "http://localhost:9200")
 - `MAILROOM_SMTP_SERVER`: the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com
@@ -48,7 +49,7 @@ For writing of message attachments, Mailroom needs access to an S3 bucket, you c
 - `MAILROOM_AWS_ACCESS_KEY_ID`: The AWS access key id used to authenticate to AWS
 - `MAILROOM_AWS_SECRET_ACCESS_KEY` The AWS secret access key used to authenticate to AWS
 
-While still in beta, Mailroom will move to writing session data to S3 in 6.6, you can configure those buckets using:
+For writing of engine session output, Mailroom needs access to an S3 bucket, you can configure access to your bucket via:
 
 - `MAILROOM_S3_SESSION_BUCKET`: The name of your S3 bucket (ex: `rp-sessions`)
 - `MAILROOM_S3_SESSION_PREFIX`: The prefix to use for filenames of sessions added to your bucket (ex: ``)
