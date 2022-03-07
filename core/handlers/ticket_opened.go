@@ -68,7 +68,7 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 		"session_id":    scene.SessionID(),
 		"ticket_uuid":   event.Ticket.UUID,
 		"ticketer_name": ticketer.Name,
-		"ticketer_uuid": ticketer.UUID,
+		"ticketer_uuid": ticketer.UUID(),
 	}).Debug("ticket opened")
 
 	return nil
