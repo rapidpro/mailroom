@@ -1,3 +1,7 @@
+v7.2.0
+----------
+ * Add missing config options to README
+
 v7.1.45
 ----------
  * Update to latest goflow
