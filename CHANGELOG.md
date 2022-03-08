@@ -1,3 +1,8 @@
+v7.2.1
+----------
+ * Improve logging of expirations task and fix logging on ticket opening
+ * CI with latest go 1.17.x
+
 v7.2.0
 ----------
  * Add missing config options to README
