@@ -67,15 +67,14 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 	}
 	defer rows.Close()
 
-	count := 0
+	numExpired, numDupes, numResumed := 0, 0, 0
+
 	for rows.Next() {
 		expiredWait := &ExpiredWait{}
 		err := rows.StructScan(expiredWait)
 		if err != nil {
 			return errors.Wrapf(err, "error scanning expired wait")
 		}
-
-		count++
 
 		// if it can't be resumed, add to batch to be expired
 		if !expiredWait.CanResume {
@@ -90,6 +89,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 				expiredSessions = expiredSessions[:0]
 			}
 
+			numExpired++
 			continue
 		}
 
@@ -102,6 +102,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 
 		// already queued? move on
 		if queued {
+			numDupes++
 			continue
 		}
 
@@ -117,6 +118,8 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 		if err != nil {
 			return errors.Wrapf(err, "error marking expiration task as queued")
 		}
+
+		numResumed++
 	}
 
 	// commit any stragglers
@@ -127,7 +130,12 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 		}
 	}
 
-	log.WithField("elapsed", time.Since(start)).WithField("count", count).Info("expirations complete")
+	log.WithFields(logrus.Fields{
+		"expired": numExpired,
+		"dupes":   numDupes,
+		"resumed": numResumed,
+		"elapsed": time.Since(start),
+	}).Info("expirations complete")
 	return nil
 }
 
