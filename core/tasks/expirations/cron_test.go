@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/goflow/envs"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -22,6 +23,9 @@ func TestExpirations(t *testing.T) {
 	defer rc.Close()
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+
+	// create a blocked contact
+	blake := testdata.InsertContact(db, testdata.Org1, "9eef59ef-21b3-4f51-a296-937529a30e38", "Blake", envs.NilLanguage, models.ContactStatusBlocked)
 
 	// create single run session for Cathy, no parent to resume
 	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, nil)
@@ -41,6 +45,11 @@ func TestExpirations(t *testing.T) {
 	s4ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeVoice, testdata.IVRFlow, conn, time.Now(), time.Now(), false, nil)
 	r5ID := testdata.InsertFlowRun(db, testdata.Org1, s4ID, testdata.Alexandria, testdata.IVRFlow, models.RunStatusWaiting)
 
+	// create a parent/child session for the blocked contact
+	s5ID := testdata.InsertWaitingSession(db, testdata.Org1, blake, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), true, nil)
+	r6ID := testdata.InsertFlowRun(db, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusWaiting)
+	r7ID := testdata.InsertFlowRun(db, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusWaiting)
+
 	time.Sleep(5 * time.Millisecond)
 
 	// expire our sessions...
@@ -51,7 +60,7 @@ func TestExpirations(t *testing.T) {
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s1ID).Columns(map[string]interface{}{"status": "X"})
 	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r1ID).Columns(map[string]interface{}{"status": "X"})
 
-	// Bob's session and run should be unchanged because it's been queued for resumption
+	// Bob's session and runs should be unchanged because it's been queued for resumption
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s2ID).Columns(map[string]interface{}{"status": "W"})
 	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r2ID).Columns(map[string]interface{}{"status": "A"})
 	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r3ID).Columns(map[string]interface{}{"status": "W"})
@@ -63,6 +72,11 @@ func TestExpirations(t *testing.T) {
 	// Alexandria's session and run should be unchanged because IVR expirations are handled separately
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s4ID).Columns(map[string]interface{}{"status": "W"})
 	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r5ID).Columns(map[string]interface{}{"status": "W"})
+
+	// blocked contact's session and runs should be expired because a blocked contact can't resume
+	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s5ID).Columns(map[string]interface{}{"status": "X"})
+	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r6ID).Columns(map[string]interface{}{"status": "X"})
+	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r7ID).Columns(map[string]interface{}{"status": "X"})
 
 	// should have created one task
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
