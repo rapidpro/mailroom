@@ -1,3 +1,8 @@
+v7.2.2
+----------
+ * Tweak log messages for expirations and timeouts
+ * Don't try to resume expired session if contact isn't active
+
 v7.2.1
 ----------
  * Improve logging of expirations task and fix logging on ticket opening
