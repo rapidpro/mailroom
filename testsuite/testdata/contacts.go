@@ -47,11 +47,11 @@ type Field struct {
 }
 
 // InsertContact inserts a contact
-func InsertContact(db *sqlx.DB, org *Org, uuid flows.ContactUUID, name string, language envs.Language) *Contact {
+func InsertContact(db *sqlx.DB, org *Org, uuid flows.ContactUUID, name string, language envs.Language, status models.ContactStatus) *Contact {
 	var id models.ContactID
 	must(db.Get(&id,
-		`INSERT INTO contacts_contact (org_id, is_active, status, ticket_count, uuid, name, language, created_on, modified_on, created_by_id, modified_by_id) 
-		VALUES($1, TRUE, 'A', 0, $2, $3, $4, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, uuid, name, language,
+		`INSERT INTO contacts_contact (org_id, is_active, ticket_count, uuid, name, language, status, created_on, modified_on, created_by_id, modified_by_id) 
+		VALUES($1, TRUE, 0, $2, $3, $4, $5, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, uuid, name, language, status,
 	))
 	return &Contact{id, uuid, "", models.NilURNID}
 }

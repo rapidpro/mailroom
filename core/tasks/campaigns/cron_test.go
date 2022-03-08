@@ -69,7 +69,7 @@ func TestQueueEventFires(t *testing.T) {
 
 	// add 110 scheduled event fires to test batch limits
 	for i := 0; i < 110; i++ {
-		contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), fmt.Sprintf("Jim %d", i), envs.NilLanguage)
+		contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), fmt.Sprintf("Jim %d", i), envs.NilLanguage, models.ContactStatusActive)
 		testdata.InsertEventFire(rt.DB, contact, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
 	}
 
