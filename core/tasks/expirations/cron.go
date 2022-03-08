@@ -67,7 +67,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 	}
 	defer rows.Close()
 
-	numExpired, numDupes, numResumed := 0, 0, 0
+	numExpired, numDupes, numQueued := 0, 0, 0
 
 	for rows.Next() {
 		expiredWait := &ExpiredWait{}
@@ -119,7 +119,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 			return errors.Wrapf(err, "error marking expiration task as queued")
 		}
 
-		numResumed++
+		numQueued++
 	}
 
 	// commit any stragglers
@@ -130,12 +130,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 		}
 	}
 
-	log.WithFields(logrus.Fields{
-		"expired": numExpired,
-		"dupes":   numDupes,
-		"resumed": numResumed,
-		"elapsed": time.Since(start),
-	}).Info("expirations complete")
+	log.WithField("expired", numExpired).WithField("dupes", numDupes).WithField("queued", numQueued).WithField("elapsed", time.Since(start)).Info("session expirations queued")
 	return nil
 }
 
