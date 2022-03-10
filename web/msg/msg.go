@@ -48,15 +48,15 @@ func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error loading messages to resend")
 	}
 
-	err = models.ResendMessages(ctx, rt.DB, rt.RP, oa, msgs)
+	resends, err := models.ResendMessages(ctx, rt.DB, rt.RP, oa, msgs)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error resending messages")
 	}
 
-	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
+	msgio.SendMessages(ctx, rt, rt.DB, nil, resends)
 
 	// response is the ids of the messages that were actually resent
-	resentMsgIDs := make([]flows.MsgID, len(msgs))
+	resentMsgIDs := make([]flows.MsgID, len(resends))
 	for i, m := range msgs {
 		resentMsgIDs[i] = m.ID()
 	}
