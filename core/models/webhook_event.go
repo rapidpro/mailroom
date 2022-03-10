@@ -34,8 +34,8 @@ func NewWebhookEvent(orgID OrgID, resthookID ResthookID, data string, createdOn 
 }
 
 const sqlInsertWebhookEvents = `
-INSERT INTO	api_webhookevent(data, resthook_id, org_id, created_on, action)
-     VALUES (:data, :resthook_id, :org_id, :created_on, 'POST')
+INSERT INTO api_webhookevent(data, resthook_id, org_id, created_on, action)
+     VALUES(:data, :resthook_id, :org_id, :created_on, 'POST')
   RETURNING id`
 
 // InsertWebhookEvents inserts the passed in webhook events, assigning them ids

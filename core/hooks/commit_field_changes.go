@@ -76,7 +76,7 @@ func (h *commitFieldChangesHook) Apply(ctx context.Context, rt *runtime.Runtime,
 
 	// then our updates
 	if len(fieldUpdates) > 0 {
-		err := models.BulkQuery(ctx, "updating contact field values", tx, sqpUpdateContactFields, fieldUpdates)
+		err := models.BulkQuery(ctx, "updating contact field values", tx, sqlUpdateContactFields, fieldUpdates)
 		if err != nil {
 			return errors.Wrapf(err, "error updating contact fields")
 		}
@@ -99,7 +99,7 @@ type FieldValue struct {
 	Text string `json:"text"`
 }
 
-const sqpUpdateContactFields = `
+const sqlUpdateContactFields = `
 UPDATE contacts_contact c
    SET fields = COALESCE(fields,'{}'::jsonb) || r.updates::jsonb
   FROM (VALUES(:contact_id, :updates)) AS r(contact_id, updates)
