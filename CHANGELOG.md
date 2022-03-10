@@ -1,3 +1,7 @@
+v7.2.3
+----------
+ * Rework resending to fail messages with no destination
+
 v7.2.2
 ----------
  * Tweak log messages for expirations and timeouts
