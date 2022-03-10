@@ -416,31 +416,53 @@ func TestResendMessages(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgOut1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", nil, models.MsgStatusFailed, false)
-	msgOut2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "out 2", nil, models.MsgStatusFailed, false)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 3", nil, models.MsgStatusFailed, false)
+	out1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
+	out2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "hi", nil, models.MsgStatusFailed, false)
+
+	// failed message with no channel
+	out3 := testdata.InsertOutgoingMsg(db, testdata.Org1, nil, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
+
+	// failed message with no URN
+	out4 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
+	db.MustExec(`UPDATE msgs_msg SET contact_urn_id = NULL, failed_reason = 'D' WHERE id = $1`, out4.ID())
+
+	// failed message with URN which we no longer have a channel for
+	out5 := testdata.InsertOutgoingMsg(db, testdata.Org1, nil, testdata.George, "hi", nil, models.MsgStatusFailed, false)
+	db.MustExec(`UPDATE msgs_msg SET failed_reason = 'E' WHERE id = $1`, out5.ID())
+	db.MustExec(`UPDATE contacts_contacturn SET scheme = 'viber', path = '1234', identity = 'viber:1234' WHERE id = $1`, testdata.George.URNID)
+
+	// other failed message not included in set to resend
+	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
 
 	// give Bob's URN an affinity for the Vonage channel
 	db.MustExec(`UPDATE contacts_contacturn SET channel_id = $1 WHERE id = $2`, testdata.VonageChannel.ID, testdata.Bob.URNID)
 
-	msgs, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(msgOut1.ID()), models.MsgID(msgOut2.ID())})
+	ids := []models.MsgID{models.MsgID(out1.ID()), models.MsgID(out2.ID()), models.MsgID(out3.ID()), models.MsgID(out4.ID()), models.MsgID(out5.ID())}
+	msgs, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, ids)
 	require.NoError(t, err)
 
 	now := dates.Now()
 
 	// resend both msgs
-	err = models.ResendMessages(ctx, db, rp, oa, msgs)
+	resent, err := models.ResendMessages(ctx, db, rp, oa, msgs)
 	require.NoError(t, err)
 
-	// both messages should now have a channel, a topup and be marked for resending
-	assert.True(t, msgs[0].IsResend())
-	assert.Equal(t, testdata.TwilioChannel.ID, msgs[0].ChannelID())
-	assert.Equal(t, models.TopupID(1), msgs[0].TopupID())
-	assert.True(t, msgs[1].IsResend())
-	assert.Equal(t, testdata.VonageChannel.ID, msgs[1].ChannelID())
-	assert.Equal(t, models.TopupID(1), msgs[1].TopupID())
+	assert.Len(t, resent, 3) // only #1, #2 and #3 can be resent
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(2)
+	// both messages should now have a channel, a topup and be marked for resending
+	assert.True(t, resent[0].IsResend())
+	assert.Equal(t, testdata.TwilioChannel.ID, resent[0].ChannelID())
+	assert.Equal(t, models.TopupID(1), resent[0].TopupID())
+	assert.True(t, resent[1].IsResend())
+	assert.Equal(t, testdata.VonageChannel.ID, resent[1].ChannelID()) // channel changed
+	assert.Equal(t, models.TopupID(1), resent[1].TopupID())
+	assert.True(t, resent[2].IsResend())
+	assert.Equal(t, testdata.TwilioChannel.ID, resent[2].ChannelID()) // channel added
+
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(3)
+
+	assertdb.Query(t, db, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out4.ID()).Columns(map[string]interface{}{"status": "F", "failed_reason": "D"})
+	assertdb.Query(t, db, `SELECT status, failed_reason FROM msgs_msg WHERE id = $1`, out5.ID()).Columns(map[string]interface{}{"status": "F", "failed_reason": "D"})
 }
 
 func TestGetMsgRepetitions(t *testing.T) {

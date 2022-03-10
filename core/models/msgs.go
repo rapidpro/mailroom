@@ -1146,80 +1146,103 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 	return msgs, nil
 }
 
-const updateMsgForResendingSQL = `
-	UPDATE
-		msgs_msg m
-	SET
-		channel_id = r.channel_id::int,
-		topup_id = r.topup_id::int,
-		status = 'P',
-		error_count = 0,
-		failed_reason = NULL,
-		queued_on = r.queued_on::timestamp with time zone,
-		sent_on = NULL,
-		modified_on = NOW()
-	FROM (
-		VALUES(:id, :channel_id, :topup_id, :queued_on)
-	) AS
-		r(id, channel_id, topup_id, queued_on)
-	WHERE
-		m.id = r.id::bigint
-`
+const sqlUpdateMsgForResending = `
+UPDATE msgs_msg m
+   SET channel_id = r.channel_id::int,
+       topup_id = r.topup_id::int,
+       status = 'P',
+       error_count = 0,
+       failed_reason = NULL,
+       queued_on = r.queued_on::timestamp with time zone,
+       sent_on = NULL,
+       modified_on = NOW()
+  FROM (VALUES(:id, :channel_id, :topup_id, :queued_on)) AS r(id, channel_id, topup_id, queued_on)
+ WHERE m.id = r.id::bigint`
+
+const sqlUpdateMsgResendFailed = `
+UPDATE msgs_msg m
+   SET channel_id = NULL, status = 'F', error_count = 0, failed_reason = 'D', sent_on = NULL, modified_on = NOW()
+ WHERE id = ANY($1)`
 
 // ResendMessages prepares messages for resending by reselecting a channel and marking them as PENDING
-func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) error {
+func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
 	channels := oa.SessionAssets().Channels()
-	resends := make([]interface{}, len(msgs))
 
-	for i, msg := range msgs {
-		// reselect channel for this message's URN
-		urn, err := URNForID(ctx, db, oa, *msg.ContactURNID())
-		if err != nil {
-			return errors.Wrap(err, "error loading URN")
+	// for the bulk db updates
+	resends := make([]interface{}, 0, len(msgs))
+	refails := make([]MsgID, 0, len(msgs))
+
+	resent := make([]*Msg, 0, len(msgs))
+
+	for _, msg := range msgs {
+		var ch *flows.Channel
+		var err error
+		urnID := msg.ContactURNID()
+
+		if urnID != nil {
+			// reselect channel for this message's URN
+			urn, err := URNForID(ctx, db, oa, *urnID)
+			if err != nil {
+				return nil, errors.Wrap(err, "error loading URN")
+			}
+			msg.m.URN = urn // needs to be set for queueing to courier
+
+			contactURN, err := flows.ParseRawURN(channels, urn, assets.IgnoreMissing)
+			if err != nil {
+				return nil, errors.Wrap(err, "error parsing URN")
+			}
+
+			ch = channels.GetForURN(contactURN, assets.ChannelRoleSend)
 		}
-		msg.m.URN = urn // needs to be set for queueing to courier
 
-		contactURN, err := flows.ParseRawURN(channels, urn, assets.IgnoreMissing)
-		if err != nil {
-			return errors.Wrap(err, "error parsing URN")
-		}
-
-		ch := channels.GetForURN(contactURN, assets.ChannelRoleSend)
 		if ch != nil {
 			channel := oa.ChannelByUUID(ch.UUID())
+			msg.channel = channel
+
 			msg.m.ChannelID = channel.ID()
 			msg.m.ChannelUUID = channel.UUID()
-			msg.channel = channel
+			msg.m.Status = MsgStatusPending
+			msg.m.QueuedOn = dates.Now()
+			msg.m.SentOn = nil
+			msg.m.ErrorCount = 0
+			msg.m.FailedReason = ""
+			msg.m.IsResend = true // mark message as being a resend so it will be queued to courier as such
+
+			// allocate a new topup for this message if org uses topups
+			msg.m.TopupID, err = AllocateTopups(ctx, db, rp, oa.Org(), 1)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error allocating topup for message resending")
+			}
+			resends = append(resends, msg.m)
+			resent = append(resent, msg)
 		} else {
+			// if we don't have channel or a URN, fail again
+			msg.channel = nil
 			msg.m.ChannelID = NilChannelID
 			msg.m.ChannelUUID = assets.ChannelUUID("")
-			msg.channel = nil
+			msg.m.Status = MsgStatusFailed
+			msg.m.QueuedOn = dates.Now()
+			msg.m.SentOn = nil
+			msg.m.ErrorCount = 0
+			msg.m.FailedReason = MsgFailedNoDestination
+
+			refails = append(refails, MsgID(msg.m.ID))
 		}
-
-		// allocate a new topup for this message if org uses topups
-		msg.m.TopupID, err = AllocateTopups(ctx, db, rp, oa.Org(), 1)
-		if err != nil {
-			return errors.Wrapf(err, "error allocating topup for message resending")
-		}
-
-		// mark message as being a resend so it will be queued to courier as such
-		msg.m.Status = MsgStatusPending
-		msg.m.QueuedOn = dates.Now()
-		msg.m.SentOn = nil
-		msg.m.ErrorCount = 0
-		msg.m.FailedReason = ""
-		msg.m.IsResend = true
-
-		resends[i] = msg.m
 	}
 
-	// update the messages in the database
-	err := BulkQuery(ctx, "updating messages for resending", db, updateMsgForResendingSQL, resends)
+	// update the messages that can be resent
+	err := BulkQuery(ctx, "updating messages for resending", db, sqlUpdateMsgForResending, resends)
 	if err != nil {
-		return errors.Wrapf(err, "error updating messages for resending")
+		return nil, errors.Wrapf(err, "error updating messages for resending")
 	}
 
-	return nil
+	// and update the messages that can't be
+	_, err = db.ExecContext(ctx, sqlUpdateMsgResendFailed, pq.Array(refails))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating non-resendable messages")
+	}
+
+	return resent, nil
 }
 
 // MarkBroadcastSent marks the passed in broadcast as sent
