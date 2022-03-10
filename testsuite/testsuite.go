@@ -178,7 +178,7 @@ func resetStorage() {
 	must(os.RemoveAll(SessionStorageDir))
 }
 
-var resetDataSQL = `
+var sqlResetTestData = `
 UPDATE contacts_contact SET current_flow_id = NULL;
 
 DELETE FROM notifications_notification;
@@ -226,7 +226,7 @@ ALTER SEQUENCE campaigns_campaignevent_id_seq RESTART WITH 30000;`
 // undo changes made to the contact data in the test database dump.
 func resetData() {
 	db := getDB()
-	db.MustExec(resetDataSQL)
+	db.MustExec(sqlResetTestData)
 
 	// because groups have changed
 	models.FlushCache()

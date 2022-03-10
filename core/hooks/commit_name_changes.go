@@ -27,7 +27,7 @@ func (h *commitNameChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, 
 	}
 
 	// do our update
-	return models.BulkQuery(ctx, "updating contact name", tx, updateContactNameSQL, updates)
+	return models.BulkQuery(ctx, "updating contact name", tx, sqlUpdateContactName, updates)
 }
 
 // struct used for our bulk insert
@@ -36,15 +36,8 @@ type nameUpdate struct {
 	Name      null.String      `db:"name"`
 }
 
-const updateContactNameSQL = `
-	UPDATE 
-		contacts_contact c
-	SET
-		name = r.name
-	FROM (
-		VALUES(:id, :name)
-	) AS
-		r(id, name)
-	WHERE
-		c.id = r.id::int
-`
+const sqlUpdateContactName = `
+UPDATE contacts_contact c
+   SET name = r.name
+  FROM (VALUES(:id, :name)) AS r(id, name)
+ WHERE c.id = r.id::int`

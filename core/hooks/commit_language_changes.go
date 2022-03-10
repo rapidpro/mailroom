@@ -26,7 +26,7 @@ func (h *commitLanguageChangesHook) Apply(ctx context.Context, rt *runtime.Runti
 	}
 
 	// do our update
-	return models.BulkQuery(ctx, "updating contact language", tx, updateContactLanguageSQL, updates)
+	return models.BulkQuery(ctx, "updating contact language", tx, sqlUpdateContactLanguage, updates)
 }
 
 // struct used for our bulk update
@@ -35,15 +35,8 @@ type languageUpdate struct {
 	Language  null.String      `db:"language"`
 }
 
-const updateContactLanguageSQL = `
-	UPDATE 
-		contacts_contact c
-	SET
-		language = r.language
-	FROM (
-		VALUES(:id, :language)
-	) AS
-		r(id, language)
-	WHERE
-		c.id = r.id::int
-`
+const sqlUpdateContactLanguage = `
+UPDATE contacts_contact c
+   SET language = r.language
+  FROM (VALUES(:id, :language)) AS r(id, language)
+ WHERE c.id = r.id::int`
