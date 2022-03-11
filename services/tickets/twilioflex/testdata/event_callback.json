@@ -1,0 +1,75 @@
+[
+  {
+    "label": "error response if no such ticketer",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/XYZ/XYZ",
+    "body": {
+      "event_type": "onMessageSent",
+      "instance_sid": "12345",
+      "body": "we can help"
+    },
+    "status": 404,
+    "response": {
+      "error": "not found: /mr/tickets/types/twilioflex/event_callback/XYZ/XYZ"
+    }
+  },
+  {
+    "label": "unauthorized response if auth fails",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/564fee60-7e84-4a9e-ade3-4fce01af19a2",
+    "body": "EventType=onMessageSent&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&Attributes=%7B%7D&DateCreated=2022-03-10T23%3A56%3A43.412Z&Index=1&From=teste_2Etwilioflex&MessageSid=IM4b440f124820414b8f500a1235532ac1&AccountSid=AC92d44315e19372138bdaffcc13cf3b05&Source=SDK&ChannelSid=CH1880a9cde40c4dbb88dd97fc3aedac08&ClientIdentity=teste_2Etwilioflex&RetryCount=0&WebhookType=webhook&Body=ola&WebhookSid=WH99d1f1895a7c4e6fa10ac5e8ac0c2242",
+    "status": 401,
+    "response": {
+      "status": "unauthorized"
+    }
+  },
+  {
+    "label": "error response if no such ticket",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/564fee60-7e84-4a9e-ade3-4fce01af19a2",
+    "body": "EventType=onMessageSent&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&Attributes=%7B%7D&DateCreated=2022-03-10T23%3A56%3A43.412Z&Index=1&From=teste_2Etwilioflex&MessageSid=IM4b440f124820414b8f500a1235532ac1&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ChannelSid=CH1880a9cde40c4dbb88dd97fc3aedac08&ClientIdentity=teste_2Etwilioflex&RetryCount=0&WebhookType=webhook&Body=ola&WebhookSid=WH99d1f1895a7c4e6fa10ac5e8ac0c2242",
+    "status": 404,
+    "response": {
+      "error": "no such ticket 564fee60-7e84-4a9e-ade3-4fce01af19a2"
+    }
+  },
+  {
+    "label": "create message if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/$cathy_ticket_uuid$",
+    "headers": {
+      "Authorization": "Token 123456789"
+    },
+    "body": "EventType=onMessageSent&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&Attributes=%7B%7D&DateCreated=2022-03-10T23%3A56%3A43.412Z&Index=1&From=teste_2Etwilioflex&MessageSid=IM4b440f124820414b8f500a1235532ac1&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ChannelSid=CH1880a9cde40c4dbb88dd97fc3aedac08&ClientIdentity=teste_2Etwilioflex&RetryCount=0&WebhookType=webhook&Body=We can help&WebhookSid=WH99d1f1895a7c4e6fa10ac5e8ac0c2242",
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O'",
+        "count": 1
+      },
+      {
+        "query": "select count(*) from tickets_ticket where status = 'O'",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "label": "close room if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/$cathy_ticket_uuid$",
+    "body": "CreatedBy=system&FriendlyName=dummy%20user&EventType=onChannelUpdated&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&DateUpdated=2022-03-11T19%3A22%3A26.236Z&Attributes=%7B%22task_sid%22%3A%22WT3010541794b70ae138f62dcb83b84eb6%22%2C%22from%22%3A%22dummy%20user2%22%2C%22channel_type%22%3A%22web%22%2C%22status%22%3A%22INACTIVE%22%2C%22long_lived%22%3Afalse%7D&DateCreated=2022-03-11T19%3A17%3A51.196Z&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ChannelSid=CH6442c09c93ba4d13966fa42e9b78f620&ClientIdentity=teste_2Etwilioflex&RetryCount=0&WebhookType=webhook&ChannelType=private&WebhookSid=WH2154dcf90a06454cb420923ac1d2253f",
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from tickets_ticket where status = 'C'",
+        "count": 1
+      }
+    ]
+  }
+]
