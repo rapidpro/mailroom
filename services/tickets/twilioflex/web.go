@@ -19,7 +19,7 @@ import (
 
 func init() {
 	base := "/mr/tickets/types/twilioflex"
-	web.RegisterRoute(http.MethodPost, base+"/event_callback/{ticketer:[a-f0-9\\-]+}/{ticket:[a-f0-9\\-]+}", handleEventCallback)
+	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback/{ticketer:[a-f0-9\\-]+}/{ticket:[a-f0-9\\-]+}", web.WithHTTPLogs(handleEventCallback))
 }
 
 type eventCallbackRequest struct {
@@ -40,33 +40,33 @@ type eventCallbackRequest struct {
 	WebhookSid     string     `json:"webhook_sid,omitempty"`
 }
 
-func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
+func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	ticketerUUID := assets.TicketerUUID(chi.URLParam(r, "ticketer"))
 	request := &eventCallbackRequest{}
 	if err := web.DecodeAndValidateForm(request, r); err != nil {
-		return errors.Wrapf(err, "error decoding form")
+		return errors.Wrapf(err, "error decoding form"), http.StatusBadRequest, nil
 	}
 
 	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt, ticketerUUID, typeTwilioFlex)
 	if err != nil {
-		return errors.Errorf("no such ticketer %s", ticketerUUID)
+		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
 
 	accountSid := request.AccountSid
 	if accountSid != ticketer.Config(configurationAccountSid) {
-		return errors.New("Unauthorized")
+		return map[string]string{"status": "unauthorized"}, http.StatusUnauthorized, nil
 	}
 
 	ticketUUID := uuids.UUID(chi.URLParam(r, "ticket"))
 
 	ticket, _, _, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(ticketUUID), typeTwilioFlex)
 	if err != nil {
-		return errors.Errorf("no such ticket %s", ticketUUID)
+		return errors.Errorf("no such ticket %s", ticketUUID), http.StatusNotFound, nil
 	}
 
 	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
-		return err
+		return err, http.StatusBadRequest, nil
 	}
 
 	switch request.EventType {
@@ -74,23 +74,20 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		// TODO: Attachments
 		_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{})
 		if err != nil {
-			return err
+			return err, http.StatusBadRequest, nil
 		}
 	case "onChannelUpdated":
 		jsonMap := make(map[string]interface{})
 		err = json.Unmarshal([]byte(request.Attributes), &jsonMap)
 		if err != nil {
-			return err
+			return err, http.StatusBadRequest, nil
 		}
 		if jsonMap["status"] == "INACTIVE" {
 			err = tickets.Close(ctx, rt, oa, ticket, false, nil)
 			if err != nil {
-				return err
+				return err, http.StatusBadRequest, nil
 			}
 		}
 	}
-	return nil
-}
-
-type EventAttributes struct {
+	return map[string]string{"status": "handled"}, http.StatusOK, nil
 }
