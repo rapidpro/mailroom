@@ -119,7 +119,7 @@ func (s *Session) Scene() *Scene                      { return s.scene }
 func (s *Session) StoragePath(cfg *runtime.Config) string {
 	ts := s.CreatedOn().UTC().Format(storageTSFormat)
 
-	// example output: /orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/session_20060102T150405.123Z_8a7fc501-177b-4567-a0aa-81c48e6de1c5_51df83ac21d3cf136d8341f0b11cb1a7.json"
+	// example output: /orgs/1/c/20a5/20a5534c-b2ad-4f18-973a-f1aa3b4e6c74/20060102T150405.123Z_session_8a7fc501-177b-4567-a0aa-81c48e6de1c5_51df83ac21d3cf136d8341f0b11cb1a7.json"
 	return path.Join(
 		cfg.S3SessionPrefix,
 		"orgs",
