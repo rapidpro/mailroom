@@ -79,7 +79,8 @@ type MsgFailedReason null.String
 
 const (
 	NilMsgFailedReason     = MsgFailedReason("")
-	MsgFailedSuspended     = MsgFailedReason("S")
+	MsgFailedSuspended     = MsgFailedReason("S") // workspace suspended
+	MsgFailedContact       = MsgFailedReason("C") // contact blocked, stopped or archived
 	MsgFailedLooping       = MsgFailedReason("L")
 	MsgFailedErrorLimit    = MsgFailedReason("E")
 	MsgFailedTooOld        = MsgFailedReason("O")
@@ -321,31 +322,31 @@ return count
 `)
 
 // GetMsgRepetitions gets the number of repetitions of this msg text for the given contact in the current 5 minute window
-func GetMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgOut) (int, error) {
+func GetMsgRepetitions(rp *redis.Pool, contact *flows.Contact, msg *flows.MsgOut) (int, error) {
 	rc := rp.Get()
 	defer rc.Close()
 
 	keyTime := dates.Now().UTC().Round(time.Minute * 5)
 	key := fmt.Sprintf("msg_repetitions:%s", keyTime.Format("2006-01-02T15:04"))
-	return redis.Int(msgRepetitionsScript.Do(rc, key, contactID, msg.Text()))
+	return redis.Int(msgRepetitionsScript.Do(rc, key, contact.ID(), msg.Text()))
 }
 
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, flow, NilBroadcastID)
+	return newOutgoingMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
-func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, nil, broadcastID)
+func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, contact, out, createdOn, nil, nil, broadcastID)
 }
 
-func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
+func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = out.UUID()
 	m.OrgID = org.ID()
-	m.ContactID = contactID
+	m.ContactID = ContactID(contact.ID())
 	m.BroadcastID = broadcastID
 	m.TopupID = NilTopupID
 	m.Text = out.Text()
@@ -364,13 +365,17 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		// we fail messages for suspended orgs right away
 		m.Status = MsgStatusFailed
 		m.FailedReason = MsgFailedSuspended
+	} else if contact.Status() != flows.ContactStatusActive {
+		// and blocked, stopped or archived contacts
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedContact
 	} else if msg.URN() == urns.NilURN || channel == nil {
 		// if msg is missing the URN or channel, we also fail it
 		m.Status = MsgStatusFailed
 		m.FailedReason = MsgFailedNoDestination
 	} else {
 		// also fail right away if this looks like a loop
-		repetitions, err := GetMsgRepetitions(rt.RP, contactID, out)
+		repetitions, err := GetMsgRepetitions(rt.RP, contact, out)
 		if err != nil {
 			return nil, errors.Wrap(err, "error looking up msg repetitions")
 		}
@@ -378,7 +383,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 			m.Status = MsgStatusFailed
 			m.FailedReason = MsgFailedLooping
 
-			logrus.WithFields(logrus.Fields{"contact_id": contactID, "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
+			logrus.WithFields(logrus.Fields{"contact_id": contact.ID(), "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
 		}
 	}
 
@@ -1082,7 +1087,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
+		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
