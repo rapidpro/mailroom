@@ -15,7 +15,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/locker"
+	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -463,7 +463,7 @@ func StartFlow(
 	start := time.Now()
 
 	// map of locks we've released
-	released := make(map[string]bool)
+	released := make(map[*redisx.Locker]bool)
 
 	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {
 		locked := make([]models.ContactID, 0, len(remaining))
@@ -472,8 +472,9 @@ func StartFlow(
 
 		// try up to a second to get a lock for a contact
 		for _, contactID := range remaining {
-			lockID := models.ContactLock(oa.OrgID(), contactID)
-			lock, err := locker.GrabLock(rt.RP, lockID, time.Minute*5, time.Second)
+			locker := models.GetContactLocker(oa.OrgID(), contactID)
+
+			lock, err := locker.Grab(rt.RP, time.Second)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error attempting to grab lock")
 			}
@@ -486,8 +487,8 @@ func StartFlow(
 
 			// defer unlocking if we exit due to error
 			defer func() {
-				if !released[lockID] {
-					locker.ReleaseLock(rt.RP, lockID, lock)
+				if !released[locker] {
+					locker.Release(rt.RP, lock)
 				}
 			}()
 		}
@@ -519,9 +520,9 @@ func StartFlow(
 
 		// release all our locks
 		for i := range locked {
-			lockID := models.ContactLock(oa.OrgID(), locked[i])
-			locker.ReleaseLock(rt.RP, lockID, locks[i])
-			released[lockID] = true
+			locker := models.GetContactLocker(oa.OrgID(), locked[i])
+			locker.Release(rt.RP, locks[i])
+			released[locker] = true
 		}
 
 		// skipped are now our remaining

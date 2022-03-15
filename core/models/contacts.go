@@ -19,6 +19,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/null"
+	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -1341,9 +1342,10 @@ func (i *ContactID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
 }
 
-// ContactLock returns the lock key for a particular contact, used with locker
-func ContactLock(orgID OrgID, contactID ContactID) string {
-	return fmt.Sprintf("c:%d:%d", orgID, contactID)
+// GetContactLocker returns the locker for a particular contact
+func GetContactLocker(orgID OrgID, contactID ContactID) *redisx.Locker {
+	key := fmt.Sprintf("lock:c:%d:%d", orgID, contactID)
+	return redisx.NewLocker(key, time.Minute*5)
 }
 
 // UpdateContactModifiedBy updates modified by the passed user id on the passed in contacts
