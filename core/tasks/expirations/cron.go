@@ -77,7 +77,7 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 		}
 
 		// if it can't be resumed, add to batch to be expired
-		if !expiredWait.WaitResumes || expiredWait.ContactStatus != models.ContactStatusActive {
+		if !expiredWait.WaitResumes {
 			expiredSessions = append(expiredSessions, expiredWait.SessionID)
 
 			// batch is full? commit it
@@ -135,20 +135,18 @@ func HandleWaitExpirations(ctx context.Context, rt *runtime.Runtime) error {
 }
 
 const sqlSelectExpiredWaits = `
-    SELECT s.id as session_id, s.org_id, s.wait_expires_on, s.wait_resume_on_expire , c.id as contact_id, c.status as contact_status
+    SELECT s.id as session_id, s.org_id, s.wait_expires_on, s.wait_resume_on_expire , s.contact_id
       FROM flows_flowsession s
-INNER JOIN contacts_contact c ON c.id = s.contact_id
      WHERE s.session_type = 'M' AND s.status = 'W' AND s.wait_expires_on <= NOW()
   ORDER BY s.wait_expires_on ASC
      LIMIT 25000`
 
 type ExpiredWait struct {
-	SessionID     models.SessionID     `db:"session_id"`
-	OrgID         models.OrgID         `db:"org_id"`
-	WaitExpiresOn time.Time            `db:"wait_expires_on"`
-	WaitResumes   bool                 `db:"wait_resume_on_expire"`
-	ContactID     models.ContactID     `db:"contact_id"`
-	ContactStatus models.ContactStatus `db:"contact_status"`
+	SessionID     models.SessionID `db:"session_id"`
+	OrgID         models.OrgID     `db:"org_id"`
+	WaitExpiresOn time.Time        `db:"wait_expires_on"`
+	WaitResumes   bool             `db:"wait_resume_on_expire"`
+	ContactID     models.ContactID `db:"contact_id"`
 }
 
 // ExpireVoiceSessions looks for voice sessions that should be expired and ends them
