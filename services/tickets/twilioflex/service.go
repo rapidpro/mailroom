@@ -3,6 +3,8 @@ package twilioflex
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 
 	"github.com/pkg/errors"
 
@@ -117,12 +119,60 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
 	identity := fmt.Sprint(ticket.ContactID())
-	msg := &ChatMessage{
+
+	// TODO: attachments
+	if len(attachments) > 0 {
+		mediaAttachements := []CreateMediaParams{}
+		for _, attachment := range attachments {
+			attUrl := attachment.URL()
+			req, err := http.NewRequest("GET", attUrl, nil)
+			resp, err := httpx.DoTrace(s.restClient.httpClient, req, s.restClient.httpRetries, nil, -1)
+			if err != nil {
+				return err
+			}
+			// mediaBody, err := io.ReadAll(resp)
+			// if err != nil {
+			// 	return err
+			// }
+
+			parsedURL, err := url.Parse(attUrl)
+			if err != nil {
+				return err
+			}
+			filename := path.Base(parsedURL.Path)
+
+			media := CreateMediaParams{
+				FileName: filename,
+				Media:    resp.ResponseBody,
+				Author:   identity,
+			}
+
+			mediaAttachements = append(mediaAttachements, media)
+
+			// resp.Body.Close()
+		}
+
+		for _, mediaParams := range mediaAttachements {
+			media, trace, err := s.restClient.CreateMedia(&mediaParams)
+			if err != nil {
+				return err
+			}
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+
+			msg := &CreateChatMessageParams{
+				From:       identity,
+				ChannelSid: string(ticket.ExternalID()),
+				MediaSid:   media.Sid,
+			}
+			_, trace, err = s.restClient.CreateMessage(msg)
+		}
+
+	}
+	msg := &CreateChatMessageParams{
 		From:       identity,
 		Body:       text,
 		ChannelSid: string(ticket.ExternalID()),
 	}
-	// TODO: attachments
 	_, trace, err := s.restClient.CreateMessage(msg)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
@@ -130,6 +180,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	if err != nil {
 		return errors.Wrap(err, "error calling Twilio")
 	}
+
 	return nil
 }
 

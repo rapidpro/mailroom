@@ -1,8 +1,11 @@
 package twilioflex
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -162,7 +165,7 @@ func (c *Client) CreateFlexChannelWebhook(channelWebhook *CreateChatChannelWebho
 }
 
 // CreateMessage create a message in chat channel.
-func (c *Client) CreateMessage(message *ChatMessage) (*ChatMessage, *httpx.Trace, error) {
+func (c *Client) CreateMessage(message *CreateChatMessageParams) (*ChatMessage, *httpx.Trace, error) {
 	url := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Messages", c.serviceSid, message.ChannelSid)
 	response := &ChatMessage{}
 	data, err := query.Values(message)
@@ -195,6 +198,66 @@ func (c *Client) CompleteTask(taskSid string) (*TaskrouterTask, *httpx.Trace, er
 		return nil, trace, err
 	}
 	return response, trace, nil
+}
+
+func (c *Client) CreateMedia(media *CreateMediaParams) (*Media, *httpx.Trace, error) {
+	url := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media", c.serviceSid)
+	response := &Media{}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	mediaPart, err := writer.CreateFormFile("Media", media.FileName)
+	if err != nil {
+		return nil, nil, err
+	}
+	mediaReader := bytes.NewReader(media.Media)
+	io.Copy(mediaPart, mediaReader)
+
+	filenamePart, err := writer.CreateFormField("FileName")
+	if err != nil {
+		return nil, nil, err
+	}
+	filenameReader := bytes.NewReader([]byte(media.FileName))
+	io.Copy(filenamePart, filenameReader)
+
+	writer.Close()
+
+	req, err := httpx.NewRequest("POST", url, body, map[string]string{})
+	if err != nil {
+		return nil, nil, err
+	}
+	req.SetBasicAuth(c.accountSid, c.authToken)
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+
+	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		response := &errorResponse{}
+		jsonx.Unmarshal(trace.ResponseBody, response)
+		return nil, trace, errors.New(response.Message)
+	}
+
+	err = jsonx.Unmarshal(trace.ResponseBody, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return response, trace, nil
+}
+
+// FetchMedia fetch a twilio flex Media by this sid.
+func (c *Client) FetchMedia(mediaSid string) (*Media, *httpx.Trace, error) {
+	fetchUrl := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/%s", mediaSid)
+	response := &Media{}
+	data := url.Values{}
+	trace, err := c.get(fetchUrl, data, response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, err
 }
 
 // https://www.twilio.com/docs/chat/rest/user-resource#user-properties
@@ -284,6 +347,13 @@ type ChatMessage struct {
 	WasEdited     bool                   `json:"was_edited,omitempty"`
 }
 
+type CreateChatMessageParams struct {
+	Body       string `json:"Body,omitempty"`
+	From       string `json:"From,omitempty"`
+	MediaSid   string `json:"MediaSid,omitempty"`
+	ChannelSid string `json:"channel_sid,omitempty"`
+}
+
 // https://www.twilio.com/docs/chat/rest/channel-webhook-resource#channelwebhook-properties
 type ChatChannelWebhook struct {
 	AccountSid    string                 `json:"account_sid,omitempty"`
@@ -331,6 +401,35 @@ type TaskrouterTask struct {
 	WorkflowFriendlyName  string                 `json:"workflow_friendly_name,omitempty"`
 	WorkflowSid           string                 `json:"workflow_sid,omitempty"`
 	WorkspaceSid          string                 `json:"workspace_sid,omitempty"`
+}
+
+// https://www.twilio.com/docs/chat/rest/media
+type CreateMediaParams struct {
+	FileName string `json:"FileName,omitempty"`
+	Media    []byte `json:"Media,omitempty"`
+	Author   string `json:"Author,omitempty"`
+}
+
+// https://www.twilio.com/docs/chat/rest/media
+type Media struct {
+	Sid               string `json:"sid"`
+	ServiceSid        string `json:"service_sid"`
+	DateCreated       string `json:"date_created"`
+	DateUploadUpdated string `json:"date_upload_updated"`
+	DateUpdated       string `json:"date_updated"`
+	Links             struct {
+		Content                string `json:"content"`
+		ContentDirectTemporary string `json:"content_direct_temporary"`
+	} `json:"links"`
+	Size                int         `json:"size"`
+	ContentType         string      `json:"content_type"`
+	Filename            string      `json:"filename"`
+	Author              string      `json:"author"`
+	Category            string      `json:"category"`
+	MessageSid          interface{} `json:"message_sid"`
+	ChannelSid          interface{} `json:"channel_sid"`
+	URL                 string      `json:"url"`
+	IsMultipartUpstream bool        `json:"is_multipart_upstream"`
 }
 
 // removeEmpties remove empty values from url.Values

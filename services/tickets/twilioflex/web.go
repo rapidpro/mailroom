@@ -23,21 +23,25 @@ func init() {
 }
 
 type eventCallbackRequest struct {
-	EventType      string     `json:"event_type,omitempty"`
-	InstanceSid    string     `json:"instance_sid,omitempty"`
-	Attributes     string     `json:"attributes,omitempty"`
-	DateCreated    *time.Time `json:"date_created,omitempty"`
-	Index          int        `json:"index,omitempty"`
-	From           string     `json:"from,omitempty"`
-	MessageSid     string     `json:"message_sid,omitempty"`
-	AccountSid     string     `json:"account_sid,omitempty"`
-	Source         string     `json:"source,omitempty"`
-	ChannelSid     string     `json:"channel_sid,omitempty"`
-	ClientIdentity string     `json:"client_identity,omitempty"`
-	RetryCount     int        `json:"retry_count,omitempty"`
-	WebhookType    string     `json:"webhook_type,omitempty"`
-	Body           string     `json:"body,omitempty"`
-	WebhookSid     string     `json:"webhook_sid,omitempty"`
+	EventType        string     `json:"event_type,omitempty"`
+	InstanceSid      string     `json:"instance_sid,omitempty"`
+	Attributes       string     `json:"attributes,omitempty"`
+	DateCreated      *time.Time `json:"date_created,omitempty"`
+	Index            int        `json:"index,omitempty"`
+	From             string     `json:"from,omitempty"`
+	MessageSid       string     `json:"message_sid,omitempty"`
+	AccountSid       string     `json:"account_sid,omitempty"`
+	Source           string     `json:"source,omitempty"`
+	ChannelSid       string     `json:"channel_sid,omitempty"`
+	ClientIdentity   string     `json:"client_identity,omitempty"`
+	RetryCount       int        `json:"retry_count,omitempty"`
+	WebhookType      string     `json:"webhook_type,omitempty"`
+	Body             string     `json:"body,omitempty"`
+	WebhookSid       string     `json:"webhook_sid,omitempty"`
+	MediaSid         string     `json:"media_sid,omitempty"`
+	MediaSize        string     `json:"media_size,omitempty"`
+	MediaContentType string     `json:"media_content_type,omitempty"`
+	MediaFilename    string     `json:"media_filename,omitempty"`
 }
 
 func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
@@ -71,8 +75,30 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 
 	switch request.EventType {
 	case "onMessageSent":
-		// TODO: Attachments
 		_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{})
+		if err != nil {
+			return err, http.StatusBadRequest, nil
+		}
+	case "onMediaMessageSent":
+		config := ticketer.Config
+		authToken := config(configurationAuthToken)
+		accountSid := config(configurationAccountSid)
+		chatServiceSid := config(configurationChatServiceSid)
+		workspaceSid := config(configurationWorkspaceSid)
+		flexFlowSid := config(configurationFlexFlowSid)
+
+		client := NewClient(http.DefaultClient, nil, authToken, accountSid, chatServiceSid, workspaceSid, flexFlowSid)
+
+		mediaContent, _, err := client.FetchMedia(request.MediaSid)
+		if err != nil {
+			return err, http.StatusBadRequest, nil
+		}
+		file, err := tickets.FetchFile(mediaContent.Links.ContentDirectTemporary, nil)
+		file.ContentType = mediaContent.ContentType
+		if err != nil {
+			return errors.Wrapf(err, "error fetching ticket file '%s'", mediaContent.Links.ContentDirectTemporary), http.StatusBadRequest, nil
+		}
+		_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{file})
 		if err != nil {
 			return err, http.StatusBadRequest, nil
 		}

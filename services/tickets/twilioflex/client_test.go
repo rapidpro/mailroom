@@ -270,7 +270,7 @@ func TestCreateMessage(t *testing.T) {
 
 	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
 
-	msg := &twilioflex.ChatMessage{
+	msg := &twilioflex.CreateChatMessageParams{
 		From:       "123",
 		Body:       "hello",
 		ChannelSid: channelSid,
@@ -347,5 +347,95 @@ func TestCompleteTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "completed", response.AssignmentStatus)
 	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 1602\r\n\r\n", string(trace.ResponseTrace))
+}
 
+func TestCreateMediaResource(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media", serviceSid): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
+			httpx.NewMockResponse(201, nil, `{
+					"sid": "ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
+					"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+					"date_created": "2022-03-14T13:10:38.897143-07:00",
+					"date_upload_updated": "2022-03-14T13:10:38.906058-07:00",
+					"date_updated": "2022-03-14T13:10:38.897143-07:00",
+					"links": {
+						"content": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd/Content"
+					},
+					"size": 153611,
+					"content_type": "image/jpeg",
+					"filename": "00ac28a5d76a30d5c8ec4f3a73964887.jpg",
+					"author": "system",
+					"category": "media",
+					"message_sid": null,
+					"channel_sid": null,
+					"url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
+					"is_multipart_upstream": false
+			}`),
+		},
+	}))
+
+	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
+
+	mediaContent := &twilioflex.CreateMediaParams{
+		FileName: "00ac28a5d76a30d5c8ec4f3a73964887.jpg",
+		Media:    []byte(""),
+	}
+
+	_, _, err := client.CreateMedia(mediaContent)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, _, err = client.CreateMedia(mediaContent)
+	assert.EqualError(t, err, "Something went wrong")
+
+	response, trace, err := client.CreateMedia(mediaContent)
+	assert.NoError(t, err)
+	assert.Equal(t, "00ac28a5d76a30d5c8ec4f3a73964887.jpg", response.Filename)
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 788\r\n\r\n", string(trace.ResponseTrace))
+}
+
+func TestFetchMedia(t *testing.T) {
+	mediaSid := "ME59b872f1e52fbd6fe6ad956bbb4fa9bd"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/%s", mediaSid): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
+			httpx.NewMockResponse(200, nil, `{
+				"sid": "ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"date_created": "2022-03-14T13:10:38.897143-07:00",
+				"date_upload_updated": "2022-03-14T13:10:38.906058-07:00",
+				"date_updated": "2022-03-14T13:10:38.897143-07:00",
+				"links": {
+					"content": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd/Content",
+					"content_direct_temporary": "https://media.us1.twilio.com/ME59b872f1e52fbd6fe6ad956bbb4fa9bd?Expires=1647355356&Signature=n05WWrmDwS4yQ521cNeL9LSH7g1RZg3gpmZ83TAy6eHHuW8KqAGn~wl0p5KGlTJYIhGmfTKhYS8o~zSr1L2iDmFyZDawiueHXqeebFNJiM~tviKn5Inna0mgI~nKSl6iV6F6sKUPnkeAc~AVb7Z3qfDaiyf87ucjyBKRTYkKT7a85c2hhBy4z8DOOeVBWNCEZxA08x-iZDsKYwPtIp~jJIwXrHA5nn3GE62jomjLkfd7RoFVggQhPjmrQQsF9Ock-piPiTb-J3o1risNaHux2rycKCO~U4hndnyo26FEeS71iemIK71hxV7MHtfFEubx04eRYijYRfaUEoWc6IXdxQ__&Key-Pair-Id=APKAJWF6YVTMIIYOF3AA"
+				},
+				"size": 153611,
+				"content_type": "image/jpeg",
+				"filename": "00ac28a5d76a30d5c8ec4f3a73964887.jpg",
+				"author": "system",
+				"category": "media",
+				"message_sid": "IMadceb005ef924c728b6abde17d02775c",
+				"channel_sid": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
+				"url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
+				"is_multipart_upstream": false
+			}`),
+		},
+	}))
+
+	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
+
+	_, _, err := client.FetchMedia(mediaSid)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, _, err = client.FetchMedia(mediaSid)
+	assert.EqualError(t, err, "Something went wrong")
+
+	response, trace, err := client.FetchMedia(mediaSid)
+	assert.NoError(t, err)
+	assert.Equal(t, "ME59b872f1e52fbd6fe6ad956bbb4fa9bd", response.Sid)
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 1342\r\n\r\n", string(trace.ResponseTrace))
 }

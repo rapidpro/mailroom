@@ -60,7 +60,7 @@ func TestOpenAndForward(t *testing.T) {
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"joined_channels_count": 0,
-				"identity": "123",
+				"identity": "10000",
 				"links": {
 						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
 						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
@@ -105,7 +105,7 @@ func TestOpenAndForward(t *testing.T) {
 				"body": "It's urgent",
 				"index": 0,
 				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"from": "123",
+				"from": "10000",
 				"date_updated": "2022-03-09T20:27:47Z",
 				"type": "text",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
@@ -115,6 +115,163 @@ func TestOpenAndForward(t *testing.T) {
 				"media": null,
 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
 				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"was_edited": false
+			}`),
+		},
+		"https://link.to/dummy_image.jpg": {
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpeg"}, `imagebytes`),
+		},
+		"https://link.to/dummy_video.mp4": {
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "video/mp4"}, `videobytes`),
+		},
+		"https://link.to/dummy_audio.ogg": {
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "audio/ogg"}, `audiobytes`),
+		},
+		"https://mcs.us1.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media": {
+			httpx.NewMockResponse(201, nil, `{
+				"sid": "ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"date_created": "2022-03-14T13:10:38.897143-07:00",
+				"date_upload_updated": "2022-03-14T13:10:38.906058-07:00",
+				"date_updated": "2022-03-14T13:10:38.897143-07:00",
+				"links": {
+					"content": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd/Content"
+				},
+				"size": 153611,
+				"content_type": "image/jpeg",
+				"filename": "dummy_image.jpg",
+				"author": "10000",
+				"category": "media",
+				"message_sid": null,
+				"channel_sid": null,
+				"url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
+				"is_multipart_upstream": false
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"sid": "ME60b872f1e52fbd6fe6ad956bbb4fa9ce",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"date_created": "2022-03-14T13:10:38.897143-07:00",
+				"date_upload_updated": "2022-03-14T13:10:38.906058-07:00",
+				"date_updated": "2022-03-14T13:10:38.897143-07:00",
+				"links": {
+					"content": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME60b872f1e52fbd6fe6ad956bbb4fa9ce/Content"
+				},
+				"size": 153611,
+				"content_type": "video/mp4",
+				"filename": "dummy_video.mp4",
+				"author": "10000",
+				"category": "media",
+				"message_sid": null,
+				"channel_sid": null,
+				"url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME60b872f1e52fbd6fe6ad956bbb4fa9ce",
+				"is_multipart_upstream": false
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"sid": "ME71b872f1e52fbd6fe6ad956bbb4fa9df",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"date_created": "2022-03-14T13:10:38.897143-07:00",
+				"date_upload_updated": "2022-03-14T13:10:38.906058-07:00",
+				"date_updated": "2022-03-14T13:10:38.897143-07:00",
+				"links": {
+					"content": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME71b872f1e52fbd6fe6ad956bbb4fa9df/Content"
+				},
+				"size": 153611,
+				"content_type": "audio/ogg",
+				"filename": "dummy_audio.ogg",
+				"author": "10000",
+				"category": "media",
+				"message_sid": null,
+				"channel_sid": null,
+				"url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME71b872f1e52fbd6fe6ad956bbb4fa9df",
+				"is_multipart_upstream": false
+			}`),
+		},
+		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages": {
+			httpx.NewMockResponse(201, nil, `{
+				"body": null,
+				"index": 0,
+				"channel_sid": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
+				"from": "10000",
+				"date_updated": "2022-03-14T20:11:08Z",
+				"type": "media",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"to": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
+				"last_updated_by": null,
+				"date_created": "2022-03-14T20:11:08Z",
+				"media": {
+						"size": 153611,
+						"filename": "dummy_image.jpg",
+						"content_type": "image/jpeg",
+						"sid": "ME59b872f1e52fbd6fe6ad956bbb4fa9bd"
+				},
+				"sid": "IMadceb005ef924c728b6abde17d02775c",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMadceb005ef924c728b6abde17d02775c",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"was_edited": false
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"body": null,
+				"index": 1,
+				"channel_sid": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
+				"from": "10000",
+				"date_updated": "2022-03-14T20:11:08Z",
+				"type": "media",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"to": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
+				"last_updated_by": null,
+				"date_created": "2022-03-14T20:11:08Z",
+				"media": {
+						"size": 153611,
+						"filename": "dummy_video.mp4",
+						"content_type": "video/mp4",
+						"sid": "ME60b872f1e52fbd6fe6ad956bbb4fa9ce"
+				},
+				"sid": "IMbcdeb005ef924c728b6abde17d02786d",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMbcdeb005ef924c728b6abde17d02786d",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"was_edited": false
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"body": null,
+				"index": 2,
+				"channel_sid": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
+				"from": "10000",
+				"date_updated": "2022-03-14T20:11:08Z",
+				"type": "media",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"to": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
+				"last_updated_by": null,
+				"date_created": "2022-03-14T20:11:08Z",
+				"media": {
+						"size": 153611,
+						"filename": "dummy_sound.ogg",
+						"content_type": "sound/ogg",
+						"sid": "ME71b872f1e52fbd6fe6ad956bbb4fa9df"
+				},
+				"sid": "IMcedfb005ef924c728b6abde17d02798e",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMcedfb005ef924c728b6abde17d02798e",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"was_edited": false
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"body": "It's urgent",
+				"index": 0,
+				"channel_sid": "CH180fa48ef2ba40a08fa5c9fb5c8ddd99",
+				"from": "10000",
+				"date_updated": "2022-03-09T20:27:47Z",
+				"type": "text",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"last_updated_by": null,
+				"date_created": "2022-03-09T20:27:47Z",
+				"media": null,
+				"sid": "IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IM8842e723153b459b9e03a0bae87298d8",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -172,15 +329,25 @@ func TestOpenAndForward(t *testing.T) {
 	assert.EqualError(t, err, "error calling Twilio: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
-	attachments := []utils.Attachment{
-		"image/jpg:https://link.to/image.jpg",
-		"video/mp4:https://link.to/video.mp4",
-		"audio/ogg:https://link.to/audio.ogg",
-	}
-	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, logger.Log)
-	require.NoError(t, err)
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, logger.Log)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
+
+	dbTicket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Cathy.ID, testdata.Twilioflex.ID, "CH180fa48ef2ba40a08fa5c9fb5c8ddd99", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
+		"contact-uuid":    string(testdata.Cathy.UUID),
+		"contact-display": "Cathy",
+	})
+
+	logger = &flows.HTTPLogger{}
+	attachments := []utils.Attachment{
+		"image/jpg:https://link.to/dummy_image.jpg",
+		"video/mp4:https://link.to/dummy_video.mp4",
+		"audio/ogg:https://link.to/dummy_audio.ogg",
+	}
+	err = svc.Forward(dbTicket2, flows.MsgUUID("5ga340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, logger.Log)
+	assert.NoError(t, err)
+	assert.Equal(t, 4, len(logger.Logs))
 }
 
 func TestCloseAndReopen(t *testing.T) {
