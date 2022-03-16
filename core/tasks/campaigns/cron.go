@@ -28,7 +28,7 @@ var campaignsMarker = redisx.NewIntervalSet("campaign_event", time.Hour*24, 2)
 
 func init() {
 	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(quit, rt, "campaign_event", time.Second*60, false, QueueEventFires, time.Minute*5)
+		cron.Start(rt, wg, "campaign_event", time.Second*60, false, QueueEventFires, time.Minute*5, quit)
 		return nil
 	})
 }

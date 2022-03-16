@@ -16,7 +16,7 @@ import (
 
 func init() {
 	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(quit, rt, "fire_schedules", time.Minute*1, false, checkSchedules, time.Minute*5)
+		cron.Start(rt, wg, "fire_schedules", time.Minute*1, false, checkSchedules, time.Minute*5, quit)
 		return nil
 	})
 }

@@ -3,6 +3,7 @@ package cron
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/apex/log"
@@ -18,7 +19,9 @@ type Function func(context.Context, *runtime.Runtime) error
 // lock so that only one process is running at once. Note that across processes
 // crons may be called more often than duration as there is no inter-process
 // coordination of cron fires. (this might be a worthy addition)
-func Start(quit chan bool, rt *runtime.Runtime, name string, interval time.Duration, allInstances bool, cronFunc Function, timeout time.Duration) {
+func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.Duration, allInstances bool, cronFunc Function, timeout time.Duration, quit chan bool) {
+	wg.Add(1) // add ourselves to the wait group
+
 	lockName := fmt.Sprintf("lock:%s_lock", name) // for historical reasons...
 
 	// for jobs that run on all instances, the lock key is specific to this instance
@@ -34,7 +37,10 @@ func Start(quit chan bool, rt *runtime.Runtime, name string, interval time.Durat
 	log := logrus.WithField("cron", name).WithField("lockName", lockName)
 
 	go func() {
-		defer log.Info("cron exiting")
+		defer func() {
+			log.Info("cron exiting")
+			wg.Done()
+		}()
 
 		for {
 			select {
@@ -58,15 +64,22 @@ func Start(quit chan bool, rt *runtime.Runtime, name string, interval time.Durat
 				}
 
 				// ok, got the lock, run our cron function
+				start := time.Now()
 				err = fireCron(rt, cronFunc, lockName, lock)
 				if err != nil {
 					log.WithError(err).Error("error while running cron")
 				}
+				elapsed := time.Since(start)
 
 				// release our lock
 				err = locker.Release(rt.RP, lock)
 				if err != nil {
 					log.WithError(err).Error("error releasing lock")
+				}
+
+				// if cron too longer than a minute, log
+				if elapsed > time.Minute {
+					logrus.WithField("cron", name).WithField("elapsed", elapsed).Error("cron took too long")
 				}
 			}
 

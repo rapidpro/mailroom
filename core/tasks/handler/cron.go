@@ -22,7 +22,7 @@ var retriedMsgs = redisx.NewIntervalSet("retried_msgs", time.Hour*24, 2)
 
 func init() {
 	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(quit, rt, "retry_msgs", time.Minute*5, false, RetryPendingMsgs, time.Minute*5)
+		cron.Start(rt, wg, "retry_msgs", time.Minute*5, false, RetryPendingMsgs, time.Minute*5, quit)
 		return nil
 	})
 }

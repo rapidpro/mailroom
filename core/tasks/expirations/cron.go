@@ -25,8 +25,8 @@ var expirationsMarker = redisx.NewIntervalSet("run_expirations", time.Hour*24, 2
 
 func init() {
 	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(quit, rt, "run_expirations", time.Minute, false, HandleWaitExpirations, time.Minute*5)
-		cron.Start(quit, rt, "expire_ivr_calls", time.Minute, false, ExpireVoiceSessions, time.Minute*5)
+		cron.Start(rt, wg, "run_expirations", time.Minute, false, HandleWaitExpirations, time.Minute*5, quit)
+		cron.Start(rt, wg, "expire_ivr_calls", time.Minute, false, ExpireVoiceSessions, time.Minute*5, quit)
 		return nil
 	})
 }

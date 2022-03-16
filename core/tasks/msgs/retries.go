@@ -16,7 +16,7 @@ import (
 
 func init() {
 	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(quit, rt, "retry_errored_messages", time.Second*60, false, RetryErroredMessages, time.Minute*5)
+		cron.Start(rt, wg, "retry_errored_messages", time.Second*60, false, RetryErroredMessages, time.Minute*5, quit)
 		return nil
 	})
 }

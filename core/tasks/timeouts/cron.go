@@ -21,7 +21,7 @@ var marker = redisx.NewIntervalSet("session_timeouts", time.Hour*24, 2)
 
 func init() {
 	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(quit, rt, "sessions_timeouts", time.Second*60, false, timeoutSessions, time.Minute*5)
+		cron.Start(rt, wg, "sessions_timeouts", time.Second*60, false, timeoutSessions, time.Minute*5, quit)
 		return nil
 	})
 }
