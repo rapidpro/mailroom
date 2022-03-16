@@ -2,22 +2,17 @@ package analytics
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(rt, wg, "stats", time.Second*60, true, reportAnalytics, time.Minute*5, quit)
-		return nil
-	})
+	mailroom.RegisterCron("analytics", time.Second*60, true, reportAnalytics)
 }
 
 var (

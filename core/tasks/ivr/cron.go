@@ -2,23 +2,18 @@ package ivr
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(rt, wg, "retry_ivr_calls", time.Minute, false, RetryCalls, time.Minute*5, quit)
-		return nil
-	})
+	mailroom.RegisterCron("retry_ivr_calls", time.Minute, false, RetryCalls)
 }
 
 // RetryCalls looks for calls that need to be retried and retries them

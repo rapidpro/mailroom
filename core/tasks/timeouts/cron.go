@@ -3,16 +3,13 @@ package timeouts
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/redisx"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -20,10 +17,7 @@ import (
 var marker = redisx.NewIntervalSet("session_timeouts", time.Hour*24, 2)
 
 func init() {
-	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(rt, wg, "sessions_timeouts", time.Second*60, false, timeoutSessions, time.Minute*5, quit)
-		return nil
-	})
+	mailroom.RegisterCron("sessions_timeouts", time.Second*60, false, timeoutSessions)
 }
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue

@@ -3,7 +3,6 @@ package expirations
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
@@ -11,7 +10,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -24,11 +22,8 @@ const (
 var expirationsMarker = redisx.NewIntervalSet("run_expirations", time.Hour*24, 2)
 
 func init() {
-	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(rt, wg, "run_expirations", time.Minute, false, HandleWaitExpirations, time.Minute*5, quit)
-		cron.Start(rt, wg, "expire_ivr_calls", time.Minute, false, ExpireVoiceSessions, time.Minute*5, quit)
-		return nil
-	})
+	mailroom.RegisterCron("run_expirations", time.Minute, false, HandleWaitExpirations)
+	mailroom.RegisterCron("expire_ivr_calls", time.Minute, false, ExpireVoiceSessions)
 }
 
 // HandleWaitExpirations handles waiting messaging sessions whose waits have expired, resuming those that can be resumed,

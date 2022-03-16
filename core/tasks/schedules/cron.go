@@ -2,23 +2,18 @@ package schedules
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-		cron.Start(rt, wg, "fire_schedules", time.Minute*1, false, checkSchedules, time.Minute*5, quit)
-		return nil
-	})
+	mailroom.RegisterCron("fire_schedules", time.Minute*1, false, checkSchedules)
 }
 
 // checkSchedules looks up any expired schedules and fires them, setting the next fire as needed
