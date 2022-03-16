@@ -32,7 +32,8 @@
             "msg_ids": [
                 $cathy_msgin_id$,
                 $cathy_msgout_id$,
-                $bob_msgout_id$
+                $bob_msgout_id$,
+                $george_msgout_id$
             ]
         },
         "status": 200,
