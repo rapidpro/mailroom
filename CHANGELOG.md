@@ -1,3 +1,10 @@
+v7.2.4
+----------
+ * Improve logging on session resume
+ * Fix example session storage path
+ * Use redis 5.x for CI
+ * Improve configuration section of README
+
 v7.2.3
 ----------
  * Rework resending to fail messages with no destination
