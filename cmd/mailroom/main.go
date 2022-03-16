@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	goruntime "runtime"
@@ -114,7 +113,6 @@ func handleSignals(mr *mailroom.Mailroom) {
 
 	for {
 		sig := <-sigs
-		fmt.Printf("SIGNAL %s\n", sig)
 		switch sig {
 		case syscall.SIGQUIT:
 			buf := make([]byte, 1<<20)
