@@ -1,3 +1,7 @@
+v7.2.5
+----------
+ * Fix resend reponses when not all messages could be resent
+
 v7.2.4
 ----------
  * Improve logging on session resume
