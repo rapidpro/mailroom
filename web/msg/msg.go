@@ -57,7 +57,7 @@ func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 	// response is the ids of the messages that were actually resent
 	resentMsgIDs := make([]flows.MsgID, len(resends))
-	for i, m := range msgs {
+	for i, m := range resends {
 		resentMsgIDs[i] = m.ID()
 	}
 	return map[string]interface{}{"msg_ids": resentMsgIDs}, http.StatusOK, nil
