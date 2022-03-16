@@ -71,7 +71,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	if err != nil {
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
-			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_id", session.ID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow in resume")
+			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_uuid", session.UUID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow for resume")
 			return nil, models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.SessionStatusFailed)
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
@@ -84,9 +84,7 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	}
 
 	// resume our session
-	resumeStart := time.Now()
 	sprint, err := fs.Resume(resume)
-	logrus.WithField("contact_id", resume.Contact().ID()).WithField("elapsed", time.Since(resumeStart)).Info("engine resume complete")
 
 	// had a problem resuming our flow? bail
 	if err != nil {
@@ -134,8 +132,8 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 		tx.Rollback()
 		return nil, errors.Wrapf(err, "error committing session changes on resume")
 	}
-	logrus.WithField("contact_uuid", resume.Contact().UUID()).WithField("elapsed", time.Since(start)).Info("resumed session")
 
+	logrus.WithField("contact_uuid", resume.Contact().UUID()).WithField("session_uuid", session.UUID()).WithField("resume_type", resume.Type()).WithField("elapsed", time.Since(start)).Info("resumed session")
 	return session, nil
 }
 
