@@ -14,25 +14,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	retryIVRLock = "retry_ivr_calls"
-)
-
 func init() {
-	mailroom.AddInitFunction(StartIVRCron)
-}
-
-// StartIVRCron starts our cron job of retrying errored calls
-func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, retryIVRLock, time.Minute, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return RetryCalls(ctx, rt)
-		},
-	)
-
-	return nil
+	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(quit, rt, "retry_ivr_calls", time.Minute, false, RetryCalls, time.Minute*5)
+		return nil
+	})
 }
 
 // RetryCalls looks for calls that need to be retried and retries them

@@ -24,28 +24,11 @@ const (
 var expirationsMarker = redisx.NewIntervalSet("run_expirations", time.Hour*24, 2)
 
 func init() {
-	mailroom.AddInitFunction(StartExpirationCron)
-}
-
-// StartExpirationCron starts our cron job of expiring runs every minute
-func StartExpirationCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, "run_expirations", time.Minute, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return HandleWaitExpirations(ctx, rt)
-		},
-	)
-
-	cron.Start(quit, rt, "expire_ivr_calls", time.Minute, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return ExpireVoiceSessions(ctx, rt)
-		},
-	)
-
-	return nil
+	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(quit, rt, "run_expirations", time.Minute, false, HandleWaitExpirations, time.Minute*5)
+		cron.Start(quit, rt, "expire_ivr_calls", time.Minute, false, ExpireVoiceSessions, time.Minute*5)
+		return nil
+	})
 }
 
 // HandleWaitExpirations handles waiting messaging sessions whose waits have expired, resuming those that can be resumed,

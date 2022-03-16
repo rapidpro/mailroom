@@ -17,18 +17,10 @@ import (
 )
 
 func init() {
-	mailroom.AddInitFunction(startEndCron)
-}
-
-func startEndCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, "end_incidents", time.Minute*3, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return EndIncidents(ctx, rt)
-		},
-	)
-	return nil
+	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(quit, rt, "end_incidents", time.Minute*3, false, EndIncidents, time.Minute*5)
+		return nil
+	})
 }
 
 // EndIncidents checks open incidents and end any that no longer apply

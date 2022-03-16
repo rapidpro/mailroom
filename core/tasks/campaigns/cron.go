@@ -27,20 +27,10 @@ const (
 var campaignsMarker = redisx.NewIntervalSet("campaign_event", time.Hour*24, 2)
 
 func init() {
-	mailroom.AddInitFunction(StartCampaignCron)
-}
-
-// StartCampaignCron starts our cron job of firing expired campaign events
-func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, "campaign_event", time.Second*60, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return QueueEventFires(ctx, rt)
-		},
-	)
-
-	return nil
+	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(quit, rt, "campaign_event", time.Second*60, false, QueueEventFires, time.Minute*5)
+		return nil
+	})
 }
 
 // QueueEventFires looks for all due campaign event fires and queues them to be started

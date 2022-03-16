@@ -17,26 +17,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	timeoutLock = "sessions_timeouts"
-)
-
 var marker = redisx.NewIntervalSet("session_timeouts", time.Hour*24, 2)
 
 func init() {
-	mailroom.AddInitFunction(StartTimeoutCron)
-}
-
-// StartTimeoutCron starts our cron job of continuing timed out sessions every minute
-func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, timeoutLock, time.Second*60, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return timeoutSessions(ctx, rt)
-		},
-	)
-	return nil
+	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(quit, rt, "sessions_timeouts", time.Second*60, false, timeoutSessions, time.Minute*5)
+		return nil
+	})
 }
 
 // timeoutRuns looks for any runs that have timed out and schedules for them to continue

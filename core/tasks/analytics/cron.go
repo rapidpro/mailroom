@@ -14,19 +14,10 @@ import (
 )
 
 func init() {
-	mailroom.AddInitFunction(StartAnalyticsCron)
-}
-
-// StartAnalyticsCron starts our cron job of posting stats every minute
-func StartAnalyticsCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, "stats", time.Second*60, true,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return reportAnalytics(ctx, rt)
-		},
-	)
-	return nil
+	mailroom.AddInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(quit, rt, "stats", time.Second*60, true, reportAnalytics, time.Minute*5)
+		return nil
+	})
 }
 
 var (
