@@ -1,3 +1,7 @@
+v7.2.6
+----------
+ * Batch calls to delete event fires
+
 v7.2.5
 ----------
  * Fix resend reponses when not all messages could be resent
