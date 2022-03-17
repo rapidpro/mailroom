@@ -58,9 +58,6 @@ func TestCreateUser(t *testing.T) {
 	_, _, err = client.CreateUser(params)
 	assert.EqualError(t, err, "Something went wrong")
 
-	_, _, err = client.CreateUser(params)
-	assert.EqualError(t, err, "invalid character 'x' looking for beginning of value")
-
 	user, trace, err := client.CreateUser(params)
 	assert.NoError(t, err)
 	assert.Equal(t, "123", user.Identity)
