@@ -445,7 +445,7 @@ func DeleteUnfiredEventFires(ctx context.Context, tx Queryer, removes []*FireDel
 	for i := range removes {
 		is[i] = removes[i]
 	}
-	return BulkQuery(ctx, "removing campaign event fires", tx, sqlRemoveUnfiredFires, is)
+	return BulkQueryBatches(ctx, "removing campaign event fires", tx, sqlRemoveUnfiredFires, 1000, is)
 }
 
 const sqlRemoveUnfiredFires = `
