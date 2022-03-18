@@ -22,7 +22,6 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -61,8 +60,9 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 	}
 
 	// acquire the lock for this contact
-	lockID := models.ContactLock(models.OrgID(task.OrgID), eventTask.ContactID)
-	lock, err := locker.GrabLock(rt.RP, lockID, time.Minute*5, time.Second*10)
+	locker := models.GetContactLocker(models.OrgID(task.OrgID), eventTask.ContactID)
+
+	lock, err := locker.Grab(rt.RP, time.Second*10)
 	if err != nil {
 		return errors.Wrapf(err, "error acquiring lock for contact %d", eventTask.ContactID)
 	}
@@ -81,7 +81,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 		}).Info("failed to get lock for contact, requeued and skipping")
 		return nil
 	}
-	defer locker.ReleaseLock(rt.RP, lockID, lock)
+	defer locker.Release(rt.RP, lock)
 
 	// read all the events for this contact, one by one
 	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)
