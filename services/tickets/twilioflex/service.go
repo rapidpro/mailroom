@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -53,6 +54,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	return nil, errors.New("missing auth_token or account_sid or chat_service_sid or workspace_sid in twilio flex config")
 }
 
+// Open opens a ticket wich for Twilioflex means create a Chat Channel associated to a Chat User
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
@@ -82,7 +84,25 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		Identity:             fmt.Sprint(contact.ID()),
 		ChatUserFriendlyName: contact.Name(),
 		ChatFriendlyName:     contact.Name(),
+		TaskAttributes:       body,
 	}
+
+	extra := &struct {
+		Department   string            `json:"department"`
+		CustomFields map[string]string `json:"custom_fields"`
+	}{}
+
+	if err := jsonx.Unmarshal([]byte(body), extra); err == nil {
+		taskAttributes := map[string]interface{}{
+			"department":    extra.Department,
+			"custom_fields": extra.CustomFields,
+		}
+
+		if attributes, err := jsonx.Marshal(taskAttributes); err == nil {
+			flexChannelParams.TaskAttributes = string(attributes)
+		}
+	}
+
 	newFlexChannel, trace, err := s.restClient.CreateFlexChannel(flexChannelParams)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
@@ -120,7 +140,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
 	identity := fmt.Sprint(ticket.ContactID())
 
-	// TODO: attachments
 	if len(attachments) > 0 {
 		mediaAttachements := []CreateMediaParams{}
 		for _, attachment := range attachments {
@@ -130,10 +149,6 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			if err != nil {
 				return err
 			}
-			// mediaBody, err := io.ReadAll(resp)
-			// if err != nil {
-			// 	return err
-			// }
 
 			parsedURL, err := url.Parse(attUrl)
 			if err != nil {
@@ -148,8 +163,6 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			}
 
 			mediaAttachements = append(mediaAttachements, media)
-
-			// resp.Body.Close()
 		}
 
 		for _, mediaParams := range mediaAttachements {
