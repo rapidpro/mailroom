@@ -1,3 +1,9 @@
+v7.3.0
+----------
+ * Update to latest goflow
+ * Replace last usages of old locker code
+ * Cleanup some SQL variables
+
 v7.2.6
 ----------
  * Batch calls to delete event fires
