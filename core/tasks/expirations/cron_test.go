@@ -1,11 +1,11 @@
 package expirations_test
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/envs"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -47,7 +47,7 @@ func TestExpirations(t *testing.T) {
 
 	// create a parent/child session for the blocked contact
 	s5ID := testdata.InsertWaitingSession(db, testdata.Org1, blake, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), true, nil)
-	r6ID := testdata.InsertFlowRun(db, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusWaiting)
+	r6ID := testdata.InsertFlowRun(db, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusActive)
 	r7ID := testdata.InsertFlowRun(db, testdata.Org1, s5ID, blake, testdata.Favorites, models.RunStatusWaiting)
 
 	time.Sleep(5 * time.Millisecond)
@@ -73,23 +73,29 @@ func TestExpirations(t *testing.T) {
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s4ID).Columns(map[string]interface{}{"status": "W"})
 	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r5ID).Columns(map[string]interface{}{"status": "W"})
 
-	// blocked contact's session and runs should be expired because a blocked contact can't resume
-	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s5ID).Columns(map[string]interface{}{"status": "X"})
-	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r6ID).Columns(map[string]interface{}{"status": "X"})
-	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r7ID).Columns(map[string]interface{}{"status": "X"})
+	// blocked contact's session and runs sshould be unchanged because it's been queued for resumption.. like any other contact
+	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1;`, s5ID).Columns(map[string]interface{}{"status": "W"})
+	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r6ID).Columns(map[string]interface{}{"status": "A"})
+	assertdb.Query(t, db, `SELECT status FROM flows_flowrun WHERE id = $1;`, r7ID).Columns(map[string]interface{}{"status": "W"})
 
-	// should have created one task
+	// should have created two expiration tasks
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
-	// decode the task
+	// check the first task
 	eventTask := &handler.HandleEventTask{}
-	err = json.Unmarshal(task.Task, eventTask)
-	assert.NoError(t, err)
-
-	// assert its the right contact
+	jsonx.MustUnmarshal(task.Task, eventTask)
 	assert.Equal(t, testdata.George.ID, eventTask.ContactID)
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	assert.NoError(t, err)
+	assert.NotNil(t, task)
+
+	// check the second task
+	eventTask = &handler.HandleEventTask{}
+	jsonx.MustUnmarshal(task.Task, eventTask)
+	assert.Equal(t, blake.ID, eventTask.ContactID)
 
 	// no other tasks
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)

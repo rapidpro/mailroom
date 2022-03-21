@@ -210,11 +210,6 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		return errors.Wrapf(err, "error loading contact")
 	}
 
-	// contact has been deleted or is blocked/stopped/archived, ignore this event
-	if len(contacts) == 0 || contacts[0].Status() != models.ContactStatusActive {
-		return nil
-	}
-
 	modelContact := contacts[0]
 
 	// build our flow contact
