@@ -76,21 +76,12 @@ func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, e
 }
 
 const selectGroupsSQL = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	id, 
-	uuid, 
-	name, 
-	query
-FROM 
-	contacts_contactgroup 
-WHERE 
-	org_id = $1 AND 
-	is_active = TRUE AND
-	group_type = 'U'
-ORDER BY 
-	name ASC
-) r;
-`
+SELECT ROW_TO_JSON(r) FROM (
+	SELECT id, uuid, name, query
+      FROM contacts_contactgroup 
+     WHERE org_id = $1 AND group_type IN ('M', 'Q', 'U') AND is_active = TRUE
+  ORDER BY name ASC
+) r;`
 
 // RemoveContactsFromGroups fires a bulk SQL query to remove all the contacts in the passed in groups
 func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*GroupRemove) error {
