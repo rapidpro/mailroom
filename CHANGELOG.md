@@ -1,3 +1,9 @@
+v7.3.1
+----------
+ * Simplify cron jobs and add them to the main mailroom waitgroup
+ * Allow expirations and timeouts to resume sessions for stopped, blocked and archived contacts
+ * Messages to stopped, blocked or archived contacts should immediately fail
+
 v7.3.0
 ----------
  * Update to latest goflow
