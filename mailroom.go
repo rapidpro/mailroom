@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 
@@ -21,13 +22,20 @@ import (
 )
 
 // InitFunction is a function that will be called when mailroom starts
-type InitFunction func(runtime *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
+type InitFunction func(*runtime.Runtime, *sync.WaitGroup, chan bool) error
 
 var initFunctions = make([]InitFunction, 0)
 
-// AddInitFunction adds an init function that will be called on startup
-func AddInitFunction(initFunc InitFunction) {
+func addInitFunction(initFunc InitFunction) {
 	initFunctions = append(initFunctions, initFunc)
+}
+
+// RegisterCron registers a new cron function to run every interval
+func RegisterCron(name string, interval time.Duration, allInstances bool, fn cron.Function) {
+	addInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(rt, wg, name, interval, allInstances, fn, time.Minute*5, quit)
+		return nil
+	})
 }
 
 // TaskFunction is the function that will be called for a type of task

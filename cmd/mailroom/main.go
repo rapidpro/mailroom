@@ -108,7 +108,7 @@ func main() {
 
 // handleSignals takes care of trapping quit, interrupt or terminate signals and doing the right thing
 func handleSignals(mr *mailroom.Mailroom) {
-	sigs := make(chan os.Signal)
+	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	for {

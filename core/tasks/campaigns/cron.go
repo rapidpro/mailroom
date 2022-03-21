@@ -3,7 +3,6 @@ package campaigns
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -13,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/redisx"
 
 	"github.com/pkg/errors"
@@ -27,20 +25,7 @@ const (
 var campaignsMarker = redisx.NewIntervalSet("campaign_event", time.Hour*24, 2)
 
 func init() {
-	mailroom.AddInitFunction(StartCampaignCron)
-}
-
-// StartCampaignCron starts our cron job of firing expired campaign events
-func StartCampaignCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, "campaign_event", time.Second*60, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return QueueEventFires(ctx, rt)
-		},
-	)
-
-	return nil
+	mailroom.RegisterCron("campaign_event", time.Second*60, false, QueueEventFires)
 }
 
 // QueueEventFires looks for all due campaign event fires and queues them to be started
