@@ -1040,7 +1040,9 @@ func StopContact(ctx context.Context, db Queryer, orgID OrgID, contactID Contact
 
 const sqlDeleteAllContactGroups = `
 DELETE FROM contacts_contactgroup_contacts
-      WHERE contact_id = $2 AND contactgroup_id = ANY(SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type = 'U')`
+      WHERE contact_id = $2 AND contactgroup_id = ANY(
+		  SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type IN ('M', 'Q', 'U')
+	  )`
 
 const sqlDeleteAllContactTriggers = `
 DELETE FROM triggers_trigger_contacts
