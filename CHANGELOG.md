@@ -1,3 +1,7 @@
+v7.3.2
+----------
+ * Add is_system to contact groups, filter groups by group_type = M|Q|U
+
 v7.3.1
 ----------
  * Simplify cron jobs and add them to the main mailroom waitgroup
