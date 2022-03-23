@@ -575,6 +575,9 @@ func TestTimedEvents(t *testing.T) {
 
 		// 9: start our favorite flow again
 		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+
+		// 10: timeout on the color question
+		{handler.TimeoutEventType, testdata.Cathy, "", "Sorry you can't participate right now, I'll try again later.", testdata.TwitterChannel.ID, testdata.Org1.ID},
 	}
 
 	last := time.Now()
@@ -585,25 +588,21 @@ func TestTimedEvents(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		var task *queue.Task
+
 		if tc.EventType == handler.MsgEventType {
-			event := &handler.MsgEvent{
-				ContactID: tc.Contact.ID,
-				OrgID:     tc.OrgID,
-				ChannelID: tc.ChannelID,
-				MsgID:     flows.MsgID(1),
-				MsgUUID:   flows.MsgUUID(uuids.New()),
-				URN:       tc.Contact.URN,
-				URNID:     tc.Contact.URNID,
-				Text:      tc.Message,
-			}
-
-			eventJSON, err := json.Marshal(event)
-			assert.NoError(t, err)
-
 			task = &queue.Task{
 				Type:  tc.EventType,
 				OrgID: int(tc.OrgID),
-				Task:  eventJSON,
+				Task: jsonx.MustMarshal(&handler.MsgEvent{
+					ContactID: tc.Contact.ID,
+					OrgID:     tc.OrgID,
+					ChannelID: tc.ChannelID,
+					MsgID:     flows.MsgID(1),
+					MsgUUID:   flows.MsgUUID(uuids.New()),
+					URN:       tc.Contact.URN,
+					URNID:     tc.Contact.URNID,
+					Text:      tc.Message,
+				}),
 			}
 		} else if tc.EventType == handler.ExpirationEventType {
 			var expiration time.Time
@@ -618,6 +617,14 @@ func TestTimedEvents(t *testing.T) {
 			}
 
 			task = handler.NewExpirationTask(tc.OrgID, tc.Contact.ID, sessionID, expiration)
+
+		} else if tc.EventType == handler.TimeoutEventType {
+			timeoutOn := time.Now()
+
+			// usually courier will set timeout_on after sending the last message
+			db.MustExec(`UPDATE flows_flowsession SET timeout_on = $2 WHERE id = $1`, sessionID, timeoutOn)
+
+			task = handler.NewTimeoutTask(tc.OrgID, tc.Contact.ID, sessionID, timeoutOn)
 		}
 
 		err := handler.QueueHandleTask(rc, tc.Contact.ID, task)
@@ -643,9 +650,9 @@ func TestTimedEvents(t *testing.T) {
 		last = time.Now()
 	}
 
-	// should only have a single waiting session/run per contact
-	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) from flows_flowrun WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(1)
+	// should have no waiting sessions or runs
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowsession WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) from flows_flowrun WHERE status = 'W' AND contact_id = $1`, testdata.Cathy.ID).Returns(0)
 
 	// test the case of a run and session no longer being the most recent but somehow still active, expiration should still work
 	r, err := db.QueryContext(ctx, `SELECT id, session_id from flows_flowrun WHERE contact_id = $1 and status = 'I' order by created_on asc limit 1`, testdata.Cathy.ID)
