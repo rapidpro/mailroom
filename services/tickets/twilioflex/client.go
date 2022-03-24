@@ -348,10 +348,11 @@ type ChatMessage struct {
 }
 
 type CreateChatMessageParams struct {
-	Body       string `json:"Body,omitempty"`
-	From       string `json:"From,omitempty"`
-	MediaSid   string `json:"MediaSid,omitempty"`
-	ChannelSid string `json:"channel_sid,omitempty"`
+	Body        string `json:"Body,omitempty"`
+	From        string `json:"From,omitempty"`
+	MediaSid    string `json:"MediaSid,omitempty"`
+	ChannelSid  string `json:"ChanelSid,omitempty"`
+	DateCreated string `json:"DateCreated,omitempty"`
 }
 
 // https://www.twilio.com/docs/chat/rest/channel-webhook-resource#channelwebhook-properties

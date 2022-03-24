@@ -1,11 +1,16 @@
 package twilioflex
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
+	"sync"
+	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -24,6 +29,26 @@ const (
 	configurationWorkspaceSid   = "workspace_sid"
 	configurationFlexFlowSid    = "flex_flow_sid"
 )
+
+var db *sqlx.DB
+var lock = &sync.Mutex{}
+
+func initDB(dbURL string) error {
+	if db == nil {
+		lock.Lock()
+		defer lock.Unlock()
+		newDB, err := sqlx.Open("postgres", dbURL)
+		if err != nil {
+			return errors.Wrapf(err, "unable to open database connection")
+		}
+		SetDB(newDB)
+	}
+	return nil
+}
+
+func SetDB(newDB *sqlx.DB) {
+	db = newDB
+}
 
 func init() {
 	models.RegisterTicketService(typeTwilioFlex, NewService)
@@ -44,6 +69,11 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	workspaceSid := config[configurationWorkspaceSid]
 	flexFlowSid := config[configurationFlexFlowSid]
 	if authToken != "" && accountSid != "" && chatServiceSid != "" && workspaceSid != "" {
+
+		if err := initDB(rtCfg.DB); err != nil {
+			return nil, err
+		}
+
 		return &service{
 			rtConfig:   rtCfg,
 			ticketer:   ticketer,
@@ -51,6 +81,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 			redactor:   utils.NewRedactor(flows.RedactionMask, authToken, accountSid, chatServiceSid, workspaceSid),
 		}, nil
 	}
+
 	return nil, errors.New("missing auth_token or account_sid or chat_service_sid or workspace_sid in twilio flex config")
 }
 
@@ -88,11 +119,12 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	extra := &struct {
-		Department   string            `json:"department"`
-		CustomFields map[string]string `json:"custom_fields"`
+		Department   string                 `json:"department"`
+		CustomFields map[string]interface{} `json:"custom_fields"`
 	}{}
 
-	if err := jsonx.Unmarshal([]byte(body), extra); err == nil {
+	err = jsonx.Unmarshal([]byte(body), extra)
+	if err == nil {
 		taskAttributes := map[string]interface{}{
 			"department":    extra.Department,
 			"custom_fields": extra.CustomFields,
@@ -120,9 +152,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	channelWebhook := &CreateChatChannelWebhookParams{
 		ConfigurationUrl:        callbackURL,
-		ConfigurationFilters:    []string{"onMessageSent", "onChannelUpdated"},
+		ConfigurationFilters:    []string{"onMessageSent", "onChannelUpdated", "onMediaMessageSent"},
 		ConfigurationMethod:     "POST",
-		ConfigurationRetryCount: 1,
+		ConfigurationRetryCount: 0,
 		Type:                    "webhook",
 	}
 	_, trace, err = s.restClient.CreateFlexChannelWebhook(channelWebhook, newFlexChannel.Sid)
@@ -131,6 +163,36 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create channel webhook")
+	}
+
+	// get messages for history
+	after := session.Runs()[0].CreatedOn()
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	msgs, err := models.SelectContactMessages(cx, db, int(contact.ID()), after)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get history messages")
+	}
+
+	// send history
+	for _, msg := range msgs {
+		m := &CreateChatMessageParams{
+			Body:        msg.Text(),
+			ChannelSid:  newFlexChannel.Sid,
+			DateCreated: msg.CreatedOn().Format(time.RFC3339),
+		}
+		if msg.Direction() == "I" {
+			m.From = fmt.Sprint(contact.ID())
+		} else {
+			m.From = "Bot"
+		}
+		_, trace, err = s.restClient.CreateMessage(m)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "error calling Twilio")
+		}
 	}
 
 	ticket.SetExternalID(newFlexChannel.Sid)
@@ -181,17 +243,20 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		}
 
 	}
-	msg := &CreateChatMessageParams{
-		From:       identity,
-		Body:       text,
-		ChannelSid: string(ticket.ExternalID()),
-	}
-	_, trace, err := s.restClient.CreateMessage(msg)
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	if err != nil {
-		return errors.Wrap(err, "error calling Twilio")
+
+	if strings.TrimSpace(text) != "" {
+		msg := &CreateChatMessageParams{
+			From:       identity,
+			Body:       text,
+			ChannelSid: string(ticket.ExternalID()),
+		}
+		_, trace, err := s.restClient.CreateMessage(msg)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return errors.Wrap(err, "error calling Twilio")
+		}
 	}
 
 	return nil

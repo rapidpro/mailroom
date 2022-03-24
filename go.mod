@@ -35,6 +35,7 @@ require (
 )
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/antlr/antlr4 v0.0.0-20200701161529-3d9351f61e0f // indirect
 	github.com/blevesearch/segment v0.9.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

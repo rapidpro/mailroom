@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -100,6 +102,60 @@ func TestOpenAndForward(t *testing.T) {
 			}`),
 		},
 		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages": {
+			httpx.NewMockResponse(201, nil, `{
+				"body": "Hi! I'll try to help you!",
+				"index": 0,
+				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"from": "10000",
+				"date_updated": "2022-03-09T20:27:47Z",
+				"type": "text",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"last_updated_by": null,
+				"date_created": "2022-03-09T20:27:47Z",
+				"media": null,
+				"sid": "IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"was_edited": false
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"body": "Where are you from?",
+				"index": 0,
+				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"from": "10000",
+				"date_updated": "2022-03-09T20:27:47Z",
+				"type": "text",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"last_updated_by": null,
+				"date_created": "2022-03-09T20:27:47Z",
+				"media": null,
+				"sid": "IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"was_edited": false
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"body": "I'm from Brazil",
+				"index": 0,
+				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"from": "10000",
+				"date_updated": "2022-03-09T20:27:47Z",
+				"type": "text",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"last_updated_by": null,
+				"date_created": "2022-03-09T20:27:47Z",
+				"media": null,
+				"sid": "IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"was_edited": false
+			}`),
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, `{
 				"body": "It's urgent",
@@ -290,6 +346,27 @@ func TestOpenAndForward(t *testing.T) {
 	)
 	assert.EqualError(t, err, "missing auth_token or account_sid or chat_service_sid or workspace_sid in twilio flex config")
 
+	mockDB, mock, err := sqlmock.New()
+	defer mockDB.Close()
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+	dummyTime, _ := time.Parse(time.RFC1123, "2019-10-07T15:21:30")
+
+	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "connection_id", "contact_id", "contact_urn_id", "org_id", "response_to_id", "topup_id"}).
+		AddRow(100, "1348d654-e3dc-4f2f-add0-a9163dc48895", "Hi! I'll try to help you!", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "398", nil, nil, nil, 3, nil, 2, 2, 3, 325, 3).
+		AddRow(101, "b9568e35-3a59-4f91-882f-fa021f591b13", "Where are you from?", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "399", nil, nil, nil, 3, nil, 2, 2, 3, 325, 3).
+		AddRow(102, "c864c4e0-9863-4fd3-9f76-bee481b4a138", "I'm from Brazil", false, dummyTime, dummyTime, dummyTime, dummyTime, "I", "P", "V", "F", 1, 0, nil, "400", nil, nil, nil, 3, nil, 2, 2, 3, nil, nil)
+
+	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
+	assert.NoError(t, err)
+
+	// mock.ExpectQuery("SELECT id,	broadcast_id,	uuid,	text,	created_on,	direction,	status,	visibility,	msg_count,	error_count,	next_attempt,	external_id,	attachments,	metadata,	channel_id,	connection_id,	contact_id,	contact_urn_id,	response_to_id,	org_id,	topup_id FROM msgs_msg WHERE contact_id = $1 AND created_on >= $2 ORDER BY id ASC").
+	mock.ExpectQuery("SELECT").
+		WithArgs(1234567, after).
+		WillReturnRows(rows)
+
+	twilioflex.SetDB(sqlxDB)
+
 	svc, err := twilioflex.NewService(
 		rt.Config,
 		http.DefaultClient,
@@ -317,7 +394,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, "Where are my cookies?", ticket.Body())
 	assert.Equal(t, "CH6442c09c93ba4d13966fa42e9b78f620", ticket.ExternalID())
-	assert.Equal(t, 4, len(logger.Logs))
+	assert.Equal(t, 7, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
 	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Twilioflex.ID, "CH6442c09c93ba4d13966fa42e9b78f620", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
