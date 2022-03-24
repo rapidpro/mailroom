@@ -360,7 +360,6 @@ func TestOpenAndForward(t *testing.T) {
 	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
 	assert.NoError(t, err)
 
-	// mock.ExpectQuery("SELECT id,	broadcast_id,	uuid,	text,	created_on,	direction,	status,	visibility,	msg_count,	error_count,	next_attempt,	external_id,	attachments,	metadata,	channel_id,	connection_id,	contact_id,	contact_urn_id,	response_to_id,	org_id,	topup_id FROM msgs_msg WHERE contact_id = $1 AND created_on >= $2 ORDER BY id ASC").
 	mock.ExpectQuery("SELECT").
 		WithArgs(1234567, after).
 		WillReturnRows(rows)
@@ -388,7 +387,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	logger := &flows.HTTPLogger{}
 	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
-	// assert.EqualError(t, err, "error calling Twilioflex: unable to connect to server")
+
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())
