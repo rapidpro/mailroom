@@ -115,7 +115,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		Identity:             fmt.Sprint(contact.ID()),
 		ChatUserFriendlyName: contact.Name(),
 		ChatFriendlyName:     contact.Name(),
-		TaskAttributes:       body,
 	}
 
 	extra := &struct {
