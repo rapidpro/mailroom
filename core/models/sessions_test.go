@@ -435,6 +435,34 @@ func TestGetSessionWaitExpiresOn(t *testing.T) {
 	assert.Nil(t, s2Actual)
 }
 
+func TestClearWaitTimeout(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	oa := testdata.Org1.Load(rt)
+
+	_, cathy := testdata.Cathy.Load(db, oa)
+
+	expiresOn := time.Now().Add(time.Hour)
+	timeoutOn := time.Now().Add(time.Minute)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), expiresOn, true, &timeoutOn)
+
+	session, err := models.FindWaitingSessionForContact(ctx, db, nil, oa, models.FlowTypeMessaging, cathy)
+	require.NoError(t, err)
+
+	// can be called without db connection to clear without updating db
+	session.ClearWaitTimeout(ctx, nil)
+	assert.Nil(t, session.WaitTimeoutOn())
+	assert.NotNil(t, session.WaitExpiresOn()) // unaffected
+
+	// and called with one to clear in the database as well
+	session.ClearWaitTimeout(ctx, db)
+	assert.Nil(t, session.WaitTimeoutOn())
+
+	assertdb.Query(t, db, `SELECT timeout_on FROM flows_flowsession WHERE id = $1`, session.ID()).Returns(nil)
+}
+
 func insertSessionAndRun(db *sqlx.DB, contact *testdata.Contact, sessionType models.FlowType, status models.SessionStatus, flow *testdata.Flow, connID models.ConnectionID) (models.SessionID, models.FlowRunID) {
 	// create session and add a run with same status
 	sessionID := testdata.InsertFlowSession(db, testdata.Org1, contact, sessionType, status, flow, connID)

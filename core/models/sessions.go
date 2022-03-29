@@ -108,7 +108,6 @@ func (s *Session) WaitStartedOn() *time.Time          { return s.s.WaitStartedOn
 func (s *Session) WaitTimeoutOn() *time.Time          { return s.s.WaitTimeoutOn }
 func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
 func (s *Session) WaitResumeOnExpire() bool           { return s.s.WaitResumeOnExpire }
-func (s *Session) ClearTimeoutOn()                    { s.s.WaitTimeoutOn = nil }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
@@ -464,6 +463,19 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
 
+	return nil
+}
+
+// ClearWaitTimeout clears the timeout on the wait on this session and is used if the engine tells us
+// that the flow no longer has a timeout on that wait. It can be called without updating the session
+// in the database which is used when handling msg_created events before session is updated anyway.
+func (s *Session) ClearWaitTimeout(ctx context.Context, db *sqlx.DB) error {
+	s.s.WaitTimeoutOn = nil
+
+	if db != nil {
+		_, err := db.ExecContext(ctx, `UPDATE flows_flowsession SET timeout_on = NULL WHERE id = $1`, s.ID())
+		return errors.Wrap(err, "error clearing wait timeout")
+	}
 	return nil
 }
 

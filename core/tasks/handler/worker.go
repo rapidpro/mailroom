@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
@@ -273,7 +274,15 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 
 	_, err = runner.ResumeFlow(ctx, rt, oa, session, modelContact, resume, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error resuming flow for timeout")
+		// if we errored, and it's the wait rejecting the timeout event, it's because it no longer exists on the flow, so clear it
+		// on the session
+		var eerr *engine.Error
+		if errors.As(err, &eerr) && eerr.Code() == engine.ErrorResumeRejectedByWait && resume.Type() == resumes.TypeWaitTimeout {
+			log.WithField("session_id", session.ID()).Info("clearing session timeout which is no longer set in flow")
+			return errors.Wrap(session.ClearWaitTimeout(ctx, rt.DB), "error clearing session timeout")
+		}
+
+		return errors.Wrap(err, "error resuming flow for timeout")
 	}
 
 	log.WithField("elapsed", time.Since(start)).Info("handled timed event")

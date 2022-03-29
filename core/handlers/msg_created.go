@@ -50,7 +50,7 @@ func handlePreMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	// everybody else gets their timeout cleared, will be set by courier
-	scene.Session().ClearTimeoutOn()
+	scene.Session().ClearWaitTimeout(ctx, nil)
 
 	return nil
 }
