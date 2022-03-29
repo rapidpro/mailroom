@@ -1,3 +1,9 @@
+v7.3.3
+----------
+ * ContactGroup.group_type can no longer be 'U'
+ * Clear session timeout if timeout resume rejected by wait
+ * Update golang.org/x/sys
+
 v7.3.2
 ----------
  * Add is_system to contact groups, filter groups by group_type = M|Q|U
