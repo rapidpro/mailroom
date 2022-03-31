@@ -250,7 +250,7 @@ func (c *Client) CreateMedia(media *CreateMediaParams) (*Media, *httpx.Trace, er
 
 // FetchMedia fetch a twilio flex Media by this sid.
 func (c *Client) FetchMedia(mediaSid string) (*Media, *httpx.Trace, error) {
-	fetchUrl := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/%s", mediaSid)
+	fetchUrl := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media/%s", c.serviceSid, mediaSid)
 	response := &Media{}
 	data := url.Values{}
 	trace, err := c.get(fetchUrl, data, response)
