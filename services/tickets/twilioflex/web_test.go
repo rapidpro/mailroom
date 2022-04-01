@@ -1,7 +1,6 @@
 package twilioflex_test
 
 import (
-	"log"
 	"testing"
 
 	"github.com/nyaruka/mailroom/testsuite"
@@ -25,6 +24,5 @@ func TestEventCallback(t *testing.T) {
 		nil,
 	)
 
-	log.Println(string(ticket.UUID))
 	web.RunWebTests(t, ctx, rt, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }
