@@ -1,0 +1,124 @@
+[
+  {
+    "label": "error response if no such ticketer",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/XYZ/XYZ",
+    "body": {
+      "event_type": "onMessageSent",
+      "instance_sid": "12345",
+      "body": "we can help"
+    },
+    "status": 404,
+    "response": {
+      "error": "not found: /mr/tickets/types/twilioflex/event_callback/XYZ/XYZ"
+    }
+  },
+  {
+    "label": "unauthorized response if auth fails",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/564fee60-7e84-4a9e-ade3-4fce01af19a2",
+    "body": "EventType=onMessageSent&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&Attributes=%7B%7D&DateCreated=2022-03-10T23%3A56%3A43.412Z&Index=1&From=teste_2Etwilioflex&MessageSid=IM4b440f124820414b8f500a1235532ac1&AccountSid=AC92d44315e19372138bdaffcc13cf3b05&Source=SDK&ChannelSid=CH1880a9cde40c4dbb88dd97fc3aedac08&ClientIdentity=teste_2Etwilioflex&RetryCount=0&WebhookType=webhook&Body=ola&WebhookSid=WH99d1f1895a7c4e6fa10ac5e8ac0c2242",
+    "status": 401,
+    "response": {
+      "status": "unauthorized"
+    }
+  },
+  {
+    "label": "error response if no such ticket",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/564fee60-7e84-4a9e-ade3-4fce01af19a2",
+    "body": "EventType=onMessageSent&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&Attributes=%7B%7D&DateCreated=2022-03-10T23%3A56%3A43.412Z&Index=1&From=teste_2Etwilioflex&MessageSid=IM4b440f124820414b8f500a1235532ac1&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ChannelSid=CH1880a9cde40c4dbb88dd97fc3aedac08&ClientIdentity=teste_2Etwilioflex&RetryCount=0&WebhookType=webhook&Body=ola&WebhookSid=WH99d1f1895a7c4e6fa10ac5e8ac0c2242",
+    "status": 404,
+    "response": {
+      "error": "no such ticket 564fee60-7e84-4a9e-ade3-4fce01af19a2"
+    }
+  },
+  {
+    "label": "create message if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/$cathy_ticket_uuid$",
+    "headers": {
+      "Authorization": "Token 123456789"
+    },
+    "body": "EventType=onMessageSent&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&Attributes=%7B%7D&DateCreated=2022-03-10T23%3A56%3A43.412Z&Index=1&From=teste_2Etwilioflex&MessageSid=IM4b440f124820414b8f500a1235532ac1&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ChannelSid=CH1880a9cde40c4dbb88dd97fc3aedac08&ClientIdentity=teste_2Etwilioflex&RetryCount=0&WebhookType=webhook&Body=We can help&WebhookSid=WH99d1f1895a7c4e6fa10ac5e8ac0c2242",
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O'",
+        "count": 1
+      },
+      {
+        "query": "select count(*) from tickets_ticket where status = 'O'",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "label": "create message with attachments if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/$cathy_ticket_uuid$",
+    "body": "MediaSid=ME59b872f1e52fbd6fe6ad956bbb4fa9bd&MediaSize=153575&EventType=onMediaMessageSent&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&Attributes=%7B%7D&DateCreated=2022-03-14T19%3A48%3A35.727Z&Index=3&From=teste_2Etwilioflex&MessageSid=IM8c57eaf105f34905883b1192e9499641&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ChannelSid=CH1880a9cde40c4dbb88dd97fc3aedac08&ClientIdentity=teste_2Etwilioflex&RetryCount=0&MediaContentType=image%2Fjpeg&WebhookType=webhook&MediaFilename=dummy_image.jpg&Body=&WebhookSid=WH4ab46f21e24d4b58b8e3b3a20ce6a1ec",
+    "http_mocks": {
+      "https://mcs.us1.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd": [
+        {
+          "status": 200,
+          "body": {
+            "sid": "ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
+            "service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+            "date_created": "2022-03-14T13:10:38.897143-07:00",
+            "date_upload_updated": "2022-03-14T13:10:38.906058-07:00",
+            "date_updated": "2022-03-14T13:10:38.897143-07:00",
+            "links": {
+              "content": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd/Content",
+              "content_direct_temporary": "https://media.us1.twilio.com/ME59b872f1e52fbd6fe6ad956bbb4fa9bd?Expires=1647355356&Signature=n05WWrmDwS4yQ521cNeL9LSH7g1RZg3gpmZ83TAy6eHHuW8KqAGn~wl0p5KGlTJYIhGmfTKhYS8o~zSr1L2iDmFyZDawiueHXqeebFNJiM~tviKn5Inna0mgI~nKSl6iV6F6sKUPnkeAc~AVb7Z3qfDaiyf87ucjyBKRTYkKT7a85c2hhBy4z8DOOeVBWNCEZxA08x-iZDsKYwPtIp~jJIwXrHA5nn3GE62jomjLkfd7RoFVggQhPjmrQQsF9Ock-piPiTb-J3o1risNaHux2rycKCO~U4hndnyo26FEeS71iemIK71hxV7MHtfFEubx04eRYijYRfaUEoWc6IXdxQ__&Key-Pair-Id=APKAJWF6YVTMIIYOF3AA"
+            },
+            "size": 153611,
+            "content_type": "image/jpeg",
+            "filename": "dummy_image.jpg",
+            "author": "system",
+            "category": "media",
+            "message_sid": "IM8c57eaf105f34905883b1192e9499641",
+            "channel_sid": "CH1880a9cde40c4dbb88dd97fc3aedac08",
+            "url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME59b872f1e52fbd6fe6ad956bbb4fa9bd",
+            "is_multipart_upstream": false
+          }
+        }
+      ],
+      "https://media.us1.twilio.com/ME59b872f1e52fbd6fe6ad956bbb4fa9bd?Expires=1647355356&Signature=n05WWrmDwS4yQ521cNeL9LSH7g1RZg3gpmZ83TAy6eHHuW8KqAGn~wl0p5KGlTJYIhGmfTKhYS8o~zSr1L2iDmFyZDawiueHXqeebFNJiM~tviKn5Inna0mgI~nKSl6iV6F6sKUPnkeAc~AVb7Z3qfDaiyf87ucjyBKRTYkKT7a85c2hhBy4z8DOOeVBWNCEZxA08x-iZDsKYwPtIp~jJIwXrHA5nn3GE62jomjLkfd7RoFVggQhPjmrQQsF9Ock-piPiTb-J3o1risNaHux2rycKCO~U4hndnyo26FEeS71iemIK71hxV7MHtfFEubx04eRYijYRfaUEoWc6IXdxQ__&Key-Pair-Id=APKAJWF6YVTMIIYOF3AA": [
+        {
+          "status": 200,
+          "body": "IMAGE"
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{image/jpeg:https:///_test_media_storage/media/1/6929/26ea/692926ea-09d6-4942-bd38-d266ec8d3716}'",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "label": "close room if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/$cathy_ticket_uuid$",
+    "body": "CreatedBy=system&FriendlyName=dummy%20user&EventType=onChannelUpdated&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&DateUpdated=2022-03-11T19%3A22%3A26.236Z&Attributes=%7B%22task_sid%22%3A%22WT3010541794b70ae138f62dcb83b84eb6%22%2C%22from%22%3A%22dummy%20user2%22%2C%22channel_type%22%3A%22web%22%2C%22status%22%3A%22INACTIVE%22%2C%22long_lived%22%3Afalse%7D&DateCreated=2022-03-11T19%3A17%3A51.196Z&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ChannelSid=CH6442c09c93ba4d13966fa42e9b78f620&ClientIdentity=teste_2Etwilioflex&RetryCount=0&WebhookType=webhook&ChannelType=private&WebhookSid=WH2154dcf90a06454cb420923ac1d2253f",
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from tickets_ticket where status = 'C'",
+        "count": 1
+      }
+    ]
+  }
+]

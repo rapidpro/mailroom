@@ -358,3 +358,19 @@ func TestNewOutgoingIVR(t *testing.T) {
 
 	testsuite.AssertQuery(t, db, `SELECT text, created_on, sent_on FROM msgs_msg WHERE uuid = $1`, dbMsg.UUID()).Columns(map[string]interface{}{"text": "Hello", "created_on": createdOn, "sent_on": createdOn})
 }
+
+func TestSelectContactMessages(t *testing.T) {
+	ctx, _, db, _ := testsuite.Get()
+
+	now := time.Now()
+	msgIn := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "in 1", models.MsgStatusHandled)
+	msgOut := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"}, models.MsgStatusSent)
+
+	msgs, err := models.SelectContactMessages(ctx, db, int(testdata.Cathy.ID), now)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(msgs))
+	assert.Equal(t, msgIn.Text(), msgs[0].Text())
+	assert.Equal(t, msgOut.Text(), msgs[1].Text())
+	assert.Equal(t, []utils.Attachment{"image/jpeg:hi.jpg"}, msgs[1].Attachments())
+}
