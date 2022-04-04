@@ -1,3 +1,7 @@
+v7.3.4
+----------
+ * Fix unstopping of contacts who message in
+
 v7.3.3
 ----------
  * ContactGroup.group_type can no longer be 'U'
