@@ -1,3 +1,7 @@
+1.2.0-mailroom-7.0.1
+----------
+ * Add ticketer Twilio Flex
+
 1.1.0-mailroom-7.0.1
 ----------
  * Update gocommon to v1.15.1
