@@ -282,8 +282,6 @@ func TestCloseTickets(t *testing.T) {
 		},
 	}))
 
-	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab80", "Tickets", "tickets > 0")
-
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
@@ -299,7 +297,7 @@ func TestCloseTickets(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
-	assert.Equal(t, "Tickets", cathy.Groups().All()[1].Name())
+	assert.Equal(t, "Open Tickets", cathy.Groups().All()[1].Name())
 
 	logger := &models.HTTPLogger{}
 	evts, err := models.CloseTickets(ctx, rt, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, false, logger)
@@ -354,8 +352,6 @@ func TestReopenTickets(t *testing.T) {
 		},
 	}))
 
-	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab80", "Two Tickets", "tickets = 2")
-
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
@@ -385,9 +381,9 @@ func TestReopenTickets(t *testing.T) {
 	// but no events for ticket #2 which waas already open
 	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'R'`, ticket2.ID).Returns(0)
 
-	// check Cathy is now in the two tickets group
+	// check Cathy is now in the open tickets group
 	_, cathy := testdata.Cathy.Load(db, oa)
 	assert.Equal(t, 2, len(cathy.Groups().All()))
 	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
-	assert.Equal(t, "Two Tickets", cathy.Groups().All()[1].Name())
+	assert.Equal(t, "Open Tickets", cathy.Groups().All()[1].Name())
 }
