@@ -228,6 +228,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 			ExpectedTotal:    1,
 		},
 		{
+			Group:         testdata.ActiveGroup,
 			Query:         "goats > 2", // no such contact field
 			ExpectedError: "error parsing query: goats > 2: can't resolve 'goats' to attribute, scheme or field",
 		},

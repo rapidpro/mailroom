@@ -40,12 +40,17 @@ func TestLoadGroups(t *testing.T) {
 		name  string
 		query string
 	}{
+		{testdata.ActiveGroup.ID, testdata.ActiveGroup.UUID, "Active", ""},
+		{testdata.ArchivedGroup.ID, testdata.ArchivedGroup.UUID, "Archived", ""},
+		{testdata.BlockedGroup.ID, testdata.BlockedGroup.UUID, "Blocked", ""},
 		{testdata.DoctorsGroup.ID, testdata.DoctorsGroup.UUID, "Doctors", ""},
 		{testdata.OpenTicketsGroup.ID, testdata.OpenTicketsGroup.UUID, "Open Tickets", "tickets > 0"},
+		{testdata.StoppedGroup.ID, testdata.StoppedGroup.UUID, "Stopped", ""},
 		{testdata.TestersGroup.ID, testdata.TestersGroup.UUID, "Testers", ""},
 	}
 
-	assert.Equal(t, 3, len(groups))
+	assert.Equal(t, 7, len(groups))
+
 	for i, tc := range tcs {
 		group := groups[i].(*models.Group)
 		assert.Equal(t, tc.uuid, group.UUID())
