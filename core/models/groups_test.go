@@ -35,22 +35,23 @@ func TestLoadGroups(t *testing.T) {
 	require.NoError(t, err)
 
 	tcs := []struct {
-		ID    models.GroupID
-		UUID  assets.GroupUUID
-		Name  string
-		Query string
+		id    models.GroupID
+		uuid  assets.GroupUUID
+		name  string
+		query string
 	}{
 		{testdata.DoctorsGroup.ID, testdata.DoctorsGroup.UUID, "Doctors", ""},
+		{testdata.OpenTicketsGroup.ID, testdata.OpenTicketsGroup.UUID, "Open Tickets", "tickets > 0"},
 		{testdata.TestersGroup.ID, testdata.TestersGroup.UUID, "Testers", ""},
 	}
 
-	assert.Equal(t, 2, len(groups))
+	assert.Equal(t, 3, len(groups))
 	for i, tc := range tcs {
 		group := groups[i].(*models.Group)
-		assert.Equal(t, tc.UUID, group.UUID())
-		assert.Equal(t, tc.ID, group.ID())
-		assert.Equal(t, tc.Name, group.Name())
-		assert.Equal(t, tc.Query, group.Query())
+		assert.Equal(t, tc.uuid, group.UUID())
+		assert.Equal(t, tc.id, group.ID())
+		assert.Equal(t, tc.name, group.Name())
+		assert.Equal(t, tc.query, group.Query())
 	}
 }
 

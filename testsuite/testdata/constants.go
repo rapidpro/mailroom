@@ -27,21 +27,25 @@ var IncomingExtraFlow = &Flow{10006, "376d3de6-7f0e-408c-80d6-b1919738bc80"}
 var ParentTimeoutFlow = &Flow{10007, "81c0f323-7e06-4e0c-a960-19c20f17117c"}
 var CampaignFlow = &Flow{10009, "3a92a964-3a8d-420b-9206-2cd9d884ac30"}
 
-var CreatedOnField = &Field{3, "53499958-0a0a-48a5-bb5f-8f9f4d8af77b"}
-var LastSeenOnField = &Field{5, "4307df2e-b00b-42b6-922b-4a1dcfc268d8"}
+var CreatedOnField = &Field{3, "fd18a69d-7514-4b76-9fad-072641995e17"}
+var LanguageField = &Field{4, "4307df2e-b00b-42b6-922b-4a1dcfc268d8"}
+var LastSeenOnField = &Field{5, "660ebe03-b717-4a80-aebf-9b7c718266e1"}
 var GenderField = &Field{6, "3a5891e4-756e-4dc9-8e12-b7a766168824"}
 var AgeField = &Field{7, "903f51da-2717-47c7-a0d3-f2f32877013d"}
 var JoinedField = &Field{8, "d83aae24-4bbf-49d0-ab85-6bfd201eac6d"}
 
-var AllContactsGroup = &Group{1, "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"}
-var BlockedContactsGroup = &Group{2, "9295ebab-5c2d-4eb1-86f9-7c15ed2f3219"}
+var ActiveGroup = &Group{1, "b97f69f7-5edf-45c7-9fda-d37066eae91d"}
+var BlockedGroup = &Group{2, "14f6ea01-456b-4417-b0b8-35e942f549f1"}
+var StoppedGroup = &Group{3, "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"}
+var ArchivedGroup = &Group{4, "9295ebab-5c2d-4eb1-86f9-7c15ed2f3219"}
+var OpenTicketsGroup = &Group{5, "361838c4-2866-495a-8990-9f3c222a7604"}
 var DoctorsGroup = &Group{10000, "c153e265-f7c9-4539-9dbc-9b358714b638"}
 var TestersGroup = &Group{10001, "5e9d8fab-5e7e-4f51-b533-261af5dea70d"}
 
 var ReportingLabel = &Label{10000, "ebc4dedc-91c4-4ed4-9dd6-daa05ea82698"}
 var TestingLabel = &Label{10001, "a6338cdc-7938-4437-8b05-2d5d785e3a08"}
 
-var DefaultTopic = &Topic{1, "ffc903f7-8cbb-443f-9627-87106842d1aa"}
+var DefaultTopic = &Topic{1, "5cc1848a-357c-4de9-9720-45770ec18d11"}
 var SalesTopic = &Topic{2, "9ef2ff21-064a-41f1-8560-ccc990b4f937"}
 var SupportTopic = &Topic{3, "0a8f2e00-fef6-402c-bd79-d789446ec0e0"}
 
