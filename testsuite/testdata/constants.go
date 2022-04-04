@@ -33,8 +33,10 @@ var GenderField = &Field{6, "3a5891e4-756e-4dc9-8e12-b7a766168824"}
 var AgeField = &Field{7, "903f51da-2717-47c7-a0d3-f2f32877013d"}
 var JoinedField = &Field{8, "d83aae24-4bbf-49d0-ab85-6bfd201eac6d"}
 
-var AllContactsGroup = &Group{1, "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"}
-var BlockedContactsGroup = &Group{2, "9295ebab-5c2d-4eb1-86f9-7c15ed2f3219"}
+var ActiveGroup = &Group{1, "b97f69f7-5edf-45c7-9fda-d37066eae91d"}
+var BlockedGroup = &Group{2, "14f6ea01-456b-4417-b0b8-35e942f549f1"}
+var StoppedGroup = &Group{3, "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"}
+var ArchivedGroup = &Group{4, "9295ebab-5c2d-4eb1-86f9-7c15ed2f3219"}
 var DoctorsGroup = &Group{10000, "c153e265-f7c9-4539-9dbc-9b358714b638"}
 var TestersGroup = &Group{10001, "5e9d8fab-5e7e-4f51-b533-261af5dea70d"}
 

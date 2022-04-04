@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -32,7 +31,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	require.NoError(t, err)
 
 	tcs := []struct {
-		Group             assets.GroupUUID
+		Group             *testdata.Group
 		ExcludeIDs        []models.ContactID
 		Query             string
 		Sort              string
@@ -43,7 +42,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 		ExpectedError     string
 	}{
 		{
-			Group: testdata.AllContactsGroup.UUID,
+			Group: testdata.ActiveGroup,
 			Query: "george",
 			ExpectedESRequest: `{
 				"_source": false,
@@ -63,7 +62,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"
+									"group_ids": 1
 								}
 							},
 							{
@@ -117,7 +116,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 			ExpectedTotal:    1,
 		},
 		{
-			Group:      testdata.BlockedContactsGroup.UUID,
+			Group:      testdata.BlockedGroup,
 			ExcludeIDs: []models.ContactID{testdata.Bob.ID, testdata.Cathy.ID},
 			Query:      "age > 32",
 			Sort:       "-age",
@@ -139,7 +138,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "9295ebab-5c2d-4eb1-86f9-7c15ed2f3219"
+									"group_ids": 2
 								}
 							},
 							{
@@ -237,7 +236,9 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	for i, tc := range tcs {
 		es.NextResponse = tc.MockedESResponse
 
-		_, ids, total, err := models.GetContactIDsForQueryPage(ctx, client, oa, tc.Group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
+		group := oa.GroupByID(tc.Group.ID)
+
+		_, ids, total, err := models.GetContactIDsForQueryPage(ctx, client, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
 
 		if tc.ExpectedError != "" {
 			assert.EqualError(t, err, tc.ExpectedError)

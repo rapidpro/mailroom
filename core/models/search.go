@@ -10,14 +10,27 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/contactql/es"
+	"github.com/nyaruka/goflow/flows"
 
 	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+type AssetMapper struct{}
+
+func (m *AssetMapper) Flow(f assets.Flow) int64 {
+	return int64(f.(*Flow).ID())
+}
+
+func (m *AssetMapper) Group(g assets.Group) int64 {
+	return int64(g.(*flows.Group).Asset().(*Group).ID())
+}
+
+var assetMapper = &AssetMapper{}
+
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStatus, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
+func BuildElasticQuery(oa *OrgAssets, group *Group, status ContactStatus, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", oa.OrgID()),
@@ -25,8 +38,8 @@ func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStat
 	)
 
 	// our group if present
-	if group != "" {
-		eq = eq.Must(elastic.NewTermQuery("groups", group))
+	if group != nil {
+		eq = eq.Must(elastic.NewTermQuery("group_ids", group.ID()))
 	}
 
 	// our status is present
@@ -45,7 +58,7 @@ func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStat
 
 	// and by our query if present
 	if query != nil {
-		q := es.ToElasticQuery(oa.Env(), query)
+		q := es.ToElasticQuery(oa.Env(), assetMapper, query)
 		eq = eq.Must(q)
 	}
 
@@ -53,7 +66,7 @@ func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStat
 }
 
 // GetContactIDsForQueryPage returns a page of contact ids for the given query and sort
-func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *OrgAssets, group assets.GroupUUID, excludeIDs []ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
+func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *OrgAssets, group *Group, excludeIDs []ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
 	env := oa.Env()
 	start := time.Now()
 	var parsed *contactql.ContactQuery
@@ -126,7 +139,7 @@ func GetContactIDsForQuery(ctx context.Context, client *elastic.Client, oa *OrgA
 	}
 
 	routing := strconv.FormatInt(int64(oa.OrgID()), 10)
-	eq := BuildElasticQuery(oa, "", ContactStatusActive, nil, parsed)
+	eq := BuildElasticQuery(oa, nil, ContactStatusActive, nil, parsed)
 	ids := make([]ContactID, 0, 100)
 
 	// if limit provided that can be done with regular search, do that
