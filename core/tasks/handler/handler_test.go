@@ -71,67 +71,7 @@ func TestMsgEvents(t *testing.T) {
 		expectedType  models.MsgType
 		expectedFlow  *testdata.Flow
 	}{
-		{
-			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
-			contact:       testdata.Cathy,
-			text:          "noop",
-			expectedReply: "",
-			expectedType:  models.MsgTypeInbox,
-		},
-		{
-			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
-			contact:       testdata.Cathy,
-			text:          "start other",
-			expectedReply: "",
-			expectedType:  models.MsgTypeInbox,
-		},
-		{
-			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
-			contact:       testdata.Cathy,
-			text:          "start",
-			expectedReply: "What is your favorite color?",
-			expectedType:  models.MsgTypeFlow,
-			expectedFlow:  testdata.Favorites,
-		},
-		{
-			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
-			contact:       testdata.Cathy,
-			text:          "purple",
-			expectedReply: "I don't know that color. Try again.",
-			expectedType:  models.MsgTypeFlow,
-			expectedFlow:  testdata.Favorites,
-		},
-		{
-			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
-			contact:       testdata.Cathy,
-			text:          "blue",
-			expectedReply: "Good choice, I like Blue too! What is your favorite beer?",
-			expectedType:  models.MsgTypeFlow,
-			expectedFlow:  testdata.Favorites,
-		},
-		{
-			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
-			contact:       testdata.Cathy,
-			text:          "MUTZIG",
-			expectedReply: "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?",
-			expectedType:  models.MsgTypeFlow,
-			expectedFlow:  testdata.Favorites,
-		},
-		{
-			org:           testdata.Org1,
-			channel:       testdata.TwitterChannel,
-			contact:       testdata.Cathy,
-			text:          "Cathy",
-			expectedReply: "Thanks Cathy, we are all done!",
-			expectedType:  models.MsgTypeFlow,
-			expectedFlow:  testdata.Favorites,
-		},
+		// 0:
 		{
 			org:           testdata.Org1,
 			channel:       testdata.TwitterChannel,
@@ -141,6 +81,82 @@ func TestMsgEvents(t *testing.T) {
 			expectedType:  models.MsgTypeInbox,
 		},
 
+		// 1:
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "start other",
+			expectedReply: "",
+			expectedType:  models.MsgTypeInbox,
+		},
+
+		// 2:
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "start",
+			expectedReply: "What is your favorite color?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+
+		// 3:
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "purple",
+			expectedReply: "I don't know that color. Try again.",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+
+		// 4:
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "blue",
+			expectedReply: "Good choice, I like Blue too! What is your favorite beer?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+
+		// 5:
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "MUTZIG",
+			expectedReply: "Mmmmm... delicious Mutzig. If only they made blue Mutzig! Lastly, what is your name?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+
+		// 6:
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "Cathy",
+			expectedReply: "Thanks Cathy, we are all done!",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+
+		// 7:
+		{
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.Cathy,
+			text:          "noop",
+			expectedReply: "",
+			expectedType:  models.MsgTypeInbox,
+		},
+
+		// 8:
 		{
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -150,6 +166,8 @@ func TestMsgEvents(t *testing.T) {
 			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2SingleMessage,
 		},
+
+		// 9:
 		{
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -159,6 +177,8 @@ func TestMsgEvents(t *testing.T) {
 			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
+
+		// 10:
 		{
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -168,6 +188,8 @@ func TestMsgEvents(t *testing.T) {
 			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
+
+		// 11:
 		{
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -177,6 +199,8 @@ func TestMsgEvents(t *testing.T) {
 			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
+
+		// 12:
 		{
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -186,6 +210,8 @@ func TestMsgEvents(t *testing.T) {
 			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
+
+		// 13:
 		{
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -196,6 +222,7 @@ func TestMsgEvents(t *testing.T) {
 			expectedFlow:  testdata.Org2SingleMessage,
 		},
 
+		// 14:
 		{
 			org:           testdata.Org1,
 			channel:       testdata.TwitterChannel,
@@ -206,7 +233,21 @@ func TestMsgEvents(t *testing.T) {
 			expectedFlow:  testdata.IVRFlow,
 		},
 
-		// no URN on contact but handle event, session gets started but no message created
+		// 15: stopped contact should be unstopped
+		{
+			preHook: func() {
+				db.MustExec(`UPDATE contacts_contact SET status = 'S' WHERE id = $1`, testdata.George.ID)
+			},
+			org:           testdata.Org1,
+			channel:       testdata.TwitterChannel,
+			contact:       testdata.George,
+			text:          "start",
+			expectedReply: "What is your favorite color?",
+			expectedType:  models.MsgTypeFlow,
+			expectedFlow:  testdata.Favorites,
+		},
+
+		// 16: no URN on contact but handle event, session gets started but no message created
 		{
 			org:           testdata.Org1,
 			channel:       testdata.TwilioChannel,
@@ -217,7 +258,7 @@ func TestMsgEvents(t *testing.T) {
 			expectedFlow:  testdata.Favorites,
 		},
 
-		// start Fred back in our favorite flow, then make it inactive, will be handled by catch-all
+		// 17: start Fred back in our favorite flow, then make it inactive, will be handled by catch-all
 		{
 			org:           testdata.Org2,
 			channel:       testdata.Org2Channel,
@@ -227,6 +268,8 @@ func TestMsgEvents(t *testing.T) {
 			expectedType:  models.MsgTypeFlow,
 			expectedFlow:  testdata.Org2Favorites,
 		},
+
+		// 18:
 		{
 			preHook: func() {
 				db.MustExec(`UPDATE flows_flow SET is_active = FALSE WHERE id = $1`, testdata.Org2Favorites.ID)
@@ -240,7 +283,7 @@ func TestMsgEvents(t *testing.T) {
 			expectedFlow:  testdata.Org2SingleMessage,
 		},
 
-		// start Fred back in our favorites flow to test retries
+		// 19: start Fred back in our favorites flow to test retries
 		{
 			preHook: func() {
 				db.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, testdata.Org2Favorites.ID)
@@ -303,8 +346,8 @@ func TestMsgEvents(t *testing.T) {
 
 		// if we are meant to have a reply, check it
 		if tc.expectedReply != "" {
-			assertdb.Query(t, db, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.contact.ID, last).
-				Returns(tc.expectedReply, "%d: response mismatch", i)
+			assertdb.Query(t, db, `SELECT text, status FROM msgs_msg WHERE contact_id = $1 AND created_on > $2 ORDER BY id DESC LIMIT 1`, tc.contact.ID, last).
+				Columns(map[string]interface{}{"text": tc.expectedReply, "status": "Q"}, "%d: response mismatch", i)
 		}
 
 		// check any open tickets for this contact where updated
@@ -331,7 +374,7 @@ func TestMsgEvents(t *testing.T) {
 
 	// check messages queued to courier
 	testsuite.AssertCourierQueues(t, map[string][]int{
-		fmt.Sprintf("msgs:%s|10/1", testdata.TwitterChannel.UUID): {1, 1, 1, 1, 1},
+		fmt.Sprintf("msgs:%s|10/1", testdata.TwitterChannel.UUID): {1, 1, 1, 1, 1, 1},
 		fmt.Sprintf("msgs:%s|10/1", testdata.Org2Channel.UUID):    {1, 1, 1, 1, 1, 1, 1, 1, 1},
 	})
 
