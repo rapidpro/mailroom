@@ -514,12 +514,6 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 	}
 
-	// build our flow contact
-	contact, err := modelContact.FlowContact(oa)
-	if err != nil {
-		return errors.Wrapf(err, "error creating flow contact")
-	}
-
 	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
 	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
 		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
@@ -538,6 +532,12 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 
 		newContact = true
+	}
+
+	// build our flow contact
+	contact, err := modelContact.FlowContact(oa)
+	if err != nil {
+		return errors.Wrapf(err, "error creating flow contact")
 	}
 
 	// if this is a new contact, we need to calculate dynamic groups and campaigns
