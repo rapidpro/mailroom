@@ -43,7 +43,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 		ExpectedError     string
 	}{
 		{
-			Group: testdata.AllContactsGroup.UUID,
+			Group: testdata.ActiveGroup.UUID,
 			Query: "george",
 			ExpectedESRequest: `{
 				"_source": false,
@@ -63,7 +63,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"
+									"groups": "b97f69f7-5edf-45c7-9fda-d37066eae91d"
 								}
 							},
 							{
@@ -117,7 +117,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 			ExpectedTotal:    1,
 		},
 		{
-			Group:      testdata.BlockedContactsGroup.UUID,
+			Group:      testdata.BlockedGroup.UUID,
 			ExcludeIDs: []models.ContactID{testdata.Bob.ID, testdata.Cathy.ID},
 			Query:      "age > 32",
 			Sort:       "-age",
@@ -139,7 +139,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "9295ebab-5c2d-4eb1-86f9-7c15ed2f3219"
+									"groups": "14f6ea01-456b-4417-b0b8-35e942f549f1"
 								}
 							},
 							{
