@@ -111,15 +111,7 @@ func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *
 		return nil, nil, 0, err
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"org_id":      oa.OrgID(),
-		"parsed":      parsed,
-		"group_uuid":  group,
-		"query":       query,
-		"elapsed":     time.Since(start),
-		"page_count":  len(ids),
-		"total_count": results.Hits.TotalHits,
-	}).Debug("paged contact query complete")
+	logrus.WithFields(logrus.Fields{"org_id": oa.OrgID(), "query": query, "elapsed": time.Since(start), "page_count": len(ids), "total_count": results.Hits.TotalHits}).Debug("paged contact query complete")
 
 	return parsed, ids, results.Hits.TotalHits.Value, nil
 }
