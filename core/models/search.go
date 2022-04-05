@@ -10,13 +10,14 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/contactql/es"
-	"github.com/nyaruka/goflow/flows"
 
 	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// AssetMapper maps resolved assets in queries to how we identify them in ES which in the case
+// of flows and groups is their ids. We can do this by just type cracking them to their models.
 type AssetMapper struct{}
 
 func (m *AssetMapper) Flow(f assets.Flow) int64 {
@@ -24,7 +25,7 @@ func (m *AssetMapper) Flow(f assets.Flow) int64 {
 }
 
 func (m *AssetMapper) Group(g assets.Group) int64 {
-	return int64(g.(*flows.Group).Asset().(*Group).ID())
+	return int64(g.(*Group).ID())
 }
 
 var assetMapper = &AssetMapper{}
