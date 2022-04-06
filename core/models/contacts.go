@@ -196,9 +196,12 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, db Queryer, oa *OrgAss
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
 func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 	// convert our groups to a list of references
-	groups := make([]*assets.GroupReference, len(c.groups))
-	for i, g := range c.groups {
-		groups[i] = assets.NewGroupReference(g.UUID(), g.Name())
+	groups := make([]*assets.GroupReference, 0, len(c.groups))
+	for _, g := range c.groups {
+		// exclude the db-trigger based status groups for now
+		if g.Type() == GroupTypeManual || g.Type() == GroupTypeSmart {
+			groups = append(groups, assets.NewGroupReference(g.UUID(), g.Name()))
+		}
 	}
 
 	// convert our tickets to flow tickets

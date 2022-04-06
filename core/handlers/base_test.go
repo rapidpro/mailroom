@@ -145,6 +145,7 @@ func createTestFlow(t *testing.T, uuid assets.FlowUUID, tc TestCase) flows.Flow 
 		definition.NewLocalization(),
 		nodes,
 		nil,
+		nil,
 	)
 	require.NoError(t, err)
 

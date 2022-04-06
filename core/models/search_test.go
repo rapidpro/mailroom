@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -32,7 +31,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	require.NoError(t, err)
 
 	tcs := []struct {
-		Group             assets.GroupUUID
+		Group             *testdata.Group
 		ExcludeIDs        []models.ContactID
 		Query             string
 		Sort              string
@@ -43,7 +42,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 		ExpectedError     string
 	}{
 		{
-			Group: testdata.ActiveGroup.UUID,
+			Group: testdata.ActiveGroup,
 			Query: "george",
 			ExpectedESRequest: `{
 				"_source": false,
@@ -63,7 +62,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "b97f69f7-5edf-45c7-9fda-d37066eae91d"
+									"group_ids": 1
 								}
 							},
 							{
@@ -117,7 +116,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 			ExpectedTotal:    1,
 		},
 		{
-			Group:      testdata.BlockedGroup.UUID,
+			Group:      testdata.BlockedGroup,
 			ExcludeIDs: []models.ContactID{testdata.Bob.ID, testdata.Cathy.ID},
 			Query:      "age > 32",
 			Sort:       "-age",
@@ -139,7 +138,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "14f6ea01-456b-4417-b0b8-35e942f549f1"
+									"group_ids": 2
 								}
 							},
 							{
@@ -229,6 +228,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 			ExpectedTotal:    1,
 		},
 		{
+			Group:         testdata.ActiveGroup,
 			Query:         "goats > 2", // no such contact field
 			ExpectedError: "error parsing query: goats > 2: can't resolve 'goats' to attribute, scheme or field",
 		},
@@ -237,7 +237,9 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	for i, tc := range tcs {
 		es.NextResponse = tc.MockedESResponse
 
-		_, ids, total, err := models.GetContactIDsForQueryPage(ctx, client, oa, tc.Group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
+		group := oa.GroupByID(tc.Group.ID)
+
+		_, ids, total, err := models.GetContactIDsForQueryPage(ctx, client, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
 
 		if tc.ExpectedError != "" {
 			assert.EqualError(t, err, tc.ExpectedError)

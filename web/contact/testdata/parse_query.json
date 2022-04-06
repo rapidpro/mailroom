@@ -140,13 +140,13 @@
         }
     },
     {
-        "label": "valid query with group",
+        "label": "valid query with group by ID",
         "method": "POST",
         "path": "/mr/contact/parse_query",
         "body": {
             "org_id": 1,
             "query": "age > 10",
-            "group_uuid": "903f51da-2717-47c7-a0d3-f2f32877013d"
+            "group_id": 10000
         },
         "status": 200,
         "response": {
@@ -166,7 +166,80 @@
                         },
                         {
                             "term": {
-                                "groups": "903f51da-2717-47c7-a0d3-f2f32877013d"
+                                "group_ids": 10000
+                            }
+                        },
+                        {
+                            "nested": {
+                                "path": "fields",
+                                "query": {
+                                    "bool": {
+                                        "must": [
+                                            {
+                                                "term": {
+                                                    "fields.field": "903f51da-2717-47c7-a0d3-f2f32877013d"
+                                                }
+                                            },
+                                            {
+                                                "range": {
+                                                    "fields.number": {
+                                                        "from": 10,
+                                                        "include_lower": false,
+                                                        "include_upper": true,
+                                                        "to": null
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            "metadata": {
+                "attributes": [],
+                "schemes": [],
+                "fields": [
+                    {
+                        "key": "age",
+                        "name": "Age"
+                    }
+                ],
+                "groups": [],
+                "allow_as_group": true
+            }
+        }
+    },
+    {
+        "label": "valid query with group by UUID",
+        "method": "POST",
+        "path": "/mr/contact/parse_query",
+        "body": {
+            "org_id": 1,
+            "query": "age > 10",
+            "group_uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+        },
+        "status": 200,
+        "response": {
+            "query": "age > 10",
+            "elastic_query": {
+                "bool": {
+                    "must": [
+                        {
+                            "term": {
+                                "org_id": 1
+                            }
+                        },
+                        {
+                            "term": {
+                                "is_active": true
+                            }
+                        },
+                        {
+                            "term": {
+                                "group_ids": 10000
                             }
                         },
                         {
@@ -238,7 +311,7 @@
                         },
                         {
                             "term": {
-                                "groups": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                                "group_ids": 10001
                             }
                         }
                     ]

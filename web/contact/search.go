@@ -23,6 +23,7 @@ func init() {
 //
 //   {
 //     "org_id": 1,
+//     "group_id": 234,
 //     "group_uuid": "985a83fe-2e9f-478d-a3ec-fa602d5e7ddd",
 //     "query": "age > 10",
 //     "sort": "-age"
@@ -30,7 +31,8 @@ func init() {
 //
 type searchRequest struct {
 	OrgID      models.OrgID       `json:"org_id"     validate:"required"`
-	GroupUUID  assets.GroupUUID   `json:"group_uuid" validate:"required"`
+	GroupID    models.GroupID     `json:"group_id"`
+	GroupUUID  assets.GroupUUID   `json:"group_uuid"`
 	ExcludeIDs []models.ContactID `json:"exclude_ids"`
 	Query      string             `json:"query"`
 	PageSize   int                `json:"page_size"`
@@ -78,9 +80,15 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
+	var group *models.Group
+	if request.GroupID != 0 {
+		group = oa.GroupByID(request.GroupID)
+	} else if request.GroupUUID != "" {
+		group = oa.GroupByUUID(request.GroupUUID)
+	}
+
 	// perform our search
-	parsed, hits, total, err := models.GetContactIDsForQueryPage(ctx, rt.ES, oa,
-		request.GroupUUID, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
+	parsed, hits, total, err := models.GetContactIDsForQueryPage(ctx, rt.ES, oa, group, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
 		isQueryError, qerr := contactql.IsQueryError(err)
@@ -117,6 +125,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 //   {
 //     "org_id": 1,
 //     "query": "age > 10",
+//     "group_id": 234,
 //     "group_uuid": "123123-123-123-"
 //   }
 //
@@ -124,6 +133,7 @@ type parseRequest struct {
 	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
 	Query     string           `json:"query"      validate:"required"`
 	ParseOnly bool             `json:"parse_only"`
+	GroupID   models.GroupID   `json:"group_id"`
 	GroupUUID assets.GroupUUID `json:"group_uuid"`
 }
 
@@ -158,6 +168,13 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request)
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
+	var group *models.Group
+	if request.GroupID != 0 {
+		group = oa.GroupByID(request.GroupID)
+	} else if request.GroupUUID != "" {
+		group = oa.GroupByUUID(request.GroupUUID)
+	}
+
 	env := oa.Env()
 	var resolver contactql.Resolver
 	if !request.ParseOnly {
@@ -179,7 +196,7 @@ func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request)
 
 	var elasticSource interface{}
 	if !request.ParseOnly {
-		eq := models.BuildElasticQuery(oa, request.GroupUUID, models.NilContactStatus, nil, parsed)
+		eq := models.BuildElasticQuery(oa, group, models.NilContactStatus, nil, parsed)
 		elasticSource, err = eq.Source()
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrap(err, "error getting elastic source")

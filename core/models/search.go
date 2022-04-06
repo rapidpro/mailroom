@@ -16,8 +16,22 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// AssetMapper maps resolved assets in queries to how we identify them in ES which in the case
+// of flows and groups is their ids. We can do this by just type cracking them to their models.
+type AssetMapper struct{}
+
+func (m *AssetMapper) Flow(f assets.Flow) int64 {
+	return int64(f.(*Flow).ID())
+}
+
+func (m *AssetMapper) Group(g assets.Group) int64 {
+	return int64(g.(*Group).ID())
+}
+
+var assetMapper = &AssetMapper{}
+
 // BuildElasticQuery turns the passed in contact ql query into an elastic query
-func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStatus, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
+func BuildElasticQuery(oa *OrgAssets, group *Group, status ContactStatus, excludeIDs []ContactID, query *contactql.ContactQuery) elastic.Query {
 	// filter by org and active contacts
 	eq := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("org_id", oa.OrgID()),
@@ -25,8 +39,8 @@ func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStat
 	)
 
 	// our group if present
-	if group != "" {
-		eq = eq.Must(elastic.NewTermQuery("groups", group))
+	if group != nil {
+		eq = eq.Must(elastic.NewTermQuery("group_ids", group.ID()))
 	}
 
 	// our status is present
@@ -45,7 +59,7 @@ func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStat
 
 	// and by our query if present
 	if query != nil {
-		q := es.ToElasticQuery(oa.Env(), query)
+		q := es.ToElasticQuery(oa.Env(), assetMapper, query)
 		eq = eq.Must(q)
 	}
 
@@ -53,7 +67,7 @@ func BuildElasticQuery(oa *OrgAssets, group assets.GroupUUID, status ContactStat
 }
 
 // GetContactIDsForQueryPage returns a page of contact ids for the given query and sort
-func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *OrgAssets, group assets.GroupUUID, excludeIDs []ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
+func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *OrgAssets, group *Group, excludeIDs []ContactID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
 	env := oa.Env()
 	start := time.Now()
 	var parsed *contactql.ContactQuery
@@ -97,15 +111,7 @@ func GetContactIDsForQueryPage(ctx context.Context, client *elastic.Client, oa *
 		return nil, nil, 0, err
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"org_id":      oa.OrgID(),
-		"parsed":      parsed,
-		"group_uuid":  group,
-		"query":       query,
-		"elapsed":     time.Since(start),
-		"page_count":  len(ids),
-		"total_count": results.Hits.TotalHits,
-	}).Debug("paged contact query complete")
+	logrus.WithFields(logrus.Fields{"org_id": oa.OrgID(), "query": query, "elapsed": time.Since(start), "page_count": len(ids), "total_count": results.Hits.TotalHits}).Debug("paged contact query complete")
 
 	return parsed, ids, results.Hits.TotalHits.Value, nil
 }
@@ -126,7 +132,7 @@ func GetContactIDsForQuery(ctx context.Context, client *elastic.Client, oa *OrgA
 	}
 
 	routing := strconv.FormatInt(int64(oa.OrgID()), 10)
-	eq := BuildElasticQuery(oa, "", ContactStatusActive, nil, parsed)
+	eq := BuildElasticQuery(oa, nil, ContactStatusActive, nil, parsed)
 	ids := make([]ContactID, 0, 100)
 
 	// if limit provided that can be done with regular search, do that

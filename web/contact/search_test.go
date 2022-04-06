@@ -153,7 +153,7 @@ func TestSearch(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "b97f69f7-5edf-45c7-9fda-d37066eae91d"
+									"group_ids": 1
 								}
 							},
 							{

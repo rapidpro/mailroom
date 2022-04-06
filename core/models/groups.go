@@ -15,6 +15,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// GroupID is our type for group ids
+type GroupID int
+
 // GroupStatus is the current status of the passed in group
 type GroupStatus string
 
@@ -24,16 +27,23 @@ const (
 	GroupStatusReady        = GroupStatus("R")
 )
 
-// GroupID is our type for group ids
-type GroupID int
+// GroupType is the the type of a group
+type GroupType string
+
+const (
+	GroupTypeManual = GroupType("M")
+	GroupTypeSmart  = GroupType("Q")
+)
 
 // Group is our mailroom type for contact groups
 type Group struct {
 	g struct {
-		ID    GroupID          `json:"id"`
-		UUID  assets.GroupUUID `json:"uuid"`
-		Name  string           `json:"name"`
-		Query string           `json:"query"`
+		ID     GroupID          `json:"id"`
+		UUID   assets.GroupUUID `json:"uuid"`
+		Name   string           `json:"name"`
+		Query  string           `json:"query"`
+		Status GroupStatus      `json:"status"`
+		Type   GroupType        `json:"group_type"`
 	}
 }
 
@@ -48,6 +58,12 @@ func (g *Group) Name() string { return g.g.Name }
 
 // Query returns the query string (if any) for this group
 func (g *Group) Query() string { return g.g.Query }
+
+// Status returns the status of this group
+func (g *Group) Status() GroupStatus { return g.g.Status }
+
+// Type returns the type of this group
+func (g *Group) Type() GroupType { return g.g.Type }
 
 // LoadGroups loads the groups for the passed in org
 func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, error) {
@@ -77,9 +93,9 @@ func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, e
 
 const selectGroupsSQL = `
 SELECT ROW_TO_JSON(r) FROM (
-    SELECT id, uuid, name, query
+    SELECT id, uuid, name, query, status, group_type
       FROM contacts_contactgroup 
-     WHERE org_id = $1 AND group_type IN ('M', 'Q') AND is_active = TRUE
+     WHERE org_id = $1 AND is_active = TRUE
   ORDER BY name ASC
 ) r;`
 
