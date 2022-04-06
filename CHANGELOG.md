@@ -1,3 +1,7 @@
+v7.3.5
+----------
+ * Update to latest goflow which requires mapping groups and flows to ids for ES queries
+
 v7.3.4
 ----------
  * Fix unstopping of contacts who message in
