@@ -56,8 +56,8 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
 
-	accountSid := request.AccountSid
-	if accountSid != ticketer.Config(configurationAccountSid) {
+	serviceSid := request.InstanceSid
+	if serviceSid != ticketer.Config(configurationChatServiceSid) {
 		return map[string]string{"status": "unauthorized"}, http.StatusUnauthorized, nil
 	}
 
