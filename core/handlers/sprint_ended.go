@@ -18,15 +18,18 @@ func init() {
 func handleSprintEnded(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*models.SprintEndedEvent)
 
-	// if contact's current flow has changed, add pseudo event to handle that
-	if scene.Session().SessionType().Interrupts() && event.Contact.CurrentFlowID() != scene.Session().CurrentFlowID() {
+	// if we're in a flow type that can wait then contact current flow has potentially changed
+	currentFlowChanged := scene.Session().SessionType().Interrupts() && event.Contact.CurrentFlowID() != scene.Session().CurrentFlowID()
+
+	if currentFlowChanged {
 		scene.AppendToEventPreCommitHook(hooks.CommitFlowChangesHook, scene.Session().CurrentFlowID())
 	}
 
-	// we assume that any sprint (i.e. an interaction with flows) requires an update to modified_on because
-	// it will have changed current flow or flow history - this isn't strictly true but maybe not worth
-	// optimizing because there the scenarios that violate this are so few
-	scene.AppendToEventPostCommitHook(hooks.ContactModifiedHook, event)
+	// if current flow has changed then we need to update modified_on, but also if this is a new session
+	// then flow history may have changed too in a way that won't be captured by a flow_entered event
+	if currentFlowChanged || !event.Resumed {
+		scene.AppendToEventPostCommitHook(hooks.ContactModifiedHook, event)
+	}
 
 	return nil
 }

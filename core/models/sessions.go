@@ -446,7 +446,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		eventsToHandle = append(eventsToHandle, sprint.Events()...)
 	}
 
-	eventsToHandle = append(eventsToHandle, NewSprintEndedEvent(contact))
+	eventsToHandle = append(eventsToHandle, NewSprintEndedEvent(contact, true))
 
 	// apply all our events to generate hooks
 	err = HandleEvents(ctx, rt, tx, oa, s.scene, eventsToHandle)
@@ -705,7 +705,7 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 			eventsToHandle = append(eventsToHandle, sprints[i].Events()...)
 		}
 
-		eventsToHandle = append(eventsToHandle, NewSprintEndedEvent(contacts[i]))
+		eventsToHandle = append(eventsToHandle, NewSprintEndedEvent(contacts[i], false))
 
 		err = HandleEvents(ctx, rt, tx, oa, s.Scene(), eventsToHandle)
 		if err != nil {

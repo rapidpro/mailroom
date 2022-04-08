@@ -266,13 +266,15 @@ const TypeSprintEnded string = "sprint_ended"
 type SprintEndedEvent struct {
 	events.BaseEvent
 
-	Contact *Contact
+	Contact *Contact // model contact so we can access current flow
+	Resumed bool     // whether this was a resume
 }
 
 // NewSprintEndedEvent creates a new sprint ended event
-func NewSprintEndedEvent(c *Contact) *SprintEndedEvent {
+func NewSprintEndedEvent(c *Contact, resumed bool) *SprintEndedEvent {
 	return &SprintEndedEvent{
 		BaseEvent: events.NewBaseEvent(TypeSprintEnded),
 		Contact:   c,
+		Resumed:   resumed,
 	}
 }
