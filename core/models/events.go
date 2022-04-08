@@ -260,18 +260,19 @@ func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, mod
 	return eventsByContact, nil
 }
 
-// TypeContactFlowChanged is the type of our event that the contact flow changed
-const TypeContactFlowChanged string = "contact_flow_changed"
+// TypeSprintEnded is a pseudo event that lets add hooks for changes to a contacts current flow or flow history
+const TypeSprintEnded string = "sprint_ended"
 
-type ContactFlowChangedEvent struct {
+type SprintEndedEvent struct {
 	events.BaseEvent
 
-	FlowID FlowID
+	Contact *Contact
 }
 
-func NewContactFlowChangedEvent(flowID FlowID) *ContactFlowChangedEvent {
-	return &ContactFlowChangedEvent{
-		BaseEvent: events.NewBaseEvent(TypeContactFlowChanged),
-		FlowID:    flowID,
+// NewSprintEndedEvent creates a new sprint ended event
+func NewSprintEndedEvent(c *Contact) *SprintEndedEvent {
+	return &SprintEndedEvent{
+		BaseEvent: events.NewBaseEvent(TypeSprintEnded),
+		Contact:   c,
 	}
 }

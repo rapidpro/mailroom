@@ -446,10 +446,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		eventsToHandle = append(eventsToHandle, sprint.Events()...)
 	}
 
-	// if contact's current flow has changed, add pseudo event to handle that
-	if s.SessionType().Interrupts() && contact.CurrentFlowID() != s.CurrentFlowID() {
-		eventsToHandle = append(eventsToHandle, NewContactFlowChangedEvent(s.CurrentFlowID()))
-	}
+	eventsToHandle = append(eventsToHandle, NewSprintEndedEvent(contact))
 
 	// apply all our events to generate hooks
 	err = HandleEvents(ctx, rt, tx, oa, s.scene, eventsToHandle)
@@ -708,10 +705,7 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 			eventsToHandle = append(eventsToHandle, sprints[i].Events()...)
 		}
 
-		// if contact's current flow has changed, add pseudo event to handle that
-		if s.SessionType().Interrupts() && contacts[i].CurrentFlowID() != s.CurrentFlowID() {
-			eventsToHandle = append(eventsToHandle, NewContactFlowChangedEvent(s.CurrentFlowID()))
-		}
+		eventsToHandle = append(eventsToHandle, NewSprintEndedEvent(contacts[i]))
 
 		err = HandleEvents(ctx, rt, tx, oa, s.Scene(), eventsToHandle)
 		if err != nil {
