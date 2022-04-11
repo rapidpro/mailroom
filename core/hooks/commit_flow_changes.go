@@ -19,8 +19,8 @@ func (h *commitFlowChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, 
 	updates := make([]interface{}, 0, len(scenes))
 	for s, evts := range scenes {
 		// there is only ever one of these events per scene
-		event := evts[len(evts)-1].(*models.ContactFlowChangedEvent)
-		updates = append(updates, &currentFlowUpdate{s.ContactID(), event.FlowID})
+		flowID := evts[len(evts)-1].(models.FlowID)
+		updates = append(updates, &currentFlowUpdate{s.ContactID(), flowID})
 	}
 
 	// do our update
