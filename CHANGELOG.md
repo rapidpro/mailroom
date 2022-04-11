@@ -1,3 +1,8 @@
+v7.3.6
+----------
+ * Update modified_on for flow history changes  by handling flow entered and sprint ended 
+events
+
 v7.3.5
 ----------
  * Update to latest goflow which requires mapping groups and flows to ids for ES queries
