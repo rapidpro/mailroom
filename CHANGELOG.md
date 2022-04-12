@@ -1,3 +1,7 @@
+v7.3.7
+----------
+ * Update to latest goflow and start using httpx.DetectContentType
+
 v7.3.6
 ----------
  * Update modified_on for flow history changes  by handling flow entered and sprint ended 
