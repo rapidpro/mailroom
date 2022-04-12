@@ -450,7 +450,7 @@ func ResumeIVRFlow(
 
 	if body != nil {
 		// guess our content type and set it
-		contentType := http.DetectContentType(body)
+		contentType := httpx.DetectContentType(body)
 		w.Header().Set("Content-Type", contentType)
 		_, err := w.Write(body)
 		return err

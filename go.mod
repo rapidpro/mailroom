@@ -19,8 +19,8 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lib/pq v1.10.4
 	github.com/nyaruka/ezconf v0.2.1
-	github.com/nyaruka/gocommon v1.17.1
-	github.com/nyaruka/goflow v0.156.1
+	github.com/nyaruka/gocommon v1.18.0
+	github.com/nyaruka/goflow v0.157.0
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0
@@ -41,6 +41,7 @@ require (
 	github.com/blevesearch/segment v0.9.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/structs v1.0.0 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.0 // indirect
 	github.com/go-mail/mail v2.3.1+incompatible // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect

@@ -181,7 +181,7 @@ func (o *Org) StoreAttachment(ctx context.Context, rt *runtime.Runtime, filename
 	content.Close()
 
 	if contentType == "" {
-		contentType = http.DetectContentType(contentBytes)
+		contentType = httpx.DetectContentType(contentBytes)
 		contentType, _, _ = mime.ParseMediaType(contentType)
 	}
 
