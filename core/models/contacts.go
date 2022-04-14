@@ -1353,15 +1353,6 @@ func GetContactLocker(orgID OrgID, contactID ContactID) *redisx.Locker {
 	return redisx.NewLocker(key, time.Minute*5)
 }
 
-// UpdateContactModifiedBy updates modified by the passed user id on the passed in contacts
-func UpdateContactModifiedBy(ctx context.Context, db Queryer, contactIDs []ContactID, userID UserID) error {
-	if userID == NilUserID || len(contactIDs) == 0 {
-		return nil
-	}
-	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW(), modified_by_id = $2 WHERE id = ANY($1)`, pq.Array(contactIDs), userID)
-	return err
-}
-
 // ContactStatusChange struct used for our contact status change
 type ContactStatusChange struct {
 	ContactID ContactID

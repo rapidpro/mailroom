@@ -509,27 +509,6 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	assert.True(t, cathy.ModifiedOn().After(t2))
 }
 
-func TestUpdateContactModifiedBy(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
-
-	defer testsuite.Reset(testsuite.ResetAll)
-
-	err := models.UpdateContactModifiedBy(ctx, db, []models.ContactID{}, models.UserID(0))
-	assert.NoError(t, err)
-
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = NULL`, testdata.Cathy.ID).Returns(0)
-
-	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{testdata.Cathy.ID}, models.UserID(0))
-	assert.NoError(t, err)
-
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = NULL`, testdata.Cathy.ID).Returns(0)
-
-	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{testdata.Cathy.ID}, models.UserID(1))
-	assert.NoError(t, err)
-
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = 1`, testdata.Cathy.ID).Returns(1)
-}
-
 func TestUpdateContactStatus(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
