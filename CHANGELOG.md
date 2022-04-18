@@ -1,3 +1,7 @@
+v7.3.8
+----------
+ * Use new contactfield.name and is_system fields
+
 v7.3.7
 ----------
  * Update to latest goflow and start using httpx.DetectContentType
