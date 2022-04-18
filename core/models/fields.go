@@ -17,12 +17,12 @@ type FieldID int
 // Field is our mailroom type for contact field types
 type Field struct {
 	f struct {
-		ID        FieldID          `json:"id"`
-		UUID      assets.FieldUUID `json:"uuid"`
-		Key       string           `json:"key"`
-		Name      string           `json:"name"`
-		FieldType assets.FieldType `json:"field_type"`
-		System    bool             `json:"is_system"`
+		ID     FieldID          `json:"id"`
+		UUID   assets.FieldUUID `json:"uuid"`
+		Key    string           `json:"key"`
+		Name   string           `json:"name"`
+		Type   assets.FieldType `json:"field_type"`
+		System bool             `json:"is_system"`
 	}
 }
 
@@ -39,7 +39,7 @@ func (f *Field) Key() string { return f.f.Key }
 func (f *Field) Name() string { return f.f.Name }
 
 // Type returns the value type for this field
-func (f *Field) Type() assets.FieldType { return f.f.FieldType }
+func (f *Field) Type() assets.FieldType { return f.f.Type }
 
 // System returns whether this is a system field
 func (f *Field) System() bool { return f.f.System }
@@ -77,26 +77,17 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 }
 
 const sqlSelectFields = `
-SELECT ROW_TO_JSON(f) FROM (SELECT
-	id,
-	uuid,
-	key,
-	label as name,
-	(SELECT CASE value_type
-		WHEN 'T' THEN 'text' 
-		WHEN 'N' THEN 'number'
-		WHEN 'D' THEN 'datetime'
-		WHEN 'S' THEN 'state'
-		WHEN 'I' THEN 'district'
-		WHEN 'W' THEN 'ward'
-	END) as field_type,
-	field_type = 'S' as is_system
-FROM
-	contacts_contactfield 
-WHERE 
-	org_id = $1 AND 
-	is_active = TRUE
-ORDER BY
-	key ASC
-) f;
-`
+SELECT ROW_TO_JSON(f) FROM (
+	SELECT id, uuid, key, name, is_system,
+		(SELECT CASE value_type
+			WHEN 'T' THEN 'text' 
+			WHEN 'N' THEN 'number'
+			WHEN 'D' THEN 'datetime'
+			WHEN 'S' THEN 'state'
+			WHEN 'I' THEN 'district'
+			WHEN 'W' THEN 'ward'
+		END) as field_type
+      FROM contacts_contactfield 
+     WHERE org_id = $1 AND is_active = TRUE
+  ORDER BY key ASC
+) f;`
