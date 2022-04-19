@@ -1,0 +1,150 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/flow/preview_start",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "missing org or flow id",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'org_id' is required, field 'flow_id' is required"
+        }
+    },
+    {
+        "label": "no inclusions or exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001
+        },
+        "status": 200,
+        "response": {
+            "query": "",
+            "count": 0,
+            "sample": []
+        }
+    },
+    {
+        "label": "manual inclusions, no exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "group_ids": [
+                10000,
+                10001
+            ],
+            "contact_ids": [
+                1234,
+                3456
+            ],
+            "urns": [
+                "tel:+1234567890",
+                "facebook:9876543210"
+            ],
+            "query": ""
+        },
+        "status": 200,
+        "response": {
+            "query": "group = \"Doctors\" OR group = \"Testers\" OR id = 1234 OR id = 3456 OR tel = \"+1234567890\" OR facebook = 9876543210",
+            "count": 1,
+            "sample": [
+                10000
+            ]
+        }
+    },
+    {
+        "label": "query inclusion, no exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "group_ids": [],
+            "contact_ids": [],
+            "urns": [],
+            "query": "gender = M"
+        },
+        "status": 200,
+        "response": {
+            "query": "gender = \"M\"",
+            "count": 1,
+            "sample": [
+                10001
+            ]
+        }
+    },
+    {
+        "label": "manual inclusions, all exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "group_ids": [
+                10000,
+                10001
+            ],
+            "contact_ids": [
+                1234,
+                3456
+            ],
+            "urns": [
+                "tel:+1234567890",
+                "facebook:9876543210"
+            ],
+            "query": "",
+            "exclusions": {
+                "non_active": true,
+                "in_a_flow": true,
+                "started_previously": true,
+                "not_seen_recently": true
+            }
+        },
+        "status": 200,
+        "response": {
+            "query": "(group = \"Doctors\" OR group = \"Testers\" OR id = 1234 OR id = 3456 OR tel = \"+1234567890\" OR facebook = 9876543210) AND status = \"A\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
+            "count": 1,
+            "sample": [
+                10002
+            ]
+        }
+    },
+    {
+        "label": "query inclusion, all exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "group_ids": [],
+            "contact_ids": [],
+            "urns": [],
+            "query": "gender = M",
+            "exclusions": {
+                "non_active": true,
+                "in_a_flow": true,
+                "started_previously": true,
+                "not_seen_recently": true
+            }
+        },
+        "status": 200,
+        "response": {
+            "query": "gender = \"M\" AND status = \"A\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
+            "count": 1,
+            "sample": [
+                10003
+            ]
+        }
+    }
+]

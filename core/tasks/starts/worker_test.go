@@ -2,7 +2,6 @@ package starts
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
@@ -14,7 +13,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
-	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,16 +24,10 @@ func TestStarts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	mes := testsuite.NewMockElasticServer()
-	defer mes.Close()
+	mockES := testsuite.NewMockElasticServer()
+	defer mockES.Close()
 
-	es, err := elastic.NewClient(
-		elastic.SetURL(mes.URL()),
-		elastic.SetHealthcheck(false),
-		elastic.SetSniff(false),
-	)
-	require.NoError(t, err)
-	rt.ES = es
+	rt.ES = mockES.Client()
 
 	// convert our single message flow to an actual background flow that shouldn't interrupt
 	db.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
@@ -54,7 +46,7 @@ func TestStarts(t *testing.T) {
 		contactIDs           []models.ContactID
 		createContact        bool
 		query                string
-		queryResponse        string
+		queryResult          []models.ContactID
 		restartParticipants  bool
 		includeActive        bool
 		queue                string
@@ -159,36 +151,10 @@ func TestStarts(t *testing.T) {
 			expectedActiveRuns:   map[models.FlowID]int{testdata.Favorites.ID: 123, testdata.PickANumber.ID: 0, testdata.SingleMessage.ID: 0},
 		},
 		{
-			label:  "Query start",
-			flowID: testdata.Favorites.ID,
-			query:  "bob",
-			queryResponse: fmt.Sprintf(`{
-			"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-			"took": 2,
-			"timed_out": false,
-			"_shards": {
-			  "total": 1,
-			  "successful": 1,
-			  "skipped": 0,
-			  "failed": 0
-			},
-			"hits": {
-			  "total": 1,
-			  "max_score": null,
-			  "hits": [
-				{
-				  "_index": "contacts",
-				  "_type": "_doc",
-				  "_id": "%d",
-				  "_score": null,
-				  "_routing": "1",
-				  "sort": [
-					15124352
-				  ]
-				}
-			  ]
-			}
-			}`, testdata.Bob.ID),
+			label:                "Query start",
+			flowID:               testdata.Favorites.ID,
+			query:                "bob",
+			queryResult:          []models.ContactID{testdata.Bob.ID},
 			restartParticipants:  true,
 			includeActive:        true,
 			queue:                queue.HandlerQueue,
@@ -263,7 +229,9 @@ func TestStarts(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		mes.NextResponse = tc.queryResponse
+		if tc.queryResult != nil {
+			mockES.AddResponse(tc.queryResult...)
+		}
 
 		// handle our start task
 		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID, tc.restartParticipants, tc.includeActive).

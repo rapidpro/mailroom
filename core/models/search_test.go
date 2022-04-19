@@ -1,7 +1,6 @@
 package models_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/nyaruka/goflow/test"
@@ -17,15 +16,13 @@ import (
 func TestGetContactIDsForQueryPage(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
-	es := testsuite.NewMockElasticServer()
-	defer es.Close()
+	mockES := testsuite.NewMockElasticServer()
+	defer mockES.Close()
 
-	client, err := elastic.NewClient(
-		elastic.SetURL(es.URL()),
-		elastic.SetHealthcheck(false),
-		elastic.SetSniff(false),
-	)
-	require.NoError(t, err)
+	mockES.AddResponse(testdata.George.ID)
+	mockES.AddResponse(testdata.George.ID)
+
+	es := mockES.Client()
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -36,7 +33,6 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 		Query             string
 		Sort              string
 		ExpectedESRequest string
-		MockedESResponse  string
 		ExpectedContacts  []models.ContactID
 		ExpectedTotal     int64
 		ExpectedError     string
@@ -85,33 +81,6 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 				],
 				"track_total_hits": true
 			}`,
-			MockedESResponse: fmt.Sprintf(`{
-				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-				"took": 2,
-				"timed_out": false,
-				"_shards": {
-				  "total": 1,
-				  "successful": 1,
-				  "skipped": 0,
-				  "failed": 0
-				},
-				"hits": {
-				  "total": 1,
-				  "max_score": null,
-				  "hits": [
-					{
-					  "_index": "contacts",
-					  "_type": "_doc",
-					  "_id": "%d",
-					  "_score": null,
-					  "_routing": "1",
-					  "sort": [
-						15124352
-					  ]
-					}
-				  ]
-				}
-			}`, testdata.George.ID),
 			ExpectedContacts: []models.ContactID{testdata.George.ID},
 			ExpectedTotal:    1,
 		},
@@ -197,33 +166,6 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 				],
 				"track_total_hits": true
 			}`,
-			MockedESResponse: fmt.Sprintf(`{
-				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-				"took": 2,
-				"timed_out": false,
-				"_shards": {
-				  "total": 1,
-				  "successful": 1,
-				  "skipped": 0,
-				  "failed": 0
-				},
-				"hits": {
-				  "total": 1,
-				  "max_score": null,
-				  "hits": [
-					{
-					  "_index": "contacts",
-					  "_type": "_doc",
-					  "_id": "%d",
-					  "_score": null,
-					  "_routing": "1",
-					  "sort": [
-						15124352
-					  ]
-					}
-				  ]
-				}
-			}`, testdata.George.ID),
 			ExpectedContacts: []models.ContactID{testdata.George.ID},
 			ExpectedTotal:    1,
 		},
@@ -235,11 +177,9 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		es.NextResponse = tc.MockedESResponse
-
 		group := oa.GroupByID(tc.Group.ID)
 
-		_, ids, total, err := models.GetContactIDsForQueryPage(ctx, client, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
+		_, ids, total, err := models.GetContactIDsForQueryPage(ctx, es, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
 
 		if tc.ExpectedError != "" {
 			assert.EqualError(t, err, tc.ExpectedError)
@@ -248,7 +188,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
 			assert.Equal(t, tc.ExpectedTotal, total, "%d: total mismatch", i)
 
-			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastRequestBody), "%d: ES request mismatch", i)
+			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(mockES.LastRequestBody), "%d: ES request mismatch", i)
 		}
 	}
 }
@@ -256,14 +196,14 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 func TestGetContactIDsForQuery(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
-	es := testsuite.NewMockElasticServer()
-	defer es.Close()
+	mockES := testsuite.NewMockElasticServer()
+	defer mockES.Close()
 
-	client, err := elastic.NewClient(
-		elastic.SetURL(es.URL()),
-		elastic.SetHealthcheck(false),
-		elastic.SetSniff(false),
-	)
+	mockES.AddResponse(testdata.George.ID)
+	mockES.AddResponse()
+	mockES.AddResponse(testdata.George.ID)
+
+	es, err := elastic.NewClient(elastic.SetURL(mockES.URL()), elastic.SetHealthcheck(false), elastic.SetSniff(false))
 	require.NoError(t, err)
 
 	oa, err := models.GetOrgAssets(ctx, rt, 1)
@@ -314,33 +254,6 @@ func TestGetContactIDsForQuery(t *testing.T) {
 				},
 				"sort":["_doc"]
 			}`,
-			mockedESResponse: fmt.Sprintf(`{
-				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-				"took": 2,
-				"timed_out": false,
-				"_shards": {
-				  "total": 1,
-				  "successful": 1,
-				  "skipped": 0,
-				  "failed": 0
-				},
-				"hits": {
-				  "total": 1,
-				  "max_score": null,
-				  "hits": [
-					{
-					  "_index": "contacts",
-					  "_type": "_doc",
-					  "_id": "%d",
-					  "_score": null,
-					  "_routing": "1",
-					  "sort": [
-						15124352
-					  ]
-					}
-				  ]
-				}
-			}`, testdata.George.ID),
 			expectedContacts: []models.ContactID{testdata.George.ID},
 		}, {
 			query:              "nobody",
@@ -377,22 +290,6 @@ func TestGetContactIDsForQuery(t *testing.T) {
 					}
 				},
 				"sort":["_doc"]
-			}`,
-			mockedESResponse: `{
-				"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-				"took": 2,
-				"timed_out": false,
-				"_shards": {
-				  "total": 1,
-				  "successful": 1,
-				  "skipped": 0,
-				  "failed": 0
-				},
-				"hits": {
-				  "total": 0,
-				  "max_score": null,
-				  "hits": []
-				}
 			}`,
 			expectedContacts: []models.ContactID{},
 		},
@@ -433,24 +330,6 @@ func TestGetContactIDsForQuery(t *testing.T) {
 				},
 				"size": 1
 			}`,
-			mockedESResponse: fmt.Sprintf(`{
-				"hits": {
-					"total": 1,
-					"max_score": null,
-					"hits": [
-						{
-							"_index": "contacts",
-							"_type": "_doc",
-							"_id": "%d",
-							"_score": null,
-							"_routing": "1",
-							"sort": [
-							15124352
-							]
-						}
-					]
-				}
-			}`, testdata.George.ID),
 			expectedContacts: []models.ContactID{testdata.George.ID},
 		},
 		{
@@ -461,9 +340,7 @@ func TestGetContactIDsForQuery(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		es.NextResponse = tc.mockedESResponse
-
-		ids, err := models.GetContactIDsForQuery(ctx, client, oa, tc.query, tc.limit)
+		ids, err := models.GetContactIDsForQuery(ctx, es, oa, tc.query, tc.limit)
 
 		if tc.expectedError != "" {
 			assert.EqualError(t, err, tc.expectedError)
@@ -471,8 +348,8 @@ func TestGetContactIDsForQuery(t *testing.T) {
 			assert.NoError(t, err, "%d: error encountered performing query", i)
 			assert.Equal(t, tc.expectedContacts, ids, "%d: ids mismatch", i)
 
-			assert.Equal(t, tc.expectedRequestURL, es.LastRequestURL, "%d: request URL mismatch", i)
-			test.AssertEqualJSON(t, []byte(tc.expectedRequestBody), []byte(es.LastRequestBody), "%d: request body mismatch", i)
+			assert.Equal(t, tc.expectedRequestURL, mockES.LastRequestURL, "%d: request URL mismatch", i)
+			test.AssertEqualJSON(t, []byte(tc.expectedRequestBody), []byte(mockES.LastRequestBody), "%d: request body mismatch", i)
 		}
 	}
 }
