@@ -1,3 +1,7 @@
+1.2.1-mailroom-7.0.1
+----------
+ * Tweak ticketer Twilio Flex to allow API key authentication
+
 1.2.0-mailroom-7.0.1
 ----------
  * Add ticketer Twilio Flex
