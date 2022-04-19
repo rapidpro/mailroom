@@ -120,7 +120,7 @@ func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, userQuery string, 
 
 	exclusions := make([]string, 0, 10)
 	if excs.NonActive {
-		exclusions = append(exclusions, "status = \"A\"")
+		exclusions = append(exclusions, "status = \"active\"")
 	}
 	if excs.InAFlow {
 		exclusions = append(exclusions, "flow = \"\"")

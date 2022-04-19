@@ -113,7 +113,7 @@
         },
         "status": 200,
         "response": {
-            "query": "(group = \"Doctors\" OR group = \"Testers\" OR id = 1234 OR id = 3456 OR tel = \"+1234567890\" OR facebook = 9876543210) AND status = \"A\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
+            "query": "(group = \"Doctors\" OR group = \"Testers\" OR id = 1234 OR id = 3456 OR tel = \"+1234567890\" OR facebook = 9876543210) AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
             "count": 1,
             "sample": [
                 10002
@@ -140,7 +140,7 @@
         },
         "status": 200,
         "response": {
-            "query": "gender = \"M\" AND status = \"A\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
+            "query": "gender = \"M\" AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
             "count": 1,
             "sample": [
                 10003
