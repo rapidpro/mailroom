@@ -46,6 +46,8 @@ func TestHTTPLogs(t *testing.T) {
 func TestHTTPLogger(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 
+	defer func() { db.MustExec(`DELETE FROM request_logs_httplog`) }()
+
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://temba.io": {

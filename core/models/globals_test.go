@@ -13,6 +13,10 @@ import (
 func TestLoadGlobals(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
+	defer func() {
+		db.MustExec(`UPDATE globals_global SET value = 'Nyaruka' WHERE org_id = $1 AND key = $2`, testdata.Org1.ID, "org_name")
+	}()
+
 	// set one of our global values to empty
 	db.MustExec(`UPDATE globals_global SET value = '' WHERE org_id = $1 AND key = $2`, testdata.Org1.ID, "org_name")
 
