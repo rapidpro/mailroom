@@ -31,7 +31,8 @@ func init() {
 //       "in_a_flow": false,
 //       "started_previously": true,
 //       "not_seen_recently": false
-//     }
+//     },
+//     "sample_size": 5
 //   }
 //
 //   {
@@ -48,6 +49,7 @@ type previewStartRequest struct {
 	URNs       []urns.URN         `json:"urns"`
 	Query      string             `json:"query"`
 	Exclusions search.Exclusions  `json:"exclusions"`
+	SampleSize int                `json:"sample_size"  validate:"required"`
 }
 
 type previewStartResponse struct {
@@ -77,7 +79,7 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 		return &previewStartResponse{Query: "", Count: 0, Sample: []models.ContactID{}}, http.StatusOK, nil
 	}
 
-	parsedQuery, sampleIDs, count, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, 5)
+	parsedQuery, sampleIDs, count, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, request.SampleSize)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error querying preview")
 	}

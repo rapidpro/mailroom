@@ -15,7 +15,7 @@
         "body": {},
         "status": 400,
         "response": {
-            "error": "request failed validation: field 'org_id' is required, field 'flow_id' is required"
+            "error": "request failed validation: field 'org_id' is required, field 'flow_id' is required, field 'sample_size' is required"
         }
     },
     {
@@ -24,7 +24,8 @@
         "path": "/mr/flow/preview_start",
         "body": {
             "org_id": 1,
-            "flow_id": 10001
+            "flow_id": 10001,
+            "sample_size": 3
         },
         "status": 200,
         "response": {
@@ -52,7 +53,8 @@
                 "tel:+1234567890",
                 "facebook:9876543210"
             ],
-            "query": ""
+            "query": "",
+            "sample_size": 3
         },
         "status": 200,
         "response": {
@@ -73,7 +75,8 @@
             "group_ids": [],
             "contact_ids": [],
             "urns": [],
-            "query": "gender = M"
+            "query": "gender = M",
+            "sample_size": 3
         },
         "status": 200,
         "response": {
@@ -109,7 +112,8 @@
                 "in_a_flow": true,
                 "started_previously": true,
                 "not_seen_recently": true
-            }
+            },
+            "sample_size": 3
         },
         "status": 200,
         "response": {
@@ -136,7 +140,8 @@
                 "in_a_flow": true,
                 "started_previously": true,
                 "not_seen_recently": true
-            }
+            },
+            "sample_size": 3
         },
         "status": 200,
         "response": {
