@@ -1,3 +1,8 @@
+v7.3.9
+----------
+ * Move search into its own package and add more tests
+ * Add endpoint to generate a flow start preview
+
 v7.3.8
 ----------
  * Use new contactfield.name and is_system fields
