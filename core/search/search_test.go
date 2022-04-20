@@ -1,13 +1,13 @@
-package models_test
+package search_test
 
 import (
 	"testing"
 
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -179,7 +179,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	for i, tc := range tcs {
 		group := oa.GroupByID(tc.Group.ID)
 
-		_, ids, total, err := models.GetContactIDsForQueryPage(ctx, es, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
+		_, ids, total, err := search.GetContactIDsForQueryPage(ctx, es, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
 
 		if tc.ExpectedError != "" {
 			assert.EqualError(t, err, tc.ExpectedError)
@@ -340,7 +340,7 @@ func TestGetContactIDsForQuery(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		ids, err := models.GetContactIDsForQuery(ctx, es, oa, tc.query, tc.limit)
+		ids, err := search.GetContactIDsForQuery(ctx, es, oa, tc.query, tc.limit)
 
 		if tc.expectedError != "" {
 			assert.EqualError(t, err, tc.expectedError)
