@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/lib/pq"
-	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,7 +59,7 @@ func TestLoadGroups(t *testing.T) {
 	}
 }
 
-func TestDynamicGroups(t *testing.T) {
+func TestSmartGroups(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -82,68 +81,32 @@ func TestDynamicGroups(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
 	assert.NoError(t, err)
 
-	esServer := testsuite.NewMockElasticServer()
-	defer esServer.Close()
+	mockES := testsuite.NewMockElasticServer()
+	defer mockES.Close()
 
-	es, err := elastic.NewClient(
-		elastic.SetURL(esServer.URL()),
-		elastic.SetHealthcheck(false),
-		elastic.SetSniff(false),
-	)
-	assert.NoError(t, err)
+	es := mockES.Client()
 
-	contactHit := `{
-		"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-		"took": 2,
-		"timed_out": false,
-		"_shards": {
-		  "total": 1,
-		  "successful": 1,
-		  "skipped": 0,
-		  "failed": 0
-		},
-		"hits": {
-		  "total": 1,
-		  "max_score": null,
-		  "hits": [
-			{
-			  "_index": "contacts",
-			  "_type": "_doc",
-			  "_id": "%d",
-			  "_score": null,
-			  "_routing": "1",
-			  "sort": [
-				15124352
-			  ]
-			}
-		  ]
-		}
-	}`
-
-	cathyHit := fmt.Sprintf(contactHit, testdata.Cathy.ID)
-	bobHit := fmt.Sprintf(contactHit, testdata.Bob.ID)
+	mockES.AddResponse(testdata.Cathy.ID)
+	mockES.AddResponse(testdata.Bob.ID)
+	mockES.AddResponse(testdata.Bob.ID)
 
 	tcs := []struct {
 		Query           string
-		ESResponse      string
 		ContactIDs      []models.ContactID
 		EventContactIDs []models.ContactID
 	}{
 		{
 			"cathy",
-			cathyHit,
 			[]models.ContactID{testdata.Cathy.ID},
 			[]models.ContactID{},
 		},
 		{
 			"bob",
-			bobHit,
 			[]models.ContactID{testdata.Bob.ID},
 			[]models.ContactID{testdata.Bob.ID},
 		},
 		{
 			"unchanged",
-			bobHit,
 			[]models.ContactID{testdata.Bob.ID},
 			[]models.ContactID{testdata.Bob.ID},
 		},
@@ -153,7 +116,6 @@ func TestDynamicGroups(t *testing.T) {
 		err := models.UpdateGroupStatus(ctx, db, testdata.DoctorsGroup.ID, models.GroupStatusInitializing)
 		assert.NoError(t, err)
 
-		esServer.NextResponse = tc.ESResponse
 		count, err := models.PopulateDynamicGroup(ctx, db, es, oa, testdata.DoctorsGroup.ID, tc.Query)
 		assert.NoError(t, err, "error populating dynamic group for: %s", tc.Query)
 
