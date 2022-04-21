@@ -7,6 +7,8 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 )
 
@@ -19,17 +21,14 @@ type Exclusions struct {
 }
 
 // BuildStartQuery builds a start query for the given flow and start options
-func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, groupIDs []models.GroupID, contactIDs []models.ContactID, urnz []urns.URN, userQuery string, excs Exclusions) string {
+func BuildStartQuery(env envs.Environment, flow *models.Flow, groups []*models.Group, contactUUIDs []flows.ContactUUID, urnz []urns.URN, userQuery string, excs Exclusions) string {
 	inclusions := make([]string, 0, 10)
 
-	for _, groupID := range groupIDs {
-		group := oa.GroupByID(groupID)
-		if group != nil {
-			inclusions = append(inclusions, fmt.Sprintf("group = \"%s\"", group.Name()))
-		}
+	for _, group := range groups {
+		inclusions = append(inclusions, fmt.Sprintf("group = \"%s\"", group.Name()))
 	}
-	for _, contactID := range contactIDs {
-		inclusions = append(inclusions, fmt.Sprintf("id = %d", contactID))
+	for _, contactUUID := range contactUUIDs {
+		inclusions = append(inclusions, fmt.Sprintf("uuid = \"%s\"", contactUUID))
 	}
 	for _, urn := range urnz {
 		scheme, path, _, _ := urn.ToParts()
@@ -54,7 +53,7 @@ func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, groupIDs []models.
 	}
 	if excs.NotSeenRecently {
 		seenSince := dates.Now().Add(-time.Hour * 24 * 90)
-		exclusions = append(exclusions, fmt.Sprintf("last_seen_on > %s", formatQueryDate(oa, seenSince)))
+		exclusions = append(exclusions, fmt.Sprintf("last_seen_on > %s", formatQueryDate(env, seenSince)))
 	}
 
 	inclusionCmp := strings.Join(inclusions, " OR ")
@@ -74,8 +73,9 @@ func BuildStartQuery(oa *models.OrgAssets, flow *models.Flow, groupIDs []models.
 	return strings.Join(conditions, " AND ")
 }
 
-func formatQueryDate(oa *models.OrgAssets, t time.Time) string {
-	d := dates.ExtractDate(t.In(oa.Env().Timezone()))
-	s, _ := d.Format(string(oa.Env().DateFormat()), oa.Env().DefaultLocale().ToBCP47())
+// formats a date for use in a query
+func formatQueryDate(env envs.Environment, t time.Time) string {
+	d := dates.ExtractDate(t.In(env.Timezone()))
+	s, _ := d.Format(string(env.DateFormat()), env.DefaultLocale().ToBCP47())
 	return s
 }

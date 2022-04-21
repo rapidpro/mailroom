@@ -2,8 +2,11 @@ package search_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -15,43 +18,49 @@ import (
 func TestBuildStartQuery(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 
+	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2022, 4, 20, 15, 30, 45, 0, time.UTC)))
+	defer dates.SetNowSource(dates.DefaultNowSource)
+
 	oa := testdata.Org1.Load(rt)
 	flow, err := oa.FlowByID(testdata.Favorites.ID)
 	require.NoError(t, err)
 
+	doctors := oa.GroupByID(testdata.DoctorsGroup.ID)
+	testers := oa.GroupByID(testdata.TestersGroup.ID)
+
 	tcs := []struct {
-		groupIDs   []models.GroupID
-		contactIDs []models.ContactID
-		urns       []urns.URN
-		userQuery  string
-		exclusions search.Exclusions
-		expected   string
+		groups       []*models.Group
+		contactUUIDs []flows.ContactUUID
+		urns         []urns.URN
+		userQuery    string
+		exclusions   search.Exclusions
+		expected     string
 	}{
 		{
-			groupIDs:   []models.GroupID{testdata.DoctorsGroup.ID, testdata.TestersGroup.ID},
-			contactIDs: []models.ContactID{testdata.Cathy.ID, testdata.George.ID},
-			urns:       []urns.URN{"tel:+1234567890", "telegram:9876543210"},
-			exclusions: search.Exclusions{},
-			expected:   `group = "Doctors" OR group = "Testers" OR id = 10000 OR id = 10002 OR tel = "+1234567890" OR telegram = "9876543210"`,
+			groups:       []*models.Group{doctors, testers},
+			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID, testdata.George.UUID},
+			urns:         []urns.URN{"tel:+1234567890", "telegram:9876543210"},
+			exclusions:   search.Exclusions{},
+			expected:     `group = "Doctors" OR group = "Testers" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" OR uuid = "8d024bcd-f473-4719-a00a-bd0bb1190135" OR tel = "+1234567890" OR telegram = "9876543210"`,
 		},
 		{
-			groupIDs:   []models.GroupID{testdata.DoctorsGroup.ID},
-			contactIDs: []models.ContactID{testdata.Cathy.ID},
-			urns:       []urns.URN{"tel:+1234567890"},
+			groups:       []*models.Group{doctors},
+			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID},
+			urns:         []urns.URN{"tel:+1234567890"},
 			exclusions: search.Exclusions{
 				NonActive:         true,
 				InAFlow:           true,
 				StartedPreviously: true,
 				NotSeenRecently:   true,
 			},
-			expected: `(group = "Doctors" OR id = 10000 OR tel = "+1234567890") AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > 20-01-2022`,
+			expected: `(group = "Doctors" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" OR tel = "+1234567890") AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > 20-01-2022`,
 		},
 		{
-			contactIDs: []models.ContactID{testdata.Cathy.ID},
+			contactUUIDs: []flows.ContactUUID{testdata.Cathy.UUID},
 			exclusions: search.Exclusions{
 				NonActive: true,
 			},
-			expected: `id = 10000 AND status = "active"`,
+			expected: `uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" AND status = "active"`,
 		},
 		{
 			userQuery:  "gender = M",
@@ -71,7 +80,7 @@ func TestBuildStartQuery(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		actual := search.BuildStartQuery(oa, flow, tc.groupIDs, tc.contactIDs, tc.urns, tc.userQuery, tc.exclusions)
+		actual := search.BuildStartQuery(oa.Env(), flow, tc.groups, tc.contactUUIDs, tc.urns, tc.userQuery, tc.exclusions)
 		assert.Equal(t, tc.expected, actual)
 	}
 }
