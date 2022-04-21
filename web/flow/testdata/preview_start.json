@@ -30,8 +30,8 @@
         "status": 200,
         "response": {
             "query": "",
-            "count": 0,
-            "sample": []
+            "total": 0,
+            "sample_ids": []
         }
     },
     {
@@ -59,8 +59,8 @@
         "status": 200,
         "response": {
             "query": "group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\" OR tel = \"+1234567890\" OR facebook = 9876543210",
-            "count": 1,
-            "sample": [
+            "total": 1,
+            "sample_ids": [
                 10000
             ],
             "metadata": {
@@ -103,8 +103,8 @@
         "status": 200,
         "response": {
             "query": "gender = \"M\"",
-            "count": 1,
-            "sample": [
+            "total": 1,
+            "sample_ids": [
                 10001
             ],
             "metadata": {
@@ -152,8 +152,8 @@
         "status": 200,
         "response": {
             "query": "(group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\" OR tel = \"+1234567890\" OR facebook = 9876543210) AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
-            "count": 1,
-            "sample": [
+            "total": 1,
+            "sample_ids": [
                 10002
             ],
             "metadata": {
@@ -203,8 +203,8 @@
         "status": 200,
         "response": {
             "query": "gender = \"M\" AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
-            "count": 1,
-            "sample": [
+            "total": 1,
+            "sample_ids": [
                 10003
             ],
             "metadata": {

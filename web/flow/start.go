@@ -40,7 +40,7 @@ func init() {
 //
 //   {
 //     "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b" OR tel = "+1234567890") AND history != \"Registration\"",
-//     "count": 567,
+//     "total": 567,
 //     "sample": [12, 34, 56, 67, 78],
 //     "metadata": {
 //       "fields": [
@@ -62,10 +62,10 @@ type previewStartRequest struct {
 }
 
 type previewStartResponse struct {
-	Query    string                `json:"query"`
-	Count    int                   `json:"count"`
-	Sample   []models.ContactID    `json:"sample"`
-	Metadata *contactql.Inspection `json:"metadata,omitempty"`
+	Query     string                `json:"query"`
+	Total     int                   `json:"total"`
+	SampleIDs []models.ContactID    `json:"sample_ids"`
+	Metadata  *contactql.Inspection `json:"metadata,omitempty"`
 }
 
 func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
@@ -94,10 +94,10 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 
 	query := search.BuildStartQuery(oa.Env(), flow, groups, request.ContactUUIDs, request.URNs, request.Query, request.Exclusions)
 	if query == "" {
-		return &previewStartResponse{Sample: []models.ContactID{}}, http.StatusOK, nil
+		return &previewStartResponse{SampleIDs: []models.ContactID{}}, http.StatusOK, nil
 	}
 
-	parsedQuery, sampleIDs, count, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, request.SampleSize)
+	parsedQuery, sampleIDs, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, request.SampleSize)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error querying preview")
 	}
@@ -105,9 +105,9 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	inspection := contactql.Inspect(parsedQuery)
 
 	return &previewStartResponse{
-		Query:    parsedQuery.String(),
-		Count:    int(count),
-		Sample:   sampleIDs,
-		Metadata: inspection,
+		Query:     parsedQuery.String(),
+		Total:     int(total),
+		SampleIDs: sampleIDs,
+		Metadata:  inspection,
 	}, http.StatusOK, nil
 }
