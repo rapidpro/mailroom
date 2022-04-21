@@ -41,13 +41,13 @@
         "body": {
             "org_id": 1,
             "flow_id": 10001,
-            "group_ids": [
-                10000,
-                10001
+            "group_uuids": [
+                "c153e265-f7c9-4539-9dbc-9b358714b638",
+                "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
             ],
-            "contact_ids": [
-                1234,
-                3456
+            "contact_uuids": [
+                "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
+                "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
             ],
             "urns": [
                 "tel:+1234567890",
@@ -58,7 +58,7 @@
         },
         "status": 200,
         "response": {
-            "query": "group = \"Doctors\" OR group = \"Testers\" OR id = 1234 OR id = 3456 OR tel = \"+1234567890\" OR facebook = 9876543210",
+            "query": "group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\" OR tel = \"+1234567890\" OR facebook = 9876543210",
             "count": 1,
             "sample": [
                 10000
@@ -94,13 +94,13 @@
         "body": {
             "org_id": 1,
             "flow_id": 10001,
-            "group_ids": [
-                10000,
-                10001
+            "group_uuids": [
+                "c153e265-f7c9-4539-9dbc-9b358714b638",
+                "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
             ],
-            "contact_ids": [
-                1234,
-                3456
+            "contact_uuids": [
+                "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
+                "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
             ],
             "urns": [
                 "tel:+1234567890",
@@ -117,7 +117,7 @@
         },
         "status": 200,
         "response": {
-            "query": "(group = \"Doctors\" OR group = \"Testers\" OR id = 1234 OR id = 3456 OR tel = \"+1234567890\" OR facebook = 9876543210) AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
+            "query": "(group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\" OR tel = \"+1234567890\" OR facebook = 9876543210) AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
             "count": 1,
             "sample": [
                 10002
@@ -131,9 +131,6 @@
         "body": {
             "org_id": 1,
             "flow_id": 10001,
-            "group_ids": [],
-            "contact_ids": [],
-            "urns": [],
             "query": "gender = M",
             "exclusions": {
                 "non_active": true,

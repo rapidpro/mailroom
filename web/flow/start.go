@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
@@ -22,8 +24,8 @@ func init() {
 //   {
 //     "org_id": 1,
 //     "flow_id": 2,
-//     "group_ids": [123, 345],
-//     "contact_ids": [12, 34],
+//     "group_uuids": ["5fa925e4-edd8-4e2a-ab24-b3dbb5932ddd", "2912b95f-5b89-4d39-a2a8-5292602f357f"],
+//     "contact_uuids": ["e5bb9e6f-7703-4ba1-afba-0b12791de38b"],
 //     "urns": ["tel:+1234567890"],
 //     "user_query": "",
 //     "exclusions": {
@@ -36,20 +38,20 @@ func init() {
 //   }
 //
 //   {
-//     "query": "(id = 12 OR id = 34 OR group = "No Age" OR group = "No Name" OR tel = "+1234567890") AND history != \"Registration\"",
+//     "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b" OR tel = "+1234567890") AND history != \"Registration\"",
 //     "count": 567,
 //     "sample": [12, 34, 56, 67, 78]
 //   }
 //
 type previewStartRequest struct {
-	OrgID      models.OrgID       `json:"org_id"       validate:"required"`
-	FlowID     models.FlowID      `json:"flow_id"      validate:"required"`
-	GroupIDs   []models.GroupID   `json:"group_ids"`
-	ContactIDs []models.ContactID `json:"contact_ids"`
-	URNs       []urns.URN         `json:"urns"`
-	Query      string             `json:"query"`
-	Exclusions search.Exclusions  `json:"exclusions"`
-	SampleSize int                `json:"sample_size"  validate:"required"`
+	OrgID        models.OrgID        `json:"org_id"       validate:"required"`
+	FlowID       models.FlowID       `json:"flow_id"      validate:"required"`
+	GroupUUIDs   []assets.GroupUUID  `json:"group_uuids"`
+	ContactUUIDs []flows.ContactUUID `json:"contact_uuids"`
+	URNs         []urns.URN          `json:"urns"`
+	Query        string              `json:"query"`
+	Exclusions   search.Exclusions   `json:"exclusions"`
+	SampleSize   int                 `json:"sample_size"  validate:"required"`
 }
 
 type previewStartResponse struct {
@@ -74,7 +76,15 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load flow")
 	}
 
-	query := search.BuildStartQuery(oa, flow, request.GroupIDs, request.ContactIDs, request.URNs, request.Query, request.Exclusions)
+	groups := make([]*models.Group, 0, len(request.GroupUUIDs))
+	for _, groupUUID := range request.GroupUUIDs {
+		g := oa.GroupByUUID(groupUUID)
+		if g != nil {
+			groups = append(groups, g)
+		}
+	}
+
+	query := search.BuildStartQuery(oa.Env(), flow, groups, request.ContactUUIDs, request.URNs, request.Query, request.Exclusions)
 	if query == "" {
 		return &previewStartResponse{Query: "", Count: 0, Sample: []models.ContactID{}}, http.StatusOK, nil
 	}
