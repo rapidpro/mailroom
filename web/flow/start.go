@@ -6,6 +6,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -40,7 +41,13 @@ func init() {
 //   {
 //     "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b" OR tel = "+1234567890") AND history != \"Registration\"",
 //     "count": 567,
-//     "sample": [12, 34, 56, 67, 78]
+//     "sample": [12, 34, 56, 67, 78],
+//     "metadata": {
+//       "fields": [
+//         {"key": "age", "name": "Age"}
+//       ],
+//       "allow_as_group": true
+//     }
 //   }
 //
 type previewStartRequest struct {
@@ -55,9 +62,10 @@ type previewStartRequest struct {
 }
 
 type previewStartResponse struct {
-	Query  string             `json:"query"`
-	Count  int                `json:"count"`
-	Sample []models.ContactID `json:"sample"`
+	Query    string                `json:"query"`
+	Count    int                   `json:"count"`
+	Sample   []models.ContactID    `json:"sample"`
+	Metadata *contactql.Inspection `json:"metadata,omitempty"`
 }
 
 func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
@@ -86,7 +94,7 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 
 	query := search.BuildStartQuery(oa.Env(), flow, groups, request.ContactUUIDs, request.URNs, request.Query, request.Exclusions)
 	if query == "" {
-		return &previewStartResponse{Query: "", Count: 0, Sample: []models.ContactID{}}, http.StatusOK, nil
+		return &previewStartResponse{Sample: []models.ContactID{}}, http.StatusOK, nil
 	}
 
 	parsedQuery, sampleIDs, count, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, nil, nil, query, "", 0, request.SampleSize)
@@ -94,5 +102,12 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error querying preview")
 	}
 
-	return &previewStartResponse{Query: parsedQuery.String(), Count: int(count), Sample: sampleIDs}, http.StatusOK, nil
+	inspection := contactql.Inspect(parsedQuery)
+
+	return &previewStartResponse{
+		Query:    parsedQuery.String(),
+		Count:    int(count),
+		Sample:   sampleIDs,
+		Metadata: inspection,
+	}, http.StatusOK, nil
 }
