@@ -1,3 +1,8 @@
+v7.3.10
+----------
+ * Changes to preview_start endpoint - 1) rename count to total to match other search endpoints, 2) add 
+query inspection metadata to preview_start endpoint response 3) switch to UUIDs for contacts and groups
+
 v7.3.9
 ----------
  * Move search into its own package and add more tests
