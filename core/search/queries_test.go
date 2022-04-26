@@ -51,7 +51,7 @@ func TestBuildStartQuery(t *testing.T) {
 				NonActive:         true,
 				InAFlow:           true,
 				StartedPreviously: true,
-				NotSeenRecently:   true,
+				NotSeenSinceDays:  90,
 			},
 			expected: `(group = "Doctors" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" OR tel = "+1234567890") AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > 20-01-2022`,
 		},
@@ -73,9 +73,9 @@ func TestBuildStartQuery(t *testing.T) {
 				NonActive:         true,
 				InAFlow:           true,
 				StartedPreviously: true,
-				NotSeenRecently:   true,
+				NotSeenSinceDays:  30,
 			},
-			expected: `gender = M AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > 20-01-2022`,
+			expected: `gender = M AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > 21-03-2022`,
 		},
 	}
 
