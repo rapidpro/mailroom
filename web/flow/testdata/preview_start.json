@@ -25,6 +25,7 @@
         "body": {
             "org_id": 1,
             "flow_id": 10001,
+            "include": {},
             "sample_size": 3
         },
         "status": 200,
@@ -41,19 +42,21 @@
         "body": {
             "org_id": 1,
             "flow_id": 10001,
-            "group_uuids": [
-                "c153e265-f7c9-4539-9dbc-9b358714b638",
-                "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
-            ],
-            "contact_uuids": [
-                "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
-                "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
-            ],
-            "urns": [
-                "tel:+1234567890",
-                "facebook:9876543210"
-            ],
-            "query": "",
+            "include": {
+                "group_uuids": [
+                    "c153e265-f7c9-4539-9dbc-9b358714b638",
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                ],
+                "contact_uuids": [
+                    "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
+                    "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
+                ],
+                "urns": [
+                    "tel:+1234567890",
+                    "facebook:9876543210"
+                ],
+                "query": ""
+            },
             "sample_size": 3
         },
         "status": 200,
@@ -94,10 +97,12 @@
         "body": {
             "org_id": 1,
             "flow_id": 10001,
-            "group_ids": [],
-            "contact_ids": [],
-            "urns": [],
-            "query": "gender = M",
+            "include": {
+                "group_ids": [],
+                "contact_ids": [],
+                "urns": [],
+                "query": "gender = M"
+            },
             "sample_size": 3
         },
         "status": 200,
@@ -128,24 +133,26 @@
         "body": {
             "org_id": 1,
             "flow_id": 10001,
-            "group_uuids": [
-                "c153e265-f7c9-4539-9dbc-9b358714b638",
-                "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
-            ],
-            "contact_uuids": [
-                "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
-                "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
-            ],
-            "urns": [
-                "tel:+1234567890",
-                "facebook:9876543210"
-            ],
-            "query": "",
-            "exclusions": {
+            "include": {
+                "group_uuids": [
+                    "c153e265-f7c9-4539-9dbc-9b358714b638",
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                ],
+                "contact_uuids": [
+                    "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
+                    "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
+                ],
+                "urns": [
+                    "tel:+1234567890",
+                    "facebook:9876543210"
+                ],
+                "query": ""
+            },
+            "exclude": {
                 "non_active": true,
                 "in_a_flow": true,
                 "started_previously": true,
-                "not_seen_recently": true
+                "not_seen_since_days": 90
             },
             "sample_size": 3
         },
@@ -191,12 +198,14 @@
         "body": {
             "org_id": 1,
             "flow_id": 10001,
-            "query": "gender = M",
-            "exclusions": {
+            "include": {
+                "query": "gender = M"
+            },
+            "exclude": {
                 "non_active": true,
                 "in_a_flow": true,
                 "started_previously": true,
-                "not_seen_recently": true
+                "not_seen_since_days": 90
             },
             "sample_size": 3
         },

@@ -14,10 +14,10 @@ import (
 
 // Exclusions are preset exclusion conditions
 type Exclusions struct {
-	NonActive         bool `json:"non_active"`         // contacts who are blocked, stopped or archived
-	InAFlow           bool `json:"in_a_flow"`          // contacts who are currently in a flow (including this one)
-	StartedPreviously bool `json:"started_previously"` // contacts who have been in this flow in the last 90 days
-	NotSeenRecently   bool `json:"not_seen_recently"`  // contacts who have not been seen for more than 90 days
+	NonActive         bool `json:"non_active"`          // contacts who are blocked, stopped or archived
+	InAFlow           bool `json:"in_a_flow"`           // contacts who are currently in a flow (including this one)
+	StartedPreviously bool `json:"started_previously"`  // contacts who have been in this flow in the last 90 days
+	NotSeenSinceDays  int  `json:"not_seen_since_days"` // contacts who have not been seen for more than this number of days
 }
 
 // BuildStartQuery builds a start query for the given flow and start options
@@ -51,8 +51,8 @@ func BuildStartQuery(env envs.Environment, flow *models.Flow, groups []*models.G
 	if excs.StartedPreviously {
 		exclusions = append(exclusions, fmt.Sprintf("history != \"%s\"", flow.Name()))
 	}
-	if excs.NotSeenRecently {
-		seenSince := dates.Now().Add(-time.Hour * 24 * 90)
+	if excs.NotSeenSinceDays > 0 {
+		seenSince := dates.Now().Add(-time.Hour * time.Duration(24*excs.NotSeenSinceDays))
 		exclusions = append(exclusions, fmt.Sprintf("last_seen_on > %s", formatQueryDate(env, seenSince)))
 	}
 
