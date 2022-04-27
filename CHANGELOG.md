@@ -1,3 +1,8 @@
+v7.3.11
+----------
+ * Rework flow/preview_start endpoint to take a number of days since last seen on
+ * Update to latest goflow that has fix for whatsapp template selection
+
 v7.3.10
 ----------
  * Changes to preview_start endpoint - 1) rename count to total to match other search endpoints, 2) add 
