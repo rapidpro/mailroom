@@ -1136,7 +1136,7 @@ func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urn
 
 // UpdateContactModifiedOn updates modified_on the passed in contacts
 func UpdateContactModifiedOn(ctx context.Context, db Queryer, contactIDs []ContactID) error {
-	for _, idBatch := range chunkContactIDs(contactIDs, 100) {
+	for _, idBatch := range chunkSlice(contactIDs, 100) {
 		_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(idBatch))
 		if err != nil {
 			return errors.Wrap(err, "error updating modified_on for contact batch")
