@@ -1,3 +1,7 @@
+v7.3.12
+----------
+ * Update to go 1.18 and use some generics
+
 v7.3.11
 ----------
  * Rework flow/preview_start endpoint to take a number of days since last seen on
