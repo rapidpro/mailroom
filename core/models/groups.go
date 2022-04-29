@@ -100,16 +100,7 @@ SELECT ROW_TO_JSON(r) FROM (
 
 // RemoveContactsFromGroups fires a bulk SQL query to remove all the contacts in the passed in groups
 func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*GroupRemove) error {
-	if len(removals) == 0 {
-		return nil
-	}
-
-	// convert to list of interfaces
-	is := make([]interface{}, len(removals))
-	for i := range removals {
-		is[i] = removals[i]
-	}
-	return BulkQuery(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, is)
+	return BulkQuery(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, removals)
 }
 
 // GroupRemove is our struct to track group removals
@@ -136,16 +127,7 @@ IN (
 
 // AddContactsToGroups fires a bulk SQL query to remove all the contacts in the passed in groups
 func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) error {
-	if len(adds) == 0 {
-		return nil
-	}
-
-	// convert to list of interfaces
-	is := make([]interface{}, len(adds))
-	for i := range adds {
-		is[i] = adds[i]
-	}
-	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, is)
+	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, adds)
 }
 
 // GroupAdd is our struct to track a final group additions

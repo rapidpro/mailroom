@@ -86,17 +86,8 @@ ORDER BY
 
 // UnsubscribeResthooks unsubscribles all the resthooks passed in
 func UnsubscribeResthooks(ctx context.Context, tx *sqlx.Tx, unsubs []*ResthookUnsubscribe) error {
-	is := make([]interface{}, len(unsubs))
-	for i := range unsubs {
-		is[i] = unsubs[i]
-	}
-
-	err := BulkQuery(ctx, "unsubscribing resthooks", tx, sqlUnsubscribeResthooks, is)
-	if err != nil {
-		return errors.Wrapf(err, "error unsubscribing from resthooks")
-	}
-
-	return nil
+	err := BulkQuery(ctx, "unsubscribing resthooks", tx, sqlUnsubscribeResthooks, unsubs)
+	return errors.Wrapf(err, "error unsubscribing from resthooks")
 }
 
 type ResthookUnsubscribe struct {

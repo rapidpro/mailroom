@@ -65,7 +65,7 @@ func MarkStartStarted(ctx context.Context, db Queryer, startID StartID, contactC
 			ContactID ContactID `db:"contact_id"`
 		}
 
-		args := make([]interface{}, len(createdContactIDs))
+		args := make([]*startContact, len(createdContactIDs))
 		for i, id := range createdContactIDs {
 			args[i] = &startContact{StartID: startID, ContactID: id}
 		}

@@ -44,7 +44,7 @@ func Exec(ctx context.Context, label string, tx Queryer, sql string, args ...int
 }
 
 // BulkQuery runs the given query as a bulk operation
-func BulkQuery(ctx context.Context, label string, tx Queryer, sql string, structs []interface{}) error {
+func BulkQuery[T any](ctx context.Context, label string, tx Queryer, sql string, structs []T) error {
 	// no values, nothing to do
 	if len(structs) == 0 {
 		return nil

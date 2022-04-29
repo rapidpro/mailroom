@@ -105,16 +105,7 @@ RETURNING id
 
 // InsertHTTPLogs inserts the passed in logs returning any errors encountered
 func InsertHTTPLogs(ctx context.Context, tx Queryer, logs []*HTTPLog) error {
-	if len(logs) == 0 {
-		return nil
-	}
-
-	ls := make([]interface{}, len(logs))
-	for i := range logs {
-		ls[i] = &logs[i]
-	}
-
-	return BulkQuery(ctx, "inserted http logs", tx, insertHTTPLogsSQL, ls)
+	return BulkQuery(ctx, "inserted http logs", tx, insertHTTPLogsSQL, logs)
 }
 
 // MarshalJSON marshals into JSON. 0 values will become null

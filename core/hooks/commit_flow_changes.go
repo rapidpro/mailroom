@@ -16,7 +16,7 @@ type commitFlowChangesHook struct{}
 // Apply commits our contact current_flow changes as a bulk update for the passed in map of scene
 func (h *commitFlowChangesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*models.Scene][]interface{}) error {
 	// build up our list of pairs of contact id and current flow id
-	updates := make([]interface{}, 0, len(scenes))
+	updates := make([]*currentFlowUpdate, 0, len(scenes))
 	for s, evts := range scenes {
 		// there is only ever one of these events per scene
 		flowID := evts[len(evts)-1].(models.FlowID)
