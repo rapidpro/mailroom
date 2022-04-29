@@ -140,12 +140,7 @@ INSERT INTO notifications_notification(org_id,  notification_type,  scope,  user
 							   ON CONFLICT DO NOTHING`
 
 func insertNotifications(ctx context.Context, db Queryer, notifications []*Notification) error {
-	is := make([]interface{}, len(notifications))
-	for i := range notifications {
-		is[i] = notifications[i]
-	}
-
-	err := dbutil.BulkQuery(ctx, db, insertNotificationSQL, is)
+	err := dbutil.BulkQuery(ctx, db, insertNotificationSQL, notifications)
 	return errors.Wrap(err, "error inserting notifications")
 }
 
