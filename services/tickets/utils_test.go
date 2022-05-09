@@ -158,6 +158,8 @@ func TestCloseTicket(t *testing.T) {
 		},
 	}))
 
+	oa := testdata.Org1.Load(rt)
+
 	// create an open ticket
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
@@ -172,14 +174,11 @@ func TestCloseTicket(t *testing.T) {
 			"contact-display": "Cathy",
 		},
 	)
-	err := models.InsertTickets(ctx, db, []*models.Ticket{ticket1})
+	err := models.InsertTickets(ctx, db, oa, []*models.Ticket{ticket1})
 	require.NoError(t, err)
 
 	// create a close ticket trigger
 	testdata.InsertTicketClosedTrigger(db, testdata.Org1, testdata.Favorites)
-
-	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	require.NoError(t, err)
 
 	logger := &models.HTTPLogger{}
 

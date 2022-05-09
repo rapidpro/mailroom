@@ -62,6 +62,8 @@ func TestTickets(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
+	oa := testdata.Org1.Load(rt)
+
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
 		testdata.Org1.ID,
@@ -108,11 +110,14 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, testdata.Admin.ID, ticket1.AssigneeID())
 	assert.Equal(t, "", ticket1.Config("xyz"))
 
-	err := models.InsertTickets(ctx, db, []*models.Ticket{ticket1, ticket2, ticket3})
+	err := models.InsertTickets(ctx, db, oa, []*models.Ticket{ticket1, ticket2, ticket3})
 	assert.NoError(t, err)
 
 	// check all tickets were created
 	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE status = 'O' AND closed_on IS NULL`).Returns(3)
+
+	// check the opened count was added
+	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'O' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(3)
 
 	// can lookup a ticket by UUID
 	tk1, err := models.LookupTicketByUUID(ctx, db, "2ef57efc-d85f-4291-b330-e4afe68af5fe")

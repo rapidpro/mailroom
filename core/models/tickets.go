@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -51,10 +52,15 @@ func (i *TicketID) Scan(value interface{}) error {
 
 type TicketerID null.Int
 type TicketStatus string
+type TicketDailyCountType string
 
 const (
 	TicketStatusOpen   = TicketStatus("O")
 	TicketStatusClosed = TicketStatus("C")
+
+	TicketDailyCountOpening    = TicketDailyCountType("O")
+	TicketDailyCountAssignment = TicketDailyCountType("A")
+	TicketDailyCountReply      = TicketDailyCountType("R")
 )
 
 // Register a ticket service factory with the engine
@@ -334,7 +340,7 @@ RETURNING
 `
 
 // InsertTickets inserts the passed in tickets returning any errors encountered
-func InsertTickets(ctx context.Context, tx Queryer, tickets []*Ticket) error {
+func InsertTickets(ctx context.Context, tx Queryer, oa *OrgAssets, tickets []*Ticket) error {
 	if len(tickets) == 0 {
 		return nil
 	}
@@ -344,7 +350,40 @@ func InsertTickets(ctx context.Context, tx Queryer, tickets []*Ticket) error {
 		ts[i] = &tickets[i].t
 	}
 
-	return BulkQuery(ctx, "inserted tickets", tx, sqlInsertTicket, ts)
+	if err := BulkQuery(ctx, "inserted tickets", tx, sqlInsertTicket, ts); err != nil {
+		return err
+	}
+
+	return insertTicketDailyCounts(ctx, tx, TicketDailyCountOpening, oa.Org().Timezone(), map[string]int{
+		fmt.Sprintf("o:%d", oa.OrgID()): len(tickets),
+	})
+}
+
+const sqlInsertTicketDailyCount = `
+INSERT INTO tickets_ticketdailycount(count_type, scope, count, day, is_squashed) 
+                              VALUES(:count_type, :scope, :count, :day, FALSE)`
+
+func insertTicketDailyCounts(ctx context.Context, tx Queryer, countType TicketDailyCountType, tz *time.Location, scopeCounts map[string]int) error {
+	type dailyCount struct {
+		CountType TicketDailyCountType `db:"count_type"`
+		Scope     string               `db:"scope"`
+		Count     int                  `db:"count"`
+		Day       dates.Date           `db:"day"`
+	}
+
+	day := dates.ExtractDate(dates.Now().In(tz))
+
+	counts := make([]*dailyCount, 0, len(scopeCounts))
+	for scope, count := range scopeCounts {
+		counts = append(counts, &dailyCount{
+			CountType: countType,
+			Scope:     scope,
+			Count:     count,
+			Day:       day,
+		})
+	}
+
+	return BulkQuery(ctx, "inserted ticket daily counts", tx, sqlInsertTicketDailyCount, counts)
 }
 
 // UpdateTicketExternalID updates the external ID of the given ticket
