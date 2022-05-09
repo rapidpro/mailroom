@@ -1,9 +1,11 @@
 package models_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/httpx"
@@ -90,13 +92,13 @@ func TestTickets(t *testing.T) {
 	)
 	ticket3 := models.NewTicket(
 		"28ef8ddc-b221-42f3-aeae-ee406fc9d716",
-		testdata.Org2.ID,
+		testdata.Org1.ID,
 		testdata.Alexandria.ID,
 		testdata.Zendesk.ID,
 		"EX6677",
 		testdata.SupportTopic.ID,
 		"Where are my pants?",
-		testdata.Org2Admin.ID,
+		testdata.Admin.ID,
 		nil,
 	)
 
@@ -116,8 +118,11 @@ func TestTickets(t *testing.T) {
 	// check all tickets were created
 	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE status = 'O' AND closed_on IS NULL`).Returns(3)
 
-	// check the opened count was added
-	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'O' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(3)
+	// check counts were added
+	assertTicketDailyCount(t, db, models.TicketDailyCountOpening, fmt.Sprintf("o:%d", testdata.Org1.ID), 3)
+	assertTicketDailyCount(t, db, models.TicketDailyCountOpening, fmt.Sprintf("o:%d", testdata.Org2.ID), 0)
+	assertTicketDailyCount(t, db, models.TicketDailyCountAssignment, fmt.Sprintf("o:%d:u:%d", testdata.Org1.ID, testdata.Admin.ID), 2)
+	assertTicketDailyCount(t, db, models.TicketDailyCountAssignment, fmt.Sprintf("o:%d:u:%d", testdata.Org1.ID, testdata.Editor.ID), 0)
 
 	// can lookup a ticket by UUID
 	tk1, err := models.LookupTicketByUUID(ctx, db, "2ef57efc-d85f-4291-b330-e4afe68af5fe")
@@ -196,22 +201,31 @@ func TestTicketsAssign(t *testing.T) {
 	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", nil)
 	modelTicket2 := ticket2.Load(db)
 
+	// create ticket already assigned to a user
+	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my glasses", "", testdata.Admin)
+	modelTicket3 := ticket3.Load(db)
+
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
 
-	evts, err := models.TicketsAssign(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, testdata.Agent.ID, "please handle these")
+	evts, err := models.TicketsAssign(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2, modelTicket3}, testdata.Agent.ID, "please handle these")
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(evts))
+	assert.Equal(t, 3, len(evts))
 	assert.Equal(t, models.TicketEventTypeAssigned, evts[modelTicket1].EventType())
 	assert.Equal(t, models.TicketEventTypeAssigned, evts[modelTicket2].EventType())
+	assert.Equal(t, models.TicketEventTypeAssigned, evts[modelTicket3].EventType())
 
 	// check tickets are now assigned
 	assertdb.Query(t, db, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket1.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
 	assertdb.Query(t, db, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket2.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
+	assertdb.Query(t, db, `SELECT assignee_id FROM tickets_ticket WHERE id = $1`, ticket3.ID).Columns(map[string]interface{}{"assignee_id": int64(testdata.Agent.ID)})
 
-	// and there are new assigned events
-	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A' AND note = 'please handle these'`).Returns(2)
-
+	// and there are new assigned events with notifications
+	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE event_type = 'A' AND note = 'please handle these'`).Returns(3)
 	assertdb.Query(t, db, `SELECT count(*) FROM notifications_notification WHERE user_id = $1 AND notification_type = 'tickets:activity'`, testdata.Agent.ID).Returns(1)
+
+	// and daily counts (we only count first assignments of a ticket)
+	assertTicketDailyCount(t, db, models.TicketDailyCountAssignment, fmt.Sprintf("o:%d:u:%d", testdata.Org1.ID, testdata.Agent.ID), 2)
+	assertTicketDailyCount(t, db, models.TicketDailyCountAssignment, fmt.Sprintf("o:%d:u:%d", testdata.Org1.ID, testdata.Admin.ID), 0)
 }
 
 func TestTicketsAddNote(t *testing.T) {
@@ -391,4 +405,11 @@ func TestReopenTickets(t *testing.T) {
 	assert.Equal(t, 2, len(cathy.Groups().All()))
 	assert.Equal(t, "Doctors", cathy.Groups().All()[0].Name())
 	assert.Equal(t, "Open Tickets", cathy.Groups().All()[1].Name())
+
+	// reopening doesn't change opening daily counts
+	assertTicketDailyCount(t, db, models.TicketDailyCountOpening, fmt.Sprintf("o:%d", testdata.Org1.ID), 0)
+}
+
+func assertTicketDailyCount(t *testing.T, db *sqlx.DB, countType models.TicketDailyCountType, scope string, expected int) {
+	assertdb.Query(t, db, `SELECT COALESCE(SUM(count), 0) FROM tickets_ticketdailycount WHERE count_type = $1 AND scope = $2`, countType, scope).Returns(expected)
 }

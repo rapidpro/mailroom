@@ -345,18 +345,30 @@ func InsertTickets(ctx context.Context, tx Queryer, oa *OrgAssets, tickets []*Ti
 		return nil
 	}
 
+	openingCounts := map[string]int{scopeOrg(oa): len(tickets)} // all new tickets are open
+	assignmentCounts := make(map[string]int)
+
 	ts := make([]interface{}, len(tickets))
-	for i := range tickets {
-		ts[i] = &tickets[i].t
+	for i, t := range tickets {
+		ts[i] = &t.t
+
+		if t.AssigneeID() != NilUserID {
+			assignmentCounts[scopeUser(oa, t.AssigneeID())]++
+		}
 	}
 
 	if err := BulkQuery(ctx, "inserted tickets", tx, sqlInsertTicket, ts); err != nil {
 		return err
 	}
 
-	return insertTicketDailyCounts(ctx, tx, TicketDailyCountOpening, oa.Org().Timezone(), map[string]int{
-		fmt.Sprintf("o:%d", oa.OrgID()): len(tickets),
-	})
+	if err := insertTicketDailyCounts(ctx, tx, TicketDailyCountOpening, oa.Org().Timezone(), openingCounts); err != nil {
+		return err
+	}
+	if err := insertTicketDailyCounts(ctx, tx, TicketDailyCountAssignment, oa.Org().Timezone(), assignmentCounts); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 const sqlInsertTicketDailyCount = `
@@ -430,8 +442,16 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
 
+	assignmentCounts := make(map[string]int)
+
 	for _, ticket := range tickets {
 		if ticket.AssigneeID() != assigneeID {
+
+			// if this is an initial assignment record count for user
+			if ticket.AssigneeID() == NilUserID && assigneeID != NilUserID {
+				assignmentCounts[scopeUser(oa, assigneeID)]++
+			}
+
 			ids = append(ids, ticket.ID())
 			t := &ticket.t
 			t.AssigneeID = assigneeID
@@ -458,6 +478,11 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 	err = NotificationsFromTicketEvents(ctx, db, oa, eventsByTicket)
 	if err != nil {
 		return nil, errors.Wrap(err, "error inserting notifications")
+	}
+
+	err = insertTicketDailyCounts(ctx, db, TicketDailyCountAssignment, oa.Org().Timezone(), assignmentCounts)
+	if err != nil {
+		return nil, errors.Wrap(err, "error inserting assignment counts")
 	}
 
 	return eventsByTicket, nil
@@ -868,4 +893,12 @@ func (i TicketerID) Value() (driver.Value, error) {
 // Scan scans from the db value. null values become 0
 func (i *TicketerID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
+}
+
+func scopeOrg(oa *OrgAssets) string {
+	return fmt.Sprintf("o:%d", oa.OrgID())
+}
+
+func scopeUser(oa *OrgAssets, uid UserID) string {
+	return fmt.Sprintf("o:%d:u:%d", oa.OrgID(), uid)
 }
