@@ -22,8 +22,8 @@ func InsertCampaign(db *sqlx.DB, org *Org, name string, group *Group) *Campaign 
 	uuid := models.CampaignUUID(uuids.New())
 	var id models.CampaignID
 	must(db.Get(&id,
-		`INSERT INTO campaigns_campaign(uuid, org_id, name, group_id, is_archived, is_active, created_on, modified_on, created_by_id, modified_by_id) 
-		VALUES($1, $2, $3, $4, FALSE, TRUE, NOW(), NOW(), 1, 1) RETURNING id`, uuid, org.ID, name, group.ID,
+		`INSERT INTO campaigns_campaign(uuid, org_id, name, group_id, is_archived, is_system, is_active, created_on, modified_on, created_by_id, modified_by_id) 
+		VALUES($1, $2, $3, $4, FALSE, FALSE, TRUE, NOW(), NOW(), 1, 1) RETURNING id`, uuid, org.ID, name, group.ID,
 	))
 	return &Campaign{id, uuid}
 }
