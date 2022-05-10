@@ -54,6 +54,9 @@ var Mailgun = &Ticketer{2, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
 var Zendesk = &Ticketer{3, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}
 var RocketChat = &Ticketer{4, "6c50665f-b4ff-4e37-9625-bc464fe6a999"}
 
+var Partners = &Team{1, "4321c30b-b596-46fa-adb4-4a46d37923f6"}
+var Office = &Team{2, "f14c1762-d38b-4072-ae63-2705332a3719"}
+
 var Luis = &Classifier{1, "097e026c-ae79-4740-af67-656dbedf0263"}
 var Wit = &Classifier{2, "ff2a817c-040a-4eb2-8404-7d92e8b79dd0"}
 var Bothub = &Classifier{3, "859b436d-3005-4e43-9ad5-3de5f26ede4c"}

@@ -61,6 +61,7 @@ type User struct {
 		FirstName string   `json:"first_name"`
 		LastName  string   `json:"last_name"`
 		Role      UserRole `json:"role"`
+		Team      *Team    `json:"team"`
 	}
 }
 
@@ -85,6 +86,11 @@ func (u *User) Name() string {
 	return strings.Join(names, " ")
 }
 
+// Team returns the user's ticketing team if any
+func (u *User) Team() *Team {
+	return u.u.Team
+}
+
 var _ assets.User = (*User)(nil)
 
 const selectOrgUsersSQL = `
@@ -93,7 +99,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
     u.email AS "email",
 	u.first_name as "first_name",
 	u.last_name as "last_name",
-    o.role AS "role"
+    o.role AS "role",
+	row_to_json(team_struct) AS team
 FROM
     auth_user u
 INNER JOIN (
@@ -107,6 +114,8 @@ INNER JOIN (
     UNION
     SELECT user_id, 'S' AS "role" FROM orgs_org_surveyors WHERE org_id = $1
 ) o ON o.user_id = u.id
+LEFT JOIN orgs_usersettings s ON s.user_id = u.id 
+LEFT JOIN LATERAL (SELECT id, uuid, name FROM tickets_team WHERE tickets_team.id = s.team_id) AS team_struct ON True
 WHERE 
     u.is_active = TRUE
 ORDER BY

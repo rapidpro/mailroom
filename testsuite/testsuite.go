@@ -184,6 +184,7 @@ UPDATE contacts_contact SET current_flow_id = NULL;
 DELETE FROM notifications_notification;
 DELETE FROM notifications_incident;
 DELETE FROM request_logs_httplog;
+DELETE FROM tickets_ticketdailycount;
 DELETE FROM tickets_ticketevent;
 DELETE FROM tickets_ticket;
 DELETE FROM triggers_trigger_contacts WHERE trigger_id >= 30000;

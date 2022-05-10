@@ -177,6 +177,7 @@ func TestBroadcastTask(t *testing.T) {
 		ContactIDs    []models.ContactID
 		URNs          []urns.URN
 		TicketID      models.TicketID
+		CreatedByID   models.UserID
 		Queue         string
 		BatchCount    int
 		MsgCount      int
@@ -190,7 +191,8 @@ func TestBroadcastTask(t *testing.T) {
 			doctorsOnly,
 			cathyOnly,
 			nil,
-			ticket.ID,
+			models.NilTicketID,
+			testdata.Admin.ID,
 			queue.BatchQueue,
 			2,
 			121,
@@ -205,6 +207,7 @@ func TestBroadcastTask(t *testing.T) {
 			cathyOnly,
 			nil,
 			models.NilTicketID,
+			models.NilUserID,
 			queue.HandlerQueue,
 			1,
 			1,
@@ -218,7 +221,8 @@ func TestBroadcastTask(t *testing.T) {
 			nil,
 			cathyOnly,
 			nil,
-			models.NilTicketID,
+			ticket.ID,
+			testdata.Agent.ID,
 			queue.HandlerQueue,
 			1,
 			1,
@@ -231,7 +235,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID, tc.CreatedByID)
 		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
@@ -277,4 +281,7 @@ func TestBroadcastTask(t *testing.T) {
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
 	}
+
+	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text)`, testdata.Org1.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT SUM(count) FROM tickets_ticketdailycount WHERE count_type = 'R' AND scope = CONCAT('o:', $1::text, ':u:', $2::text)`, testdata.Org1.ID, testdata.Agent.ID).Returns(1)
 }
