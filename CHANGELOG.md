@@ -1,3 +1,9 @@
+v7.3.13
+----------
+ * Update to latest goflow which fixes contact query simplification
+ * Record ticket daily counts when opening, assigning and replying to tickets
+ * Update to latest gocommon, phonenumbers, jsonparser
+
 v7.3.12
 ----------
  * Update to go 1.18 and use some generics
