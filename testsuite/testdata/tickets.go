@@ -23,6 +23,11 @@ type Ticket struct {
 	UUID flows.TicketUUID
 }
 
+type Team struct {
+	ID   models.TeamID
+	UUID models.TeamUUID
+}
+
 func (k *Ticket) Load(db *sqlx.DB) *models.Ticket {
 	tickets, err := models.LoadTickets(context.Background(), db, []models.TicketID{k.ID})
 	must(err, len(tickets) == 1)

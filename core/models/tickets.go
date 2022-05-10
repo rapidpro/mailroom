@@ -353,7 +353,10 @@ func InsertTickets(ctx context.Context, tx Queryer, oa *OrgAssets, tickets []*Ti
 		ts[i] = &t.t
 
 		if t.AssigneeID() != NilUserID {
-			assignmentCounts[scopeUser(oa, t.AssigneeID())]++
+			assignee := oa.UserByID(t.AssigneeID())
+			if assignee != nil {
+				assignmentCounts[scopeUser(oa, assignee)]++
+			}
 		}
 	}
 
@@ -449,7 +452,10 @@ func TicketsAssign(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID
 
 			// if this is an initial assignment record count for user
 			if ticket.AssigneeID() == NilUserID && assigneeID != NilUserID {
-				assignmentCounts[scopeUser(oa, assigneeID)]++
+				assignee := oa.UserByID(assigneeID)
+				if assignee != nil {
+					assignmentCounts[scopeUser(oa, assignee)]++
+				}
 			}
 
 			ids = append(ids, ticket.ID())
@@ -899,6 +905,10 @@ func scopeOrg(oa *OrgAssets) string {
 	return fmt.Sprintf("o:%d", oa.OrgID())
 }
 
-func scopeUser(oa *OrgAssets, uid UserID) string {
-	return fmt.Sprintf("o:%d:u:%d", oa.OrgID(), uid)
+func scopeTeam(t *Team) string {
+	return fmt.Sprintf("t:%d", t.ID)
+}
+
+func scopeUser(oa *OrgAssets, u *User) string {
+	return fmt.Sprintf("o:%d:u:%d", oa.OrgID(), u.ID())
 }

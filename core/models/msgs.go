@@ -697,22 +697,24 @@ type BroadcastTranslation struct {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty" db:"id"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"  db:"id"`
 		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-		Text          hstore.Hstore                           `                              db:"text"`
+		Text          hstore.Hstore                           `                               db:"text"`
 		TemplateState TemplateState                           `json:"template_state"`
-		BaseLanguage  envs.Language                           `json:"base_language"          db:"base_language"`
+		BaseLanguage  envs.Language                           `json:"base_language"           db:"base_language"`
 		URNs          []urns.URN                              `json:"urns,omitempty"`
 		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
 		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
-		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
-		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
-		TicketID      TicketID                                `json:"ticket_id,omitempty"    db:"ticket_id"`
+		OrgID         OrgID                                   `json:"org_id"                  db:"org_id"`
+		CreatedByID   UserID                                  `json:"created_by_id,omitempty" db:"created_by_id"`
+		ParentID      BroadcastID                             `json:"parent_id,omitempty"     db:"parent_id"`
+		TicketID      TicketID                                `json:"ticket_id,omitempty"     db:"ticket_id"`
 	}
 }
 
 func (b *Broadcast) ID() BroadcastID                                       { return b.b.BroadcastID }
 func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
+func (b *Broadcast) CreatedByID() UserID                                   { return b.b.CreatedByID }
 func (b *Broadcast) ContactIDs() []ContactID                               { return b.b.ContactIDs }
 func (b *Broadcast) GroupIDs() []GroupID                                   { return b.b.GroupIDs }
 func (b *Broadcast) URNs() []urns.URN                                      { return b.b.URNs }
@@ -727,7 +729,7 @@ func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(
 	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID) *Broadcast {
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID, createdByID UserID) *Broadcast {
 
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
@@ -739,6 +741,7 @@ func NewBroadcast(
 	bcast.b.ContactIDs = contactIDs
 	bcast.b.GroupIDs = groupIDs
 	bcast.b.TicketID = ticketID
+	bcast.b.CreatedByID = createdByID
 
 	return bcast
 }
@@ -755,8 +758,8 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.b.ContactIDs,
 		parent.b.GroupIDs,
 		parent.b.TicketID,
+		parent.b.CreatedByID,
 	)
-	// populate our parent id
 	child.b.ParentID = parent.ID()
 
 	// populate text from our translations
@@ -894,7 +897,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event
 		}
 	}
 
-	return NewBroadcast(oa.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID), nil
+	return NewBroadcast(oa.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID, NilUserID), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
@@ -904,6 +907,7 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 	batch.b.Translations = b.b.Translations
 	batch.b.TemplateState = b.b.TemplateState
 	batch.b.OrgID = b.b.OrgID
+	batch.b.CreatedByID = b.b.CreatedByID
 	batch.b.TicketID = b.b.TicketID
 	batch.b.ContactIDs = contactIDs
 	return batch
@@ -920,6 +924,7 @@ type BroadcastBatch struct {
 		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
 		IsLast        bool                                    `json:"is_last"`
 		OrgID         OrgID                                   `json:"org_id"`
+		CreatedByID   UserID                                  `json:"created_by_id"`
 		TicketID      TicketID                                `json:"ticket_id"`
 	}
 }
@@ -929,6 +934,7 @@ func (b *BroadcastBatch) ContactIDs() []ContactID             { return b.b.Conta
 func (b *BroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.URNs }
 func (b *BroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
 func (b *BroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
+func (b *BroadcastBatch) CreatedByID() UserID                 { return b.b.CreatedByID }
 func (b *BroadcastBatch) TicketID() TicketID                  { return b.b.TicketID }
 func (b *BroadcastBatch) Translations() map[envs.Language]*BroadcastTranslation {
 	return b.b.Translations
@@ -1146,6 +1152,21 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		if err != nil {
 			return nil, errors.Wrapf(err, "error updating broadcast ticket")
 		}
+
+		// record reply counts for org, user and team
+		replyCounts := map[string]int{scopeOrg(oa): 1}
+
+		if bcast.CreatedByID() != NilUserID {
+			user := oa.UserByID(bcast.CreatedByID())
+			if user != nil {
+				replyCounts[scopeUser(oa, user)] = 1
+				if user.Team() != nil {
+					replyCounts[scopeTeam(user.Team())] = 1
+				}
+			}
+		}
+
+		insertTicketDailyCounts(ctx, rt.DB, TicketDailyCountReply, oa.Org().Timezone(), replyCounts)
 	}
 
 	return msgs, nil
