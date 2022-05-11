@@ -1,3 +1,7 @@
+v7.3.14
+----------
+ * Update to latest goflow which fixes contact query bug
+
 v7.3.13
 ----------
  * Update to latest goflow which fixes contact query simplification
