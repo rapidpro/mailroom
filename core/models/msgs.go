@@ -1148,28 +1148,47 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 	// if the broadcast was a ticket reply, update the ticket
 	if bcast.TicketID() != NilTicketID {
-		err = updateTicketLastActivity(ctx, rt.DB, []TicketID{bcast.TicketID()}, dates.Now())
-		if err != nil {
-			return nil, errors.Wrapf(err, "error updating broadcast ticket")
+		if err := bcast.updateTicket(ctx, rt.DB, oa); err != nil {
+			return nil, err
 		}
-
-		// record reply counts for org, user and team
-		replyCounts := map[string]int{scopeOrg(oa): 1}
-
-		if bcast.CreatedByID() != NilUserID {
-			user := oa.UserByID(bcast.CreatedByID())
-			if user != nil {
-				replyCounts[scopeUser(oa, user)] = 1
-				if user.Team() != nil {
-					replyCounts[scopeTeam(user.Team())] = 1
-				}
-			}
-		}
-
-		insertTicketDailyCounts(ctx, rt.DB, TicketDailyCountReply, oa.Org().Timezone(), replyCounts)
 	}
 
 	return msgs, nil
+}
+
+func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAssets) error {
+	err := updateTicketLastActivity(ctx, db, []TicketID{b.TicketID()}, dates.Now())
+	if err != nil {
+		return errors.Wrapf(err, "error updating broadcast ticket")
+	}
+
+	// record reply counts for org, user and team
+	replyCounts := map[string]int{scopeOrg(oa): 1}
+
+	if b.CreatedByID() != NilUserID {
+		user := oa.UserByID(b.CreatedByID())
+		if user != nil {
+			replyCounts[scopeUser(oa, user)] = 1
+			if user.Team() != nil {
+				replyCounts[scopeTeam(user.Team())] = 1
+			}
+		}
+	}
+
+	if err := insertTicketDailyCounts(ctx, db, TicketDailyCountReply, oa.Org().Timezone(), replyCounts); err != nil {
+		return err
+	}
+
+	seconds, err := TicketRecordReplied(ctx, db, b.TicketID(), dates.Now())
+	if err != nil {
+		return err
+	}
+	if seconds >= 0 {
+		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), 1, seconds); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 const sqlUpdateMsgForResending = `

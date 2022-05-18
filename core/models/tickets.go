@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -53,6 +52,7 @@ func (i *TicketID) Scan(value interface{}) error {
 type TicketerID null.Int
 type TicketStatus string
 type TicketDailyCountType string
+type TicketDailyTimingType string
 
 const (
 	TicketStatusOpen   = TicketStatus("O")
@@ -61,6 +61,9 @@ const (
 	TicketDailyCountOpening    = TicketDailyCountType("O")
 	TicketDailyCountAssignment = TicketDailyCountType("A")
 	TicketDailyCountReply      = TicketDailyCountType("R")
+
+	TicketDailyTimingFirstReply = TicketDailyTimingType("R")
+	TicketDailyTimingLastClose  = TicketDailyTimingType("C")
 )
 
 // Register a ticket service factory with the engine
@@ -88,6 +91,7 @@ type Ticket struct {
 		AssigneeID     UserID           `db:"assignee_id"`
 		Config         null.Map         `db:"config"`
 		OpenedOn       time.Time        `db:"opened_on"`
+		RepliedOn      *time.Time       `db:"replied_on"`
 		ModifiedOn     time.Time        `db:"modified_on"`
 		ClosedOn       *time.Time       `db:"closed_on"`
 		LastActivityOn time.Time        `db:"last_activity_on"`
@@ -191,6 +195,7 @@ SELECT
   t.assignee_id AS assignee_id,
   t.config AS config,
   t.opened_on AS opened_on,
+  t.replied_on,
   t.modified_on AS modified_on,
   t.closed_on AS closed_on,
   t.last_activity_on AS last_activity_on
@@ -220,6 +225,7 @@ SELECT
   t.assignee_id AS assignee_id,
   t.config AS config,
   t.opened_on AS opened_on,
+  t.replied_on,
   t.modified_on AS modified_on,
   t.closed_on AS closed_on,
   t.last_activity_on AS last_activity_on
@@ -268,6 +274,7 @@ SELECT
   t.assignee_id AS assignee_id,
   t.config AS config,
   t.opened_on AS opened_on,
+  t.replied_on,
   t.modified_on AS modified_on,
   t.closed_on AS closed_on,
   t.last_activity_on AS last_activity_on
@@ -296,6 +303,7 @@ SELECT
   t.assignee_id AS assignee_id,
   t.config AS config,
   t.opened_on AS opened_on,
+  t.replied_on,
   t.modified_on AS modified_on,
   t.closed_on AS closed_on,
   t.last_activity_on AS last_activity_on
@@ -372,33 +380,6 @@ func InsertTickets(ctx context.Context, tx Queryer, oa *OrgAssets, tickets []*Ti
 	}
 
 	return nil
-}
-
-const sqlInsertTicketDailyCount = `
-INSERT INTO tickets_ticketdailycount(count_type, scope, count, day, is_squashed) 
-                              VALUES(:count_type, :scope, :count, :day, FALSE)`
-
-func insertTicketDailyCounts(ctx context.Context, tx Queryer, countType TicketDailyCountType, tz *time.Location, scopeCounts map[string]int) error {
-	type dailyCount struct {
-		CountType TicketDailyCountType `db:"count_type"`
-		Scope     string               `db:"scope"`
-		Count     int                  `db:"count"`
-		Day       dates.Date           `db:"day"`
-	}
-
-	day := dates.ExtractDate(dates.Now().In(tz))
-
-	counts := make([]*dailyCount, 0, len(scopeCounts))
-	for scope, count := range scopeCounts {
-		counts = append(counts, &dailyCount{
-			CountType: countType,
-			Scope:     scope,
-			Count:     count,
-			Day:       day,
-		})
-	}
-
-	return BulkQuery(ctx, "inserted ticket daily counts", tx, sqlInsertTicketDailyCount, counts)
 }
 
 // UpdateTicketExternalID updates the external ID of the given ticket
@@ -717,6 +698,35 @@ func recalcGroupsForTicketChanges(ctx context.Context, db Queryer, oa *OrgAssets
 	return CalculateDynamicGroups(ctx, db, oa, flowContacts)
 }
 
+const sqlUpdateTicketRepliedOn = `
+   UPDATE tickets_ticket 
+      SET replied_on = $2
+    WHERE id = $1 AND replied_on IS NOT NULL 
+RETURNING EXTRACT(EPOCH FROM (replied_on - opened_on))`
+
+// TicketRecordReplied records a ticket as being replied to, returning the number of seconds between the reply
+// and the ticket being opened, if this is
+func TicketRecordReplied(ctx context.Context, db Queryer, ticketID TicketID, when time.Time) (int64, error) {
+	rows, err := db.QueryxContext(ctx, sqlUpdateTicketRepliedOn, ticketID, when)
+	if err != nil && err != sql.ErrNoRows {
+		return -1, err
+	}
+
+	defer rows.Close()
+
+	// if we didn't get anything back then we didn't change the ticket because it was already replied to
+	if err == sql.ErrNoRows || !rows.Next() {
+		return -1, nil
+	}
+
+	var seconds int64
+	if err := rows.Scan(&seconds); err != nil {
+		return -1, err
+	}
+
+	return seconds, nil
+}
+
 // Ticketer is our type for a ticketer asset
 type Ticketer struct {
 	t struct {
@@ -901,14 +911,10 @@ func (i *TicketerID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
 }
 
-func scopeOrg(oa *OrgAssets) string {
-	return fmt.Sprintf("o:%d", oa.OrgID())
+func insertTicketDailyCounts(ctx context.Context, tx Queryer, countType TicketDailyCountType, tz *time.Location, scopeCounts map[string]int) error {
+	return insertDailyCounts(ctx, tx, "tickets_ticketdailycount", countType, tz, scopeCounts)
 }
 
-func scopeTeam(t *Team) string {
-	return fmt.Sprintf("t:%d", t.ID)
-}
-
-func scopeUser(oa *OrgAssets, u *User) string {
-	return fmt.Sprintf("o:%d:u:%d", oa.OrgID(), u.ID())
+func insertTicketDailyTiming(ctx context.Context, tx Queryer, countType TicketDailyTimingType, tz *time.Location, scope string, count int, seconds int64) error {
+	return insertDailyTiming(ctx, tx, "tickets_ticketdailytiming", countType, tz, scope, count, seconds)
 }
