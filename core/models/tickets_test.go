@@ -150,7 +150,7 @@ func TestUpdateTicketConfig(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
 	// empty configs are null
@@ -171,19 +171,19 @@ func TestUpdateTicketLastActivity(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	now := time.Date(2021, 6, 22, 15, 59, 30, 123456789, time.UTC)
+	now := time.Date(2021, 6, 22, 15, 59, 30, 123456000, time.UTC)
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewFixedNowSource(now))
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
 	models.UpdateTicketLastActivity(ctx, db, []*models.Ticket{modelTicket})
 
 	assert.Equal(t, now, modelTicket.LastActivityOn())
 
-	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND last_activity_on = $2`, ticket.ID, modelTicket.LastActivityOn()).Returns(1)
+	assertdb.Query(t, db, `SELECT last_activity_on FROM tickets_ticket WHERE id = $1`, ticket.ID).Returns(modelTicket.LastActivityOn())
 
 }
 
@@ -198,14 +198,14 @@ func TestTicketsAssign(t *testing.T) {
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
 	modelTicket1 := ticket1.Load(db)
 
-	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", nil)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", time.Now(), nil)
 	modelTicket2 := ticket2.Load(db)
 
 	// create ticket already assigned to a user
-	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my glasses", "", testdata.Admin)
+	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my glasses", "", time.Now(), testdata.Admin)
 	modelTicket3 := ticket3.Load(db)
 
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 
 	evts, err := models.TicketsAssign(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2, modelTicket3}, testdata.Agent.ID, "please handle these")
 	require.NoError(t, err)
@@ -239,10 +239,10 @@ func TestTicketsAddNote(t *testing.T) {
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
 	modelTicket1 := ticket1.Load(db)
 
-	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", testdata.Agent)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", time.Now(), testdata.Agent)
 	modelTicket2 := ticket2.Load(db)
 
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 
 	evts, err := models.TicketsAddNote(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, "spam")
 	require.NoError(t, err)
@@ -267,13 +267,13 @@ func TestTicketsChangeTopic(t *testing.T) {
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.SalesTopic, "Where my shoes", "123", nil)
 	modelTicket1 := ticket1.Load(db)
 
-	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Where my pants", "234", nil)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Where my pants", "234", time.Now(), nil)
 	modelTicket2 := ticket2.Load(db)
 
-	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "345", nil)
+	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "345", time.Now(), nil)
 	modelTicket3 := ticket3.Load(db)
 
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 
 	evts, err := models.TicketsChangeTopic(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2, modelTicket3}, testdata.SupportTopic.ID)
 	require.NoError(t, err)
@@ -304,7 +304,7 @@ func TestCloseTickets(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTicketers|models.RefreshGroups)
 	require.NoError(t, err)
 
-	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
+	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", time.Now(), nil)
 	modelTicket1 := ticket1.Load(db)
 
 	ticket2 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", nil)
@@ -345,7 +345,7 @@ func TestCloseTickets(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id = $1 AND event_type = 'C'`, ticket2.ID).Returns(0)
 
 	// can close tickets without a user
-	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
+	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", time.Now(), nil)
 	modelTicket3 := ticket3.Load(db)
 
 	evts, err = models.CloseTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{modelTicket3}, false, false, logger)
@@ -377,7 +377,7 @@ func TestReopenTickets(t *testing.T) {
 	ticket1 := testdata.InsertClosedTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
 	modelTicket1 := ticket1.Load(db)
 
-	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", nil)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Where my pants", "234", time.Now(), nil)
 	modelTicket2 := ticket2.Load(db)
 
 	logger := &models.HTTPLogger{}
@@ -408,6 +408,42 @@ func TestReopenTickets(t *testing.T) {
 
 	// reopening doesn't change opening daily counts
 	assertTicketDailyCount(t, db, models.TicketDailyCountOpening, fmt.Sprintf("o:%d", testdata.Org1.ID), 0)
+}
+
+func TestTicketRecordReply(t *testing.T) {
+	ctx, _, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	openedOn := time.Date(2022, 5, 18, 14, 21, 0, 0, time.UTC)
+	repliedOn := time.Date(2022, 5, 18, 15, 0, 0, 0, time.UTC)
+
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", openedOn, nil)
+
+	timing, err := models.TicketRecordReplied(ctx, db, ticket.ID, repliedOn)
+	assert.NoError(t, err)
+	assert.Equal(t, 2340*time.Second, timing)
+
+	modelTicket := ticket.Load(db)
+	assert.Equal(t, repliedOn, *modelTicket.RepliedOn())
+	assert.Equal(t, repliedOn, modelTicket.LastActivityOn())
+
+	assertdb.Query(t, db, `SELECT replied_on FROM tickets_ticket WHERE id = $1`, ticket.ID).Returns(repliedOn)
+	assertdb.Query(t, db, `SELECT last_activity_on FROM tickets_ticket WHERE id = $1`, ticket.ID).Returns(repliedOn)
+
+	repliedAgainOn := time.Date(2022, 5, 18, 15, 5, 0, 0, time.UTC)
+
+	// if we call it again, it won't change replied_on again but it will update last_activity_on
+	timing, err = models.TicketRecordReplied(ctx, db, ticket.ID, repliedAgainOn)
+	assert.NoError(t, err)
+	assert.Equal(t, time.Duration(-1), timing)
+
+	modelTicket = ticket.Load(db)
+	assert.Equal(t, repliedOn, *modelTicket.RepliedOn())
+	assert.Equal(t, repliedAgainOn, modelTicket.LastActivityOn())
+
+	assertdb.Query(t, db, `SELECT replied_on FROM tickets_ticket WHERE id = $1`, ticket.ID).Returns(repliedOn)
+	assertdb.Query(t, db, `SELECT last_activity_on FROM tickets_ticket WHERE id = $1`, ticket.ID).Returns(repliedAgainOn)
 }
 
 func assertTicketDailyCount(t *testing.T, db *sqlx.DB, countType models.TicketDailyCountType, scope string, expected int) {
