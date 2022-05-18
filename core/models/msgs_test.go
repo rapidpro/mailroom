@@ -595,7 +595,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("eng"): {Text: "Hi there"}}

@@ -38,8 +38,8 @@ func TestMsgEvents(t *testing.T) {
 	// give Cathy and Bob some tickets...
 	openTickets := map[*testdata.Contact][]*testdata.Ticket{
 		testdata.Cathy: {
-			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", nil),
-			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Ok", "", nil),
+			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
+			testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Ok", "", time.Now(), nil),
 		},
 	}
 	closedTickets := map[*testdata.Contact][]*testdata.Ticket{

@@ -124,6 +124,7 @@ func (t *Ticket) Status() TicketStatus      { return t.t.Status }
 func (t *Ticket) TopicID() TopicID          { return t.t.TopicID }
 func (t *Ticket) Body() string              { return t.t.Body }
 func (t *Ticket) AssigneeID() UserID        { return t.t.AssigneeID }
+func (t *Ticket) RepliedOn() *time.Time     { return t.t.RepliedOn }
 func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
@@ -699,14 +700,16 @@ func recalcGroupsForTicketChanges(ctx context.Context, db Queryer, oa *OrgAssets
 }
 
 const sqlUpdateTicketRepliedOn = `
-   UPDATE tickets_ticket 
-      SET replied_on = $2
-    WHERE id = $1 AND replied_on IS NOT NULL 
-RETURNING EXTRACT(EPOCH FROM (replied_on - opened_on))`
+   UPDATE tickets_ticket t1
+      SET last_activity_on = $2, replied_on = LEAST(t1.replied_on, $2)
+	 FROM tickets_ticket t2
+    WHERE t1.id = t2.id AND t1.id = $1
+RETURNING CASE WHEN t2.replied_on IS NULL THEN EXTRACT(EPOCH FROM (t1.replied_on - t1.opened_on)) ELSE NULL END`
 
-// TicketRecordReplied records a ticket as being replied to, returning the number of seconds between the reply
-// and the ticket being opened, if this is
-func TicketRecordReplied(ctx context.Context, db Queryer, ticketID TicketID, when time.Time) (int64, error) {
+// TicketRecordReplied records a ticket as being replied to, updating last_activity_on. If this is the first reply
+// to this ticket then replied_on is updated and the function returns the number of seconds between that and when
+// the ticket was opened.
+func TicketRecordReplied(ctx context.Context, db Queryer, ticketID TicketID, when time.Time) (time.Duration, error) {
 	rows, err := db.QueryxContext(ctx, sqlUpdateTicketRepliedOn, ticketID, when)
 	if err != nil && err != sql.ErrNoRows {
 		return -1, err
@@ -719,12 +722,16 @@ func TicketRecordReplied(ctx context.Context, db Queryer, ticketID TicketID, whe
 		return -1, nil
 	}
 
-	var seconds int64
+	var seconds *float64
 	if err := rows.Scan(&seconds); err != nil {
 		return -1, err
 	}
 
-	return seconds, nil
+	if seconds != nil {
+		return time.Duration(*seconds * float64(time.Second)), nil
+	}
+
+	return time.Duration(-1), nil
 }
 
 // Ticketer is our type for a ticketer asset
@@ -915,6 +922,6 @@ func insertTicketDailyCounts(ctx context.Context, tx Queryer, countType TicketDa
 	return insertDailyCounts(ctx, tx, "tickets_ticketdailycount", countType, tz, scopeCounts)
 }
 
-func insertTicketDailyTiming(ctx context.Context, tx Queryer, countType TicketDailyTimingType, tz *time.Location, scope string, count int, seconds int64) error {
-	return insertDailyTiming(ctx, tx, "tickets_ticketdailytiming", countType, tz, scope, count, seconds)
+func insertTicketDailyTiming(ctx context.Context, tx Queryer, countType TicketDailyTimingType, tz *time.Location, scope string, duration time.Duration) error {
+	return insertDailyTiming(ctx, tx, "tickets_ticketdailytiming", countType, tz, scope, duration)
 }

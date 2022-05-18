@@ -52,8 +52,8 @@ func TestFromTicketUUID(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// create some tickets
-	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
-	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my shoes?", "", nil)
+	ticket1 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", time.Now(), nil)
+	ticket2 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my shoes?", "", time.Now(), nil)
 
 	// break mailgun configuration
 	db.MustExec(`UPDATE tickets_ticketer SET config = '{"foo":"bar"}'::jsonb WHERE id = $1`, testdata.Mailgun.ID)
@@ -123,7 +123,7 @@ func TestSendReply(t *testing.T) {
 	image := &tickets.File{URL: "http://coolfiles.com/a.jpg", ContentType: "image/jpeg", Body: imageBody}
 
 	// create a ticket
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
 	msg, err := tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})

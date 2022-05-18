@@ -1157,9 +1157,9 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 }
 
 func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAssets) error {
-	err := updateTicketLastActivity(ctx, db, []TicketID{b.TicketID()}, dates.Now())
+	firstReplySeconds, err := TicketRecordReplied(ctx, db, b.TicketID(), dates.Now())
 	if err != nil {
-		return errors.Wrapf(err, "error updating broadcast ticket")
+		return err
 	}
 
 	// record reply counts for org, user and team
@@ -1179,12 +1179,8 @@ func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAs
 		return err
 	}
 
-	seconds, err := TicketRecordReplied(ctx, db, b.TicketID(), dates.Now())
-	if err != nil {
-		return err
-	}
-	if seconds >= 0 {
-		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), 1, seconds); err != nil {
+	if firstReplySeconds >= 0 {
+		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplySeconds); err != nil {
 			return err
 		}
 	}

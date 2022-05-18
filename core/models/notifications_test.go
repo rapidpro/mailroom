@@ -165,7 +165,7 @@ func assertNotifications(t *testing.T, ctx context.Context, db *sqlx.DB, after t
 }
 
 func openTicket(t *testing.T, ctx context.Context, db *sqlx.DB, openedBy *testdata.User, assignee *testdata.User) (*models.Ticket, *models.TicketEvent) {
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.SupportTopic, "Where my pants", "", assignee)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.SupportTopic, "Where my pants", "", time.Now(), assignee)
 	modelTicket := ticket.Load(db)
 
 	openedEvent := models.NewTicketOpenedEvent(modelTicket, openedBy.SafeID(), assignee.SafeID())
