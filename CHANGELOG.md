@@ -1,3 +1,9 @@
+v7.3.15
+----------
+ * Simplify BroadcastBatch
+ * Record first-reply timings for tickets
+ * Add arm64 as a build target
+
 v7.3.14
 ----------
  * Update to latest goflow which fixes contact query bug
