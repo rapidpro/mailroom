@@ -901,58 +901,38 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
-	batch := &BroadcastBatch{}
-	batch.b.BroadcastID = b.b.BroadcastID
-	batch.b.BaseLanguage = b.b.BaseLanguage
-	batch.b.Translations = b.b.Translations
-	batch.b.TemplateState = b.b.TemplateState
-	batch.b.OrgID = b.b.OrgID
-	batch.b.CreatedByID = b.b.CreatedByID
-	batch.b.TicketID = b.b.TicketID
-	batch.b.ContactIDs = contactIDs
-	return batch
+	return &BroadcastBatch{
+		BroadcastID:   b.b.BroadcastID,
+		BaseLanguage:  b.b.BaseLanguage,
+		Translations:  b.b.Translations,
+		TemplateState: b.b.TemplateState,
+		OrgID:         b.b.OrgID,
+		CreatedByID:   b.b.CreatedByID,
+		TicketID:      b.b.TicketID,
+		ContactIDs:    contactIDs,
+	}
 }
 
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {
-	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
-		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage  envs.Language                           `json:"base_language"`
-		TemplateState TemplateState                           `json:"template_state"`
-		URNs          map[ContactID]urns.URN                  `json:"urns,omitempty"`
-		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
-		IsLast        bool                                    `json:"is_last"`
-		OrgID         OrgID                                   `json:"org_id"`
-		CreatedByID   UserID                                  `json:"created_by_id"`
-		TicketID      TicketID                                `json:"ticket_id"`
-	}
+	BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
+	Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+	BaseLanguage  envs.Language                           `json:"base_language"`
+	TemplateState TemplateState                           `json:"template_state"`
+	URNs          map[ContactID]urns.URN                  `json:"urns,omitempty"`
+	ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
+	IsLast        bool                                    `json:"is_last"`
+	OrgID         OrgID                                   `json:"org_id"`
+	CreatedByID   UserID                                  `json:"created_by_id"`
+	TicketID      TicketID                                `json:"ticket_id"`
 }
 
-func (b *BroadcastBatch) BroadcastID() BroadcastID            { return b.b.BroadcastID }
-func (b *BroadcastBatch) ContactIDs() []ContactID             { return b.b.ContactIDs }
-func (b *BroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.URNs }
-func (b *BroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
-func (b *BroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
-func (b *BroadcastBatch) CreatedByID() UserID                 { return b.b.CreatedByID }
-func (b *BroadcastBatch) TicketID() TicketID                  { return b.b.TicketID }
-func (b *BroadcastBatch) Translations() map[envs.Language]*BroadcastTranslation {
-	return b.b.Translations
-}
-func (b *BroadcastBatch) TemplateState() TemplateState { return b.b.TemplateState }
-func (b *BroadcastBatch) BaseLanguage() envs.Language  { return b.b.BaseLanguage }
-func (b *BroadcastBatch) IsLast() bool                 { return b.b.IsLast }
-func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
-
-func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
-func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
-
-func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
-	broadcastURNs := bcast.URNs()
+	broadcastURNs := b.URNs
 
 	// build our list of contact ids
-	contactIDs := bcast.ContactIDs()
+	contactIDs := b.ContactIDs
 
 	// build a map of the contacts that are present both in our URN list and our contact id list
 	if broadcastURNs != nil {
@@ -1045,7 +1025,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 
 		// have a valid contact language, try that
-		trans := bcast.Translations()
+		trans := b.Translations
 		t := trans[lang]
 
 		// not found? try org default language
@@ -1055,20 +1035,20 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// not found? use broadcast base language
 		if t == nil {
-			t = trans[bcast.BaseLanguage()]
+			t = trans[b.BaseLanguage]
 		}
 
 		if t == nil {
-			logrus.WithField("base_language", bcast.BaseLanguage()).WithField("translations", trans).Error("unable to find translation for broadcast")
+			logrus.WithField("base_language", b.BaseLanguage).WithField("translations", trans).Error("unable to find translation for broadcast")
 			return nil, nil
 		}
 
 		template := ""
 
 		// if this is a legacy template, migrate it forward
-		if bcast.TemplateState() == TemplateStateLegacy {
+		if b.TemplateState == TemplateStateLegacy {
 			template, _ = expressions.MigrateTemplate(t.Text, nil)
-		} else if bcast.TemplateState() == TemplateStateUnevaluated {
+		} else if b.TemplateState == TemplateStateUnevaluated {
 			template = t.Text
 		}
 
@@ -1093,7 +1073,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), bcast.BroadcastID())
+		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), b.BroadcastID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
@@ -1147,8 +1127,8 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 	}
 
 	// if the broadcast was a ticket reply, update the ticket
-	if bcast.TicketID() != NilTicketID {
-		if err := bcast.updateTicket(ctx, rt.DB, oa); err != nil {
+	if b.TicketID != NilTicketID {
+		if err := b.updateTicket(ctx, rt.DB, oa); err != nil {
 			return nil, err
 		}
 	}
@@ -1157,7 +1137,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 }
 
 func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAssets) error {
-	firstReplySeconds, err := TicketRecordReplied(ctx, db, b.TicketID(), dates.Now())
+	firstReplySeconds, err := TicketRecordReplied(ctx, db, b.TicketID, dates.Now())
 	if err != nil {
 		return err
 	}
@@ -1165,8 +1145,8 @@ func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAs
 	// record reply counts for org, user and team
 	replyCounts := map[string]int{scopeOrg(oa): 1}
 
-	if b.CreatedByID() != NilUserID {
-		user := oa.UserByID(b.CreatedByID())
+	if b.CreatedByID != NilUserID {
+		user := oa.UserByID(b.CreatedByID)
 		if user != nil {
 			replyCounts[scopeUser(oa, user)] = 1
 			if user.Team() != nil {

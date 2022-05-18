@@ -626,18 +626,18 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID})
 
-	assert.Equal(t, models.NilBroadcastID, batch.BroadcastID())
-	assert.Equal(t, testdata.Org1.ID, batch.OrgID())
-	assert.Equal(t, envs.Language("eng"), batch.BaseLanguage())
-	assert.Equal(t, translations, batch.Translations())
-	assert.Equal(t, models.TemplateStateUnevaluated, batch.TemplateState())
-	assert.Equal(t, ticket.ID, batch.TicketID())
-	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs())
+	assert.Equal(t, models.NilBroadcastID, batch.BroadcastID)
+	assert.Equal(t, testdata.Org1.ID, batch.OrgID)
+	assert.Equal(t, envs.Language("eng"), batch.BaseLanguage)
+	assert.Equal(t, translations, batch.Translations)
+	assert.Equal(t, models.TemplateStateUnevaluated, batch.TemplateState)
+	assert.Equal(t, ticket.ID, batch.TicketID)
+	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch)
+	msgs, err := batch.CreateMessages(ctx, rt, oa)
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, len(msgs))
