@@ -27,6 +27,7 @@ import (
 
 func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
+	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
@@ -352,10 +353,10 @@ func TestOpenAndForward(t *testing.T) {
 
 	dummyTime, _ := time.Parse(time.RFC1123, "2019-10-07T15:21:30")
 
-	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "connection_id", "contact_id", "contact_urn_id", "org_id", "response_to_id", "topup_id"}).
-		AddRow(100, "1348d654-e3dc-4f2f-add0-a9163dc48895", "Hi! I'll try to help you!", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "398", nil, nil, nil, 3, nil, 2, 2, 3, 325, 3).
-		AddRow(101, "b9568e35-3a59-4f91-882f-fa021f591b13", "Where are you from?", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "399", nil, nil, nil, 3, nil, 2, 2, 3, 325, 3).
-		AddRow(102, "c864c4e0-9863-4fd3-9f76-bee481b4a138", "I'm from Brazil", false, dummyTime, dummyTime, dummyTime, dummyTime, "I", "P", "V", "F", 1, 0, nil, "400", nil, nil, nil, 3, nil, 2, 2, 3, nil, nil)
+	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id"}).
+		AddRow(100, "1348d654-e3dc-4f2f-add0-a9163dc48895", "Hi! I'll try to help you!", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "398", nil, nil, nil, 3, 2, 2, 3, 3).
+		AddRow(101, "b9568e35-3a59-4f91-882f-fa021f591b13", "Where are you from?", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "399", nil, nil, nil, 3, 2, 2, 3, 3).
+		AddRow(102, "c864c4e0-9863-4fd3-9f76-bee481b4a138", "I'm from Brazil", false, dummyTime, dummyTime, dummyTime, dummyTime, "I", "P", "V", "F", 1, 0, nil, "400", nil, nil, nil, 3, 2, 2, 3, nil)
 
 	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
 	assert.NoError(t, err)

@@ -10,6 +10,7 @@ import (
 
 func TestEventCallback(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
+	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
