@@ -4,13 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,6 +27,7 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		"status":       event.Status,
 		"elapsed_ms":   event.ElapsedMS,
 		"resthook":     event.Resthook,
+		"extraction":   event.Extraction,
 	}).Debug("webhook called")
 
 	// if this was a resthook and the status was 410, that means we should remove it
@@ -41,7 +41,7 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		scene.AppendToEventPreCommitHook(hooks.UnsubscribeResthookHook, unsub)
 	}
 
-	run, _ := scene.Session().FindStep(e.StepUUID())
+	run, step := scene.Session().FindStep(e.StepUUID())
 	flow, _ := oa.Flow(run.FlowReference().UUID)
 
 	// create an HTTP log
@@ -57,6 +57,9 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		)
 		scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, httpLog)
 	}
+
+	// pass node and response time to the hook that monitors webhook health
+	scene.AppendToEventPreCommitHook(hooks.MonitorWebhooks, &hooks.WebhookCall{NodeUUID: step.NodeUUID(), Event: event})
 
 	return nil
 }

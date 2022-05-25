@@ -629,8 +629,7 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 	updateSQL := updateSessionSQL
 
 	// if writing to S3, do so
-	sessionMode := org.Org().SessionStorageMode()
-	if sessionMode == S3Sessions {
+	if rt.Config.SessionStorage == "s3" {
 		err := WriteSessionOutputsToStorage(ctx, rt, []*Session{s})
 		if err != nil {
 			logrus.WithError(err).Error("error writing session to s3")
@@ -691,6 +690,10 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, newRuns)
 	if err != nil {
 		return errors.Wrapf(err, "error writing runs")
+	}
+
+	if err := RecordFlowStatistics(ctx, rt, tx, []flows.Session{fs}, []flows.Sprint{sprint}); err != nil {
+		return errors.Wrapf(err, "error saving flow statistics")
 	}
 
 	// apply all our events
@@ -816,8 +819,7 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	insertIncompleteSQL := insertIncompleteSessionSQL
 
 	// if writing our sessions to S3, do so
-	sessionMode := org.Org().SessionStorageMode()
-	if sessionMode == S3Sessions {
+	if rt.Config.SessionStorage == "s3" {
 		err := WriteSessionOutputsToStorage(ctx, rt, sessions)
 		if err != nil {
 			// for now, continue on for errors, we are still reading from the DB
@@ -861,6 +863,10 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, runs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error writing runs")
+	}
+
+	if err := RecordFlowStatistics(ctx, rt, tx, ss, sprints); err != nil {
+		return nil, errors.Wrapf(err, "error saving flow statistics")
 	}
 
 	// apply our all events for the session
@@ -1046,7 +1052,7 @@ func RunExpiration(ctx context.Context, db *sqlx.DB, runID FlowRunID) (*time.Tim
 }
 
 // ExitSessions marks the passed in sessions as completed, also doing so for all associated runs
-func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitType ExitType, now time.Time) error {
+func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitType ExitType) error {
 	if len(sessionIDs) == 0 {
 		return nil
 	}
@@ -1058,24 +1064,29 @@ func ExitSessions(ctx context.Context, tx Queryer, sessionIDs []SessionID, exitT
 		return errors.Errorf("unknown exit type: %s", exitType)
 	}
 
-	// first interrupt our runs
-	start := time.Now()
-	res, err := tx.ExecContext(ctx, exitSessionRunsSQL, pq.Array(sessionIDs), exitType, now, runStatus)
-	if err != nil {
-		return errors.Wrapf(err, "error exiting session runs")
-	}
-	rows, _ := res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session runs")
+	for _, idBatch := range chunkSessionIDs(sessionIDs, 1000) {
+		// first interrupt our runs
+		start := time.Now()
 
-	// then our sessions
-	start = time.Now()
+		res, err := tx.ExecContext(ctx, exitSessionRunsSQL, pq.Array(idBatch), exitType, time.Now(), runStatus)
+		if err != nil {
+			return errors.Wrapf(err, "error exiting session runs")
+		}
 
-	res, err = tx.ExecContext(ctx, exitSessionsSQL, pq.Array(sessionIDs), now, sessionStatus)
-	if err != nil {
-		return errors.Wrapf(err, "error exiting sessions")
+		rows, _ := res.RowsAffected()
+		logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited session runs")
+
+		// then our sessions
+		start = time.Now()
+
+		res, err = tx.ExecContext(ctx, exitSessionsSQL, pq.Array(idBatch), time.Now(), sessionStatus)
+		if err != nil {
+			return errors.Wrapf(err, "error exiting sessions")
+		}
+
+		rows, _ = res.RowsAffected()
+		logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited sessions")
 	}
-	rows, _ = res.RowsAffected()
-	logrus.WithField("count", rows).WithField("elapsed", time.Since(start)).Debug("exited sessions")
 
 	return nil
 }

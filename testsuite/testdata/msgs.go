@@ -37,8 +37,24 @@ func InsertIncomingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 }
 
 // InsertOutgoingMsg inserts an outgoing message
-func InsertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, status models.MsgStatus) *flows.MsgOut {
-	msg := flows.NewMsgOut(contact.URN, assets.NewChannelReference(channel.UUID, ""), text, attachments, nil, nil, flows.NilMsgTopic)
+func InsertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, status models.MsgStatus, highPriority bool) *flows.MsgOut {
+	return insertOutgoingMsg(db, org, channel, contact, text, attachments, status, highPriority, 0, nil)
+}
+
+// InsertErroredOutgoingMsg inserts an ERRORED(E) outgoing message
+func InsertErroredOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact, text string, errorCount int, nextAttempt time.Time, highPriority bool) *flows.MsgOut {
+	return insertOutgoingMsg(db, org, channel, contact, text, nil, models.MsgStatusErrored, highPriority, errorCount, &nextAttempt)
+}
+
+func insertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact, text string, attachments []utils.Attachment, status models.MsgStatus, highPriority bool, errorCount int, nextAttempt *time.Time) *flows.MsgOut {
+	var channelRef *assets.ChannelReference
+	var channelID models.ChannelID
+	if channel != nil {
+		channelRef = assets.NewChannelReference(channel.UUID, "")
+		channelID = channel.ID
+	}
+
+	msg := flows.NewMsgOut(contact.URN, channelRef, text, attachments, nil, nil, flows.NilMsgTopic)
 
 	var sentOn *time.Time
 	if status == models.MsgStatusWired || status == models.MsgStatusSent || status == models.MsgStatusDelivered {
@@ -48,8 +64,9 @@ func InsertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 
 	var id flows.MsgID
 	must(db.Get(&id,
-		`INSERT INTO msgs_msg(uuid, text, attachments, created_on, direction, status, visibility, msg_count, error_count, next_attempt, contact_id, contact_urn_id, org_id, channel_id, sent_on)
-	  	 VALUES($1, $2, $3, NOW(), 'O', $4, 'V', 1, 0, NOW(), $5, $6, $7, $8, $9) RETURNING id`, msg.UUID(), text, pq.Array(attachments), status, contact.ID, contact.URNID, org.ID, channel.ID, sentOn,
+		`INSERT INTO msgs_msg(uuid, text, attachments, created_on, direction, status, visibility, contact_id, contact_urn_id, org_id, channel_id, sent_on, msg_count, error_count, next_attempt, high_priority)
+	  	 VALUES($1, $2, $3, NOW(), 'O', $4, 'V', $5, $6, $7, $8, $9, 1, $10, $11, $12) RETURNING id`,
+		msg.UUID(), text, pq.Array(attachments), status, contact.ID, contact.URNID, org.ID, channelID, sentOn, errorCount, nextAttempt, highPriority,
 	))
 	msg.SetID(id)
 	return msg

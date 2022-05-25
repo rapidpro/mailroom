@@ -3,7 +3,6 @@ package mailroom
 import (
 	"context"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -165,8 +164,7 @@ func (mr *Mailroom) Start() error {
 
 	// if we have a librato token, configure it
 	if c.LibratoToken != "" {
-		host, _ := os.Hostname()
-		librato.Configure(c.LibratoUsername, c.LibratoToken, host, time.Second, mr.wg)
+		librato.Configure(c.LibratoUsername, c.LibratoToken, c.InstanceName, time.Second, mr.wg)
 		librato.Start()
 	}
 

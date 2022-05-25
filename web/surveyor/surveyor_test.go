@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -114,8 +113,7 @@ func TestSurveyor(t *testing.T) {
 	for i, tc := range tcs {
 		testID := fmt.Sprintf("%s[token=%s]", tc.File, tc.Token)
 		path := filepath.Join("testdata", tc.File)
-		submission, err := os.ReadFile(path)
-		assert.NoError(t, err)
+		submission := testsuite.ReadFile(path)
 
 		url := "http://localhost:8090/mr/surveyor/submit"
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(submission))

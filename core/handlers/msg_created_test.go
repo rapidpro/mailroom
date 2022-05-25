@@ -66,8 +66,8 @@ func TestMsgCreated(t *testing.T) {
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND metadata = $2 AND response_to_id = $3 AND high_priority = TRUE",
-					Args:  []interface{}{testdata.Cathy.ID, `{"quick_replies":["yes","no"]}`, msg1.ID()},
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND metadata = $2 AND high_priority = TRUE",
+					Args:  []interface{}{testdata.Cathy.ID, `{"quick_replies":["yes","no"]}`},
 					Count: 2,
 				},
 				{
@@ -76,9 +76,9 @@ func TestMsgCreated(t *testing.T) {
 					Count: 1,
 				},
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1;",
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1 AND STATUS = 'F' AND failed_reason = 'D';",
 					Args:  []interface{}{testdata.Bob.ID},
-					Count: 0,
+					Count: 1,
 				},
 				{
 					SQL: "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND text = $2 AND metadata = $3 AND direction = 'O' AND status = 'Q' AND channel_id = $4",

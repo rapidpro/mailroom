@@ -24,22 +24,22 @@ func init() {
 
 // StartCheckSchedules starts our cron job of firing schedules every minute
 func StartCheckSchedules(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.StartCron(quit, rt.RP, scheduleLock, time.Minute*1,
-		func(lockName string, lockValue string) error {
+	cron.Start(quit, rt, scheduleLock, time.Minute*1, false,
+		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
 			// we sleep 1 second since we fire right on the minute and want to make sure to fire
 			// things that are schedules right at the minute as well (and DB time may be slightly drifted)
 			time.Sleep(time.Second * 1)
-			return checkSchedules(ctx, rt, lockName, lockValue)
+			return checkSchedules(ctx, rt)
 		},
 	)
 	return nil
 }
 
 // checkSchedules looks up any expired schedules and fires them, setting the next fire as needed
-func checkSchedules(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
-	log := logrus.WithField("comp", "schedules_cron").WithField("lock", lockValue)
+func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
+	log := logrus.WithField("comp", "schedules_cron")
 	start := time.Now()
 
 	rc := rt.RP.Get()

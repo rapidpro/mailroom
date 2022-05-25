@@ -57,9 +57,6 @@ func airtimeServiceFactory(c *runtime.Config) engine.AirtimeServiceFactory {
 // OrgID is our type for orgs ids
 type OrgID int
 
-// SessionStorageMode is our type for how we persist our sessions
-type SessionStorageMode string
-
 const (
 	// NilOrgID is the id 0 considered as nil org id
 	NilOrgID = OrgID(0)
@@ -67,11 +64,6 @@ const (
 	configSMTPServer  = "smtp_server"
 	configDTOneKey    = "dtone_key"
 	configDTOneSecret = "dtone_secret"
-
-	configSessionStorageMode = "session_storage_mode"
-
-	DBSessions = SessionStorageMode("db")
-	S3Sessions = SessionStorageMode("s3")
 )
 
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
@@ -93,10 +85,6 @@ func (o *Org) Suspended() bool { return o.o.Suspended }
 
 // UsesTopups returns whether the org uses topups
 func (o *Org) UsesTopups() bool { return o.o.UsesTopups }
-
-func (o *Org) SessionStorageMode() SessionStorageMode {
-	return SessionStorageMode(o.ConfigValue(configSessionStorageMode, string(DBSessions)))
-}
 
 // DateFormat returns the date format for this org
 func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }

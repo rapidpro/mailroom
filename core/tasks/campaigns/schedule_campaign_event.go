@@ -8,15 +8,14 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/locker"
-
+	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 )
 
 // TypeScheduleCampaignEvent is the type of the schedule event task
 const TypeScheduleCampaignEvent = "schedule_campaign_event"
 
-const scheduleLockKey string = "schedule_campaign_event_%d"
+const scheduleLockKey string = "lock:schedule_campaign_event_%d"
 
 func init() {
 	tasks.RegisterType(TypeScheduleCampaignEvent, func() tasks.Task { return &ScheduleCampaignEventTask{} })
@@ -34,14 +33,12 @@ func (t *ScheduleCampaignEventTask) Timeout() time.Duration {
 
 // Perform creates the actual event fires to schedule the given campaign event
 func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
-	rp := rt.RP
-	lockKey := fmt.Sprintf(scheduleLockKey, t.CampaignEventID)
-
-	lock, err := locker.GrabLock(rp, lockKey, time.Hour, time.Minute*5)
+	locker := redisx.NewLocker(fmt.Sprintf(scheduleLockKey, t.CampaignEventID), time.Hour)
+	lock, err := locker.Grab(rt.RP, time.Minute*5)
 	if err != nil {
 		return errors.Wrapf(err, "error grabbing lock to schedule campaign event %d", t.CampaignEventID)
 	}
-	defer locker.ReleaseLock(rp, lockKey, lock)
+	defer locker.Release(rt.RP, lock)
 
 	err = models.ScheduleCampaignEvent(ctx, rt, orgID, t.CampaignEventID)
 	if err != nil {
