@@ -1,3 +1,7 @@
+1.3.0-mailroom-7.1.22
+----------
+ * Merge nyaruka tag v7.1.22 into weni 1.2.1-mailroom-7.0.1 and resolve conflicts.
+
 1.2.1-mailroom-7.0.1
 ----------
  * Tweak ticketer Twilio Flex to allow API key authentication
