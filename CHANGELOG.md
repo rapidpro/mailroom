@@ -1,3 +1,7 @@
+v7.3.16
+----------
+ * Update to latest goflow
+
 v7.3.15
 ----------
  * Simplify BroadcastBatch
