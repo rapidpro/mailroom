@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -107,8 +107,8 @@ func QueueEventFires(ctx context.Context, rt *runtime.Runtime) error {
 		numTasks++
 	}
 
-	librato.Gauge("mr.campaign_event_cron_elapsed", float64(time.Since(start))/float64(time.Second))
-	librato.Gauge("mr.campaign_event_cron_count", float64(numFires))
+	analytics.Gauge("mr.campaign_event_cron_elapsed", float64(time.Since(start))/float64(time.Second))
+	analytics.Gauge("mr.campaign_event_cron_count", float64(numFires))
 	log.WithFields(logrus.Fields{
 		"elapsed": time.Since(start),
 		"fires":   numFires,
