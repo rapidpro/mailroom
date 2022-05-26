@@ -8,6 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
@@ -17,7 +18,6 @@ import (
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -159,10 +159,10 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 		}
 
 		// log our processing time to librato
-		librato.Gauge(fmt.Sprintf("mr.%s_elapsed", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
+		analytics.Gauge(fmt.Sprintf("mr.%s_elapsed", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
 
 		// and total latency for this task since it was queued
-		librato.Gauge(fmt.Sprintf("mr.%s_latency", contactEvent.Type), float64(time.Since(task.QueuedOn))/float64(time.Second))
+		analytics.Gauge(fmt.Sprintf("mr.%s_latency", contactEvent.Type), float64(time.Since(task.QueuedOn))/float64(time.Second))
 
 		// if we get an error processing an event, requeue it for later and return our error
 		if err != nil {

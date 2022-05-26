@@ -6,11 +6,11 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -243,8 +243,8 @@ func StartFlowBatch(
 	}
 
 	// log both our total and average
-	librato.Gauge("mr.flow_batch_start_elapsed", float64(time.Since(start))/float64(time.Second))
-	librato.Gauge("mr.flow_batch_start_count", float64(len(sessions)))
+	analytics.Gauge("mr.flow_batch_start_elapsed", float64(time.Since(start))/float64(time.Second))
+	analytics.Gauge("mr.flow_batch_start_count", float64(len(sessions)))
 
 	return sessions, nil
 }
@@ -393,8 +393,8 @@ func FireCampaignEvents(
 	}
 
 	// log both our total and average
-	librato.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
-	librato.Gauge("mr.campaign_event_count", float64(len(sessions)))
+	analytics.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
+	analytics.Gauge("mr.campaign_event_count", float64(len(sessions)))
 
 	// build the list of contacts actually started
 	startedContacts := make([]models.ContactID, len(sessions))
@@ -559,7 +559,7 @@ func StartFlowForContacts(
 			continue
 		}
 		log.WithField("elapsed", time.Since(start)).Info("flow engine start")
-		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
+		analytics.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
 		sprints = append(sprints, sprint)

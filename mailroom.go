@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/librato"
 	"github.com/olivere/elastic/v7"
 	"github.com/sirupsen/logrus"
 )
@@ -172,9 +172,10 @@ func (mr *Mailroom) Start() error {
 
 	// if we have a librato token, configure it
 	if c.LibratoToken != "" {
-		librato.Configure(c.LibratoUsername, c.LibratoToken, c.InstanceName, time.Second, mr.wg)
-		librato.Start()
+		analytics.RegisterBackend(analytics.NewLibrato(c.LibratoUsername, c.LibratoToken, c.InstanceName, time.Second, mr.wg))
 	}
+
+	analytics.Start()
 
 	// init our foremen and start it
 	mr.batchForeman.Start()
@@ -194,7 +195,7 @@ func (mr *Mailroom) Stop() error {
 	logrus.Info("mailroom stopping")
 	mr.batchForeman.Stop()
 	mr.handlerForeman.Stop()
-	librato.Stop()
+	analytics.Stop()
 	close(mr.quit)
 	mr.cancel()
 
