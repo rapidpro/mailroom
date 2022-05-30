@@ -24,7 +24,7 @@ func TestRetryMsgs(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// noop does nothing
-	err := handler.RetryPendingMsgs(ctx, rt, "test", "test")
+	err := handler.RetryPendingMsgs(ctx, rt)
 	assert.NoError(t, err)
 
 	testMsgs := []struct {
@@ -44,7 +44,7 @@ func TestRetryMsgs(t *testing.T) {
 			uuids.New(), testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.Cathy.ID, testdata.Cathy.URNID, msg.Text, models.DirectionIn, msg.Status, msg.CreatedOn)
 	}
 
-	err = handler.RetryPendingMsgs(ctx, rt, "test", "test")
+	err = handler.RetryPendingMsgs(ctx, rt)
 	assert.NoError(t, err)
 
 	// should have one message requeued

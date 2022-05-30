@@ -29,7 +29,7 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...inte
 		actual[queueKey] = make([]int, size)
 
 		if size > 0 {
-			results, err := redis.Values(rc.Do("ZPOPMAX", queueKey, size))
+			results, err := redis.Values(rc.Do("ZRANGE", queueKey, 0, -1, "WITHSCORES"))
 			require.NoError(t, err)
 			require.Equal(t, int(size*2), len(results)) // result is (item, score, item, score, ...)
 

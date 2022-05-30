@@ -11,7 +11,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/nyaruka/mailroom/utils/marker"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -21,10 +20,7 @@ func TestExpirations(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetAll)
-
-	err := marker.ClearTasks(rc, expirationLock)
-	assert.NoError(t, err)
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// create a few sessions
 	s1 := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.SessionStatusWaiting, nil)
@@ -62,7 +58,7 @@ func TestExpirations(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowsession WHERE status = 'X' AND contact_id = $1;`, testdata.Bob.ID).Returns(0)
 
 	// expire our runs
-	err = expireRuns(ctx, rt, expirationLock, "foo")
+	err := expireRuns(ctx, rt)
 	assert.NoError(t, err)
 
 	// shouldn't have any active runs or sessions

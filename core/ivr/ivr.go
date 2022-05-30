@@ -22,6 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -433,7 +434,7 @@ func ResumeIVRFlow(
 
 	// check if connection has been marked as errored - it maybe have been updated by status callback
 	if conn.Status() == models.ConnectionStatusErrored || conn.Status() == models.ConnectionStatusFailed {
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitInterrupted, time.Now())
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitInterrupted)
 		if err != nil {
 			logrus.WithError(err).Error("error interrupting session")
 		}
@@ -483,6 +484,7 @@ func ResumeIVRFlow(
 	switch res := ivrResume.(type) {
 	case InputResume:
 		resume, svcErr, err = buildMsgResume(ctx, rt, svc, channel, contact, urn, conn, oa, r, res)
+		session.SetIncomingMsg(resume.(*resumes.MsgResume).Msg().ID(), null.NullString)
 
 	case DialResume:
 		resume, svcErr, err = buildDialResume(oa, contact, res)
@@ -513,7 +515,7 @@ func ResumeIVRFlow(
 			return errors.Wrapf(err, "error writing ivr response for resume")
 		}
 	} else {
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitCompleted, time.Now())
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitCompleted)
 		if err != nil {
 			logrus.WithError(err).Error("error closing session")
 		}

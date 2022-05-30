@@ -1,0 +1,65 @@
+{
+  "uuid": "bc5d6b7b-3e18-4d7c-8279-50b460e74f7f",
+  "name": "Test",
+  "spec_version": "13.1.0",
+  "language": "eng",
+  "type": "messaging",
+  "nodes": [
+    {
+      "uuid": "1bff8fe4-0714-433e-96a3-437405bf21cf",
+      "actions": [
+        {
+          "uuid": "4e2ddf56-dd6e-435d-b688-92ae60dcb35c",
+          "headers": {
+            "Accept": "application/json"
+          },
+          "type": "call_webhook",
+          "url": "http://example.com",
+          "body": "",
+          "method": "GET",
+          "result_name": "Result"
+        }
+      ],
+      "router": {
+        "type": "switch",
+        "operand": "@results.result.category",
+        "cases": [
+          {
+            "uuid": "9b74c0bd-7c1a-482b-b219-fb2e1ec50e59",
+            "type": "has_only_text",
+            "arguments": [
+              "Success"
+            ],
+            "category_uuid": "f40e9698-adc7-4528-9761-beb76bfa1801"
+          }
+        ],
+        "categories": [
+          {
+            "uuid": "f40e9698-adc7-4528-9761-beb76bfa1801",
+            "name": "Success",
+            "exit_uuid": "e46b09ab-7a9a-4b4b-a9e5-c6a8bd130517"
+          },
+          {
+            "uuid": "3f884912-d193-4d57-86a6-046477b9e568",
+            "name": "Failure",
+            "exit_uuid": "d1318a17-86cc-4733-8c91-1ffb49917cfd"
+          }
+        ],
+        "default_category_uuid": "3f884912-d193-4d57-86a6-046477b9e568"
+      },
+      "exits": [
+        {
+          "uuid": "e46b09ab-7a9a-4b4b-a9e5-c6a8bd130517",
+          "destination_uuid": null
+        },
+        {
+          "uuid": "d1318a17-86cc-4733-8c91-1ffb49917cfd",
+          "destination_uuid": null
+        }
+      ]
+    }
+  ],
+  "revision": 24,
+  "expire_after_minutes": 10080,
+  "localization": {}
+}

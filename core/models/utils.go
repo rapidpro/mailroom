@@ -90,3 +90,17 @@ func chunkSlice(slice []interface{}, size int) [][]interface{} {
 	}
 	return chunks
 }
+
+// chunks a slice of session IDs.. hurry up go generics
+func chunkSessionIDs(ids []SessionID, size int) [][]SessionID {
+	chunks := make([][]SessionID, 0, len(ids)/size+1)
+
+	for i := 0; i < len(ids); i += size {
+		end := i + size
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunks = append(chunks, ids[i:end])
+	}
+	return chunks
+}

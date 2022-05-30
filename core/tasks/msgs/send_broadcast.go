@@ -1,4 +1,4 @@
-package broadcasts
+package msgs
 
 import (
 	"context"

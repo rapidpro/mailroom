@@ -1,4 +1,4 @@
-package broadcasts
+package msgs_test
 
 import (
 	"encoding/json"
@@ -13,6 +13,7 @@ import (
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
@@ -84,7 +85,7 @@ func TestBroadcastEvents(t *testing.T) {
 		bcast, err := models.NewBroadcastFromEvent(ctx, db, oa, event)
 		assert.NoError(t, err)
 
-		err = CreateBroadcastBatches(ctx, rt, bcast)
+		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
@@ -103,7 +104,7 @@ func TestBroadcastEvents(t *testing.T) {
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
 
-			err = SendBroadcastBatch(ctx, rt, batch)
+			err = msgs.SendBroadcastBatch(ctx, rt, batch)
 			assert.NoError(t, err)
 		}
 
@@ -230,7 +231,7 @@ func TestBroadcastTask(t *testing.T) {
 	for i, tc := range tcs {
 		// handle our start task
 		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID)
-		err = CreateBroadcastBatches(ctx, rt, bcast)
+		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
@@ -249,7 +250,7 @@ func TestBroadcastTask(t *testing.T) {
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
 
-			err = SendBroadcastBatch(ctx, rt, batch)
+			err = msgs.SendBroadcastBatch(ctx, rt, batch)
 			assert.NoError(t, err)
 		}
 

@@ -23,6 +23,7 @@ import (
 
 func TestGetContactDisplay(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
+	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)

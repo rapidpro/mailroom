@@ -172,7 +172,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			})
 
 			if qerr := dbutil.AsQueryError(err); qerr != nil {
-				log.WithFields(qerr.Fields())
+				log = log.WithFields(qerr.Fields())
 			}
 
 			contactEvent.ErrorCount++
@@ -235,7 +235,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 	// if we didn't find a session or it is another session then this flow got interrupted and this is a race, fail it
 	if session == nil || session.ID() != event.SessionID {
 		log.Error("expiring run with mismatched session, session for run no longer active, failing runs and session")
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{event.SessionID}, models.ExitFailed, time.Now())
+		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{event.SessionID}, models.ExitFailed)
 		if err != nil {
 			return errors.Wrapf(err, "error failing expired runs for session that is no longer active")
 		}
@@ -577,7 +577,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 		// flow this session is in is gone, interrupt our session and reset it
 		if err == models.ErrNotFound {
-			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed, time.Now())
+			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed)
 			session = nil
 		}
 

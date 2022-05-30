@@ -17,7 +17,8 @@ func TestValidate(t *testing.T) {
 	c.ReadonlyDB = "??"
 	c.Redis = "??"
 	c.Elastic = "??"
-	assert.EqualError(t, c.Validate(), "field 'DB' is not a valid URL, field 'ReadonlyDB' is not a valid URL, field 'Redis' is not a valid URL, field 'Elastic' is not a valid URL")
+	c.SessionStorage = "??"
+	assert.EqualError(t, c.Validate(), "field 'DB' is not a valid URL, field 'ReadonlyDB' is not a valid URL, field 'Redis' is not a valid URL, field 'Elastic' is not a valid URL, field 'SessionStorage' is not a valid session storage mode")
 
 	c = runtime.NewDefaultConfig()
 	c.DB = "mysql://temba:temba@localhost/temba"
