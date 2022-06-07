@@ -13,10 +13,9 @@ require (
 	github.com/golang/protobuf v1.4.0
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.1.0
-	github.com/jmoiron/sqlx v1.2.0
+	github.com/jmoiron/sqlx v1.3.4
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/lib/pq v1.4.0
-	github.com/mattn/go-sqlite3 v1.10.0 // indirect
+	github.com/lib/pq v1.10.4
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.15.1
 	github.com/nyaruka/goflow v0.144.3
@@ -42,14 +41,14 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/structs v1.0.0 // indirect
 	github.com/go-mail/mail v2.3.1+incompatible // indirect
-	github.com/go-playground/locales v0.13.0 // indirect
-	github.com/go-playground/universal-translator v0.17.0 // indirect
+	github.com/go-playground/locales v0.14.0 // indirect
+	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/gofrs/uuid v3.3.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.1 // indirect
-	github.com/leodido/go-urn v1.2.0 // indirect
+	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/naoina/go-stringutil v0.1.0 // indirect
@@ -66,3 +65,5 @@ require (
 )
 
 go 1.17
+
+replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-slack-develop
