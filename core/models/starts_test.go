@@ -100,7 +100,7 @@ func TestStartsBuilding(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, testdata.Favorites.ID, true, true).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, testdata.Favorites.ID, true).
 		WithGroupIDs([]models.GroupID{testdata.DoctorsGroup.ID}).
 		WithExcludeGroupIDs([]models.GroupID{testdata.TestersGroup.ID}).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}).

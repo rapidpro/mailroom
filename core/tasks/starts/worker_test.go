@@ -48,7 +48,7 @@ func TestStarts(t *testing.T) {
 		query                string
 		queryResult          []models.ContactID
 		restartParticipants  bool
-		includeActive        bool
+		excludeInAFlow       bool
 		queue                string
 		expectedContactCount int
 		expectedBatchCount   int
@@ -59,6 +59,7 @@ func TestStarts(t *testing.T) {
 		{
 			label:                "Empty flow start",
 			flowID:               testdata.Favorites.ID,
+			excludeInAFlow:       true,
 			queue:                queue.BatchQueue,
 			expectedContactCount: 0,
 			expectedBatchCount:   0,
@@ -70,6 +71,7 @@ func TestStarts(t *testing.T) {
 			label:                "Single group",
 			flowID:               testdata.Favorites.ID,
 			groupIDs:             []models.GroupID{testdata.DoctorsGroup.ID},
+			excludeInAFlow:       true,
 			queue:                queue.BatchQueue,
 			expectedContactCount: 121,
 			expectedBatchCount:   2,
@@ -82,6 +84,7 @@ func TestStarts(t *testing.T) {
 			flowID:               testdata.Favorites.ID,
 			groupIDs:             []models.GroupID{testdata.DoctorsGroup.ID},
 			contactIDs:           []models.ContactID{testdata.Cathy.ID},
+			excludeInAFlow:       true,
 			queue:                queue.BatchQueue,
 			expectedContactCount: 121,
 			expectedBatchCount:   2,
@@ -94,7 +97,7 @@ func TestStarts(t *testing.T) {
 			flowID:               testdata.Favorites.ID,
 			contactIDs:           []models.ContactID{testdata.Cathy.ID},
 			restartParticipants:  true,
-			includeActive:        true,
+			excludeInAFlow:       false,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
@@ -129,7 +132,7 @@ func TestStarts(t *testing.T) {
 			label:                "Single contact, include active, but no restart",
 			flowID:               testdata.Favorites.ID,
 			contactIDs:           []models.ContactID{testdata.Bob.ID},
-			includeActive:        true,
+			excludeInAFlow:       false,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
@@ -142,7 +145,7 @@ func TestStarts(t *testing.T) {
 			flowID:               testdata.Favorites.ID,
 			contactIDs:           []models.ContactID{testdata.Bob.ID},
 			restartParticipants:  true,
-			includeActive:        true,
+			excludeInAFlow:       false,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
@@ -156,7 +159,7 @@ func TestStarts(t *testing.T) {
 			query:                "bob",
 			queryResult:          []models.ContactID{testdata.Bob.ID},
 			restartParticipants:  true,
-			includeActive:        true,
+			excludeInAFlow:       false,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
@@ -169,7 +172,7 @@ func TestStarts(t *testing.T) {
 			flowID:               testdata.Favorites.ID,
 			query:                "xyz = 45",
 			restartParticipants:  true,
-			includeActive:        true,
+			excludeInAFlow:       false,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 0,
 			expectedBatchCount:   0,
@@ -192,7 +195,7 @@ func TestStarts(t *testing.T) {
 			label:                "Other messaging flow",
 			flowID:               testdata.PickANumber.ID,
 			contactIDs:           []models.ContactID{testdata.Bob.ID},
-			includeActive:        true,
+			excludeInAFlow:       false,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
@@ -204,7 +207,7 @@ func TestStarts(t *testing.T) {
 			label:                "Background flow",
 			flowID:               testdata.SingleMessage.ID,
 			contactIDs:           []models.ContactID{testdata.Bob.ID},
-			includeActive:        true,
+			excludeInAFlow:       false,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
@@ -218,7 +221,7 @@ func TestStarts(t *testing.T) {
 			contactIDs:           []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID},
 			excludeGroupIDs:      []models.GroupID{testdata.DoctorsGroup.ID}, // should exclude Cathy
 			restartParticipants:  true,
-			includeActive:        true,
+			excludeInAFlow:       false,
 			queue:                queue.HandlerQueue,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
@@ -234,11 +237,12 @@ func TestStarts(t *testing.T) {
 		}
 
 		// handle our start task
-		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID, tc.restartParticipants, tc.includeActive).
+		start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeManual, models.FlowTypeMessaging, tc.flowID, tc.restartParticipants).
 			WithGroupIDs(tc.groupIDs).
 			WithExcludeGroupIDs(tc.excludeGroupIDs).
 			WithContactIDs(tc.contactIDs).
 			WithQuery(tc.query).
+			WithExcludeInAFlow(tc.excludeInAFlow).
 			WithCreateContact(tc.createContact)
 
 		err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})

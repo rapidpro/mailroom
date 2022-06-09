@@ -195,6 +195,10 @@ func (s *FlowStart) WithQuery(query string) *FlowStart {
 
 func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants }
 func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
+func (s *FlowStart) WithExcludeInAFlow(exclude bool) *FlowStart {
+	s.s.IncludeActive = !exclude
+	return s
+}
 
 func (s *FlowStart) CreateContact() bool { return s.s.CreateContact }
 func (s *FlowStart) WithCreateContact(create bool) *FlowStart {
@@ -234,7 +238,7 @@ func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
-func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID, restartParticipants, includeActive bool) *FlowStart {
+func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID, restartParticipants bool) *FlowStart {
 	s := &FlowStart{}
 	s.s.UUID = uuids.New()
 	s.s.OrgID = orgID
@@ -242,8 +246,7 @@ func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID Fl
 	s.s.FlowType = flowType
 	s.s.FlowID = flowID
 	s.s.RestartParticipants = restartParticipants
-	s.s.IncludeActive = includeActive
-
+	s.s.IncludeActive = true
 	return s
 }
 
