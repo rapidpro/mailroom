@@ -112,16 +112,16 @@ type FlowStartBatch struct {
 	}
 }
 
-func (b *FlowStartBatch) StartID() StartID          { return b.b.StartID }
-func (b *FlowStartBatch) StartType() StartType      { return b.b.StartType }
-func (b *FlowStartBatch) OrgID() OrgID              { return b.b.OrgID }
-func (b *FlowStartBatch) CreatedByID() UserID       { return b.b.CreatedByID }
-func (b *FlowStartBatch) FlowID() FlowID            { return b.b.FlowID }
-func (b *FlowStartBatch) ContactIDs() []ContactID   { return b.b.ContactIDs }
-func (b *FlowStartBatch) RestartParticipants() bool { return b.b.RestartParticipants }
-func (b *FlowStartBatch) IncludeActive() bool       { return b.b.IncludeActive }
-func (b *FlowStartBatch) IsLast() bool              { return b.b.IsLast }
-func (b *FlowStartBatch) TotalContacts() int        { return b.b.TotalContacts }
+func (b *FlowStartBatch) StartID() StartID               { return b.b.StartID }
+func (b *FlowStartBatch) StartType() StartType           { return b.b.StartType }
+func (b *FlowStartBatch) OrgID() OrgID                   { return b.b.OrgID }
+func (b *FlowStartBatch) CreatedByID() UserID            { return b.b.CreatedByID }
+func (b *FlowStartBatch) FlowID() FlowID                 { return b.b.FlowID }
+func (b *FlowStartBatch) ContactIDs() []ContactID        { return b.b.ContactIDs }
+func (b *FlowStartBatch) ExcludeStartedPreviously() bool { return !b.b.RestartParticipants }
+func (b *FlowStartBatch) ExcludeInAFlow() bool           { return !b.b.IncludeActive }
+func (b *FlowStartBatch) IsLast() bool                   { return b.b.IsLast }
+func (b *FlowStartBatch) TotalContacts() int             { return b.b.TotalContacts }
 
 func (b *FlowStartBatch) ParentSummary() json.RawMessage  { return json.RawMessage(b.b.ParentSummary) }
 func (b *FlowStartBatch) SessionHistory() json.RawMessage { return json.RawMessage(b.b.SessionHistory) }
@@ -193,8 +193,13 @@ func (s *FlowStart) WithQuery(query string) *FlowStart {
 	return s
 }
 
-func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants }
-func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
+func (s *FlowStart) ExcludeStartedPreviously() bool { return !s.s.RestartParticipants }
+func (s *FlowStart) WithExcludeStartedPreviously(exclude bool) *FlowStart {
+	s.s.RestartParticipants = !exclude
+	return s
+}
+
+func (s *FlowStart) ExcludeInAFlow() bool { return !s.s.IncludeActive }
 func (s *FlowStart) WithExcludeInAFlow(exclude bool) *FlowStart {
 	s.s.IncludeActive = !exclude
 	return s
@@ -238,14 +243,14 @@ func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
-func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID, restartParticipants bool) *FlowStart {
+func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID) *FlowStart {
 	s := &FlowStart{}
 	s.s.UUID = uuids.New()
 	s.s.OrgID = orgID
 	s.s.StartType = startType
 	s.s.FlowType = flowType
 	s.s.FlowID = flowID
-	s.s.RestartParticipants = restartParticipants
+	s.s.RestartParticipants = true
 	s.s.IncludeActive = true
 	return s
 }
@@ -338,8 +343,8 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 	b.b.FlowID = s.FlowID()
 	b.b.FlowType = s.FlowType()
 	b.b.ContactIDs = contactIDs
-	b.b.RestartParticipants = s.RestartParticipants()
-	b.b.IncludeActive = s.IncludeActive()
+	b.b.RestartParticipants = s.s.RestartParticipants
+	b.b.IncludeActive = s.s.IncludeActive
 	b.b.ParentSummary = null.JSON(s.ParentSummary())
 	b.b.SessionHistory = null.JSON(s.SessionHistory())
 	b.b.Extra = null.JSON(s.Extra())

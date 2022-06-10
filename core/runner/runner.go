@@ -33,11 +33,11 @@ var startTypeToOrigin = map[models.StartType]string{
 
 // StartOptions define the various parameters that can be used when starting a flow
 type StartOptions struct {
-	// ExcludeWaiting excludes contacts with waiting sessions which would otherwise have to be interrupted
-	ExcludeWaiting bool
+	// ExcludeInAFlow excludes contacts with waiting sessions which would otherwise have to be interrupted
+	ExcludeInAFlow bool
 
-	// ExcludeReruns excludes contacts who have been in this flow previously (at least as long as we have runs for)
-	ExcludeReruns bool
+	// ExcludeStartedPreviously excludes contacts who have been in this flow previously (at least as long as we have runs for)
+	ExcludeStartedPreviously bool
 
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
@@ -52,9 +52,9 @@ type StartOptions struct {
 // NewStartOptions creates and returns the default start options to be used for flow starts
 func NewStartOptions() *StartOptions {
 	return &StartOptions{
-		ExcludeWaiting: false,
-		ExcludeReruns:  false,
-		Interrupt:      true,
+		ExcludeInAFlow:           false,
+		ExcludeStartedPreviously: false,
+		Interrupt:                true,
 	}
 }
 
@@ -231,8 +231,8 @@ func StartFlowBatch(
 
 	// options for our flow start
 	options := NewStartOptions()
-	options.ExcludeReruns = !batch.RestartParticipants()
-	options.ExcludeWaiting = !batch.IncludeActive()
+	options.ExcludeStartedPreviously = batch.ExcludeStartedPreviously()
+	options.ExcludeInAFlow = batch.ExcludeInAFlow()
 	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
@@ -306,16 +306,16 @@ func FireCampaignEvents(
 	options := NewStartOptions()
 	switch dbEvent.StartMode() {
 	case models.StartModeInterrupt:
-		options.ExcludeWaiting = false
-		options.ExcludeReruns = false
+		options.ExcludeInAFlow = false
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = true
 	case models.StartModePassive:
-		options.ExcludeWaiting = false
-		options.ExcludeReruns = false
+		options.ExcludeInAFlow = false
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = false
 	case models.StartModeSkip:
-		options.ExcludeWaiting = true
-		options.ExcludeReruns = false
+		options.ExcludeInAFlow = true
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = true
 	default:
 		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())
@@ -417,7 +417,7 @@ func StartFlow(
 	exclude := make(map[models.ContactID]bool, 5)
 
 	// filter out anybody who has has a flow run in this flow if appropriate
-	if options.ExcludeReruns {
+	if options.ExcludeStartedPreviously {
 		// find all participants that have been in this flow
 		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, flow.ID(), contactIDs)
 		if err != nil {
@@ -429,7 +429,7 @@ func StartFlow(
 	}
 
 	// filter out our list of contacts to only include those that should be started
-	if options.ExcludeWaiting {
+	if options.ExcludeInAFlow {
 		// find all participants active in any flow
 		active, err := models.FilterByWaitingSession(ctx, rt.DB, contactIDs)
 		if err != nil {
@@ -719,7 +719,7 @@ func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	tx, _ := rt.DB.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID, true).
+	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID).
 		WithContactIDs(contactIDs)
 
 	// insert it
