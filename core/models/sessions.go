@@ -883,7 +883,7 @@ RETURNING contact_id`
 const sqlExitSessionRuns = `
 UPDATE flows_flowrun
    SET exited_on = $2, status = $3, modified_on = NOW()
- WHERE id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND status IN ('A', 'W'))`
+ WHERE session_id = ANY($1) AND status IN ('A', 'W')`
 
 const sqlExitSessionContacts = `
  UPDATE contacts_contact 
