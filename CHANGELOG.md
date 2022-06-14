@@ -1,3 +1,10 @@
+v7.3.17
+----------
+ * Update to latest goflow and simplify code for exiting session runs
+ * Add support for excluding contacts already in a flow in start_session actions
+ * Don't blow up in msg_created handler if flow has been deleted
+ * Use analytics package from gocommon instead of librato directly
+
 v7.3.16
 ----------
  * Update to latest goflow
