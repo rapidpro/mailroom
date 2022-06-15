@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apex/log"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 	"github.com/sirupsen/logrus"
@@ -96,7 +95,7 @@ func Start(rt *runtime.Runtime, wg *sync.WaitGroup, name string, interval time.D
 // fireCron is just a wrapper around the cron function we will call for the purposes of
 // catching and logging panics
 func fireCron(rt *runtime.Runtime, cronFunc Function, lockName string, lockValue string) error {
-	log := log.WithField("lockValue", lockValue).WithField("func", cronFunc)
+	log := logrus.WithField("lockValue", lockValue).WithField("func", cronFunc)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()

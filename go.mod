@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/apex/log v1.1.4
 	github.com/aws/aws-sdk-go v1.44.34
 	github.com/buger/jsonparser v1.1.1
 	github.com/edganiukov/fcm v0.4.0
@@ -12,7 +11,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/gomodule/redigo v1.8.8
-	github.com/gorilla/schema v1.1.0
+	github.com/gorilla/schema v1.2.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.6
 	github.com/nyaruka/ezconf v0.2.1
@@ -25,7 +24,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.9.1
+	github.com/prometheus/common v0.34.0
 	github.com/shopspring/decimal v1.3.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.2
@@ -34,7 +33,7 @@ require (
 
 require (
 	github.com/Shopify/gomail v0.0.0-20220314142144-6897a5a5ba29 // indirect
-	github.com/antlr/antlr4 v0.0.0-20200701161529-3d9351f61e0f // indirect
+	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220527190237-ee62e23da966 // indirect
 	github.com/blevesearch/segment v0.9.0 // indirect
 	github.com/certifi/gocertifi v0.0.0-20200211180108-c7c1fbc02894 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
