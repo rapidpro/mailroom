@@ -1,3 +1,8 @@
+v7.3.18
+----------
+ * Use new orgmembership table to load users
+ * Update to latest goflow
+
 v7.3.17
 ----------
  * Update to latest goflow and simplify code for exiting session runs
