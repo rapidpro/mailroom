@@ -3,9 +3,9 @@ package starts
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
-	"github.com/nyaruka/gocommon/uuids"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -32,11 +32,8 @@ func TestStarts(t *testing.T) {
 	// convert our single message flow to an actual background flow that shouldn't interrupt
 	db.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
 
-	// insert a flow run for one of our contacts
-	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
-	db.MustExec(
-		`INSERT INTO flows_flowrun(uuid, status, created_on, modified_on, responded, contact_id, flow_id, org_id)
-		                    VALUES($1, 'W', now(), now(), FALSE, $2, $3, 1);`, uuids.New(), testdata.George.ID, testdata.Favorites.ID)
+	sID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), true, nil)
+	testdata.InsertFlowRun(db, testdata.Org1, sID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
 
 	tcs := []struct {
 		label                    string
