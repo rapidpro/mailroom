@@ -1,3 +1,8 @@
+v7.3.19
+----------
+ * Update dependencies
+ * Log version at startup
+
 v7.3.18
 ----------
  * Use new orgmembership table to load users
