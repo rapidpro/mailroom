@@ -96,7 +96,14 @@ func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 		}
 	}
 
-	query := search.BuildStartQuery(oa.Env(), flow, groups, request.Include.ContactUUIDs, request.Include.URNs, request.Include.Query, request.Exclude)
+	query, err := search.BuildStartQuery(oa, flow, groups, request.Include.ContactUUIDs, request.Include.URNs, request.Include.Query, request.Exclude)
+	if err != nil {
+		isQueryError, qerr := contactql.IsQueryError(err)
+		if isQueryError {
+			return qerr, http.StatusBadRequest, nil
+		}
+		return nil, http.StatusInternalServerError, err
+	}
 	if query == "" {
 		return &previewStartResponse{SampleIDs: []models.ContactID{}}, http.StatusOK, nil
 	}
