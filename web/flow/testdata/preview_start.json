@@ -234,5 +234,49 @@
                 "allow_as_group": false
             }
         }
+    },
+    {
+        "label": "invalid query inclusion (bad syntax)",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {
+                "query": "gender ="
+            },
+            "exclude": {},
+            "sample_size": 3
+        },
+        "status": 400,
+        "response": {
+            "code": "unexpected_token",
+            "error": "mismatched input '<EOF>' expecting {TEXT, STRING}",
+            "extra": {
+                "token": "<EOF>"
+            }
+        }
+    },
+    {
+        "label": "invalid query inclusion (missing field)",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {
+                "query": "goats > 10"
+            },
+            "exclude": {},
+            "sample_size": 3
+        },
+        "status": 400,
+        "response": {
+            "code": "unknown_property",
+            "error": "can't resolve 'goats' to attribute, scheme or field",
+            "extra": {
+                "property": "goats"
+            }
+        }
     }
 ]
