@@ -1,3 +1,7 @@
+v7.4.0
+----------
+ * Update README
+
 v7.3.20
 ----------
  * Use proper query construction for preview_start endpoint and return search errors for invalid user queries
