@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,8 +22,10 @@ func TestHTTPLogs(t *testing.T) {
 
 	defer func() { db.MustExec(`DELETE FROM request_logs_httplog`) }()
 
-	// insert a classifier log
-	log := models.NewClassifierCalledLog(testdata.Org1.ID, testdata.Wit.ID, "http://foo.bar", 200, "GET /", "STATUS 200", false, time.Second, 0, time.Now())
+	// insert a classifier log with a URL that's too long
+	log := models.NewClassifierCalledLog(testdata.Org1.ID, testdata.Wit.ID, "http://foo.bar?"+strings.Repeat("x", 3000), 200, "GET /", "STATUS 200", false, time.Second, 0, time.Now())
+	assert.Equal(t, "http://foo.bar?"+strings.Repeat("x", 2033), log.URL)
+
 	err := models.InsertHTTPLogs(ctx, db, []*models.HTTPLog{log})
 	assert.Nil(t, err)
 

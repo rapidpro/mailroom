@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/null"
 )
 
@@ -55,7 +56,7 @@ func newHTTPLog(orgID OrgID, logType HTTPLogType, url string, statusCode int, re
 	return &HTTPLog{
 		OrgID:       orgID,
 		LogType:     logType,
-		URL:         url,
+		URL:         utils.Truncate(url, 2048),
 		StatusCode:  statusCode,
 		Request:     request,
 		Response:    null.String(response),
