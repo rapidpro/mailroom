@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -107,12 +108,12 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
-func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-	contactDisplay := tickets.GetContactDisplay(session.Environment(), session.Contact())
+	contactDisplay := tickets.GetContactDisplay(env, contact)
 
 	from := s.ticketAddress(contactDisplay, ticket.UUID())
-	context := s.templateContext(body, "", string(session.Contact().UUID()), contactDisplay)
+	context := s.templateContext(body, "", string(contact.UUID()), contactDisplay)
 	fullBody := evaluateTemplate(openBodyTemplate, context)
 
 	msgID, trace, err := s.client.SendMessage(from, s.toAddress, subjectFromBody(body), fullBody, nil, nil)

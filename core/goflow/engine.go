@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
@@ -98,7 +99,7 @@ func simulatorEmailServiceFactory(session flows.Session) (flows.EmailService, er
 
 type simulatorEmailService struct{}
 
-func (s *simulatorEmailService) Send(session flows.Session, addresses []string, subject, body string) error {
+func (s *simulatorEmailService) Send(addresses []string, subject, body string) error {
 	return nil
 }
 
@@ -110,7 +111,7 @@ type simulatorTicketService struct {
 	ticketer *flows.Ticketer
 }
 
-func (s *simulatorTicketService) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *simulatorTicketService) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	return flows.OpenTicket(s.ticketer, topic, body, assignee), nil
 }
 
@@ -120,7 +121,7 @@ func simulatorAirtimeServiceFactory(session flows.Session) (flows.AirtimeService
 
 type simulatorAirtimeService struct{}
 
-func (s *simulatorAirtimeService) Transfer(session flows.Session, sender urns.URN, recipient urns.URN, amounts map[string]decimal.Decimal, logHTTP flows.HTTPLogCallback) (*flows.AirtimeTransfer, error) {
+func (s *simulatorAirtimeService) Transfer(sender urns.URN, recipient urns.URN, amounts map[string]decimal.Decimal, logHTTP flows.HTTPLogCallback) (*flows.AirtimeTransfer, error) {
 	transfer := &flows.AirtimeTransfer{
 		Sender:        sender,
 		Recipient:     recipient,

@@ -24,10 +24,7 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
-
-	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
-	require.NoError(t, err)
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	defer dates.SetNowSource(dates.DefaultNowSource)
@@ -54,7 +51,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
 
-	_, err = mailgun.NewService(
+	_, err := mailgun.NewService(
 		rt.Config,
 		http.DefaultClient,
 		nil,
@@ -84,12 +81,15 @@ func TestOpenAndForward(t *testing.T) {
 	require.NoError(t, err)
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
-	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	env := envs.NewBuilder().Build()
+	_, contact := testdata.Cathy.Load(db, oa)
+
+	_, err = svc.Open(env, contact, defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.EqualError(t, err, "error calling mailgun API: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
 
-	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies? Where are my cookies? Where are my cookies? Where are my cookies? Where are my cookies?", nil, logger.Log)
+	ticket, err := svc.Open(env, contact, defaultTopic, "Where are my cookies? Where are my cookies? Where are my cookies? Where are my cookies? Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("9688d21d-95aa-4bed-afc7-f31b35731a3d"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())

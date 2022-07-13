@@ -31,7 +31,7 @@ func TestEngineWebhook(t *testing.T) {
 	request, err := http.NewRequest("GET", "http://rapidpro.io", nil)
 	require.NoError(t, err)
 
-	call, err := svc.Call(nil, request)
+	call, err := svc.Call(request)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
 	assert.Equal(t, "GET / HTTP/1.1\r\nHost: rapidpro.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: normal\r\nAccept-Encoding: gzip\r\n\r\n", string(call.RequestTrace))
@@ -47,7 +47,7 @@ func TestSimulatorAirtime(t *testing.T) {
 
 	amounts := map[string]decimal.Decimal{"USD": decimal.RequireFromString(`1.50`)}
 
-	transfer, err := svc.Transfer(nil, urns.URN("tel:+593979111111"), urns.URN("tel:+593979222222"), amounts, nil)
+	transfer, err := svc.Transfer(urns.URN("tel:+593979111111"), urns.URN("tel:+593979222222"), amounts, nil)
 	assert.NoError(t, err)
 
 	assert.Equal(t, &flows.AirtimeTransfer{
@@ -71,7 +71,7 @@ func TestSimulatorTicket(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	ticket, err := svc.Open(nil, oa.SessionAssets().Topics().FindByName("General"), "Where are my cookies?", nil, nil)
+	ticket, err := svc.Open(nil, nil, oa.SessionAssets().Topics().FindByName("General"), "Where are my cookies?", nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, testdata.Mailgun.UUID, ticket.Ticketer().UUID())
 	assert.Equal(t, "Where are my cookies?", ticket.Body())
@@ -91,7 +91,7 @@ func TestSimulatorWebhook(t *testing.T) {
 	request, err := http.NewRequest("GET", "http://rapidpro.io", nil)
 	require.NoError(t, err)
 
-	call, err := svc.Call(nil, request)
+	call, err := svc.Call(request)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
 	assert.Equal(t, "GET / HTTP/1.1\r\nHost: rapidpro.io\r\nUser-Agent: RapidProMailroom/Dev\r\nX-Mailroom-Mode: simulation\r\nAccept-Encoding: gzip\r\n\r\n", string(call.RequestTrace))

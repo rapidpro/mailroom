@@ -46,7 +46,7 @@
         "body": [
             {
                 "name": "recipient",
-                "data": "ticket+$cathy_ticket_uuid$@mr.nyaruka.com"
+                "data": "ticket+94b24a1f-245f-47ec-83f2-3a6266c0c8ba@mr.nyaruka.com"
             },
             {
                 "name": "sender",
@@ -178,7 +178,7 @@
         "body": [
             {
                 "name": "recipient",
-                "data": "ticket+$cathy_ticket_uuid$@mr.nyaruka.com"
+                "data": "ticket+94b24a1f-245f-47ec-83f2-3a6266c0c8ba@mr.nyaruka.com"
             },
             {
                 "name": "sender",
@@ -213,18 +213,18 @@
         "status": 200,
         "response": {
             "action": "rejected",
-            "ticket_uuid": "$cathy_ticket_uuid$"
+            "ticket_uuid": "94b24a1f-245f-47ec-83f2-3a6266c0c8ba"
         }
     },
     {
         "label": "forwarded response if message was created (no attachments, request sent as urlencoded form)",
         "method": "POST",
         "path": "/mr/tickets/types/mailgun/receive",
-        "body": "recipient=ticket%2B$cathy_ticket_uuid$%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A%20%5BRapidPro-Tickets%5D%20New%20ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
+        "body": "recipient=ticket%2B94b24a1f-245f-47ec-83f2-3a6266c0c8ba%40mr.nyaruka.com&sender=bob%40acme.com&subject=Re%3A%20%5BRapidPro-Tickets%5D%20New%20ticket&Message-Id=%3C12345%40mail.gmail.com%3E&stripped-text=Hello&timestamp=1590088411&token=987654321&signature=3300d885d266c13e8804f032f8f7eb34c3b1abb071c8a8d9fb8dfb7d2184107e",
         "status": 200,
         "response": {
             "action": "forwarded",
-            "ticket_uuid": "$cathy_ticket_uuid$",
+            "ticket_uuid": "94b24a1f-245f-47ec-83f2-3a6266c0c8ba",
             "msg_uuid": "692926ea-09d6-4942-bd38-d266ec8d3716"
         },
         "db_assertions": [
@@ -245,7 +245,7 @@
         "body": [
             {
                 "name": "recipient",
-                "data": "ticket+$cathy_ticket_uuid$@mr.nyaruka.com"
+                "data": "ticket+94b24a1f-245f-47ec-83f2-3a6266c0c8ba@mr.nyaruka.com"
             },
             {
                 "name": "sender",
@@ -296,7 +296,7 @@
         "status": 200,
         "response": {
             "action": "forwarded",
-            "ticket_uuid": "$cathy_ticket_uuid$",
+            "ticket_uuid": "94b24a1f-245f-47ec-83f2-3a6266c0c8ba",
             "msg_uuid": "5802813d-6c58-4292-8228-9728778b6c98"
         },
         "db_assertions": [
@@ -325,7 +325,7 @@
         "body": [
             {
                 "name": "recipient",
-                "data": "ticket+$cathy_ticket_uuid$@mr.nyaruka.com"
+                "data": "ticket+94b24a1f-245f-47ec-83f2-3a6266c0c8ba@mr.nyaruka.com"
             },
             {
                 "name": "sender",
@@ -360,7 +360,7 @@
         "status": 200,
         "response": {
             "action": "closed",
-            "ticket_uuid": "$cathy_ticket_uuid$"
+            "ticket_uuid": "94b24a1f-245f-47ec-83f2-3a6266c0c8ba"
         },
         "db_assertions": [
             {

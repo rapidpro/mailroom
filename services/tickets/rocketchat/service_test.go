@@ -24,13 +24,10 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
-
-	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
-	require.NoError(t, err)
 
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
@@ -49,7 +46,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
 
-	_, err = rocketchat.NewService(
+	_, err := rocketchat.NewService(
 		rt.Config,
 		http.DefaultClient,
 		nil,
@@ -74,12 +71,15 @@ func TestOpenAndForward(t *testing.T) {
 	require.NoError(t, err)
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
+	env := envs.NewBuilder().Build()
+	_, contact := testdata.Cathy.Load(db, oa)
+
 	logger := &flows.HTTPLogger{}
-	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	_, err = svc.Open(env, contact, defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.EqualError(t, err, "error calling RocketChat: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
-	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	ticket, err := svc.Open(env, contact, defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())

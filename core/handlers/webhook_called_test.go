@@ -102,7 +102,7 @@ type failingWebhookService struct {
 	delay time.Duration
 }
 
-func (s *failingWebhookService) Call(session flows.Session, request *http.Request) (*flows.WebhookCall, error) {
+func (s *failingWebhookService) Call(request *http.Request) (*flows.WebhookCall, error) {
 	return &flows.WebhookCall{
 		Trace: &httpx.Trace{
 			Request:       request,
