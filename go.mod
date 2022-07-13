@@ -16,7 +16,7 @@ require (
 	github.com/lib/pq v1.10.6
 	github.com/nyaruka/ezconf v0.2.1
 	github.com/nyaruka/gocommon v1.22.4
-	github.com/nyaruka/goflow v0.164.0
+	github.com/nyaruka/goflow v0.164.2
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0
 	github.com/nyaruka/redisx v0.2.1

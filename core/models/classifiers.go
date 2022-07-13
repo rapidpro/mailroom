@@ -54,7 +54,7 @@ func init() {
 }
 
 func classificationServiceFactory(c *runtime.Config) engine.ClassificationServiceFactory {
-	return func(session flows.Session, classifier *flows.Classifier) (flows.ClassificationService, error) {
+	return func(classifier *flows.Classifier) (flows.ClassificationService, error) {
 		return classifier.Asset().(*Classifier).AsService(c, classifier)
 	}
 }

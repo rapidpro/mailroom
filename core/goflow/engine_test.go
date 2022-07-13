@@ -65,7 +65,7 @@ func TestSimulatorTicket(t *testing.T) {
 	ticketer, err := models.LookupTicketerByUUID(ctx, db, testdata.Mailgun.UUID)
 	require.NoError(t, err)
 
-	svc, err := goflow.Simulator(rt.Config).Services().Ticket(nil, flows.NewTicketer(ticketer))
+	svc, err := goflow.Simulator(rt.Config).Services().Ticket(flows.NewTicketer(ticketer))
 	assert.NoError(t, err)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)

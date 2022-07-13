@@ -93,7 +93,7 @@ func Simulator(c *runtime.Config) flows.Engine {
 	return simulator
 }
 
-func simulatorEmailServiceFactory(session flows.Session) (flows.EmailService, error) {
+func simulatorEmailServiceFactory(flows.SessionAssets) (flows.EmailService, error) {
 	return &simulatorEmailService{}, nil
 }
 
@@ -103,7 +103,7 @@ func (s *simulatorEmailService) Send(addresses []string, subject, body string) e
 	return nil
 }
 
-func simulatorTicketServiceFactory(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
+func simulatorTicketServiceFactory(ticketer *flows.Ticketer) (flows.TicketService, error) {
 	return &simulatorTicketService{ticketer: ticketer}, nil
 }
 
@@ -115,7 +115,7 @@ func (s *simulatorTicketService) Open(env envs.Environment, contact *flows.Conta
 	return flows.OpenTicket(s.ticketer, topic, body, assignee), nil
 }
 
-func simulatorAirtimeServiceFactory(session flows.Session) (flows.AirtimeService, error) {
+func simulatorAirtimeServiceFactory(flows.SessionAssets) (flows.AirtimeService, error) {
 	return &simulatorAirtimeService{}, nil
 }
 

@@ -38,8 +38,8 @@ func init() {
 func emailServiceFactory(c *runtime.Config) engine.EmailServiceFactory {
 	var emailRetries = smtpx.NewFixedRetries(time.Second*3, time.Second*6)
 
-	return func(session flows.Session) (flows.EmailService, error) {
-		return orgFromSession(session).EmailService(c, emailRetries)
+	return func(sa flows.SessionAssets) (flows.EmailService, error) {
+		return orgFromAssets(sa).EmailService(c, emailRetries)
 	}
 }
 
@@ -48,8 +48,8 @@ func airtimeServiceFactory(c *runtime.Config) engine.AirtimeServiceFactory {
 	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
 	airtimeHTTPRetries := httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
-	return func(session flows.Session) (flows.AirtimeService, error) {
-		return orgFromSession(session).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
+	return func(sa flows.SessionAssets) (flows.AirtimeService, error) {
+		return orgFromAssets(sa).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
 	}
 }
 
@@ -219,9 +219,9 @@ func (o *Org) attachmentPath(prefix string, filename string) string {
 	return path
 }
 
-// gets the underlying org for the given engine session
-func orgFromSession(session flows.Session) *Org {
-	return session.Assets().Source().(*OrgAssets).Org()
+// gets the underlying org for the given session assets
+func orgFromAssets(sa flows.SessionAssets) *Org {
+	return sa.Source().(*OrgAssets).Org()
 }
 
 // LoadOrg loads the org for the passed in id, returning any error encountered

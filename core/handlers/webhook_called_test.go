@@ -139,7 +139,7 @@ func TestUnhealthyWebhookCalls(t *testing.T) {
 	// webhook service with a 2 second delay
 	svc := &failingWebhookService{delay: 2 * time.Second}
 
-	eng := engine.NewBuilder().WithWebhookServiceFactory(func(flows.Session) (flows.WebhookService, error) { return svc, nil }).Build()
+	eng := engine.NewBuilder().WithWebhookServiceFactory(func(flows.SessionAssets) (flows.WebhookService, error) { return svc, nil }).Build()
 	flowRef := assets.NewFlowReference("bc5d6b7b-3e18-4d7c-8279-50b460e74f7f", "Test")
 
 	handlers.RunFlowAndApplyEvents(t, ctx, rt, env, eng, oa, flowRef, cathy)

@@ -185,7 +185,7 @@
                         "resource_events": [
                             {
                                 "type_id": "comment_on_new_ticket",
-                                "external_id": "242617bf-06a1-4ff0-adee-831a83533221",
+                                "external_id": "$cathy_ticket_uuid$",
                                 "comment_id": 111,
                                 "ticket_id": 222
                             }
