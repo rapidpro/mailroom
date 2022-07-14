@@ -66,4 +66,4 @@ require (
 
 go 1.17
 
-replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-slack-develop
+replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-weni
