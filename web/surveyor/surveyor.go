@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
@@ -116,7 +117,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 	// run through each contact modifier, applying it to our contact
 	for _, m := range mods {
-		m.Apply(oa.Env(), oa.SessionAssets(), flowContact, appender)
+		modifiers.Apply(oa.Env(), goflow.Engine(rt.Config).Services(), oa.SessionAssets(), flowContact, m, appender)
 	}
 
 	// set this updated contact on our session

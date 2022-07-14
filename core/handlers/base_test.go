@@ -12,8 +12,10 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/definition"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/goflow/flows/routers"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
@@ -158,6 +160,8 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 	oa, err := models.GetOrgAssets(ctx, rt, models.OrgID(1))
 	assert.NoError(t, err)
 
+	svcs := goflow.Engine(rt.Config).Services()
+
 	// reuse id from one of our real flows
 	flowUUID := testdata.Favorites.UUID
 
@@ -222,7 +226,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 
 			// apply our modifiers
 			for _, mod := range mods {
-				mod.Apply(oa.Env(), oa.SessionAssets(), flowContact, func(e flows.Event) { result.Events = append(result.Events, e) })
+				modifiers.Apply(oa.Env(), svcs, oa.SessionAssets(), flowContact, mod, func(e flows.Event) { result.Events = append(result.Events, e) })
 			}
 
 			results[contact.ID()] = result
