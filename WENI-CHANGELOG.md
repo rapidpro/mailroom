@@ -1,3 +1,7 @@
+1.3.2-mailroom-7.1.22
+----------
+* Replace gocommon v1.16.2 with version v1.16.2-weni compatible with Teams channel
+
 1.3.1-mailroom-7.1.22
 ----------
  * Replace gocommon for one with slack bot channel urn
