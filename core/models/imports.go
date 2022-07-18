@@ -161,7 +161,8 @@ func (b *ContactImportBatch) tryImport(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// and apply in bulk
-	_, err = ApplyModifiers(ctx, rt, oa, modifiersByContact)
+	// TODO pass user here who created the import?
+	_, err = ApplyModifiers(ctx, rt, oa, nil, modifiersByContact)
 	if err != nil {
 		return errors.Wrap(err, "error applying modifiers")
 	}

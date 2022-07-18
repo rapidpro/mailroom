@@ -38,7 +38,7 @@ func init() {
 //
 type createRequest struct {
 	OrgID   models.OrgID        `json:"org_id"   validate:"required"`
-	UserID  models.UserID       `json:"user_id"`
+	UserID  models.UserID       `json:"user_id"  validate:"required"`
 	Contact *models.ContactSpec `json:"contact"  validate:"required"`
 }
 
@@ -55,18 +55,23 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
+	user := oa.UserByID(request.UserID)
+	if user == nil {
+		return nil, http.StatusInternalServerError, errors.Errorf("unable to load user #%d", request.UserID)
+	}
+
 	c, err := SpecToCreation(request.Contact, oa.Env(), oa.SessionAssets())
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
-	_, contact, err := models.CreateContact(ctx, rt.DB, oa, request.UserID, c.Name, c.Language, c.URNs)
+	_, contact, err := models.CreateContact(ctx, rt.DB, oa, user.ID(), c.Name, c.Language, c.URNs)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
-	_, err = models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
+	_, err = models.ApplyModifiers(ctx, rt, oa, user, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
 	}
@@ -131,6 +136,11 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
+	user := oa.UserByID(request.UserID)
+	if user == nil {
+		return nil, http.StatusInternalServerError, errors.Errorf("unable to load user #%d", request.UserID)
+	}
+
 	// read the modifiers from the request
 	mods, err := goflow.ReadModifiers(oa.SessionAssets(), request.Modifiers, goflow.ErrorOnMissing)
 	if err != nil {
@@ -154,7 +164,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		modifiersByContact[flowContact] = mods
 	}
 
-	eventsByContact, err := models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
+	eventsByContact, err := models.ApplyModifiers(ctx, rt, oa, user, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

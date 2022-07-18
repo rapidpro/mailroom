@@ -69,6 +69,8 @@ func TestTickets(t *testing.T) {
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
 		testdata.Org1.ID,
+		testdata.Admin.ID,
+		models.NilFlowID,
 		testdata.Cathy.ID,
 		testdata.Mailgun.ID,
 		"EX12345",
@@ -82,6 +84,8 @@ func TestTickets(t *testing.T) {
 	ticket2 := models.NewTicket(
 		"64f81be1-00ff-48ef-9e51-97d6f924c1a4",
 		testdata.Org1.ID,
+		testdata.Admin.ID,
+		models.NilFlowID,
 		testdata.Bob.ID,
 		testdata.Zendesk.ID,
 		"EX7869",
@@ -93,6 +97,8 @@ func TestTickets(t *testing.T) {
 	ticket3 := models.NewTicket(
 		"28ef8ddc-b221-42f3-aeae-ee406fc9d716",
 		testdata.Org1.ID,
+		models.NilUserID,
+		testdata.Favorites.ID,
 		testdata.Alexandria.ID,
 		testdata.Zendesk.ID,
 		"EX6677",

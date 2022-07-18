@@ -328,7 +328,7 @@ func LoadContacts(ctx context.Context, db Queryer, oa *OrgAssets, ids []ContactI
 		for _, t := range e.Tickets {
 			ticketer := oa.TicketerByID(t.TicketerID)
 			if ticketer != nil {
-				tickets = append(tickets, NewTicket(t.UUID, oa.OrgID(), contact.ID(), ticketer.ID(), t.ExternalID, t.TopicID, t.Body, t.AssigneeID, nil))
+				tickets = append(tickets, NewTicket(t.UUID, oa.OrgID(), NilUserID, NilFlowID, contact.ID(), ticketer.ID(), t.ExternalID, t.TopicID, t.Body, t.AssigneeID, nil))
 			}
 		}
 		contact.tickets = tickets
