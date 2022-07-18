@@ -1305,6 +1305,105 @@
         ]
     },
     {
+        "label": "open ticket",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": [
+                {
+                    "type": "ticket",
+                    "ticketer": {
+                        "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa",
+                        "name": "RapidPro Tickets"
+                    },
+                    "topic": {
+                        "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
+                        "name": "Support"
+                    },
+                    "body": "Need help",
+                    "assignee": {
+                        "email": "admin1@nyaruka.com",
+                        "name": "Andy Admin"
+                    }
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "10000": {
+                "contact": {
+                    "created_on": "2018-07-06T12:30:00.123457Z",
+                    "groups": [
+                        {
+                            "name": "Open Tickets",
+                            "uuid": "361838c4-2866-495a-8990-9f3c222a7604"
+                        }
+                    ],
+                    "id": 10000,
+                    "language": "fra",
+                    "status": "active",
+                    "tickets": [
+                        {
+                            "assignee": {
+                                "email": "admin1@nyaruka.com",
+                                "name": "Andy Admin"
+                            },
+                            "body": "Need help",
+                            "ticketer": {
+                                "name": "RapidPro Tickets",
+                                "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+                            },
+                            "topic": {
+                                "name": "Support",
+                                "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0"
+                            },
+                            "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
+                        }
+                    ],
+                    "timezone": "America/Los_Angeles",
+                    "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
+                },
+                "events": [
+                    {
+                        "created_on": "2018-07-06T12:30:00.123456789Z",
+                        "ticket": {
+                            "assignee": {
+                                "email": "admin1@nyaruka.com",
+                                "name": "Andy Admin"
+                            },
+                            "body": "Need help",
+                            "ticketer": {
+                                "name": "RapidPro Tickets",
+                                "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+                            },
+                            "topic": {
+                                "name": "Support",
+                                "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0"
+                            },
+                            "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
+                        },
+                        "type": "ticket_opened"
+                    },
+                    {
+                        "created_on": "2018-07-06T12:30:01.123456789Z",
+                        "groups_added": [
+                            {
+                                "name": "Open Tickets",
+                                "uuid": "361838c4-2866-495a-8990-9f3c222a7604"
+                            }
+                        ],
+                        "type": "contact_groups_changed"
+                    }
+                ]
+            }
+        }
+    },
+    {
         "label": "multiple modifiers of different types",
         "method": "POST",
         "path": "/mr/contact/modify",
@@ -1350,12 +1449,34 @@
                     "name": "Juan",
                     "language": "spa",
                     "status": "active",
+                    "tickets": [
+                        {
+                            "assignee": {
+                                "email": "admin1@nyaruka.com",
+                                "name": "Andy Admin"
+                            },
+                            "body": "Need help",
+                            "ticketer": {
+                                "name": "RapidPro Tickets",
+                                "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+                            },
+                            "topic": {
+                                "name": "Support",
+                                "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0"
+                            },
+                            "uuid": "d2f852ec-7b4e-457f-ae7f-f8b243c49ff5"
+                        }
+                    ],
                     "timezone": "America/Los_Angeles",
                     "created_on": "2018-07-06T12:30:00.123457Z",
                     "urns": [
                         "tel:+255788555111"
                     ],
                     "groups": [
+                        {
+                            "name": "Open Tickets",
+                            "uuid": "361838c4-2866-495a-8990-9f3c222a7604"
+                        },
                         {
                             "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
                             "name": "Testers"
