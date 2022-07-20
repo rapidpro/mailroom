@@ -1,3 +1,8 @@
+v7.5.0
+----------
+ * Update to latest goflow with support for ticket modifier
+ * Update to latest goflow which removes sessions from engine services
+
 v7.4.1
 ----------
  * Update to latest goflow
