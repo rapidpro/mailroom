@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -75,9 +76,9 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 }
 
 // Open opens a ticket which for mailgun means just sending an initial email
-func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-	contactDisplay := session.Contact().Format(session.Environment())
+	contactDisplay := contact.Format(env)
 
 	msg := &ExternalResource{
 		ExternalID: string(ticket.UUID()), // there's no local msg so use ticket UUID instead
@@ -85,7 +86,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		ThreadID:   string(ticket.UUID()),
 		CreatedAt:  dates.Now(),
 		Author: Author{
-			ExternalID: string(session.Contact().UUID()),
+			ExternalID: string(contact.UUID()),
 			Name:       contactDisplay,
 		},
 		AllowChannelback: true,

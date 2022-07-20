@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/webhooks"
@@ -92,17 +93,17 @@ func Simulator(c *runtime.Config) flows.Engine {
 	return simulator
 }
 
-func simulatorEmailServiceFactory(session flows.Session) (flows.EmailService, error) {
+func simulatorEmailServiceFactory(flows.SessionAssets) (flows.EmailService, error) {
 	return &simulatorEmailService{}, nil
 }
 
 type simulatorEmailService struct{}
 
-func (s *simulatorEmailService) Send(session flows.Session, addresses []string, subject, body string) error {
+func (s *simulatorEmailService) Send(addresses []string, subject, body string) error {
 	return nil
 }
 
-func simulatorTicketServiceFactory(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
+func simulatorTicketServiceFactory(ticketer *flows.Ticketer) (flows.TicketService, error) {
 	return &simulatorTicketService{ticketer: ticketer}, nil
 }
 
@@ -110,17 +111,17 @@ type simulatorTicketService struct {
 	ticketer *flows.Ticketer
 }
 
-func (s *simulatorTicketService) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *simulatorTicketService) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	return flows.OpenTicket(s.ticketer, topic, body, assignee), nil
 }
 
-func simulatorAirtimeServiceFactory(session flows.Session) (flows.AirtimeService, error) {
+func simulatorAirtimeServiceFactory(flows.SessionAssets) (flows.AirtimeService, error) {
 	return &simulatorAirtimeService{}, nil
 }
 
 type simulatorAirtimeService struct{}
 
-func (s *simulatorAirtimeService) Transfer(session flows.Session, sender urns.URN, recipient urns.URN, amounts map[string]decimal.Decimal, logHTTP flows.HTTPLogCallback) (*flows.AirtimeTransfer, error) {
+func (s *simulatorAirtimeService) Transfer(sender urns.URN, recipient urns.URN, amounts map[string]decimal.Decimal, logHTTP flows.HTTPLogCallback) (*flows.AirtimeTransfer, error) {
 	transfer := &flows.AirtimeTransfer{
 		Sender:        sender,
 		Recipient:     recipient,

@@ -72,7 +72,7 @@ func init() {
 }
 
 func ticketServiceFactory(c *runtime.Config) engine.TicketServiceFactory {
-	return func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
+	return func(ticketer *flows.Ticketer) (flows.TicketService, error) {
 		return ticketer.Asset().(*Ticketer).AsService(c, ticketer)
 	}
 }
