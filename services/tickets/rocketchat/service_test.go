@@ -75,11 +75,11 @@ func TestOpenAndForward(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	logger := &flows.HTTPLogger{}
-	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	_, err = svc.Open(session.Environment(), session.Contact(), defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.EqualError(t, err, "error calling RocketChat: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
-	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	ticket, err := svc.Open(session.Environment(), session.Contact(), defaultTopic, "Where are my cookies?", nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())

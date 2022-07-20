@@ -6,6 +6,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/modifiers"
+	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 )
@@ -242,13 +244,15 @@ func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, use
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
+	svcs := goflow.Engine(rt.Config).Services()
+
 	eventsByContact := make(map[*flows.Contact][]flows.Event, len(modifiersByContact))
 
 	// apply the modifiers to get the events for each contact
 	for contact, mods := range modifiersByContact {
 		events := make([]flows.Event, 0)
 		for _, mod := range mods {
-			mod.Apply(env, oa.SessionAssets(), contact, func(e flows.Event) { events = append(events, e) })
+			modifiers.Apply(env, svcs, oa.SessionAssets(), contact, mod, func(e flows.Event) { events = append(events, e) })
 		}
 		eventsByContact[contact] = events
 	}
