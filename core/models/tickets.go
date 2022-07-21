@@ -133,6 +133,7 @@ func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
 func (t *Ticket) Config(key string) string {
 	return t.t.Config.GetString(key, "")
 }
+func (t *Ticket) OpenedByID() UserID { return t.t.OpenedByID }
 
 func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
 	modelTicketer := oa.TicketerByID(t.TicketerID())
