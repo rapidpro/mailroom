@@ -38,7 +38,7 @@ func init() {
 //
 type createRequest struct {
 	OrgID   models.OrgID        `json:"org_id"   validate:"required"`
-	UserID  models.UserID       `json:"user_id"`
+	UserID  models.UserID       `json:"user_id"  validate:"required"`
 	Contact *models.ContactSpec `json:"contact"  validate:"required"`
 }
 
@@ -66,7 +66,7 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
-	_, err = models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
+	_, err = models.ApplyModifiers(ctx, rt, oa, request.UserID, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error modifying new contact")
 	}
@@ -154,7 +154,7 @@ func handleModify(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		modifiersByContact[flowContact] = mods
 	}
 
-	eventsByContact, err := models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
+	eventsByContact, err := models.ApplyModifiers(ctx, rt, oa, request.UserID, modifiersByContact)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}

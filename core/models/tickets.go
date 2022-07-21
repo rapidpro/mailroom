@@ -91,6 +91,8 @@ type Ticket struct {
 		AssigneeID     UserID           `db:"assignee_id"`
 		Config         null.Map         `db:"config"`
 		OpenedOn       time.Time        `db:"opened_on"`
+		OpenedByID     UserID           `db:"opened_by_id"`
+		OpenedInID     FlowID           `db:"opened_in_id"`
 		RepliedOn      *time.Time       `db:"replied_on"`
 		ModifiedOn     time.Time        `db:"modified_on"`
 		ClosedOn       *time.Time       `db:"closed_on"`
@@ -99,10 +101,12 @@ type Ticket struct {
 }
 
 // NewTicket creates a new open ticket
-func NewTicket(uuid flows.TicketUUID, orgID OrgID, contactID ContactID, ticketerID TicketerID, externalID string, topicID TopicID, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
+func NewTicket(uuid flows.TicketUUID, orgID OrgID, userID UserID, flowID FlowID, contactID ContactID, ticketerID TicketerID, externalID string, topicID TopicID, body string, assigneeID UserID, config map[string]interface{}) *Ticket {
 	t := &Ticket{}
 	t.t.UUID = uuid
 	t.t.OrgID = orgID
+	t.t.OpenedByID = userID
+	t.t.OpenedInID = flowID
 	t.t.ContactID = contactID
 	t.t.TicketerID = ticketerID
 	t.t.ExternalID = null.String(externalID)
@@ -184,28 +188,28 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, oa *O
 
 const sqlSelectOpenTickets = `
 SELECT
-  t.id AS id,
-  t.uuid AS uuid,
-  t.org_id AS org_id,
-  t.contact_id AS contact_id,
-  t.ticketer_id AS ticketer_id,
-  t.external_id AS external_id,
-  t.status AS status,
-  t.topic_id AS topic_id,
-  t.body AS body,
-  t.assignee_id AS assignee_id,
-  t.config AS config,
-  t.opened_on AS opened_on,
+  t.id,
+  t.uuid,
+  t.org_id,
+  t.contact_id,
+  t.ticketer_id,
+  t.external_id,
+  t.status,
+  t.topic_id,
+  t.body,
+  t.assignee_id,
+  t.config,
+  t.opened_on,
+  t.opened_by_id,
+  t.opened_in_id,
   t.replied_on,
-  t.modified_on AS modified_on,
-  t.closed_on AS closed_on,
-  t.last_activity_on AS last_activity_on
+  t.modified_on,
+  t.closed_on,
+  t.last_activity_on
 FROM
   tickets_ticket t
 WHERE
-  t.contact_id = $1 AND
-  t.status = 'O'
-`
+  t.contact_id = $1 AND t.status = 'O'`
 
 // LoadOpenTicketsForContact looks up the open tickets for the passed in contact
 func LoadOpenTicketsForContact(ctx context.Context, db Queryer, contact *Contact) ([]*Ticket, error) {
@@ -214,27 +218,28 @@ func LoadOpenTicketsForContact(ctx context.Context, db Queryer, contact *Contact
 
 const sqlSelectTicketsByID = `
 SELECT
-  t.id AS id,
-  t.uuid AS uuid,
-  t.org_id AS org_id,
-  t.contact_id AS contact_id,
-  t.ticketer_id AS ticketer_id,
-  t.external_id AS external_id,
-  t.status AS status,
-  t.topic_id AS topic_id,
-  t.body AS body,
-  t.assignee_id AS assignee_id,
-  t.config AS config,
-  t.opened_on AS opened_on,
+  t.id,
+  t.uuid,
+  t.org_id,
+  t.contact_id,
+  t.ticketer_id,
+  t.external_id,
+  t.status,
+  t.topic_id,
+  t.body,
+  t.assignee_id,
+  t.config,
+  t.opened_on,
+  t.opened_by_id,
+  t.opened_in_id,
   t.replied_on,
-  t.modified_on AS modified_on,
-  t.closed_on AS closed_on,
-  t.last_activity_on AS last_activity_on
+  t.modified_on,
+  t.closed_on,
+  t.last_activity_on
 FROM
   tickets_ticket t
 WHERE
-  t.id = ANY($1)
-`
+  t.id = ANY($1)`
 
 // LoadTickets loads all of the tickets with the given ids
 func LoadTickets(ctx context.Context, db Queryer, ids []TicketID) ([]*Ticket, error) {
@@ -263,27 +268,28 @@ func loadTickets(ctx context.Context, db Queryer, query string, params ...interf
 
 const sqlSelectTicketByUUID = `
 SELECT
-  t.id AS id,
-  t.uuid AS uuid,
-  t.org_id AS org_id,
-  t.contact_id AS contact_id,
-  t.ticketer_id AS ticketer_id,
-  t.external_id AS external_id,
-  t.status AS status,
-  t.topic_id AS topic_id,
-  t.body AS body,
-  t.assignee_id AS assignee_id,
-  t.config AS config,
-  t.opened_on AS opened_on,
+  t.id,
+  t.uuid,
+  t.org_id,
+  t.contact_id,
+  t.ticketer_id,
+  t.external_id,
+  t.status,
+  t.topic_id,
+  t.body,
+  t.assignee_id,
+  t.config,
+  t.opened_on,
+  t.opened_by_id,
+  t.opened_in_id,
   t.replied_on,
-  t.modified_on AS modified_on,
-  t.closed_on AS closed_on,
-  t.last_activity_on AS last_activity_on
+  t.modified_on,
+  t.closed_on,
+  t.last_activity_on
 FROM
   tickets_ticket t
 WHERE
-  t.uuid = $1
-`
+  t.uuid = $1`
 
 // LookupTicketByUUID looks up the ticket with the passed in UUID
 func LookupTicketByUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID) (*Ticket, error) {
@@ -292,28 +298,28 @@ func LookupTicketByUUID(ctx context.Context, db *sqlx.DB, uuid flows.TicketUUID)
 
 const sqlSelectTicketByExternalID = `
 SELECT
-  t.id AS id,
-  t.uuid AS uuid,
-  t.org_id AS org_id,
-  t.contact_id AS contact_id,
-  t.ticketer_id AS ticketer_id,
-  t.external_id AS external_id,
-  t.status AS status,
-  t.topic_id AS topic_id,
-  t.body AS body,
-  t.assignee_id AS assignee_id,
-  t.config AS config,
-  t.opened_on AS opened_on,
+  t.id,
+  t.uuid,
+  t.org_id,
+  t.contact_id,
+  t.ticketer_id,
+  t.external_id,
+  t.status,
+  t.topic_id,
+  t.body,
+  t.assignee_id,
+  t.config,
+  t.opened_on,
+  t.opened_by_id,
+  t.opened_in_id,
   t.replied_on,
-  t.modified_on AS modified_on,
-  t.closed_on AS closed_on,
-  t.last_activity_on AS last_activity_on
+  t.modified_on,
+  t.closed_on,
+  t.last_activity_on
 FROM
   tickets_ticket t
 WHERE
-  t.ticketer_id = $1 AND
-  t.external_id = $2
-`
+  t.ticketer_id = $1 AND t.external_id = $2`
 
 // LookupTicketByExternalID looks up the ticket with the passed in ticketer and external ID
 func LookupTicketByExternalID(ctx context.Context, db Queryer, ticketerID TicketerID, externalID string) (*Ticket, error) {
@@ -342,8 +348,8 @@ func lookupTicket(ctx context.Context, db Queryer, query string, params ...inter
 
 const sqlInsertTicket = `
 INSERT INTO 
-  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  topic_id,  body,  assignee_id,  config,  opened_on, modified_on, last_activity_on)
-  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :topic_id, :body, :assignee_id, :config, NOW(),     NOW()      , NOW())
+  tickets_ticket(uuid,  org_id,  contact_id,  ticketer_id,  external_id,  status,  topic_id,  body,  assignee_id,  config,  opened_on, opened_by_id,  opened_in_id,  modified_on, last_activity_on)
+  VALUES(        :uuid, :org_id, :contact_id, :ticketer_id, :external_id, :status, :topic_id, :body, :assignee_id, :config, NOW(),     :opened_by_id, :opened_in_id, NOW()      , NOW())
 RETURNING
   id
 `

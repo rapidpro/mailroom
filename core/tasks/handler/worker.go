@@ -752,7 +752,7 @@ func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsset
 	contact.SetLastSeenOn(msgEvent.CreatedOn())
 	contactEvents := map[*flows.Contact][]flows.Event{contact: {msgEvent}}
 
-	err := models.HandleAndCommitEvents(ctx, rt, oa, contactEvents)
+	err := models.HandleAndCommitEvents(ctx, rt, oa, models.NilUserID, contactEvents)
 	if err != nil {
 		return errors.Wrap(err, "error handling inbox message events")
 	}

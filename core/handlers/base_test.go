@@ -41,6 +41,7 @@ type TestCase struct {
 	Actions       ContactActionMap
 	Msgs          ContactMsgMap
 	Modifiers     ContactModifierMap
+	ModifierUser  *testdata.User
 	Assertions    []Assertion
 	SQLAssertions []SQLAssertion
 }
@@ -222,7 +223,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 				Events:  make([]flows.Event, 0, len(mods)),
 			}
 
-			scene := models.NewSceneForContact(flowContact)
+			scene := models.NewSceneForContact(flowContact, tc.ModifierUser.SafeID())
 
 			// apply our modifiers
 			for _, mod := range mods {

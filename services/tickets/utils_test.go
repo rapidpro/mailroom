@@ -164,6 +164,8 @@ func TestCloseTicket(t *testing.T) {
 	ticket1 := models.NewTicket(
 		"2ef57efc-d85f-4291-b330-e4afe68af5fe",
 		testdata.Org1.ID,
+		testdata.Admin.ID,
+		models.NilFlowID,
 		testdata.Cathy.ID,
 		testdata.Mailgun.ID,
 		"EX12345",
