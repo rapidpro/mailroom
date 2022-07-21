@@ -1,3 +1,8 @@
+v7.5.2
+----------
+ * Update to latest goflow
+ * Set opened_by_id on the open ticket event as well as the ticket itself
+
 v7.5.1
 ----------
  * Add Ticket.opened_by and opened_in and set when opening tickets
