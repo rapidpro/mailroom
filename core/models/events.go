@@ -16,7 +16,7 @@ import (
 type Scene struct {
 	contact *flows.Contact
 	session *Session
-	user    *User
+	userID  UserID
 
 	preCommits  map[EventCommitHook][]interface{}
 	postCommits map[EventCommitHook][]interface{}
@@ -34,10 +34,10 @@ func NewSceneForSession(session *Session) *Scene {
 }
 
 // NewSceneForContact creates a new scene for the passed in contact, session will be nil
-func NewSceneForContact(contact *flows.Contact, user *User) *Scene {
+func NewSceneForContact(contact *flows.Contact, userID UserID) *Scene {
 	return &Scene{
 		contact: contact,
-		user:    user,
+		userID:  userID,
 
 		preCommits:  make(map[EventCommitHook][]interface{}),
 		postCommits: make(map[EventCommitHook][]interface{}),
@@ -59,8 +59,8 @@ func (s *Scene) ContactUUID() flows.ContactUUID { return s.contact.UUID() }
 // Session returns the session for this scene if any
 func (s *Scene) Session() *Session { return s.session }
 
-// User returns the user for this scene if any
-func (s *Scene) User() *User { return s.user }
+// User returns the user ID for this scene if any
+func (s *Scene) UserID() UserID { return s.userID }
 
 // AppendToEventPreCommitHook adds a new event to be handled by a pre commit hook
 func (s *Scene) AppendToEventPreCommitHook(hook EventCommitHook, event interface{}) {
@@ -187,11 +187,11 @@ func ApplyEventPostCommitHooks(ctx context.Context, rt *runtime.Runtime, tx *sql
 }
 
 // HandleAndCommitEvents takes a set of contacts and events, handles the events and applies any hooks, and commits everything
-func HandleAndCommitEvents(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, user *User, contactEvents map[*flows.Contact][]flows.Event) error {
+func HandleAndCommitEvents(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, contactEvents map[*flows.Contact][]flows.Event) error {
 	// create scenes for each contact
 	scenes := make([]*Scene, 0, len(contactEvents))
 	for contact := range contactEvents {
-		scene := NewSceneForContact(contact, user)
+		scene := NewSceneForContact(contact, userID)
 		scenes = append(scenes, scene)
 	}
 
@@ -240,7 +240,9 @@ func HandleAndCommitEvents(ctx context.Context, rt *runtime.Runtime, oa *OrgAsse
 }
 
 // ApplyModifiers modifies contacts by applying modifiers and handling the resultant events
-func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, user *User, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
+// Note that we don't load the user object from org assets because it's possible that the user isn't part
+// of the org, e.g. customer support.
+func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, modifiersByContact map[*flows.Contact][]flows.Modifier) (map[*flows.Contact][]flows.Event, error) {
 	// create an environment instance with location support
 	env := flows.NewEnvironment(oa.Env(), oa.SessionAssets().Locations())
 
@@ -257,7 +259,7 @@ func ApplyModifiers(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, use
 		eventsByContact[contact] = events
 	}
 
-	err := HandleAndCommitEvents(ctx, rt, oa, user, eventsByContact)
+	err := HandleAndCommitEvents(ctx, rt, oa, userID, eventsByContact)
 	if err != nil {
 		return nil, errors.Wrap(err, "error commiting events")
 	}

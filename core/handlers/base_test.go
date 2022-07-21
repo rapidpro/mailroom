@@ -208,11 +208,6 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 
 		results := make(map[models.ContactID]modifyResult)
 
-		var modifierUser *models.User
-		if tc.ModifierUser != nil {
-			modifierUser = oa.UserByID(tc.ModifierUser.ID)
-		}
-
 		// create scenes for our contacts
 		scenes := make([]*models.Scene, 0, len(tc.Modifiers))
 		for contact, mods := range tc.Modifiers {
@@ -228,7 +223,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 				Events:  make([]flows.Event, 0, len(mods)),
 			}
 
-			scene := models.NewSceneForContact(flowContact, modifierUser)
+			scene := models.NewSceneForContact(flowContact, tc.ModifierUser.SafeID())
 
 			// apply our modifiers
 			for _, mod := range mods {
