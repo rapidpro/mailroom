@@ -1,3 +1,7 @@
+v7.5.1
+----------
+ * Add Ticket.opened_by and opened_in and set when opening tickets
+
 v7.5.0
 ----------
  * Update to latest goflow with support for ticket modifier
