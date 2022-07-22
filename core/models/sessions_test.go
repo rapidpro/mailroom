@@ -278,16 +278,17 @@ func TestInterruptSessionsForContacts(t *testing.T) {
 	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
 
 	// noop if no contacts
-	err := models.InterruptSessionsForContacts(ctx, db, []models.ContactID{})
-	require.NoError(t, err)
+	_, err := models.InterruptSessionsForContacts(ctx, db, []models.ContactID{})
+	assert.NoError(t, err)
 
 	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted)
 	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusWaiting)
 	assertSessionAndRunStatus(t, db, session3ID, models.SessionStatusWaiting)
 	assertSessionAndRunStatus(t, db, session4ID, models.SessionStatusWaiting)
 
-	err = models.InterruptSessionsForContacts(ctx, db, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})
-	require.NoError(t, err)
+	count, err := models.InterruptSessionsForContacts(ctx, db, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.Alexandria.ID})
+	assert.Equal(t, 2, count)
+	assert.NoError(t, err)
 
 	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted) // wasn't waiting
 	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusInterrupted)

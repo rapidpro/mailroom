@@ -1,0 +1,68 @@
+[
+    {
+        "label": "error if fields not provided",
+        "method": "POST",
+        "path": "/mr/contact/interrupt",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'org_id' is required, field 'user_id' is required, field 'contact_id' is required"
+        }
+    },
+    {
+        "label": "interrupts a contact",
+        "method": "POST",
+        "path": "/mr/contact/interrupt",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "contact_id": 10000
+        },
+        "status": 200,
+        "response": {
+            "sessions": 1
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W' AND contact_id = 10000",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'I' AND contact_id = 10000",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "noop if contact doesn't have a waiting session",
+        "method": "POST",
+        "path": "/mr/contact/interrupt",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "contact_id": 10000
+        },
+        "status": 200,
+        "response": {
+            "sessions": 0
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W'",
+                "count": 1
+            },
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W' AND contact_id = 10000",
+                "count": 0
+            },
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'I' AND contact_id = 10000",
+                "count": 1
+            }
+        ]
+    }
+]
