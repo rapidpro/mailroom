@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/buger/jsonparser"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
@@ -23,19 +22,15 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	assetsJSON, err := os.ReadFile("testdata/session_test_flows.json")
-	require.NoError(t, err)
-
-	flowJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[0]")
-	require.NoError(t, err)
-	flow := testdata.InsertFlow(db, testdata.Org1, flowJSON)
+	testFlows := testdata.ImportFlows(db, testdata.Org1, "testdata/session_test_flows.json")
+	flow := testFlows[0]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	modelContact, _ := testdata.Bob.Load(db, oa)
 
-	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("c49daa28-cf70-407a-a767-a4c1360f4b01").
+	sa, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(flow.UUID).
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Bob.ID), "Bob", "eng", "").MustBuild()
 
 	tx := db.MustBegin()
@@ -79,7 +74,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
 
-	flowSession, sprint2, err := test.ResumeSession(flowSession, assetsJSON, "no")
+	flowSession, sprint2, err := test.ResumeSession(flowSession, sa, "no")
 	require.NoError(t, err)
 
 	tx = db.MustBegin()
@@ -101,7 +96,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
 
-	flowSession, sprint3, err := test.ResumeSession(flowSession, assetsJSON, "yes")
+	flowSession, sprint3, err := test.ResumeSession(flowSession, sa, "yes")
 	require.NoError(t, err)
 
 	tx = db.MustBegin()
@@ -138,19 +133,15 @@ func TestSingleSprintSession(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	assetsJSON, err := os.ReadFile("testdata/session_test_flows.json")
-	require.NoError(t, err)
-
-	flowJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[1]")
-	require.NoError(t, err)
-	testdata.InsertFlow(db, testdata.Org1, flowJSON)
+	testFlows := testdata.ImportFlows(db, testdata.Org1, "testdata/session_test_flows.json")
+	flow := testFlows[1]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	modelContact, _ := testdata.Bob.Load(db, oa)
 
-	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("8b1b02a0-e217-4d59-8ecb-3b20bec69cf4").
+	_, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(flow.UUID).
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Bob.ID), "Bob", "eng", "").MustBuild()
 
 	tx := db.MustBegin()
@@ -190,32 +181,15 @@ func TestSessionWithSubflows(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-<<<<<<< Updated upstream
-	assetsJSON, err := os.ReadFile("testdata/session_test_flows.json")
-	require.NoError(t, err)
-
-	parentJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[2]")
-	require.NoError(t, err)
-	testdata.InsertFlow(db, testdata.Org1, parentJSON)
-
-	childJSON, _, _, err := jsonparser.Get(assetsJSON, "flows", "[3]")
-	require.NoError(t, err)
-	childFlow := testdata.InsertFlow(db, testdata.Org1, childJSON)
-=======
 	testFlows := testdata.ImportFlows(db, testdata.Org1, "testdata/session_test_flows.json")
 	parent, child := testFlows[2], testFlows[3]
->>>>>>> Stashed changes
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	modelContact, _ := testdata.Cathy.Load(db, oa)
 
-<<<<<<< Updated upstream
-	flowSession, sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("f128803a-9027-42b1-a707-f1dbe4cf88bd").
-=======
 	sa, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(parent.UUID).
->>>>>>> Stashed changes
 		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
 
 	tx := db.MustBegin()
@@ -237,7 +211,7 @@ func TestSessionWithSubflows(t *testing.T) {
 	assert.Equal(t, models.FlowTypeMessaging, session.SessionType())
 	assert.Equal(t, testdata.Cathy.ID, session.ContactID())
 	assert.Equal(t, models.SessionStatusWaiting, session.Status())
-	assert.Equal(t, childFlow.ID, session.CurrentFlowID())
+	assert.Equal(t, child.ID, session.CurrentFlowID())
 	assert.NotNil(t, session.CreatedOn())
 	assert.Nil(t, session.EndedOn())
 	assert.False(t, session.Responded())
@@ -249,13 +223,13 @@ func TestSessionWithSubflows(t *testing.T) {
 	// check that matches what is in the db
 	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on, wait_resume_on_expire FROM flows_flowsession`).
 		Columns(map[string]interface{}{
-			"status": "W", "session_type": "M", "current_flow_id": int64(childFlow.ID), "responded": false, "ended_on": nil, "wait_resume_on_expire": true,
+			"status": "W", "session_type": "M", "current_flow_id": int64(child.ID), "responded": false, "ended_on": nil, "wait_resume_on_expire": true,
 		})
 
 	flowSession, err = session.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
 	require.NoError(t, err)
 
-	flowSession, sprint2, err := test.ResumeSession(flowSession, assetsJSON, "yes")
+	flowSession, sprint2, err := test.ResumeSession(flowSession, sa, "yes")
 	require.NoError(t, err)
 
 	tx = db.MustBegin()
@@ -312,10 +286,12 @@ func TestSessionFailedStart(t *testing.T) {
 	assert.Equal(t, models.SessionStatusFailed, session.Status())
 	assert.Equal(t, models.NilFlowID, session.CurrentFlowID())
 	assert.Nil(t, session.WaitExpiresOn())
+	assert.NotNil(t, session.EndedOn())
 
 	// check that matches what is in the db
-	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded, ended_on FROM flows_flowsession`).
-		Columns(map[string]interface{}{"status": "F", "session_type": "M", "current_flow_id": nil, "responded": false, "ended_on": nil})
+	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
+		Columns(map[string]interface{}{"status": "F", "session_type": "M", "current_flow_id": nil, "responded": false})
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE ended_on IS NOT NULL`).Returns(1)
 }
 
 func TestInterruptSessionsForContacts(t *testing.T) {

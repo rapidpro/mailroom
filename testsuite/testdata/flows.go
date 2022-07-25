@@ -1,6 +1,7 @@
 package testdata
 
 import (
+	"os"
 	"time"
 
 	"github.com/buger/jsonparser"
@@ -41,6 +42,30 @@ func InsertFlow(db *sqlx.DB, org *Org, definition []byte) *Flow {
 	VALUES($1, $2, '13.1.0', 1, TRUE, $3, NOW(), $3, NOW())`, id, definition, Admin.ID)
 
 	return &Flow{ID: id, UUID: assets.FlowUUID(uuid)}
+}
+
+func ImportFlows(db *sqlx.DB, org *Org, path string) []*Flow {
+	assetsJSON, err := os.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+
+	flowsJSON, _, _, err := jsonparser.Get(assetsJSON, "flows")
+	if err != nil {
+		panic(err)
+	}
+
+	flows := []*Flow{}
+
+	_, err = jsonparser.ArrayEach(flowsJSON, func(flowJSON []byte, dataType jsonparser.ValueType, offset int, err error) {
+		flow := InsertFlow(db, org, flowJSON)
+		flows = append(flows, flow)
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return flows
 }
 
 // InsertFlowStart inserts a flow start
