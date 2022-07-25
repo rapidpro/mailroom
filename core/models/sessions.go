@@ -565,33 +565,29 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, fs flows.Sessio
 	return session, nil
 }
 
-const sqlInsertCompleteSession = `
+const sqlInsertWaitingSession = `
+INSERT INTO
+	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  connection_id)
+               VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :connection_id)
+RETURNING id`
+
+const sqlInsertWaitingSessionNoOutput = `
+INSERT INTO
+	flows_flowsession( uuid,  session_type,  status,  responded,           output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  connection_id)
+               VALUES(:uuid, :session_type, :status, :responded,          :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :connection_id)
+RETURNING id`
+
+const sqlInsertEndedSession = `
 INSERT INTO
 	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, connection_id)
                VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :connection_id)
-RETURNING id
-`
+RETURNING id`
 
-const sqlInsertIncompleteSession = `
+const sqlInsertEndedSessionNoOutput = `
 INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded,  output,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :connection_id)
-RETURNING id
-`
-
-const sqlInsertCompleteSessionNoOutput = `
-INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :connection_id)
-RETURNING id
-`
-
-const sqlInsertIncompleteSessionNoOutput = `
-INSERT INTO
-	flows_flowsession( uuid, session_type, status, responded,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  connection_id)
-               VALUES(:uuid,:session_type,:status,:responded, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :connection_id)
-RETURNING id
-`
+	flows_flowsession( uuid,  session_type,  status,  responded,           output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, connection_id)
+               VALUES(:uuid, :session_type, :status, :responded,          :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :connection_id)
+RETURNING id`
 
 // InsertSessions writes the passed in session to our database, writes any runs that need to be created
 // as well as appying any events created in the session
@@ -602,9 +598,10 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 
 	// create all our session objects
 	sessions := make([]*Session, 0, len(ss))
-	completeSessionsI := make([]interface{}, 0, len(ss))
-	incompleteSessionsI := make([]interface{}, 0, len(ss))
+	waitingSessionsI := make([]interface{}, 0, len(ss))
+	endedSessionsI := make([]interface{}, 0, len(ss))
 	completedConnectionIDs := make([]ConnectionID, 0, 1)
+
 	for i, s := range ss {
 		session, err := NewSession(ctx, tx, oa, s, sprints[i])
 		if err != nil {
@@ -612,13 +609,13 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 		}
 		sessions = append(sessions, session)
 
-		if session.Status() == SessionStatusCompleted {
-			completeSessionsI = append(completeSessionsI, &session.s)
+		if session.Status() == SessionStatusWaiting {
+			waitingSessionsI = append(waitingSessionsI, &session.s)
+		} else {
+			endedSessionsI = append(endedSessionsI, &session.s)
 			if session.channelConnection != nil {
 				completedConnectionIDs = append(completedConnectionIDs, session.channelConnection.ID())
 			}
-		} else {
-			incompleteSessionsI = append(incompleteSessionsI, &session.s)
 		}
 	}
 
@@ -640,26 +637,25 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 		}
 	}
 
-	// the SQL we'll use to do our insert of complete sessions
-	insertCompleteSQL := sqlInsertCompleteSession
-	insertIncompleteSQL := sqlInsertIncompleteSession
+	// the SQL we'll use to do our insert of sessions
+	insertEndedSQL := sqlInsertEndedSession
+	insertWaitingSQL := sqlInsertWaitingSession
 
 	// if writing our sessions to S3, do so
 	if rt.Config.SessionStorage == "s3" {
 		err := WriteSessionOutputsToStorage(ctx, rt, sessions)
 		if err != nil {
-			// for now, continue on for errors, we are still reading from the DB
-			logrus.WithError(err).Error("error writing sessions to s3")
+			return nil, errors.Wrapf(err, "error writing sessions to storage")
 		}
 
-		insertCompleteSQL = sqlInsertCompleteSessionNoOutput
-		insertIncompleteSQL = sqlInsertIncompleteSessionNoOutput
+		insertEndedSQL = sqlInsertEndedSessionNoOutput
+		insertWaitingSQL = sqlInsertWaitingSessionNoOutput
 	}
 
-	// insert our complete sessions first
-	err := BulkQuery(ctx, "insert completed sessions", tx, insertCompleteSQL, completeSessionsI)
+	// insert our ended sessions first
+	err := BulkQuery(ctx, "insert ended sessions", tx, insertEndedSQL, endedSessionsI)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting completed sessions")
+		return nil, errors.Wrapf(err, "error inserting ended sessions")
 	}
 
 	// mark any connections that are done as complete as well
@@ -668,10 +664,10 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 		return nil, errors.Wrapf(err, "error updating channel connections to complete")
 	}
 
-	// insert incomplete sessions
-	err = BulkQuery(ctx, "insert incomplete sessions", tx, insertIncompleteSQL, incompleteSessionsI)
+	// insert waiting sessions
+	err = BulkQuery(ctx, "insert waiting sessions", tx, insertWaitingSQL, waitingSessionsI)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting incomplete sessions")
+		return nil, errors.Wrapf(err, "error inserting waiting sessions")
 	}
 
 	// for each session associate our run with each
