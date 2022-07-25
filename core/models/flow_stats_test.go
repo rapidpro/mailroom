@@ -24,11 +24,11 @@ func TestRecordFlowStatistics(t *testing.T) {
 	assetsJSON, err := os.ReadFile("testdata/flow_stats_test.json")
 	require.NoError(t, err)
 
-	session1, session1Sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("19eab6aa-4a88-42a1-8882-b9956823c680").
+	sa1, session1, session1Sprint1 := test.NewSessionBuilder().WithAssetsJSON(assetsJSON).WithFlow("19eab6aa-4a88-42a1-8882-b9956823c680").
 		WithContact("4ad4f0a6-fb95-4845-b4cb-335f67eafe96", 123, "Bob", "eng", "").MustBuild()
-	session2, session2Sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("19eab6aa-4a88-42a1-8882-b9956823c680").
+	sa2, session2, session2Sprint1 := test.NewSessionBuilder().WithAssetsJSON(assetsJSON).WithFlow("19eab6aa-4a88-42a1-8882-b9956823c680").
 		WithContact("5cfe8b70-0d4a-4862-8fb5-e72603d832a9", 234, "Ann", "eng", "").MustBuild()
-	session3, session3Sprint1 := test.NewSessionBuilder().WithAssets(assetsJSON).WithFlow("19eab6aa-4a88-42a1-8882-b9956823c680").
+	sa3, session3, session3Sprint1 := test.NewSessionBuilder().WithAssetsJSON(assetsJSON).WithFlow("19eab6aa-4a88-42a1-8882-b9956823c680").
 		WithContact("367c8ef2-aac7-4264-9a03-40877371995d", 345, "Jim", "eng", "").MustBuild()
 
 	err = models.RecordFlowStatistics(ctx, rt, nil, []flows.Session{session1, session2, session3}, []flows.Sprint{session1Sprint1, session2Sprint1, session3Sprint1})
@@ -43,13 +43,13 @@ func TestRecordFlowStatistics(t *testing.T) {
 		[]string{"LZbbzXDPJH|123|", "reuPYVP90u|234|", "qWARtWDACk|345|"},
 	)
 
-	_, session1Sprint2, err := test.ResumeSession(session1, assetsJSON, "blue")
+	_, session1Sprint2, err := test.ResumeSession(session1, sa1, "blue")
 	require.NoError(t, err)
-	_, session2Sprint2, err := test.ResumeSession(session2, assetsJSON, "BLUE")
+	_, session2Sprint2, err := test.ResumeSession(session2, sa2, "BLUE")
 	require.NoError(t, err)
-	session3, session3Sprint2, err := test.ResumeSession(session3, assetsJSON, "teal")
+	session3, session3Sprint2, err := test.ResumeSession(session3, sa3, "teal")
 	require.NoError(t, err)
-	_, session3Sprint3, err := test.ResumeSession(session3, assetsJSON, "azure")
+	_, session3Sprint3, err := test.ResumeSession(session3, sa3, "azure")
 	require.NoError(t, err)
 
 	err = models.RecordFlowStatistics(ctx, rt, nil, []flows.Session{session1, session2, session3}, []flows.Sprint{session1Sprint2, session2Sprint2, session3Sprint2})
