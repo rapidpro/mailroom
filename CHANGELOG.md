@@ -1,3 +1,8 @@
+v7.5.4
+----------
+ * Add test utility to make it easier to test with imported flows
+ * Failed sessions should be saved with ended_on set
+
 v7.5.3
 ----------
  * Add endpoint to do synchronous interrupt of a single contact
