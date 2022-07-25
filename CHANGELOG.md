@@ -1,3 +1,7 @@
+v7.5.3
+----------
+ * Add endpoint to do synchronous interrupt of a single contact
+
 v7.5.2
 ----------
  * Update to latest goflow
