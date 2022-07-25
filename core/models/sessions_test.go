@@ -190,7 +190,7 @@ func TestSessionWithSubflows(t *testing.T) {
 	modelContact, _ := testdata.Cathy.Load(db, oa)
 
 	sa, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(parent.UUID).
-		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
+		WithContact(testdata.Cathy.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
 
 	tx := db.MustBegin()
 
@@ -263,7 +263,7 @@ func TestSessionFailedStart(t *testing.T) {
 	modelContact, _ := testdata.Cathy.Load(db, oa)
 
 	_, flowSession, sprint1 := test.NewSessionBuilder().WithAssets(oa.SessionAssets()).WithFlow(ping.UUID).
-		WithContact(testdata.Bob.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
+		WithContact(testdata.Cathy.UUID, flows.ContactID(testdata.Cathy.ID), "Cathy", "eng", "").MustBuild()
 
 	tx := db.MustBegin()
 
