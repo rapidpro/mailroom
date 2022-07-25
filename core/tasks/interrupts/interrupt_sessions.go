@@ -35,7 +35,7 @@ func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime
 	db := rt.DB
 
 	if len(t.ContactIDs) > 0 {
-		if err := models.InterruptSessionsForContacts(ctx, db, t.ContactIDs); err != nil {
+		if _, err := models.InterruptSessionsForContacts(ctx, db, t.ContactIDs); err != nil {
 			return err
 		}
 	}

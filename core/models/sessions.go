@@ -942,13 +942,13 @@ func getWaitingSessionsForContacts(ctx context.Context, db Queryer, contactIDs [
 }
 
 // InterruptSessionsForContacts interrupts any waiting sessions for the given contacts
-func InterruptSessionsForContacts(ctx context.Context, db *sqlx.DB, contactIDs []ContactID) error {
+func InterruptSessionsForContacts(ctx context.Context, db *sqlx.DB, contactIDs []ContactID) (int, error) {
 	sessionIDs, err := getWaitingSessionsForContacts(ctx, db, contactIDs)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return errors.Wrapf(ExitSessions(ctx, db, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
+	return len(sessionIDs), errors.Wrapf(ExitSessions(ctx, db, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
 }
 
 // InterruptSessionsForContactsTx interrupts any waiting sessions for the given contacts inside the given transaction.

@@ -20,6 +20,7 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(handleCreate))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/modify", web.RequireAuthToken(handleModify))
 	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/resolve", web.RequireAuthToken(handleResolve))
+	web.RegisterJSONRoute(http.MethodPost, "/mr/contact/interrupt", web.RequireAuthToken(handleInterrupt))
 }
 
 // Request to create a new contact.
@@ -91,10 +92,10 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 //   }
 //
 type modifyRequest struct {
-	OrgID      models.OrgID       `json:"org_id"       validate:"required"`
-	UserID     models.UserID      `json:"user_id"`
-	ContactIDs []models.ContactID `json:"contact_ids"  validate:"required"`
-	Modifiers  []json.RawMessage  `json:"modifiers"    validate:"required"`
+	OrgID      models.OrgID       `json:"org_id"      validate:"required"`
+	UserID     models.UserID      `json:"user_id"     validate:"required"`
+	ContactIDs []models.ContactID `json:"contact_ids" validate:"required"`
+	Modifiers  []json.RawMessage  `json:"modifiers"   validate:"required"`
 }
 
 // Response for a contact update. Will return the full contact state and any errors
@@ -225,4 +226,33 @@ func handleResolve(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 		},
 		"created": created,
 	}, http.StatusOK, nil
+}
+
+// Request that a single contact is interrupted. Multiple contacts should be interrupted via the task.
+//
+//   {
+//     "org_id": 1,
+//     "user_id": 3,
+//     "contact_id": 235
+//   }
+//
+type interruptRequest struct {
+	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
+	UserID    models.UserID    `json:"user_id"    validate:"required"`
+	ContactID models.ContactID `json:"contact_id" validate:"required"`
+}
+
+// handles a request to interrupt a contact
+func handleInterrupt(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+	request := &interruptRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
+	}
+
+	count, err := models.InterruptSessionsForContacts(ctx, rt.DB, []models.ContactID{request.ContactID})
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to interrupt contact")
+	}
+
+	return map[string]interface{}{"sessions": count}, http.StatusOK, nil
 }
