@@ -44,6 +44,7 @@ type TemplateTranslation struct {
 		Language      envs.Language           `json:"language"        validate:"required"`
 		Country       null.String             `json:"country"`
 		Namespace     string                  `json:"namespace"`
+		ExternalID    string                  `json:"external_id"`
 		Content       string                  `json:"content"         validate:"required"`
 		VariableCount int                     `json:"variable_count"`
 	}
@@ -60,6 +61,7 @@ func (t *TemplateTranslation) Language() envs.Language          { return t.t.Lan
 func (t *TemplateTranslation) Country() envs.Country            { return envs.Country(t.t.Country) }
 func (t *TemplateTranslation) Content() string                  { return t.t.Content }
 func (t *TemplateTranslation) Namespace() string                { return t.t.Namespace }
+func (t *TemplateTranslation) ExternalID() string               { return t.t.ExternalID }
 func (t *TemplateTranslation) VariableCount() int               { return t.t.VariableCount }
 
 // loads the templates for the passed in org
@@ -98,6 +100,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 			tr.country as country,
 			tr.content as content,
 			tr.namespace as namespace,
+			tr.external_id as external_id,
 			tr.variable_count as variable_count,
 			JSON_BUILD_OBJECT('uuid', c.uuid, 'name', c.name) as channel
 		FROM

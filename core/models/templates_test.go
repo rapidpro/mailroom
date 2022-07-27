@@ -30,6 +30,7 @@ func TestTemplates(t *testing.T) {
 	assert.Equal(t, envs.Language("fra"), tt.Language())
 	assert.Equal(t, envs.NilCountry, tt.Country())
 	assert.Equal(t, "", tt.Namespace())
+	assert.Equal(t, "fra2", tt.ExternalID())
 	assert.Equal(t, testdata.TwitterChannel.UUID, tt.Channel().UUID)
 	assert.Equal(t, "Salut!", tt.Content())
 

@@ -255,7 +255,7 @@ func TestSessionFailedStart(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	testFlows := testdata.ImportFlows(db, testdata.Org1, "testdata/ping_pong.json")
-	ping := testFlows[0]
+	ping, pong := testFlows[0], testFlows[1]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
@@ -292,6 +292,12 @@ func TestSessionFailedStart(t *testing.T) {
 	assertdb.Query(t, db, `SELECT status, session_type, current_flow_id, responded FROM flows_flowsession`).
 		Columns(map[string]interface{}{"status": "F", "session_type": "M", "current_flow_id": nil, "responded": false})
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE ended_on IS NOT NULL`).Returns(1)
+
+	// check the state of all the created runs
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun`).Returns(101)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1`, ping.ID).Returns(51)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1`, pong.ID).Returns(50)
+	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE status = 'F' AND exited_on IS NOT NULL`).Returns(101)
 }
 
 func TestInterruptSessionsForContacts(t *testing.T) {
