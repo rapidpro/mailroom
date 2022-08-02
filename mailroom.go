@@ -112,16 +112,19 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// create our storage (S3 or file system)
-	if mr.rt.Config.AWSAccessKeyID != "" {
-		s3Client, err := storage.NewS3Client(&storage.S3Options{
-			AWSAccessKeyID:     c.AWSAccessKeyID,
-			AWSSecretAccessKey: c.AWSSecretAccessKey,
+	if mr.rt.Config.AWSAccessKeyID != "" || mr.rt.Config.AWSUseCredChain {
+		s3config := &storage.S3Options{
 			Endpoint:           c.S3Endpoint,
 			Region:             c.S3Region,
 			DisableSSL:         c.S3DisableSSL,
 			ForcePathStyle:     c.S3ForcePathStyle,
 			MaxRetries:         3,
-		})
+		}
+		if mr.rt.Config.AWSAccessKeyID != "" && !mr.rt.Config.AWSUseCredChain {
+			s3config.AWSAccessKeyID =    c.AWSAccessKeyID
+			s3config.AWSSecretAccessKey = c.AWSSecretAccessKey
+		}
+		s3Client, err := storage.NewS3Client(s3config)
 		if err != nil {
 			return err
 		}
