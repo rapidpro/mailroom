@@ -60,6 +60,7 @@ type Config struct {
 
 	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
+	AWSUseCredChain    bool   `help:"whether to use the AWS credentials chain. Defaults to false."`
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
@@ -116,6 +117,7 @@ func NewDefaultConfig() *Config {
 
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",
+		AWSUseCredChain:    false,
 
 		InstanceName: hostname,
 		LogLevel:     "error",
