@@ -51,8 +51,8 @@ func TestHTTPLogger(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://temba.io": {
-			httpx.NewMockResponse(200, nil, `hello`),
-			httpx.NewMockResponse(400, nil, `world`),
+			httpx.NewMockResponse(200, nil, []byte(`hello`)),
+			httpx.NewMockResponse(400, nil, []byte(`world`)),
 		},
 	}))
 

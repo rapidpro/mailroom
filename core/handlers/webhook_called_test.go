@@ -33,13 +33,13 @@ func TestWebhookCalled(t *testing.T) {
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"http://rapidpro.io/": {
-			httpx.NewMockResponse(200, nil, "OK"),
-			httpx.NewMockResponse(200, nil, "OK"),
+			httpx.NewMockResponse(200, nil, []byte("OK")),
+			httpx.NewMockResponse(200, nil, []byte("OK")),
 		},
 		"http://rapidpro.io/?unsub=1": {
-			httpx.NewMockResponse(410, nil, "Gone"),
-			httpx.NewMockResponse(410, nil, "Gone"),
-			httpx.NewMockResponse(410, nil, "Gone"),
+			httpx.NewMockResponse(410, nil, []byte("Gone")),
+			httpx.NewMockResponse(410, nil, []byte("Gone")),
+			httpx.NewMockResponse(410, nil, []byte("Gone")),
 		},
 	}))
 
