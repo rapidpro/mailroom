@@ -39,11 +39,11 @@ func TestOpenAndForward(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		baseURL + "/room": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(201, nil, `{ "id": "uiF7ybjsv7PSJGSw6" }`),
+			httpx.NewMockResponse(201, nil, []byte(`{ "id": "uiF7ybjsv7PSJGSw6" }`)),
 		},
 		baseURL + "/visitor-message": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(201, nil, `{ "id": "tyLrD97j8TFZmT3Y6" }`),
+			httpx.NewMockResponse(201, nil, []byte(`{ "id": "tyLrD97j8TFZmT3Y6" }`)),
 		},
 	}))
 
@@ -118,8 +118,8 @@ func TestCloseAndReopen(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		baseURL + "/room.close": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(204, nil, ``),
-			httpx.NewMockResponse(204, nil, ``),
+			httpx.NewMockResponse(204, nil, nil),
+			httpx.NewMockResponse(204, nil, nil),
 		},
 	}))
 

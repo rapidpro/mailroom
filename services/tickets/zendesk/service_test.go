@@ -38,22 +38,22 @@ func TestOpenAndForward(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"results": [
 					{
 						"external_resource_id": "123",
 						"status": {"code": "success"}
 					}
 				]
-			}`),
-			httpx.NewMockResponse(201, nil, `{
+			}`)),
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"results": [
 					{
 						"external_resource_id": "124",
 						"status": {"code": "success"}
 					}
 				]
-			}`),
+			}`)),
 		},
 	}))
 
@@ -131,22 +131,22 @@ func TestCloseAndReopen(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=12,14": {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"job_status": {
 					"id": "1234-abcd",
 					"url": "http://zendesk.com",
 					"status": "queued"
 				}
-			}`),
+			}`)),
 		},
 		"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=14": {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"job_status": {
 					"id": "1234-abcd",
 					"url": "http://zendesk.com",
 					"status": "queued"
 				}
-			}`),
+			}`)),
 		},
 	}))
 

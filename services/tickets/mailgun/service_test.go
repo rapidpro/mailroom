@@ -38,17 +38,17 @@ func TestOpenAndForward(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
-			}`),
-			httpx.NewMockResponse(200, nil, `{
+			}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
-			}`),
+			}`)),
 		},
 		"http://myfiles.com/media/0123/attachment1.jpg": {
-			httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpg"}, `MYIMAGE`),
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpg"}, []byte(`MYIMAGE`)),
 		},
 	}))
 
@@ -126,18 +126,18 @@ func TestCloseAndReopen(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
-			}`),
-			httpx.NewMockResponse(200, nil, `{
+			}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
-			}`),
-			httpx.NewMockResponse(200, nil, `{
+			}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
-			}`),
+			}`)),
 		},
 	}))
 

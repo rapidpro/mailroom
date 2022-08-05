@@ -25,7 +25,7 @@ func TestEngineWebhook(t *testing.T) {
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://rapidpro.io": {httpx.NewMockResponse(200, nil, "OK")},
+		"http://rapidpro.io": {httpx.NewMockResponse(200, nil, []byte("OK"))},
 	}))
 
 	request, err := http.NewRequest("GET", "http://rapidpro.io", nil)
@@ -85,7 +85,7 @@ func TestSimulatorWebhook(t *testing.T) {
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"http://rapidpro.io": {httpx.NewMockResponse(200, nil, "OK")},
+		"http://rapidpro.io": {httpx.NewMockResponse(200, nil, []byte("OK"))},
 	}))
 
 	request, err := http.NewRequest("GET", "http://rapidpro.io", nil)

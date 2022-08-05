@@ -1,11 +1,12 @@
 package rocketchat_test
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 const (
@@ -19,8 +20,8 @@ func TestCreateRoom(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		baseURL + "/room": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{ "error": "There's no agents online" }`),
-			httpx.NewMockResponse(201, nil, `{ "id": "uiF7ybjsv7PSJGSw6" }`),
+			httpx.NewMockResponse(400, nil, []byte(`{ "error": "There's no agents online" }`)),
+			httpx.NewMockResponse(201, nil, []byte(`{ "id": "uiF7ybjsv7PSJGSw6" }`)),
 		},
 	}))
 
@@ -33,7 +34,7 @@ func TestCreateRoom(t *testing.T) {
 			Email:       "bob@acme.com",
 			Phone:       "+16055741111",
 		},
-		TicketID:     "88ff1e41-c1f8-4637-af8e-d56acbde9171",
+		TicketID: "88ff1e41-c1f8-4637-af8e-d56acbde9171",
 	}
 
 	_, _, err := client.CreateRoom(room)
@@ -54,8 +55,8 @@ func TestCloseRoom(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		baseURL + "/room.close": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a room for visitor token: 1234" }`),
-			httpx.NewMockResponse(204, nil, ``),
+			httpx.NewMockResponse(400, nil, []byte(`{ "error": "Could not find a room for visitor token: 1234" }`)),
+			httpx.NewMockResponse(204, nil, nil),
 		},
 	}))
 
@@ -79,8 +80,8 @@ func TestSendMessage(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		baseURL + "/visitor-message": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a room for visitor token: 1234" }`),
-			httpx.NewMockResponse(201, nil, `{ "id": "tyLrD97j8TFZmT3Y6" }`),
+			httpx.NewMockResponse(400, nil, []byte(`{ "error": "Could not find a room for visitor token: 1234" }`)),
+			httpx.NewMockResponse(201, nil, []byte(`{ "id": "tyLrD97j8TFZmT3Y6" }`)),
 		},
 	}))
 

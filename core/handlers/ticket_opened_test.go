@@ -27,20 +27,20 @@ func TestTicketOpened(t *testing.T) {
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
 				"message": "Queued. Thank you."
-			}`),
+			}`)),
 		},
 		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"results": [
 					{
 						"external_resource_id": "123",
 						"status": {"code": "success"}
 					}
 				]
-			}`),
+			}`)),
 		},
 	}))
 
