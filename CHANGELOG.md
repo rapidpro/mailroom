@@ -1,3 +1,8 @@
+v7.5.5
+----------
+ * Update to latest goflow and gocommon
+ * Add support for AWS Cred Chains
+
 v7.5.4
 ----------
  * Add test utility to make it easier to test with imported flows
