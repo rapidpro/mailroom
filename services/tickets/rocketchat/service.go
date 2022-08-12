@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
@@ -30,7 +31,7 @@ func init() {
 type service struct {
 	client   *Client
 	ticketer *flows.Ticketer
-	redactor utils.Redactor
+	redactor stringsx.Redactor
 }
 
 // NewService creates a new RocketChat ticket service
@@ -42,7 +43,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		return &service{
 			client:   NewClient(httpClient, httpRetries, baseURL, secret),
 			ticketer: ticketer,
-			redactor: utils.NewRedactor(flows.RedactionMask, secret),
+			redactor: stringsx.NewRedactor(flows.RedactionMask, secret),
 		}, nil
 	}
 	return nil, errors.New("missing base_url or secret config")

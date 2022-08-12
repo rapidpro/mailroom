@@ -272,7 +272,7 @@ func TestAirtimeTransferred(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://dvs-api.dtone.com/v1/lookup/mobile-number/+16055741111": {
 			httpx.NewMockResponse(200, nil, []byte(lookupNumberResponse)), // successful mobile number lookup
 		},

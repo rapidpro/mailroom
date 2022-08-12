@@ -31,7 +31,7 @@ func TestWebhookCalled(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"http://rapidpro.io/": {
 			httpx.NewMockResponse(200, nil, []byte("OK")),
 			httpx.NewMockResponse(200, nil, []byte("OK")),

@@ -35,7 +35,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, []byte(`{
@@ -129,7 +129,7 @@ func TestCloseAndReopen(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=12,14": {
 			httpx.NewMockResponse(201, nil, []byte(`{
 				"job_status": {

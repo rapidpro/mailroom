@@ -36,7 +36,7 @@ func TestOpenAndForward(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, []byte(`{ "id": "uiF7ybjsv7PSJGSw6" }`)),
@@ -115,7 +115,7 @@ func TestCloseAndReopen(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room.close": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(204, nil, nil),

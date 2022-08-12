@@ -13,7 +13,7 @@ import (
 
 func TestCreateTarget(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/targets.json": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, []byte(`{"description": "Something went wrong", "error": "Unknown"}`)), // non-200 response
@@ -55,7 +55,7 @@ func TestCreateTarget(t *testing.T) {
 
 func TestDeleteTarget(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/targets/123.json": {
 			httpx.NewMockResponse(200, nil, nil),
 		},
@@ -71,7 +71,7 @@ func TestDeleteTarget(t *testing.T) {
 
 func TestCreateTrigger(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/triggers.json": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, []byte(`{"description": "Something went wrong", "error": "Unknown"}`)), // non-200 response
@@ -129,7 +129,7 @@ func TestCreateTrigger(t *testing.T) {
 
 func TestDeleteTrigger(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/triggers/123.json": {
 			httpx.NewMockResponse(200, nil, nil),
 		},
@@ -145,7 +145,7 @@ func TestDeleteTrigger(t *testing.T) {
 
 func TestUpdateManyTickets(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=123,234": {
 			httpx.NewMockResponse(201, nil, []byte(`{
 				"job_status": {
@@ -169,7 +169,7 @@ func TestUpdateManyTickets(t *testing.T) {
 
 func TestPush(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, []byte(`{"description": "Something went wrong", "error": "Unknown"}`)), // non-200 response
