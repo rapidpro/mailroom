@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -80,7 +81,7 @@ type service struct {
 	toAddress string
 	brandName string
 	urlBase   string
-	redactor  utils.Redactor
+	redactor  stringsx.Redactor
 }
 
 // NewService creates a new mailgun email-based ticket service
@@ -101,7 +102,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 			toAddress: toAddress,
 			brandName: brandName,
 			urlBase:   urlBase,
-			redactor:  utils.NewRedactor(flows.RedactionMask, apiKey, basicAuth),
+			redactor:  stringsx.NewRedactor(flows.RedactionMask, apiKey, basicAuth),
 		}, nil
 	}
 	return nil, errors.New("missing domain or api_key or to_address or url_base in mailgun config")
@@ -231,5 +232,5 @@ func evaluateTemplate(t *template.Template, c map[string]string) string {
 }
 
 func subjectFromBody(body string) string {
-	return utils.Truncate(strings.ReplaceAll(body, "\n", ""), 64)
+	return stringsx.Truncate(strings.ReplaceAll(body, "\n", ""), 64)
 }

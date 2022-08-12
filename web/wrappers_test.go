@@ -23,7 +23,7 @@ func TestWithHTTPLogs(t *testing.T) {
 	defer db.MustExec(`DELETE FROM request_logs_httplog`)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://temba.io": {
 			httpx.NewMockResponse(200, nil, []byte(`hello`)),
 			httpx.NewMockResponse(400, nil, []byte(`world`)),

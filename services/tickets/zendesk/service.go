@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -42,7 +43,7 @@ type service struct {
 	restClient     *RESTClient
 	pushClient     *PushClient
 	ticketer       *flows.Ticketer
-	redactor       utils.Redactor
+	redactor       stringsx.Redactor
 	secret         string
 	instancePushID string
 	targetID       string
@@ -65,7 +66,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
 			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
 			ticketer:       ticketer,
-			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
+			redactor:       stringsx.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
 			secret:         secret,
 			instancePushID: instancePushID,
 			targetID:       targetID,
@@ -250,7 +251,6 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 // For example https://mybucket.s3.amazonaws.com/attachments/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // is sent to Zendesk as file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
-//
 func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
 	prefix := s.rtConfig.S3MediaPrefix
 	if !strings.HasPrefix(prefix, "/") {

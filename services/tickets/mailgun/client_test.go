@@ -17,7 +17,7 @@ func TestSendMessage(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, []byte(`{"message": "Something went wrong"}`)), // non-200 response

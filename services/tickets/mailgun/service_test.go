@@ -35,7 +35,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 123456789, time.UTC)))
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(200, nil, []byte(`{
@@ -124,7 +124,7 @@ func TestCloseAndReopen(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",

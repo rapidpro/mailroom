@@ -17,7 +17,7 @@ const (
 func TestCreateRoom(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, []byte(`{ "error": "There's no agents online" }`)),
@@ -52,7 +52,7 @@ func TestCreateRoom(t *testing.T) {
 func TestCloseRoom(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room.close": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, []byte(`{ "error": "Could not find a room for visitor token: 1234" }`)),
@@ -77,7 +77,7 @@ func TestCloseRoom(t *testing.T) {
 func TestSendMessage(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/visitor-message": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, []byte(`{ "error": "Could not find a room for visitor token: 1234" }`)),

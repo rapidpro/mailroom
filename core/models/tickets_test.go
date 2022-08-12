@@ -298,7 +298,7 @@ func TestCloseTickets(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",
@@ -368,7 +368,7 @@ func TestReopenTickets(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.mailgun.net/v3/tickets.rapidpro.io/messages": {
 			httpx.NewMockResponse(200, nil, []byte(`{
 				"id": "<20200426161758.1.590432020254B2BF@tickets.rapidpro.io>",

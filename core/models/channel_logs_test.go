@@ -19,7 +19,7 @@ func TestChannelLogs(t *testing.T) {
 	defer db.MustExec(`DELETE FROM channels_channellog`)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"http://rapidpro.io":     {httpx.NewMockResponse(200, nil, []byte("OK"))},
 		"http://rapidpro.io/bad": {httpx.NewMockResponse(400, nil, []byte("Oops"))},
 		"http://rapidpro.io/new": {httpx.NewMockResponse(200, nil, []byte("OK"))},
