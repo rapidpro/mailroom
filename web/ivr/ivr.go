@@ -33,31 +33,27 @@ type ivrHandlerFn func(ctx context.Context, rt *runtime.Runtime, r *http.Request
 
 func newIVRHandler(handler ivrHandlerFn) web.Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
-		recorder := httpx.NewRecorder(r, w)
-
-		// immediately save our request body so we have a complete channel log
-		err := recorder.SaveRequest()
+		recorder, err := httpx.NewRecorder(r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error reading request body")
 		}
-		ww := recorder.ResponseWriter
 
-		channel, connection, rerr := handler(ctx, rt, r, ww)
+		channel, connection, rerr := handler(ctx, rt, r, recorder.ResponseWriter)
 
 		if channel != nil {
-			trace, err := recorder.End()
+			err := recorder.End()
 			if err != nil {
 				logrus.WithError(err).WithField("http_request", r).Error("error recording IVR request")
 			}
 
 			desc := "IVR event handled"
 			isError := false
-			if trace.Response == nil || trace.Response.StatusCode != http.StatusOK {
+			if recorder.Trace.Response == nil || recorder.Trace.Response.StatusCode != http.StatusOK {
 				desc = "IVR Error"
 				isError = true
 			}
 
-			log := models.NewChannelLog(trace, isError, desc, channel, connection)
+			log := models.NewChannelLog(recorder.Trace, isError, desc, channel, connection)
 			err = models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{log})
 			if err != nil {
 				logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
