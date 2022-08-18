@@ -39,8 +39,8 @@ type ChannelLog struct {
 }
 
 const sqlInsertChannelLog = `
-INSERT INTO channels_channellog( channel_id,  connection_id,  log_type,  http_logs,  is_error,  elapsed_ms,  created_on, description)
-                         VALUES(:channel_id, :connection_id, :log_type, :http_logs, :is_error, :elapsed_ms, :created_on, '')
+INSERT INTO channels_channellog( channel_id,  connection_id,  log_type,  http_logs,  is_error,  elapsed_ms,  created_on)
+                         VALUES(:channel_id, :connection_id, :log_type, :http_logs, :is_error, :elapsed_ms, :created_on)
   RETURNING id`
 
 // NewChannelLog creates a new channel log from the given HTTP trace
