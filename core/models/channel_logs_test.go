@@ -34,23 +34,23 @@ func TestChannelLogs(t *testing.T) {
 	req1, _ := httpx.NewRequest("GET", "http://rapidpro.io", nil, nil)
 	trace1, err := httpx.DoTrace(http.DefaultClient, req1, nil, nil, -1)
 	require.NoError(t, err)
-	log1 := models.NewChannelLog(trace1, false, "test request", channel, nil)
+	log1 := models.NewChannelLog(channel.ID(), nil, models.ChannelLogTypeIVRIncoming, trace1)
 
 	req2, _ := httpx.NewRequest("GET", "http://rapidpro.io/bad", nil, nil)
 	trace2, err := httpx.DoTrace(http.DefaultClient, req2, nil, nil, -1)
 	require.NoError(t, err)
-	log2 := models.NewChannelLog(trace2, true, "test request", channel, nil)
+	log2 := models.NewChannelLog(channel.ID(), nil, models.ChannelLogTypeIVRCallback, trace2)
 
 	req3, _ := httpx.NewRequest("GET", "http://rapidpro.io/new", nil, map[string]string{"X-Forwarded-Path": "/old"})
 	trace3, err := httpx.DoTrace(http.DefaultClient, req3, nil, nil, -1)
 	require.NoError(t, err)
-	log3 := models.NewChannelLog(trace3, false, "test request", channel, nil)
+	log3 := models.NewChannelLog(channel.ID(), nil, models.ChannelLogTypeIVRStatus, trace3)
 
 	err = models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log1, log2, log3})
 	require.NoError(t, err)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog`).Returns(3)
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'http://rapidpro.io/bad' AND is_error = TRUE AND channel_id = $1`, channel.ID()).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE url = 'https://rapidpro.io/old' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE http_logs -> 0 ->> 'url' = 'http://rapidpro.io' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE http_logs -> 0 ->> 'url' = 'http://rapidpro.io/bad' AND is_error = TRUE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE http_logs -> 0 ->> 'url' = 'https://rapidpro.io/old' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
 }

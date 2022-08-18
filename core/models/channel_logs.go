@@ -2,71 +2,79 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/pkg/errors"
 )
 
 // ChannelLogID is our type for a channel log id
 type ChannelLogID int64
 
+type ChanneLogType string
+
+const (
+	ChannelLogTypeIVRStart    = "ivr_start"
+	ChannelLogTypeIVRIncoming = "ivr_incoming"
+	ChannelLogTypeIVRCallback = "ivr_callback"
+	ChannelLogTypeIVRStatus   = "ivr_status"
+	ChannelLogTypeIVRHangup   = "ivr_hangup"
+)
+
 // ChannelLog is the mailroom struct that represents channel logs
 type ChannelLog struct {
-	// inner struct for privacy and so we don't collide with method names
-	l struct {
-		ID           ChannelLogID `db:"id"`
-		Description  string       `db:"description"`
-		IsError      bool         `db:"is_error"`
-		URL          string       `db:"url"`
-		Method       string       `db:"method"`
-		Request      string       `db:"request"`
-		Response     string       `db:"response"`
-		Status       int          `db:"response_status"`
-		CreatedOn    time.Time    `db:"created_on"`
-		RequestTime  int          `db:"request_time"`
-		ChannelID    ChannelID    `db:"channel_id"`
-		ConnectionID ConnectionID `db:"connection_id"`
-	}
+	ID           ChannelLogID `db:"id"`
+	ChannelID    ChannelID    `db:"channel_id"`
+	ConnectionID ConnectionID `db:"connection_id"`
+
+	Type      ChanneLogType   `db:"log_type"`
+	HTTPLogs  json.RawMessage `db:"http_logs"`
+	IsError   bool            `db:"is_error"`
+	ElapsedMS int             `db:"elapsed_ms"`
+	CreatedOn time.Time       `db:"created_on"`
 }
 
-// ID returns the id of this channel log
-func (l *ChannelLog) ID() ChannelLogID { return l.l.ID }
-
 const sqlInsertChannelLog = `
-INSERT INTO channels_channellog( description, is_error,  url,  method,  request,  response,  response_status,  created_on,  request_time,  channel_id,  connection_id)
-     VALUES(:description, :is_error, :url, :method, :request, :response, :response_status, :created_on, :request_time, :channel_id, :connection_id)
-  RETURNING id as id`
+INSERT INTO channels_channellog( channel_id,  connection_id,  log_type,  http_logs,  is_error,  elapsed_ms,  created_on, description)
+                         VALUES(:channel_id, :connection_id, :log_type, :http_logs, :is_error, :elapsed_ms, :created_on, '')
+  RETURNING id`
 
-// NewChannelLog creates a new channel log
-func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Channel, conn *ChannelConnection) *ChannelLog {
-	log := &ChannelLog{}
-	l := &log.l
-
-	statusCode := 0
-	if trace.Response != nil {
-		statusCode = trace.Response.StatusCode
-	}
+// NewChannelLog creates a new channel log from the given HTTP trace
+func NewChannelLog(channelID ChannelID, conn *ChannelConnection, logType ChanneLogType, trace *httpx.Trace) *ChannelLog {
+	httpLog := httpx.NewLog(trace, 2048, 50000, nil)
 
 	// if URL was rewritten (by nginx for example), we want to log the original request
-	url := originalURL(trace.Request)
+	httpLog.URL = originalURL(trace.Request)
 
-	l.Description = desc
-	l.IsError = isError
-	l.URL = url
-	l.Method = trace.Request.Method
-	l.Request = string(trace.RequestTrace)
-	l.Response = string(trace.SanitizedResponse("..."))
-	l.Status = statusCode
-	l.CreatedOn = trace.StartTime
-	l.RequestTime = int((trace.EndTime.Sub(trace.StartTime)) / time.Millisecond)
-	l.ChannelID = channel.ID()
+	isError := false
+	if trace.Response == nil || trace.Response.StatusCode/100 != 2 {
+		isError = true
+	}
+
+	l := &ChannelLog{
+		ChannelID: channelID,
+		Type:      logType,
+		HTTPLogs:  jsonx.MustMarshal([]*httpx.Log{httpLog}),
+		IsError:   isError,
+		ElapsedMS: httpLog.ElapsedMS,
+		CreatedOn: time.Now(),
+	}
+
 	if conn != nil {
 		l.ConnectionID = conn.ID()
 	}
-	return log
+
+	return l
+}
+
+// InsertChannelLogs writes the given channel logs to the db
+func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) error {
+	err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, logs)
+	return errors.Wrapf(err, "error inserting channel logs")
 }
 
 func originalURL(r *http.Request) string {
@@ -75,48 +83,4 @@ func originalURL(r *http.Request) string {
 		return fmt.Sprintf("https://%s%s", r.Host, proxyPath)
 	}
 	return r.URL.String()
-}
-
-// InsertChannelLogs writes the given channel logs to the db
-func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) error {
-	ls := make([]interface{}, len(logs))
-	for i := range logs {
-		ls[i] = &logs[i].l
-	}
-
-	err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, ls)
-	if err != nil {
-		return errors.Wrapf(err, "error inserting channel log")
-	}
-	return nil
-}
-
-// InsertChannelLog writes a channel log to the db returning the inserted log
-func InsertChannelLog(ctx context.Context, db Queryer,
-	desc string, isError bool, method string, url string, request []byte, status int, response []byte,
-	createdOn time.Time, elapsed time.Duration, channel *Channel, conn *ChannelConnection) (*ChannelLog, error) {
-
-	log := &ChannelLog{}
-	l := &log.l
-
-	l.Description = desc
-	l.IsError = isError
-	l.URL = url
-	l.Method = method
-	l.Request = string(request)
-	l.Response = string(response)
-	l.Status = status
-	l.CreatedOn = createdOn
-	l.RequestTime = int(elapsed / time.Millisecond)
-	l.ChannelID = channel.ID()
-
-	if conn != nil {
-		l.ConnectionID = conn.ID()
-	}
-
-	err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, []interface{}{l})
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting channel log")
-	}
-	return log, nil
 }

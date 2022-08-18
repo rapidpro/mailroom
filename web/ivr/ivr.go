@@ -24,14 +24,14 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/handle", newIVRHandler(handleFlow))
-	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/status", newIVRHandler(handleStatus))
-	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/incoming", newIVRHandler(handleIncomingCall))
+	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/handle", newIVRHandler(handleCallback, models.ChannelLogTypeIVRCallback))
+	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/status", newIVRHandler(handleStatus, models.ChannelLogTypeIVRStatus))
+	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/incoming", newIVRHandler(handleIncoming, models.ChannelLogTypeIVRIncoming))
 }
 
 type ivrHandlerFn func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error)
 
-func newIVRHandler(handler ivrHandlerFn) web.Handler {
+func newIVRHandler(handler ivrHandlerFn, logType models.ChanneLogType) web.Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
 		recorder, err := httpx.NewRecorder(r, w)
 		if err != nil {
@@ -46,14 +46,7 @@ func newIVRHandler(handler ivrHandlerFn) web.Handler {
 				logrus.WithError(err).WithField("http_request", r).Error("error recording IVR request")
 			}
 
-			desc := "IVR event handled"
-			isError := false
-			if recorder.Trace.Response == nil || recorder.Trace.Response.StatusCode != http.StatusOK {
-				desc = "IVR Error"
-				isError = true
-			}
-
-			log := models.NewChannelLog(recorder.Trace, isError, desc, channel, connection)
+			log := models.NewChannelLog(channel.ID(), connection, logType, recorder.Trace)
 			err = models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{log})
 			if err != nil {
 				logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
@@ -64,7 +57,7 @@ func newIVRHandler(handler ivrHandlerFn) web.Handler {
 	}
 }
 
-func handleIncomingCall(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error) {
+func handleIncoming(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error) {
 	channelUUID := assets.ChannelUUID(chi.URLParam(r, "uuid"))
 
 	// load the org id for this UUID (we could load the entire channel here but we want to take the same paths through everything else)
@@ -209,8 +202,8 @@ func buildResumeURL(cfg *runtime.Config, channel *models.Channel, conn *models.C
 	return fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
 }
 
-// handleFlow handles all incoming IVR requests related to a flow (status is handled elsewhere)
-func handleFlow(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error) {
+// handles all incoming IVR requests related to a flow (status is handled elsewhere)
+func handleCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*55)
 	defer cancel()
 

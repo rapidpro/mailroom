@@ -143,6 +143,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 	defer rows.Close()
 
 	expiredSessions := make([]models.SessionID, 0, 100)
+	channelLogs := make([]*models.ChannelLog, 0, 100)
 
 	for rows.Next() {
 		expiredWait := &ExpiredVoiceWait{}
@@ -162,9 +163,13 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		}
 
 		// hang up our call
-		err = ivr.HangupCall(ctx, rt, conn)
+		trace, err := ivr.HangupCall(ctx, rt, conn)
 		if err != nil {
+			// log error but carry on with other calls
 			log.WithError(err).WithField("connection_id", conn.ID()).Error("error hanging up call")
+		}
+		if trace != nil {
+			channelLogs = append(channelLogs, models.NewChannelLog(conn.ChannelID(), conn, models.ChannelLogTypeIVRHangup, trace))
 		}
 	}
 
@@ -175,6 +180,10 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 			log.WithError(err).Error("error expiring sessions for expired calls")
 		}
 		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on channel connections")
+	}
+
+	if err := models.InsertChannelLogs(ctx, rt.DB, channelLogs); err != nil {
+		return errors.Wrap(err, "error inserting channel logs")
 	}
 
 	return nil
