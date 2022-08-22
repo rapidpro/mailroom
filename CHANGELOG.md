@@ -1,3 +1,7 @@
+v7.5.7
+----------
+ * Update to latest gocommon
+
 v7.5.6
 ----------
  * Update to latest gocommon and goflow
