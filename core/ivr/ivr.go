@@ -96,53 +96,31 @@ type Service interface {
 }
 
 // HangupCall hangs up the passed in call also taking care of updating the status of our call in the process
-func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection) error {
+func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection) (*httpx.Trace, error) {
 	// no matter what mark our call as failed
 	defer conn.MarkFailed(ctx, rt.DB, time.Now())
 
 	// load our org assets
 	oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
 	if err != nil {
-		return errors.Wrapf(err, "unable to load org")
+		return nil, errors.Wrapf(err, "unable to load org")
 	}
 
 	// and our channel
 	channel := oa.ChannelByID(conn.ChannelID())
 	if channel == nil {
-		return errors.Wrapf(err, "unable to load channel")
+		return nil, errors.Wrapf(err, "unable to load channel")
 	}
 
 	// create the right service
 	c, err := GetService(channel)
 	if err != nil {
-		return errors.Wrapf(err, "unable to create IVR service")
+		return nil, errors.Wrapf(err, "unable to create IVR service")
 	}
 
 	// try to request our call hangup
 	trace, err := c.HangupCall(conn.ExternalID())
-
-	// insert an channel log if we have an HTTP trace
-	if trace != nil {
-		desc := "Hangup Requested"
-		isError := false
-		if trace.Response == nil || trace.Response.StatusCode/100 != 2 {
-			desc = "Error Hanging up Call"
-			isError = true
-		}
-		log := models.NewChannelLog(trace, isError, desc, channel, conn)
-		err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{log})
-
-		// log any error inserting our channel log, but try to continue
-		if err != nil {
-			logrus.WithError(err).Error("error inserting channel log")
-		}
-	}
-
-	if err != nil {
-		return errors.Wrapf(err, "error hanging call up")
-	}
-
-	return nil
+	return trace, errors.Wrapf(err, "error hanging call up")
 }
 
 // RequestCallStart creates a new ChannelSession for the passed in flow start and contact, returning the created session
@@ -254,13 +232,7 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 
 	/// insert an channel log if we have an HTTP trace
 	if trace != nil {
-		desc := "Call Requested"
-		isError := false
-		if trace.Response == nil || trace.Response.StatusCode/100 != 2 {
-			desc = "Error Requesting Call"
-			isError = true
-		}
-		log := models.NewChannelLog(trace, isError, desc, channel, conn)
+		log := models.NewChannelLog(channel.ID(), conn, models.ChannelLogTypeIVRStart, trace)
 		err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{log})
 
 		// log any error inserting our channel log, but try to continue
