@@ -1,3 +1,9 @@
+v7.5.6
+----------
+ * Update to latest gocommon and goflow
+ * Save IVR channel logs in new format
+ * Upgrade dependencies
+
 v7.5.5
 ----------
  * Update to latest goflow and gocommon
