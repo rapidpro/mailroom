@@ -28,7 +28,9 @@ jobs:
           postgresql password: temba
 
       - name: Install Linux packages
-        run: sudo apt install -y --no-install-recommends postgresql-client
+        run: |
+          sudo apt-get update
+          sudo apt install -y --no-install-recommends postgresql-client
 
       - name: Initialize database
         # we create our test database with a different user so that we can drop everything owned by this user between tests
