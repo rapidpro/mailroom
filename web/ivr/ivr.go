@@ -33,7 +33,7 @@ type ivrHandlerFn func(ctx context.Context, rt *runtime.Runtime, r *http.Request
 
 func newIVRHandler(handler ivrHandlerFn, logType models.ChanneLogType) web.Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
-		recorder, err := httpx.NewRecorder(r, w)
+		recorder, err := httpx.NewRecorder(r, w, true)
 		if err != nil {
 			return errors.Wrapf(err, "error reading request body")
 		}
