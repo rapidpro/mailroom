@@ -3,8 +3,6 @@ package models
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -47,9 +45,6 @@ INSERT INTO channels_channellog( channel_id,  connection_id,  log_type,  http_lo
 func NewChannelLog(channelID ChannelID, conn *ChannelConnection, logType ChanneLogType, trace *httpx.Trace) *ChannelLog {
 	httpLog := httpx.NewLog(trace, 2048, 50000, nil)
 
-	// if URL was rewritten (by nginx for example), we want to log the original request
-	httpLog.URL = originalURL(trace.Request)
-
 	isError := false
 	if trace.Response == nil || trace.Response.StatusCode/100 != 2 {
 		isError = true
@@ -75,12 +70,4 @@ func NewChannelLog(channelID ChannelID, conn *ChannelConnection, logType ChanneL
 func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) error {
 	err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, logs)
 	return errors.Wrapf(err, "error inserting channel logs")
-}
-
-func originalURL(r *http.Request) string {
-	proxyPath := r.Header.Get("X-Forwarded-Path")
-	if proxyPath != "" {
-		return fmt.Sprintf("https://%s%s", r.Host, proxyPath)
-	}
-	return r.URL.String()
 }
