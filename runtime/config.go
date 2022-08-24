@@ -71,6 +71,7 @@ type Config struct {
 	LogLevel     string `help:"the logging level courier should use"`
 	UUIDSeed     int    `help:"seed to use for UUID generation in a testing environment"`
 	Version      string `help:"the version of this mailroom install"`
+	TimeoutTime  int    `help:"the amount of time to between every timeout queued"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -121,6 +122,7 @@ func NewDefaultConfig() *Config {
 		LogLevel:     "error",
 		UUIDSeed:     0,
 		Version:      "Dev",
+		TimeoutTime:  15,
 	}
 }
 
