@@ -29,7 +29,7 @@ func init() {
 
 // StartTimeoutCron starts our cron job of continuing timed out sessions every minute
 func StartTimeoutCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, timeoutLock, time.Second*60, false,
+	cron.Start(quit, rt, timeoutLock, time.Second*time.Duration(rt.Config.TimeoutTime), false,
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
