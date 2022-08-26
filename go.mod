@@ -15,8 +15,8 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.6
 	github.com/nyaruka/ezconf v0.2.1
-	github.com/nyaruka/gocommon v1.28.2
-	github.com/nyaruka/goflow v0.168.1
+	github.com/nyaruka/gocommon v1.29.0
+	github.com/nyaruka/goflow v0.168.2
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0
 	github.com/nyaruka/redisx v0.2.2
@@ -52,7 +52,7 @@ require (
 	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/naoina/toml v0.1.1 // indirect
 	github.com/nyaruka/librato v1.0.0 // indirect
-	github.com/nyaruka/phonenumbers v1.1.0 // indirect
+	github.com/nyaruka/phonenumbers v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
