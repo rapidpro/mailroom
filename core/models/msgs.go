@@ -585,10 +585,8 @@ SELECT
 	attachments,
 	metadata,
 	channel_id,
-	connection_id,
 	contact_id,
 	contact_urn_id,
-	response_to_id,
 	org_id,
 	topup_id
 FROM
