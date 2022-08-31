@@ -1,0 +1,125 @@
+[
+  {
+    "label": "error response if no such ticketer",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/XYZ/XYZ",
+    "body": {
+      "type": "msg.create",
+      "content": {
+        "text": "we can help"
+      }
+    },
+    "status": 404,
+    "response": {
+      "error": "not found: /mr/tickets/types/wenichats/event_callback/XYZ/XYZ"
+    }
+  },
+  {
+    "label": "error response if no such ticket",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/3908cb99-087d-456e-93f4-66a1e04f3105/564fee60-7e84-4a9e-ade3-4fce01af19a2",
+    "body": {
+      "type": "msg.create",
+      "content": {
+        "text": "we can help"
+      }
+    },
+    "status": 404,
+    "response": {
+      "error": "no such ticket 564fee60-7e84-4a9e-ade3-4fce01af19a2"
+    }
+  },
+  {
+    "label": "error response if invalid event type",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
+    "body": {
+      "type": "other",
+      "content": {
+        "text": "we can help"
+      }
+     },
+    "status": 400,
+    "response": {
+      "error": "invalid event type"
+    }
+  },
+  {
+    "label": "create message if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
+    "body": {
+      "type": "msg.create",
+      "content": {
+        "text": "1234"
+      }
+    },
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O'",
+        "count": 1
+      },
+      {
+        "query": "select count(*) from tickets_ticket where status = 'O'",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "label": "create message with attachments if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
+    "body": {
+      "type": "msg.create",
+      "content": {
+        "text": "1234",
+        "media": [
+          {
+            "type": "image/jpg",
+            "url": "https://link.to/image.jpg"
+          }
+        ]
+      }
+    },
+    "http_mocks": {
+      "https://link.to/image.jpg": [
+        {
+          "status": 200,
+          "body": "IMAGE"
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{text/plain:https:///_test_media_storage/media/1/6929/26ea/692926ea-09d6-4942-bd38-d266ec8d3716.jpg}'",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "label": "close room if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
+    "body": {
+      "type": "room.update"
+    },
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from tickets_ticket where status = 'C'",
+        "count": 1
+      }
+    ]
+  }
+]
