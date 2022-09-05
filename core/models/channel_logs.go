@@ -7,11 +7,15 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/pkg/errors"
 )
 
 // ChannelLogID is our type for a channel log id
 type ChannelLogID int64
+
+// ChannelLogUUID is our type for a channel log UUID
+type ChannelLogUUID uuids.UUID
 
 type ChanneLogType string
 
@@ -25,9 +29,10 @@ const (
 
 // ChannelLog is the mailroom struct that represents channel logs
 type ChannelLog struct {
-	ID           ChannelLogID `db:"id"`
-	ChannelID    ChannelID    `db:"channel_id"`
-	ConnectionID ConnectionID `db:"connection_id"`
+	ID           ChannelLogID   `db:"id"`
+	UUID         ChannelLogUUID `db:"uuid"`
+	ChannelID    ChannelID      `db:"channel_id"`
+	ConnectionID ConnectionID   `db:"connection_id"`
 
 	Type      ChanneLogType   `db:"log_type"`
 	HTTPLogs  json.RawMessage `db:"http_logs"`
@@ -37,8 +42,8 @@ type ChannelLog struct {
 }
 
 const sqlInsertChannelLog = `
-INSERT INTO channels_channellog( channel_id,  connection_id,  log_type,  http_logs,  is_error,  elapsed_ms,  created_on)
-                         VALUES(:channel_id, :connection_id, :log_type, :http_logs, :is_error, :elapsed_ms, :created_on)
+INSERT INTO channels_channellog( uuid,  channel_id,  connection_id,  log_type,  http_logs,  is_error,  elapsed_ms,  created_on)
+                         VALUES(:uuid, :channel_id, :connection_id, :log_type, :http_logs, :is_error, :elapsed_ms, :created_on)
   RETURNING id`
 
 // NewChannelLog creates a new channel log from the given HTTP trace
@@ -51,6 +56,7 @@ func NewChannelLog(channelID ChannelID, conn *ChannelConnection, logType ChanneL
 	}
 
 	l := &ChannelLog{
+		UUID:      ChannelLogUUID(uuids.New()),
 		ChannelID: channelID,
 		Type:      logType,
 		HTTPLogs:  jsonx.MustMarshal([]*httpx.Log{httpLog}),
