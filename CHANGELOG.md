@@ -1,3 +1,8 @@
+v7.5.9
+----------
+ * Add channel log UUID field
+ * Add codecov token to ci.yml
+
 v7.5.8
 ----------
  * Update to latest goflow and gocommon
