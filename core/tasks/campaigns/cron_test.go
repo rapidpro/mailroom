@@ -101,8 +101,8 @@ func TestFireCampaignEvents(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// create due fires for Cathy and George
-	testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
-	testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+	f1ID := testdata.InsertEventFire(rt.DB, testdata.Cathy, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
+	f2ID := testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent1, time.Now().Add(-time.Minute))
 
 	// queue the event task
 	err := campaigns.QueueEventFires(ctx, rt)
@@ -121,8 +121,39 @@ func TestFireCampaignEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	// should now have a flow run for that contact and flow
-	assertdb.Query(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, testdata.Cathy.ID, testdata.Favorites.ID).Returns(1)
-	assertdb.Query(t, db, `SELECT COUNT(*) from flows_flowrun WHERE contact_id = $1 AND flow_id = $2;`, testdata.George.ID, testdata.Favorites.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2 AND status = 'W'`, testdata.Cathy.ID, testdata.Favorites.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2 AND status = 'W'`, testdata.George.ID, testdata.Favorites.ID).Returns(1)
+
+	// the event fires should be marked as fired
+	assertdb.Query(t, db, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f1ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
+	assertdb.Query(t, db, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f2ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
+
+	// create due fires for George and Bob for a different event that skips
+	f3ID := testdata.InsertEventFire(rt.DB, testdata.George, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
+	f4ID := testdata.InsertEventFire(rt.DB, testdata.Bob, testdata.RemindersEvent3, time.Now().Add(-time.Minute))
+
+	// queue the event task
+	err = campaigns.QueueEventFires(ctx, rt)
+	assert.NoError(t, err)
+
+	// then actually work on the event
+	task, err = queue.PopNextTask(rc, queue.BatchQueue)
+	assert.NoError(t, err)
+	assert.NotNil(t, task)
+
+	typedTask, err = tasks.ReadTask(task.Type, task.Task)
+	require.NoError(t, err)
+
+	// work on that task
+	err = typedTask.Perform(ctx, rt, models.OrgID(task.OrgID))
+	assert.NoError(t, err)
+
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2 AND status = 'W'`, testdata.George.ID, testdata.Favorites.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2 AND status = 'W'`, testdata.Bob.ID, testdata.PickANumber.ID).Returns(1)
+
+	// the event fires should be marked as fired
+	assertdb.Query(t, db, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f3ID).Columns(map[string]interface{}{"fired": true, "fired_result": "S"})
+	assertdb.Query(t, db, `SELECT fired IS NOT NULL AS fired, fired_result FROM campaigns_eventfire WHERE id = $1`, f4ID).Columns(map[string]interface{}{"fired": true, "fired_result": "F"})
 }
 
 func TestIVRCampaigns(t *testing.T) {
