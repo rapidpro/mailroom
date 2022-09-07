@@ -1,3 +1,8 @@
+v7.5.10
+----------
+ * Bump default steps per sprint limit to 200
+ * Use go 1.19
+
 v7.5.9
 ----------
  * Add channel log UUID field
