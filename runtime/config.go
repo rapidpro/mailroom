@@ -101,7 +101,7 @@ func NewDefaultConfig() *Config {
 
 		SMTPServer:           "",
 		DisallowedNetworks:   `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fe80::/10`,
-		MaxStepsPerSprint:    100,
+		MaxStepsPerSprint:    200,
 		MaxResumesPerSession: 250,
 		MaxValueLength:       640,
 		SessionStorage:       "db",
