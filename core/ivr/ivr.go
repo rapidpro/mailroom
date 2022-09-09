@@ -96,7 +96,7 @@ type Service interface {
 }
 
 // HangupCall hangs up the passed in call also taking care of updating the status of our call in the process
-func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection) (*httpx.Trace, error) {
+func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection) (*models.ChannelLog, error) {
 	// no matter what mark our call as failed
 	defer conn.MarkFailed(ctx, rt.DB, time.Now())
 
@@ -113,14 +113,25 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelCo
 	}
 
 	// create the right service
-	c, err := GetService(channel)
+	svc, err := GetService(channel)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to create IVR service")
 	}
 
+	clog := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, nil)
+	clog.SetConnection(conn)
+	defer clog.End()
+
 	// try to request our call hangup
-	trace, err := c.HangupCall(conn.ExternalID())
-	return trace, errors.Wrapf(err, "error hanging call up")
+	trace, err := svc.HangupCall(conn.ExternalID())
+	if trace != nil {
+		clog.HTTP(trace)
+	}
+	if err != nil {
+		clog.Error(err)
+		return clog, errors.Wrapf(err, "error hanging call up")
+	}
+	return clog, nil
 }
 
 // RequestCallStart creates a new ChannelSession for the passed in flow start and contact, returning the created session
@@ -179,10 +190,19 @@ func RequestCallStart(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAs
 		return nil, errors.Wrapf(err, "error creating ivr session")
 	}
 
-	return conn, RequestCallStartForConnection(ctx, rt, channel, telURN, conn)
+	clog, err := RequestCallStartForConnection(ctx, rt, channel, telURN, conn)
+
+	// log any error inserting our channel log, but continue
+	if clog != nil {
+		if err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog}); err != nil {
+			logrus.WithError(err).Error("error inserting channel log")
+		}
+	}
+
+	return conn, err
 }
 
-func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, telURN urns.URN, conn *models.ChannelConnection) error {
+func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, telURN urns.URN, conn *models.ChannelConnection) (*models.ChannelLog, error) {
 	// the domain that will be used for callbacks, can be specific for channels due to white labeling
 	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, rt.Config.Domain)
 
@@ -195,7 +215,7 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 		if maxCalls > 0 {
 			count, err := models.ActiveChannelConnectionCount(ctx, rt.DB, channel.ID())
 			if err != nil {
-				return errors.Wrapf(err, "error finding number of active channel connections")
+				return nil, errors.Wrapf(err, "error finding number of active channel connections")
 			}
 
 			// we are at max calls, do not move on
@@ -203,9 +223,9 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 				logrus.WithField("channel_id", channel.ID()).Info("call being queued, max concurrent reached")
 				err := conn.MarkThrottled(ctx, rt.DB, time.Now())
 				if err != nil {
-					return errors.Wrapf(err, "error marking connection as throttled")
+					return nil, errors.Wrapf(err, "error marking connection as throttled")
 				}
-				return nil
+				return nil, nil
 			}
 		}
 	}
@@ -224,39 +244,36 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 	// create the right service
 	c, err := GetService(channel)
 	if err != nil {
-		return errors.Wrapf(err, "unable to create IVR service")
+		return nil, errors.Wrapf(err, "unable to create IVR service")
 	}
+
+	clog := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, nil)
+	clog.SetConnection(conn)
+	defer clog.End()
 
 	// try to request our call start
 	callID, trace, err := c.RequestCall(telURN, resumeURL, statusURL, channel.MachineDetection())
-
-	/// insert an channel log if we have an HTTP trace
 	if trace != nil {
-		log := models.NewChannelLog(channel.ID(), conn, models.ChannelLogTypeIVRStart, trace)
-		err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{log})
-
-		// log any error inserting our channel log, but try to continue
-		if err != nil {
-			logrus.WithError(err).Error("error inserting channel log")
-		}
+		clog.HTTP(trace)
 	}
-
 	if err != nil {
+		clog.Error(err)
+
 		// set our status as errored
 		err := conn.UpdateStatus(ctx, rt.DB, models.ConnectionStatusFailed, 0, time.Now())
 		if err != nil {
-			return errors.Wrapf(err, "error setting errored status on session")
+			return clog, errors.Wrapf(err, "error setting errored status on session")
 		}
-		return nil
+		return clog, nil
 	}
 
 	// update our channel session
 	err = conn.UpdateExternalID(ctx, rt.DB, string(callID))
 	if err != nil {
-		return errors.Wrapf(err, "error updating session external id")
+		return clog, errors.Wrapf(err, "error updating session external id")
 	}
 
-	return nil
+	return clog, nil
 }
 
 // HandleAsFailure marks the passed in connection as errored and writes the appropriate error response to our writer

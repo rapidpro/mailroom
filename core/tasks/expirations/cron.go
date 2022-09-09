@@ -143,7 +143,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 	defer rows.Close()
 
 	expiredSessions := make([]models.SessionID, 0, 100)
-	channelLogs := make([]*models.ChannelLog, 0, 100)
+	clogs := make([]*models.ChannelLog, 0, 100)
 
 	for rows.Next() {
 		expiredWait := &ExpiredVoiceWait{}
@@ -156,20 +156,21 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		expiredSessions = append(expiredSessions, expiredWait.SessionID)
 
 		// load our connection
-		conn, err := models.SelectChannelConnection(ctx, rt.DB, expiredWait.ConnectionID)
+		conn, err := models.SelectChannelConnection(ctx, rt.DB, expiredWait.OrgID, expiredWait.ConnectionID)
 		if err != nil {
 			log.WithError(err).WithField("connection_id", expiredWait.ConnectionID).Error("unable to load connection")
 			continue
 		}
 
 		// hang up our call
-		trace, err := ivr.HangupCall(ctx, rt, conn)
+		clog, err := ivr.HangupCall(ctx, rt, conn)
 		if err != nil {
 			// log error but carry on with other calls
 			log.WithError(err).WithField("connection_id", conn.ID()).Error("error hanging up call")
 		}
-		if trace != nil {
-			channelLogs = append(channelLogs, models.NewChannelLog(conn.ChannelID(), conn, models.ChannelLogTypeIVRHangup, trace))
+
+		if clog != nil {
+			clogs = append(clogs, clog)
 		}
 	}
 
@@ -182,7 +183,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on channel connections")
 	}
 
-	if err := models.InsertChannelLogs(ctx, rt.DB, channelLogs); err != nil {
+	if err := models.InsertChannelLogs(ctx, rt.DB, clogs); err != nil {
 		return errors.Wrap(err, "error inserting channel logs")
 	}
 
@@ -190,7 +191,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 }
 
 const sqlSelectExpiredVoiceWaits = `
-  SELECT id, connection_id, wait_expires_on
+  SELECT id, org_id, connection_id, wait_expires_on
     FROM flows_flowsession
    WHERE session_type = 'V' AND status = 'W' AND wait_expires_on <= NOW()
 ORDER BY wait_expires_on ASC
@@ -198,6 +199,7 @@ ORDER BY wait_expires_on ASC
 
 type ExpiredVoiceWait struct {
 	SessionID    models.SessionID    `db:"id"`
+	OrgID        models.OrgID        `db:"org_id"`
 	ConnectionID models.ConnectionID `db:"connection_id"`
 	ExpiresOn    time.Time           `db:"wait_expires_on"`
 }

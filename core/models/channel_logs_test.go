@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -30,17 +31,25 @@ func TestChannelLogsOutgoing(t *testing.T) {
 	channel := oa.ChannelByID(testdata.TwilioChannel.ID)
 	require.NotNil(t, channel)
 
+	clog1 := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, nil)
+	clog2 := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, nil)
+
 	req1, _ := httpx.NewRequest("GET", "http://ivr.com/start", nil, nil)
 	trace1, err := httpx.DoTrace(http.DefaultClient, req1, nil, nil, -1)
 	require.NoError(t, err)
-	log1 := models.NewChannelLog(channel.ID(), nil, models.ChannelLogTypeIVRStart, trace1)
+
+	clog1.HTTP(trace1)
+	clog1.End()
 
 	req2, _ := httpx.NewRequest("GET", "http://ivr.com/hangup", nil, nil)
 	trace2, err := httpx.DoTrace(http.DefaultClient, req2, nil, nil, -1)
 	require.NoError(t, err)
-	log2 := models.NewChannelLog(channel.ID(), nil, models.ChannelLogTypeIVRHangup, trace2)
 
-	err = models.InsertChannelLogs(ctx, db, []*models.ChannelLog{log1, log2})
+	clog2.HTTP(trace2)
+	clog2.Error(errors.New("oops"))
+	clog2.End()
+
+	err = models.InsertChannelLogs(ctx, db, []*models.ChannelLog{clog1, clog2})
 	require.NoError(t, err)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog`).Returns(2)

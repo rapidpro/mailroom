@@ -31,6 +31,7 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	}
 
 	throttledChannels := make(map[models.ChannelID]bool)
+	clogs := make([]*models.ChannelLog, 0, len(conns))
 
 	// schedules calls for each connection
 	for _, conn := range conns {
@@ -68,7 +69,10 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 			continue
 		}
 
-		err = ivr.RequestCallStartForConnection(ctx, rt, channel, urn, conn)
+		clog, err := ivr.RequestCallStartForConnection(ctx, rt, channel, urn, conn)
+		if clog != nil {
+			clogs = append(clogs, clog)
+		}
 		if err != nil {
 			log.WithError(err).Error(err)
 			continue
@@ -76,6 +80,11 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 
 		// queued status on a connection we just tried means it is throttled, mark our channel as such
 		throttledChannels[conn.ChannelID()] = true
+	}
+
+	// log any error inserting our channel logs, but continue
+	if err := models.InsertChannelLogs(ctx, rt.DB, clogs); err != nil {
+		logrus.WithError(err).Error("error inserting channel logs")
 	}
 
 	log.WithField("count", len(conns)).WithField("elapsed", time.Since(start)).Info("retried errored calls")
