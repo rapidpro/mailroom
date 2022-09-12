@@ -25,7 +25,7 @@ func TestChannelConnections(t *testing.T) {
 
 	assertdb.Query(t, db, `SELECT count(*) from channels_channelconnection where external_id = 'test1' AND id = $1`, conn.ID()).Returns(1)
 
-	conn2, err := models.SelectChannelConnection(ctx, db, conn.ID())
+	conn2, err := models.SelectChannelConnection(ctx, db, testdata.Org1.ID, conn.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, "test1", conn2.ExternalID())
 }

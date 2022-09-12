@@ -211,13 +211,13 @@ FROM
 	channels_channelconnection as cc
 	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
-	cc.id = $1
+	cc.org_id = $1 AND cc.id = $2
 `
 
 // SelectChannelConnection loads a channel connection by id
-func SelectChannelConnection(ctx context.Context, db Queryer, id ConnectionID) (*ChannelConnection, error) {
+func SelectChannelConnection(ctx context.Context, db Queryer, orgID OrgID, id ConnectionID) (*ChannelConnection, error) {
 	conn := &ChannelConnection{}
-	err := db.GetContext(ctx, &conn.c, selectConnectionSQL, id)
+	err := db.GetContext(ctx, &conn.c, selectConnectionSQL, orgID, id)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load channel connection with id: %d", id)
 	}
