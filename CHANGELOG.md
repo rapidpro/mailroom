@@ -1,3 +1,9 @@
+v7.5.11
+----------
+ * Use MsgOut.UnsendableReason instead of checking contact status
+ * Restructure channel logs like how they are in courier
+ * Update to latest goflow and gocommon
+
 v7.5.10
 ----------
  * Bump default steps per sprint limit to 200
