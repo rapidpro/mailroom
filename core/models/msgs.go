@@ -87,6 +87,11 @@ const (
 	MsgFailedNoDestination = MsgFailedReason("D")
 )
 
+var unsendableToFailedReason = map[flows.UnsendableReason]MsgFailedReason{
+	flows.UnsendableReasonContactStatus: MsgFailedContact,
+	flows.UnsendableReasonNoDestination: MsgFailedNoDestination,
+}
+
 // BroadcastID is our internal type for broadcast ids, which can be null/0
 type BroadcastID null.Int
 
@@ -361,18 +366,13 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 	msg.SetChannel(channel)
 	msg.SetURN(out.URN())
 
-	if org.Suspended() {
+	if out.UnsendableReason() != flows.NilUnsendableReason {
+		m.Status = MsgStatusFailed
+		m.FailedReason = unsendableToFailedReason[out.UnsendableReason()]
+	} else if org.Suspended() {
 		// we fail messages for suspended orgs right away
 		m.Status = MsgStatusFailed
 		m.FailedReason = MsgFailedSuspended
-	} else if contact.Status() != flows.ContactStatusActive {
-		// and blocked, stopped or archived contacts
-		m.Status = MsgStatusFailed
-		m.FailedReason = MsgFailedContact
-	} else if msg.URN() == urns.NilURN || channel == nil {
-		// if msg is missing the URN or channel, we also fail it
-		m.Status = MsgStatusFailed
-		m.FailedReason = MsgFailedNoDestination
 	} else {
 		// also fail right away if this looks like a loop
 		repetitions, err := GetMsgRepetitions(rt.RP, contact, out)
@@ -1071,8 +1071,15 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 			return nil, nil
 		}
 
+		unsendableReason := flows.NilUnsendableReason
+		if contact.Status() != flows.ContactStatusActive {
+			unsendableReason = flows.UnsendableReasonContactStatus
+		} else if urn == urns.NilURN || channel == nil {
+			unsendableReason = flows.UnsendableReasonNoDestination
+		}
+
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, unsendableReason)
 		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), b.BroadcastID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
