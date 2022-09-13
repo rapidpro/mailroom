@@ -16,8 +16,6 @@ const (
 	NewConversationEventType = ChannelEventType("new_conversation")
 	WelcomeMessageEventType  = ChannelEventType("welcome_message")
 	ReferralEventType        = ChannelEventType("referral")
-	MTMissEventType          = ChannelEventType("mt_miss")
-	MTCallEventType          = ChannelEventType("mt_call")
 	MOMissEventType          = ChannelEventType("mo_miss")
 	MOCallEventType          = ChannelEventType("mo_call")
 	StopContactEventType     = ChannelEventType("stop_contact")
