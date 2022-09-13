@@ -24,7 +24,6 @@ import (
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -521,4 +520,8 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, e
 	}
 
 	return xml.Header + string(body), nil
+}
+
+func (s *service) RedactValues(ch *models.Channel) []string {
+	return []string{ch.ConfigValue(authTokenConfig, "")}
 }

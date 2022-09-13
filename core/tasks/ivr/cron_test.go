@@ -43,8 +43,8 @@ func TestRetries(t *testing.T) {
 	err = json.Unmarshal(task.Task, batch)
 	assert.NoError(t, err)
 
-	client.callError = nil
-	client.callID = ivr.CallID("call1")
+	service.callError = nil
+	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
 	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,

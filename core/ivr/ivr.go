@@ -93,6 +93,8 @@ type Service interface {
 	URNForRequest(r *http.Request) (urns.URN, error)
 
 	CallIDForRequest(r *http.Request) (string, error)
+
+	RedactValues(*models.Channel) []string
 }
 
 // HangupCall hangs up the passed in call also taking care of updating the status of our call in the process
@@ -118,7 +120,7 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelCo
 		return nil, errors.Wrapf(err, "unable to create IVR service")
 	}
 
-	clog := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, nil)
+	clog := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, svc.RedactValues(channel))
 	clog.SetConnection(conn)
 	defer clog.End()
 
@@ -242,17 +244,17 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 	statusURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/status", domain, channel.UUID())
 
 	// create the right service
-	c, err := GetService(channel)
+	svc, err := GetService(channel)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to create IVR service")
 	}
 
-	clog := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, nil)
+	clog := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, svc.RedactValues(channel))
 	clog.SetConnection(conn)
 	defer clog.End()
 
 	// try to request our call start
-	callID, trace, err := c.RequestCall(telURN, resumeURL, statusURL, channel.MachineDetection())
+	callID, trace, err := svc.RequestCall(telURN, resumeURL, statusURL, channel.MachineDetection())
 	if trace != nil {
 		clog.HTTP(trace)
 	}

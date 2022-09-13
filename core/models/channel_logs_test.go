@@ -31,10 +31,10 @@ func TestChannelLogsOutgoing(t *testing.T) {
 	channel := oa.ChannelByID(testdata.TwilioChannel.ID)
 	require.NotNil(t, channel)
 
-	clog1 := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, nil)
-	clog2 := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, nil)
+	clog1 := models.NewChannelLog(models.ChannelLogTypeIVRStart, channel, []string{"sesame"})
+	clog2 := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, []string{"sesame"})
 
-	req1, _ := httpx.NewRequest("GET", "http://ivr.com/start", nil, nil)
+	req1, _ := httpx.NewRequest("GET", "http://ivr.com/start", nil, map[string]string{"Authorization": "Token sesame"})
 	trace1, err := httpx.DoTrace(http.DefaultClient, req1, nil, nil, -1)
 	require.NoError(t, err)
 
@@ -55,4 +55,5 @@ func TestChannelLogsOutgoing(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog`).Returns(2)
 	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE log_type = 'ivr_start' AND http_logs -> 0 ->> 'url' = 'http://ivr.com/start' AND is_error = FALSE AND channel_id = $1`, channel.ID()).Returns(1)
 	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE log_type = 'ivr_hangup' AND http_logs -> 0 ->> 'url' = 'http://ivr.com/hangup' AND is_error = TRUE AND channel_id = $1`, channel.ID()).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE http_logs::text LIKE '%sesame%'`).Returns(0)
 }
