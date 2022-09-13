@@ -18,6 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buger/jsonparser"
+	"github.com/golang-jwt/jwt"
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -29,10 +32,6 @@ import (
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/buger/jsonparser"
-	"github.com/golang-jwt/jwt"
-	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -892,4 +891,8 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 	}
 
 	return string(body), nil
+}
+
+func (s *service) RedactValues(ch *models.Channel) []string {
+	return []string{ch.ConfigValue(privateKeyConfig, "")}
 }

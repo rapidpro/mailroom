@@ -70,7 +70,7 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 			return errors.Wrapf(err, "error reading request body")
 		}
 
-		clog := models.NewChannelLogForIncoming(logType, ch, recorder, nil)
+		clog := models.NewChannelLogForIncoming(logType, ch, recorder, svc.RedactValues(ch))
 
 		connection, rerr := handler(ctx, rt, oa, ch, svc, r, recorder.ResponseWriter)
 		clog.SetConnection(connection)
