@@ -391,7 +391,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	// if this session is complete, so is any associated connection
 	if s.channelConnection != nil {
 		if s.Status() == SessionStatusCompleted || s.Status() == SessionStatusFailed {
-			err := s.channelConnection.UpdateStatus(ctx, tx, ConnectionStatusCompleted, 0, time.Now())
+			err := s.channelConnection.UpdateStatus(ctx, tx, ConnectionStatusCompleted, 0, time.Now(), nil)
 			if err != nil {
 				return errors.Wrapf(err, "error update channel connection")
 			}

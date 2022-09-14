@@ -29,7 +29,7 @@ func init() {
 	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/incoming", newIVRHandler(handleIncoming, models.ChannelLogTypeIVRIncoming))
 }
 
-type ivrHandlerFn func(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter) (*models.ChannelConnection, error)
+type ivrHandlerFn func(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter, clog *models.ChannelLog) (*models.ChannelConnection, error)
 
 func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
@@ -72,7 +72,7 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 
 		clog := models.NewChannelLogForIncoming(logType, ch, recorder, svc.RedactValues(ch))
 
-		connection, rerr := handler(ctx, rt, oa, ch, svc, r, recorder.ResponseWriter)
+		connection, rerr := handler(ctx, rt, oa, ch, svc, r, recorder.ResponseWriter, clog)
 		clog.SetConnection(connection)
 
 		if err := recorder.End(); err != nil {
@@ -90,7 +90,7 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 	}
 }
 
-func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter) (*models.ChannelConnection, error) {
+func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter, clog *models.ChannelLog) (*models.ChannelConnection, error) {
 	// lookup the URN of the caller
 	urn, err := svc.URNForRequest(r)
 	if err != nil {
@@ -204,7 +204,7 @@ func buildResumeURL(cfg *runtime.Config, channel *models.Channel, conn *models.C
 }
 
 // handles all incoming IVR requests related to a flow (status is handled elsewhere)
-func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter) (*models.ChannelConnection, error) {
+func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter, clog *models.ChannelLog) (*models.ChannelConnection, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*55)
 	defer cancel()
 
@@ -253,11 +253,11 @@ func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	// if this a start, start our contact
 	switch request.Action {
 	case actionStart:
-		err = ivr.StartIVRFlow(ctx, rt, svc, resumeURL, oa, ch, conn, contacts[0], urn, conn.StartID(), r, w)
+		err = ivr.StartIVRFlow(ctx, rt, svc, resumeURL, oa, ch, conn, contacts[0], urn, conn.StartID(), r, w, clog)
 	case actionResume:
-		err = ivr.ResumeIVRFlow(ctx, rt, resumeURL, svc, oa, ch, conn, contacts[0], urn, r, w)
+		err = ivr.ResumeIVRFlow(ctx, rt, resumeURL, svc, oa, ch, conn, contacts[0], urn, r, w, clog)
 	case actionStatus:
-		err = ivr.HandleIVRStatus(ctx, rt, oa, svc, conn, r, w)
+		err = ivr.HandleIVRStatus(ctx, rt, oa, svc, conn, r, w, clog)
 
 	default:
 		err = svc.WriteErrorResponse(w, errors.Errorf("unknown action: %s", request.Action))
@@ -266,14 +266,14 @@ func handleCallback(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	// had an error? mark our connection as errored and log it
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error while handling IVR")
-		return conn, ivr.HandleAsFailure(ctx, rt.DB, svc, conn, w, err)
+		return conn, ivr.HandleAsFailure(ctx, rt.DB, svc, conn, w, err, clog)
 	}
 
 	return conn, nil
 }
 
 // handleStatus handles all incoming IVR events / status updates
-func handleStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter) (*models.ChannelConnection, error) {
+func handleStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ch *models.Channel, svc ivr.Service, r *http.Request, w http.ResponseWriter, clog *models.ChannelLog) (*models.ChannelConnection, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*55)
 	defer cancel()
 
@@ -304,12 +304,12 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets
 		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "unable to load channel connection with id: %s", externalID))
 	}
 
-	err = ivr.HandleIVRStatus(ctx, rt, oa, svc, conn, r, w)
+	err = ivr.HandleIVRStatus(ctx, rt, oa, svc, conn, r, w, clog)
 
 	// had an error? mark our connection as errored and log it
 	if err != nil {
 		logrus.WithError(err).WithField("http_request", r).Error("error while handling status")
-		return conn, ivr.HandleAsFailure(ctx, rt.DB, svc, conn, w, err)
+		return conn, ivr.HandleAsFailure(ctx, rt.DB, svc, conn, w, err, clog)
 	}
 
 	return conn, nil

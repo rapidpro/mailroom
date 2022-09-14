@@ -99,8 +99,13 @@ type Service interface {
 
 // HangupCall hangs up the passed in call also taking care of updating the status of our call in the process
 func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection) (*models.ChannelLog, error) {
-	// no matter what mark our call as failed
-	defer conn.MarkFailed(ctx, rt.DB, time.Now())
+	// if we error during the hangup process, ensure that we still mark the connection as failed
+	ended := false
+	defer func() {
+		if !ended {
+			conn.MarkFailed(ctx, rt.DB, time.Now(), nil)
+		}
+	}()
 
 	// load our org assets
 	oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
@@ -122,7 +127,6 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelCo
 
 	clog := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, svc.RedactValues(channel))
 	clog.SetConnection(conn)
-	defer clog.End()
 
 	// try to request our call hangup
 	trace, err := svc.HangupCall(conn.ExternalID())
@@ -131,9 +135,13 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelCo
 	}
 	if err != nil {
 		clog.Error(err)
-		return clog, errors.Wrapf(err, "error hanging call up")
 	}
-	return clog, nil
+
+	clog.End()
+	conn.MarkFailed(ctx, rt.DB, time.Now(), clog)
+	ended = true
+
+	return clog, errors.Wrapf(err, "error hanging call up")
 }
 
 // RequestCallStart creates a new ChannelSession for the passed in flow start and contact, returning the created session
@@ -262,7 +270,7 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 		clog.Error(err)
 
 		// set our status as errored
-		err := conn.UpdateStatus(ctx, rt.DB, models.ConnectionStatusFailed, 0, time.Now())
+		err := conn.UpdateStatus(ctx, rt.DB, models.ConnectionStatusFailed, 0, time.Now(), clog)
 		if err != nil {
 			return clog, errors.Wrapf(err, "error setting errored status on session")
 		}
@@ -279,8 +287,8 @@ func RequestCallStartForConnection(ctx context.Context, rt *runtime.Runtime, cha
 }
 
 // HandleAsFailure marks the passed in connection as errored and writes the appropriate error response to our writer
-func HandleAsFailure(ctx context.Context, db *sqlx.DB, svc Service, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error) error {
-	err := conn.MarkFailed(ctx, db, time.Now())
+func HandleAsFailure(ctx context.Context, db *sqlx.DB, svc Service, conn *models.ChannelConnection, w http.ResponseWriter, rootErr error, clog *models.ChannelLog) error {
+	err := conn.MarkFailed(ctx, db, time.Now(), clog)
 	if err != nil {
 		logrus.WithError(err).Error("error marking connection as failed")
 	}
@@ -291,11 +299,11 @@ func HandleAsFailure(ctx context.Context, db *sqlx.DB, svc Service, conn *models
 func StartIVRFlow(
 	ctx context.Context, rt *runtime.Runtime, svc Service, resumeURL string, oa *models.OrgAssets,
 	channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN, startID models.StartID,
-	r *http.Request, w http.ResponseWriter) error {
+	r *http.Request, w http.ResponseWriter, clog *models.ChannelLog) error {
 
 	// connection isn't in a wired or in-progress status then we shouldn't be here
 	if conn.Status() != models.ConnectionStatusWired && conn.Status() != models.ConnectionStatusInProgress {
-		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("connection in invalid state: %s", conn.Status()), clog)
 	}
 
 	// get the flow for our start
@@ -400,7 +408,7 @@ func ResumeIVRFlow(
 	ctx context.Context, rt *runtime.Runtime,
 	resumeURL string, svc Service,
 	oa *models.OrgAssets, channel *models.Channel, conn *models.ChannelConnection, c *models.Contact, urn urns.URN,
-	r *http.Request, w http.ResponseWriter) error {
+	r *http.Request, w http.ResponseWriter, clog *models.ChannelLog) error {
 
 	contact, err := c.FlowContact(oa)
 	if err != nil {
@@ -413,14 +421,14 @@ func ResumeIVRFlow(
 	}
 
 	if session == nil {
-		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("no active IVR session for contact"))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("no active IVR session for contact"), clog)
 	}
 
 	if session.ConnectionID() == nil {
-		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("active session: %d has no connection", session.ID()), clog)
 	}
 	if *session.ConnectionID() != conn.ID() {
-		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()), clog)
 	}
 
 	// check if connection has been marked as errored - it maybe have been updated by status callback
@@ -458,7 +466,7 @@ func ResumeIVRFlow(
 	// make sure our call is still happening
 	status, _, _ := svc.StatusForRequest(r)
 	if status != models.ConnectionStatusInProgress {
-		err := conn.UpdateStatus(ctx, rt.DB, status, 0, time.Now())
+		err := conn.UpdateStatus(ctx, rt.DB, status, 0, time.Now(), clog)
 		if err != nil {
 			return errors.Wrapf(err, "error updating status")
 		}
@@ -467,7 +475,7 @@ func ResumeIVRFlow(
 	// get the input of our request
 	ivrResume, err := svc.ResumeForRequest(r)
 	if err != nil {
-		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Wrapf(err, "error finding input for request"))
+		return HandleAsFailure(ctx, rt.DB, svc, conn, w, errors.Wrapf(err, "error finding input for request"), clog)
 	}
 
 	var resume flows.Resume
@@ -595,7 +603,7 @@ func buildMsgResume(
 
 // HandleIVRStatus is called on status callbacks for an IVR call. We let the service decide whether the call has
 // ended for some reason and update the state of the call and session if so
-func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, svc Service, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
+func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, svc Service, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter, clog *models.ChannelLog) error {
 	// read our status and duration from our service
 	status, errorReason, duration := svc.StatusForRequest(r)
 
@@ -608,7 +616,7 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 
 		// if this is an incoming call it won't have an associated start and we don't retry it so just fail permanently
 		if conn.StartID() == models.NilStartID {
-			conn.MarkFailed(ctx, rt.DB, time.Now())
+			conn.MarkFailed(ctx, rt.DB, time.Now(), clog)
 			return svc.WriteEmptyResponse(w, "no flow start found, status updated: F")
 		}
 
@@ -630,10 +638,10 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 		}
 
 	} else if status == models.ConnectionStatusFailed {
-		conn.MarkFailed(ctx, rt.DB, time.Now())
+		conn.MarkFailed(ctx, rt.DB, time.Now(), clog)
 	} else {
 		if status != conn.Status() || duration > 0 {
-			err := conn.UpdateStatus(ctx, rt.DB, status, duration, time.Now())
+			err := conn.UpdateStatus(ctx, rt.DB, status, duration, time.Now(), clog)
 			if err != nil {
 				return errors.Wrapf(err, "error updating call status")
 			}

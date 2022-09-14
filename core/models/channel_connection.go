@@ -380,16 +380,22 @@ func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now tim
 }
 
 // MarkFailed updates the status for this connection
-func (c *ChannelConnection) MarkFailed(ctx context.Context, db Queryer, now time.Time) error {
+func (c *ChannelConnection) MarkFailed(ctx context.Context, db Queryer, now time.Time, clog *ChannelLog) error {
 	c.c.Status = ConnectionStatusFailed
 	c.c.EndedOn = &now
 
-	_, err := db.ExecContext(ctx,
-		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, modified_on = NOW() WHERE id = $1`,
-		c.c.ID, c.c.Status, c.c.EndedOn,
-	)
+	var sql string
+	var args []any
 
-	if err != nil {
+	if clog != nil {
+		sql = `UPDATE channels_channelconnection SET status = $2, ended_on = $3, modified_on = NOW(), log_uuids = array_append(log_uuids, $4) WHERE id = $1`
+		args = []any{c.c.ID, c.c.Status, c.c.EndedOn, clog.UUID()}
+	} else {
+		sql = `UPDATE channels_channelconnection SET status = $2, ended_on = $3, modified_on = NOW() WHERE id = $1`
+		args = []any{c.c.ID, c.c.Status, c.c.EndedOn}
+	}
+
+	if _, err := db.ExecContext(ctx, sql, args...); err != nil {
 		return errors.Wrapf(err, "error marking channel connection as failed")
 	}
 
@@ -415,26 +421,22 @@ func (c *ChannelConnection) MarkThrottled(ctx context.Context, db Queryer, now t
 }
 
 // UpdateStatus updates the status for this connection
-func (c *ChannelConnection) UpdateStatus(ctx context.Context, db Queryer, status ConnectionStatus, duration int, now time.Time) error {
+func (c *ChannelConnection) UpdateStatus(ctx context.Context, db Queryer, status ConnectionStatus, duration int, now time.Time, clog *ChannelLog) error {
 	c.c.Status = status
-	var err error
+	c.c.Duration = duration
+	c.c.EndedOn = &now
 
-	// only write a duration if it is greater than 0
-	if duration > 0 {
-		c.c.Duration = duration
-		c.c.EndedOn = &now
-		_, err = db.ExecContext(ctx,
-			`UPDATE channels_channelconnection SET status = $2, duration = $3, ended_on = $4, modified_on = NOW() WHERE id = $1`,
-			c.c.ID, c.c.Status, c.c.Duration, c.c.EndedOn,
-		)
+	var sql string
+	var args []any
+	if clog != nil {
+		sql = `UPDATE channels_channelconnection SET status = $2, duration = GREATEST(duration, $3), ended_on = $4, modified_on = NOW(), log_uuids = array_append(log_uuids, $5) WHERE id = $1`
+		args = []any{c.c.ID, c.c.Status, c.c.Duration, c.c.EndedOn, clog.UUID()}
 	} else {
-		_, err = db.ExecContext(ctx,
-			`UPDATE channels_channelconnection SET status = $2, modified_on = NOW() WHERE id = $1`,
-			c.c.ID, c.c.Status,
-		)
+		sql = `UPDATE channels_channelconnection SET status = $2, duration = GREATEST(duration, $3), ended_on = $4, modified_on = NOW() WHERE id = $1`
+		args = []any{c.c.ID, c.c.Status, c.c.Duration, c.c.EndedOn}
 	}
 
-	if err != nil {
+	if _, err := db.ExecContext(ctx, sql, args...); err != nil {
 		return errors.Wrapf(err, "error updating status for channel connection: %d", c.c.ID)
 	}
 

@@ -87,6 +87,8 @@ func (l *ChannelLog) Error(err error) {
 	l.errors = append(l.errors, NewChannelError(err.Error(), ""))
 }
 
+func (l *ChannelLog) UUID() ChannelLogUUID { return l.uuid }
+
 func (l *ChannelLog) End() {
 	if l.recorder != nil {
 		// prepend so it's the first HTTP request in the log
