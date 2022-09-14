@@ -1,3 +1,7 @@
+v7.5.12
+----------
+ * Add redaction to IVR channel logging
+
 v7.5.11
 ----------
  * Use MsgOut.UnsendableReason instead of checking contact status
