@@ -75,6 +75,8 @@ func newChannelLog(t ChannelLogType, ch *Channel, r *httpx.Recorder, redactVals 
 	}
 }
 
+func (l *ChannelLog) UUID() ChannelLogUUID { return l.uuid }
+
 func (l *ChannelLog) SetConnection(c *ChannelConnection) {
 	l.connection = c
 }
