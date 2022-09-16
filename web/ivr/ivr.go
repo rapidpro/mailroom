@@ -296,7 +296,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets
 	}
 
 	// load our connection
-	conn, err := models.SelectChannelConnectionByExternalID(ctx, rt.DB, ch.ID(), models.ConnectionTypeIVR, externalID)
+	conn, err := models.SelectChannelConnectionByExternalID(ctx, rt.DB, ch.ID(), externalID)
 	if errors.Cause(err) == sql.ErrNoRows {
 		return nil, svc.WriteEmptyResponse(w, "unknown connection, ignoring")
 	}

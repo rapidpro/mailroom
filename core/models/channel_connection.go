@@ -35,11 +35,6 @@ const (
 	ConnectionDirectionOut = ConnectionDirection("O")
 )
 
-// connection type constants
-const (
-	ConnectionTypeIVR = ConnectionType("V")
-)
-
 // connection status constants
 const (
 	ConnectionStatusPending    = ConnectionStatus("P") // used for initial creation in database
@@ -67,24 +62,23 @@ const (
 // ChannelConnection models a session or connection with a particular channel
 type ChannelConnection struct {
 	c struct {
-		ID             ConnectionID        `json:"id"              db:"id"`
-		CreatedOn      time.Time           `json:"created_on"      db:"created_on"`
-		ModifiedOn     time.Time           `json:"modified_on"     db:"modified_on"`
-		ExternalID     string              `json:"external_id"     db:"external_id"`
-		Status         ConnectionStatus    `json:"status"          db:"status"`
-		Direction      ConnectionDirection `json:"direction"       db:"direction"`
-		StartedOn      *time.Time          `json:"started_on"      db:"started_on"`
-		EndedOn        *time.Time          `json:"ended_on"        db:"ended_on"`
-		ConnectionType ConnectionType      `json:"connection_type" db:"connection_type"`
-		Duration       int                 `json:"duration"        db:"duration"`
-		ErrorReason    null.String         `json:"error_reason"    db:"error_reason"`
-		ErrorCount     int                 `json:"error_count"     db:"error_count"`
-		NextAttempt    *time.Time          `json:"next_attempt"    db:"next_attempt"`
-		ChannelID      ChannelID           `json:"channel_id"      db:"channel_id"`
-		ContactID      ContactID           `json:"contact_id"      db:"contact_id"`
-		ContactURNID   URNID               `json:"contact_urn_id"  db:"contact_urn_id"`
-		OrgID          OrgID               `json:"org_id"          db:"org_id"`
-		StartID        StartID             `json:"start_id"        db:"start_id"`
+		ID           ConnectionID        `json:"id"              db:"id"`
+		CreatedOn    time.Time           `json:"created_on"      db:"created_on"`
+		ModifiedOn   time.Time           `json:"modified_on"     db:"modified_on"`
+		ExternalID   string              `json:"external_id"     db:"external_id"`
+		Status       ConnectionStatus    `json:"status"          db:"status"`
+		Direction    ConnectionDirection `json:"direction"       db:"direction"`
+		StartedOn    *time.Time          `json:"started_on"      db:"started_on"`
+		EndedOn      *time.Time          `json:"ended_on"        db:"ended_on"`
+		Duration     int                 `json:"duration"        db:"duration"`
+		ErrorReason  null.String         `json:"error_reason"    db:"error_reason"`
+		ErrorCount   int                 `json:"error_count"     db:"error_count"`
+		NextAttempt  *time.Time          `json:"next_attempt"    db:"next_attempt"`
+		ChannelID    ChannelID           `json:"channel_id"      db:"channel_id"`
+		ContactID    ContactID           `json:"contact_id"      db:"contact_id"`
+		ContactURNID URNID               `json:"contact_urn_id"  db:"contact_urn_id"`
+		OrgID        OrgID               `json:"org_id"          db:"org_id"`
+		StartID      StartID             `json:"start_id"        db:"start_id"`
 	}
 }
 
@@ -113,7 +107,6 @@ INSERT INTO channels_channelconnection
 	external_id,
 	status,
 	direction,
-	connection_type,
 	duration,
 	org_id,
 	channel_id,
@@ -127,7 +120,6 @@ VALUES(
 	:external_id,
 	:status,
 	:direction,
-	:connection_type,
 	0,
 	:org_id,
 	:channel_id,
@@ -150,7 +142,6 @@ func InsertIVRConnection(ctx context.Context, db *sqlx.DB, orgID OrgID, channelI
 	c.ContactURNID = urnID
 	c.Direction = direction
 	c.Status = status
-	c.ConnectionType = ConnectionTypeIVR
 	c.ExternalID = externalID
 	c.StartID = startID
 
@@ -197,7 +188,6 @@ SELECT
 	cc.direction as direction, 
 	cc.started_on as started_on, 
 	cc.ended_on as ended_on, 
-	cc.connection_type as connection_type, 
 	cc.duration as duration, 
 	cc.error_reason as error_reason,
 	cc.error_count as error_count,
@@ -234,7 +224,6 @@ SELECT
 	cc.direction as direction, 
 	cc.started_on as started_on, 
 	cc.ended_on as ended_on, 
-	cc.connection_type as connection_type, 
 	cc.duration as duration, 
 	cc.error_reason as error_reason,
 	cc.error_count as error_count,
@@ -248,18 +237,16 @@ FROM
 	channels_channelconnection as cc
 	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
-	cc.channel_id = $1 AND
-	cc.connection_type = $2 AND
-	cc.external_id = $3
+	cc.channel_id = $1 AND cc.external_id = $2
 ORDER BY
 	cc.id DESC
 LIMIT 1
 `
 
 // SelectChannelConnectionByExternalID loads a channel connection by id
-func SelectChannelConnectionByExternalID(ctx context.Context, db Queryer, channelID ChannelID, connType ConnectionType, externalID string) (*ChannelConnection, error) {
+func SelectChannelConnectionByExternalID(ctx context.Context, db Queryer, channelID ChannelID, externalID string) (*ChannelConnection, error) {
 	conn := &ChannelConnection{}
-	err := db.GetContext(ctx, &conn.c, selectConnectionByExternalIDSQL, channelID, connType, externalID)
+	err := db.GetContext(ctx, &conn.c, selectConnectionByExternalIDSQL, channelID, externalID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to load channel connection with external id: %s", externalID)
 	}
@@ -276,7 +263,6 @@ SELECT
 	cc.direction as direction, 
 	cc.started_on as started_on, 
 	cc.ended_on as ended_on, 
-	cc.connection_type as connection_type, 
 	cc.duration as duration, 
 	cc.error_reason as error_reason,
 	cc.error_count as error_count,
@@ -290,9 +276,7 @@ FROM
 	channels_channelconnection as cc
 	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
 WHERE
-	cc.connection_type = 'V' AND
-	cc.status IN ('Q', 'E') AND
-	next_attempt < NOW()
+	cc.status IN ('Q', 'E') AND next_attempt < NOW()
 ORDER BY 
 	cc.next_attempt ASC
 LIMIT
