@@ -25,51 +25,51 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, 100)
+	calls, err := models.LoadCallsToRetry(ctx, rt.DB, 100)
 	if err != nil {
-		return errors.Wrapf(err, "error loading connections to retry")
+		return errors.Wrapf(err, "error loading calls to retry")
 	}
 
 	throttledChannels := make(map[models.ChannelID]bool)
-	clogs := make([]*models.ChannelLog, 0, len(conns))
+	clogs := make([]*models.ChannelLog, 0, len(calls))
 
-	// schedules calls for each connection
-	for _, conn := range conns {
-		log = log.WithField("connection_id", conn.ID())
+	// schedules requests for each call
+	for _, call := range calls {
+		log = log.WithField("call_id", call.ID())
 
-		// if the channel for this connection is throttled, move on
-		if throttledChannels[conn.ChannelID()] {
-			conn.MarkThrottled(ctx, rt.DB, time.Now())
-			log.WithField("channel_id", conn.ChannelID()).Info("skipping connection, throttled")
+		// if the channel for this call is throttled, move on
+		if throttledChannels[call.ChannelID()] {
+			call.MarkThrottled(ctx, rt.DB, time.Now())
+			log.WithField("channel_id", call.ChannelID()).Info("skipping call, throttled")
 			continue
 		}
 
-		// load the org for this connection
-		oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
+		// load the org for this call
+		oa, err := models.GetOrgAssets(ctx, rt, call.OrgID())
 		if err != nil {
-			log.WithError(err).WithField("org_id", conn.OrgID()).Error("error loading org")
+			log.WithError(err).WithField("org_id", call.OrgID()).Error("error loading org")
 			continue
 		}
 
 		// and the associated channel
-		channel := oa.ChannelByID(conn.ChannelID())
+		channel := oa.ChannelByID(call.ChannelID())
 		if channel == nil {
 			// fail this call, channel is no longer active
-			err = models.UpdateChannelConnectionStatuses(ctx, rt.DB, []models.ConnectionID{conn.ID()}, models.ConnectionStatusFailed)
+			err = models.BulkUpdateCallStatuses(ctx, rt.DB, []models.CallID{call.ID()}, models.CallStatusFailed)
 			if err != nil {
-				log.WithError(err).WithField("channel_id", conn.ChannelID()).Error("error marking call as failed due to missing channel")
+				log.WithError(err).WithField("channel_id", call.ChannelID()).Error("error marking call as failed due to missing channel")
 			}
 			continue
 		}
 
 		// finally load the full URN
-		urn, err := models.URNForID(ctx, rt.DB, oa, conn.ContactURNID())
+		urn, err := models.URNForID(ctx, rt.DB, oa, call.ContactURNID())
 		if err != nil {
-			log.WithError(err).WithField("urn_id", conn.ContactURNID()).Error("unable to load contact urn")
+			log.WithError(err).WithField("urn_id", call.ContactURNID()).Error("unable to load contact urn")
 			continue
 		}
 
-		clog, err := ivr.RequestCallStartForConnection(ctx, rt, channel, urn, conn)
+		clog, err := ivr.RequestStartForCall(ctx, rt, channel, urn, call)
 		if clog != nil {
 			clogs = append(clogs, clog)
 		}
@@ -78,8 +78,8 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 			continue
 		}
 
-		// queued status on a connection we just tried means it is throttled, mark our channel as such
-		throttledChannels[conn.ChannelID()] = true
+		// queued status on a call we just tried means it is throttled, mark our channel as such
+		throttledChannels[call.ChannelID()] = true
 	}
 
 	// log any error inserting our channel logs, but continue
@@ -87,7 +87,7 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 		logrus.WithError(err).Error("error inserting channel logs")
 	}
 
-	log.WithField("count", len(conns)).WithField("elapsed", time.Since(start)).Info("retried errored calls")
+	log.WithField("count", len(calls)).WithField("elapsed", time.Since(start)).Info("retried errored calls")
 
 	return nil
 }

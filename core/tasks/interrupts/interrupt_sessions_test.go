@@ -18,7 +18,7 @@ func TestInterrupts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	insertSession := func(org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow, connectionID models.ConnectionID) models.SessionID {
+	insertSession := func(org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow, connectionID models.CallID) models.SessionID {
 		sessionID := testdata.InsertWaitingSession(db, org, contact, models.FlowTypeMessaging, flow, connectionID, time.Now(), time.Now(), false, nil)
 
 		// give session one waiting run too
@@ -62,19 +62,19 @@ func TestInterrupts(t *testing.T) {
 		// mark any remaining flow sessions as inactive
 		db.MustExec(`UPDATE flows_flowsession SET status='C', ended_on=NOW() WHERE status = 'W';`)
 
-		// twilio connection
-		twilioConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
+		// twilio call
+		twilioCallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
 
 		sessionIDs := make([]models.SessionID, 5)
 
 		// insert our dummy contact sessions
-		sessionIDs[0] = insertSession(testdata.Org1, testdata.Cathy, testdata.Favorites, models.NilConnectionID)
-		sessionIDs[1] = insertSession(testdata.Org1, testdata.George, testdata.Favorites, models.NilConnectionID)
-		sessionIDs[2] = insertSession(testdata.Org1, testdata.Alexandria, testdata.Favorites, twilioConnectionID)
-		sessionIDs[3] = insertSession(testdata.Org1, testdata.Bob, testdata.PickANumber, models.NilConnectionID)
+		sessionIDs[0] = insertSession(testdata.Org1, testdata.Cathy, testdata.Favorites, models.NilCallID)
+		sessionIDs[1] = insertSession(testdata.Org1, testdata.George, testdata.Favorites, models.NilCallID)
+		sessionIDs[2] = insertSession(testdata.Org1, testdata.Alexandria, testdata.Favorites, twilioCallID)
+		sessionIDs[3] = insertSession(testdata.Org1, testdata.Bob, testdata.PickANumber, models.NilCallID)
 
 		// a session we always end explicitly
-		sessionIDs[4] = insertSession(testdata.Org1, testdata.Bob, testdata.Favorites, models.NilConnectionID)
+		sessionIDs[4] = insertSession(testdata.Org1, testdata.Bob, testdata.Favorites, models.NilCallID)
 
 		// create our task
 		task := &InterruptSessionsTask{

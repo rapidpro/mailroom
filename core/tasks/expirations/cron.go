@@ -155,10 +155,10 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		// add the session to those we need to expire
 		expiredSessions = append(expiredSessions, expiredWait.SessionID)
 
-		// load our connection
-		conn, err := models.SelectChannelConnection(ctx, rt.DB, expiredWait.OrgID, expiredWait.ConnectionID)
+		// load our call
+		conn, err := models.GetCallByID(ctx, rt.DB, expiredWait.OrgID, expiredWait.CallID)
 		if err != nil {
-			log.WithError(err).WithField("connection_id", expiredWait.ConnectionID).Error("unable to load connection")
+			log.WithError(err).WithField("call_id", expiredWait.CallID).Error("unable to load call")
 			continue
 		}
 
@@ -166,7 +166,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		clog, err := ivr.HangupCall(ctx, rt, conn)
 		if err != nil {
 			// log error but carry on with other calls
-			log.WithError(err).WithField("connection_id", conn.ID()).Error("error hanging up call")
+			log.WithError(err).WithField("call_id", conn.ID()).Error("error hanging up call")
 		}
 
 		if clog != nil {
@@ -180,7 +180,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 		if err != nil {
 			log.WithError(err).Error("error expiring sessions for expired calls")
 		}
-		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on channel connections")
+		log.WithField("count", len(expiredSessions)).WithField("elapsed", time.Since(start)).Info("expired and hung up on call")
 	}
 
 	if err := models.InsertChannelLogs(ctx, rt.DB, clogs); err != nil {
@@ -198,8 +198,8 @@ ORDER BY wait_expires_on ASC
    LIMIT 100`
 
 type ExpiredVoiceWait struct {
-	SessionID    models.SessionID    `db:"id"`
-	OrgID        models.OrgID        `db:"org_id"`
-	ConnectionID models.ConnectionID `db:"connection_id"`
-	ExpiresOn    time.Time           `db:"wait_expires_on"`
+	SessionID models.SessionID `db:"id"`
+	OrgID     models.OrgID     `db:"org_id"`
+	CallID    models.CallID    `db:"connection_id"`
+	ExpiresOn time.Time        `db:"wait_expires_on"`
 }

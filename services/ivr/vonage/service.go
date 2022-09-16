@@ -166,7 +166,7 @@ func (s *service) DownloadMedia(url string) (*http.Response, error) {
 	return http.DefaultClient.Do(req)
 }
 
-func (s *service) CheckStartRequest(r *http.Request) models.ConnectionError {
+func (s *service) CheckStartRequest(r *http.Request) models.CallError {
 	return ""
 }
 
@@ -280,7 +280,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	return s.MakeEmptyResponseBody("ignoring non final status for tranfer leg"), nil
 }
 
-func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.Call, r *http.Request) ([]byte, error) {
 	// if this is a recording_url resume, grab that
 	waitType := r.URL.Query().Get("wait_type")
 
@@ -507,54 +507,54 @@ type StatusRequest struct {
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (s *service) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
+func (s *service) StatusForRequest(r *http.Request) (models.CallStatus, models.CallError, int) {
 	// this is a resume, call is in progress, no need to look at the body
 	if r.Form.Get("action") == "resume" {
-		return models.ConnectionStatusInProgress, "", 0
+		return models.CallStatusInProgress, "", 0
 	}
 
 	bb, err := readBody(r)
 	if err != nil {
 		logrus.WithError(err).Error("error reading status request body")
-		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
+		return models.CallStatusErrored, models.CallErrorProvider, 0
 	}
 
 	status := &StatusRequest{}
 	err = json.Unmarshal(bb, status)
 	if err != nil {
 		logrus.WithError(err).WithField("body", string(bb)).Error("error unmarshalling ncco status")
-		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
+		return models.CallStatusErrored, models.CallErrorProvider, 0
 	}
 
 	// transfer status callbacks have no status, safe to ignore them
 	if status.Status == "" {
-		return models.ConnectionStatusInProgress, "", 0
+		return models.CallStatusInProgress, "", 0
 	}
 
 	switch status.Status {
 
 	case "started", "ringing":
-		return models.ConnectionStatusWired, "", 0
+		return models.CallStatusWired, "", 0
 
 	case "answered":
-		return models.ConnectionStatusInProgress, "", 0
+		return models.CallStatusInProgress, "", 0
 
 	case "completed":
 		duration, _ := strconv.Atoi(status.Duration)
-		return models.ConnectionStatusCompleted, "", duration
+		return models.CallStatusCompleted, "", duration
 
 	case "busy":
-		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
+		return models.CallStatusErrored, models.CallErrorBusy, 0
 	case "rejected", "unanswered", "timeout":
-		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
+		return models.CallStatusErrored, models.CallErrorNoAnswer, 0
 	case "machine":
-		return models.ConnectionStatusErrored, models.ConnectionErrorMachine, 0
+		return models.CallStatusErrored, models.CallErrorMachine, 0
 	case "failed":
-		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
+		return models.CallStatusErrored, models.CallErrorProvider, 0
 
 	default:
 		logrus.WithField("status", status.Status).Error("unknown call status in ncco callback")
-		return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 0
+		return models.CallStatusFailed, models.CallErrorProvider, 0
 	}
 }
 
@@ -589,7 +589,7 @@ func (s *service) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a NCCO response for the events in the passed in session
-func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -726,7 +726,7 @@ func (s *service) generateToken() (string, error) {
 
 // NCCO building utilities
 
-func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, resumeURL string, es []flows.Event) (string, error) {
+func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.Call, resumeURL string, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 

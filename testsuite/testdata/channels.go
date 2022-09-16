@@ -25,9 +25,9 @@ func InsertChannel(db *sqlx.DB, org *Org, channelType, name string, schemes []st
 	return &Channel{id, uuid}
 }
 
-// InsertConnection inserts a channel connection
-func InsertConnection(db *sqlx.DB, org *Org, channel *Channel, contact *Contact) models.ConnectionID {
-	var id models.ConnectionID
+// InsertCall inserts a call
+func InsertCall(db *sqlx.DB, org *Org, channel *Channel, contact *Contact) models.CallID {
+	var id models.CallID
 	must(db.Get(&id,
 		`INSERT INTO channels_channelconnection(created_on, modified_on, external_id, status, direction, error_count, org_id, channel_id, contact_id, contact_urn_id) 
 		VALUES(NOW(), NOW(), 'ext1', 'I', 'I', 0, $1, $2, $3, $4) RETURNING id`, org.ID, channel.ID, contact.ID, contact.URNID,

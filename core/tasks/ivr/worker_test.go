@@ -53,20 +53,20 @@ func TestIVR(t *testing.T) {
 	service.callError = errors.Errorf("unable to create call")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.ConnectionStatusFailed).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.CallStatusFailed).Returns(1)
 
 	service.callError = nil
 	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.ConnectionStatusWired, "call1").Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// trying again should put us in a throttled state (queued)
 	service.callError = nil
 	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.ConnectionStatusQueued).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.CallStatusQueued).Returns(1)
 }
 
 var service = &MockService{}
@@ -88,7 +88,7 @@ func (s *MockService) HangupCall(externalID string) (*httpx.Trace, error) {
 	return nil, nil
 }
 
-func (s *MockService) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {
+func (s *MockService) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {
 	return nil
 }
 
@@ -104,15 +104,15 @@ func (s *MockService) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 	return nil, nil
 }
 
-func (s *MockService) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
-	return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 10
+func (s *MockService) StatusForRequest(r *http.Request) (models.CallStatus, models.CallError, int) {
+	return models.CallStatusFailed, models.CallErrorProvider, 10
 }
 
-func (s *MockService) CheckStartRequest(r *http.Request) models.ConnectionError {
+func (s *MockService) CheckStartRequest(r *http.Request) models.CallError {
 	return ""
 }
 
-func (s *MockService) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (s *MockService) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.Call, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 

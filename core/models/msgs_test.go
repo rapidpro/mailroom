@@ -662,7 +662,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 	require.NoError(t, err)
 
 	vonage := oa.ChannelByUUID(testdata.VonageChannel.UUID)
-	conn, err := models.InsertIVRConnection(ctx, db, testdata.Org1.ID, testdata.VonageChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.ConnectionDirectionOut, models.ConnectionStatusInProgress, "")
+	conn, err := models.InsertCall(ctx, db, testdata.Org1.ID, testdata.VonageChannel.ID, models.NilStartID, testdata.Cathy.ID, testdata.Cathy.URNID, models.CallDirectionOut, models.CallStatusInProgress, "")
 	require.NoError(t, err)
 
 	createdOn := time.Date(2021, 7, 26, 12, 6, 30, 0, time.UTC)
@@ -683,7 +683,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 }
 
 func insertTestSession(t *testing.T, ctx context.Context, rt *runtime.Runtime, org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow) *models.Session {
-	testdata.InsertWaitingSession(rt.DB, org, contact, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, nil)
+	testdata.InsertWaitingSession(rt.DB, org, contact, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)

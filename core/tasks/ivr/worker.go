@@ -89,7 +89,7 @@ func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models
 		start := time.Now()
 
 		ctx, cancel := context.WithTimeout(bg, time.Minute)
-		session, err := ivr.RequestCallStart(ctx, rt, oa, batch, contact)
+		session, err := ivr.RequestCall(ctx, rt, oa, batch, contact)
 		cancel()
 		if err != nil {
 			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID())

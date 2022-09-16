@@ -236,7 +236,7 @@ func (m *Msg) MarshalJSON() ([]byte, error) {
 }
 
 // NewIncomingIVR creates a new incoming IVR message for the passed in text and attachment
-func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, in *flows.MsgIn, createdOn time.Time) *Msg {
+func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, call *Call, in *flows.MsgIn, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -247,11 +247,11 @@ func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, i
 	m.Status = MsgStatusHandled
 	m.Visibility = VisibilityVisible
 	m.MsgType = MsgTypeIVR
-	m.ContactID = conn.ContactID()
+	m.ContactID = call.ContactID()
 
-	urnID := conn.ContactURNID()
+	urnID := call.ContactURNID()
 	m.ContactURNID = &urnID
-	m.ChannelID = conn.ChannelID()
+	m.ChannelID = call.ChannelID()
 
 	m.OrgID = orgID
 	m.TopupID = NilTopupID
@@ -266,7 +266,7 @@ func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, i
 }
 
 // NewOutgoingIVR creates a new IVR message for the passed in text with the optional attachment
-func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, out *flows.MsgOut, createdOn time.Time) *Msg {
+func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.MsgOut, createdOn time.Time) *Msg {
 	msg := &Msg{}
 	m := &msg.m
 
@@ -278,11 +278,11 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, conn *ChannelConnection, o
 	m.Status = MsgStatusWired
 	m.Visibility = VisibilityVisible
 	m.MsgType = MsgTypeIVR
-	m.ContactID = conn.ContactID()
+	m.ContactID = call.ContactID()
 
-	urnID := conn.ContactURNID()
+	urnID := call.ContactURNID()
 	m.ContactURNID = &urnID
-	m.ChannelID = conn.ChannelID()
+	m.ChannelID = call.ChannelID()
 
 	m.URN = out.URN()
 
