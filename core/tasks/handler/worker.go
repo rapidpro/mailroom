@@ -290,7 +290,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 }
 
 // HandleChannelEvent is called for channel events
-func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.ChannelConnection) (*models.Session, error) {
+func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType models.ChannelEventType, event *models.ChannelEvent, conn *models.Call) (*models.Session, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID())
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org")
@@ -431,7 +431,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	if conn != nil {
 		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
 			for _, session := range sessions {
-				session.SetChannelConnection(conn)
+				session.SetCall(conn)
 			}
 			return nil
 		}

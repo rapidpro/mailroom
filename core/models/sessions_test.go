@@ -305,10 +305,10 @@ func TestInterruptSessionsForContacts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
-	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
+	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilCallID)
+	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
+	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
 
 	// noop if no contacts
 	_, err := models.InterruptSessionsForContacts(ctx, db, []models.ContactID{})
@@ -339,10 +339,10 @@ func TestInterruptSessionsForContactsTx(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
-	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilConnectionID)
+	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilCallID)
+	session2ID, run2ID := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeVoice, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
+	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, models.NilCallID)
 
 	tx := db.MustBegin()
 
@@ -380,15 +380,15 @@ func TestInterruptSessionsForChannels(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	cathy1ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	cathy2ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	bobConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
-	georgeConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.VonageChannel, testdata.George)
+	cathy1CallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	cathy2CallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	bobCallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
+	georgeCallID := testdata.InsertCall(db, testdata.Org1, testdata.VonageChannel, testdata.George)
 
-	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, cathy1ConnectionID)
-	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, cathy2ConnectionID)
-	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, georgeConnectionID)
+	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, cathy1CallID)
+	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, cathy2CallID)
+	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobCallID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, georgeCallID)
 
 	// noop if no channels
 	err := models.InterruptSessionsForChannels(ctx, db, []models.ChannelID{})
@@ -417,15 +417,15 @@ func TestInterruptSessionsForFlows(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	cathy1ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	cathy2ConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
-	bobConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
-	georgeConnectionID := testdata.InsertConnection(db, testdata.Org1, testdata.VonageChannel, testdata.George)
+	cathy1CallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	cathy2CallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy)
+	bobCallID := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob)
+	georgeCallID := testdata.InsertCall(db, testdata.Org1, testdata.VonageChannel, testdata.George)
 
-	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, cathy1ConnectionID)
-	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, cathy2ConnectionID)
-	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobConnectionID)
-	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.PickANumber, georgeConnectionID)
+	session1ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, cathy1CallID)
+	session2ID, _ := insertSessionAndRun(db, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, cathy2CallID)
+	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobCallID)
+	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.PickANumber, georgeCallID)
 
 	// noop if no flows
 	err := models.InterruptSessionsForFlows(ctx, db, []models.FlowID{})
@@ -455,14 +455,14 @@ func TestGetSessionWaitExpiresOn(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetData)
 
 	s1Expires := time.Date(2022, 1, 26, 13, 28, 30, 0, time.UTC)
-	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), s1Expires, true, nil)
+	s1ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), s1Expires, true, nil)
 
 	s1Actual, err := models.GetSessionWaitExpiresOn(ctx, db, s1ID)
 	assert.NoError(t, err)
 	assert.Equal(t, s1Expires, *s1Actual)
 
 	// for a non-waiting session, should return nil
-	s2ID := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilConnectionID)
+	s2ID := testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdata.Favorites, models.NilCallID)
 
 	s2Actual, err := models.GetSessionWaitExpiresOn(ctx, db, s2ID)
 	assert.NoError(t, err)
@@ -480,7 +480,7 @@ func TestClearWaitTimeout(t *testing.T) {
 
 	expiresOn := time.Now().Add(time.Hour)
 	timeoutOn := time.Now().Add(time.Minute)
-	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), expiresOn, true, &timeoutOn)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), expiresOn, true, &timeoutOn)
 
 	session, err := models.FindWaitingSessionForContact(ctx, db, nil, oa, models.FlowTypeMessaging, cathy)
 	require.NoError(t, err)
@@ -497,7 +497,7 @@ func TestClearWaitTimeout(t *testing.T) {
 	assertdb.Query(t, db, `SELECT timeout_on FROM flows_flowsession WHERE id = $1`, session.ID()).Returns(nil)
 }
 
-func insertSessionAndRun(db *sqlx.DB, contact *testdata.Contact, sessionType models.FlowType, status models.SessionStatus, flow *testdata.Flow, connID models.ConnectionID) (models.SessionID, models.FlowRunID) {
+func insertSessionAndRun(db *sqlx.DB, contact *testdata.Contact, sessionType models.FlowType, status models.SessionStatus, flow *testdata.Flow, connID models.CallID) (models.SessionID, models.FlowRunID) {
 	// create session and add a run with same status
 	sessionID := testdata.InsertFlowSession(db, testdata.Org1, contact, sessionType, status, flow, connID)
 	runID := testdata.InsertFlowRun(db, testdata.Org1, sessionID, contact, flow, models.RunStatus(status))

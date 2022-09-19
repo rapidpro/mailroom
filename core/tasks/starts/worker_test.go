@@ -32,7 +32,7 @@ func TestStarts(t *testing.T) {
 	// convert our single message flow to an actual background flow that shouldn't interrupt
 	db.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
 
-	sID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), true, nil)
+	sID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
 	testdata.InsertFlowRun(db, testdata.Org1, sID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
 
 	tcs := []struct {

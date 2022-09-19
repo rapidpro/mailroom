@@ -139,11 +139,11 @@ func (s *service) DownloadMedia(url string) (*http.Response, error) {
 	return http.Get(url)
 }
 
-func (s *service) CheckStartRequest(r *http.Request) models.ConnectionError {
+func (s *service) CheckStartRequest(r *http.Request) models.CallError {
 	r.ParseForm()
 	answeredBy := r.Form.Get("AnsweredBy")
 	if answeredBy == "machine_start" || answeredBy == "fax" {
-		return models.ConnectionErrorMachine
+		return models.CallErrorMachine
 	}
 	return ""
 }
@@ -152,7 +152,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	return nil, nil
 }
 
-func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.Call, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 
@@ -290,28 +290,28 @@ func (s *service) ResumeForRequest(r *http.Request) (ivr.Resume, error) {
 
 // StatusForRequest returns the call status for the passed in request, and if it's an error the reason,
 // and if available, the current call duration
-func (s *service) StatusForRequest(r *http.Request) (models.ConnectionStatus, models.ConnectionError, int) {
+func (s *service) StatusForRequest(r *http.Request) (models.CallStatus, models.CallError, int) {
 	status := r.Form.Get("CallStatus")
 	switch status {
 
 	case "queued", "ringing":
-		return models.ConnectionStatusWired, "", 0
+		return models.CallStatusWired, "", 0
 	case "in-progress", "initiated":
-		return models.ConnectionStatusInProgress, "", 0
+		return models.CallStatusInProgress, "", 0
 	case "completed":
 		duration, _ := strconv.Atoi(r.Form.Get("CallDuration"))
-		return models.ConnectionStatusCompleted, "", duration
+		return models.CallStatusCompleted, "", duration
 
 	case "busy":
-		return models.ConnectionStatusErrored, models.ConnectionErrorBusy, 0
+		return models.CallStatusErrored, models.CallErrorBusy, 0
 	case "no-answer":
-		return models.ConnectionStatusErrored, models.ConnectionErrorNoAnswer, 0
+		return models.CallStatusErrored, models.CallErrorNoAnswer, 0
 	case "canceled", "failed":
-		return models.ConnectionStatusErrored, models.ConnectionErrorProvider, 0
+		return models.CallStatusErrored, models.CallErrorProvider, 0
 
 	default:
 		logrus.WithField("call_status", status).Error("unknown call status in status callback")
-		return models.ConnectionStatusFailed, models.ConnectionErrorProvider, 0
+		return models.CallStatusFailed, models.CallErrorProvider, 0
 	}
 }
 
@@ -350,7 +350,7 @@ func (s *service) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a TWIML response for the events in the passed in session
-func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.ChannelConnection, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")

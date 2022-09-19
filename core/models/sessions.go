@@ -67,14 +67,14 @@ type Session struct {
 		WaitExpiresOn      *time.Time        `db:"wait_expires_on"`
 		WaitResumeOnExpire bool              `db:"wait_resume_on_expire"`
 		CurrentFlowID      FlowID            `db:"current_flow_id"`
-		ConnectionID       *ConnectionID     `db:"connection_id"`
+		ConnectionID       *CallID           `db:"connection_id"`
 	}
 
 	incomingMsgID      MsgID
 	incomingExternalID null.String
 
-	// any channel connection associated with this flow session
-	channelConnection *ChannelConnection
+	// any call associated with this flow session
+	call *Call
 
 	// time after our last message is sent that we should timeout
 	timeout *time.Duration
@@ -109,7 +109,7 @@ func (s *Session) WaitTimeoutOn() *time.Time          { return s.s.WaitTimeoutOn
 func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
 func (s *Session) WaitResumeOnExpire() bool           { return s.s.WaitResumeOnExpire }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
-func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
+func (s *Session) ConnectionID() *CallID              { return s.s.ConnectionID }
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
 func (s *Session) IncomingMsgExternalID() null.String { return s.incomingExternalID }
 func (s *Session) Scene() *Scene                      { return s.scene }
@@ -171,15 +171,15 @@ func (s *Session) SetIncomingMsg(id flows.MsgID, externalID null.String) {
 	s.incomingExternalID = externalID
 }
 
-// SetChannelConnection sets the channel connection associated with this sprint
-func (s *Session) SetChannelConnection(cc *ChannelConnection) {
-	connID := cc.ID()
+// SetCall sets the channel connection associated with this sprint
+func (s *Session) SetCall(c *Call) {
+	connID := c.ID()
 	s.s.ConnectionID = &connID
-	s.channelConnection = cc
+	s.call = c
 }
 
-func (s *Session) ChannelConnection() *ChannelConnection {
-	return s.channelConnection
+func (s *Session) Call() *Call {
+	return s.call
 }
 
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
@@ -389,9 +389,9 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	// if this session is complete, so is any associated connection
-	if s.channelConnection != nil {
+	if s.call != nil {
 		if s.Status() == SessionStatusCompleted || s.Status() == SessionStatusFailed {
-			err := s.channelConnection.UpdateStatus(ctx, tx, ConnectionStatusCompleted, 0, time.Now())
+			err := s.call.UpdateStatus(ctx, tx, CallStatusCompleted, 0, time.Now())
 			if err != nil {
 				return errors.Wrapf(err, "error update channel connection")
 			}
@@ -600,7 +600,7 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 	sessions := make([]*Session, 0, len(ss))
 	waitingSessionsI := make([]interface{}, 0, len(ss))
 	endedSessionsI := make([]interface{}, 0, len(ss))
-	completedConnectionIDs := make([]ConnectionID, 0, 1)
+	completedCallIDs := make([]CallID, 0, 1)
 
 	for i, s := range ss {
 		session, err := NewSession(ctx, tx, oa, s, sprints[i])
@@ -613,8 +613,8 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 			waitingSessionsI = append(waitingSessionsI, &session.s)
 		} else {
 			endedSessionsI = append(endedSessionsI, &session.s)
-			if session.channelConnection != nil {
-				completedConnectionIDs = append(completedConnectionIDs, session.channelConnection.ID())
+			if session.call != nil {
+				completedCallIDs = append(completedCallIDs, session.call.ID())
 			}
 		}
 	}
@@ -659,7 +659,7 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 	}
 
 	// mark any connections that are done as complete as well
-	err = UpdateChannelConnectionStatuses(ctx, tx, completedConnectionIDs, ConnectionStatusCompleted)
+	err = BulkUpdateCallStatuses(ctx, tx, completedCallIDs, CallStatusCompleted)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating channel connections to complete")
 	}
@@ -964,7 +964,7 @@ SELECT fs.id
   JOIN channels_channelconnection cc ON fs.connection_id = cc.id
  WHERE fs.status = 'W' AND cc.channel_id = ANY($1);`
 
-// InterruptSessionsForChannels interrupts any waiting sessions with connections on the given channels
+// InterruptSessionsForChannels interrupts any waiting sessions with calls on the given channels
 func InterruptSessionsForChannels(ctx context.Context, db *sqlx.DB, channelIDs []ChannelID) error {
 	if len(channelIDs) == 0 {
 		return nil

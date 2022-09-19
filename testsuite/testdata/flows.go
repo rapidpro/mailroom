@@ -84,7 +84,7 @@ func InsertFlowStart(db *sqlx.DB, org *Org, flow *Flow, contacts []*Contact) mod
 }
 
 // InsertFlowSession inserts a flow session
-func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, status models.SessionStatus, currentFlow *Flow, connectionID models.ConnectionID) models.SessionID {
+func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, status models.SessionStatus, currentFlow *Flow, callID models.CallID) models.SessionID {
 	now := time.Now()
 	tomorrow := now.Add(time.Hour * 24)
 
@@ -99,17 +99,17 @@ func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType mode
 	var id models.SessionID
 	must(db.Get(&id,
 		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, connection_id, wait_started_on, wait_expires_on, wait_resume_on_expire, ended_on) 
-		 VALUES($1, $2, $3, $4, '{}', TRUE, NOW(), $5, $6, $7, $8, $9, FALSE, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, status, sessionType, currentFlow.ID, connectionID, waitStartedOn, waitExpiresOn, endedOn,
+		 VALUES($1, $2, $3, $4, '{}', TRUE, NOW(), $5, $6, $7, $8, $9, FALSE, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, status, sessionType, currentFlow.ID, callID, waitStartedOn, waitExpiresOn, endedOn,
 	))
 	return id
 }
 
 // InsertWaitingSession inserts a waiting flow session
-func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, currentFlow *Flow, connectionID models.ConnectionID, waitStartedOn, waitExpiresOn time.Time, waitResumeOnExpire bool, waitTimeoutOn *time.Time) models.SessionID {
+func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, currentFlow *Flow, callID models.CallID, waitStartedOn, waitExpiresOn time.Time, waitResumeOnExpire bool, waitTimeoutOn *time.Time) models.SessionID {
 	var id models.SessionID
 	must(db.Get(&id,
 		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, connection_id, wait_started_on, wait_expires_on, wait_resume_on_expire, timeout_on) 
-		 VALUES($1, $2, $3, 'W', '{"status":"waiting"}', TRUE, NOW(), $4, $5, $6, $7, $8, $9, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, sessionType, currentFlow.ID, connectionID, waitStartedOn, waitExpiresOn, waitResumeOnExpire, waitTimeoutOn,
+		 VALUES($1, $2, $3, 'W', '{"status":"waiting"}', TRUE, NOW(), $4, $5, $6, $7, $8, $9, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, sessionType, currentFlow.ID, callID, waitStartedOn, waitExpiresOn, waitResumeOnExpire, waitTimeoutOn,
 	))
 	return id
 }

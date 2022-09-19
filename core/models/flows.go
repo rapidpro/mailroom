@@ -88,7 +88,7 @@ func (f *Flow) Version() string { return f.f.Version }
 
 // IVRRetryWait returns the wait before retrying a failed IVR call (nil means no retry)
 func (f *Flow) IVRRetryWait() *time.Duration {
-	wait := ConnectionRetryWait
+	wait := CallRetryWait
 
 	value := f.f.Config.Get(flowConfigIVRRetryMinutes, nil)
 	fv, isFloat := value.(float64)
