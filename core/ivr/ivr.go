@@ -131,9 +131,13 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, conn *models.Call) (*m
 	}
 	if err != nil {
 		clog.Error(err)
-		return clog, errors.Wrapf(err, "error hanging call up")
 	}
-	return clog, nil
+
+	if err := conn.AttachLog(ctx, rt.DB, clog); err != nil {
+		logrus.WithError(err).Error("error attaching ivr channel log")
+	}
+
+	return clog, err
 }
 
 // RequestCall creates a new ChannelSession for the passed in flow start and contact, returning the created session
@@ -269,10 +273,12 @@ func RequestStartForCall(ctx context.Context, rt *runtime.Runtime, channel *mode
 		return clog, nil
 	}
 
-	// update our call
-	err = call.UpdateExternalID(ctx, rt.DB, string(callID))
-	if err != nil {
-		return clog, errors.Wrapf(err, "error updating call external id")
+	// update our channel session
+	if err := call.UpdateExternalID(ctx, rt.DB, string(callID)); err != nil {
+		return clog, errors.Wrapf(err, "error updating session external id")
+	}
+	if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
+		logrus.WithError(err).Error("error attaching ivr channel log")
 	}
 
 	return clog, nil

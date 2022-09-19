@@ -73,7 +73,12 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 		clog := models.NewChannelLogForIncoming(logType, ch, recorder, svc.RedactValues(ch))
 
 		call, rerr := handler(ctx, rt, oa, ch, svc, r, recorder.ResponseWriter)
-		clog.SetCall(call)
+		if call != nil {
+			clog.SetCall(call)
+			if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
+				logrus.WithError(err).WithField("http_request", r).Error("error attaching ivr channel log")
+			}
+		}
 
 		if err := recorder.End(); err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error recording IVR request")
@@ -81,8 +86,7 @@ func newIVRHandler(handler ivrHandlerFn, logType models.ChannelLogType) web.Hand
 
 		clog.End()
 
-		err = models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog})
-		if err != nil {
+		if err := models.InsertChannelLogs(ctx, rt.DB, []*models.ChannelLog{clog}); err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error writing ivr channel log")
 		}
 

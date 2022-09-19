@@ -431,6 +431,11 @@ func BulkUpdateCallStatuses(ctx context.Context, db Queryer, callIDs []CallID, s
 	return nil
 }
 
+func (c *Call) AttachLog(ctx context.Context, db Queryer, clog *ChannelLog) error {
+	_, err := db.ExecContext(ctx, `UPDATE channels_channelconnection SET log_uuids = array_append(log_uuids, $2) WHERE id = $1`, c.c.ID, clog.UUID())
+	return errors.Wrap(err, "error attaching log to call")
+}
+
 const sqlSelectActiveCallCount = `
 SELECT count(*)
   FROM channels_channelconnection
