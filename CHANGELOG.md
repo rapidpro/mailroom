@@ -1,3 +1,10 @@
+v7.5.13
+----------
+ * Update test database
+ * Rename channelconnection to call
+ * Don't read or write connection_type
+ * Attach channel logs to channel connections
+
 v7.5.12
 ----------
  * Add redaction to IVR channel logging
