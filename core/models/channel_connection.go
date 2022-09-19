@@ -379,6 +379,11 @@ func (c *ChannelConnection) MarkErrored(ctx context.Context, db Queryer, now tim
 	return nil
 }
 
+func (c *ChannelConnection) AttachLog(ctx context.Context, db Queryer, clog *ChannelLog) error {
+	_, err := db.ExecContext(ctx, `UPDATE channels_channelconnection SET log_uuids = array_append(log_uuids, $2) WHERE id = $1`, c.c.ID, clog.UUID())
+	return errors.Wrap(err, "error attaching log to channel connection")
+}
+
 // MarkFailed updates the status for this connection
 func (c *ChannelConnection) MarkFailed(ctx context.Context, db Queryer, now time.Time) error {
 	c.c.Status = ConnectionStatusFailed
