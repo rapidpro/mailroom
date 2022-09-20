@@ -114,11 +114,11 @@ func TestTwilioIVR(t *testing.T) {
 	require.NoError(t, err)
 
 	// check our 3 contacts have 3 wired calls
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.Cathy.ID, models.CallStatusWired, "Call1").Returns(1)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.Bob.ID, models.CallStatusWired, "Call2").Returns(1)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.George.ID, models.CallStatusWired, "Call3").Returns(1)
 
 	tcs := []struct {
@@ -318,7 +318,7 @@ func TestTwilioIVR(t *testing.T) {
 		}
 
 		for connExtID, expStatus := range tc.expectedConnStatus {
-			assertdb.Query(t, db, `SELECT status FROM channels_channelconnection WHERE external_id = $1`, connExtID).
+			assertdb.Query(t, db, `SELECT status FROM ivr_call WHERE external_id = $1`, connExtID).
 				Columns(map[string]interface{}{"status": expStatus}, "status mismatch for connection '%s' in test '%s'", connExtID, tc.label)
 		}
 	}
@@ -332,7 +332,7 @@ func TestTwilioIVR(t *testing.T) {
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id = $1`, testdata.TwilioChannel.ID).Returns(9)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE call_id = 1 AND channel_id = $1`, testdata.TwilioChannel.ID).Returns(9)
 	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE http_logs::text LIKE '%sesame%'`).Returns(0) // auth token redacted
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' 
@@ -421,10 +421,10 @@ func TestVonageIVR(t *testing.T) {
 	err = ivr_tasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.Cathy.ID, models.CallStatusWired, "Call1").Returns(1)
 
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.George.ID, models.CallStatusWired, "Call2").Returns(1)
 
 	tcs := []struct {
@@ -624,18 +624,18 @@ func TestVonageIVR(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
 	assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND status = 'C'`, testdata.Cathy.ID).Returns(1)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = 'D' AND duration = 50`, testdata.Cathy.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM ivr_call WHERE contact_id = $1 AND status = 'D' AND duration = 50`, testdata.Cathy.ID).Returns(1)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND status = 'W' AND direction = 'O'`, testdata.Cathy.ID).Returns(9)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'F' AND direction = 'I'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM ivr_call WHERE status = 'F' AND direction = 'I'`).Returns(1)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND status = 'H' AND direction = 'I'`, testdata.Cathy.ID).Returns(5)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE connection_id = 1 AND channel_id = $1`, testdata.VonageChannel.ID).Returns(10)
+	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE call_id = 1 AND channel_id = $1`, testdata.VonageChannel.ID).Returns(10)
 	assertdb.Query(t, db, `SELECT count(*) FROM channels_channellog WHERE http_logs::text LIKE '%BEGIN PRIVATE KEY%'`).Returns(0) // private key redacted
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND msg_type = 'V' AND ((status = 'H' AND direction = 'I') OR (status = 'W' AND direction = 'O'))`, testdata.George.ID).Returns(3)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM channels_channelconnection WHERE status = 'D' AND contact_id = $1`, testdata.George.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM ivr_call WHERE status = 'D' AND contact_id = $1`, testdata.George.ID).Returns(1)
 }

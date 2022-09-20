@@ -67,7 +67,7 @@ type Session struct {
 		WaitExpiresOn      *time.Time        `db:"wait_expires_on"`
 		WaitResumeOnExpire bool              `db:"wait_resume_on_expire"`
 		CurrentFlowID      FlowID            `db:"current_flow_id"`
-		ConnectionID       *CallID           `db:"connection_id"`
+		CallID             *CallID           `db:"call_id"`
 	}
 
 	incomingMsgID      MsgID
@@ -109,7 +109,7 @@ func (s *Session) WaitTimeoutOn() *time.Time          { return s.s.WaitTimeoutOn
 func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
 func (s *Session) WaitResumeOnExpire() bool           { return s.s.WaitResumeOnExpire }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
-func (s *Session) ConnectionID() *CallID              { return s.s.ConnectionID }
+func (s *Session) ConnectionID() *CallID              { return s.s.CallID }
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
 func (s *Session) IncomingMsgExternalID() null.String { return s.incomingExternalID }
 func (s *Session) Scene() *Scene                      { return s.scene }
@@ -174,7 +174,7 @@ func (s *Session) SetIncomingMsg(id flows.MsgID, externalID null.String) {
 // SetCall sets the channel connection associated with this sprint
 func (s *Session) SetCall(c *Call) {
 	connID := c.ID()
-	s.s.ConnectionID = &connID
+	s.s.CallID = &connID
 	s.call = c
 }
 
@@ -567,26 +567,26 @@ func NewSession(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, fs flows.Sessio
 
 const sqlInsertWaitingSession = `
 INSERT INTO
-	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  connection_id)
-               VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :connection_id)
+	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  call_id)
+               VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :call_id)
 RETURNING id`
 
 const sqlInsertWaitingSessionNoOutput = `
 INSERT INTO
-	flows_flowsession( uuid,  session_type,  status,  responded,           output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  connection_id)
-               VALUES(:uuid, :session_type, :status, :responded,          :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :connection_id)
+	flows_flowsession( uuid,  session_type,  status,  responded,           output_url,  contact_id,  org_id, created_on, current_flow_id,  timeout_on,  wait_started_on,  wait_expires_on,  wait_resume_on_expire,  call_id)
+               VALUES(:uuid, :session_type, :status, :responded,          :output_url, :contact_id, :org_id, NOW(),     :current_flow_id, :timeout_on, :wait_started_on, :wait_expires_on, :wait_resume_on_expire, :call_id)
 RETURNING id`
 
 const sqlInsertEndedSession = `
 INSERT INTO
-	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, connection_id)
-               VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :connection_id)
+	flows_flowsession( uuid,  session_type,  status,  responded,  output,  output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, call_id)
+               VALUES(:uuid, :session_type, :status, :responded, :output, :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :call_id)
 RETURNING id`
 
 const sqlInsertEndedSessionNoOutput = `
 INSERT INTO
-	flows_flowsession( uuid,  session_type,  status,  responded,           output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, connection_id)
-               VALUES(:uuid, :session_type, :status, :responded,          :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :connection_id)
+	flows_flowsession( uuid,  session_type,  status,  responded,           output_url,  contact_id,  org_id, created_on, ended_on, wait_resume_on_expire, call_id)
+               VALUES(:uuid, :session_type, :status, :responded,          :output_url, :contact_id, :org_id, NOW(),      NOW(),    FALSE,                :call_id)
 RETURNING id`
 
 // InsertSessions writes the passed in session to our database, writes any runs that need to be created
@@ -739,7 +739,7 @@ SELECT
 	wait_expires_on,
 	wait_resume_on_expire,
 	current_flow_id,
-	connection_id
+	call_id
 FROM 
 	flows_flowsession fs
 WHERE
@@ -961,7 +961,7 @@ func InterruptSessionsForContactsTx(ctx context.Context, tx *sqlx.Tx, contactIDs
 const sqlWaitingSessionIDsForChannels = `
 SELECT fs.id
   FROM flows_flowsession fs
-  JOIN channels_channelconnection cc ON fs.connection_id = cc.id
+  JOIN ivr_call cc ON fs.call_id = cc.id
  WHERE fs.status = 'W' AND cc.channel_id = ANY($1);`
 
 // InterruptSessionsForChannels interrupts any waiting sessions with calls on the given channels

@@ -231,7 +231,7 @@ func TestBatchStart(t *testing.T) {
 
 		assertdb.Query(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
-			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
+			AND status = 'C' AND responded = FALSE AND org_id = 1 AND call_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
 			Returns(tc.Count, "%d: unexpected number of sessions", i)
 
 		assertdb.Query(t, db,
@@ -273,7 +273,7 @@ func TestResume(t *testing.T) {
 
 	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NULL`, modelContact.ID(), flow.ID()).Returns(1)
+		 AND status = 'W' AND responded = FALSE AND org_id = 1 AND call_id IS NULL AND output IS NULL`, modelContact.ID(), flow.ID()).Returns(1)
 
 	assertdb.Query(t, db,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
@@ -306,7 +306,7 @@ func TestResume(t *testing.T) {
 
 		assertdb.Query(t, db,
 			`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1
-			 AND status = $2 AND responded = TRUE AND org_id = 1 AND connection_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, modelContact.ID(), tc.SessionStatus).
+			 AND status = $2 AND responded = TRUE AND org_id = 1 AND call_id IS NULL AND output IS NULL AND output_url IS NOT NULL`, modelContact.ID(), tc.SessionStatus).
 			Returns(1, "%d: didn't find expected session", i)
 
 		runQuery := `SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
