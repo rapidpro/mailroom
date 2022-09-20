@@ -1273,6 +1273,38 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 	return resent, nil
 }
 
+const sqlUpdateMsgStatusFailed = `
+UPDATE msgs_msg m
+   SET status = 'F', modified_on = NOW()
+ WHERE id = ANY($1)`
+
+// FailMessages prepares messages for failing and marking them as FAILED
+func FailMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
+
+	// for the bulk db updates
+	fails := make([]MsgID, 0, len(msgs))
+	failedMsgs := make([]*Msg, 0, len(msgs))
+
+	for _, msg := range msgs {
+		if msg.m.Status == MsgStatusQueued || msg.m.Status == MsgStatusPending || msg.m.Status == MsgStatusErrored {
+			msg.m.Status = MsgStatusFailed
+			fails = append(fails, MsgID(msg.m.ID))
+			failedMsgs = append(failedMsgs, msg)
+		}
+	}
+
+	for _, idBatch := range chunkSlice(fails, 1000) {
+		// and update the messages as FAILED
+		_, err := db.ExecContext(ctx, sqlUpdateMsgStatusFailed, pq.Array(idBatch))
+		if err != nil {
+			return nil, errors.Wrapf(err, "error failing messages")
+		}
+	}
+
+	return failedMsgs, nil
+
+}
+
 // MarkBroadcastSent marks the passed in broadcast as sent
 func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
 	// noop if it is a nil id
