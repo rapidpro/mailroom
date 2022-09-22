@@ -68,9 +68,8 @@ type Service interface {
 	HangupCall(externalID string) (*httpx.Trace, error)
 
 	WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
-
+	WriteHangupResponse(w http.ResponseWriter) error
 	WriteErrorResponse(w http.ResponseWriter, err error) error
-
 	WriteEmptyResponse(w http.ResponseWriter, msg string) error
 
 	ResumeForRequest(r *http.Request) (Resume, error)

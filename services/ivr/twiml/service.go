@@ -376,29 +376,37 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	return nil
 }
 
+func (s *service) WriteHangupResponse(w http.ResponseWriter) error {
+	return s.writeResponse(w, &Response{
+		Commands: []any{Hangup{}},
+	})
+}
+
 // WriteErrorResponse writes an error / unavailable response
 func (s *service) WriteErrorResponse(w http.ResponseWriter, err error) error {
-	r := &Response{Message: strings.Replace(err.Error(), "--", "__", -1)}
-	r.Commands = append(r.Commands, Say{Text: ivr.ErrorMessage})
-	r.Commands = append(r.Commands, Hangup{})
-
-	body, err := xml.Marshal(r)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write([]byte(xml.Header + string(body)))
-	return err
+	return s.writeResponse(w, &Response{
+		Message: strings.Replace(err.Error(), "--", "__", -1),
+		Commands: []any{
+			Say{Text: ivr.ErrorMessage},
+			Hangup{},
+		},
+	})
 }
 
 // WriteEmptyResponse writes an empty (but valid) response
 func (s *service) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
-	r := &Response{Message: strings.Replace(msg, "--", "__", -1)}
+	return s.writeResponse(w, &Response{
+		Message: strings.Replace(msg, "--", "__", -1),
+	})
+}
 
-	body, err := xml.Marshal(r)
+func (s *service) writeResponse(w http.ResponseWriter, resp *Response) error {
+	marshalled, err := xml.Marshal(resp)
 	if err != nil {
 		return err
 	}
-	_, err = w.Write([]byte(xml.Header + string(body)))
+	w.Write([]byte(xml.Header))
+	_, err = w.Write(marshalled)
 	return err
 }
 
