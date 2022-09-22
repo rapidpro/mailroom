@@ -53,20 +53,20 @@ func TestIVR(t *testing.T) {
 	service.callError = errors.Errorf("unable to create call")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.CallStatusFailed).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2`, testdata.Cathy.ID, models.CallStatusFailed).Returns(1)
 
 	service.callError = nil
 	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`, testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// trying again should put us in a throttled state (queued)
 	service.callError = nil
 	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.CallStatusQueued).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND next_attempt IS NOT NULL;`, testdata.Cathy.ID, models.CallStatusQueued).Returns(1)
 }
 
 var service = &MockService{}

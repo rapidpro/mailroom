@@ -191,7 +191,7 @@ func ExpireVoiceSessions(ctx context.Context, rt *runtime.Runtime) error {
 }
 
 const sqlSelectExpiredVoiceWaits = `
-  SELECT id, org_id, connection_id, wait_expires_on
+  SELECT id, org_id, call_id, wait_expires_on
     FROM flows_flowsession
    WHERE session_type = 'V' AND status = 'W' AND wait_expires_on <= NOW()
 ORDER BY wait_expires_on ASC
@@ -200,6 +200,6 @@ ORDER BY wait_expires_on ASC
 type ExpiredVoiceWait struct {
 	SessionID models.SessionID `db:"id"`
 	OrgID     models.OrgID     `db:"org_id"`
-	CallID    models.CallID    `db:"connection_id"`
+	CallID    models.CallID    `db:"call_id"`
 	ExpiresOn time.Time        `db:"wait_expires_on"`
 }

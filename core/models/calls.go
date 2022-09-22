@@ -92,7 +92,7 @@ func (c *Call) ErrorCount() int         { return c.c.ErrorCount }
 func (c *Call) NextAttempt() *time.Time { return c.c.NextAttempt }
 
 const sqlInsertCall = `
-INSERT INTO channels_channelconnection
+INSERT INTO ivr_call
 (
 	created_on,
 	modified_on,
@@ -152,7 +152,7 @@ func InsertCall(ctx context.Context, db *sqlx.DB, orgID OrgID, channelID Channel
 	if startID != NilStartID {
 		_, err := db.ExecContext(
 			ctx,
-			`INSERT INTO flows_flowstart_connections(flowstart_id, channelconnection_id) VALUES($1, $2) ON CONFLICT DO NOTHING`,
+			`INSERT INTO flows_flowstart_calls(flowstart_id, call_id) VALUES($1, $2) ON CONFLICT DO NOTHING`,
 			startID, c.ID,
 		)
 		if err != nil {
@@ -187,8 +187,9 @@ SELECT
 	cc.org_id as org_id, 
 	fsc.flowstart_id as start_id
 FROM
-	channels_channelconnection as cc
-	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
+	ivr_call as cc
+LEFT OUTER JOIN 
+	flows_flowstart_calls fsc ON cc.id = fsc.call_id
 WHERE
 	cc.org_id = $1 AND cc.id = $2
 `
@@ -223,8 +224,9 @@ SELECT
 	cc.org_id as org_id, 
 	fsc.flowstart_id as start_id
 FROM
-	channels_channelconnection as cc
-	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
+	ivr_call as cc
+LEFT OUTER JOIN 
+	flows_flowstart_calls fsc ON cc.id = fsc.call_id
 WHERE
 	cc.channel_id = $1 AND cc.external_id = $2
 ORDER BY
@@ -262,8 +264,9 @@ SELECT
 	cc.org_id as org_id, 
 	fsc.flowstart_id as start_id
 FROM
-	channels_channelconnection as cc
-	LEFT OUTER JOIN flows_flowstart_connections fsc ON cc.id = fsc.channelconnection_id
+	ivr_call as cc
+LEFT OUTER JOIN 
+	flows_flowstart_calls fsc ON cc.id = fsc.call_id
 WHERE
 	cc.status IN ('Q', 'E') AND next_attempt < NOW()
 ORDER BY 
@@ -298,10 +301,7 @@ func (c *Call) UpdateExternalID(ctx context.Context, db Queryer, id string) erro
 	c.c.ExternalID = id
 	c.c.Status = CallStatusWired
 
-	_, err := db.ExecContext(ctx, `
-	UPDATE channels_channelconnection SET external_id = $2, status = $3, modified_on = NOW() WHERE id = $1
-	`, c.c.ID, c.c.ExternalID, c.c.Status)
-
+	_, err := db.ExecContext(ctx, `UPDATE ivr_call SET external_id = $2, status = $3, modified_on = NOW() WHERE id = $1`, c.c.ID, c.c.ExternalID, c.c.Status)
 	if err != nil {
 		return errors.Wrapf(err, "error updating external id to: %s for call: %d", c.c.ExternalID, c.c.ID)
 	}
@@ -314,10 +314,7 @@ func (c *Call) MarkStarted(ctx context.Context, db Queryer, now time.Time) error
 	c.c.Status = CallStatusInProgress
 	c.c.StartedOn = &now
 
-	_, err := db.ExecContext(ctx, `
-	UPDATE channels_channelconnection SET status = $2, started_on = $3, modified_on = NOW() WHERE id = $1
-	`, c.c.ID, c.c.Status, c.c.StartedOn)
-
+	_, err := db.ExecContext(ctx, `UPDATE ivr_call SET status = $2, started_on = $3, modified_on = NOW() WHERE id = $1`, c.c.ID, c.c.Status, c.c.StartedOn)
 	if err != nil {
 		return errors.Wrapf(err, "error marking call as started")
 	}
@@ -341,7 +338,7 @@ func (c *Call) MarkErrored(ctx context.Context, db Queryer, now time.Time, retry
 	}
 
 	_, err := db.ExecContext(ctx,
-		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, error_reason = $4, error_count = $5, next_attempt = $6, modified_on = NOW() WHERE id = $1`,
+		`UPDATE ivr_call SET status = $2, ended_on = $3, error_reason = $4, error_count = $5, next_attempt = $6, modified_on = NOW() WHERE id = $1`,
 		c.c.ID, c.c.Status, c.c.EndedOn, c.c.ErrorReason, c.c.ErrorCount, c.c.NextAttempt,
 	)
 
@@ -358,7 +355,7 @@ func (c *Call) MarkFailed(ctx context.Context, db Queryer, now time.Time) error 
 	c.c.EndedOn = &now
 
 	_, err := db.ExecContext(ctx,
-		`UPDATE channels_channelconnection SET status = $2, ended_on = $3, modified_on = NOW() WHERE id = $1`,
+		`UPDATE ivr_call SET status = $2, ended_on = $3, modified_on = NOW() WHERE id = $1`,
 		c.c.ID, c.c.Status, c.c.EndedOn,
 	)
 
@@ -375,11 +372,7 @@ func (c *Call) MarkThrottled(ctx context.Context, db Queryer, now time.Time) err
 	next := now.Add(CallThrottleWait)
 	c.c.NextAttempt = &next
 
-	_, err := db.ExecContext(ctx,
-		`UPDATE channels_channelconnection SET status = $2, next_attempt = $3, modified_on = NOW() WHERE id = $1`,
-		c.c.ID, c.c.Status, c.c.NextAttempt,
-	)
-
+	_, err := db.ExecContext(ctx, `UPDATE ivr_call SET status = $2, next_attempt = $3, modified_on = NOW() WHERE id = $1`, c.c.ID, c.c.Status, c.c.NextAttempt)
 	if err != nil {
 		return errors.Wrapf(err, "error marking call as throttled")
 	}
@@ -396,15 +389,9 @@ func (c *Call) UpdateStatus(ctx context.Context, db Queryer, status CallStatus, 
 	if duration > 0 {
 		c.c.Duration = duration
 		c.c.EndedOn = &now
-		_, err = db.ExecContext(ctx,
-			`UPDATE channels_channelconnection SET status = $2, duration = $3, ended_on = $4, modified_on = NOW() WHERE id = $1`,
-			c.c.ID, c.c.Status, c.c.Duration, c.c.EndedOn,
-		)
+		_, err = db.ExecContext(ctx, `UPDATE ivr_call SET status = $2, duration = $3, ended_on = $4, modified_on = NOW() WHERE id = $1`, c.c.ID, c.c.Status, c.c.Duration, c.c.EndedOn)
 	} else {
-		_, err = db.ExecContext(ctx,
-			`UPDATE channels_channelconnection SET status = $2, modified_on = NOW() WHERE id = $1`,
-			c.c.ID, c.c.Status,
-		)
+		_, err = db.ExecContext(ctx, `UPDATE ivr_call SET status = $2, modified_on = NOW() WHERE id = $1`, c.c.ID, c.c.Status)
 	}
 
 	if err != nil {
@@ -420,7 +407,7 @@ func BulkUpdateCallStatuses(ctx context.Context, db Queryer, callIDs []CallID, s
 		return nil
 	}
 	_, err := db.ExecContext(ctx,
-		`UPDATE channels_channelconnection SET status = $2, modified_on = NOW() WHERE id = ANY($1)`,
+		`UPDATE ivr_call SET status = $2, modified_on = NOW() WHERE id = ANY($1)`,
 		pq.Array(callIDs), status,
 	)
 
@@ -432,13 +419,13 @@ func BulkUpdateCallStatuses(ctx context.Context, db Queryer, callIDs []CallID, s
 }
 
 func (c *Call) AttachLog(ctx context.Context, db Queryer, clog *ChannelLog) error {
-	_, err := db.ExecContext(ctx, `UPDATE channels_channelconnection SET log_uuids = array_append(log_uuids, $2) WHERE id = $1`, c.c.ID, clog.UUID())
+	_, err := db.ExecContext(ctx, `UPDATE ivr_call SET log_uuids = array_append(log_uuids, $2) WHERE id = $1`, c.c.ID, clog.UUID())
 	return errors.Wrap(err, "error attaching log to call")
 }
 
 const sqlSelectActiveCallCount = `
 SELECT count(*)
-  FROM channels_channelconnection
+  FROM ivr_call
  WHERE channel_id = $1 AND (status = 'W' OR status = 'R' OR status = 'I')`
 
 // ActiveCallCount returns the number of ongoing calls for the passed in channel

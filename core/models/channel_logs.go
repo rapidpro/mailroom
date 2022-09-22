@@ -103,21 +103,21 @@ func (l *ChannelLog) traceToLog(t *httpx.Trace) *httpx.Log {
 }
 
 const sqlInsertChannelLog = `
-INSERT INTO channels_channellog( uuid,  channel_id,  connection_id,  log_type,  http_logs,  errors,  is_error,  elapsed_ms,  created_on)
-                         VALUES(:uuid, :channel_id, :connection_id, :log_type, :http_logs, :errors, :is_error, :elapsed_ms, :created_on)
+INSERT INTO channels_channellog( uuid,  channel_id,  call_id,  log_type,  http_logs,  errors,  is_error,  elapsed_ms,  created_on)
+                         VALUES(:uuid, :channel_id, :call_id, :log_type, :http_logs, :errors, :is_error, :elapsed_ms, :created_on)
   RETURNING id`
 
 type dbChannelLog struct {
-	ID           ChannelLogID    `db:"id"`
-	UUID         ChannelLogUUID  `db:"uuid"`
-	ChannelID    ChannelID       `db:"channel_id"`
-	ConnectionID CallID          `db:"connection_id"`
-	Type         ChannelLogType  `db:"log_type"`
-	HTTPLogs     json.RawMessage `db:"http_logs"`
-	Errors       json.RawMessage `db:"errors"`
-	IsError      bool            `db:"is_error"`
-	ElapsedMS    int             `db:"elapsed_ms"`
-	CreatedOn    time.Time       `db:"created_on"`
+	ID        ChannelLogID    `db:"id"`
+	UUID      ChannelLogUUID  `db:"uuid"`
+	ChannelID ChannelID       `db:"channel_id"`
+	CallID    CallID          `db:"call_id"`
+	Type      ChannelLogType  `db:"log_type"`
+	HTTPLogs  json.RawMessage `db:"http_logs"`
+	Errors    json.RawMessage `db:"errors"`
+	IsError   bool            `db:"is_error"`
+	ElapsedMS int             `db:"elapsed_ms"`
+	CreatedOn time.Time       `db:"created_on"`
 }
 
 // InsertChannelLogs writes the given channel logs to the db
@@ -146,7 +146,7 @@ func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) erro
 			ElapsedMS: int(l.elapsed / time.Millisecond),
 		}
 		if l.call != nil {
-			v.ConnectionID = l.call.ID()
+			v.CallID = l.call.ID()
 		}
 		vs[i] = v
 	}
