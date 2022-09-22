@@ -1,3 +1,7 @@
+v7.5.14
+----------
+ * Switch to new ivr_call table
+
 v7.5.13
 ----------
  * Update test database
