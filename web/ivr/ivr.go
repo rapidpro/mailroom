@@ -193,11 +193,11 @@ func writeGenericErrorResponse(w http.ResponseWriter, err error) error {
 	return err
 }
 
-func buildResumeURL(cfg *runtime.Config, channel *models.Channel, conn *models.Call, urn urns.URN) string {
+func buildResumeURL(cfg *runtime.Config, channel *models.Channel, call *models.Call, urn urns.URN) string {
 	domain := channel.ConfigValue(models.ChannelConfigCallbackDomain, cfg.Domain)
 	form := url.Values{
 		"action":     []string{actionResume},
-		"connection": []string{fmt.Sprintf("%d", conn.ID())},
+		"connection": []string{fmt.Sprintf("%d", call.ID())},
 		"urn":        []string{urn.String()},
 	}
 

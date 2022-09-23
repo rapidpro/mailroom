@@ -109,7 +109,7 @@ func (s *Session) WaitTimeoutOn() *time.Time          { return s.s.WaitTimeoutOn
 func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
 func (s *Session) WaitResumeOnExpire() bool           { return s.s.WaitResumeOnExpire }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
-func (s *Session) ConnectionID() *CallID              { return s.s.CallID }
+func (s *Session) CallID() *CallID                    { return s.s.CallID }
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
 func (s *Session) IncomingMsgExternalID() null.String { return s.incomingExternalID }
 func (s *Session) Scene() *Scene                      { return s.scene }

@@ -41,8 +41,8 @@ func TestExpirations(t *testing.T) {
 	r4ID := testdata.InsertFlowRun(db, testdata.Org1, s3ID, testdata.Bob, testdata.Favorites, models.RunStatusWaiting)
 
 	// create an IVR session for Alexandria
-	conn := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
-	s4ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeVoice, testdata.IVRFlow, conn, time.Now(), time.Now(), false, nil)
+	call := testdata.InsertCall(db, testdata.Org1, testdata.TwilioChannel, testdata.Alexandria)
+	s4ID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.Alexandria, models.FlowTypeVoice, testdata.IVRFlow, call, time.Now(), time.Now(), false, nil)
 	r5ID := testdata.InsertFlowRun(db, testdata.Org1, s4ID, testdata.Alexandria, testdata.IVRFlow, models.RunStatusWaiting)
 
 	// create a parent/child session for the blocked contact
