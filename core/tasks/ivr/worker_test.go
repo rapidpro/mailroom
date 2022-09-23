@@ -88,7 +88,7 @@ func (s *MockService) HangupCall(externalID string) (*httpx.Trace, error) {
 	return nil, nil
 }
 
-func (s *MockService) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {
+func (s *MockService) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error {
 	return nil
 }
 
@@ -116,7 +116,7 @@ func (s *MockService) CheckStartRequest(r *http.Request) models.CallError {
 	return ""
 }
 
-func (s *MockService) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.Call, r *http.Request) ([]byte, error) {
+func (s *MockService) PreprocessResume(ctx context.Context, rt *runtime.Runtime, call *models.Call, r *http.Request) ([]byte, error) {
 	return nil, nil
 }
 

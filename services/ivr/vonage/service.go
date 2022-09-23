@@ -280,7 +280,7 @@ func (s *service) PreprocessStatus(ctx context.Context, rt *runtime.Runtime, r *
 	return s.MakeEmptyResponseBody("ignoring non final status for tranfer leg"), nil
 }
 
-func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, conn *models.Call, r *http.Request) ([]byte, error) {
+func (s *service) PreprocessResume(ctx context.Context, rt *runtime.Runtime, call *models.Call, r *http.Request) ([]byte, error) {
 	// if this is a recording_url resume, grab that
 	waitType := r.URL.Query().Get("wait_type")
 
@@ -589,7 +589,7 @@ func (s *service) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a NCCO response for the events in the passed in session
-func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, conn *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for failed session")
@@ -602,7 +602,7 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// get our response
-	response, err := s.responseForSprint(ctx, rt.RP, channel, conn, resumeURL, sprint.Events())
+	response, err := s.responseForSprint(ctx, rt.RP, channel, call, resumeURL, sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -721,7 +721,7 @@ func (s *service) generateToken() (string, error) {
 
 // NCCO building utilities
 
-func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.Call, resumeURL string, es []flows.Event) (string, error) {
+func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, call *models.Call, resumeURL string, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 
@@ -810,13 +810,13 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 			}
 			waitActions = append(waitActions, connect)
 
-			// create our outbound call with the same conversation UUID
-			call := CallRequest{}
-			call.To = append(call.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")})
-			call.From = Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")}
-			call.NCCO = append(call.NCCO, NCCO{Action: "conversation", Name: conversationUUID})
+			// create our outbound cr with the same conversation UUID
+			cr := CallRequest{}
+			cr.To = append(cr.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")})
+			cr.From = Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")}
+			cr.NCCO = append(cr.NCCO, NCCO{Action: "conversation", Name: conversationUUID})
 
-			trace, err := s.makeRequest(http.MethodPost, s.callURL, call)
+			trace, err := s.makeRequest(http.MethodPost, s.callURL, cr)
 			logrus.WithField("trace", trace).Debug("initiated new call for transfer")
 			if err != nil {
 				return "", errors.Wrapf(err, "error trying to start call")
@@ -838,12 +838,12 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 
 			eventURL := resumeURL + "&wait_type=dial"
 			redisKey := fmt.Sprintf("dial_%s", transferUUID)
-			redisValue := fmt.Sprintf("%s:%s", conn.ExternalID(), eventURL)
+			redisValue := fmt.Sprintf("%s:%s", call.ExternalID(), eventURL)
 			_, err = rc.Do("setex", redisKey, 3600, redisValue)
 			if err != nil {
 				return "", errors.Wrapf(err, "error inserting transfer ID into redis")
 			}
-			logrus.WithField("transferUUID", transferUUID).WithField("callID", conn.ExternalID()).WithField("redisKey", redisKey).WithField("redisValue", redisValue).Debug("saved away call id")
+			logrus.WithField("transferUUID", transferUUID).WithField("callID", call.ExternalID()).WithField("redisKey", redisKey).WithField("redisValue", redisValue).Debug("saved away call id")
 		}
 	}
 

@@ -418,7 +418,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		urn := contacts[0].URNForID(event.URNID())
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
-			WithConnection(urn).
+			WithCall(urn).
 			Build()
 
 	default:
