@@ -423,15 +423,10 @@ func (c *Call) AttachLog(ctx context.Context, db Queryer, clog *ChannelLog) erro
 	return errors.Wrap(err, "error attaching log to call")
 }
 
-const sqlSelectActiveCallCount = `
-SELECT count(*)
-  FROM ivr_call
- WHERE channel_id = $1 AND (status = 'W' OR status = 'R' OR status = 'I')`
-
 // ActiveCallCount returns the number of ongoing calls for the passed in channel
 func ActiveCallCount(ctx context.Context, db Queryer, id ChannelID) (int, error) {
 	count := 0
-	err := db.GetContext(ctx, &count, sqlSelectActiveCallCount, id)
+	err := db.GetContext(ctx, &count, `SELECT count(*) FROM ivr_call WHERE channel_id = $1 AND (status = 'W' OR status = 'I')`, id)
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to select active call count")
 	}
