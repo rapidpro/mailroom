@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -504,7 +505,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	modelContact := contacts[0]
 
 	// load the channel for this message
-	channel := oa.ChannelByID(event.ChannelID)
+	channel := oa.ChannelByUUID(event.ChannelUUID)
 
 	// if we have URNs make sure the message URN is our highest priority (this is usually a noop)
 	if len(modelContact.URNs()) > 0 {
@@ -798,7 +799,8 @@ type TimedEvent struct {
 type MsgEvent struct {
 	ContactID     models.ContactID   `json:"contact_id"`
 	OrgID         models.OrgID       `json:"org_id"`
-	ChannelID     models.ChannelID   `json:"channel_id"`
+	ChannelUUID   assets.ChannelUUID `json:"channel_uuid"`
+	ChannelType   models.ChannelType `json:"channel_type"`
 	MsgID         flows.MsgID        `json:"msg_id"`
 	MsgUUID       flows.MsgUUID      `json:"msg_uuid"`
 	MsgExternalID null.String        `json:"msg_external_id"`

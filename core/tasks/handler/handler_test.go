@@ -300,14 +300,15 @@ func TestMsgEvents(t *testing.T) {
 
 	makeMsgTask := func(org *testdata.Org, channel *testdata.Channel, contact *testdata.Contact, text string) *queue.Task {
 		return &queue.Task{Type: handler.MsgEventType, OrgID: int(org.ID), Task: jsonx.MustMarshal(&handler.MsgEvent{
-			ContactID: contact.ID,
-			OrgID:     org.ID,
-			ChannelID: channel.ID,
-			MsgID:     dbMsg.ID(),
-			MsgUUID:   dbMsg.UUID(),
-			URN:       contact.URN,
-			URNID:     contact.URNID,
-			Text:      text,
+			ContactID:   contact.ID,
+			OrgID:       org.ID,
+			ChannelUUID: channel.UUID,
+			ChannelType: channel.Type,
+			MsgID:       dbMsg.ID(),
+			MsgUUID:     dbMsg.UUID(),
+			URN:         contact.URN,
+			URNID:       contact.URNID,
+			Text:        text,
 		})}
 	}
 
@@ -587,47 +588,47 @@ func TestTimedEvents(t *testing.T) {
 		Contact   *testdata.Contact
 		Message   string
 		Response  string
-		ChannelID models.ChannelID
-		OrgID     models.OrgID
+		Channel   *testdata.Channel
+		Org       *testdata.Org
 	}{
 		// 0: start the flow
-		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel, testdata.Org1},
 
 		// 1: this expiration does nothing because the times don't match
-		{handler.ExpirationEventType, testdata.Cathy, "bad", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.ExpirationEventType, testdata.Cathy, "bad", "", testdata.TwitterChannel, testdata.Org1},
 
 		// 2: this checks that the flow wasn't expired
-		{handler.MsgEventType, testdata.Cathy, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy, "red", "Good choice, I like Red too! What is your favorite beer?", testdata.TwitterChannel, testdata.Org1},
 
 		// 3: this expiration will actually take
-		{handler.ExpirationEventType, testdata.Cathy, "good", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.ExpirationEventType, testdata.Cathy, "good", "", testdata.TwitterChannel, testdata.Org1},
 
 		// 4: we won't get a response as we will be out of the flow
-		{handler.MsgEventType, testdata.Cathy, "mutzig", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy, "mutzig", "", testdata.TwitterChannel, testdata.Org1},
 
 		// 5: start the parent expiration flow
-		{handler.MsgEventType, testdata.Cathy, "parent", "Child", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy, "parent", "Child", testdata.TwitterChannel, testdata.Org1},
 
 		// 6: respond, should bring us out
-		{handler.MsgEventType, testdata.Cathy, "hi", "Completed", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy, "hi", "Completed", testdata.TwitterChannel, testdata.Org1},
 
 		// 7: expiring our child should be a no op
-		{handler.ExpirationEventType, testdata.Cathy, "child", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.ExpirationEventType, testdata.Cathy, "child", "", testdata.TwitterChannel, testdata.Org1},
 
 		// 8: respond one last time, should be done
-		{handler.MsgEventType, testdata.Cathy, "done", "Ended", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy, "done", "Ended", testdata.TwitterChannel, testdata.Org1},
 
 		// 9: start our favorite flow again
-		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy, "start", "What is your favorite color?", testdata.TwitterChannel, testdata.Org1},
 
 		// 10: timeout on the color question
-		{handler.TimeoutEventType, testdata.Cathy, "", "Sorry you can't participate right now, I'll try again later.", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.TimeoutEventType, testdata.Cathy, "", "Sorry you can't participate right now, I'll try again later.", testdata.TwitterChannel, testdata.Org1},
 
 		// 11: start the pick a number flow
-		{handler.MsgEventType, testdata.Cathy, "pick", "Pick a number between 1-10.", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.MsgEventType, testdata.Cathy, "pick", "Pick a number between 1-10.", testdata.TwitterChannel, testdata.Org1},
 
 		// 12: try to resume with timeout even tho flow doesn't have one set
-		{handler.TimeoutEventType, testdata.Cathy, "", "", testdata.TwitterChannel.ID, testdata.Org1.ID},
+		{handler.TimeoutEventType, testdata.Cathy, "", "", testdata.TwitterChannel, testdata.Org1},
 	}
 
 	last := time.Now()
@@ -642,16 +643,17 @@ func TestTimedEvents(t *testing.T) {
 		if tc.EventType == handler.MsgEventType {
 			task = &queue.Task{
 				Type:  tc.EventType,
-				OrgID: int(tc.OrgID),
+				OrgID: int(tc.Org.ID),
 				Task: jsonx.MustMarshal(&handler.MsgEvent{
-					ContactID: tc.Contact.ID,
-					OrgID:     tc.OrgID,
-					ChannelID: tc.ChannelID,
-					MsgID:     flows.MsgID(1),
-					MsgUUID:   flows.MsgUUID(uuids.New()),
-					URN:       tc.Contact.URN,
-					URNID:     tc.Contact.URNID,
-					Text:      tc.Message,
+					ContactID:   tc.Contact.ID,
+					OrgID:       tc.Org.ID,
+					ChannelUUID: tc.Channel.UUID,
+					ChannelType: tc.Channel.Type,
+					MsgID:       flows.MsgID(1),
+					MsgUUID:     flows.MsgUUID(uuids.New()),
+					URN:         tc.Contact.URN,
+					URNID:       tc.Contact.URNID,
+					Text:        tc.Message,
 				}),
 			}
 		} else if tc.EventType == handler.ExpirationEventType {
@@ -666,7 +668,7 @@ func TestTimedEvents(t *testing.T) {
 				expiration = time.Now().Add(time.Hour * 24)
 			}
 
-			task = handler.NewExpirationTask(tc.OrgID, tc.Contact.ID, sessionID, expiration)
+			task = handler.NewExpirationTask(tc.Org.ID, tc.Contact.ID, sessionID, expiration)
 
 		} else if tc.EventType == handler.TimeoutEventType {
 			timeoutOn := time.Now().Round(time.Millisecond) // so that there's no difference between this and what we read from the db
@@ -674,7 +676,7 @@ func TestTimedEvents(t *testing.T) {
 			// usually courier will set timeout_on after sending the last message
 			db.MustExec(`UPDATE flows_flowsession SET timeout_on = $2 WHERE id = $1`, sessionID, timeoutOn)
 
-			task = handler.NewTimeoutTask(tc.OrgID, tc.Contact.ID, sessionID, timeoutOn)
+			task = handler.NewTimeoutTask(tc.Org.ID, tc.Contact.ID, sessionID, timeoutOn)
 		}
 
 		err := handler.QueueHandleTask(rc, tc.Contact.ID, task)
