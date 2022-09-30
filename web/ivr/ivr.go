@@ -142,9 +142,9 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 
 	// if we matched with an incoming-call trigger, we'll have a session
 	if session != nil {
-		// that might have started a non-voice flow, in which case we need to hangup this call
+		// that might have started a non-voice flow, in which case we need to reject this call
 		if session.SessionType() != models.FlowTypeVoice {
-			return call, svc.WriteHangupResponse(w)
+			return call, svc.WriteRejectResponse(w)
 		}
 
 		// build our resume URL

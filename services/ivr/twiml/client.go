@@ -3,6 +3,10 @@ package twiml
 // BaseURL is our default base URL for TWIML channels (public for testing overriding)
 var BaseURL = `https://api.twilio.com`
 
+type Reject struct {
+	XMLName string `xml:"Reject"`
+}
+
 type Say struct {
 	XMLName  string `xml:"Say"`
 	Text     string `xml:",chardata"`

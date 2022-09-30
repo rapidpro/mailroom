@@ -92,7 +92,7 @@ func (s *MockService) WriteSessionResponse(ctx context.Context, rt *runtime.Runt
 	return nil
 }
 
-func (s *MockService) WriteHangupResponse(w http.ResponseWriter) error {
+func (s *MockService) WriteRejectResponse(w http.ResponseWriter) error {
 	return nil
 }
 
