@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -382,7 +383,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		return nil, errors.Wrapf(err, "error loading flow for trigger")
 	}
 
-	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
+	// if this is an IVR flow and we don't have a call, trigger that asynchronously
 	if flow.FlowType() == models.FlowTypeVoice && call == nil {
 		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
@@ -428,7 +429,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	// if we have a channel connection we set the connection on the session before our event hooks fire
 	// so that IVR messages can be created with the right connection reference
 	var hook models.SessionCommitHook
-	if call != nil {
+	if flow.FlowType() == models.FlowTypeVoice && call != nil {
 		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
 			for _, session := range sessions {
 				session.SetCall(call)
@@ -498,7 +499,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	modelContact := contacts[0]
 
 	// load the channel for this message
-	channel := oa.ChannelByID(event.ChannelID)
+	channel := oa.ChannelByUUID(event.ChannelUUID)
 
 	// if we have URNs make sure the message URN is our highest priority (this is usually a noop)
 	if len(modelContact.URNs()) > 0 {
@@ -792,7 +793,8 @@ type TimedEvent struct {
 type MsgEvent struct {
 	ContactID     models.ContactID   `json:"contact_id"`
 	OrgID         models.OrgID       `json:"org_id"`
-	ChannelID     models.ChannelID   `json:"channel_id"`
+	ChannelUUID   assets.ChannelUUID `json:"channel_uuid"`
+	ChannelType   models.ChannelType `json:"channel_type"`
 	MsgID         flows.MsgID        `json:"msg_id"`
 	MsgUUID       flows.MsgUUID      `json:"msg_uuid"`
 	MsgExternalID null.String        `json:"msg_external_id"`

@@ -616,20 +616,20 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	return nil
 }
 
+func (s *service) WriteHangupResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	_, err := w.Write([]byte(`[]`))
+	return err
+}
+
 // WriteErrorResponse writes an error / unavailable response
 func (s *service) WriteErrorResponse(w http.ResponseWriter, err error) error {
-	actions := []interface{}{Talk{
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(jsonx.MustMarshal([]any{Talk{
 		Action: "talk",
 		Text:   ivr.ErrorMessage,
 		Error:  err.Error(),
-	}}
-	body, err := json.Marshal(actions)
-	if err != nil {
-		return errors.Wrapf(err, "error marshalling ncco error")
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(body)
+	}}))
 	return err
 }
 
@@ -641,14 +641,9 @@ func (s *service) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
 }
 
 func (s *service) MakeEmptyResponseBody(msg string) []byte {
-	msgBody := map[string]string{
+	return jsonx.MustMarshal(map[string]string{
 		"_message": msg,
-	}
-	body, err := json.Marshal(msgBody)
-	if err != nil {
-		panic(errors.Wrapf(err, "error marshalling message"))
-	}
-	return body
+	})
 }
 
 func (s *service) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
@@ -816,10 +811,13 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 			waitActions = append(waitActions, connect)
 
 			// create our outbound cr with the same conversation UUID
-			cr := CallRequest{}
-			cr.To = append(cr.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")})
-			cr.From = Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")}
-			cr.NCCO = append(cr.NCCO, NCCO{Action: "conversation", Name: conversationUUID})
+			cr := CallRequest{
+				From:         Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")},
+				To:           []Phone{{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")}},
+				NCCO:         []NCCO{{Action: "conversation", Name: conversationUUID}},
+				RingingTimer: wait.DialLimitSeconds,
+				LengthTimer:  wait.CallLimitSeconds,
+			}
 
 			trace, err := s.makeRequest(http.MethodPost, s.callURL, cr)
 			logrus.WithField("trace", trace).Debug("initiated new call for transfer")

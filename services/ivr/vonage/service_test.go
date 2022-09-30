@@ -1,11 +1,13 @@
 package vonage
 
 import (
+	"io"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -27,12 +29,14 @@ func TestResponseForSprint(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
+	mockVonage := httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.nexmo.com/v1/calls": {
 			httpx.NewMockResponse(201, nil, []byte(`{"uuid": "63f61863-4a51-4f6b-86e1-46edebcf9356", "status": "started", "direction": "outbound"}`)),
 		},
-	}))
+	})
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(mockVonage)
 
 	urn := urns.URN("tel:+12067799294")
 	expiresOn := time.Now().Add(time.Hour)
@@ -117,7 +121,7 @@ func TestResponseForSprint(t *testing.T) {
 		},
 		{
 			[]flows.Event{
-				events.NewDialWait(urns.URN(`tel:+1234567890`), &expiresOn),
+				events.NewDialWait(urns.URN(`tel:+1234567890`), 60, 7200, &expiresOn),
 			},
 			`[{"action":"conversation","name":"8bcb9ef2-d4a6-4314-b68d-6d299761ea9e"}]`,
 		},
@@ -128,6 +132,14 @@ func TestResponseForSprint(t *testing.T) {
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, tc.expected, response, "%d: unexpected response", i)
 	}
+
+	// the dial action will have made a call to the calls endpoint
+	assert.Equal(t, 1, len(mockVonage.Requests()))
+	body, _ := io.ReadAll(mockVonage.Requests()[0].Body)
+	var decodedBody map[string]interface{}
+	jsonx.MustUnmarshal(body, &decodedBody)
+	assert.Equal(t, float64(60), decodedBody["ringing_timer"])
+	assert.Equal(t, float64(7200), decodedBody["length_timer"])
 }
 
 func TestRedactValues(t *testing.T) {
