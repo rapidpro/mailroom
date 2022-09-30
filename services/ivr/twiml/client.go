@@ -24,10 +24,11 @@ type Redirect struct {
 }
 
 type Dial struct {
-	XMLName string `xml:"Dial"`
-	Number  string `xml:",chardata"`
-	Action  string `xml:"action,attr"`
-	Timeout int    `xml:"timeout,attr,omitempty"`
+	XMLName   string `xml:"Dial"`
+	Number    string `xml:",chardata"`
+	Action    string `xml:"action,attr"`
+	Timeout   int    `xml:"timeout,attr,omitempty"`
+	TimeLimit int    `xml:"timeLimit,attr,omitempty"`
 }
 
 type Gather struct {

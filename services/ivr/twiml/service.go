@@ -496,7 +496,7 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, e
 
 		case *events.DialWaitEvent:
 			hasWait = true
-			dial := Dial{Action: resumeURL + "&wait_type=dial", Number: event.URN.Path()}
+			dial := Dial{Action: resumeURL + "&wait_type=dial", Number: event.URN.Path(), Timeout: event.DialLimitSeconds, TimeLimit: event.CallLimitSeconds}
 			commands = append(commands, dial)
 			r.Commands = commands
 		}

@@ -98,9 +98,9 @@ func TestResponseForSprint(t *testing.T) {
 		},
 		{
 			[]flows.Event{
-				events.NewDialWait(urns.URN(`tel:+1234567890`), &expiresOn),
+				events.NewDialWait(urns.URN(`tel:+1234567890`), 60, 7200, &expiresOn),
 			},
-			`<Response><Dial action="http://temba.io/resume?session=1&amp;wait_type=dial">+1234567890</Dial></Response>`,
+			`<Response><Dial action="http://temba.io/resume?session=1&amp;wait_type=dial" timeout="60" timeLimit="7200">+1234567890</Dial></Response>`,
 		},
 	}
 

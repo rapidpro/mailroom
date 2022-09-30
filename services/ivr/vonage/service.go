@@ -816,10 +816,13 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 			waitActions = append(waitActions, connect)
 
 			// create our outbound cr with the same conversation UUID
-			cr := CallRequest{}
-			cr.To = append(cr.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")})
-			cr.From = Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")}
-			cr.NCCO = append(cr.NCCO, NCCO{Action: "conversation", Name: conversationUUID})
+			cr := CallRequest{
+				From:         Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")},
+				To:           []Phone{{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")}},
+				NCCO:         []NCCO{{Action: "conversation", Name: conversationUUID}},
+				RingingTimer: wait.DialLimitSeconds,
+				LengthTimer:  wait.CallLimitSeconds,
+			}
 
 			trace, err := s.makeRequest(http.MethodPost, s.callURL, cr)
 			logrus.WithField("trace", trace).Debug("initiated new call for transfer")
