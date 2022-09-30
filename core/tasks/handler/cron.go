@@ -105,22 +105,23 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime) error {
 
 const unhandledMsgsQuery = `
 SELECT org_id, contact_id, msg_id, ROW_TO_JSON(r) FROM (SELECT
-	m.contact_id as contact_id,
-	m.org_id as org_id, 
-	m.channel_id as channel_id,
-	m.id as msg_id,
-	m.uuid as msg_uuid,
-	m.external_id as msg_external_id,
-	u.identity as urn,
-	m.contact_urn_id as urn_id,
-	m.text as text,
-	m.attachments as attachments
+	m.contact_id AS contact_id,
+	m.org_id AS org_id, 
+	c.id AS channel_id,
+	c.uuid AS channel_uuid,
+	c.channel_type AS channel_type,
+	m.id AS msg_id,
+	m.uuid AS msg_uuid,
+	m.external_id AS msg_external_id,
+	u.identity AS urn,
+	m.contact_urn_id AS urn_id,
+	m.text AS text,
+	m.attachments AS attachments
 FROM
 	msgs_msg m
-	JOIN contacts_contacturn as u ON m.contact_urn_id = u.id
+	INNER JOIN channels_channel c ON c.id = m.channel_id 
+	INNER JOIN contacts_contacturn u ON u.id = m.contact_urn_id
 WHERE
-	m.direction = 'I' AND
-	m.status = 'P' AND
-	m.created_on < now() - INTERVAL '5 min'
+	m.direction = 'I' AND m.status = 'P' AND m.created_on < now() - INTERVAL '5 min'
 ) r;
 `
