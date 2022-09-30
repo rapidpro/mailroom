@@ -1,3 +1,11 @@
+v7.5.15
+----------
+ * Update to latest goflow which changes expirations for dial waits
+ * Add support for time limits on dial waits
+ * Rework message events to use channel UUID and include channel type
+ * Simplify getting active call count
+ * Allow incoming call triggers to take message flows
+
 v7.5.14
 ----------
  * Switch to new ivr_call table
