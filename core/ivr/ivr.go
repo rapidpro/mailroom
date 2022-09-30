@@ -581,17 +581,8 @@ func buildMsgResume(
 	// create an incoming message
 	msg := models.NewIncomingIVR(rt.Config, oa.OrgID(), call, msgIn, time.Now())
 
-	// allocate a topup for this message if org uses topups)
-	topupID, err := models.AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), 1)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "error allocating topup for incoming IVR message")
-	}
-
-	msg.SetTopup(topupID)
-
 	// commit it
-	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg})
-	if err != nil {
+	if err := models.InsertMessages(ctx, rt.DB, []*models.Msg{msg}); err != nil {
 		return nil, nil, errors.Wrapf(err, "error committing new message")
 	}
 

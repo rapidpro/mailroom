@@ -113,7 +113,7 @@ func TestBroadcastEvents(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
 		lastNow = time.Now()
@@ -263,7 +263,7 @@ func TestBroadcastTask(t *testing.T) {
 		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
 
 		// assert our count of total msgs created
-		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND topup_id IS NOT NULL AND text = $2`, lastNow, tc.MsgText).
+		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
 
 		// make sure our broadcast is marked as sent

@@ -480,12 +480,6 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return errors.Wrapf(err, "error loading org")
 	}
 
-	// allocate a topup for this message if org uses topups
-	topupID, err := models.AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), 1)
-	if err != nil {
-		return errors.Wrapf(err, "error allocating topup for incoming message")
-	}
-
 	// load our contact
 	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
 	if err != nil {
@@ -494,7 +488,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// contact has been deleted, ignore this message but mark it as handled
 	if len(contacts) == 0 {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID)
 		if err != nil {
 			return errors.Wrapf(err, "error updating message for deleted contact")
 		}
@@ -516,7 +510,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
 	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking blocked or nil channel message as handled")
 		}
@@ -594,7 +588,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 		sessions[0].SetIncomingMsg(event.MsgID, event.MsgExternalID)
 
-		return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
+		return markMsgHandled(ctx, tx, contact, msgIn, flow, tickets)
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
@@ -611,7 +605,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 			if flow.FlowType() == models.FlowTypeVoice {
 				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
-					return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
+					return markMsgHandled(ctx, tx, contact, msgIn, flow, tickets)
 				}
 				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
 				if err != nil {
@@ -641,7 +635,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
-	err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
+	err = handleAsInbox(ctx, rt, oa, contact, msgIn, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
 	}
@@ -745,7 +739,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 }
 
 // handles a message as an inbox message
-func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, topupID models.TopupID, tickets []*models.Ticket) error {
+func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *flows.Contact, msg *flows.MsgIn, tickets []*models.Ticket) error {
 	// usually last_seen_on is updated by handling the msg_received event in the engine sprint, but since this is an inbox
 	// message we manually create that event and handle it
 	msgEvent := events.NewMsgReceived(msg)
@@ -757,11 +751,11 @@ func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsset
 		return errors.Wrap(err, "error handling inbox message events")
 	}
 
-	return markMsgHandled(ctx, rt.DB, contact, msg, nil, topupID, tickets)
+	return markMsgHandled(ctx, rt.DB, contact, msg, nil, tickets)
 }
 
 // utility to mark as message as handled and update any open contact tickets
-func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, topupID models.TopupID, tickets []*models.Ticket) error {
+func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, tickets []*models.Ticket) error {
 	msgType := models.MsgTypeInbox
 	flowID := models.NilFlowID
 	if flow != nil {
@@ -769,7 +763,7 @@ func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Conta
 		flowID = flow.ID()
 	}
 
-	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, topupID)
+	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}

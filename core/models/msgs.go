@@ -140,7 +140,6 @@ type Msg struct {
 		URN                  urns.URN           `db:"urn_urn"         json:"urn"`
 		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
-		TopupID              TopupID            `db:"topup_id"        json:"-"`
 		FlowID               FlowID             `db:"flow_id"         json:"-"`
 
 		// extra data from handling added to the courier payload
@@ -183,13 +182,10 @@ func (m *Msg) ChannelUUID() assets.ChannelUUID  { return m.m.ChannelUUID }
 func (m *Msg) URN() urns.URN                    { return m.m.URN }
 func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
-func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
 func (m *Msg) FlowID() FlowID                   { return m.m.FlowID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
-
-func (m *Msg) SetTopup(topupID TopupID) { m.m.TopupID = topupID }
 
 func (m *Msg) SetChannel(channel *Channel) {
 	m.channel = channel
@@ -254,7 +250,6 @@ func NewIncomingIVR(cfg *runtime.Config, orgID OrgID, call *Call, in *flows.MsgI
 	m.ChannelID = call.ChannelID()
 
 	m.OrgID = orgID
-	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
 	// add any attachments
@@ -287,7 +282,6 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 	m.URN = out.URN()
 
 	m.OrgID = orgID
-	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 	m.SentOn = &createdOn
 
@@ -353,7 +347,6 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 	m.OrgID = org.ID()
 	m.ContactID = ContactID(contact.ID())
 	m.BroadcastID = broadcastID
-	m.TopupID = NilTopupID
 	m.Text = out.Text()
 	m.HighPriority = false
 	m.Direction = DirectionOut
@@ -450,7 +443,6 @@ func NewIncomingMsg(cfg *runtime.Config, orgID OrgID, channel *Channel, contactI
 	m.MsgType = MsgTypeFlow
 	m.ContactID = contactID
 	m.OrgID = orgID
-	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
 
 	// add any attachments
@@ -482,8 +474,7 @@ SELECT
 	channel_id,
 	contact_id,
 	contact_urn_id,
-	org_id,
-	topup_id
+	org_id
 FROM
 	msgs_msg
 WHERE
@@ -520,7 +511,6 @@ SELECT
 	m.contact_id,
 	m.contact_urn_id,
 	m.org_id,
-	m.topup_id,
 	u.identity AS "urn_urn",
 	u.auth AS "urn_auth"
 FROM
@@ -621,10 +611,10 @@ const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
-		 contact_id, contact_urn_id, org_id, topup_id, flow_id, broadcast_id)
+		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
-		 :contact_id, :contact_urn_id, :org_id, :topup_id, :flow_id, :broadcast_id)
+		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id)
 RETURNING 
 	id as id, 
 	now() as modified_on,
@@ -632,20 +622,11 @@ RETURNING
 `
 
 // UpdateMessage updates a message after handling
-func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID, topup TopupID) error {
+func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID) error {
 	_, err := tx.ExecContext(ctx,
-		`UPDATE 
-			msgs_msg 
-		SET 
-			status = $2,
-			visibility = $3,
-			msg_type = $4,
-			flow_id = $5,
-			topup_id = $6
-		WHERE
-			id = $1`,
-		msgID, status, visibility, msgType, flow, topup)
-
+		`UPDATE msgs_msg SET status = $2, visibility = $3, msg_type = $4, flow_id = $5 WHERE id = $1`,
+		msgID, status, visibility, msgType, flow,
+	)
 	if err != nil {
 		return errors.Wrapf(err, "error updating msg: %d", msgID)
 	}
@@ -1114,19 +1095,6 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 		}
 	}
 
-	// allocate a topup for these message if org uses topups
-	topup, err := AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), len(msgs))
-	if err != nil {
-		return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
-	}
-
-	// if we have an active topup, assign it to our messages
-	if topup != NilTopupID {
-		for _, m := range msgs {
-			m.SetTopup(topup)
-		}
-	}
-
 	// insert them in a single request
 	err = InsertMessages(ctx, rt.DB, msgs)
 	if err != nil {
@@ -1177,14 +1145,13 @@ func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAs
 const sqlUpdateMsgForResending = `
 UPDATE msgs_msg m
    SET channel_id = r.channel_id::int,
-       topup_id = r.topup_id::int,
        status = 'P',
        error_count = 0,
        failed_reason = NULL,
        queued_on = r.queued_on::timestamp with time zone,
        sent_on = NULL,
        modified_on = NOW()
-  FROM (VALUES(:id, :channel_id, :topup_id, :queued_on)) AS r(id, channel_id, topup_id, queued_on)
+  FROM (VALUES(:id, :channel_id, :queued_on)) AS r(id, channel_id, queued_on)
  WHERE m.id = r.id::bigint`
 
 const sqlUpdateMsgResendFailed = `
@@ -1204,7 +1171,6 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 
 	for _, msg := range msgs {
 		var ch *flows.Channel
-		var err error
 		urnID := msg.ContactURNID()
 
 		if urnID != nil {
@@ -1236,11 +1202,6 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 			msg.m.FailedReason = ""
 			msg.m.IsResend = true // mark message as being a resend so it will be queued to courier as such
 
-			// allocate a new topup for this message if org uses topups
-			msg.m.TopupID, err = AllocateTopups(ctx, db, rp, oa.Org(), 1)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error allocating topup for message resending")
-			}
 			resends = append(resends, msg.m)
 			resent = append(resent, msg)
 		} else {

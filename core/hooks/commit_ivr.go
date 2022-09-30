@@ -24,22 +24,8 @@ func (h *commitIVRHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sqlx
 		}
 	}
 
-	// find the topup we will assign
-	topup, err := models.AllocateTopups(ctx, tx, rt.RP, oa.Org(), len(msgs))
-	if err != nil {
-		return errors.Wrapf(err, "error allocating topup for outgoing IVR message")
-	}
-
-	// if we have an active topup, assign it to our messages
-	if topup != models.NilTopupID {
-		for _, m := range msgs {
-			m.SetTopup(topup)
-		}
-	}
-
 	// insert all our messages
-	err = models.InsertMessages(ctx, tx, msgs)
-	if err != nil {
+	if err := models.InsertMessages(ctx, tx, msgs); err != nil {
 		return errors.Wrapf(err, "error writing messages")
 	}
 
