@@ -24,16 +24,18 @@ type CallRequest struct {
 
 	NCCO             []NCCO `json:"ncco,omitempty"`
 	MachineDetection string `json:"machine_detection"`
+	LengthTimer      int    `json:"length_timer,omitempty"`
 	RingingTimer     int    `json:"ringing_timer,omitempty"`
 }
 
 // CallResponse is the response from creating a new call
-// {
-//  "uuid": "63f61863-4a51-4f6b-86e1-46edebcf9356",
-//  "status": "started",
-//  "direction": "outbound",
-//  "conversation_uuid": "CON-f972836a-550f-45fa-956c-12a2ab5b7d22"
-// }
+//
+//	{
+//	 "uuid": "63f61863-4a51-4f6b-86e1-46edebcf9356",
+//	 "status": "started",
+//	 "direction": "outbound",
+//	 "conversation_uuid": "CON-f972836a-550f-45fa-956c-12a2ab5b7d22"
+//	}
 type CallResponse struct {
 	UUID             string `json:"uuid"`
 	Status           string `json:"status"`
