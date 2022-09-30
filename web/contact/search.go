@@ -59,10 +59,6 @@ type searchResponse struct {
 	Offset     int                   `json:"offset"`
 	Sort       string                `json:"sort"`
 	Metadata   *contactql.Inspection `json:"metadata,omitempty"`
-
-	// deprecated
-	Fields       []string `json:"fields"`
-	AllowAsGroup bool     `json:"allow_as_group"`
 }
 
 // handles a contact search request
@@ -83,7 +79,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// perform our search
-	parsed, hits, total, err := models.ContactIDsForQueryPage(ctx, rt.ES, oa,
+	parsed, hits, total, err := models.GetContactIDsForQueryPage(ctx, rt.ES, oa,
 		request.GroupUUID, request.ExcludeIDs, request.Query, request.Sort, request.Offset, request.PageSize)
 
 	if err != nil {
@@ -97,29 +93,20 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	// normalize and inspect the query
 	normalized := ""
 	var metadata *contactql.Inspection
-	allowAsGroup := false
-	fields := make([]string, 0)
 
 	if parsed != nil {
 		normalized = parsed.String()
 		metadata = contactql.Inspect(parsed)
-		fields = append(fields, metadata.Attributes...)
-		for _, f := range metadata.Fields {
-			fields = append(fields, f.Key)
-		}
-		allowAsGroup = metadata.AllowAsGroup
 	}
 
 	// build our response
 	response := &searchResponse{
-		Query:        normalized,
-		ContactIDs:   hits,
-		Total:        total,
-		Offset:       request.Offset,
-		Sort:         request.Sort,
-		Metadata:     metadata,
-		Fields:       fields,
-		AllowAsGroup: allowAsGroup,
+		Query:      normalized,
+		ContactIDs: hits,
+		Total:      total,
+		Offset:     request.Offset,
+		Sort:       request.Sort,
+		Metadata:   metadata,
 	}
 
 	return response, http.StatusOK, nil

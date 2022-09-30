@@ -91,18 +91,19 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	}
 
 	// get the current version of this contact from the database
+	var modelContact *models.Contact
 	var flowContact *flows.Contact
 
 	if len(fs.Contact().URNs()) > 0 {
 		// create / fetch our contact based on the highest priority URN
 		urn := fs.Contact().URNs()[0].URN()
 
-		_, flowContact, _, err = models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, models.NilChannelID)
+		modelContact, flowContact, _, err = models.GetOrCreateContact(ctx, rt.DB, oa, []urns.URN{urn}, models.NilChannelID)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to look up contact")
 		}
 	} else {
-		_, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
+		modelContact, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
 		if err != nil {
 			return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to create contact")
 		}
@@ -132,7 +133,7 @@ func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error starting transaction for session write")
 	}
-	sessions, err := models.WriteSessions(ctx, rt, tx, oa, []flows.Session{fs}, []flows.Sprint{sprint}, nil)
+	sessions, err := models.InsertSessions(ctx, rt, tx, oa, []flows.Session{fs}, []flows.Sprint{sprint}, []*models.Contact{modelContact}, nil)
 	if err == nil && len(sessions) == 0 {
 		err = errors.Errorf("no sessions written")
 	}

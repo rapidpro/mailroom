@@ -10,7 +10,6 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/null"
-
 	"github.com/pkg/errors"
 )
 
@@ -42,18 +41,6 @@ const (
 	StartStatusComplete = StartStatus("C")
 	StartStatusFailed   = StartStatus("F")
 )
-
-// RestartParticipants is our type for the bool of restarting participatants
-type RestartParticipants bool
-
-const DoRestartParticipants = RestartParticipants(true)
-const DontRestartParticipants = RestartParticipants(false)
-
-// IncludeActive is our type for the bool of whether to include active contacts
-type IncludeActive bool
-
-const DoIncludeActive = IncludeActive(true)
-const DontIncludeActive = IncludeActive(false)
 
 // MarkStartComplete sets the status for the passed in flow start
 func MarkStartComplete(ctx context.Context, db Queryer, startID StartID) error {
@@ -115,8 +102,8 @@ type FlowStartBatch struct {
 		SessionHistory null.JSON `json:"session_history,omitempty"`
 		Extra          null.JSON `json:"extra,omitempty"`
 
-		RestartParticipants RestartParticipants `json:"restart_participants"`
-		IncludeActive       IncludeActive       `json:"include_active"`
+		RestartParticipants bool `json:"restart_participants"`
+		IncludeActive       bool `json:"include_active"`
 
 		IsLast        bool `json:"is_last,omitempty"`
 		TotalContacts int  `json:"total_contacts"`
@@ -125,16 +112,16 @@ type FlowStartBatch struct {
 	}
 }
 
-func (b *FlowStartBatch) StartID() StartID                         { return b.b.StartID }
-func (b *FlowStartBatch) StartType() StartType                     { return b.b.StartType }
-func (b *FlowStartBatch) OrgID() OrgID                             { return b.b.OrgID }
-func (b *FlowStartBatch) CreatedByID() UserID                      { return b.b.CreatedByID }
-func (b *FlowStartBatch) FlowID() FlowID                           { return b.b.FlowID }
-func (b *FlowStartBatch) ContactIDs() []ContactID                  { return b.b.ContactIDs }
-func (b *FlowStartBatch) RestartParticipants() RestartParticipants { return b.b.RestartParticipants }
-func (b *FlowStartBatch) IncludeActive() IncludeActive             { return b.b.IncludeActive }
-func (b *FlowStartBatch) IsLast() bool                             { return b.b.IsLast }
-func (b *FlowStartBatch) TotalContacts() int                       { return b.b.TotalContacts }
+func (b *FlowStartBatch) StartID() StartID          { return b.b.StartID }
+func (b *FlowStartBatch) StartType() StartType      { return b.b.StartType }
+func (b *FlowStartBatch) OrgID() OrgID              { return b.b.OrgID }
+func (b *FlowStartBatch) CreatedByID() UserID       { return b.b.CreatedByID }
+func (b *FlowStartBatch) FlowID() FlowID            { return b.b.FlowID }
+func (b *FlowStartBatch) ContactIDs() []ContactID   { return b.b.ContactIDs }
+func (b *FlowStartBatch) RestartParticipants() bool { return b.b.RestartParticipants }
+func (b *FlowStartBatch) IncludeActive() bool       { return b.b.IncludeActive }
+func (b *FlowStartBatch) IsLast() bool              { return b.b.IsLast }
+func (b *FlowStartBatch) TotalContacts() int        { return b.b.TotalContacts }
 
 func (b *FlowStartBatch) ParentSummary() json.RawMessage  { return json.RawMessage(b.b.ParentSummary) }
 func (b *FlowStartBatch) SessionHistory() json.RawMessage { return json.RawMessage(b.b.SessionHistory) }
@@ -161,8 +148,8 @@ type FlowStart struct {
 		Query           null.String `json:"query,omitempty"        db:"query"`
 		CreateContact   bool        `json:"create_contact"`
 
-		RestartParticipants RestartParticipants `json:"restart_participants" db:"restart_participants"`
-		IncludeActive       IncludeActive       `json:"include_active"       db:"include_active"`
+		RestartParticipants bool `json:"restart_participants" db:"restart_participants"`
+		IncludeActive       bool `json:"include_active"       db:"include_active"`
 
 		Extra          null.JSON `json:"extra,omitempty"           db:"extra"`
 		ParentSummary  null.JSON `json:"parent_summary,omitempty"  db:"parent_summary"`
@@ -172,6 +159,7 @@ type FlowStart struct {
 
 func (s *FlowStart) ID() StartID         { return s.s.ID }
 func (s *FlowStart) OrgID() OrgID        { return s.s.OrgID }
+func (s *FlowStart) Type() StartType     { return s.s.StartType }
 func (s *FlowStart) CreatedByID() UserID { return s.s.CreatedByID }
 func (s *FlowStart) FlowID() FlowID      { return s.s.FlowID }
 func (s *FlowStart) FlowType() FlowType  { return s.s.FlowType }
@@ -205,8 +193,8 @@ func (s *FlowStart) WithQuery(query string) *FlowStart {
 	return s
 }
 
-func (s *FlowStart) RestartParticipants() RestartParticipants { return s.s.RestartParticipants }
-func (s *FlowStart) IncludeActive() IncludeActive             { return s.s.IncludeActive }
+func (s *FlowStart) RestartParticipants() bool { return s.s.RestartParticipants }
+func (s *FlowStart) IncludeActive() bool       { return s.s.IncludeActive }
 
 func (s *FlowStart) CreateContact() bool { return s.s.CreateContact }
 func (s *FlowStart) WithCreateContact(create bool) *FlowStart {
@@ -246,7 +234,7 @@ func GetFlowStartAttributes(ctx context.Context, db Queryer, startID StartID) (*
 }
 
 // NewFlowStart creates a new flow start objects for the passed in parameters
-func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID, restartParticipants RestartParticipants, includeActive IncludeActive) *FlowStart {
+func NewFlowStart(orgID OrgID, startType StartType, flowType FlowType, flowID FlowID, restartParticipants, includeActive bool) *FlowStart {
 	s := &FlowStart{}
 	s.s.UUID = uuids.New()
 	s.s.OrgID = orgID
@@ -282,7 +270,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our starts
-	err := BulkQuery(ctx, "inserting flow start", db, insertStartSQL, is)
+	err := BulkQuery(ctx, "inserting flow start", db, sqlInsertStart, is)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow starts")
 	}
@@ -299,7 +287,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our contacts
-	err = BulkQuery(ctx, "inserting flow start contacts", db, insertStartContactsSQL, contacts)
+	err = BulkQuery(ctx, "inserting flow start contacts", db, sqlInsertStartContact, contacts)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow start contacts for flow")
 	}
@@ -316,7 +304,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	}
 
 	// insert our groups
-	err = BulkQuery(ctx, "inserting flow start groups", db, insertStartGroupsSQL, groups)
+	err = BulkQuery(ctx, "inserting flow start groups", db, sqlInsertStartGroup, groups)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting flow start groups for flow")
 	}
@@ -324,7 +312,7 @@ func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) erro
 	return nil
 }
 
-const insertStartSQL = `
+const sqlInsertStart = `
 INSERT INTO
 	flows_flowstart(uuid,  org_id,  flow_id,  start_type,  created_on,  modified_on,  restart_participants,  include_active,  query,  status, extra,  parent_summary,  session_history)
 			 VALUES(:uuid, :org_id, :flow_id, :start_type, NOW(),       NOW(),        :restart_participants, :include_active, :query, 'P',    :extra, :parent_summary, :session_history)
@@ -332,17 +320,11 @@ RETURNING
 	id
 `
 
-const insertStartContactsSQL = `
-INSERT INTO
-	flows_flowstart_contacts( flowstart_id,  contact_id)
-	                  VALUES(:start_id,     :contact_id)
-`
+const sqlInsertStartContact = `
+INSERT INTO flows_flowstart_contacts(flowstart_id, contact_id) VALUES(:start_id, :contact_id)`
 
-const insertStartGroupsSQL = `
-INSERT INTO
-	flows_flowstart_groups( flowstart_id,  contactgroup_id)
-	                VALUES(:start_id,     :contactgroup_id)
-`
+const sqlInsertStartGroup = `
+INSERT INTO flows_flowstart_groups(flowstart_id, contactgroup_id) VALUES(:start_id, :contactgroup_id)`
 
 // CreateBatch creates a batch for this start using the passed in contact ids
 func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {

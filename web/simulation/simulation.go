@@ -219,7 +219,7 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 			var flow *models.Flow
 			for _, r := range session.Runs() {
 				if r.Status() == flows.RunStatusWaiting {
-					f, _ := oa.Flow(r.FlowReference().UUID)
+					f, _ := oa.FlowByUUID(r.FlowReference().UUID)
 					if f != nil {
 						flow = f.(*models.Flow)
 					}
@@ -235,7 +235,7 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 				}
 
 				if triggeredFlow != nil {
-					tb := triggers.NewBuilder(oa.Env(), triggeredFlow.FlowReference(), resume.Contact())
+					tb := triggers.NewBuilder(oa.Env(), triggeredFlow.Reference(), resume.Contact())
 
 					var sessionTrigger flows.Trigger
 					if triggeredFlow.FlowType() == models.FlowTypeVoice {

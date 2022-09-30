@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nyaruka/gocommon/uuids"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -37,11 +36,7 @@ func TestModifyContacts(t *testing.T) {
 	db.MustExec(`UPDATE contacts_contactgroup SET query = 'age > 18' WHERE id = $1`, testdata.DoctorsGroup.ID)
 
 	// insert an event on our campaign that is based on created on
-	db.MustExec(
-		`INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, 
-											 campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
-									   VALUES(TRUE, NOW(), NOW(), $1, 1000, 'W', 'F', -1, $2, 1, 1, $3, $4, 'I')`,
-		uuids.New(), testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.CreatedOnField.ID)
+	testdata.InsertCampaignFlowEvent(db, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 1000, "W")
 
 	// for simpler tests we clear out cathy's fields and groups to start
 	db.MustExec(`UPDATE contacts_contact SET fields = NULL WHERE id = $1`, testdata.Cathy.ID)

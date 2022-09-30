@@ -1,25 +1,6 @@
 package testdata
 
-import (
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/core/models"
-)
-
 // Constants used in tests, these are tied to the DB created by the RapidPro `mailroom_db` management command.
-
-type Classifier struct {
-	ID   models.ClassifierID
-	UUID assets.ClassifierUUID
-}
-
-type Campaign struct {
-	ID   models.CampaignID
-	UUID models.CampaignUUID
-}
-
-type CampaignEvent struct {
-	ID models.CampaignEventID
-}
 
 var Org1 = &Org{1, "bf0514a5-9407-44c9-b0f9-3f36f9c18414"}
 var Admin = &User{3, "admin1@nyaruka.com"}
@@ -75,8 +56,9 @@ var Wit = &Classifier{2, "ff2a817c-040a-4eb2-8404-7d92e8b79dd0"}
 var Bothub = &Classifier{3, "859b436d-3005-4e43-9ad5-3de5f26ede4c"}
 
 var RemindersCampaign = &Campaign{10000, "72aa12c5-cc11-4bc7-9406-044047845c70"}
-var RemindersEvent1 = &CampaignEvent{10000}
-var RemindersEvent2 = &CampaignEvent{10001}
+var RemindersEvent1 = &CampaignEvent{10000, "f2a3f8c5-e831-4df3-b046-8d8cdb90f178"} // Favorites flow, interrupts
+var RemindersEvent2 = &CampaignEvent{10001, "aff4b8ac-2534-420f-a353-66a3e74b6e16"} // Message event, passive
+var RemindersEvent3 = &CampaignEvent{10002, "3e4f06c2-e04f-47ca-a047-f5252b3160ea"} // Pick A Number flow, skips
 
 // secondary org.. only a few things
 var Org2 = &Org{2, "3ae7cdeb-fd96-46e5-abc4-a4622f349921"}

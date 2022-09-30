@@ -18,9 +18,6 @@ import (
 )
 
 func TestEngineWebhook(t *testing.T) {
-	// this is only here because this is the first test run.. should find a better way to ensure DB is in correct state for first test that needs it
-	testsuite.Reset(testsuite.ResetDB)
-
 	_, rt, _, _ := testsuite.Get()
 
 	svc, err := goflow.Engine(rt.Config).Services().Webhook(nil)

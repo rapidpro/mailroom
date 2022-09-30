@@ -14,10 +14,62 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAssets(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	// create new flow with same name as an existing flow
+	testdata.InsertFlow(db, testdata.Org1, []byte(`{
+		"uuid": "fd7d16dd-3a38-4351-aea6-7a80acb41dd9",
+		"name": "Pick a Number"
+	}`))
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	flow, err := oa.FlowByUUID(testdata.Favorites.UUID) // from db
+	assert.NoError(t, err)
+	assert.Equal(t, "Favorites", flow.Name())
+
+	flow, err = oa.FlowByUUID(testdata.Favorites.UUID) // from cache
+	assert.NoError(t, err)
+	assert.Equal(t, "Favorites", flow.Name())
+
+	flow, err = oa.FlowByUUID(`c1b78e46-de99-4ae1-beb8-205801178c35`)
+	assert.Equal(t, err, models.ErrNotFound)
+	assert.Nil(t, flow)
+
+	flow, err = oa.FlowByName("PICK A NUMBER") // from db
+	assert.NoError(t, err)
+	assert.Equal(t, assets.FlowUUID("fd7d16dd-3a38-4351-aea6-7a80acb41dd9"), flow.UUID()) // new flow as newer saved_on
+	assert.Equal(t, "Pick a Number", flow.Name())
+
+	flow, err = oa.FlowByName("pick a number") // from cache
+	assert.NoError(t, err)
+	assert.Equal(t, "Pick a Number", flow.Name())
+
+	flow, err = oa.FlowByName(`not a flow`)
+	assert.Equal(t, err, models.ErrNotFound)
+	assert.Nil(t, flow)
+
+	dbFlow, err := oa.FlowByID(testdata.IVRFlow.ID) // from db
+	assert.NoError(t, err)
+	assert.Equal(t, "IVR Flow", dbFlow.Name())
+
+	dbFlow, err = oa.FlowByID(testdata.IVRFlow.ID) // from cache
+	assert.NoError(t, err)
+	assert.Equal(t, "IVR Flow", dbFlow.Name())
+
+	dbFlow, err = oa.FlowByID(123456)
+	assert.Equal(t, err, models.ErrNotFound)
+	assert.Nil(t, dbFlow)
+}
+
 func TestCloneForSimulation(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
-	models.FlushCache()
+	defer testsuite.Reset(0)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -41,7 +93,7 @@ func TestCloneForSimulation(t *testing.T) {
 	require.NoError(t, err)
 
 	// should get new definition
-	flow, err := clone.Flow(testdata.Favorites.UUID)
+	flow, err := clone.FlowByUUID(testdata.Favorites.UUID)
 	require.NoError(t, err)
 	assert.Equal(t, newFavoritesDef, string(flow.Definition()))
 
@@ -56,7 +108,7 @@ func TestCloneForSimulation(t *testing.T) {
 	assert.Equal(t, "Vonage", vonage.Name())
 
 	// original assets still has original flow definition
-	flow, err = oa.Flow(testdata.Favorites.UUID)
+	flow, err = oa.FlowByUUID(testdata.Favorites.UUID)
 	require.NoError(t, err)
 	assert.Equal(t, "{\"_ui\": {\"nodes\": {\"10c9c241-777f-4010-a841-6e87abed8520\": {\"typ", string(flow.Definition())[:64])
 

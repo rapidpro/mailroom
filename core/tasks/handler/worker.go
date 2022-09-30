@@ -8,6 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -21,7 +22,6 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -172,7 +172,8 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 			})
 
 			if qerr := dbutil.AsQueryError(err); qerr != nil {
-				log = log.WithFields(qerr.Fields())
+				query, params := qerr.Query()
+				log = log.WithFields(logrus.Fields{"sql": query, "sql_params": params})
 			}
 
 			contactEvent.ErrorCount++
@@ -196,12 +197,8 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 // handleTimedEvent is called for timeout events
 func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string, event *TimedEvent) error {
 	start := time.Now()
-	log := logrus.WithFields(logrus.Fields{
-		"event_type": eventType,
-		"contact_id": event.ContactID,
-		"run_id":     event.RunID,
-		"session_id": event.SessionID,
-	})
+	log := logrus.WithFields(logrus.Fields{"event_type": eventType, "contact_id": event.ContactID, "session_id": event.SessionID})
+
 	oa, err := models.GetOrgAssets(ctx, rt, event.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading org")
@@ -226,19 +223,14 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
-	// get the active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
+	// look for a waiting session for this contact
+	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
-		return errors.Wrapf(err, "error loading active session for contact")
+		return errors.Wrapf(err, "error loading waiting session for contact")
 	}
 
-	// if we didn't find a session or it is another session then this flow got interrupted and this is a race, fail it
+	// if we didn't find a session or it is another session then this session has already been interrupted
 	if session == nil || session.ID() != event.SessionID {
-		log.Error("expiring run with mismatched session, session for run no longer active, failing runs and session")
-		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{event.SessionID}, models.ExitFailed)
-		if err != nil {
-			return errors.Wrapf(err, "error failing expired runs for session that is no longer active")
-		}
 		return nil
 	}
 
@@ -248,31 +240,31 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 
 	case ExpirationEventType:
 		// check that our expiration is still the same
-		expiration, err := models.RunExpiration(ctx, rt.DB, event.RunID)
+		expiresOn, err := models.GetSessionWaitExpiresOn(ctx, rt.DB, event.SessionID)
 		if err != nil {
 			return errors.Wrapf(err, "unable to load expiration for run")
 		}
 
-		if expiration == nil {
-			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, run no longer active")
+		if expiresOn == nil {
+			log.WithField("event_expiration", event.Time).Info("ignoring expiration, session no longer waiting")
 			return nil
 		}
 
-		if expiration != nil && !expiration.Equal(event.Time) {
-			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiration).Info("ignoring expiration, has been updated")
+		if expiresOn != nil && !expiresOn.Equal(event.Time) {
+			log.WithField("event_expiration", event.Time).WithField("run_expiration", expiresOn).Info("ignoring expiration, has been updated")
 			return nil
 		}
 
 		resume = resumes.NewRunExpiration(oa.Env(), contact)
 
 	case TimeoutEventType:
-		if session.TimeoutOn() == nil {
+		if session.WaitTimeoutOn() == nil {
 			log.WithField("session_id", session.ID()).Info("ignoring session timeout, has no timeout set")
 			return nil
 		}
 
 		// check that the timeout is the same
-		timeout := *session.TimeoutOn()
+		timeout := *session.WaitTimeoutOn()
 		if !timeout.Equal(event.Time) {
 			log.WithField("event_timeout", event.Time).WithField("session_timeout", timeout).Info("ignoring timeout, has been updated")
 			return nil
@@ -284,7 +276,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 		return errors.Errorf("unknown event type: %s", eventType)
 	}
 
-	_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, nil)
+	_, err = runner.ResumeFlow(ctx, rt, oa, session, modelContact, resume, nil)
 	if err != nil {
 		return errors.Wrapf(err, "error resuming flow for timeout")
 	}
@@ -413,14 +405,14 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	switch eventType {
 
 	case models.NewConversationEventType, models.ReferralEventType, models.MOMissEventType:
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventType(eventType)).
 			WithParams(params).
 			Build()
 
 	case models.MOCallEventType:
 		urn := contacts[0].URNForID(event.URNID())
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Channel(channel.ChannelReference(), triggers.ChannelEventTypeIncomingCall).
 			WithConnection(urn).
 			Build()
@@ -441,7 +433,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		}
 	}
 
-	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{flowTrigger}, hook, true)
+	sessions, err := runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{flowTrigger}, hook, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -498,7 +490,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// contact has been deleted, ignore this message but mark it as handled
 	if len(contacts) == 0 {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
 		if err != nil {
 			return errors.Wrapf(err, "error updating message for deleted contact")
 		}
@@ -526,7 +518,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
 	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
-		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
 		if err != nil {
 			return errors.Wrapf(err, "error marking blocked or nil channel message as handled")
 		}
@@ -564,8 +556,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// find any matching triggers
 	trigger := models.FindMatchingMsgTrigger(oa, contact, event.Text)
 
-	// get any active session for this contact
-	session, err := models.ActiveSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
+	// look for a waiting session for this contact
+	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, contact)
 	if err != nil {
 		return errors.Wrapf(err, "error loading active session for contact")
 	}
@@ -577,7 +569,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 		// flow this session is in is gone, interrupt our session and reset it
 		if err == models.ErrNotFound {
-			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed)
+			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.SessionStatusFailed)
 			session = nil
 		}
 
@@ -598,14 +590,14 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 		sessions[0].SetIncomingMsg(event.MsgID, event.MsgExternalID)
 
-		return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
+		return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
 		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) {
 		// load our flow
-		flow, err := oa.FlowByID(trigger.FlowID())
+		flow, err = oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
 			return errors.Wrapf(err, "error loading flow for trigger")
 		}
@@ -615,7 +607,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 			if flow.FlowType() == models.FlowTypeVoice {
 				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
-					return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
+					return markMsgHandled(ctx, tx, contact, msgIn, flow, topupID, tickets)
 				}
 				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
 				if err != nil {
@@ -625,8 +617,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
-			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, flowMsgHook, true)
+			trigger := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
+			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{trigger}, flowMsgHook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -637,7 +629,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// if there is a session, resume it
 	if session != nil && flow != nil {
 		resume := resumes.NewMsg(oa.Env(), contact, msgIn)
-		_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, flowMsgHook)
+		_, err = runner.ResumeFlow(ctx, rt, oa, session, modelContact, resume, flowMsgHook)
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
 		}
@@ -734,14 +726,14 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 
 	switch event.EventType() {
 	case models.TicketEventTypeClosed:
-		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
+		flowTrigger = triggers.NewBuilder(oa.Env(), flow.Reference(), contact).
 			Ticket(ticket, triggers.TicketEventTypeClosed).
 			Build()
 	default:
 		return errors.Errorf("unknown ticket event type: %s", event.EventType())
 	}
 
-	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{flowTrigger}, nil, true)
+	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []*models.Contact{modelContact}, []flows.Trigger{flowTrigger}, nil, true)
 	if err != nil {
 		return errors.Wrapf(err, "error starting flow for contact")
 	}
@@ -761,12 +753,19 @@ func handleAsInbox(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsset
 		return errors.Wrap(err, "error handling inbox message events")
 	}
 
-	return markMsgHandled(ctx, rt.DB, contact, msg, models.MsgTypeInbox, topupID, tickets)
+	return markMsgHandled(ctx, rt.DB, contact, msg, nil, topupID, tickets)
 }
 
 // utility to mark as message as handled and update any open contact tickets
-func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, msgType models.MsgType, topupID models.TopupID, tickets []*models.Ticket) error {
-	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, topupID)
+func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Contact, msg *flows.MsgIn, flow *models.Flow, topupID models.TopupID, tickets []*models.Ticket) error {
+	msgType := models.MsgTypeInbox
+	flowID := models.NilFlowID
+	if flow != nil {
+		msgType = models.MsgTypeFlow
+		flowID = flow.ID()
+	}
+
+	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, topupID)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
@@ -789,7 +788,6 @@ type TimedEvent struct {
 	ContactID models.ContactID `json:"contact_id"`
 	OrgID     models.OrgID     `json:"org_id"`
 	SessionID models.SessionID `json:"session_id"`
-	RunID     models.FlowRunID `json:"run_id,omitempty"`
 	Time      time.Time        `json:"time"`
 }
 
@@ -815,12 +813,11 @@ type StopEvent struct {
 }
 
 // creates a new event task for the passed in timeout event
-func newTimedTask(eventType string, orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, eventTime time.Time) *queue.Task {
+func newTimedTask(eventType string, orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, eventTime time.Time) *queue.Task {
 	event := &TimedEvent{
 		OrgID:     orgID,
 		ContactID: contactID,
 		SessionID: sessionID,
-		RunID:     runID,
 		Time:      eventTime,
 	}
 	eventJSON, err := json.Marshal(event)
@@ -840,10 +837,10 @@ func newTimedTask(eventType string, orgID models.OrgID, contactID models.Contact
 
 // NewTimeoutTask creates a new event task for the passed in timeout event
 func NewTimeoutTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
-	return newTimedTask(TimeoutEventType, orgID, contactID, sessionID, models.NilFlowRunID, time)
+	return newTimedTask(TimeoutEventType, orgID, contactID, sessionID, time)
 }
 
 // NewExpirationTask creates a new event task for the passed in expiration event
-func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, runID models.FlowRunID, time time.Time) *queue.Task {
-	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, runID, time)
+func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
+	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, time)
 }

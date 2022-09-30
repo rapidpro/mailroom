@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/tasks/contacts"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -36,21 +37,21 @@ func TestImportContactBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// import is still in progress
-	testsuite.AssertQuery(t, db, `SELECT status FROM contacts_contactimport WHERE id = $1`, importID).Columns(map[string]interface{}{"status": "O"})
+	assertdb.Query(t, db, `SELECT status FROM contacts_contactimport WHERE id = $1`, importID).Columns(map[string]interface{}{"status": "O"})
 
 	// perform second batch task...
 	task2 := &contacts.ImportContactBatchTask{ContactImportBatchID: batch2ID}
 	err = task2.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id >= 30000`).Returns(3)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Norbert' AND language = 'eng'`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Leah' AND language IS NULL`).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Rowan' AND language = 'spa'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id >= 30000`).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Norbert' AND language = 'eng'`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Leah' AND language IS NULL`).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE name = 'Rowan' AND language = 'spa'`).Returns(1)
 
 	// import is now complete and there is a notification for the creator
-	testsuite.AssertQuery(t, db, `SELECT status FROM contacts_contactimport WHERE id = $1`, importID).Columns(map[string]interface{}{"status": "C"})
-	testsuite.AssertQuery(t, db, `SELECT org_id, notification_type, scope, user_id FROM notifications_notification WHERE contact_import_id = $1`, importID).
+	assertdb.Query(t, db, `SELECT status FROM contacts_contactimport WHERE id = $1`, importID).Columns(map[string]interface{}{"status": "C"})
+	assertdb.Query(t, db, `SELECT org_id, notification_type, scope, user_id FROM notifications_notification WHERE contact_import_id = $1`, importID).
 		Columns(map[string]interface{}{
 			"org_id":            int64(testdata.Org1.ID),
 			"notification_type": "import:finished",

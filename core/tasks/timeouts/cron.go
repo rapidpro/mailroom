@@ -55,8 +55,9 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 	rc := rt.RP.Get()
 	defer rc.Close()
 
+	numQueued, numDupes := 0, 0
+
 	// add a timeout task for each run
-	count := 0
 	timeout := &Timeout{}
 	for rows.Next() {
 		err := rows.StructScan(timeout)
@@ -73,6 +74,7 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 
 		// already queued? move on
 		if queued {
+			numDupes++
 			continue
 		}
 
@@ -89,10 +91,10 @@ func timeoutSessions(ctx context.Context, rt *runtime.Runtime) error {
 			return errors.Wrapf(err, "error marking timeout task as queued")
 		}
 
-		count++
+		numQueued++
 	}
 
-	log.WithField("elapsed", time.Since(start)).WithField("count", count).Info("timeouts queued")
+	log.WithField("dupes", numDupes).WithField("queued", numQueued).WithField("elapsed", time.Since(start)).Info("session timeouts queued")
 	return nil
 }
 

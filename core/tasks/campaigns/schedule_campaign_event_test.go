@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/campaigns"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -70,40 +69,30 @@ func TestScheduleCampaignEvent(t *testing.T) {
 	db.MustExec(`UPDATE contacts_contact SET created_on = '2035-01-01T00:00:00Z' WHERE id = $1 OR id = $2`, testdata.Cathy.ID, testdata.Alexandria.ID)
 
 	// create new campaign event based on created_on + 5 minutes
-	event3 := insertCampaignEvent(t, db, testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.CreatedOnField.ID, 5, "M")
+	event3 := testdata.InsertCampaignFlowEvent(db, testdata.RemindersCampaign, testdata.Favorites, testdata.CreatedOnField, 5, "M")
 
-	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event3}
+	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event3.ID}
 	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
 	// only cathy is in the group and new enough to have a fire
-	assertContactFires(t, db, event3, map[models.ContactID]time.Time{
+	assertContactFires(t, db, event3.ID, map[models.ContactID]time.Time{
 		testdata.Cathy.ID: time.Date(2035, 1, 1, 0, 5, 0, 0, time.UTC),
 	})
 
 	// create new campaign event based on last_seen_on + 1 day
-	event4 := insertCampaignEvent(t, db, testdata.RemindersCampaign.ID, testdata.Favorites.ID, testdata.LastSeenOnField.ID, 1, "D")
+	event4 := testdata.InsertCampaignFlowEvent(db, testdata.RemindersCampaign, testdata.Favorites, testdata.LastSeenOnField, 1, "D")
 
 	// bump last_seen_on for bob
 	db.MustExec(`UPDATE contacts_contact SET last_seen_on = '2040-01-01T00:00:00Z' WHERE id = $1`, testdata.Bob.ID)
 
-	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event4}
+	task = &campaigns.ScheduleCampaignEventTask{CampaignEventID: event4.ID}
 	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	assertContactFires(t, db, event4, map[models.ContactID]time.Time{
+	assertContactFires(t, db, event4.ID, map[models.ContactID]time.Time{
 		testdata.Bob.ID: time.Date(2040, 1, 2, 0, 0, 0, 0, time.UTC),
 	})
-}
-
-func insertCampaignEvent(t *testing.T, db *sqlx.DB, campaignID models.CampaignID, flowID models.FlowID, relativeToID models.FieldID, offset int, unit string) models.CampaignEventID {
-	var eventID models.CampaignEventID
-	err := db.Get(&eventID, `
-	INSERT INTO campaigns_campaignevent(is_active, created_on, modified_on, uuid, "offset", unit, event_type, delivery_hour, campaign_id, created_by_id, modified_by_id, flow_id, relative_to_id, start_mode)
-	VALUES(TRUE, NOW(), NOW(), $1, $5, $6, 'F', -1, $2, 1, 1, $3, $4, 'I') RETURNING id`, uuids.New(), campaignID, flowID, relativeToID, offset, unit)
-	require.NoError(t, err)
-
-	return eventID
 }
 
 func assertContactFires(t *testing.T, db *sqlx.DB, eventID models.CampaignEventID, expected map[models.ContactID]time.Time) {

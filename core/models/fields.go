@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/mailroom/utils/dbutil"
-
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/dbutil"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -49,7 +48,7 @@ func (f *Field) System() bool { return f.f.System }
 func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Field, []assets.Field, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectFieldsSQL, orgID)
+	rows, err := db.Queryx(sqlSelectFields, orgID)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error querying fields for org: %d", orgID)
 	}
@@ -60,7 +59,7 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 
 	for rows.Next() {
 		field := &Field{}
-		err = dbutil.ReadJSONRow(rows, &field.f)
+		err = dbutil.ScanJSON(rows, &field.f)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "error reading field")
 		}
@@ -77,7 +76,7 @@ func loadFields(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Fie
 	return userFields, systemFields, nil
 }
 
-const selectFieldsSQL = `
+const sqlSelectFields = `
 SELECT ROW_TO_JSON(f) FROM (SELECT
 	id,
 	uuid,

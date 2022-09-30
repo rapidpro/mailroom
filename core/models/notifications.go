@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nyaruka/mailroom/utils/dbutil"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/pkg/errors"
 )
 

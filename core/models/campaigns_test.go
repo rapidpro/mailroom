@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -95,10 +95,10 @@ func TestAddEventFires(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire`).Returns(3)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent1.ID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Bob.ID, testdata.RemindersEvent1.ID).Returns(1)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Bob.ID, testdata.RemindersEvent2.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire`).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent1.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Bob.ID, testdata.RemindersEvent1.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Bob.ID, testdata.RemindersEvent2.ID).Returns(1)
 
 	db.MustExec(`UPDATE campaigns_eventfire SET fired = NOW() WHERE contact_id = $1`, testdata.Cathy.ID)
 
@@ -110,7 +110,7 @@ func TestAddEventFires(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire`).Returns(4)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent1.ID).Returns(2)
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Bob.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire`).Returns(4)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent1.ID).Returns(2)
+	assertdb.Query(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Bob.ID).Returns(2)
 }

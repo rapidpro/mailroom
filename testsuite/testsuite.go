@@ -7,10 +7,14 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"testing"
 
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/stretchr/testify/require"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -23,6 +27,8 @@ import (
 	"orgs_org":         "0f650bf7b9fb77ffa3ff0992be98da53",
 	"tickets_ticketer": "6487a4aed61e16c3aa0d6cf117f58de3",
 }*/
+
+var _db *sqlx.DB
 
 const MediaStorageDir = "_test_media_storage"
 const SessionStorageDir = "_test_session_storage"
@@ -54,7 +60,6 @@ func Reset(what ResetFlag) {
 	}
 
 	models.FlushCache()
-	logrus.SetLevel(logrus.DebugLevel)
 }
 
 // Get returns the various runtime things a test might need
@@ -71,6 +76,8 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 		Config:         runtime.NewDefaultConfig(),
 	}
 
+	logrus.SetLevel(logrus.DebugLevel)
+
 	/*for name, expected := range tableHashes {
 		var actual string
 	    must(db.Get(&actual, fmt.Sprintf(`SELECT md5(array_to_string(array_agg(t.* order by id), '|', '')) FROM %s t`, name)))
@@ -84,7 +91,17 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 
 // returns an open test database pool
 func getDB() *sqlx.DB {
-	return sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
+	if _db == nil {
+		_db = sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
+
+		// check if we have tables and if not load test database dump
+		_, err := _db.Exec("SELECT * from orgs_org")
+		if err != nil {
+			loadTestDump()
+			return getDB()
+		}
+	}
+	return _db
 }
 
 // returns a redis pool to our test database
@@ -119,9 +136,12 @@ func getRC() redis.Conn {
 //   % cp mailroom_test.dump ../mailroom
 func resetDB() {
 	db := getDB()
-	defer db.Close()
+	db.MustExec("DROP OWNED BY mailroom_test CASCADE")
 
-	db.MustExec("drop owned by mailroom_test cascade")
+	loadTestDump()
+}
+
+func loadTestDump() {
 	dir, _ := os.Getwd()
 
 	// our working directory is set to the directory of the module being tested, we want to get just
@@ -131,6 +151,12 @@ func resetDB() {
 	}
 
 	mustExec("pg_restore", "-h", "localhost", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
+
+	// force re-connection
+	if _db != nil {
+		_db.Close()
+		_db = nil
+	}
 }
 
 // resets our redis database
@@ -153,6 +179,8 @@ func resetStorage() {
 }
 
 var resetDataSQL = `
+UPDATE contacts_contact SET current_flow_id = NULL;
+
 DELETE FROM notifications_notification;
 DELETE FROM notifications_incident;
 DELETE FROM request_logs_httplog;
@@ -163,16 +191,18 @@ DELETE FROM triggers_trigger_groups WHERE trigger_id >= 30000;
 DELETE FROM triggers_trigger WHERE id >= 30000;
 DELETE FROM channels_channelcount;
 DELETE FROM msgs_msg;
-DELETE FROM flows_flowpathrecentrun;
 DELETE FROM flows_flowrun;
+DELETE FROM flows_flowpathcount;
+DELETE FROM flows_flownodecount;
+DELETE FROM flows_flowruncount;
+DELETE FROM flows_flowcategorycount;
 DELETE FROM flows_flowsession;
 DELETE FROM flows_flowrevision WHERE flow_id >= 30000;
 DELETE FROM flows_flow WHERE id >= 30000;
+DELETE FROM channels_channelconnection;
 DELETE FROM campaigns_eventfire;
-DELETE FROM flows_flowrun;
-DELETE FROM flows_flowsession;
-DELETE FROM flows_flowrevision WHERE id >= 30000;
-DELETE FROM flows_flow WHERE id >= 30000;
+DELETE FROM campaigns_campaignevent WHERE id >= 30000;
+DELETE FROM campaigns_campaign WHERE id >= 30000;
 DELETE FROM contacts_contactimportbatch;
 DELETE FROM contacts_contactimport;
 DELETE FROM contacts_contacturn WHERE id >= 30000;
@@ -188,14 +218,14 @@ ALTER SEQUENCE flows_flowrun_id_seq RESTART WITH 1;
 ALTER SEQUENCE flows_flowsession_id_seq RESTART WITH 1;
 ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000;
 ALTER SEQUENCE contacts_contacturn_id_seq RESTART WITH 30000;
-ALTER SEQUENCE contacts_contactgroup_id_seq RESTART WITH 30000;`
+ALTER SEQUENCE contacts_contactgroup_id_seq RESTART WITH 30000;
+ALTER SEQUENCE campaigns_campaign_id_seq RESTART WITH 30000;
+ALTER SEQUENCE campaigns_campaignevent_id_seq RESTART WITH 30000;`
 
 // removes contact data not in the test database dump. Note that this function can't
 // undo changes made to the contact data in the test database dump.
 func resetData() {
 	db := getDB()
-	defer db.Close()
-
 	db.MustExec(resetDataSQL)
 
 	// because groups have changed
@@ -225,4 +255,31 @@ func ReadFile(path string) []byte {
 	d, err := os.ReadFile(path)
 	noError(err)
 	return d
+}
+
+func CurrentOrgTasks(t *testing.T, rp *redis.Pool) map[models.OrgID][]*queue.Task {
+	rc := rp.Get()
+	defer rc.Close()
+
+	// get all active org queues
+	active, err := redis.Ints(rc.Do("ZRANGE", "batch:active", 0, -1))
+	require.NoError(t, err)
+
+	tasks := make(map[models.OrgID][]*queue.Task)
+	for _, orgID := range active {
+		orgTasksEncoded, err := redis.Strings(rc.Do("ZRANGE", fmt.Sprintf("batch:%d", orgID), 0, -1))
+		require.NoError(t, err)
+
+		orgTasks := make([]*queue.Task, len(orgTasksEncoded))
+
+		for i := range orgTasksEncoded {
+			task := &queue.Task{}
+			jsonx.MustUnmarshal([]byte(orgTasksEncoded[i]), task)
+			orgTasks[i] = task
+		}
+
+		tasks[models.OrgID(orgID)] = orgTasks
+	}
+
+	return tasks
 }

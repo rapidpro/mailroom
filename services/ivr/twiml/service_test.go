@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/services/ivr/twiml"
@@ -25,6 +25,7 @@ func TestResponseForSprint(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 
 	urn := urns.URN("tel:+12067799294")
+	expiresOn := time.Now().Add(time.Hour)
 	channelRef := assets.NewChannelReference(assets.ChannelUUID(uuids.New()), "Twilio Channel")
 
 	resumeURL := "http://temba.io/resume?session=1"
@@ -34,33 +35,37 @@ func TestResponseForSprint(t *testing.T) {
 	defer func() { rt.Config.AttachmentDomain = "" }()
 
 	tcs := []struct {
-		Events   []flows.Event
-		Wait     flows.ActivatedWait
-		Expected string
+		events   []flows.Event
+		expected string
 	}{
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", nil, nil, nil, flows.NilMsgTopic))},
-			nil,
+			[]flows.Event{
+				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", nil, nil, nil, flows.NilMsgTopic)),
+			},
 			`<Response><Say>hello world</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "eng", ""))},
-			nil,
+			[]flows.Event{
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "eng", "")),
+			},
 			`<Response><Say language="en-US">hello world</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "ben", ""))},
-			nil,
+			[]flows.Event{
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "ben", "")),
+			},
 			`<Response><Say>hello world</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic))},
-			nil,
+			[]flows.Event{
+				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic)),
+			},
 			`<Response><Play>https://mailroom.io/recordings/foo.wav</Play><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:https://temba.io/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic))},
-			nil,
+			[]flows.Event{
+				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:https://temba.io/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic)),
+			},
 			`<Response><Play>https://temba.io/recordings/foo.wav</Play><Hangup></Hangup></Response>`,
 		},
 		{
@@ -68,30 +73,41 @@ func TestResponseForSprint(t *testing.T) {
 				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", nil, nil, nil, flows.NilMsgTopic)),
 				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "goodbye", nil, nil, nil, flows.NilMsgTopic)),
 			},
-			nil,
 			`<Response><Say>hello world</Say><Say>goodbye</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "enter a number", nil, nil, nil, flows.NilMsgTopic))},
-			waits.NewActivatedMsgWait(nil, hints.NewFixedDigitsHint(1)),
+			[]flows.Event{
+				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "enter a number", nil, nil, nil, flows.NilMsgTopic)),
+				events.NewMsgWait(nil, nil, hints.NewFixedDigitsHint(1)),
+			},
 			`<Response><Gather numDigits="1" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "enter a number, then press #", nil, nil, nil, flows.NilMsgTopic))},
-			waits.NewActivatedMsgWait(nil, hints.NewTerminatedDigitsHint("#")),
+			[]flows.Event{
+				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "enter a number, then press #", nil, nil, nil, flows.NilMsgTopic)),
+				events.NewMsgWait(nil, nil, hints.NewTerminatedDigitsHint("#")),
+			},
 			`<Response><Gather finishOnKey="#" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number, then press #</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
 		},
 		{
-			[]flows.Event{events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "say something", nil, nil, nil, flows.NilMsgTopic))},
-			waits.NewActivatedMsgWait(nil, hints.NewAudioHint()),
+			[]flows.Event{
+				events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "say something", nil, nil, nil, flows.NilMsgTopic)),
+				events.NewMsgWait(nil, nil, hints.NewAudioHint()),
+			},
 			`<Response><Say>say something</Say><Record action="http://temba.io/resume?session=1&amp;wait_type=record" maxLength="600"></Record><Redirect>http://temba.io/resume?session=1&amp;wait_type=record&amp;empty=true</Redirect></Response>`,
+		},
+		{
+			[]flows.Event{
+				events.NewDialWait(urns.URN(`tel:+1234567890`), &expiresOn),
+			},
+			`<Response><Dial action="http://temba.io/resume?session=1&amp;wait_type=dial">+1234567890</Dial></Response>`,
 		},
 	}
 
 	for i, tc := range tcs {
-		response, err := twiml.ResponseForSprint(rt.Config, urn, resumeURL, tc.Wait, tc.Events, false)
+		response, err := twiml.ResponseForSprint(rt.Config, urn, resumeURL, tc.events, false)
 		assert.NoError(t, err, "%d: unexpected error")
-		assert.Equal(t, xml.Header+tc.Expected, response, "%d: unexpected response", i)
+		assert.Equal(t, xml.Header+tc.expected, response, "%d: unexpected response", i)
 	}
 }
 

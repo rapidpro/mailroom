@@ -44,12 +44,12 @@ func TestSessionTriggered(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				testdata.Cathy: []flows.Action{
-					actions.NewStartSession(handlers.NewActionUUID(), simpleFlow.FlowReference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
+					actions.NewStartSession(handlers.NewActionUUID(), simpleFlow.Reference(), nil, []*flows.ContactReference{contactRef}, []*assets.GroupReference{groupRef}, nil, true),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
-					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
+					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND status = 'C'",
 					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
 				},
@@ -105,7 +105,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 	favoriteFlow, err := oa.FlowByID(testdata.Favorites.ID)
 	assert.NoError(t, err)
 
-	sessionAction := actions.NewStartSession(handlers.NewActionUUID(), favoriteFlow.FlowReference(), nil, nil, nil, nil, true)
+	sessionAction := actions.NewStartSession(handlers.NewActionUUID(), favoriteFlow.Reference(), nil, nil, nil, nil, true)
 	sessionAction.ContactQuery = "name ~ @contact.name"
 
 	tcs := []handlers.TestCase{

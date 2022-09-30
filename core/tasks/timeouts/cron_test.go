@@ -24,9 +24,9 @@ func TestTimeouts(t *testing.T) {
 
 	// need to create a session that has an expired timeout
 	s1TimeoutOn := time.Now()
-	testdata.InsertFlowSession(db, testdata.Org1, testdata.Cathy, models.SessionStatusWaiting, &s1TimeoutOn)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, &s1TimeoutOn)
 	s2TimeoutOn := time.Now().Add(time.Hour * 24)
-	testdata.InsertFlowSession(db, testdata.Org1, testdata.George, models.SessionStatusWaiting, &s2TimeoutOn)
+	testdata.InsertWaitingSession(db, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilConnectionID, time.Now(), time.Now(), false, &s2TimeoutOn)
 
 	time.Sleep(10 * time.Millisecond)
 

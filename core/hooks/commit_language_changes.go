@@ -39,8 +39,7 @@ const updateContactLanguageSQL = `
 	UPDATE 
 		contacts_contact c
 	SET
-		language = r.language,
-		modified_on = NOW()
+		language = r.language
 	FROM (
 		VALUES(:id, :language)
 	) AS

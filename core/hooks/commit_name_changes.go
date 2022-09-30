@@ -40,8 +40,7 @@ const updateContactNameSQL = `
 	UPDATE 
 		contacts_contact c
 	SET
-		name = r.name,
-		modified_on = NOW()
+		name = r.name
 	FROM (
 		VALUES(:id, :name)
 	) AS

@@ -27,31 +27,38 @@ We recommend running Mailroom with no changes to the configuration and no parame
 environment variables to configure it. You can use `% mailroom --help` to see a list of the
 environment variables and parameters and for more details on each option.
 
-# RapidPro Configuration
-
-For use with RapidPro, you will want to configure these settings:
+For use with RapidPro, you will need to configure these settings:
 
 - `MAILROOM_ADDRESS`: the address to bind our web server to (default "localhost")
 - `MAILROOM_DOMAIN`: the domain that mailroom is listening on
 - `MAILROOM_AUTH_TOKEN`: the token clients will need to authenticate web requests (should match setting in RapidPro)
 - `MAILROOM_ATTACHMENT_DOMAIN`: the domain that will be used for relative attachments in flows
 - `MAILROOM_DB`: URL describing how to connect to the RapidPro database (default "postgres://temba:temba@localhost/temba?sslmode=disable")
+- `MAILROOM_READONLY_DB`: URL for an additional database connection for read-only operations (optional)
 - `MAILROOM_REDIS`: URL describing how to connect to Redis (default "redis://localhost:6379/15")
 - `MAILROOM_ELASTIC`: URL describing how to connect to ElasticSearch (default "http://localhost:9200")
 - `MAILROOM_SMTP_SERVER`: the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com
+- `MAILROOM_FCM_KEY`: the key for Firebase Cloud Messaging used to sync Android channels
 
-For writing of message attachments, Mailroom needs access to an S3 bucket, you can configure access to your bucket via:
+For writing of message attachments, you need an S3 compatible service which you configure with:
 
-- `MAILROOM_S3_REGION`: The region for your S3 bucket (ex: `eu-west-1`)
-- `MAILROOM_S3_MEDIA_BUCKET`: The name of your S3 bucket (ex: `dl-mailroom`)
-- `MAILROOM_S3_MEDIA_PREFIX`: The prefix to use for filenames of attachments added to your bucket (ex: `attachments`)
-- `MAILROOM_AWS_ACCESS_KEY_ID`: The AWS access key id used to authenticate to AWS
-- `MAILROOM_AWS_SECRET_ACCESS_KEY` The AWS secret access key used to authenticate to AWS
+- `MAILROOM_AWS_ACCESS_KEY_ID`: the AWS access key id used to authenticate to AWS
+- `MAILROOM_AWS_SECRET_ACCESS_KEY` the AWS secret access key used to authenticate to AWS
+- `MAILROOM_S3_REGION`: the region for your S3 bucket (ex: `eu-west-1`)
+- `MAILROOM_S3_MEDIA_BUCKET`: the name of your S3 bucket (ex: `dl-mailroom`)
+- `MAILROOM_S3_MEDIA_PREFIX`: the prefix to use for filenames of attachments added to your bucket (ex: `attachments`)
 
-While still in beta, Mailroom will move to writing session data to S3 in 6.6, you can configure those buckets using:
+You can optionally use the S3 service for session out storage as well with:
 
+- `MAILROOM_SESSION_STORAGE`: where session output is stored which must be `db` (default) or `s3`
 - `MAILROOM_S3_SESSION_BUCKET`: The name of your S3 bucket (ex: `rp-sessions`)
 - `MAILROOM_S3_SESSION_PREFIX`: The prefix to use for filenames of sessions added to your bucket (ex: ``)
+
+Flow engine configuration:
+
+- `MAILROOM_MAX_STEPS_PER_SPRINT`: the maximum number of steps allowed in a single engine sprint
+- `MAILROOM_MAX_RESUMES_PER_SESSION`: the maximum number of resumes allowed in an engine session
+- `MAILROOM_MAX_VALUE_LENGTH`: the maximum length in characters of contact field and run result values
 
 Recommended settings for error and performance monitoring:
 
@@ -80,5 +87,5 @@ $ createuser -P -E -s mailroom_test (set no password)
 To run all of the tests:
 
 ```
-go test ./... -p=1
+go test -p=1 ./...
 ```

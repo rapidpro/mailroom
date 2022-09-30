@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/test"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -75,57 +76,66 @@ func TestSearch(t *testing.T) {
 	}`, testdata.Cathy.ID)
 
 	tcs := []struct {
-		URL               string
-		Method            string
-		Body              string
-		ESResponse        string
-		ExpectedStatus    int
-		ExpectedError     string
-		ExpectedHits      []models.ContactID
-		ExpectedQuery     string
-		ExpectedFields    []string
-		ExpectedESRequest string
+		method               string
+		url                  string
+		body                 string
+		esResponse           string
+		expectedStatus       int
+		expectedError        string
+		expectedHits         []models.ContactID
+		expectedQuery        string
+		expectedAttributes   []string
+		expectedFields       []*assets.FieldReference
+		expectedSchemes      []string
+		expectedAllowAsGroup bool
+		expectedESRequest    string
 	}{
 		{
-			Method:         "GET",
-			URL:            "/mr/contact/search",
-			ExpectedStatus: 405,
-			ExpectedError:  "illegal method: GET",
+			method:         "GET",
+			url:            "/mr/contact/search",
+			expectedStatus: 405,
+			expectedError:  "illegal method: GET",
 		},
 		{
-			Method:         "POST",
-			URL:            "/mr/contact/search",
-			Body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
-			ExpectedStatus: 400,
-			ExpectedError:  "can't resolve 'birthday' to attribute, scheme or field",
+			method:         "POST",
+			url:            "/mr/contact/search",
+			body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
+			expectedStatus: 400,
+			expectedError:  "can't resolve 'birthday' to attribute, scheme or field",
 		},
 		{
-			Method:         "POST",
-			URL:            "/mr/contact/search",
-			Body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
-			ExpectedStatus: 400,
-			ExpectedError:  "can't convert 'tomorrow' to a number",
+			method:         "POST",
+			url:            "/mr/contact/search",
+			body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
+			expectedStatus: 400,
+			expectedError:  "can't convert 'tomorrow' to a number",
 		},
 		{
-			Method:         "POST",
-			URL:            "/mr/contact/search",
-			Body:           fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
-			ESResponse:     singleESResponse,
-			ExpectedStatus: 200,
-			ExpectedHits:   []models.ContactID{testdata.Cathy.ID},
-			ExpectedQuery:  `name ~ "Cathy"`,
-			ExpectedFields: []string{"name"},
+			method:               "POST",
+			url:                  "/mr/contact/search",
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
+			esResponse:           singleESResponse,
+			expectedStatus:       200,
+			expectedHits:         []models.ContactID{testdata.Cathy.ID},
+			expectedQuery:        `name ~ "Cathy"`,
+			expectedAttributes:   []string{"name"},
+			expectedFields:       []*assets.FieldReference{},
+			expectedSchemes:      []string{},
+			expectedAllowAsGroup: true,
 		},
 		{
-			Method:         "POST",
-			URL:            "/mr/contact/search",
-			Body:           fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s", "exclude_ids": [%d, %d]}`, testdata.AllContactsGroup.UUID, testdata.Bob.ID, testdata.George.ID),
-			ESResponse:     singleESResponse,
-			ExpectedStatus: 200,
-			ExpectedHits:   []models.ContactID{testdata.Cathy.ID},
-			ExpectedQuery:  `name ~ "Cathy"`,
-			ExpectedFields: []string{"name"},
-			ExpectedESRequest: `{
+			method:               "POST",
+			url:                  "/mr/contact/search",
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s", "exclude_ids": [%d, %d]}`, testdata.AllContactsGroup.UUID, testdata.Bob.ID, testdata.George.ID),
+			esResponse:           singleESResponse,
+			expectedStatus:       200,
+			expectedHits:         []models.ContactID{testdata.Cathy.ID},
+			expectedQuery:        `name ~ "Cathy"`,
+			expectedAttributes:   []string{"name"},
+			expectedFields:       []*assets.FieldReference{},
+			expectedSchemes:      []string{},
+			expectedAllowAsGroup: true,
+			expectedESRequest: `{
 				"_source": false,
 				"from": 0,
 				"query": {
@@ -176,42 +186,51 @@ func TestSearch(t *testing.T) {
 			}`,
 		},
 		{
-			Method:         "POST",
-			URL:            "/mr/contact/search",
-			Body:           fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
-			ESResponse:     singleESResponse,
-			ExpectedStatus: 200,
-			ExpectedHits:   []models.ContactID{testdata.Cathy.ID},
-			ExpectedQuery:  `age = 10 AND gender = "M"`,
-			ExpectedFields: []string{"age", "gender"},
+			method:             "POST",
+			url:                "/mr/contact/search",
+			body:               fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
+			esResponse:         singleESResponse,
+			expectedStatus:     200,
+			expectedHits:       []models.ContactID{testdata.Cathy.ID},
+			expectedQuery:      `age = 10 AND gender = "M"`,
+			expectedAttributes: []string{},
+			expectedFields: []*assets.FieldReference{
+				assets.NewFieldReference("age", "Age"),
+				assets.NewFieldReference("gender", "Gender"),
+			},
+			expectedSchemes:      []string{},
+			expectedAllowAsGroup: true,
 		},
 		{
-			Method:         "POST",
-			URL:            "/mr/contact/search",
-			Body:           fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
-			ESResponse:     singleESResponse,
-			ExpectedStatus: 200,
-			ExpectedHits:   []models.ContactID{testdata.Cathy.ID},
-			ExpectedQuery:  ``,
-			ExpectedFields: []string{},
+			method:               "POST",
+			url:                  "/mr/contact/search",
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
+			esResponse:           singleESResponse,
+			expectedStatus:       200,
+			expectedHits:         []models.ContactID{testdata.Cathy.ID},
+			expectedQuery:        ``,
+			expectedAttributes:   []string{},
+			expectedFields:       []*assets.FieldReference{},
+			expectedSchemes:      []string{},
+			expectedAllowAsGroup: true,
 		},
 	}
 
 	for i, tc := range tcs {
 		var body io.Reader
-		es.NextResponse = tc.ESResponse
+		es.NextResponse = tc.esResponse
 
-		if tc.Body != "" {
-			body = bytes.NewReader([]byte(tc.Body))
+		if tc.body != "" {
+			body = bytes.NewReader([]byte(tc.body))
 		}
 
-		req, err := http.NewRequest(tc.Method, "http://localhost:8090"+tc.URL, body)
+		req, err := http.NewRequest(tc.method, "http://localhost:8090"+tc.url, body)
 		assert.NoError(t, err, "%d: error creating request", i)
 
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err, "%d: error making request", i)
 
-		assert.Equal(t, tc.ExpectedStatus, resp.StatusCode, "%d: unexpected status", i)
+		assert.Equal(t, tc.expectedStatus, resp.StatusCode, "%d: unexpected status", i)
 
 		content, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err, "%d: error reading body", i)
@@ -221,18 +240,24 @@ func TestSearch(t *testing.T) {
 			r := &searchResponse{}
 			err = json.Unmarshal(content, r)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.ExpectedHits, r.ContactIDs)
-			assert.Equal(t, tc.ExpectedQuery, r.Query)
-			assert.Equal(t, tc.ExpectedFields, r.Fields)
+			assert.Equal(t, tc.expectedHits, r.ContactIDs)
+			assert.Equal(t, tc.expectedQuery, r.Query)
 
-			if tc.ExpectedESRequest != "" {
-				test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(es.LastBody), "elastic request mismatch")
+			if len(tc.expectedAttributes) > 0 || len(tc.expectedFields) > 0 || len(tc.expectedSchemes) > 0 {
+				assert.Equal(t, tc.expectedAttributes, r.Metadata.Attributes)
+				assert.Equal(t, tc.expectedFields, r.Metadata.Fields)
+				assert.Equal(t, tc.expectedSchemes, r.Metadata.Schemes)
+				assert.Equal(t, tc.expectedAllowAsGroup, r.Metadata.AllowAsGroup)
+			}
+
+			if tc.expectedESRequest != "" {
+				test.AssertEqualJSON(t, []byte(tc.expectedESRequest), []byte(es.LastRequestBody), "elastic request mismatch")
 			}
 		} else {
 			r := &web.ErrorResponse{}
 			err = json.Unmarshal(content, r)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.ExpectedError, r.Error)
+			assert.Equal(t, tc.expectedError, r.Error)
 		}
 	}
 }

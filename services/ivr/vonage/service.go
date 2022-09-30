@@ -19,11 +19,11 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/ivr"
@@ -389,7 +389,7 @@ func (s *service) RequestCall(number urns.URN, resumeURL string, statusURL strin
 	}
 
 	if trace.Response.StatusCode != http.StatusCreated {
-		return ivr.NilCallID, trace, errors.Errorf("received non 200 status for call start: %d", trace.Response.StatusCode)
+		return ivr.NilCallID, trace, errors.Errorf("received non 201 status for call start: %d", trace.Response.StatusCode)
 	}
 
 	// parse out our call sid
@@ -603,7 +603,7 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// get our response
-	response, err := s.responseForSprint(ctx, rt.RP, channel, conn, resumeURL, session.Wait(), sprint.Events())
+	response, err := s.responseForSprint(ctx, rt.RP, channel, conn, resumeURL, sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -653,11 +653,7 @@ func (s *service) MakeEmptyResponseBody(msg string) []byte {
 }
 
 func (s *service) makeRequest(method string, sendURL string, body interface{}) (*httpx.Trace, error) {
-	bb, err := json.Marshal(body)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error json encoding request")
-	}
-
+	bb := jsonx.MustMarshal(body)
 	req, _ := http.NewRequest(method, sendURL, bytes.NewReader(bb))
 	token, err := s.generateToken()
 	if err != nil {
@@ -731,14 +727,22 @@ func (s *service) generateToken() (string, error) {
 
 // NCCO building utilities
 
-func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel *models.Channel, conn *models.ChannelConnection, resumeURL string, es []flows.Event) (string, error) {
 	actions := make([]interface{}, 0, 1)
 	waitActions := make([]interface{}, 0, 1)
 
-	if w != nil {
-		switch wait := w.(type) {
-		case *waits.ActivatedMsgWait:
-			switch hint := wait.Hint().(type) {
+	var waitEvent flows.Event
+	for _, e := range es {
+		switch event := e.(type) {
+		case *events.MsgWaitEvent, *events.DialWaitEvent:
+			waitEvent = event
+		}
+	}
+
+	if waitEvent != nil {
+		switch wait := waitEvent.(type) {
+		case *events.MsgWaitEvent:
+			switch hint := wait.Hint.(type) {
 			case *hints.DigitsHint:
 				eventURL := resumeURL + "&wait_type=gather"
 				eventURL = eventURL + "&sig=" + url.QueryEscape(s.calculateSignature(eventURL))
@@ -794,10 +798,10 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 				waitActions = append(waitActions, input)
 
 			default:
-				return "", errors.Errorf("unable to use wait in IVR call, unknow hint type: %s", wait.Hint().Type())
+				return "", errors.Errorf("unable to use wait in IVR call, unknow hint type: %s", wait.Hint.Type())
 			}
 
-		case *waits.ActivatedDialWait:
+		case *events.DialWaitEvent:
 			// Vonage handles forwards a bit differently. We have to create a new call to the forwarded number, then
 			// join the current call with the call we are starting.
 			//
@@ -814,12 +818,9 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 
 			// create our outbound call with the same conversation UUID
 			call := CallRequest{}
-			call.To = append(call.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN().Path(), "+")})
+			call.To = append(call.To, Phone{Type: "phone", Number: strings.TrimLeft(wait.URN.Path(), "+")})
 			call.From = Phone{Type: "phone", Number: strings.TrimLeft(channel.Address(), "+")}
 			call.NCCO = append(call.NCCO, NCCO{Action: "conversation", Name: conversationUUID})
-			if wait.TimeoutSeconds() != nil {
-				call.RingingTimer = *wait.TimeoutSeconds()
-			}
 
 			trace, err := s.makeRequest(http.MethodPost, s.callURL, call)
 			logrus.WithField("trace", trace).Debug("initiated new call for transfer")
@@ -849,9 +850,6 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 				return "", errors.Wrapf(err, "error inserting transfer ID into redis")
 			}
 			logrus.WithField("transferUUID", transferUUID).WithField("callID", conn.ExternalID()).WithField("redisKey", redisKey).WithField("redisValue", redisValue).Debug("saved away call id")
-
-		default:
-			return "", errors.Errorf("unable to use wait in IVR call, unknow wait type: %s", w)
 		}
 	}
 

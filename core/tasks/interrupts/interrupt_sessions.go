@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/lib/pq"
 	"github.com/pkg/errors"
 )
 
@@ -27,37 +26,6 @@ type InterruptSessionsTask struct {
 	FlowIDs    []models.FlowID    `json:"flow_ids,omitempty"`
 }
 
-const activeSessionIDsForChannelsSQL = `
-SELECT 
-	fs.id
-FROM 
-	flows_flowsession fs
-	JOIN channels_channelconnection cc ON fs.connection_id = cc.id
-WHERE
-	fs.status = 'W' AND
-	cc.channel_id = ANY($1);
-`
-
-const activeSessionIDsForContactsSQL = `
-SELECT 
-	id
-FROM 
-	flows_flowsession fs
-WHERE
-	fs.status = 'W' AND
-	fs.contact_id = ANY($1);
-`
-
-const activeSessionIDsForFlowsSQL = `
-SELECT 
-	id
-FROM 
-	flows_flowsession fs
-WHERE
-	fs.status = 'W' AND
-	fs.current_flow_id = ANY($1);
-`
-
 // Timeout is the maximum amount of time the task can run for
 func (t *InterruptSessionsTask) Timeout() time.Duration {
 	return time.Hour
@@ -66,62 +34,26 @@ func (t *InterruptSessionsTask) Timeout() time.Duration {
 func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	db := rt.DB
 
-	sessionIDs := make(map[models.SessionID]bool)
-	for _, sid := range t.SessionIDs {
-		sessionIDs[sid] = true
-	}
-
-	// if we have ivr channel ids, explode those to session ids
-	if len(t.ChannelIDs) > 0 {
-		channelSessionIDs := make([]models.SessionID, 0, len(t.ChannelIDs))
-
-		err := db.SelectContext(ctx, &channelSessionIDs, activeSessionIDsForChannelsSQL, pq.Array(t.ChannelIDs))
-		if err != nil {
-			return errors.Wrapf(err, "error selecting sessions for channels")
-		}
-
-		for _, sid := range channelSessionIDs {
-			sessionIDs[sid] = true
-		}
-	}
-
-	// if we have contact ids, explode those to session ids
 	if len(t.ContactIDs) > 0 {
-		contactSessionIDs := make([]models.SessionID, 0, len(t.ContactIDs))
-
-		err := db.SelectContext(ctx, &contactSessionIDs, activeSessionIDsForContactsSQL, pq.Array(t.ContactIDs))
-		if err != nil {
-			return errors.Wrapf(err, "error selecting sessions for contacts")
-		}
-
-		for _, sid := range contactSessionIDs {
-			sessionIDs[sid] = true
+		if err := models.InterruptSessionsForContacts(ctx, db, t.ContactIDs); err != nil {
+			return err
 		}
 	}
-
-	// if we have flow ids, explode those to session ids
+	if len(t.ChannelIDs) > 0 {
+		if err := models.InterruptSessionsForChannels(ctx, db, t.ChannelIDs); err != nil {
+			return err
+		}
+	}
 	if len(t.FlowIDs) > 0 {
-		flowSessionIDs := make([]models.SessionID, 0, len(t.FlowIDs))
-
-		err := db.SelectContext(ctx, &flowSessionIDs, activeSessionIDsForFlowsSQL, pq.Array(t.FlowIDs))
-		if err != nil {
-			return errors.Wrapf(err, "error selecting sessions for flows")
+		if err := models.InterruptSessionsForFlows(ctx, db, t.FlowIDs); err != nil {
+			return err
 		}
-
-		for _, sid := range flowSessionIDs {
-			sessionIDs[sid] = true
+	}
+	if len(t.SessionIDs) > 0 {
+		if err := models.ExitSessions(ctx, db, t.SessionIDs, models.SessionStatusInterrupted); err != nil {
+			return errors.Wrapf(err, "error interrupting sessions")
 		}
 	}
 
-	uniqueSessionIDs := make([]models.SessionID, 0, len(sessionIDs))
-	for id := range sessionIDs {
-		uniqueSessionIDs = append(uniqueSessionIDs, id)
-	}
-
-	// interrupt all sessions and their associated runs
-	err := models.ExitSessions(ctx, db, uniqueSessionIDs, models.ExitInterrupted)
-	if err != nil {
-		return errors.Wrapf(err, "error interrupting sessions")
-	}
 	return nil
 }

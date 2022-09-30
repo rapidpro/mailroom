@@ -6,12 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/utils/dbutil"
-
-	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -105,7 +104,7 @@ func loadTriggers(ctx context.Context, db Queryer, orgID OrgID) ([]*Trigger, err
 	triggers := make([]*Trigger, 0, 10)
 	for rows.Next() {
 		trigger := &Trigger{}
-		err = dbutil.ReadJSONRow(rows, &trigger.t)
+		err = dbutil.ScanJSON(rows, &trigger.t)
 		if err != nil {
 			return nil, errors.Wrap(err, "error scanning label row")
 		}

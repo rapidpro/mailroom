@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/uuids"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -42,8 +43,8 @@ func TestStarts(t *testing.T) {
 	// insert a flow run for one of our contacts
 	// TODO: can be replaced with a normal flow start of another flow once we support flows with waits
 	db.MustExec(
-		`INSERT INTO flows_flowrun(uuid, status, is_active, created_on, modified_on, responded, contact_id, flow_id, org_id)
-		                    VALUES($1, 'W', TRUE, now(), now(), FALSE, $2, $3, 1);`, uuids.New(), testdata.George.ID, testdata.Favorites.ID)
+		`INSERT INTO flows_flowrun(uuid, status, created_on, modified_on, responded, contact_id, flow_id, org_id)
+		                    VALUES($1, 'W', now(), now(), FALSE, $2, $3, 1);`, uuids.New(), testdata.George.ID, testdata.Favorites.ID)
 
 	tcs := []struct {
 		label                string
@@ -54,8 +55,8 @@ func TestStarts(t *testing.T) {
 		createContact        bool
 		query                string
 		queryResponse        string
-		restartParticipants  models.RestartParticipants
-		includeActive        models.IncludeActive
+		restartParticipants  bool
+		includeActive        bool
 		queue                string
 		expectedContactCount int
 		expectedBatchCount   int
@@ -305,20 +306,20 @@ func TestStarts(t *testing.T) {
 		assert.Equal(t, tc.expectedBatchCount, count, "unexpected batch count in '%s'", tc.label)
 
 		// assert our count of total flow runs created
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1 AND start_id = $2`, tc.flowID, start.ID()).Returns(tc.expectedTotalCount, "unexpected total run count in '%s'", tc.label)
+		assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1 AND start_id = $2`, tc.flowID, start.ID()).Returns(tc.expectedTotalCount, "unexpected total run count in '%s'", tc.label)
 
 		// assert final status
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowstart where status = $2 AND id = $1`, start.ID(), tc.expectedStatus).Returns(1, "status mismatch in '%s'", tc.label)
+		assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart where status = $2 AND id = $1`, start.ID(), tc.expectedStatus).Returns(1, "status mismatch in '%s'", tc.label)
 
 		// assert final contact count
 		if tc.expectedStatus != models.StartStatusFailed {
-			testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowstart where contact_count = $2 AND id = $1`,
+			assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart where contact_count = $2 AND id = $1`,
 				[]interface{}{start.ID(), tc.expectedContactCount}, 1, "contact count mismatch in '%s'", tc.label)
 		}
 
 		// assert count of active runs by flow
 		for flowID, activeRuns := range tc.expectedActiveRuns {
-			testsuite.AssertQuery(t, db, `SELECT count(*) FROM flows_flowrun WHERE status = 'W' AND flow_id = $1`, flowID).Returns(activeRuns, "active runs mismatch for flow #%d in '%s'", flowID, tc.label)
+			assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE status = 'W' AND flow_id = $1`, flowID).Returns(activeRuns, "active runs mismatch for flow #%d in '%s'", flowID, tc.label)
 		}
 	}
 }

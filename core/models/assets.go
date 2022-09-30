@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -478,7 +479,7 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 	return a.fieldsByKey[key]
 }
 
-// CloneForSimulation clones our org assets for simulation
+// CloneForSimulation clones our org assets for simulation and returns a new org assets with the given flow definitions overrided
 func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
 	clone, err := NewOrgAssets(context.Background(), a.rt, a.OrgID(), a, RefreshFlows)
@@ -488,7 +489,7 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime,
 
 	for flowUUID, newDef := range newDefs {
 		// get the original flow
-		flowAsset, err := a.Flow(flowUUID)
+		flowAsset, err := a.FlowByUUID(flowUUID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to find flow with UUID '%s'", flowUUID)
 		}
@@ -512,52 +513,66 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime,
 	return clone, err
 }
 
-// Flow returns the flow with the passed in UUID
-func (a *OrgAssets) Flow(flowUUID assets.FlowUUID) (assets.Flow, error) {
+// FlowByUUID returns the flow with the passed in UUID
+func (a *OrgAssets) FlowByUUID(flowUUID assets.FlowUUID) (assets.Flow, error) {
+	return a.loadFlow(
+		func() assets.Flow {
+			return a.flowByUUID[flowUUID]
+		},
+		func(ctx context.Context) (*Flow, error) {
+			return LoadFlowByUUID(ctx, a.rt.ReadonlyDB, a.orgID, flowUUID)
+		},
+	)
+}
+
+// FlowByName returns the flow with the passed in name
+func (a *OrgAssets) FlowByName(name string) (assets.Flow, error) {
+	return a.loadFlow(
+		func() assets.Flow {
+			for _, f := range a.flowByUUID {
+				if strings.EqualFold(f.Name(), name) {
+					return f
+				}
+			}
+			return nil
+		},
+		func(ctx context.Context) (*Flow, error) {
+			return LoadFlowByName(ctx, a.rt.ReadonlyDB, a.orgID, name)
+		},
+	)
+}
+
+// FlowByID returns the flow with the passed in ID (unlike FlowByUUID, FlowByName returns *Flow rather than assets.Flow)
+func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
+	asset, err := a.loadFlow(
+		func() assets.Flow {
+			return a.flowByID[flowID]
+		},
+		func(ctx context.Context) (*Flow, error) {
+			return LoadFlowByID(ctx, a.rt.ReadonlyDB, a.orgID, flowID)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return asset.(*Flow), nil
+}
+
+func (a *OrgAssets) loadFlow(fromCache func() assets.Flow, fromDB func(context.Context) (*Flow, error)) (assets.Flow, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	a.flowCacheLock.RLock()
-	flow, found := a.flowByUUID[flowUUID]
+	flow := fromCache()
 	a.flowCacheLock.RUnlock()
 
-	if found {
+	if flow != nil {
 		return flow, nil
 	}
 
-	dbFlow, err := LoadFlowByUUID(ctx, a.rt.DB, a.orgID, flowUUID)
+	dbFlow, err := fromDB(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error loading flow: %s", flowUUID)
-	}
-
-	if dbFlow == nil {
-		return nil, ErrNotFound
-	}
-
-	a.flowCacheLock.Lock()
-	a.flowByID[dbFlow.ID()] = dbFlow
-	a.flowByUUID[dbFlow.UUID()] = dbFlow
-	a.flowCacheLock.Unlock()
-
-	return dbFlow, nil
-}
-
-// FlowByID returns the flow with the passed in ID
-func (a *OrgAssets) FlowByID(flowID FlowID) (*Flow, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	a.flowCacheLock.RLock()
-	flow, found := a.flowByID[flowID]
-	a.flowCacheLock.RUnlock()
-
-	if found {
-		return flow.(*Flow), nil
-	}
-
-	dbFlow, err := LoadFlowByID(ctx, a.rt.DB, a.orgID, flowID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error loading flow: %d", flowID)
+		return nil, errors.Wrap(err, "error loading flow from db")
 	}
 
 	if dbFlow == nil {

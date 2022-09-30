@@ -54,7 +54,7 @@ func TestSurveyor(t *testing.T) {
 		}},
 		// new contact is created (our test db already has a bob, he should be unaffected)
 		{"contact_surveyor_submission.json", "sesame", 201, `"status": "C"`, []Assertion{
-			{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id AND is_active = FALSE`, 1},
+			{`SELECT count(*) FROM flows_flowrun WHERE flow_id = :flow_id AND contact_id = :contact_id AND status = 'C'`, 1},
 			{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND org_id = 1`, 2},
 			{`SELECT count(*) FROM contacts_contact WHERE uuid = 'bdfe862c-84f8-422e-8fdc-ebfaaae0697a'`, 0},
 			{`SELECT count(*) FROM contacts_contact WHERE name = 'Bob' AND fields -> :age_field_uuid = jsonb_build_object('text', '37', 'number', 37)`, 1},
