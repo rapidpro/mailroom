@@ -383,7 +383,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		return nil, errors.Wrapf(err, "error loading flow for trigger")
 	}
 
-	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
+	// if this is an IVR flow and we don't have a call, trigger that asynchronously
 	if flow.FlowType() == models.FlowTypeVoice && call == nil {
 		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
@@ -429,7 +429,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 	// if we have a channel connection we set the connection on the session before our event hooks fire
 	// so that IVR messages can be created with the right connection reference
 	var hook models.SessionCommitHook
-	if call != nil {
+	if flow.FlowType() == models.FlowTypeVoice && call != nil {
 		hook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
 			for _, session := range sessions {
 				session.SetCall(call)

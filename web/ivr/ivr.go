@@ -140,8 +140,13 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 		return call, svc.WriteErrorResponse(w, errors.Wrapf(err, "error handling incoming call"))
 	}
 
-	// we got a session back so we have an active call trigger
+	// if we matched with an incoming-call trigger, we'll have a session
 	if session != nil {
+		// that might have started a non-voice flow, in which case we need to hangup this call
+		if session.SessionType() != models.FlowTypeVoice {
+			return call, svc.WriteHangupResponse(w)
+		}
+
 		// build our resume URL
 		resumeURL := buildResumeURL(rt.Config, ch, call, urn)
 
