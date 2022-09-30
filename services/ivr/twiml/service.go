@@ -376,9 +376,9 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	return nil
 }
 
-func (s *service) WriteHangupResponse(w http.ResponseWriter) error {
+func (s *service) WriteRejectResponse(w http.ResponseWriter) error {
 	return s.writeResponse(w, &Response{
-		Commands: []any{Hangup{}},
+		Commands: []any{Reject{}},
 	})
 }
 
