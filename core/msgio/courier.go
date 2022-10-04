@@ -116,3 +116,24 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 	// any remaining in our batch, queue it up
 	return commitBatch()
 }
+
+var clearChannelQueueScript = redis.NewScript(3, `
+-- KEYS: [QueueType, QueueName, TPS]
+local queueType, queueName, tps = KEYS[1], KEYS[2], tonumber(KEYS[3])
+
+-- first construct the base key for this queue from the type + name + tps, e.g. "msgs:0a77a158-1dcb-4c06-9aee-e15bdf64653e|10"
+local queueKey = queueType .. ":" .. queueName .. "|" .. tps
+
+-- clear the sorted sets for the key
+redis.call("ZREMRANGEBYSCORE", queueKey .. "/1", "-inf", "inf")
+redis.call("ZREMRANGEBYSCORE", queueKey .. "/0", "-inf", "inf")
+
+-- reset queue to zero
+redis.call("ZADD", queueType .. ":active", 0, queueKey)
+
+`)
+
+func ClearChannelCourierQueue(rc redis.Conn, ch *models.Channel) error {
+	_, err := clearChannelQueueScript.Do(rc, "msgs", ch.UUID(), ch.TPS())
+	return err
+}
