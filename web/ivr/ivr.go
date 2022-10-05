@@ -289,7 +289,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets
 		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "error while preprocessing status"))
 	}
 	if len(body) > 0 {
-		contentType := httpx.DetectContentType(body)
+		contentType, _ := httpx.DetectContentType(body)
 		w.Header().Set("Content-Type", contentType)
 		_, err := w.Write(body)
 		return nil, err
