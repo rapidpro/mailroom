@@ -539,45 +539,6 @@ func GetMessagesForRetry(ctx context.Context, db Queryer) ([]*Msg, error) {
 	return loadMessages(ctx, db, loadMessagesForRetrySQL)
 }
 
-var loadMessagesForInterruptChannelSQL = `
-SELECT
-	id,
-	broadcast_id,
-	uuid,
-	text,
-	created_on,
-	direction,
-	status,
-	visibility,
-	msg_count,
-	error_count,
-	next_attempt,
-	failed_reason,
-	coalesce(high_priority, FALSE) as high_priority,
-	external_id,
-	attachments,
-	metadata,
-	channel_id,
-	contact_id,
-	contact_urn_id,
-	org_id,
-	topup_id
-FROM
-	msgs_msg
-WHERE
-	org_id = $1 AND
-	direction = 'O' AND
-	channel_id = $2 AND
-	status = ANY($3)
-ORDER BY
-	id ASC
-`
-
-func GetChannelMessagesToInterrupt(ctx context.Context, db Queryer, orgID OrgID, channelID ChannelID) ([]*Msg, error) {
-	statuses := []MsgStatus{MsgStatusPending, MsgStatusErrored, MsgStatusQueued}
-	return loadMessages(ctx, db, loadMessagesForInterruptChannelSQL, orgID, channelID, pq.Array(statuses))
-}
-
 func loadMessages(ctx context.Context, db Queryer, sql string, params ...interface{}) ([]*Msg, error) {
 	rows, err := db.QueryxContext(ctx, sql, params...)
 	if err != nil {
@@ -1312,36 +1273,31 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 	return resent, nil
 }
 
-const sqlUpdateMsgStatusFailed = `
-UPDATE msgs_msg m
-   SET status = 'F', modified_on = NOW()
- WHERE id = ANY($1)`
+const sqlFailChannelMessages = `
+WITH rows AS (
+	SELECT id FROM msgs_msg
+	WHERE org_id = $1 AND direction = 'O' AND channel_id = $2 AND status = ANY($3) LIMIT 1000
+)
+UPDATE msgs_msg SET status = 'F', modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
 
-// FailMessages prepares messages for failing and marking them as FAILED
-func FailMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAssets, msgs []*Msg) ([]*Msg, error) {
-
-	// for the bulk db updates
-	fails := make([]MsgID, 0, len(msgs))
-	failedMsgs := make([]*Msg, 0, len(msgs))
-
-	for _, msg := range msgs {
-		if msg.m.Status == MsgStatusQueued || msg.m.Status == MsgStatusPending || msg.m.Status == MsgStatusErrored {
-			msg.m.Status = MsgStatusFailed
-			fails = append(fails, MsgID(msg.m.ID))
-			failedMsgs = append(failedMsgs, msg)
-		}
+func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID ChannelID) error {
+	if channelID == NilChannelID {
+		return nil
 	}
 
-	for _, idBatch := range chunkSlice(fails, 1000) {
+	statuses := []MsgStatus{MsgStatusPending, MsgStatusErrored, MsgStatusQueued}
+	for {
 		// and update the messages as FAILED
-		_, err := db.ExecContext(ctx, sqlUpdateMsgStatusFailed, pq.Array(idBatch))
+		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID, pq.Array(statuses))
 		if err != nil {
-			return nil, errors.Wrapf(err, "error failing messages")
+			return err
+		}
+		rows, _ := res.RowsAffected()
+		if rows == 0 {
+			break
 		}
 	}
-
-	return failedMsgs, nil
-
+	return nil
 }
 
 // MarkBroadcastSent marks the passed in broadcast as sent

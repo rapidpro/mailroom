@@ -125,8 +125,8 @@ local queueType, queueName, tps = KEYS[1], KEYS[2], tonumber(KEYS[3])
 local queueKey = queueType .. ":" .. queueName .. "|" .. tps
 
 -- clear the sorted sets for the key
-redis.call("ZREMRANGEBYSCORE", queueKey .. "/1", "-inf", "inf")
-redis.call("ZREMRANGEBYSCORE", queueKey .. "/0", "-inf", "inf")
+redis.call("DEL", queueKey .. "/1")
+redis.call("DEL", queueKey .. "/0")
 
 -- reset queue to zero
 redis.call("ZADD", queueType .. ":active", 0, queueKey)

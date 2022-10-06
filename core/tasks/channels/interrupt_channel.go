@@ -28,11 +28,6 @@ func (t *InterruptChannelTask) Perform(ctx context.Context, rt *runtime.Runtime,
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	oa, err := models.GetOrgAssets(ctx, rt, orgID)
-	if err != nil {
-		return err
-	}
-
 	channelIDs := []models.ChannelID{t.ChannelID}
 
 	channels, err := models.GetChannelsByID(ctx, db, channelIDs)
@@ -46,17 +41,12 @@ func (t *InterruptChannelTask) Perform(ctx context.Context, rt *runtime.Runtime,
 		return err
 	}
 
-	msgs, err := models.GetChannelMessagesToInterrupt(ctx, db, orgID, t.ChannelID)
-	if err != nil {
-		return err
-	}
-
 	err = msgio.ClearChannelCourierQueue(rc, channel)
 	if err != nil {
 		return err
 	}
 
-	_, err = models.FailMessages(ctx, db, rt.RP, oa, msgs)
+	err = models.FailChannelMessages(ctx, db, orgID, t.ChannelID)
 
 	return err
 

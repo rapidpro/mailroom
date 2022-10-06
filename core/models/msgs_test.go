@@ -431,29 +431,6 @@ func TestGetMessagesByID(t *testing.T) {
 	assert.Equal(t, "in 1", msgs[0].Text())
 }
 
-func TestGetChannelMessagesForInterrupt(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
-
-	defer testsuite.Reset(testsuite.ResetData)
-
-	testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "in 1", models.MsgStatusHandled)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"}, models.MsgStatusSent, false)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 2", nil, models.MsgStatusSent, false)
-	testdata.InsertOutgoingMsg(db, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "out 3", nil, models.MsgStatusSent, false)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 3", nil, models.MsgStatusErrored, false)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 4", nil, models.MsgStatusPending, false)
-	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 5", nil, models.MsgStatusQueued, false)
-
-	msgs, err := models.GetChannelMessagesToInterrupt(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID)
-
-	// should only return the outgoing messages for this org
-	require.NoError(t, err)
-	assert.Equal(t, 3, len(msgs))
-	assert.Equal(t, "out 3", msgs[0].Text())
-	assert.Equal(t, "out 4", msgs[1].Text())
-	assert.Equal(t, "out 5", msgs[2].Text())
-}
-
 func TestResendMessages(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 
@@ -512,35 +489,29 @@ func TestResendMessages(t *testing.T) {
 }
 
 func TestFailMessages(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
+	ctx, _, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
-
-	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
-	require.NoError(t, err)
 
 	out1 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusPending, false)
 	out2 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "hi", nil, models.MsgStatusErrored, false)
 	out3 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusFailed, false)
 	out4 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hi", nil, models.MsgStatusQueued, false)
-	out5 := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.George, "hi", nil, models.MsgStatusQueued, false)
+	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.George, "hi", nil, models.MsgStatusQueued, false)
 
 	ids := []models.MsgID{models.MsgID(out1.ID()), models.MsgID(out2.ID()), models.MsgID(out3.ID()), models.MsgID(out4.ID())}
-
-	msgs, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, ids)
-	require.NoError(t, err)
+	println(ids)
 
 	now := dates.Now()
 
 	// fail the msgs
-	failedMsgs, err := models.FailMessages(ctx, db, rp, oa, msgs)
+	err := models.FailChannelMessages(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID)
 	require.NoError(t, err)
 
-	assert.Len(t, failedMsgs, 3)
+	//assert.Len(t, failedMsgs, 3)
 
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND modified_on > $1`, now).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND modified_on > $1`, now).Returns(4)
 	assertdb.Query(t, db, `SELECT status FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"status": "F"})
-	assertdb.Query(t, db, `SELECT status FROM msgs_msg WHERE id = $1`, out5.ID()).Columns(map[string]interface{}{"status": "Q"})
 
 }
 
