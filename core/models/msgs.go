@@ -632,7 +632,7 @@ RETURNING
 `
 
 // UpdateMessage updates a message after handling
-func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID, topup TopupID) error {
+func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID, topup TopupID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
 	_, err := tx.ExecContext(ctx,
 		`UPDATE 
 			msgs_msg 
@@ -641,10 +641,12 @@ func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status Ms
 			visibility = $3,
 			msg_type = $4,
 			flow_id = $5,
-			topup_id = $6
+			topup_id = $6,
+			attachments = $7,
+			log_uuids = array_cat(log_uuids, $8)
 		WHERE
 			id = $1`,
-		msgID, status, visibility, msgType, flow, topup)
+		msgID, status, visibility, msgType, flow, topup, pq.Array(attachments), pq.Array(logUUIDs))
 
 	if err != nil {
 		return errors.Wrapf(err, "error updating msg: %d", msgID)

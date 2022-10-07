@@ -1,17 +1,30 @@
 package msgio
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
-
-	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/mailroom/runtime"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+var courierHttpClient = &http.Client{
+	Timeout: 5 * time.Second,
+}
 
 const (
 	bulkPriority = 0
@@ -115,4 +128,41 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 
 	// any remaining in our batch, queue it up
 	return commitBatch()
+}
+
+// see https://github.com/nyaruka/courier/blob/main/attachments.go#L23
+type fetchAttachmentRequest struct {
+	ChannelType models.ChannelType `json:"channel_type"`
+	ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
+	URL         string             `json:"url"`
+}
+
+type fetchAttachmentResponse struct {
+	Attachment struct {
+		ContentType string `json:"content_type"`
+		URL         string `json:"url"`
+		Size        int    `json:"size"`
+	} `json:"attachment"`
+	LogUUID string `json:"log_uuid"`
+}
+
+func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channel, attURL string) (utils.Attachment, models.ChannelLogUUID, error) {
+	payload := jsonx.MustMarshal(&fetchAttachmentRequest{
+		ChannelType: ch.Type(),
+		ChannelUUID: ch.UUID(),
+		URL:         attURL,
+	})
+	req, _ := http.NewRequest("POST", fmt.Sprintf("https://%s/c/_fetch-attachment", rt.Config.Domain), bytes.NewReader(payload))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.Config.CourierAuthToken))
+
+	resp, err := httpx.DoTrace(courierHttpClient, req, nil, nil, -1)
+	if err != nil || resp.Response.StatusCode != 200 {
+		return "", "", errors.New("error calling courier endpoint")
+	}
+	fa := &fetchAttachmentResponse{}
+	if err := json.Unmarshal(resp.ResponseBody, fa); err != nil {
+		return "", "", errors.Wrap(err, "error unmarshaling courier response")
+	}
+
+	return utils.Attachment(fmt.Sprintf("%s:%s", fa.Attachment.ContentType, fa.Attachment.URL)), models.ChannelLogUUID(fa.LogUUID), nil
 }

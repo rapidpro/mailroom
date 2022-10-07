@@ -300,15 +300,14 @@ func TestMsgEvents(t *testing.T) {
 
 	makeMsgTask := func(org *testdata.Org, channel *testdata.Channel, contact *testdata.Contact, text string) *queue.Task {
 		return &queue.Task{Type: handler.MsgEventType, OrgID: int(org.ID), Task: jsonx.MustMarshal(&handler.MsgEvent{
-			ContactID:   contact.ID,
-			OrgID:       org.ID,
-			ChannelUUID: channel.UUID,
-			ChannelType: channel.Type,
-			MsgID:       dbMsg.ID(),
-			MsgUUID:     dbMsg.UUID(),
-			URN:         contact.URN,
-			URNID:       contact.URNID,
-			Text:        text,
+			ContactID: contact.ID,
+			OrgID:     org.ID,
+			ChannelID: channel.ID,
+			MsgID:     dbMsg.ID(),
+			MsgUUID:   dbMsg.UUID(),
+			URN:       contact.URN,
+			URNID:     contact.URNID,
+			Text:      text,
 		})}
 	}
 
@@ -645,15 +644,14 @@ func TestTimedEvents(t *testing.T) {
 				Type:  tc.EventType,
 				OrgID: int(tc.Org.ID),
 				Task: jsonx.MustMarshal(&handler.MsgEvent{
-					ContactID:   tc.Contact.ID,
-					OrgID:       tc.Org.ID,
-					ChannelUUID: tc.Channel.UUID,
-					ChannelType: tc.Channel.Type,
-					MsgID:       flows.MsgID(1),
-					MsgUUID:     flows.MsgUUID(uuids.New()),
-					URN:         tc.Contact.URN,
-					URNID:       tc.Contact.URNID,
-					Text:        tc.Message,
+					ContactID: tc.Contact.ID,
+					OrgID:     tc.Org.ID,
+					ChannelID: tc.Channel.ID,
+					MsgID:     flows.MsgID(1),
+					MsgUUID:   flows.MsgUUID(uuids.New()),
+					URN:       tc.Contact.URN,
+					URNID:     tc.Contact.URNID,
+					Text:      tc.Message,
 				}),
 			}
 		} else if tc.EventType == handler.ExpirationEventType {
