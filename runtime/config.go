@@ -67,11 +67,12 @@ type Config struct {
 	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
 	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 
-	InstanceName string `help:"the unique name of this instance used for analytics"`
-	LogLevel     string `help:"the logging level courier should use"`
-	UUIDSeed     int    `help:"seed to use for UUID generation in a testing environment"`
-	Version      string `help:"the version of this mailroom install"`
-	TimeoutTime  int    `help:"the amount of time to between every timeout queued"`
+	InstanceName        string `help:"the unique name of this instance used for analytics"`
+	LogLevel            string `help:"the logging level courier should use"`
+	UUIDSeed            int    `help:"seed to use for UUID generation in a testing environment"`
+	Version             string `help:"the version of this mailroom install"`
+	TimeoutTime         int    `help:"the amount of time to between every timeout queued"`
+	WenichatsServiceURL string `help:"wenichats external api url for ticketer service integration"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -118,11 +119,12 @@ func NewDefaultConfig() *Config {
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",
 
-		InstanceName: hostname,
-		LogLevel:     "error",
-		UUIDSeed:     0,
-		Version:      "Dev",
-		TimeoutTime:  15,
+		InstanceName:        hostname,
+		LogLevel:            "error",
+		UUIDSeed:            0,
+		Version:             "Dev",
+		TimeoutTime:         15,
+		WenichatsServiceURL: "https://chats-engine.dev.cloud.weni.ai/v1/external",
 	}
 }
 
