@@ -1,3 +1,7 @@
+1.4.0-mailroom-7.1.22
+----------
+ * Add wenichats ticketer integration
+
 1.3.3-mailroom-7.1.22
 ----------
  * Fix contacts msgs query
