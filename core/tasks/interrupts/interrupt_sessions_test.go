@@ -27,34 +27,34 @@ func TestInterrupts(t *testing.T) {
 	}
 
 	tcs := []struct {
-		ContactIDs    []models.ContactID
-		ChannelIDs    []models.ChannelID
-		FlowIDs       []models.FlowID
-		StatusesAfter [5]string
+		contactIDs       []models.ContactID
+		flowIDs          []models.FlowID
+		expectedStatuses [5]string
 	}{
 		{
-			nil, nil, nil,
-			[5]string{"W", "W", "W", "W", "I"},
+			contactIDs:       nil,
+			flowIDs:          nil,
+			expectedStatuses: [5]string{"W", "W", "W", "W", "I"},
 		},
 		{
-			[]models.ContactID{testdata.Cathy.ID}, nil, nil,
-			[5]string{"I", "W", "W", "W", "I"},
+			contactIDs:       []models.ContactID{testdata.Cathy.ID},
+			flowIDs:          nil,
+			expectedStatuses: [5]string{"I", "W", "W", "W", "I"},
 		},
 		{
-			[]models.ContactID{testdata.Cathy.ID, testdata.George.ID}, nil, nil,
-			[5]string{"I", "I", "W", "W", "I"},
+			contactIDs:       []models.ContactID{testdata.Cathy.ID, testdata.George.ID},
+			flowIDs:          nil,
+			expectedStatuses: [5]string{"I", "I", "W", "W", "I"},
 		},
 		{
-			nil, []models.ChannelID{testdata.TwilioChannel.ID}, nil,
-			[5]string{"W", "W", "I", "W", "I"},
+			contactIDs:       nil,
+			flowIDs:          []models.FlowID{testdata.PickANumber.ID},
+			expectedStatuses: [5]string{"W", "W", "W", "I", "I"},
 		},
 		{
-			nil, nil, []models.FlowID{testdata.PickANumber.ID},
-			[5]string{"W", "W", "W", "I", "I"},
-		},
-		{
-			[]models.ContactID{testdata.Cathy.ID, testdata.George.ID}, []models.ChannelID{testdata.TwilioChannel.ID}, []models.FlowID{testdata.PickANumber.ID},
-			[5]string{"I", "I", "I", "I", "I"},
+			contactIDs:       []models.ContactID{testdata.Cathy.ID, testdata.George.ID},
+			flowIDs:          []models.FlowID{testdata.PickANumber.ID},
+			expectedStatuses: [5]string{"I", "I", "W", "I", "I"},
 		},
 	}
 
@@ -79,9 +79,8 @@ func TestInterrupts(t *testing.T) {
 		// create our task
 		task := &InterruptSessionsTask{
 			SessionIDs: []models.SessionID{sessionIDs[4]},
-			ContactIDs: tc.ContactIDs,
-			ChannelIDs: tc.ChannelIDs,
-			FlowIDs:    tc.FlowIDs,
+			ContactIDs: tc.contactIDs,
+			FlowIDs:    tc.flowIDs,
 		}
 
 		// execute it
@@ -93,10 +92,10 @@ func TestInterrupts(t *testing.T) {
 			var status string
 			err := db.Get(&status, `SELECT status FROM flows_flowsession WHERE id = $1`, sID)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.StatusesAfter[j], status, "%d: status mismatch for session #%d", i, j)
+			assert.Equal(t, tc.expectedStatuses[j], status, "%d: status mismatch for session #%d", i, j)
 
 			// check for runs with a different status to the session
-			assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE session_id = $1 AND status != $2`, sID, tc.StatusesAfter[j]).
+			assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE session_id = $1 AND status != $2`, sID, tc.expectedStatuses[j]).
 				Returns(0, "%d: unexpected un-interrupted runs for session #%d", i, j)
 		}
 	}
