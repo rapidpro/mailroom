@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/pkg/errors"
 )
 
 // TypeInterruptChannel is the type of the interruption of a channel
@@ -32,23 +33,26 @@ func (t *InterruptChannelTask) Perform(ctx context.Context, rt *runtime.Runtime,
 
 	channels, err := models.GetChannelsByID(ctx, db, channelIDs)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error getting channels")
 	}
 
 	channel := channels[0]
 
 	if err := models.InterruptSessionsForChannels(ctx, db, channelIDs); err != nil {
-		return err
+		return errors.Wrapf(err, "error interrupting sessions")
 	}
 
 	err = msgio.ClearChannelCourierQueue(rc, channel)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error clearing courier queues")
 	}
 
 	err = models.FailChannelMessages(ctx, db, orgID, t.ChannelID)
+	if err != nil {
+		return errors.Wrapf(err, "error failing channel messages")
+	}
 
-	return err
+	return nil
 
 }
 
