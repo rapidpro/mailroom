@@ -958,23 +958,19 @@ func InterruptSessionsForContactsTx(ctx context.Context, tx *sqlx.Tx, contactIDs
 	return errors.Wrapf(exitSessionBatch(ctx, tx, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
 }
 
-const sqlWaitingSessionIDsForChannels = `
+const sqlWaitingSessionIDsForChannel = `
 SELECT fs.id
   FROM flows_flowsession fs
   JOIN ivr_call cc ON fs.call_id = cc.id
- WHERE fs.status = 'W' AND cc.channel_id = ANY($1);`
+ WHERE fs.status = 'W' AND cc.channel_id = $1;`
 
-// InterruptSessionsForChannels interrupts any waiting sessions with calls on the given channels
-func InterruptSessionsForChannels(ctx context.Context, db *sqlx.DB, channelIDs []ChannelID) error {
-	if len(channelIDs) == 0 {
-		return nil
-	}
+// InterruptSessionsForChannel interrupts any waiting sessions with calls on the given channel
+func InterruptSessionsForChannel(ctx context.Context, db *sqlx.DB, channelID ChannelID) error {
+	sessionIDs := make([]SessionID, 0, 10)
 
-	sessionIDs := make([]SessionID, 0, len(channelIDs))
-
-	err := db.SelectContext(ctx, &sessionIDs, sqlWaitingSessionIDsForChannels, pq.Array(channelIDs))
+	err := db.SelectContext(ctx, &sessionIDs, sqlWaitingSessionIDsForChannel, channelID)
 	if err != nil {
-		return errors.Wrapf(err, "error selecting waiting sessions for channels")
+		return errors.Wrapf(err, "error selecting waiting sessions for channel %d", channelID)
 	}
 
 	return errors.Wrapf(ExitSessions(ctx, db, sessionIDs, SessionStatusInterrupted), "error exiting sessions")
