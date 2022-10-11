@@ -1,3 +1,8 @@
+v7.5.17
+----------
+ * Update to latest goflow
+ * Add interrupt channel task
+
 v7.5.16
 ----------
  * If starting a message flow from an ivr trigger, send reject response

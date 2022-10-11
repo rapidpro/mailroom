@@ -88,14 +88,14 @@ func TestClearChannelCourierQueue(t *testing.T) {
 	})
 
 	twilioChannel := oa.ChannelByID(testdata.TwilioChannel.ID)
-	msgio.ClearChannelCourierQueue(rc, twilioChannel)
+	msgio.ClearCourierQueues(rc, twilioChannel)
 
 	testsuite.AssertCourierQueues(t, map[string][]int{
 		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/0": {1}, // vonage, bulk priority
 	})
 
 	vonageChannel := oa.ChannelByID(testdata.VonageChannel.ID)
-	msgio.ClearChannelCourierQueue(rc, vonageChannel)
+	msgio.ClearCourierQueues(rc, vonageChannel)
 	testsuite.AssertCourierQueues(t, map[string][]int{})
 
 }
