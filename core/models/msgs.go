@@ -527,14 +527,18 @@ FROM
 	msgs_msg m
 INNER JOIN 
 	contacts_contacturn u ON u.id = m.contact_urn_id
+INNER JOIN 
+	channels_channel c ON c.id = m.channel_id
 WHERE
 	m.direction = 'O' AND
 	m.status = 'E' AND
-	m.next_attempt <= NOW()
+	m.next_attempt <= NOW() AND
+	c.is_active = TRUE
 ORDER BY
     m.next_attempt ASC, m.created_on ASC
 LIMIT 5000`
 
+// GetMessagesForRetry gets errored outgoing messages scheduled for retry, with an active channel
 func GetMessagesForRetry(ctx context.Context, db Queryer) ([]*Msg, error) {
 	return loadMessages(ctx, db, loadMessagesForRetrySQL)
 }
@@ -1276,19 +1280,15 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 const sqlFailChannelMessages = `
 WITH rows AS (
 	SELECT id FROM msgs_msg
-	WHERE org_id = $1 AND direction = 'O' AND channel_id = $2 AND status = ANY($3) LIMIT 1000
+	WHERE org_id = $1 AND direction = 'O' AND channel_id = $2 AND status IN ('P', 'Q', 'E') 
+	LIMIT 1000
 )
 UPDATE msgs_msg SET status = 'F', modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
 
 func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID ChannelID) error {
-	if channelID == NilChannelID {
-		return nil
-	}
-
-	statuses := []MsgStatus{MsgStatusPending, MsgStatusErrored, MsgStatusQueued}
 	for {
 		// and update the messages as FAILED
-		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID, pq.Array(statuses))
+		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID)
 		if err != nil {
 			return err
 		}
