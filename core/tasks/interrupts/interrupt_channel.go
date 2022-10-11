@@ -1,4 +1,4 @@
-package channels
+package interrupts
 
 import (
 	"context"
@@ -29,16 +29,14 @@ func (t *InterruptChannelTask) Perform(ctx context.Context, rt *runtime.Runtime,
 	rc := rt.RP.Get()
 	defer rc.Close()
 
-	channelIDs := []models.ChannelID{t.ChannelID}
-
-	channels, err := models.GetChannelsByID(ctx, db, channelIDs)
+	channels, err := models.GetChannelsByID(ctx, db, []models.ChannelID{t.ChannelID})
 	if err != nil {
 		return errors.Wrapf(err, "error getting channels")
 	}
 
 	channel := channels[0]
 
-	if err := models.InterruptSessionsForChannels(ctx, db, channelIDs); err != nil {
+	if err := models.InterruptSessionsForChannel(ctx, db, t.ChannelID); err != nil {
 		return errors.Wrapf(err, "error interrupting sessions")
 	}
 

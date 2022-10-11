@@ -1,4 +1,4 @@
-package channels
+package interrupts_test
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/interrupts"
 	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -52,7 +53,7 @@ func TestInterruptChannel(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.TwilioChannel.ID).Returns(0)
 
 	// twilio channel task
-	task := &InterruptChannelTask{
+	task := &interrupts.InterruptChannelTask{
 		ChannelID: testdata.TwilioChannel.ID,
 	}
 
@@ -83,7 +84,7 @@ func TestInterruptChannel(t *testing.T) {
 	})
 
 	// vonage channel task
-	task = &InterruptChannelTask{
+	task = &interrupts.InterruptChannelTask{
 		ChannelID: testdata.VonageChannel.ID,
 	}
 

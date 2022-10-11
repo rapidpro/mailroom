@@ -390,16 +390,7 @@ func TestInterruptSessionsForChannels(t *testing.T) {
 	session3ID, _ := insertSessionAndRun(db, testdata.Bob, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, bobCallID)
 	session4ID, _ := insertSessionAndRun(db, testdata.George, models.FlowTypeMessaging, models.SessionStatusWaiting, testdata.Favorites, georgeCallID)
 
-	// noop if no channels
-	err := models.InterruptSessionsForChannels(ctx, db, []models.ChannelID{})
-	require.NoError(t, err)
-
-	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted)
-	assertSessionAndRunStatus(t, db, session2ID, models.SessionStatusWaiting)
-	assertSessionAndRunStatus(t, db, session3ID, models.SessionStatusWaiting)
-	assertSessionAndRunStatus(t, db, session4ID, models.SessionStatusWaiting)
-
-	err = models.InterruptSessionsForChannels(ctx, db, []models.ChannelID{testdata.TwilioChannel.ID})
+	err := models.InterruptSessionsForChannel(ctx, db, testdata.TwilioChannel.ID)
 	require.NoError(t, err)
 
 	assertSessionAndRunStatus(t, db, session1ID, models.SessionStatusCompleted) // wasn't waiting
