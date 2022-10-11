@@ -1273,6 +1273,33 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 	return resent, nil
 }
 
+const sqlFailChannelMessages = `
+WITH rows AS (
+	SELECT id FROM msgs_msg
+	WHERE org_id = $1 AND direction = 'O' AND channel_id = $2 AND status = ANY($3) LIMIT 1000
+)
+UPDATE msgs_msg SET status = 'F', modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
+
+func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID ChannelID) error {
+	if channelID == NilChannelID {
+		return nil
+	}
+
+	statuses := []MsgStatus{MsgStatusPending, MsgStatusErrored, MsgStatusQueued}
+	for {
+		// and update the messages as FAILED
+		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID, pq.Array(statuses))
+		if err != nil {
+			return err
+		}
+		rows, _ := res.RowsAffected()
+		if rows == 0 {
+			break
+		}
+	}
+	return nil
+}
+
 // MarkBroadcastSent marks the passed in broadcast as sent
 func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
 	// noop if it is a nil id
