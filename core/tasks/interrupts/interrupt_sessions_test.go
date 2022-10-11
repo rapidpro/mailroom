@@ -1,4 +1,4 @@
-package interrupts
+package interrupts_test
 
 import (
 	"testing"
@@ -7,9 +7,9 @@ import (
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/interrupts"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,7 +77,7 @@ func TestInterrupts(t *testing.T) {
 		sessionIDs[4] = insertSession(testdata.Org1, testdata.Bob, testdata.Favorites, models.NilCallID)
 
 		// create our task
-		task := &InterruptSessionsTask{
+		task := &interrupts.InterruptSessionsTask{
 			SessionIDs: []models.SessionID{sessionIDs[4]},
 			ContactIDs: tc.contactIDs,
 			FlowIDs:    tc.flowIDs,

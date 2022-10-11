@@ -7,7 +7,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
 )
 
