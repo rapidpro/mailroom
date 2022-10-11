@@ -130,6 +130,27 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 	return commitBatch()
 }
 
+var clearChannelQueueScript = redis.NewScript(3, `
+-- KEYS: [QueueType, QueueName, TPS]
+local queueType, queueName, tps = KEYS[1], KEYS[2], tonumber(KEYS[3])
+
+-- first construct the base key for this queue from the type + name + tps, e.g. "msgs:0a77a158-1dcb-4c06-9aee-e15bdf64653e|10"
+local queueKey = queueType .. ":" .. queueName .. "|" .. tps
+
+-- clear the sorted sets for the key
+redis.call("DEL", queueKey .. "/1")
+redis.call("DEL", queueKey .. "/0")
+
+-- reset queue to zero
+redis.call("ZADD", queueType .. ":active", 0, queueKey)
+
+`)
+
+func ClearChannelCourierQueue(rc redis.Conn, ch *models.Channel) error {
+	_, err := clearChannelQueueScript.Do(rc, "msgs", ch.UUID(), ch.TPS())
+	return err
+}
+
 // see https://github.com/nyaruka/courier/blob/main/attachments.go#L23
 type fetchAttachmentRequest struct {
 	ChannelType models.ChannelType `json:"channel_type"`
@@ -165,4 +186,3 @@ func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channe
 	}
 
 	return utils.Attachment(fmt.Sprintf("%s:%s", fa.Attachment.ContentType, fa.Attachment.URL)), models.ChannelLogUUID(fa.LogUUID), nil
-}
