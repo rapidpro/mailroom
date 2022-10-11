@@ -1,3 +1,9 @@
+v7.5.18
+----------
+ * Move interrupt_channel task into tasks/interrupts
+ * Tweak msg retries to ignore deleted channels
+ * Remove no longer used channels option from interrupt_sessions task
+
 v7.5.17
 ----------
  * Update to latest goflow
