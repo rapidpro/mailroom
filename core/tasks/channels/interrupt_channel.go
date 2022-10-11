@@ -42,7 +42,7 @@ func (t *InterruptChannelTask) Perform(ctx context.Context, rt *runtime.Runtime,
 		return errors.Wrapf(err, "error interrupting sessions")
 	}
 
-	err = msgio.ClearChannelCourierQueue(rc, channel)
+	err = msgio.ClearCourierQueues(rc, channel)
 	if err != nil {
 		return errors.Wrapf(err, "error clearing courier queues")
 	}

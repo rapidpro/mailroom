@@ -117,7 +117,7 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 	return commitBatch()
 }
 
-var clearChannelQueueScript = redis.NewScript(3, `
+var queueClearScript = redis.NewScript(3, `
 -- KEYS: [QueueType, QueueName, TPS]
 local queueType, queueName, tps = KEYS[1], KEYS[2], tonumber(KEYS[3])
 
@@ -130,10 +130,10 @@ redis.call("DEL", queueKey .. "/0")
 
 -- reset queue to zero
 redis.call("ZADD", queueType .. ":active", 0, queueKey)
-
 `)
 
-func ClearChannelCourierQueue(rc redis.Conn, ch *models.Channel) error {
-	_, err := clearChannelQueueScript.Do(rc, "msgs", ch.UUID(), ch.TPS())
+// ClearCourierQueues clears the courier queues (priority and bulk) for the given channel
+func ClearCourierQueues(rc redis.Conn, ch *models.Channel) error {
+	_, err := queueClearScript.Do(rc, "msgs", ch.UUID(), ch.TPS())
 	return err
 }
