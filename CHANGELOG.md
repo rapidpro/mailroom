@@ -1,3 +1,8 @@
+v7.5.19
+----------
+ * Add channel removed failed reason for msgs
+ * Call courier endpoint to fetch attachments if they're raw URLs
+
 v7.5.18
 ----------
  * Move interrupt_channel task into tasks/interrupts
