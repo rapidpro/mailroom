@@ -505,13 +505,15 @@ func TestFailMessages(t *testing.T) {
 	now := dates.Now()
 
 	// fail the msgs
-	err := models.FailChannelMessages(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID)
+	err := models.FailChannelMessages(ctx, db, testdata.Org1.ID, testdata.TwilioChannel.ID, models.MsgFailedChannelRemoved)
 	require.NoError(t, err)
 
 	//assert.Len(t, failedMsgs, 3)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND modified_on > $1`, now).Returns(4)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' AND failed_reason = 'R' AND modified_on > $1`, now).Returns(4)
 	assertdb.Query(t, db, `SELECT status FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"status": "F"})
+	assertdb.Query(t, db, `SELECT failed_reason FROM msgs_msg WHERE id = $1`, out3.ID()).Columns(map[string]interface{}{"failed_reason": nil})
 
 }
 

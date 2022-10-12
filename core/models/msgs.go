@@ -78,13 +78,14 @@ const (
 type MsgFailedReason null.String
 
 const (
-	NilMsgFailedReason     = MsgFailedReason("")
-	MsgFailedSuspended     = MsgFailedReason("S") // workspace suspended
-	MsgFailedContact       = MsgFailedReason("C") // contact blocked, stopped or archived
-	MsgFailedLooping       = MsgFailedReason("L")
-	MsgFailedErrorLimit    = MsgFailedReason("E")
-	MsgFailedTooOld        = MsgFailedReason("O")
-	MsgFailedNoDestination = MsgFailedReason("D")
+	NilMsgFailedReason      = MsgFailedReason("")
+	MsgFailedSuspended      = MsgFailedReason("S") // workspace suspended
+	MsgFailedContact        = MsgFailedReason("C") // contact blocked, stopped or archived
+	MsgFailedLooping        = MsgFailedReason("L")
+	MsgFailedErrorLimit     = MsgFailedReason("E")
+	MsgFailedTooOld         = MsgFailedReason("O")
+	MsgFailedNoDestination  = MsgFailedReason("D")
+	MsgFailedChannelRemoved = MsgFailedReason("R")
 )
 
 var unsendableToFailedReason = map[flows.UnsendableReason]MsgFailedReason{
@@ -1285,12 +1286,12 @@ WITH rows AS (
 	WHERE org_id = $1 AND direction = 'O' AND channel_id = $2 AND status IN ('P', 'Q', 'E') 
 	LIMIT 1000
 )
-UPDATE msgs_msg SET status = 'F', modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
+UPDATE msgs_msg SET status = 'F', failed_reason = $3, modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
 
-func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID ChannelID) error {
+func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID ChannelID, failedReason MsgFailedReason) error {
 	for {
 		// and update the messages as FAILED
-		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID)
+		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID, failedReason)
 		if err != nil {
 			return err
 		}

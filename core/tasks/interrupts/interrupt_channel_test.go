@@ -49,6 +49,7 @@ func TestInterruptChannel(t *testing.T) {
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1`, sessionID2).Returns("W")
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1`, sessionID3).Returns("W")
 
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and failed_reason = 'R' and channel_id = $1`, testdata.VonageChannel.ID).Returns(0)
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.VonageChannel.ID).Returns(1)
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.TwilioChannel.ID).Returns(0)
 
@@ -62,7 +63,8 @@ func TestInterruptChannel(t *testing.T) {
 	assert.NoError(t, err)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.VonageChannel.ID).Returns(1)
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.TwilioChannel.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and failed_reason = 'R' and channel_id = $1`, testdata.VonageChannel.ID).Returns(0)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and failed_reason = 'R' and channel_id = $1`, testdata.TwilioChannel.ID).Returns(1)
 
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1`, sessionID1).Returns("W")
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1`, sessionID2).Returns("W")
@@ -92,8 +94,9 @@ func TestInterruptChannel(t *testing.T) {
 	err = task.Perform(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
 
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and failed_reason = 'R' and channel_id = $1`, testdata.VonageChannel.ID).Returns(6)
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.VonageChannel.ID).Returns(7)
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.TwilioChannel.ID).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and failed_reason = 'R' and channel_id = $1`, testdata.TwilioChannel.ID).Returns(1)
 
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1`, sessionID1).Returns("W")
 	assertdb.Query(t, db, `SELECT status FROM flows_flowsession WHERE id = $1`, sessionID2).Returns("I")
