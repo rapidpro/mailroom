@@ -61,6 +61,45 @@ func TestQueueCourierMessages(t *testing.T) {
 	})
 }
 
+func TestClearChannelCourierQueue(t *testing.T) {
+	ctx, rt, _, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg|models.RefreshChannels)
+	require.NoError(t, err)
+
+	// queue 3 messages for Cathy..
+	msgs := []*models.Msg{
+		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
+		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
+		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy, HighPriority: true}).createMsg(t, rt, oa),
+		(&msgSpec{Channel: testdata.VonageChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
+	}
+
+	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, msgs)
+
+	testsuite.AssertCourierQueues(t, map[string][]int{
+		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // twilio, bulk priority
+		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1}, // twilio, high priority
+		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/0": {1}, // vonage, bulk priority
+	})
+
+	twilioChannel := oa.ChannelByID(testdata.TwilioChannel.ID)
+	msgio.ClearCourierQueues(rc, twilioChannel)
+
+	testsuite.AssertCourierQueues(t, map[string][]int{
+		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/0": {1}, // vonage, bulk priority
+	})
+
+	vonageChannel := oa.ChannelByID(testdata.VonageChannel.ID)
+	msgio.ClearCourierQueues(rc, vonageChannel)
+	testsuite.AssertCourierQueues(t, map[string][]int{})
+
+}
+
 func TestPushCourierBatch(t *testing.T) {
 	ctx, rt, _, rp := testsuite.Get()
 	rc := rp.Get()

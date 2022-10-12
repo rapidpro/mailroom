@@ -616,9 +616,12 @@ func (s *service) WriteSessionResponse(ctx context.Context, rt *runtime.Runtime,
 	return nil
 }
 
-func (s *service) WriteHangupResponse(w http.ResponseWriter) error {
+func (s *service) WriteRejectResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
-	_, err := w.Write([]byte(`[]`))
+	_, err := w.Write(jsonx.MustMarshal([]any{Talk{
+		Action: "talk",
+		Text:   "This number is not accepting calls",
+	}}))
 	return err
 }
 

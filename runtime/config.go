@@ -62,9 +62,9 @@ type Config struct {
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
 	AWSUseCredChain    bool   `help:"whether to use the AWS credentials chain. Defaults to false."`
 
-	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
-	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
-
+	CourierAuthToken  string `help:"the authentication token used for requests to Courier"`
+	LibratoUsername   string `help:"the username that will be used to authenticate to Librato"`
+	LibratoToken      string `help:"the token that will be used to authenticate to Librato"`
 	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
 	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 

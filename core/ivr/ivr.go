@@ -68,7 +68,7 @@ type Service interface {
 	HangupCall(externalID string) (*httpx.Trace, error)
 
 	WriteSessionResponse(ctx context.Context, rt *runtime.Runtime, channel *models.Channel, call *models.Call, session *models.Session, number urns.URN, resumeURL string, req *http.Request, w http.ResponseWriter) error
-	WriteHangupResponse(w http.ResponseWriter) error
+	WriteRejectResponse(w http.ResponseWriter) error
 	WriteErrorResponse(w http.ResponseWriter, err error) error
 	WriteEmptyResponse(w http.ResponseWriter, msg string) error
 
@@ -446,7 +446,7 @@ func ResumeIVRFlow(
 
 	if body != nil {
 		// guess our content type and set it
-		contentType := httpx.DetectContentType(body)
+		contentType, _ := httpx.DetectContentType(body)
 		w.Header().Set("Content-Type", contentType)
 		_, err := w.Write(body)
 		return err

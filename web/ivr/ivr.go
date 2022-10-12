@@ -142,9 +142,9 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 
 	// if we matched with an incoming-call trigger, we'll have a session
 	if session != nil {
-		// that might have started a non-voice flow, in which case we need to hangup this call
+		// that might have started a non-voice flow, in which case we need to reject this call
 		if session.SessionType() != models.FlowTypeVoice {
-			return call, svc.WriteHangupResponse(w)
+			return call, svc.WriteRejectResponse(w)
 		}
 
 		// build our resume URL
@@ -289,7 +289,7 @@ func handleStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets
 		return nil, svc.WriteErrorResponse(w, errors.Wrapf(err, "error while preprocessing status"))
 	}
 	if len(body) > 0 {
-		contentType := httpx.DetectContentType(body)
+		contentType, _ := httpx.DetectContentType(body)
 		w.Header().Set("Content-Type", contentType)
 		_, err := w.Write(body)
 		return nil, err

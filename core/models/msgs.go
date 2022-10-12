@@ -517,14 +517,18 @@ FROM
 	msgs_msg m
 INNER JOIN 
 	contacts_contacturn u ON u.id = m.contact_urn_id
+INNER JOIN 
+	channels_channel c ON c.id = m.channel_id
 WHERE
 	m.direction = 'O' AND
 	m.status = 'E' AND
-	m.next_attempt <= NOW()
+	m.next_attempt <= NOW() AND
+	c.is_active = TRUE
 ORDER BY
     m.next_attempt ASC, m.created_on ASC
 LIMIT 5000`
 
+// GetMessagesForRetry gets errored outgoing messages scheduled for retry, with an active channel
 func GetMessagesForRetry(ctx context.Context, db Queryer) ([]*Msg, error) {
 	return loadMessages(ctx, db, loadMessagesForRetrySQL)
 }
@@ -622,11 +626,21 @@ RETURNING
 `
 
 // UpdateMessage updates a message after handling
-func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID) error {
+func UpdateMessage(ctx context.Context, tx Queryer, msgID flows.MsgID, status MsgStatus, visibility MsgVisibility, msgType MsgType, flow FlowID, attachments []utils.Attachment, logUUIDs []ChannelLogUUID) error {
 	_, err := tx.ExecContext(ctx,
-		`UPDATE msgs_msg SET status = $2, visibility = $3, msg_type = $4, flow_id = $5 WHERE id = $1`,
-		msgID, status, visibility, msgType, flow,
-	)
+		`UPDATE 
+			msgs_msg 
+		SET 
+			status = $2,
+			visibility = $3,
+			msg_type = $4,
+			flow_id = $5,
+			attachments = $6,
+			log_uuids = array_cat(log_uuids, $7)
+		WHERE
+			id = $1`,
+		msgID, status, visibility, msgType, flow, pq.Array(attachments), pq.Array(logUUIDs))
+
 	if err != nil {
 		return errors.Wrapf(err, "error updating msg: %d", msgID)
 	}
@@ -1232,6 +1246,29 @@ func ResendMessages(ctx context.Context, db Queryer, rp *redis.Pool, oa *OrgAsse
 	}
 
 	return resent, nil
+}
+
+const sqlFailChannelMessages = `
+WITH rows AS (
+	SELECT id FROM msgs_msg
+	WHERE org_id = $1 AND direction = 'O' AND channel_id = $2 AND status IN ('P', 'Q', 'E') 
+	LIMIT 1000
+)
+UPDATE msgs_msg SET status = 'F', modified_on = NOW() WHERE id IN (SELECT id FROM rows)`
+
+func FailChannelMessages(ctx context.Context, db Queryer, orgID OrgID, channelID ChannelID) error {
+	for {
+		// and update the messages as FAILED
+		res, err := db.ExecContext(ctx, sqlFailChannelMessages, orgID, channelID)
+		if err != nil {
+			return err
+		}
+		rows, _ := res.RowsAffected()
+		if rows == 0 {
+			break
+		}
+	}
+	return nil
 }
 
 // MarkBroadcastSent marks the passed in broadcast as sent
