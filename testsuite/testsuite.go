@@ -71,8 +71,8 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 		ReadonlyDB:     db,
 		RP:             rp,
 		ES:             nil,
-		MediaStorage:   storage.NewFS(MediaStorageDir),
-		SessionStorage: storage.NewFS(SessionStorageDir),
+		MediaStorage:   storage.NewFS(MediaStorageDir, 0766),
+		SessionStorage: storage.NewFS(SessionStorageDir, 0766),
 		Config:         runtime.NewDefaultConfig(),
 	}
 

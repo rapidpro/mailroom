@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -128,11 +129,11 @@ func (mr *Mailroom) Start() error {
 		if err != nil {
 			return err
 		}
-		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, 32)
-		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, 32)
+		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, s3.BucketCannedACLPublicRead, 32)
+		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, s3.ObjectCannedACLPrivate, 32)
 	} else {
-		mr.rt.MediaStorage = storage.NewFS("_storage")
-		mr.rt.SessionStorage = storage.NewFS("_storage")
+		mr.rt.MediaStorage = storage.NewFS("_storage", 0766)
+		mr.rt.SessionStorage = storage.NewFS("_storage", 0766)
 	}
 
 	// test our media storage
