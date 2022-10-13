@@ -109,7 +109,7 @@ func NewDefaultConfig() *Config {
 		S3Endpoint:       "https://s3.amazonaws.com",
 		S3Region:         "us-east-1",
 		S3MediaBucket:    "mailroom-media",
-		S3MediaPrefix:    "/media/",
+		S3MediaPrefix:    "/attachments/",
 		S3SessionBucket:  "mailroom-sessions",
 		S3SessionPrefix:  "/",
 		S3DisableSSL:     false,

@@ -301,7 +301,7 @@
         },
         "db_assertions": [
             {
-                "query": "select count(*) from msgs_msg where direction = 'O' AND uuid = '5802813d-6c58-4292-8228-9728778b6c98' AND attachments = '{text/plain:https:///_test_media_storage/media/1/8720/f157/8720f157-ca1c-432f-9c0b-2014ddc77094.txt,image/jpeg:https:///_test_media_storage/media/1/c34b/6c7d/c34b6c7d-fa06-4563-92a3-d648ab64bccb.jpg}'",
+                "query": "select count(*) from msgs_msg where direction = 'O' AND uuid = '5802813d-6c58-4292-8228-9728778b6c98' AND attachments = '{text/plain:https:///_test_attachments_storage/attachments/1/8720/f157/8720f157-ca1c-432f-9c0b-2014ddc77094.txt,image/jpeg:https:///_test_attachments_storage/attachments/1/c34b/6c7d/c34b6c7d-fa06-4563-92a3-d648ab64bccb.jpg}'",
                 "count": 1
             },
             {

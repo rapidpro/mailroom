@@ -192,7 +192,7 @@
     },
     "db_assertions": [
       {
-        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{text/plain:https:///_test_media_storage/media/1/6929/26ea/692926ea-09d6-4942-bd38-d266ec8d3716.jpg}'",
+        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{text/plain:https:///_test_attachments_storage/attachments/1/6929/26ea/692926ea-09d6-4942-bd38-d266ec8d3716.jpg}'",
         "count": 1
       }
     ]

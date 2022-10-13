@@ -187,7 +187,7 @@ func (o *Org) StoreAttachment(ctx context.Context, rt *runtime.Runtime, filename
 
 	path := o.attachmentPath(prefix, filename)
 
-	url, err := rt.MediaStorage.Put(ctx, path, contentType, contentBytes)
+	url, err := rt.AttachmentStorage.Put(ctx, path, contentType, contentBytes)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to store attachment content")
 	}

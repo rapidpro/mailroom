@@ -30,7 +30,7 @@ import (
 
 var _db *sqlx.DB
 
-const MediaStorageDir = "_test_media_storage"
+const AttachmentStorageDir = "_test_attachments_storage"
 const SessionStorageDir = "_test_session_storage"
 
 // Refresh is our type for the pieces of org assets we want fresh (not cached)
@@ -67,13 +67,13 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 	db := getDB()
 	rp := getRP()
 	rt := &runtime.Runtime{
-		DB:             db,
-		ReadonlyDB:     db,
-		RP:             rp,
-		ES:             nil,
-		MediaStorage:   storage.NewFS(MediaStorageDir, 0766),
-		SessionStorage: storage.NewFS(SessionStorageDir, 0766),
-		Config:         runtime.NewDefaultConfig(),
+		DB:                db,
+		ReadonlyDB:        db,
+		RP:                rp,
+		ES:                nil,
+		AttachmentStorage: storage.NewFS(AttachmentStorageDir, 0766),
+		SessionStorage:    storage.NewFS(SessionStorageDir, 0766),
+		Config:            runtime.NewDefaultConfig(),
 	}
 
 	logrus.SetLevel(logrus.DebugLevel)
@@ -176,7 +176,7 @@ func resetRedis() {
 
 // clears our storage for tests
 func resetStorage() {
-	must(os.RemoveAll(MediaStorageDir))
+	must(os.RemoveAll(AttachmentStorageDir))
 	must(os.RemoveAll(SessionStorageDir))
 }
 
