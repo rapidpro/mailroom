@@ -252,7 +252,7 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 // is sent to Zendesk as file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
-	prefix := s.rtConfig.S3MediaPrefix
+	prefix := s.rtConfig.S3AttachmentsPrefix
 	if !strings.HasPrefix(prefix, "/") {
 		prefix = "/" + prefix
 	}
