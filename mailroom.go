@@ -129,22 +129,22 @@ func (mr *Mailroom) Start() error {
 		if err != nil {
 			return err
 		}
-		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, s3.BucketCannedACLPublicRead, 32)
+		mr.rt.AttachmentStorage = storage.NewS3(s3Client, mr.rt.Config.S3AttachmentsBucket, c.S3Region, s3.BucketCannedACLPublicRead, 32)
 		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, s3.ObjectCannedACLPrivate, 32)
 	} else {
-		mr.rt.MediaStorage = storage.NewFS("_storage", 0766)
+		mr.rt.AttachmentStorage = storage.NewFS("_storage", 0766)
 		mr.rt.SessionStorage = storage.NewFS("_storage", 0766)
 	}
 
-	// test our media storage
+	// test our attachment storage
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	err = mr.rt.MediaStorage.Test(ctx)
+	err = mr.rt.AttachmentStorage.Test(ctx)
 	cancel()
 
 	if err != nil {
-		log.WithError(err).Error(mr.rt.MediaStorage.Name() + " media storage not available")
+		log.WithError(err).Error(mr.rt.AttachmentStorage.Name() + " attachment storage not available")
 	} else {
-		log.Info(mr.rt.MediaStorage.Name() + " media storage ok")
+		log.Info(mr.rt.AttachmentStorage.Name() + " attachment storage ok")
 	}
 
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)

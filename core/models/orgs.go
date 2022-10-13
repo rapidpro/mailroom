@@ -171,7 +171,7 @@ func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryCo
 
 // StoreAttachment saves an attachment to storage
 func (o *Org) StoreAttachment(ctx context.Context, rt *runtime.Runtime, filename string, contentType string, content io.ReadCloser) (utils.Attachment, error) {
-	prefix := rt.Config.S3MediaPrefix
+	prefix := rt.Config.S3AttachmentsPrefix
 
 	// read the content
 	contentBytes, err := io.ReadAll(content)
@@ -187,7 +187,7 @@ func (o *Org) StoreAttachment(ctx context.Context, rt *runtime.Runtime, filename
 
 	path := o.attachmentPath(prefix, filename)
 
-	url, err := rt.MediaStorage.Put(ctx, path, contentType, contentBytes)
+	url, err := rt.AttachmentStorage.Put(ctx, path, contentType, contentBytes)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to store attachment content")
 	}
