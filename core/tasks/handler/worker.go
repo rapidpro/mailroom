@@ -819,7 +819,6 @@ type MsgEvent struct {
 	Text          string           `json:"text"`
 	Attachments   []string         `json:"attachments"`
 	NewContact    bool             `json:"new_contact"`
-	CreatedOn     time.Time        `json:"created_on"`
 }
 
 type StopEvent struct {
