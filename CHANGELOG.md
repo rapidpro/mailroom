@@ -1,3 +1,7 @@
+v7.5.21
+----------
+ * Update to latest goflow
+
 v7.5.20
 ----------
  * Remove unused created_on field from msg events
