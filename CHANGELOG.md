@@ -1,3 +1,9 @@
+v7.5.20
+----------
+ * Remove unused created_on field from msg events
+ * Rename media config vars
+ * Update to latest gocommon
+
 v7.5.19
 ----------
  * Add channel removed failed reason for msgs
