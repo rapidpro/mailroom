@@ -1,3 +1,7 @@
+v7.5.22
+----------
+ * Set is_active=TRUE on new broadcasts
+
 v7.5.21
 ----------
  * Update to latest goflow
