@@ -220,12 +220,12 @@ func TestOpenAndForward(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	logger := &flows.HTTPLogger{}
-	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	ticket, err := svc.Open(session, defaultTopic, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, nil, logger.Log)
 
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())
-	assert.Equal(t, "Where are my cookies?", ticket.Body())
+	assert.Equal(t, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, ticket.Body())
 	assert.Equal(t, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", ticket.ExternalID())
 	assert.Equal(t, 2, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)

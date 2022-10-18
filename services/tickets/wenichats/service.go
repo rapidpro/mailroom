@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -92,6 +93,15 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	roomData.Contact.Name = contact.Name()
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.UUID())
+
+	extra := &struct {
+		CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
+	}{}
+
+	err := jsonx.Unmarshal([]byte(body), extra)
+	if err == nil {
+		roomData.CustomFields = extra.CustomFields
+	}
 
 	newRoom, trace, err := s.restClient.CreateRoom(roomData)
 	if trace != nil {
