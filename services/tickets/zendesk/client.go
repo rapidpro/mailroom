@@ -94,39 +94,45 @@ func NewRESTClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subd
 	return &RESTClient{baseClient: newBaseClient(httpClient, httpRetries, subdomain, token)}
 }
 
-// Target see https://developer.zendesk.com/rest_api/docs/support/targets
-type Target struct {
-	ID          int64  `json:"id"`
-	Title       string `json:"title"`
-	Type        string `json:"type"`
-	TargetURL   string `json:"target_url"`
-	Method      string `json:"method"`
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	ContentType string `json:"content_type"`
+type Webhook struct {
+	ID             string `json:"id"`
+	Authentication struct {
+		AddPosition string `json:"add_position"`
+		Data        struct {
+			Password string `json:"password"`
+			Username string `json:"username"`
+		} `json:"data"`
+		Type string `json:"type"`
+	} `json:"authentication"`
+	Endpoint      string   `json:"endpoint"`
+	HttpMethod    string   `json:"http_method"`
+	Name          string   `json:"name"`
+	RequestFormat string   `json:"request_format"`
+	Status        string   `json:"status"`
+	Subscriptions []string `json:"subscriptions"`
 }
 
-// CreateTarget see https://developer.zendesk.com/rest_api/docs/support/targets#create-target
-func (c *RESTClient) CreateTarget(target *Target) (*Target, *httpx.Trace, error) {
+// CreateWebhook see https://developer.zendesk.com/api-reference/event-connectors/webhooks/webhooks/#create-or-clone-webhook
+func (c *RESTClient) CreateWebhook(webhook *Webhook) (*Webhook, *httpx.Trace, error) {
 	payload := struct {
-		Target *Target `json:"target"`
-	}{Target: target}
+		Webhook *Webhook `json:"webhook"`
+	}{Webhook: webhook}
 
 	response := &struct {
-		Target *Target `json:"target"`
+		Webhook *Webhook `json:"webhook"`
 	}{}
 
-	trace, err := c.post("targets.json", payload, response)
+	trace, err := c.post("webhooks", payload, response)
 	if err != nil {
 		return nil, trace, err
 	}
 
-	return response.Target, trace, nil
+	return response.Webhook, trace, nil
 }
 
-// DeleteTarget see https://developer.zendesk.com/rest_api/docs/support/targets#delete-target
-func (c *RESTClient) DeleteTarget(id int64) (*httpx.Trace, error) {
-	return c.delete(fmt.Sprintf("targets/%d.json", id))
+// DeleteWebhook see https://developer.zendesk.com/api-reference/event-connectors/webhooks/webhooks/#delete-webhook
+func (c *RESTClient) DeleteWebhook(id int64) (*httpx.Trace, error) {
+	return c.delete(fmt.Sprintf("webhooks/%d", id))
 }
 
 // Condition see https://developer.zendesk.com/rest_api/docs/support/triggers#conditions

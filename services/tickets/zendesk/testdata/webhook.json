@@ -2,17 +2,17 @@
     {
         "label": "404 response if URL malformed",
         "method": "POST",
-        "path": "/mr/tickets/types/zendesk/target/XYZ",
+        "path": "/mr/tickets/types/zendesk/webhook/XYZ",
         "body": {},
         "status": 404,
         "response": {
-            "error": "not found: /mr/tickets/types/zendesk/target/XYZ"
+            "error": "not found: /mr/tickets/types/zendesk/webhook/XYZ"
         }
     },
     {
         "label": "404 response if no such ticketer",
         "method": "POST",
-        "path": "/mr/tickets/types/zendesk/target/122a91d5-cfc0-4777-88ef-d5b1e013e031",
+        "path": "/mr/tickets/types/zendesk/webhook/122a91d5-cfc0-4777-88ef-d5b1e013e031",
         "body": {},
         "status": 404,
         "response": {
@@ -22,10 +22,10 @@
     {
         "label": "unauthorized response if basic auth missing",
         "method": "POST",
-        "path": "/mr/tickets/types/zendesk/target/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "path": "/mr/tickets/types/zendesk/webhook/4ee6d4f3-f92b-439b-9718-8da90c05490b",
         "body": {
             "event": "status_changed",
-            "id": 1234,
+            "id": "1234",
             "status": "New"
         },
         "status": 401,
@@ -36,13 +36,13 @@
     {
         "label": "unauthorized response if basic auth fails",
         "method": "POST",
-        "path": "/mr/tickets/types/zendesk/target/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "path": "/mr/tickets/types/zendesk/webhook/4ee6d4f3-f92b-439b-9718-8da90c05490b",
         "headers": {
             "Authorization": "Basic emVuZGVzazoyMzUy"
         },
         "body": {
             "event": "status_changed",
-            "id": 1234,
+            "id": "1234",
             "status": "New"
         },
         "status": 401,
@@ -53,7 +53,7 @@
     {
         "label": "error response if missing required field",
         "method": "POST",
-        "path": "/mr/tickets/types/zendesk/target/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "path": "/mr/tickets/types/zendesk/webhook/4ee6d4f3-f92b-439b-9718-8da90c05490b",
         "headers": {
             "Authorization": "Basic emVuZGVzazpzZXNhbWU="
         },
@@ -69,13 +69,13 @@
     {
         "label": "ignored response if can't find ticket",
         "method": "POST",
-        "path": "/mr/tickets/types/zendesk/target/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "path": "/mr/tickets/types/zendesk/webhook/4ee6d4f3-f92b-439b-9718-8da90c05490b",
         "headers": {
             "Authorization": "Basic emVuZGVzazpzZXNhbWU="
         },
         "body": {
             "event": "status_changed",
-            "id": 34567845,
+            "id": "34567845",
             "status": "New"
         },
         "status": 200,
@@ -86,13 +86,13 @@
     {
         "label": "ticket updated if credentials correct",
         "method": "POST",
-        "path": "/mr/tickets/types/zendesk/target/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "path": "/mr/tickets/types/zendesk/webhook/4ee6d4f3-f92b-439b-9718-8da90c05490b",
         "headers": {
             "Authorization": "Basic emVuZGVzazpzZXNhbWU="
         },
         "body": {
             "event": "status_changed",
-            "id": 1234,
+            "id": "1234",
             "status": "Solved"
         },
         "status": 200,
@@ -109,14 +109,37 @@
     {
         "label": "ticket updated also when status is non-English",
         "method": "POST",
-        "path": "/mr/tickets/types/zendesk/target/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "path": "/mr/tickets/types/zendesk/webhook/4ee6d4f3-f92b-439b-9718-8da90c05490b",
         "headers": {
             "Authorization": "Basic emVuZGVzazpzZXNhbWU="
         },
         "body": {
             "event": "status_changed",
-            "id": 1234,
+            "id": "1234",
             "status": "Abierto"
+        },
+        "status": 200,
+        "response": {
+            "status": "handled"
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from tickets_ticket where status = 'O'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "ticket updated also when status is Portuguese",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/webhook/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "headers": {
+            "Authorization": "Basic emVuZGVzazpzZXNhbWU="
+        },
+        "body": {
+            "event": "status_changed",
+            "id": "1234",
+            "status": "Aberto"
         },
         "status": 200,
         "response": {
