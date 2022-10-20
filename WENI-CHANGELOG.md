@@ -1,3 +1,8 @@
+1.4.2-mailroom-7.1.22
+----------
+ * twilio flex support extra fields
+ * twilio flex has Header X-Twilio-Webhook-Enabled=True on send msg
+
 1.4.1-mailroom-7.1.22
 ----------
  * wenichats ticketer support custom fields
