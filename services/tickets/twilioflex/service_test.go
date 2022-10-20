@@ -387,12 +387,12 @@ func TestOpenAndForward(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	logger := &flows.HTTPLogger{}
-	ticket, err := svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
+	ticket, err := svc.Open(session, defaultTopic, `{"extra_field":"foo","custom_fields":{"bar_field":"bar"}}`, nil, logger.Log)
 
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())
-	assert.Equal(t, "Where are my cookies?", ticket.Body())
+	assert.Equal(t, `{"extra_field":"foo","custom_fields":{"bar_field":"bar"}}`, ticket.Body())
 	assert.Equal(t, "CH6442c09c93ba4d13966fa42e9b78f620", ticket.ExternalID())
 	assert.Equal(t, 7, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
@@ -424,7 +424,7 @@ func TestOpenAndForward(t *testing.T) {
 	}
 	err = svc.Forward(dbTicket2, flows.MsgUUID("5ga340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, logger.Log)
 	assert.NoError(t, err)
-	assert.Equal(t, 4, len(logger.Logs))
+	assert.Equal(t, 7, len(logger.Logs))
 }
 
 func TestCloseAndReopen(t *testing.T) {
