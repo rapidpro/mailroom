@@ -68,10 +68,9 @@ const (
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
 type Org struct {
 	o struct {
-		ID         OrgID    `json:"id"`
-		Suspended  bool     `json:"is_suspended"`
-		UsesTopups bool     `json:"uses_topups"`
-		Config     null.Map `json:"config"`
+		ID        OrgID    `json:"id"`
+		Suspended bool     `json:"is_suspended"`
+		Config    null.Map `json:"config"`
 	}
 	env envs.Environment
 }
@@ -81,9 +80,6 @@ func (o *Org) ID() OrgID { return o.o.ID }
 
 // Suspended returns whether the org has been suspended
 func (o *Org) Suspended() bool { return o.o.Suspended }
-
-// UsesTopups returns whether the org uses topups
-func (o *Org) UsesTopups() bool { return o.o.UsesTopups }
 
 // DateFormat returns the date format for this org
 func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
@@ -252,7 +248,6 @@ const selectOrgByID = `
 SELECT ROW_TO_JSON(o) FROM (SELECT
 	id,
 	is_suspended,
-	uses_topups,
 	COALESCE(o.config::json,'{}'::json) AS config,
 	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' END) AS date_format, 
 	'tt:mm' AS time_format,
