@@ -1,3 +1,8 @@
+v7.5.24
+----------
+ * Update to latest goflow
+ * Remove some leftover references to topups
+
 v7.5.23
 ----------
  * Remove topups
