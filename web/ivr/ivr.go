@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-chi/chi"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -17,8 +18,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
-
-	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -157,21 +156,6 @@ func handleIncoming(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 		}
 
 		return call, nil
-	}
-
-	// no session means no trigger, create a missed call event instead
-	// we first create an incoming call channel event and see if that matches
-	event = models.NewChannelEvent(models.MOMissEventType, oa.OrgID(), ch.ID(), contact.ID(), urnID, nil, false)
-	err = event.Insert(ctx, rt.DB)
-	if err != nil {
-		return call, svc.WriteErrorResponse(w, errors.Wrapf(err, "error inserting channel event"))
-	}
-
-	// try to handle it, this time looking for a missed call event
-	_, err = handler.HandleChannelEvent(ctx, rt, models.MOMissEventType, event, nil)
-	if err != nil {
-		logrus.WithError(err).WithField("http_request", r).Error("error handling missed call")
-		return call, svc.WriteErrorResponse(w, errors.Wrapf(err, "error handling missed call"))
 	}
 
 	// write our empty response
