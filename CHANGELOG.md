@@ -1,3 +1,7 @@
+v7.5.27
+----------
+ * Remove legacy functionality to look for missed call trigger if there's no incoming call trigger
+
 v7.5.26
 ----------
  * Update to latest goflow
