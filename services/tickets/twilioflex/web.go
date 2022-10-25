@@ -76,14 +76,14 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 
 	switch request.EventType {
 	case "onMessageSent":
-		if request.ClientIdentity != fmt.Sprint(ticket.ContactID()) { // prevent echo message
+		if request.ClientIdentity != fmt.Sprint(ticket.ContactID()) && request.From != fmt.Sprint(ticket.ContactID()) { // prevent echo message
 			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{})
 			if err != nil {
 				return err, http.StatusBadRequest, nil
 			}
 		}
 	case "onMediaMessageSent":
-		if request.ClientIdentity != fmt.Sprint(ticket.ContactID()) { // prevent echo message
+		if request.ClientIdentity != fmt.Sprint(ticket.ContactID()) && request.From != fmt.Sprint(ticket.ContactID()) { // prevent echo message
 			config := ticketer.Config
 			authToken := config(configurationAuthToken)
 			accountSid := config(configurationAccountSid)
