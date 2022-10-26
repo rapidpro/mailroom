@@ -1,3 +1,7 @@
+1.4.3-mailroom-7.1.22
+----------
+ * fix twilio flex contact echo msgs from webhook
+
 1.4.2-mailroom-7.1.22
 ----------
  * twilio flex support extra fields
