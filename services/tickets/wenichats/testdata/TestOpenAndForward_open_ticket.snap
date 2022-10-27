@@ -1,9 +1,9 @@
 POST /v1/external/rooms/ HTTP/1.1
 Host: chats-engine.dev.cloud.weni.ai
 User-Agent: Go-http-client/1.1
-Content-Length: 243
+Content-Length: 323
 Authorization: Bearer ****************
 Content-Type: application/json
 Accept-Encoding: gzip
 
-{"queue_uuid":"ffc903f7-8cbb-443f-9627-87106842d1aa","sector_uuid":"1a4bae05-993c-4f3b-91b5-80f4e09951f2","contact":{"external_id":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis"},"custom_fields":{"country":"brazil","mood":"angry"}}
+{"queue_uuid":"ffc903f7-8cbb-443f-9627-87106842d1aa","sector_uuid":"1a4bae05-993c-4f3b-91b5-80f4e09951f2","contact":{"external_id":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis"},"custom_fields":{"activation_****************":"AACC55","age":"23","country":"brazil","gender":"Male","join_date":"2017-12-02","mood":"angry"}}

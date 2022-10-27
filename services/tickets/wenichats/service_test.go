@@ -70,7 +70,10 @@ func TestOpenAndForward(t *testing.T) {
 				"is_active": true,
 				"custom_fields": {
 					"country": "brazil",
-					"mood": "angry"
+					"mood": "angry",
+					"age": 23,
+					"join_date": "2017-12-02",
+					"gender": "male"
 				},
 				"callback_url": "http://example.com"
 			}`),
