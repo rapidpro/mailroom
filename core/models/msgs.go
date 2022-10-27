@@ -356,6 +356,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 	m.MsgType = MsgTypeFlow
 	m.MsgCount = 1
 	m.CreatedOn = createdOn
+	m.Metadata = null.NewMap(buildMsgMetadata(out))
 
 	msg.SetChannel(channel)
 	msg.SetURN(out.URN())
@@ -405,27 +406,26 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 		}
 	}
 
-	// populate metadata if we have any
-	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic {
-		metadata := make(map[string]interface{})
-		if len(out.QuickReplies()) > 0 {
-			metadata["quick_replies"] = out.QuickReplies()
-		}
-		if out.Templating() != nil {
-			metadata["templating"] = out.Templating()
-		}
-		if out.Topic() != flows.NilMsgTopic {
-			metadata["topic"] = string(out.Topic())
-		}
-		m.Metadata = null.NewMap(metadata)
-	}
-
 	// if we're sending to a phone, message may have to be sent in multiple parts
 	if m.URN.Scheme() == urns.TelScheme {
 		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
 	}
 
 	return msg, nil
+}
+
+func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
+	metadata := make(map[string]interface{})
+	if len(m.QuickReplies()) > 0 {
+		metadata["quick_replies"] = m.QuickReplies()
+	}
+	if m.Templating() != nil {
+		metadata["templating"] = m.Templating()
+	}
+	if m.Topic() != flows.NilMsgTopic {
+		metadata["topic"] = string(m.Topic())
+	}
+	return metadata
 }
 
 // NewIncomingMsg creates a new incoming message for the passed in text and attachment

@@ -62,34 +62,35 @@ const (
 	baseURLConfig = "base_url"
 )
 
-var validLanguageCodes = map[string]bool{
-	"da-DK": true,
-	"de-DE": true,
-	"en-AU": true,
-	"en-CA": true,
-	"en-GB": true,
-	"en-IN": true,
-	"en-US": true,
-	"ca-ES": true,
-	"es-ES": true,
-	"es-MX": true,
-	"fi-FI": true,
-	"fr-CA": true,
-	"fr-FR": true,
-	"it-IT": true,
-	"ja-JP": true,
-	"ko-KR": true,
-	"nb-NO": true,
-	"nl-NL": true,
-	"pl-PL": true,
-	"pt-BR": true,
-	"pt-PT": true,
-	"ru-RU": true,
-	"sv-SE": true,
-	"zh-CN": true,
-	"zh-HK": true,
-	"zh-TW": true,
-}
+// https://www.twilio.com/docs/voice/twiml/say
+var supportedSayLanguages = utils.StringSet([]string{
+	"da-DK",
+	"de-DE",
+	"en-AU",
+	"en-CA",
+	"en-GB",
+	"en-IN",
+	"en-US",
+	"ca-ES",
+	"es-ES",
+	"es-MX",
+	"fi-FI",
+	"fr-CA",
+	"fr-FR",
+	"it-IT",
+	"ja-JP",
+	"ko-KR",
+	"nb-NO",
+	"nl-NL",
+	"pl-PL",
+	"pt-BR",
+	"pt-PT",
+	"ru-RU",
+	"sv-SE",
+	"zh-CN",
+	"zh-HK",
+	"zh-TW",
+})
 
 type service struct {
 	httpClient   *http.Client
@@ -464,7 +465,7 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, e
 				locale := envs.NewLocale(event.Msg.TextLanguage, country)
 				languageCode := locale.ToBCP47()
 
-				if _, valid := validLanguageCodes[languageCode]; !valid {
+				if _, valid := supportedSayLanguages[languageCode]; !valid {
 					languageCode = ""
 				}
 				commands = append(commands, Say{Text: event.Msg.Text(), Language: languageCode})
