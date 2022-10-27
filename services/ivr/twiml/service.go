@@ -452,7 +452,7 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 
 // TWIML building utilities
 
-func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, es []flows.Event, indent bool) (string, error) {
+func ResponseForSprint(cfg *runtime.Config, urn urns.URN, resumeURL string, es []flows.Event, indent bool) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 	hasWait := false
@@ -461,14 +461,16 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, e
 		switch event := e.(type) {
 		case *events.IVRCreatedEvent:
 			if len(event.Msg.Attachments()) == 0 {
-				country := envs.DeriveCountryFromTel(number.Path())
-				locale := envs.NewLocale(event.Msg.TextLanguage, country)
-				languageCode := locale.ToBCP47()
+				urnCountry := envs.DeriveCountryFromTel(urn.Path())
+				msgLocale := envs.NewLocale(event.Msg.TextLanguage, urnCountry)
 
-				if _, valid := supportedSayLanguages[languageCode]; !valid {
-					languageCode = ""
+				// only send locale if it's a supported say language for Twilio
+				msgLocaleCode := msgLocale.ToBCP47()
+				if _, valid := supportedSayLanguages[msgLocaleCode]; !valid {
+					msgLocaleCode = ""
 				}
-				commands = append(commands, Say{Text: event.Msg.Text(), Language: languageCode})
+
+				commands = append(commands, &Say{Text: event.Msg.Text(), Language: msgLocaleCode})
 			} else {
 				for _, a := range event.Msg.Attachments() {
 					a = models.NormalizeAttachment(cfg, a)

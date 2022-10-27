@@ -39,68 +39,71 @@ func TestResponseForSprint(t *testing.T) {
 		expected string
 	}{
 		{
-			[]flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "", "")),
+			// ivr msg, no text language specified
+			events: []flows.Event{
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "", "")),
 			},
-			`<Response><Say>hello world</Say><Hangup></Hangup></Response>`,
+			expected: `<Response><Say>Hi there</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "eng", "")),
+			// ivr msg, supported text language specified
+			events: []flows.Event{
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "eng", "")),
 			},
-			`<Response><Say language="en-US">hello world</Say><Hangup></Hangup></Response>`,
+			expected: `<Response><Say language="en-US">Hi there</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "ben", "")),
+			// ivr msg, unsupported text language specified
+			events: []flows.Event{
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Amakuru", "kin", "")),
 			},
-			`<Response><Say>hello world</Say><Hangup></Hangup></Response>`,
+			expected: `<Response><Say>Amakuru</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "eng", "/recordings/foo.wav")),
+			// ivr msg with audio attachment, text language ignored
+			events: []flows.Event{
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "Hi there", "eng", "/recordings/foo.wav")),
 			},
-			`<Response><Play>https://mailroom.io/recordings/foo.wav</Play><Hangup></Hangup></Response>`,
+			expected: `<Response><Play>https://mailroom.io/recordings/foo.wav</Play><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "", "https://temba.io/recordings/foo.wav")),
-			},
-			`<Response><Play>https://temba.io/recordings/foo.wav</Play><Hangup></Hangup></Response>`,
-		},
-		{
-			[]flows.Event{
+			// 2 ivr msgs
+			events: []flows.Event{
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "", "")),
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "goodbye", "", "")),
 			},
-			`<Response><Say>hello world</Say><Say>goodbye</Say><Hangup></Hangup></Response>`,
+			expected: `<Response><Say>hello world</Say><Say>goodbye</Say><Hangup></Hangup></Response>`,
 		},
 		{
-			[]flows.Event{
+			// ivr msg followed by wait for digits
+			events: []flows.Event{
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "enter a number", "", "")),
 				events.NewMsgWait(nil, nil, hints.NewFixedDigitsHint(1)),
 			},
-			`<Response><Gather numDigits="1" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
+			expected: `<Response><Gather numDigits="1" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
 		},
 		{
-			[]flows.Event{
+			// ivr msg followed by wait for terminated digits
+			events: []flows.Event{
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "enter a number, then press #", "", "")),
 				events.NewMsgWait(nil, nil, hints.NewTerminatedDigitsHint("#")),
 			},
-			`<Response><Gather finishOnKey="#" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number, then press #</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
+			expected: `<Response><Gather finishOnKey="#" timeout="30" action="http://temba.io/resume?session=1&amp;wait_type=gather"><Say>enter a number, then press #</Say></Gather><Redirect>http://temba.io/resume?session=1&amp;wait_type=gather&amp;timeout=true</Redirect></Response>`,
 		},
 		{
-			[]flows.Event{
+			// ivr msg followed by wait for recording
+			events: []flows.Event{
 				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "say something", "", "")),
 				events.NewMsgWait(nil, nil, hints.NewAudioHint()),
 			},
-			`<Response><Say>say something</Say><Record action="http://temba.io/resume?session=1&amp;wait_type=record" maxLength="600"></Record><Redirect>http://temba.io/resume?session=1&amp;wait_type=record&amp;empty=true</Redirect></Response>`,
+			expected: `<Response><Say>say something</Say><Record action="http://temba.io/resume?session=1&amp;wait_type=record" maxLength="600"></Record><Redirect>http://temba.io/resume?session=1&amp;wait_type=record&amp;empty=true</Redirect></Response>`,
 		},
 		{
-			[]flows.Event{
+			// dial wait
+			events: []flows.Event{
 				events.NewDialWait(urns.URN(`tel:+1234567890`), 60, 7200, &expiresOn),
 			},
-			`<Response><Dial action="http://temba.io/resume?session=1&amp;wait_type=dial" timeout="60" timeLimit="7200">+1234567890</Dial></Response>`,
+			expected: `<Response><Dial action="http://temba.io/resume?session=1&amp;wait_type=dial" timeout="60" timeLimit="7200">+1234567890</Dial></Response>`,
 		},
 	}
 
