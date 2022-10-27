@@ -1,9 +1,0 @@
-POST /api/apps/public/684202ed-1461-4983-9ea7-fde74b15026c/visitor-message HTTP/1.1
-Host: my.rocket.chat
-User-Agent: Go-http-client/1.1
-Content-Length: 231
-Authorization: Token ****************
-Content-Type: application/json
-Accept-Encoding: gzip
-
-{"visitor":{"token":"10000"},"text":"It's urgent","attachments":[{"type":"image/jpg","url":"https://link.to/image.jpg"},{"type":"video/mp4","url":"https://link.to/video.mp4"},{"type":"audio/ogg","url":"https://link.to/audio.ogg"}]}

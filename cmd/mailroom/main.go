@@ -30,7 +30,6 @@ import (
 	_ "github.com/nyaruka/mailroom/services/ivr/vonage"
 	_ "github.com/nyaruka/mailroom/services/tickets/intern"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
-	_ "github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	_ "github.com/nyaruka/mailroom/web/contact"
 	_ "github.com/nyaruka/mailroom/web/docs"
