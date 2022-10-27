@@ -7,7 +7,6 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/translation"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/i18n"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -24,12 +23,11 @@ func init() {
 
 // Exports a PO file from the given set of flows.
 //
-//   {
-//     "org_id": 123,
-//     "flow_ids": [123, 354, 456],
-//     "language": "spa"
-//   }
-//
+//	{
+//	  "org_id": 123,
+//	  "flow_ids": [123, 354, 456],
+//	  "language": "spa"
+//	}
 type exportRequest struct {
 	OrgID    models.OrgID    `json:"org_id"  validate:"required"`
 	FlowIDs  []models.FlowID `json:"flow_ids" validate:"required"`
@@ -38,7 +36,7 @@ type exportRequest struct {
 
 func handleExport(ctx context.Context, rt *runtime.Runtime, r *http.Request, rawW http.ResponseWriter) error {
 	request := &exportRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation")
 	}
 
@@ -62,12 +60,11 @@ func handleExport(ctx context.Context, rt *runtime.Runtime, r *http.Request, raw
 
 // Imports translations from a PO file into the given set of flows.
 //
-//   {
-//     "org_id": 123,
-//     "flow_ids": [123, 354, 456],
-//     "language": "spa"
-//   }
-//
+//	{
+//	  "org_id": 123,
+//	  "flow_ids": [123, 354, 456],
+//	  "language": "spa"
+//	}
 type importForm struct {
 	OrgID    models.OrgID    `form:"org_id"  validate:"required"`
 	FlowIDs  []models.FlowID `form:"flow_ids" validate:"required"`

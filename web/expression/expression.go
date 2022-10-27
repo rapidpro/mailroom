@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 
@@ -18,10 +17,9 @@ func init() {
 
 // Migrates a legacy expression to the new flow definition specification
 //
-//   {
-//     "expression": "@contact.age"
-//   }
-//
+//	{
+//	  "expression": "@contact.age"
+//	}
 type migrateRequest struct {
 	Expression string `json:"expression" validate:"required"`
 }
@@ -32,7 +30,7 @@ type migrateResponse struct {
 
 func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &migrateRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 

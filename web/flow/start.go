@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
@@ -22,36 +21,35 @@ func init() {
 
 // Generates a preview of which contacts will be started in the given flow.
 //
-//   {
-//     "org_id": 1,
-//     "flow_id": 2,
-//     "include": {
-//       "group_uuids": ["5fa925e4-edd8-4e2a-ab24-b3dbb5932ddd", "2912b95f-5b89-4d39-a2a8-5292602f357f"],
-//       "contact_uuids": ["e5bb9e6f-7703-4ba1-afba-0b12791de38b"],
-//       "urns": ["tel:+1234567890"],
-//       "user_query": ""
-//     },
-//     "exclude": {
-//       "non_active": false,
-//       "in_a_flow": false,
-//       "started_previously": true,
-//       "not_seen_recently": false
-//     },
-//     "sample_size": 5
-//   }
+//	{
+//	  "org_id": 1,
+//	  "flow_id": 2,
+//	  "include": {
+//	    "group_uuids": ["5fa925e4-edd8-4e2a-ab24-b3dbb5932ddd", "2912b95f-5b89-4d39-a2a8-5292602f357f"],
+//	    "contact_uuids": ["e5bb9e6f-7703-4ba1-afba-0b12791de38b"],
+//	    "urns": ["tel:+1234567890"],
+//	    "user_query": ""
+//	  },
+//	  "exclude": {
+//	    "non_active": false,
+//	    "in_a_flow": false,
+//	    "started_previously": true,
+//	    "not_seen_recently": false
+//	  },
+//	  "sample_size": 5
+//	}
 //
-//   {
-//     "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b" OR tel = "+1234567890") AND history != \"Registration\"",
-//     "total": 567,
-//     "sample": [12, 34, 56, 67, 78],
-//     "metadata": {
-//       "fields": [
-//         {"key": "age", "name": "Age"}
-//       ],
-//       "allow_as_group": true
-//     }
-//   }
-//
+//	{
+//	  "query": "(group = "No Age" OR group = "No Name" OR uuid = "e5bb9e6f-7703-4ba1-afba-0b12791de38b" OR tel = "+1234567890") AND history != \"Registration\"",
+//	  "total": 567,
+//	  "sample": [12, 34, 56, 67, 78],
+//	  "metadata": {
+//	    "fields": [
+//	      {"key": "age", "name": "Age"}
+//	    ],
+//	    "allow_as_group": true
+//	  }
+//	}
 type previewStartRequest struct {
 	OrgID   models.OrgID  `json:"org_id"    validate:"required"`
 	FlowID  models.FlowID `json:"flow_id"   validate:"required"`
@@ -74,7 +72,7 @@ type previewStartResponse struct {
 
 func handlePreviewStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &previewStartRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 

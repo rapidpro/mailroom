@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/modifiers"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -27,12 +26,11 @@ func init() {
 
 // Represents a surveyor submission
 //
-//   {
-//     "session": {...},
-//     "events": [{...}],
-//     "modifiers": [{...}]
-//   }
-//
+//	{
+//	  "session": {...},
+//	  "events": [{...}],
+//	  "modifiers": [{...}]
+//	}
 type submitRequest struct {
 	Session   json.RawMessage   `json:"session"    validate:"required"`
 	Events    []json.RawMessage `json:"events"`
@@ -53,7 +51,7 @@ type submitResponse struct {
 // handles a surveyor request
 func handleSubmit(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &submitRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
 	}
 

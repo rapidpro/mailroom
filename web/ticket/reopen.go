@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -18,15 +17,14 @@ func init() {
 
 // Reopens any closed tickets with the given ids
 //
-//   {
-//     "org_id": 123,
-//     "user_id": 234,
-//     "ticket_ids": [1234, 2345]
-//   }
-//
+//	{
+//	  "org_id": 123,
+//	  "user_id": 234,
+//	  "ticket_ids": [1234, 2345]
+//	}
 func handleReopen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &bulkTicketRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 

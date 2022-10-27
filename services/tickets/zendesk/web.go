@@ -133,7 +133,7 @@ type eventCallbackRequest struct {
 
 func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &eventCallbackRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 
@@ -269,7 +269,7 @@ func handleTicketerTarget(ctx context.Context, rt *runtime.Runtime, r *http.Requ
 
 	// parse request payload
 	request := &targetRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -24,16 +23,15 @@ type addNoteRequest struct {
 
 // Adds the given text note to the tickets with the given ids
 //
-//   {
-//     "org_id": 123,
-//     "user_id": 234,
-//     "ticket_ids": [1234, 2345],
-//     "note": "spam"
-//   }
-//
+//	{
+//	  "org_id": 123,
+//	  "user_id": 234,
+//	  "ticket_ids": [1234, 2345],
+//	  "note": "spam"
+//	}
 func handleAddNote(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &addNoteRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -24,17 +23,16 @@ type assignRequest struct {
 
 // Assigns the tickets with the given ids to the given user
 //
-//   {
-//     "org_id": 123,
-//     "user_id": 234,
-//     "ticket_ids": [1234, 2345],
-//     "assignee_id": 567,
-//     "note": "please look at these"
-//   }
-//
+//	{
+//	  "org_id": 123,
+//	  "user_id": 234,
+//	  "ticket_ids": [1234, 2345],
+//	  "assignee_id": 567,
+//	  "note": "please look at these"
+//	}
 func handleAssign(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &assignRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 

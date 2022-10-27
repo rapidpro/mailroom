@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/runtime"
@@ -20,11 +19,10 @@ func init() {
 
 // Request to resend failed messages.
 //
-//   {
-//     "org_id": 1,
-//     "msg_ids": [123456, 345678]
-//   }
-//
+//	{
+//	  "org_id": 1,
+//	  "msg_ids": [123456, 345678]
+//	}
 type resendRequest struct {
 	OrgID  models.OrgID   `json:"org_id"   validate:"required"`
 	MsgIDs []models.MsgID `json:"msg_ids"  validate:"required"`
@@ -33,7 +31,7 @@ type resendRequest struct {
 // handles a request to resend the given messages
 func handleResend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &resendRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 

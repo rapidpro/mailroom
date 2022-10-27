@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -23,16 +22,15 @@ type changeTopicRequest struct {
 
 // Changes the topic of the tickets with the given ids
 //
-//   {
-//     "org_id": 123,
-//     "user_id": 234,
-//     "ticket_ids": [1234, 2345],
-//     "topic_id": 345
-//   }
-//
+//	{
+//	  "org_id": 123,
+//	  "user_id": 234,
+//	  "ticket_ids": [1234, 2345],
+//	  "topic_id": 345
+//	}
 func handleChangeTopic(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &changeTopicRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 

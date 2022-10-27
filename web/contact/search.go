@@ -6,7 +6,6 @@ import (
 
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/contactql"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
@@ -22,13 +21,12 @@ func init() {
 
 // Searches the contacts for an org
 //
-//   {
-//     "org_id": 1,
-//     "group_id": 234,
-//     "query": "age > 10",
-//     "sort": "-age"
-//   }
-//
+//	{
+//	  "org_id": 1,
+//	  "group_id": 234,
+//	  "query": "age > 10",
+//	  "sort": "-age"
+//	}
 type searchRequest struct {
 	OrgID      models.OrgID       `json:"org_id"     validate:"required"`
 	GroupID    models.GroupID     `json:"group_id"`
@@ -42,18 +40,18 @@ type searchRequest struct {
 
 // Response for a contact search
 //
-// {
-//   "query": "age > 10",
-//   "contact_ids": [5,10,15],
-//   "total": 3,
-//   "offset": 0,
-//   "metadata": {
-//     "fields": [
-//       {"key": "age", "name": "Age"}
-//     ],
-//     "allow_as_group": true
-//   }
-// }
+//	{
+//	  "query": "age > 10",
+//	  "contact_ids": [5,10,15],
+//	  "total": 3,
+//	  "offset": 0,
+//	  "metadata": {
+//	    "fields": [
+//	      {"key": "age", "name": "Age"}
+//	    ],
+//	    "allow_as_group": true
+//	  }
+//	}
 type searchResponse struct {
 	Query      string                `json:"query"`
 	ContactIDs []models.ContactID    `json:"contact_ids"`
@@ -70,7 +68,7 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 		PageSize: 50,
 		Sort:     "-id",
 	}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
@@ -122,12 +120,11 @@ func handleSearch(ctx context.Context, rt *runtime.Runtime, r *http.Request) (in
 
 // Request to parse the passed in query
 //
-//   {
-//     "org_id": 1,
-//     "query": "age > 10",
-//     "group_id": 234
-//   }
-//
+//	{
+//	  "org_id": 1,
+//	  "query": "age > 10",
+//	  "group_id": 234
+//	}
 type parseRequest struct {
 	OrgID     models.OrgID     `json:"org_id"     validate:"required"`
 	Query     string           `json:"query"      validate:"required"`
@@ -138,16 +135,16 @@ type parseRequest struct {
 
 // Response for a parse query request
 //
-// {
-//   "query": "age > 10",
-//   "elastic_query": { .. },
-//   "metadata": {
-//     "fields": [
-//       {"key": "age", "name": "Age"}
-//     ],
-//     "allow_as_group": true
-//   }
-// }
+//	{
+//	  "query": "age > 10",
+//	  "elastic_query": { .. },
+//	  "metadata": {
+//	    "fields": [
+//	      {"key": "age", "name": "Age"}
+//	    ],
+//	    "allow_as_group": true
+//	  }
+//	}
 type parseResponse struct {
 	Query        string                `json:"query"`
 	ElasticQuery interface{}           `json:"elastic_query"`
@@ -157,7 +154,7 @@ type parseResponse struct {
 // handles a query parsing request
 func handleParseQuery(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &parseRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 

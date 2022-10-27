@@ -8,7 +8,6 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -27,11 +26,10 @@ func init() {
 
 // Migrates a flow to the latest flow specification
 //
-//   {
-//     "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...},
-//     "to_version": "13.0.0"
-//   }
-//
+//	{
+//	  "flow": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "action_sets": [], ...},
+//	  "to_version": "13.0.0"
+//	}
 type migrateRequest struct {
 	Flow      json.RawMessage `json:"flow" validate:"required"`
 	ToVersion *semver.Version `json:"to_version"`
@@ -39,7 +37,7 @@ type migrateRequest struct {
 
 func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &migrateRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
@@ -62,11 +60,10 @@ func handleMigrate(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 // and dependencies in the flow. If `org_id` is specified then the dependencies will be checked
 // to see if they exist in the org assets.
 //
-//   {
-//     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]},
-//     "org_id": 1
-//   }
-//
+//	{
+//	  "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]},
+//	  "org_id": 1
+//	}
 type inspectRequest struct {
 	Flow  json.RawMessage `json:"flow" validate:"required"`
 	OrgID models.OrgID    `json:"org_id"`
@@ -74,7 +71,7 @@ type inspectRequest struct {
 
 func handleInspect(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &inspectRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
@@ -98,14 +95,13 @@ func handleInspect(ctx context.Context, rt *runtime.Runtime, r *http.Request) (i
 
 // Clones a flow, replacing all UUIDs with either the given mapping or new random UUIDs.
 //
-//   {
-//     "dependency_mapping": {
-//       "4ee4189e-0c06-4b00-b54f-5621329de947": "db31d23f-65b8-4518-b0f6-45638bfbbbf2",
-//       "723e62d8-a544-448f-8590-1dfd0fccfcd4": "f1fd861c-9e75-4376-a829-dcf76db6e721"
-//     },
-//     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]}
-//   }
-//
+//	{
+//	  "dependency_mapping": {
+//	    "4ee4189e-0c06-4b00-b54f-5621329de947": "db31d23f-65b8-4518-b0f6-45638bfbbbf2",
+//	    "723e62d8-a544-448f-8590-1dfd0fccfcd4": "f1fd861c-9e75-4376-a829-dcf76db6e721"
+//	  },
+//	  "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]}
+//	}
 type cloneRequest struct {
 	DependencyMapping map[uuids.UUID]uuids.UUID `json:"dependency_mapping"`
 	Flow              json.RawMessage           `json:"flow" validate:"required"`
@@ -113,7 +109,7 @@ type cloneRequest struct {
 
 func handleClone(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &cloneRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
@@ -134,11 +130,10 @@ func handleClone(ctx context.Context, rt *runtime.Runtime, r *http.Request) (int
 
 // Changes the language of a flow by replacing the text with a translation.
 //
-//   {
-//     "language": "spa",
-//     "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]}
-//   }
-//
+//	{
+//	  "language": "spa",
+//	  "flow": { "uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "nodes": [...]}
+//	}
 type changeLanguageRequest struct {
 	Language envs.Language   `json:"language" validate:"required"`
 	Flow     json.RawMessage `json:"flow"     validate:"required"`
@@ -146,7 +141,7 @@ type changeLanguageRequest struct {
 
 func handleChangeLanguage(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	request := &changeLanguageRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return errors.Wrapf(err, "request failed validation"), http.StatusBadRequest, nil
 	}
 
