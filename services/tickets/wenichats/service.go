@@ -83,7 +83,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
 
-	roomData := &RoomRequest{Contact: &Contact{}}
+	roomData := &RoomRequest{Contact: &Contact{}, CustomFields: map[string]interface{}{}}
 
 	if assignee != nil {
 		roomData.UserEmail = assignee.Email()
@@ -101,6 +101,12 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	err := jsonx.Unmarshal([]byte(body), extra)
 	if err == nil {
 		roomData.CustomFields = extra.CustomFields
+	}
+
+	for k, v := range contact.Fields() {
+		if v != nil {
+			roomData.CustomFields[k] = v.Text.Render()
+		}
 	}
 
 	newRoom, trace, err := s.restClient.CreateRoom(roomData)
