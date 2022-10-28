@@ -1,3 +1,7 @@
+1.4.4-mailroom-7.1.22
+----------
+ * wenichats open ticket with contact fields as default in addition to custom fields
+
 1.4.3-mailroom-7.1.22
 ----------
  * fix twilio flex contact echo msgs from webhook
