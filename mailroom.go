@@ -154,7 +154,7 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// initialize our elastic client
-	mr.rt.ES, err = newElasticClient(c.Elastic)
+	mr.rt.ES, err = newElasticClient(c.Elastic, c.ElasticUsername, c.ElasticPassword)
 	if err != nil {
 		log.WithError(err).Error("elastic search not available")
 	} else {
@@ -271,7 +271,7 @@ func openAndCheckRedisPool(redisUrl string) (*redis.Pool, error) {
 	return rp, err
 }
 
-func newElasticClient(url string) (*elastic.Client, error) {
+func newElasticClient(url string, username string, password string) (*elastic.Client, error) {
 	// enable retrying
 	backoff := elastic.NewSimpleBackoff(500, 1000, 2000)
 	backoff.Jitter(true)
@@ -281,5 +281,6 @@ func newElasticClient(url string) (*elastic.Client, error) {
 		elastic.SetURL(url),
 		elastic.SetSniff(false),
 		elastic.SetRetrier(retrier),
+		elastic.SetBasicAuth(username, password),
 	)
 }
