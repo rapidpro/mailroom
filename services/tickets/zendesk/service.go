@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -79,6 +80,15 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contactDisplay := session.Contact().Format(session.Environment())
 
+	extra := &struct {
+		TicketFields []FieldValue `json:"fields"`
+	}{}
+
+	err := jsonx.Unmarshal([]byte(body), extra)
+	if err != nil {
+		return nil, err
+	}
+
 	msg := &ExternalResource{
 		ExternalID: string(ticket.UUID()), // there's no local msg so use ticket UUID instead
 		Message:    body,
@@ -89,6 +99,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			Name:       contactDisplay,
 		},
 		AllowChannelback: true,
+		Fields:           extra.TicketFields,
 	}
 
 	if err := s.push(msg, logHTTP); err != nil {
@@ -249,7 +260,6 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 // For example https://mybucket.s3.amazonaws.com/attachments/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // is sent to Zendesk as file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
-//
 func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
 	prefix := s.rtConfig.S3MediaPrefix
 	if !strings.HasPrefix(prefix, "/") {
