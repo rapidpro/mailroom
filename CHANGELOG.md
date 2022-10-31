@@ -1,3 +1,8 @@
+v7.5.29
+----------
+ * Update to latest gocommon and goflow
+ * Remove rocketchat as ticketer
+
 v7.5.28
 ----------
  * Update deps
