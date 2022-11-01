@@ -413,9 +413,10 @@ type TaskrouterTask struct {
 
 // https://www.twilio.com/docs/chat/rest/media
 type CreateMediaParams struct {
-	FileName string `json:"FileName,omitempty"`
-	Media    []byte `json:"Media,omitempty"`
-	Author   string `json:"Author,omitempty"`
+	FileName    string `json:"FileName,omitempty"`
+	Media       []byte `json:"Media,omitempty"`
+	Author      string `json:"Author,omitempty"`
+	ContentType string `json:"ContentType"`
 }
 
 // https://www.twilio.com/docs/chat/rest/media
