@@ -1,4 +1,4 @@
-1.4.0-mailroom-7.1.22
+1.4.0-mailroom-7.2.6
 ----------
  * Merge nyaruka tag v7.2.6 into weni 1.3.3-mailroom-7.1.22 and resolve conflicts.
 
