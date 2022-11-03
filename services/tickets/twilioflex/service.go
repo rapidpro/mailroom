@@ -2,6 +2,7 @@ package twilioflex
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -117,6 +118,19 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	flexChannelParams.TaskAttributes = body
+
+	bodyStruct := struct {
+		FlexFlowSid *string `json:"flex_flow_sid,omitempty"`
+	}{}
+
+	err = json.Unmarshal([]byte(body), &bodyStruct)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal body")
+	}
+
+	if bodyStruct.FlexFlowSid != nil {
+		flexChannelParams.FlexFlowSid = *bodyStruct.FlexFlowSid
+	}
 
 	newFlexChannel, trace, err := s.restClient.CreateFlexChannel(flexChannelParams)
 	if trace != nil {
