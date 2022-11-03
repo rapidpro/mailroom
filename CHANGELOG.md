@@ -1,3 +1,7 @@
+v7.5.30
+----------
+ * Add workaround to contact resolve endpoint to deal with invalid phone numbers
+
 v7.5.29
 ----------
  * Update to latest gocommon and goflow
