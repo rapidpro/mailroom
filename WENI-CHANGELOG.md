@@ -1,3 +1,7 @@
+1.4.0-mailroom-7.1.22
+----------
+ * Merge nyaruka tag v7.2.6 into weni 1.3.3-mailroom-7.1.22 and resolve conflicts.
+
 1.3.3-mailroom-7.1.22
 ----------
  * Fix contacts msgs query
