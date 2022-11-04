@@ -248,7 +248,7 @@ func processCommentOnNewTicket(ctx context.Context, rt *runtime.Runtime, reqID R
 
 type webhookRequest struct {
 	Event  string `json:"event"   validate:"required"`
-	ID     string `json:"id"      validate:"required"`
+	ID     int    `json:"id"      validate:"required"`
 	Status string `json:"status"`
 }
 
@@ -274,7 +274,7 @@ func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Req
 	}
 
 	// lookup ticket
-	ticket, err := models.LookupTicketByExternalID(ctx, rt.DB, ticketer.ID(), fmt.Sprintf("%s", request.ID))
+	ticket, err := models.LookupTicketByExternalID(ctx, rt.DB, ticketer.ID(), fmt.Sprintf("%d", request.ID))
 	if err != nil || ticket == nil {
 		// we don't return an error here, because ticket might just belong to a different ticketer
 		return map[string]string{"status": "ignored"}, http.StatusOK, nil
