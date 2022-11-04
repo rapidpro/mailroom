@@ -99,12 +99,12 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		msg.Message = body
 	} else {
 		extra := &struct {
-			Message      string      `json:"message"`
-			Priority     string      `json:"priority"`
-			Subject      string      `json:"subject"`
-			Description  string      `json:"description"`
-			CustomFields interface{} `json:"custom_fields"`
-			Tags         []string    `json:"tags"`
+			Message      string       `json:"message"`
+			Priority     string       `json:"priority"`
+			Subject      string       `json:"subject"`
+			Description  string       `json:"description"`
+			CustomFields []FieldValue `json:"custom_fields"`
+			Tags         []string     `json:"tags"`
 		}{}
 
 		err := jsonx.Unmarshal([]byte(body), extra)
@@ -116,7 +116,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		fields := reflect.Indirect(v)
 		if fields.NumField() > 0 {
 			for i := 0; i < fields.NumField(); i++ {
-				if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != 0 {
+				if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != "" {
+					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+				} else if fields.Type().Field(i).Tag.Get("json") == "custom_fields" && fields.Field(i).Interface() != nil {
 					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
 				}
 			}
@@ -141,14 +143,16 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, err
 	}
 	response := &struct {
-		TicketID int `json:"id"`
+		Tickets []struct {
+			TicketID int `json:"id"`
+		} `json:"tickets"`
 	}{}
 	err = jsonx.Unmarshal(trace.ResponseBody, response)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = s.restClient.put(fmt.Sprint(response.TicketID)+"/tags.json", tags, nil)
+	_, err = s.restClient.put(fmt.Sprint(response.Tickets[0].TicketID)+"/tags.json", tags, nil)
 	if err != nil {
 		return nil, err
 	}
