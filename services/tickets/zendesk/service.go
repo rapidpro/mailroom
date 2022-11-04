@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -81,7 +83,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	msg := &ExternalResource{
 		ExternalID: string(ticket.UUID()), // there's no local msg so use ticket UUID instead
-		Message:    body,
 		ThreadID:   string(ticket.UUID()),
 		CreatedAt:  dates.Now(),
 		Author: Author{
@@ -91,8 +92,71 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		AllowChannelback: true,
 	}
 
+	var tags []string
+
+	fieldsValue := []FieldValue{}
+	if !strings.HasPrefix(body, "{") {
+		msg.Message = body
+	} else {
+		extra := &struct {
+			Message      string       `json:"message"`
+			Priority     string       `json:"priority"`
+			Subject      string       `json:"subject"`
+			Description  string       `json:"description"`
+			CustomFields []FieldValue `json:"custom_fields"`
+			Tags         []string     `json:"tags"`
+		}{}
+
+		err := jsonx.Unmarshal([]byte(body), extra)
+		if err != nil {
+			return nil, err
+		}
+
+		v := reflect.ValueOf(extra)
+		fields := reflect.Indirect(v)
+		if fields.NumField() > 0 {
+			for i := 0; i < fields.NumField(); i++ {
+				if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != "" {
+					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+				} else if fields.Type().Field(i).Tag.Get("json") == "custom_fields" && fields.Field(i).Interface() != nil {
+					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+				}
+			}
+			msg.Fields = fieldsValue
+		}
+
+		if extra.Message != "" {
+			msg.Message = extra.Message
+		} else {
+			msg.Message = extra.Subject
+		}
+
+		tags = extra.Tags
+	}
+
 	if err := s.push(msg, logHTTP); err != nil {
 		return nil, err
+	}
+
+	if tags != nil {
+		trace, err := s.restClient.get("tickets?external_id="+string(ticket.UUID()), nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		response := &struct {
+			Tickets []struct {
+				TicketID int `json:"id"`
+			} `json:"tickets"`
+		}{}
+		err = jsonx.Unmarshal(trace.ResponseBody, response)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = s.restClient.put(fmt.Sprint(response.Tickets[0].TicketID)+"/tags.json", tags, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return ticket, nil
@@ -249,7 +313,6 @@ func (s *service) push(msg *ExternalResource, logHTTP flows.HTTPLogCallback) err
 // For example https://mybucket.s3.amazonaws.com/attachments/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // is sent to Zendesk as file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
 // which it will request as POST https://textit.com/tickets/types/zendesk/file/1/01c1/1aa4/01c11aa4-770a-4783.jpg
-//
 func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, error) {
 	prefix := s.rtConfig.S3MediaPrefix
 	if !strings.HasPrefix(prefix, "/") {

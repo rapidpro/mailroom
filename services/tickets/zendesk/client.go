@@ -34,6 +34,10 @@ type errorResponse struct {
 	Description string `json:"description"`
 }
 
+func (c *baseClient) get(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+	return c.request("GET", endpoint, payload, response)
+}
+
 func (c *baseClient) post(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
 	return c.request("POST", endpoint, payload, response)
 }
@@ -225,8 +229,8 @@ func NewPushClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subd
 
 // FieldValue is a value for the named field
 type FieldValue struct {
-	ID    string `json:"id"`
-	Value string `json:"value"`
+	ID    string      `json:"id"`
+	Value interface{} `json:"value"`
 }
 
 // Author see https://developer.zendesk.com/rest_api/docs/support/channel_framework#author-object
