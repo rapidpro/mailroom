@@ -138,23 +138,25 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, err
 	}
 
-	trace, err := s.restClient.get("tickets?external_id="+string(ticket.UUID()), nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	response := &struct {
-		Tickets []struct {
-			TicketID int `json:"id"`
-		} `json:"tickets"`
-	}{}
-	err = jsonx.Unmarshal(trace.ResponseBody, response)
-	if err != nil {
-		return nil, err
-	}
+	if tags != nil {
+		trace, err := s.restClient.get("tickets?external_id="+string(ticket.UUID()), nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		response := &struct {
+			Tickets []struct {
+				TicketID int `json:"id"`
+			} `json:"tickets"`
+		}{}
+		err = jsonx.Unmarshal(trace.ResponseBody, response)
+		if err != nil {
+			return nil, err
+		}
 
-	_, err = s.restClient.put(fmt.Sprint(response.Tickets[0].TicketID)+"/tags.json", tags, nil)
-	if err != nil {
-		return nil, err
+		_, err = s.restClient.put(fmt.Sprint(response.Tickets[0].TicketID)+"/tags.json", tags, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return ticket, nil
