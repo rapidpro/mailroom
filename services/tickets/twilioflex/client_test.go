@@ -377,8 +377,9 @@ func TestCreateMediaResource(t *testing.T) {
 	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
 
 	mediaContent := &twilioflex.CreateMediaParams{
-		FileName: "00ac28a5d76a30d5c8ec4f3a73964887.jpg",
-		Media:    []byte(""),
+		FileName:    "00ac28a5d76a30d5c8ec4f3a73964887.jpg",
+		Media:       []byte(""),
+		ContentType: "image/jpeg",
 	}
 
 	_, _, err := client.CreateMedia(mediaContent)

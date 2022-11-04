@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
@@ -206,10 +207,13 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			}
 			filename := path.Base(parsedURL.Path)
 
+			mimeType := mimetype.Detect(resp.ResponseBody)
+
 			media := CreateMediaParams{
-				FileName: filename,
-				Media:    resp.ResponseBody,
-				Author:   identity,
+				FileName:    filename,
+				Media:       resp.ResponseBody,
+				Author:      identity,
+				ContentType: mimeType.String(),
 			}
 
 			mediaAttachements = append(mediaAttachements, media)
