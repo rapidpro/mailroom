@@ -1,3 +1,16 @@
+1.4.4-mailroom-7.1.22
+----------
+ * wenichats open ticket with contact fields as default in addition to custom fields
+
+1.4.3-mailroom-7.1.22
+----------
+ * fix twilio flex contact echo msgs from webhook
+
+1.4.2-mailroom-7.1.22
+----------
+ * twilio flex support extra fields
+ * twilio flex has Header X-Twilio-Webhook-Enabled=True on send msg
+
 1.4.1-mailroom-7.1.22
 ----------
  * wenichats ticketer support custom fields

@@ -2,6 +2,7 @@ package twilioflex
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,11 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -117,21 +118,19 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		ChatFriendlyName:     contact.Name(),
 	}
 
-	extra := &struct {
-		Department   string                 `json:"department"`
-		CustomFields map[string]interface{} `json:"custom_fields"`
+	flexChannelParams.TaskAttributes = body
+
+	bodyStruct := struct {
+		FlexFlowSid *string `json:"flex_flow_sid,omitempty"`
 	}{}
 
-	err = jsonx.Unmarshal([]byte(body), extra)
-	if err == nil {
-		taskAttributes := map[string]interface{}{
-			"department":    extra.Department,
-			"custom_fields": extra.CustomFields,
-		}
+	err = json.Unmarshal([]byte(body), &bodyStruct)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal body")
+	}
 
-		if attributes, err := jsonx.Marshal(taskAttributes); err == nil {
-			flexChannelParams.TaskAttributes = string(attributes)
-		}
+	if bodyStruct.FlexFlowSid != nil {
+		flexChannelParams.FlexFlowSid = *bodyStruct.FlexFlowSid
 	}
 
 	newFlexChannel, trace, err := s.restClient.CreateFlexChannel(flexChannelParams)
@@ -182,10 +181,12 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 		if msg.Direction() == "I" {
 			m.From = fmt.Sprint(contact.ID())
+			headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
+			_, trace, err = s.restClient.CreateMessage(m, headerWebhookEnabled)
 		} else {
 			m.From = "Bot"
+			_, trace, err = s.restClient.CreateMessage(m, nil)
 		}
-		_, trace, err = s.restClient.CreateMessage(m)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}
@@ -206,6 +207,9 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		for _, attachment := range attachments {
 			attUrl := attachment.URL()
 			req, err := http.NewRequest("GET", attUrl, nil)
+			if err != nil {
+				return err
+			}
 			resp, err := httpx.DoTrace(s.restClient.httpClient, req, s.restClient.httpRetries, nil, -1)
 			if err != nil {
 				return err
@@ -217,10 +221,13 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			}
 			filename := path.Base(parsedURL.Path)
 
+			mimeType := mimetype.Detect(resp.ResponseBody)
+
 			media := CreateMediaParams{
-				FileName: filename,
-				Media:    resp.ResponseBody,
-				Author:   identity,
+				FileName:    filename,
+				Media:       resp.ResponseBody,
+				Author:      identity,
+				ContentType: mimeType.String(),
 			}
 
 			mediaAttachements = append(mediaAttachements, media)
@@ -228,17 +235,25 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 
 		for _, mediaParams := range mediaAttachements {
 			media, trace, err := s.restClient.CreateMedia(&mediaParams)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
 			if err != nil {
 				return err
 			}
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 
 			msg := &CreateChatMessageParams{
 				From:       identity,
 				ChannelSid: string(ticket.ExternalID()),
 				MediaSid:   media.Sid,
 			}
-			_, trace, err = s.restClient.CreateMessage(msg)
+			_, trace, err = s.restClient.CreateMessage(msg, http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}})
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return err
+			}
 		}
 
 	}
@@ -249,7 +264,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			Body:       text,
 			ChannelSid: string(ticket.ExternalID()),
 		}
-		_, trace, err := s.restClient.CreateMessage(msg)
+		_, trace, err := s.restClient.CreateMessage(msg, http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}})
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}

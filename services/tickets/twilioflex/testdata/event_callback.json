@@ -34,6 +34,29 @@
     }
   },
   {
+    "label": "dont create message from own contact echo message",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/$cathy_ticket_uuid$",
+    "headers": {
+      "Authorization": "Token 123456789"
+    },
+    "body": "EventType=onMessageSent&InstanceSid=IS38067ec392f1486bb6e4de4610f26fb3&Attributes=%7B%7D&DateCreated=2022-03-10T23%3A56%3A43.412Z&Index=1&From=teste_2Etwilioflex&MessageSid=IM4b440f124820414b8f500a1235532ac1&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ChannelSid=CH1880a9cde40c4dbb88dd97fc3aedac08&ClientIdentity=10000&RetryCount=0&WebhookType=webhook&Body=We can help&WebhookSid=WH99d1f1895a7c4e6fa10ac5e8ac0c2242",
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O'",
+        "count": 0
+      },
+      {
+        "query": "select count(*) from tickets_ticket where status = 'O'",
+        "count": 1
+      }
+    ]
+  },
+  {
     "label": "create message if everything is correct",
     "method": "POST",
     "path": "/mr/tickets/types/twilioflex/event_callback/12cc5dcf-44c2-4b25-9781-27275873e0df/$cathy_ticket_uuid$",

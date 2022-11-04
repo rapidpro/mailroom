@@ -3,6 +3,7 @@ package twilioflex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -75,32 +76,36 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 
 	switch request.EventType {
 	case "onMessageSent":
-		_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{})
-		if err != nil {
-			return err, http.StatusBadRequest, nil
+		if request.ClientIdentity != fmt.Sprint(ticket.ContactID()) && request.From != fmt.Sprint(ticket.ContactID()) { // prevent echo message
+			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{})
+			if err != nil {
+				return err, http.StatusBadRequest, nil
+			}
 		}
 	case "onMediaMessageSent":
-		config := ticketer.Config
-		authToken := config(configurationAuthToken)
-		accountSid := config(configurationAccountSid)
-		chatServiceSid := config(configurationChatServiceSid)
-		workspaceSid := config(configurationWorkspaceSid)
-		flexFlowSid := config(configurationFlexFlowSid)
+		if request.ClientIdentity != fmt.Sprint(ticket.ContactID()) && request.From != fmt.Sprint(ticket.ContactID()) { // prevent echo message
+			config := ticketer.Config
+			authToken := config(configurationAuthToken)
+			accountSid := config(configurationAccountSid)
+			chatServiceSid := config(configurationChatServiceSid)
+			workspaceSid := config(configurationWorkspaceSid)
+			flexFlowSid := config(configurationFlexFlowSid)
 
-		client := NewClient(http.DefaultClient, nil, authToken, accountSid, chatServiceSid, workspaceSid, flexFlowSid)
+			client := NewClient(http.DefaultClient, nil, authToken, accountSid, chatServiceSid, workspaceSid, flexFlowSid)
 
-		mediaContent, _, err := client.FetchMedia(request.MediaSid)
-		if err != nil {
-			return err, http.StatusBadRequest, nil
-		}
-		file, err := tickets.FetchFile(mediaContent.Links.ContentDirectTemporary, nil)
-		file.ContentType = mediaContent.ContentType
-		if err != nil {
-			return errors.Wrapf(err, "error fetching ticket file '%s'", mediaContent.Links.ContentDirectTemporary), http.StatusBadRequest, nil
-		}
-		_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{file})
-		if err != nil {
-			return err, http.StatusBadRequest, nil
+			mediaContent, _, err := client.FetchMedia(request.MediaSid)
+			if err != nil {
+				return err, http.StatusBadRequest, nil
+			}
+			file, err := tickets.FetchFile(mediaContent.Links.ContentDirectTemporary, nil)
+			file.ContentType = mediaContent.ContentType
+			if err != nil {
+				return errors.Wrapf(err, "error fetching ticket file '%s'", mediaContent.Links.ContentDirectTemporary), http.StatusBadRequest, nil
+			}
+			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{file})
+			if err != nil {
+				return err, http.StatusBadRequest, nil
+			}
 		}
 	case "onChannelUpdated":
 		jsonMap := make(map[string]interface{})
