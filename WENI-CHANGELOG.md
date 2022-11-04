@@ -1,3 +1,10 @@
+1.4.5-mailroom-7.1.22
+----------
+ * Add Ticket Fields for Zendesk #86
+ * twilio flex detect and setup media on create media type  #87
+ * twilio flex open ticket can set preferred flexflow from body json field flex_flow_sid #88
+ * Swap targets for webhooks in Zendesk #89
+
 1.4.4-mailroom-7.1.22
 ----------
  * wenichats open ticket with contact fields as default in addition to custom fields
