@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 
 	"github.com/nyaruka/gocommon/dates"
@@ -80,18 +81,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contactDisplay := session.Contact().Format(session.Environment())
 
-	extra := &struct {
-		TicketFields []FieldValue `json:"fields"`
-	}{}
-
-	err := jsonx.Unmarshal([]byte(body), extra)
-	if err != nil {
-		return nil, err
-	}
-
 	msg := &ExternalResource{
 		ExternalID: string(ticket.UUID()), // there's no local msg so use ticket UUID instead
-		Message:    body,
 		ThreadID:   string(ticket.UUID()),
 		CreatedAt:  dates.Now(),
 		Author: Author{
@@ -99,10 +90,66 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			Name:       contactDisplay,
 		},
 		AllowChannelback: true,
-		Fields:           extra.TicketFields,
+	}
+
+	var tags []string
+
+	fieldsValue := []FieldValue{}
+	if !strings.HasPrefix(body, "{") {
+		msg.Message = body
+	} else {
+		extra := &struct {
+			Message      string      `json:"message"`
+			Priority     string      `json:"priority"`
+			Subject      string      `json:"subject"`
+			Description  string      `json:"description"`
+			CustomFields interface{} `json:"custom_fields"`
+			Tags         []string    `json:"tags"`
+		}{}
+
+		err := jsonx.Unmarshal([]byte(body), extra)
+		if err != nil {
+			return nil, err
+		}
+
+		v := reflect.ValueOf(extra)
+		fields := reflect.Indirect(v)
+		if fields.NumField() > 0 {
+			for i := 0; i < fields.NumField(); i++ {
+				if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != 0 {
+					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+				}
+			}
+			msg.Fields = fieldsValue
+		}
+
+		if extra.Message != "" {
+			msg.Message = extra.Message
+		} else {
+			msg.Message = extra.Subject
+		}
+
+		tags = extra.Tags
 	}
 
 	if err := s.push(msg, logHTTP); err != nil {
+		return nil, err
+	}
+
+	trace, err := s.restClient.get("tickets?external_id="+string(ticket.UUID()), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	response := &struct {
+		TicketID int `json:"id"`
+	}{}
+	err = jsonx.Unmarshal(trace.ResponseBody, response)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = s.restClient.put(fmt.Sprint(response.TicketID)+"/tags.json", tags, nil)
+	if err != nil {
 		return nil, err
 	}
 
