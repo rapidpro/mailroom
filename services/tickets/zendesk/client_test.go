@@ -11,62 +11,87 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateTarget(t *testing.T) {
+func TestCreateWebhook(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://nyaruka.zendesk.com/api/v2/targets.json": {
+		"https://nyaruka.zendesk.com/api/v2/webhooks": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"description": "Something went wrong", "error": "Unknown"}`), // non-200 response
 			httpx.NewMockResponse(200, nil, `xx`), // non-JSON response
 			httpx.NewMockResponse(201, nil, `{
-				"target": {
-					"id": 1234567,
-					"title": "Temba",
-					"target_url": "http://temba.io/updates",
-					"method": "POST",
-					"content_type": "application/json"
+				"webhook": {
+					"id": "1234567",
+					"name": "Temba",
+					"status": "active",
+					"subscriptions": [
+						"conditional_ticket_events"
+					],
+					"endpoint": "http://temba.io/updates",
+					"http_method": "POST",
+					"request_format": "json",
+					"authentication": {
+						"type": "basic_auth",
+						"data": {
+							"username": "zendesk",
+							"password":"cffc2ed5-ab65-4bd3-93ed-b4430a20984c"
+						},
+						"add_position": "header"
+					}
 				}
 			}`),
 		},
 	}))
 
 	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
-	target := &zendesk.Target{
-		Title:       "Temba",
-		TargetURL:   "http://temba.io/updates",
-		Method:      "POST",
-		ContentType: "application/json",
+	webhook := &zendesk.Webhook{
+		Authentication: struct {
+			AddPosition string "json:\"add_position\""
+			Data        struct {
+				Password string "json:\"password\""
+				Username string "json:\"username\""
+			} "json:\"data\""
+			Type string "json:\"type\""
+		}{AddPosition: "header", Type: "basic_auth", Data: struct {
+			Password string "json:\"password\""
+			Username string "json:\"username\""
+		}{Password: "cffc2ed5-ab65-4bd3-93ed-b4430a20984c", Username: "zendesk"}},
+		Endpoint:      "http://temba.io/updates",
+		HttpMethod:    "POST",
+		Name:          "Temba",
+		RequestFormat: "json",
+		Status:        "active",
+		Subscriptions: []string{"conditional_ticket_events"},
 	}
 
-	_, _, err := client.CreateTarget(target)
+	_, _, err := client.CreateWebhook(webhook)
 	assert.EqualError(t, err, "unable to connect to server")
 
-	_, _, err = client.CreateTarget(target)
+	_, _, err = client.CreateWebhook(webhook)
 	assert.EqualError(t, err, "Something went wrong")
 
-	_, _, err = client.CreateTarget(target)
+	_, _, err = client.CreateWebhook(webhook)
 	assert.EqualError(t, err, "invalid character 'x' looking for beginning of value")
 
-	target, trace, err := client.CreateTarget(target)
+	webhook, trace, err := client.CreateWebhook(webhook)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(1234567), target.ID)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 180\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "1234567", webhook.ID)
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 470\r\n\r\n", string(trace.ResponseTrace))
 }
 
-func TestDeleteTarget(t *testing.T) {
+func TestDeleteWebhook(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://nyaruka.zendesk.com/api/v2/targets/123.json": {
+		"https://nyaruka.zendesk.com/api/v2/webhooks/123": {
 			httpx.NewMockResponse(200, nil, ``),
 		},
 	}))
 
 	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
 
-	trace, err := client.DeleteTarget(123)
+	trace, err := client.DeleteWebhook(123)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "DELETE /api/v2/targets/123.json HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nAuthorization: Bearer 123456789\r\nAccept-Encoding: gzip\r\n\r\n", string(trace.RequestTrace))
+	assert.Equal(t, "DELETE /api/v2/webhooks/123 HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nAuthorization: Bearer 123456789\r\nAccept-Encoding: gzip\r\n\r\n", string(trace.RequestTrace))
 }
 
 func TestCreateTrigger(t *testing.T) {
@@ -90,7 +115,7 @@ func TestCreateTrigger(t *testing.T) {
 					},
 					"actions": [
 						{
-							"field": "notification_target",
+							"field": "notification_webhook",
 							"value": ["123", "{}"]
 						}
 					]
@@ -108,7 +133,7 @@ func TestCreateTrigger(t *testing.T) {
 			},
 		},
 		Actions: []zendesk.Action{
-			{"notification_target", []string{"123", "{}"}},
+			{"notification_webhook", []string{"123", "{}"}},
 		},
 	}
 
@@ -124,7 +149,7 @@ func TestCreateTrigger(t *testing.T) {
 	trigger, trace, err := client.CreateTrigger(trigger)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1234567), trigger.ID)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 317\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 318\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestDeleteTrigger(t *testing.T) {
