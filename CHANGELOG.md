@@ -1,3 +1,8 @@
+v7.5.31
+----------
+ * Set server idle timeout to 90 seconds
+ * Test against redis 6.2 and postgres 14
+
 v7.5.30
 ----------
  * Add workaround to contact resolve endpoint to deal with invalid phone numbers
