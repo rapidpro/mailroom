@@ -99,12 +99,12 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		msg.Message = body
 	} else {
 		extra := &struct {
-			Message      string       `json:"message"`
-			Priority     string       `json:"priority"`
-			Subject      string       `json:"subject"`
-			Description  string       `json:"description"`
-			CustomFields []FieldValue `json:"custom_fields"`
-			Tags         []string     `json:"tags"`
+			Message      string      `json:"message"`
+			Priority     string      `json:"priority"`
+			Subject      string      `json:"subject"`
+			Description  string      `json:"description"`
+			CustomFields interface{} `json:"custom_fields"`
+			Tags         []string    `json:"tags"`
 		}{}
 
 		err := jsonx.Unmarshal([]byte(body), extra)
