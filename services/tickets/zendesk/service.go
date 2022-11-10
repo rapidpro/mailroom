@@ -122,6 +122,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
 				}
 			}
+			fieldsValue = append(fieldsValue, FieldValue{ID: "external_id", Value: string(ticket.UUID())})
 			msg.Fields = fieldsValue
 		}
 
@@ -130,7 +131,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		} else {
 			msg.Message = extra.Subject
 		}
-
 		tags = extra.Tags
 	}
 
