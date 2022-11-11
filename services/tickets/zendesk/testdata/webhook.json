@@ -25,7 +25,7 @@
         "path": "/mr/tickets/types/zendesk/webhook/4ee6d4f3-f92b-439b-9718-8da90c05490b",
         "body": {
             "event": "status_changed",
-            "id": "1234",
+            "id": 1234,
             "status": "New"
         },
         "status": 401,
@@ -42,7 +42,7 @@
         },
         "body": {
             "event": "status_changed",
-            "id": "1234",
+            "id": 1234,
             "status": "New"
         },
         "status": 401,
@@ -75,7 +75,7 @@
         },
         "body": {
             "event": "status_changed",
-            "id": "34567845",
+            "id": 34567845,
             "status": "New"
         },
         "status": 200,
@@ -92,7 +92,7 @@
         },
         "body": {
             "event": "status_changed",
-            "id": "1234",
+            "id": 1234,
             "status": "Solved"
         },
         "status": 200,
@@ -115,7 +115,7 @@
         },
         "body": {
             "event": "status_changed",
-            "id": "1234",
+            "id": 1234,
             "status": "Abierto"
         },
         "status": 200,
@@ -138,7 +138,7 @@
         },
         "body": {
             "event": "status_changed",
-            "id": "1234",
+            "id": 1234,
             "status": "Aberto"
         },
         "status": 200,
