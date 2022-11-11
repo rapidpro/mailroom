@@ -1,3 +1,7 @@
+1.4.6-mailroom-7.1.22
+----------
+ * Fix tag registration, custom_fields and ticket closing in Zendesk #91
+
 1.4.5-mailroom-7.1.22
 ----------
  * Add Ticket Fields for Zendesk #86
