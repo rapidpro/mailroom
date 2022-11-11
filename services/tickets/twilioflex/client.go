@@ -227,6 +227,13 @@ func (c *Client) CreateMedia(media *CreateMediaParams) (*Media, *httpx.Trace, er
 	filenameReader := bytes.NewReader([]byte(media.FileName))
 	io.Copy(filenamePart, filenameReader)
 
+	mediaContentTypePart, err := writer.CreateFormField("ContentType")
+	if err != nil {
+		return nil, nil, err
+	}
+	mediaContentTypeReader := bytes.NewReader([]byte(media.ContentType))
+	io.Copy(mediaContentTypePart, mediaContentTypeReader)
+
 	writer.Close()
 
 	req, err := httpx.NewRequest("POST", url, body, map[string]string{})

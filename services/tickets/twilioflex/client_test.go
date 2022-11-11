@@ -391,6 +391,7 @@ func TestCreateMediaResource(t *testing.T) {
 	response, trace, err := client.CreateMedia(mediaContent)
 	assert.NoError(t, err)
 	assert.Equal(t, "00ac28a5d76a30d5c8ec4f3a73964887.jpg", response.Filename)
+	assert.Equal(t, "image/jpeg", response.ContentType)
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 788\r\n\r\n", string(trace.ResponseTrace))
 }
 
