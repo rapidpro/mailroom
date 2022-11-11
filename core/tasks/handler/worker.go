@@ -588,7 +588,15 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 	}
 
-	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, attachments)
+	// flow will only see the attachments we were able to fetch
+	availableAttachments := make([]utils.Attachment, 0, len(attachments))
+	for _, att := range attachments {
+		if att.ContentType() != utils.UnavailableType {
+			availableAttachments = append(availableAttachments, att)
+		}
+	}
+
+	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, availableAttachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
 
