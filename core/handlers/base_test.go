@@ -188,7 +188,7 @@ func RunTestCases(t *testing.T, ctx context.Context, rt *runtime.Runtime, tcs []
 			for _, s := range session {
 				msg := msgsByContactID[s.ContactID()]
 				if msg != nil {
-					s.SetIncomingMsg(msg.ID(), "")
+					s.SetIncomingMsg(models.MsgID(msg.ID()), "")
 				}
 			}
 			return nil

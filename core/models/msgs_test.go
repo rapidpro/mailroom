@@ -173,7 +173,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 		session := insertTestSession(t, ctx, rt, testdata.Org1, tc.Contact, testdata.Favorites)
 		if tc.ResponseTo != models.NilMsgID {
-			session.SetIncomingMsg(flows.MsgID(tc.ResponseTo), null.NullString)
+			session.SetIncomingMsg(tc.ResponseTo, null.NullString)
 		}
 
 		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, tc.Unsendable)
@@ -327,7 +327,7 @@ func TestMarshalMsg(t *testing.T) {
 		flows.NilUnsendableReason,
 	)
 	in1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
-	session.SetIncomingMsg(flows.MsgID(in1.ID()), null.String("EX123"))
+	session.SetIncomingMsg(models.MsgID(in1.ID()), null.String("EX123"))
 	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg2, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
 

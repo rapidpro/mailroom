@@ -156,6 +156,7 @@ type fetchAttachmentRequest struct {
 	ChannelType models.ChannelType `json:"channel_type"`
 	ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
 	URL         string             `json:"url"`
+	MsgID       models.MsgID       `json:"msg_id"`
 }
 
 type fetchAttachmentResponse struct {
@@ -168,11 +169,12 @@ type fetchAttachmentResponse struct {
 }
 
 // FetchAttachment calls courier to fetch the given attachment
-func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channel, attURL string) (utils.Attachment, models.ChannelLogUUID, error) {
+func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channel, attURL string, msgID models.MsgID) (utils.Attachment, models.ChannelLogUUID, error) {
 	payload := jsonx.MustMarshal(&fetchAttachmentRequest{
 		ChannelType: ch.Type(),
 		ChannelUUID: ch.UUID(),
 		URL:         attURL,
+		MsgID:       msgID,
 	})
 	req, _ := http.NewRequest("POST", fmt.Sprintf("https://%s/c/_fetch-attachment", rt.Config.Domain), bytes.NewReader(payload))
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.Config.CourierAuthToken))

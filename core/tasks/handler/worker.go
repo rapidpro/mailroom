@@ -495,7 +495,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			if utils.Attachment(attURL).ContentType() != "" {
 				attachments = append(attachments, utils.Attachment(attURL))
 			} else {
-				attachment, logUUID, err := msgio.FetchAttachment(ctx, rt, channel, attURL)
+				attachment, logUUID, err := msgio.FetchAttachment(ctx, rt, channel, attURL, event.MsgID)
 				if err != nil {
 					return errors.Wrapf(err, "error fetching attachment '%s'", attURL)
 				}
@@ -598,7 +598,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, availableAttachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
-	msgIn.SetID(event.MsgID)
+	msgIn.SetID(flows.MsgID(event.MsgID))
 
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
@@ -783,7 +783,7 @@ func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Conta
 		flowID = flow.ID()
 	}
 
-	err := models.UpdateMessage(ctx, db, msg.ID(), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, attachments, logUUIDs)
+	err := models.UpdateMessage(ctx, db, models.MsgID(msg.ID()), models.MsgStatusHandled, models.VisibilityVisible, msgType, flowID, attachments, logUUIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error marking message as handled")
 	}
@@ -813,7 +813,7 @@ type MsgEvent struct {
 	ContactID     models.ContactID `json:"contact_id"`
 	OrgID         models.OrgID     `json:"org_id"`
 	ChannelID     models.ChannelID `json:"channel_id"`
-	MsgID         flows.MsgID      `json:"msg_id"`
+	MsgID         models.MsgID     `json:"msg_id"`
 	MsgUUID       flows.MsgUUID    `json:"msg_uuid"`
 	MsgExternalID null.String      `json:"msg_external_id"`
 	URN           urns.URN         `json:"urn"`

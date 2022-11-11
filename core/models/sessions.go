@@ -165,8 +165,8 @@ func (s *Session) OutputMD5() string {
 }
 
 // SetIncomingMsg set the incoming message that this session should be associated with in this sprint
-func (s *Session) SetIncomingMsg(id flows.MsgID, externalID null.String) {
-	s.incomingMsgID = MsgID(id)
+func (s *Session) SetIncomingMsg(id MsgID, externalID null.String) {
+	s.incomingMsgID = id
 	s.incomingExternalID = externalID
 }
 
