@@ -1,3 +1,9 @@
+v7.5.32
+----------
+ * Send msg id to fetch-attachments endpoint and clean up flows.MsgID vs models.MsgID
+ * Revert "Remove rocketchat as ticketer"
+ * Don't include unavailable attachments in flows but do save them
+
 v7.5.31
 ----------
  * Set server idle timeout to 90 seconds
