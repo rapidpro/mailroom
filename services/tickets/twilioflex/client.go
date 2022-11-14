@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -213,26 +214,21 @@ func (c *Client) CreateMedia(media *CreateMediaParams) (*Media, *httpx.Trace, er
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	mediaPart, err := writer.CreateFormFile("Media", media.FileName)
+	h := make(textproto.MIMEHeader)
+	h.Set(
+		"Content-Disposition",
+		fmt.Sprintf(
+			`form-data; name="%s"; filename="%s"`,
+			"Media", media.FileName,
+		),
+	)
+	h.Set("Content-Type", media.ContentType)
+	mediaPart, err := writer.CreatePart(h)
 	if err != nil {
 		return nil, nil, err
 	}
 	mediaReader := bytes.NewReader(media.Media)
 	io.Copy(mediaPart, mediaReader)
-
-	filenamePart, err := writer.CreateFormField("FileName")
-	if err != nil {
-		return nil, nil, err
-	}
-	filenameReader := bytes.NewReader([]byte(media.FileName))
-	io.Copy(filenamePart, filenameReader)
-
-	mediaContentTypePart, err := writer.CreateFormField("ContentType")
-	if err != nil {
-		return nil, nil, err
-	}
-	mediaContentTypeReader := bytes.NewReader([]byte(media.ContentType))
-	io.Copy(mediaContentTypePart, mediaContentTypeReader)
 
 	writer.Close()
 
