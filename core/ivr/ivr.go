@@ -481,7 +481,7 @@ func ResumeIVRFlow(
 	case InputResume:
 		resume, svcErr, err = buildMsgResume(ctx, rt, svc, channel, contact, urn, call, oa, r, res)
 		if resume != nil {
-			session.SetIncomingMsg(resume.(*resumes.MsgResume).Msg().ID(), null.NullString)
+			session.SetIncomingMsg(models.MsgID(resume.(*resumes.MsgResume).Msg().ID()), null.NullString)
 		}
 
 	case DialResume:
