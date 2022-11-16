@@ -124,10 +124,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		FlexFlowSid *string `json:"flex_flow_sid,omitempty"`
 	}{}
 
-	err = json.Unmarshal([]byte(body), &bodyStruct)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal body")
-	}
+	json.Unmarshal([]byte(body), &bodyStruct)
 
 	if bodyStruct.FlexFlowSid != nil {
 		flexChannelParams.FlexFlowSid = *bodyStruct.FlexFlowSid
