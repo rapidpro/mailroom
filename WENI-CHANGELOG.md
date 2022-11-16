@@ -1,3 +1,7 @@
+1.4.7-mailroom-7.1.22
+----------
+ * Fix twilio flex media creation content-type param #93
+
 1.4.6-mailroom-7.1.22
 ----------
  * Fix tag registration, custom_fields and ticket closing in Zendesk #91
