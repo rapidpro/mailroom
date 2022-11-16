@@ -1,3 +1,8 @@
+v7.5.33
+----------
+ * Test with only redis 6.2
+ * Don't filter labels by label_type which is being removed
+
 v7.5.32
 ----------
  * Send msg id to fetch-attachments endpoint and clean up flows.MsgID vs models.MsgID
