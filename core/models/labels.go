@@ -36,7 +36,7 @@ func (l *Label) Name() string { return l.l.Name }
 func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Label, error) {
 	start := time.Now()
 
-	rows, err := db.Queryx(selectLabelsSQL, orgID)
+	rows, err := db.Queryx(sqlSelectLabels, orgID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error querying labels for org: %d", orgID)
 	}
@@ -57,35 +57,24 @@ func loadLabels(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Lab
 	return labels, nil
 }
 
-const selectLabelsSQL = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	id, 
-	uuid, 
-	name
-FROM 
-	msgs_label
-WHERE 
-	org_id = $1 AND 
-	is_active = TRUE AND
-	label_type = 'L'
-ORDER BY 
-	name ASC
+const sqlSelectLabels = `
+SELECT ROW_TO_JSON(r) FROM (
+	  SELECT id, uuid, name
+        FROM msgs_label
+       WHERE org_id = $1 AND is_active = TRUE
+    ORDER BY name ASC
 ) r;
 `
 
 // AddMsgLabels inserts the passed in msg labels to our db
 func AddMsgLabels(ctx context.Context, tx *sqlx.Tx, adds []*MsgLabelAdd) error {
-	err := BulkQuery(ctx, "inserting msg labels", tx, insertMsgLabelsSQL, adds)
+	err := BulkQuery(ctx, "inserting msg labels", tx, sqlInsertMsgLabels, adds)
 	return errors.Wrapf(err, "error inserting new msg labels")
 }
 
-const insertMsgLabelsSQL = `
-INSERT INTO 
-	msgs_msg_labels(msg_id, label_id)
-	VALUES(:msg_id, :label_id)
-ON CONFLICT
-	DO NOTHING
-`
+const sqlInsertMsgLabels = `
+INSERT INTO msgs_msg_labels(msg_id, label_id) VALUES(:msg_id, :label_id)
+ON CONFLICT DO NOTHING`
 
 // MsgLabelAdd represents a single label that should be added to a message
 type MsgLabelAdd struct {
