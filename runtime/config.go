@@ -22,8 +22,11 @@ type Config struct {
 	ReadonlyDB string `validate:"omitempty,url,startswith=postgres:" help:"URL of optional connection to readonly database instance"`
 	DBPoolSize int    `                                              help:"the size of our db pool"`
 	Redis      string `validate:"url,startswith=redis:"              help:"URL for your Redis instance"`
-	Elastic    string `validate:"url"                                help:"URL for your ElasticSearch service"`
 	SentryDSN  string `                                              help:"the DSN used for logging errors to Sentry"`
+
+	Elastic         string `validate:"url"                                help:"URL for your ElasticSearch service"`
+	ElasticUsername string `help:"Username for ElasticSearch service"`
+	ElasticPassword string `help:"Password for ElasticSearch service"`
 
 	Address          string `help:"the address to bind our web server to"`
 	Port             int    `help:"the port to bind our web server to"`
@@ -83,7 +86,10 @@ func NewDefaultConfig() *Config {
 		ReadonlyDB: "",
 		DBPoolSize: 36,
 		Redis:      "redis://localhost:6379/15",
-		Elastic:    "http://localhost:9200",
+
+		Elastic:         "http://localhost:9200",
+		ElasticUsername: "",
+		ElasticPassword: "",
 
 		Address: "localhost",
 		Port:    8090,

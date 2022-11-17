@@ -35,9 +35,11 @@ For use with RapidPro, you will need to configure these settings:
 - `MAILROOM_DB`: URL describing how to connect to the RapidPro database (default "postgres://temba:temba@localhost/temba?sslmode=disable")
 - `MAILROOM_READONLY_DB`: URL for an additional database connection for read-only operations (optional)
 - `MAILROOM_REDIS`: URL describing how to connect to Redis (default "redis://localhost:6379/15")
-- `MAILROOM_ELASTIC`: URL describing how to connect to ElasticSearch (default "http://localhost:9200")
 - `MAILROOM_SMTP_SERVER`: the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com
 - `MAILROOM_FCM_KEY`: the key for Firebase Cloud Messaging used to sync Android channels
+- `MAILROOM_ELASTIC`: URL describing how to connect to ElasticSearch (default "http://localhost:9200")
+- `MAILROOM_ELASTIC_USERNAME`: ElasticSearch username for Basic Auth
+- `MAILROOM_ELASTIC_PASSWORD`: ElasticSearch password for Basic Auth
 
 For writing of message attachments, you need an S3 compatible service which you configure with:
 
