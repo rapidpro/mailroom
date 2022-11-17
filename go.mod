@@ -66,6 +66,6 @@ require (
 
 go 1.17
 
-replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-weni
+replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.17.1-weni
 
 replace github.com/gomodule/redigo => github.com/gomodule/redigo v1.8.8
