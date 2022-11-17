@@ -24,10 +24,6 @@ type Config struct {
 	Redis      string `validate:"url,startswith=redis:"              help:"URL for your Redis instance"`
 	SentryDSN  string `                                              help:"the DSN used for logging errors to Sentry"`
 
-	Elastic         string `validate:"url"                                help:"URL for your ElasticSearch service"`
-	ElasticUsername string `help:"Username for ElasticSearch service"`
-	ElasticPassword string `help:"Password for ElasticSearch service"`
-
 	Address          string `help:"the address to bind our web server to"`
 	Port             int    `help:"the port to bind our web server to"`
 	AuthToken        string `help:"the token clients will need to authenticate web requests"`
@@ -51,6 +47,10 @@ type Config struct {
 	MaxResumesPerSession int    `help:"the maximum number of resumes allowed per engine session"`
 	MaxValueLength       int    `help:"the maximum size in characters for contact field values and run result values"`
 	SessionStorage       string `validate:"omitempty,session_storage"         help:"where to store session output (s3|db)"`
+
+	Elastic         string `validate:"url" help:"the URL of your ElasticSearch instance"`
+	ElasticUsername string `help:"the username for ElasticSearch if using basic auth"`
+	ElasticPassword string `help:"the password for ElasticSearch if using basic auth"`
 
 	S3Endpoint          string `help:"the S3 endpoint we will write attachments to"`
 	S3Region            string `help:"the S3 region we will write attachments to"`
@@ -87,10 +87,6 @@ func NewDefaultConfig() *Config {
 		DBPoolSize: 36,
 		Redis:      "redis://localhost:6379/15",
 
-		Elastic:         "http://localhost:9200",
-		ElasticUsername: "",
-		ElasticPassword: "",
-
 		Address: "localhost",
 		Port:    8090,
 
@@ -111,6 +107,10 @@ func NewDefaultConfig() *Config {
 		MaxResumesPerSession: 250,
 		MaxValueLength:       640,
 		SessionStorage:       "db",
+
+		Elastic:         "http://localhost:9200",
+		ElasticUsername: "",
+		ElasticPassword: "",
 
 		S3Endpoint:          "https://s3.amazonaws.com",
 		S3Region:            "us-east-1",
