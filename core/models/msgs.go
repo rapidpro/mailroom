@@ -63,16 +63,14 @@ const (
 type MsgStatus string
 
 const (
-	MsgStatusInitializing = MsgStatus("I")
-	MsgStatusPending      = MsgStatus("P")
-	MsgStatusQueued       = MsgStatus("Q")
-	MsgStatusWired        = MsgStatus("W")
-	MsgStatusSent         = MsgStatus("S")
-	MsgStatusDelivered    = MsgStatus("D")
-	MsgStatusHandled      = MsgStatus("H")
-	MsgStatusErrored      = MsgStatus("E")
-	MsgStatusFailed       = MsgStatus("F")
-	MsgStatusResent       = MsgStatus("R")
+	MsgStatusPending   = MsgStatus("P") // incoming msg created but not yet handled
+	MsgStatusHandled   = MsgStatus("H") // incoming msg handled
+	MsgStatusQueued    = MsgStatus("Q") // outgoing msg created and queued to courier
+	MsgStatusWired     = MsgStatus("W") // outgoing msg requested to be sent via channel
+	MsgStatusSent      = MsgStatus("S") // outgoing msg having received sent confirmation from channel
+	MsgStatusDelivered = MsgStatus("D") // outgoing msg having received delivery confirmation from channel
+	MsgStatusErrored   = MsgStatus("E") // outgoing msg which has errored and will be retried
+	MsgStatusFailed    = MsgStatus("F") // outgoing msg which has failed permanently
 )
 
 type MsgFailedReason null.String
