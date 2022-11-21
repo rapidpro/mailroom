@@ -66,11 +66,6 @@ func TestOpenAndForward(t *testing.T) {
 				}
 			]}`),
 		},
-		"https://nyaruka.zendesk.com/api/v2/1234/tags.json": {
-			httpx.NewMockResponse(200, nil, `{
-				"tags": ["TAG_01","TAG_02"]
-			}`),
-		},
 	}))
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
