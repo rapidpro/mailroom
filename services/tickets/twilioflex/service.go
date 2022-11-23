@@ -14,6 +14,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
@@ -33,6 +34,7 @@ const (
 
 var db *sqlx.DB
 var lock = &sync.Mutex{}
+var historyDelay = 6
 
 func initDB(dbURL string) error {
 	if db == nil {
@@ -160,37 +162,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "failed to create channel webhook")
 	}
 
-	// get messages for history
-	after := session.Runs()[0].CreatedOn()
-	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	msgs, err := models.SelectContactMessages(cx, db, int(contact.ID()), after)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get history messages")
-	}
-
-	// send history
-	for _, msg := range msgs {
-		m := &CreateChatMessageParams{
-			Body:        msg.Text(),
-			ChannelSid:  newFlexChannel.Sid,
-			DateCreated: msg.CreatedOn().Format(time.RFC3339),
-		}
-		if msg.Direction() == "I" {
-			m.From = fmt.Sprint(contact.ID())
-			headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
-			_, trace, err = s.restClient.CreateMessage(m, headerWebhookEnabled)
-		} else {
-			m.From = "Bot"
-			_, trace, err = s.restClient.CreateMessage(m, nil)
-		}
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return nil, errors.Wrap(err, "error calling Twilio")
-		}
-	}
+	go func() {
+		time.Sleep(time.Second * time.Duration(historyDelay))
+		SendHistory(session, contact.ID(), newFlexChannel, logHTTP, s.restClient, s.redactor)
+	}()
 
 	ticket.SetExternalID(newFlexChannel.Sid)
 	return ticket, nil
@@ -296,4 +271,40 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	return errors.New("Twilio Flex ticket type doesn't support reopening")
+}
+
+func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChannel *FlexChannel, logHTTP flows.HTTPLogCallback, restClient *Client, redactor utils.Redactor) {
+	after := session.Runs()[0].CreatedOn()
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	// get messages for history
+	msgs, err := models.SelectContactMessages(cx, db, int(contactID), after)
+	if err != nil {
+		logrus.Error(errors.Wrap(err, "failed to get history messages"))
+		return
+	}
+	var trace *httpx.Trace
+	// send history
+	for _, msg := range msgs {
+		m := &CreateChatMessageParams{
+			Body:        msg.Text(),
+			ChannelSid:  newFlexChannel.Sid,
+			DateCreated: msg.CreatedOn().Format(time.RFC3339),
+		}
+		if msg.Direction() == "I" {
+			m.From = fmt.Sprint(contactID)
+			headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
+			_, trace, err = restClient.CreateMessage(m, headerWebhookEnabled)
+		} else {
+			m.From = "Bot"
+			_, trace, err = restClient.CreateMessage(m, nil)
+		}
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
+		}
+		if err != nil {
+			logrus.Error(errors.Wrap(err, "error calling Twilio to send message from history"))
+			return
+		}
+	}
 }
