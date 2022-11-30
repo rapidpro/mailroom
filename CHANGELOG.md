@@ -1,3 +1,9 @@
+v7.5.34 (2022-11-30)
+-------------------------
+ * Update deps including new goflow which adds legacy_vars issues
+ * Fix test and cleanup msg status constants
+ * Add basic auth for Elastic
+
 v7.5.33
 ----------
  * Test with only redis 6.2
