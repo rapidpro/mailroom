@@ -1,29 +1,28 @@
-# mailroom
+# Mailroom
 
 [![Build Status](https://github.com/nyaruka/mailroom/workflows/CI/badge.svg)](https://github.com/nyaruka/mailroom/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/nyaruka/mailroom/branch/main/graph/badge.svg)](https://codecov.io/gh/nyaruka/mailroom)
 
-# About
+Service for RapidPro/TextIt which does the heavy lifting of running flow starts, campaigns etc.
+flows. It interacts directly with the database and sends and receives messages with [Courier](https://github.com/nyaruka/courier) 
+for handling via Redis.
 
-Mailroom is the [RapidPro](https://github.com/rapidpro/rapidpro) components which does the heavy lifting of running flow starts, campaigns etc.
-flows. It interacts directly with the RapidPro database and sends and receives messages with [Courier](https://github.com/nyaruka/courier) for handling via Redis.
+## Deploying
 
-# Deploying
-
-As Mailroom is a Go application, it compiles to a binary and that binary along with the config file is all
+As a Go application, it compiles to a binary and that binary along with the config file is all
 you need to run it on your server. You can find bundles for each platform in the
-[releases directory](https://github.com/nyaruka/mailroom/releases). We recommend running Mailroom
+[releases directory](https://github.com/nyaruka/mailroom/releases). We recommend running it
 behind a reverse proxy such as nginx or Elastic Load Balancer that provides HTTPs encryption.
 
-# Configuration
+## Configuration
 
-Mailroom uses a tiered configuration system, each option takes precendence over the ones above it:
+The service uses a tiered configuration system, each option takes precendence over the ones above it:
 
 1.  The configuration file
 2.  Environment variables starting with `MAILROOM_`
 3.  Command line parameters
 
-We recommend running Mailroom with no changes to the configuration and no parameters, using only
+We recommend running it with no changes to the configuration and no parameters, using only
 environment variables to configure it. You can use `% mailroom --help` to see a list of the
 environment variables and parameters and for more details on each option.
 
@@ -67,9 +66,9 @@ Recommended settings for error and performance monitoring:
 - `MAILROOM_SENTRY_DSN`: The DSN to use when logging errors to Sentry
 - `MAILROOM_LOG_LEVEL`: the logging level mailroom should use (default "error", use "debug" for more)
 
-# Development
+## Development
 
-Once you've checked out the code, you can build Mailroom with:
+Once you've checked out the code, you can build the service with:
 
 ```
 go build github.com/nyaruka/mailroom/cmd/mailroom

@@ -103,8 +103,8 @@ func CreateBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *mod
 
 		// also set our URNs
 		if isLast {
-			batch.SetIsLast(true)
-			batch.SetURNs(urnContacts)
+			batch.IsLast = true
+			batch.URNs = urnContacts
 		}
 
 		err = queue.AddTask(rc, q, queue.SendBroadcastBatch, int(bcast.OrgID()), batch, queue.DefaultPriority)
@@ -151,21 +151,21 @@ func handleSendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, task *qu
 func SendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, bcast *models.BroadcastBatch) error {
 	// always set our broadcast as sent if it is our last
 	defer func() {
-		if bcast.IsLast() {
-			err := models.MarkBroadcastSent(ctx, rt.DB, bcast.BroadcastID())
+		if bcast.IsLast {
+			err := models.MarkBroadcastSent(ctx, rt.DB, bcast.BroadcastID)
 			if err != nil {
 				logrus.WithError(err).Error("error marking broadcast as sent")
 			}
 		}
 	}()
 
-	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
 	// create this batch of messages
-	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, bcast)
+	msgs, err := bcast.CreateMessages(ctx, rt, oa)
 	if err != nil {
 		return errors.Wrapf(err, "error creating broadcast messages")
 	}

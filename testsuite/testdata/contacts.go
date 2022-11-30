@@ -58,10 +58,15 @@ func InsertContact(db *sqlx.DB, org *Org, uuid flows.ContactUUID, name string, l
 
 // InsertContactGroup inserts a contact group
 func InsertContactGroup(db *sqlx.DB, org *Org, uuid assets.GroupUUID, name, query string) *Group {
+	groupType := "M"
+	if query != "" {
+		groupType = "Q"
+	}
+
 	var id models.GroupID
 	must(db.Get(&id,
-		`INSERT INTO contacts_contactgroup(uuid, org_id, group_type, name, query, status, is_active, created_by_id, created_on, modified_by_id, modified_on) 
-		 VALUES($1, $2, 'U', $3, $4, 'R', TRUE, 1, NOW(), 1, NOW()) RETURNING id`, uuid, org.ID, name, null.String(query),
+		`INSERT INTO contacts_contactgroup(uuid, org_id, group_type, name, query, status, is_system, is_active, created_by_id, created_on, modified_by_id, modified_on) 
+		 VALUES($1, $2, $3, $4, $5, 'R', FALSE, TRUE, 1, NOW(), 1, NOW()) RETURNING id`, uuid, org.ID, groupType, name, null.String(query),
 	))
 	return &Group{id, uuid}
 }

@@ -3,7 +3,6 @@ package incidents
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -11,24 +10,12 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.AddInitFunction(startEndCron)
-}
-
-func startEndCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, "end_incidents", time.Minute*3, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return EndIncidents(ctx, rt)
-		},
-	)
-	return nil
+	mailroom.RegisterCron("end_incidents", time.Minute*3, false, EndIncidents)
 }
 
 // EndIncidents checks open incidents and end any that no longer apply

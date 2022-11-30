@@ -79,7 +79,8 @@ type MsgFailedReason null.String
 
 const (
 	NilMsgFailedReason     = MsgFailedReason("")
-	MsgFailedSuspended     = MsgFailedReason("S")
+	MsgFailedSuspended     = MsgFailedReason("S") // workspace suspended
+	MsgFailedContact       = MsgFailedReason("C") // contact blocked, stopped or archived
 	MsgFailedLooping       = MsgFailedReason("L")
 	MsgFailedErrorLimit    = MsgFailedReason("E")
 	MsgFailedTooOld        = MsgFailedReason("O")
@@ -321,31 +322,31 @@ return count
 `)
 
 // GetMsgRepetitions gets the number of repetitions of this msg text for the given contact in the current 5 minute window
-func GetMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgOut) (int, error) {
+func GetMsgRepetitions(rp *redis.Pool, contact *flows.Contact, msg *flows.MsgOut) (int, error) {
 	rc := rp.Get()
 	defer rc.Close()
 
 	keyTime := dates.Now().UTC().Round(time.Minute * 5)
 	key := fmt.Sprintf("msg_repetitions:%s", keyTime.Format("2006-01-02T15:04"))
-	return redis.Int(msgRepetitionsScript.Do(rc, key, contactID, msg.Text()))
+	return redis.Int(msgRepetitionsScript.Do(rc, key, contact.ID(), msg.Text()))
 }
 
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, flow *Flow, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, flow, NilBroadcastID)
+	return newOutgoingMsg(rt, org, channel, session.Contact(), out, createdOn, session, flow, NilBroadcastID)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
-func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, nil, broadcastID)
+func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, contact, out, createdOn, nil, nil, broadcastID)
 }
 
-func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
+func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *flows.Contact, out *flows.MsgOut, createdOn time.Time, session *Session, flow *Flow, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = out.UUID()
 	m.OrgID = org.ID()
-	m.ContactID = contactID
+	m.ContactID = ContactID(contact.ID())
 	m.BroadcastID = broadcastID
 	m.TopupID = NilTopupID
 	m.Text = out.Text()
@@ -364,13 +365,17 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		// we fail messages for suspended orgs right away
 		m.Status = MsgStatusFailed
 		m.FailedReason = MsgFailedSuspended
+	} else if contact.Status() != flows.ContactStatusActive {
+		// and blocked, stopped or archived contacts
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedContact
 	} else if msg.URN() == urns.NilURN || channel == nil {
 		// if msg is missing the URN or channel, we also fail it
 		m.Status = MsgStatusFailed
 		m.FailedReason = MsgFailedNoDestination
 	} else {
 		// also fail right away if this looks like a loop
-		repetitions, err := GetMsgRepetitions(rt.RP, contactID, out)
+		repetitions, err := GetMsgRepetitions(rt.RP, contact, out)
 		if err != nil {
 			return nil, errors.Wrap(err, "error looking up msg repetitions")
 		}
@@ -378,7 +383,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 			m.Status = MsgStatusFailed
 			m.FailedReason = MsgFailedLooping
 
-			logrus.WithFields(logrus.Fields{"contact_id": contactID, "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
+			logrus.WithFields(logrus.Fields{"contact_id": contact.ID(), "text": out.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
 		}
 	}
 
@@ -743,22 +748,24 @@ type BroadcastTranslation struct {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty" db:"id"`
+		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"  db:"id"`
 		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-		Text          hstore.Hstore                           `                              db:"text"`
+		Text          hstore.Hstore                           `                               db:"text"`
 		TemplateState TemplateState                           `json:"template_state"`
-		BaseLanguage  envs.Language                           `json:"base_language"          db:"base_language"`
+		BaseLanguage  envs.Language                           `json:"base_language"           db:"base_language"`
 		URNs          []urns.URN                              `json:"urns,omitempty"`
 		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
 		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
-		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
-		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
-		TicketID      TicketID                                `json:"ticket_id,omitempty"    db:"ticket_id"`
+		OrgID         OrgID                                   `json:"org_id"                  db:"org_id"`
+		CreatedByID   UserID                                  `json:"created_by_id,omitempty" db:"created_by_id"`
+		ParentID      BroadcastID                             `json:"parent_id,omitempty"     db:"parent_id"`
+		TicketID      TicketID                                `json:"ticket_id,omitempty"     db:"ticket_id"`
 	}
 }
 
 func (b *Broadcast) ID() BroadcastID                                       { return b.b.BroadcastID }
 func (b *Broadcast) OrgID() OrgID                                          { return b.b.OrgID }
+func (b *Broadcast) CreatedByID() UserID                                   { return b.b.CreatedByID }
 func (b *Broadcast) ContactIDs() []ContactID                               { return b.b.ContactIDs }
 func (b *Broadcast) GroupIDs() []GroupID                                   { return b.b.GroupIDs }
 func (b *Broadcast) URNs() []urns.URN                                      { return b.b.URNs }
@@ -773,7 +780,7 @@ func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(
 	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID) *Broadcast {
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID, createdByID UserID) *Broadcast {
 
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
@@ -785,6 +792,7 @@ func NewBroadcast(
 	bcast.b.ContactIDs = contactIDs
 	bcast.b.GroupIDs = groupIDs
 	bcast.b.TicketID = ticketID
+	bcast.b.CreatedByID = createdByID
 
 	return bcast
 }
@@ -801,8 +809,8 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.b.ContactIDs,
 		parent.b.GroupIDs,
 		parent.b.TicketID,
+		parent.b.CreatedByID,
 	)
-	// populate our parent id
 	child.b.ParentID = parent.ID()
 
 	// populate text from our translations
@@ -940,59 +948,42 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event
 		}
 	}
 
-	return NewBroadcast(oa.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID), nil
+	return NewBroadcast(oa.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID, NilUserID), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
-	batch := &BroadcastBatch{}
-	batch.b.BroadcastID = b.b.BroadcastID
-	batch.b.BaseLanguage = b.b.BaseLanguage
-	batch.b.Translations = b.b.Translations
-	batch.b.TemplateState = b.b.TemplateState
-	batch.b.OrgID = b.b.OrgID
-	batch.b.TicketID = b.b.TicketID
-	batch.b.ContactIDs = contactIDs
-	return batch
+	return &BroadcastBatch{
+		BroadcastID:   b.b.BroadcastID,
+		BaseLanguage:  b.b.BaseLanguage,
+		Translations:  b.b.Translations,
+		TemplateState: b.b.TemplateState,
+		OrgID:         b.b.OrgID,
+		CreatedByID:   b.b.CreatedByID,
+		TicketID:      b.b.TicketID,
+		ContactIDs:    contactIDs,
+	}
 }
 
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {
-	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
-		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage  envs.Language                           `json:"base_language"`
-		TemplateState TemplateState                           `json:"template_state"`
-		URNs          map[ContactID]urns.URN                  `json:"urns,omitempty"`
-		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
-		IsLast        bool                                    `json:"is_last"`
-		OrgID         OrgID                                   `json:"org_id"`
-		TicketID      TicketID                                `json:"ticket_id"`
-	}
+	BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
+	Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
+	BaseLanguage  envs.Language                           `json:"base_language"`
+	TemplateState TemplateState                           `json:"template_state"`
+	URNs          map[ContactID]urns.URN                  `json:"urns,omitempty"`
+	ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
+	IsLast        bool                                    `json:"is_last"`
+	OrgID         OrgID                                   `json:"org_id"`
+	CreatedByID   UserID                                  `json:"created_by_id"`
+	TicketID      TicketID                                `json:"ticket_id"`
 }
 
-func (b *BroadcastBatch) BroadcastID() BroadcastID            { return b.b.BroadcastID }
-func (b *BroadcastBatch) ContactIDs() []ContactID             { return b.b.ContactIDs }
-func (b *BroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.URNs }
-func (b *BroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
-func (b *BroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
-func (b *BroadcastBatch) TicketID() TicketID                  { return b.b.TicketID }
-func (b *BroadcastBatch) Translations() map[envs.Language]*BroadcastTranslation {
-	return b.b.Translations
-}
-func (b *BroadcastBatch) TemplateState() TemplateState { return b.b.TemplateState }
-func (b *BroadcastBatch) BaseLanguage() envs.Language  { return b.b.BaseLanguage }
-func (b *BroadcastBatch) IsLast() bool                 { return b.b.IsLast }
-func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
-
-func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
-func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
-
-func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
-	broadcastURNs := bcast.URNs()
+	broadcastURNs := b.URNs
 
 	// build our list of contact ids
-	contactIDs := bcast.ContactIDs()
+	contactIDs := b.ContactIDs
 
 	// build a map of the contacts that are present both in our URN list and our contact id list
 	if broadcastURNs != nil {
@@ -1085,7 +1076,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 
 		// have a valid contact language, try that
-		trans := bcast.Translations()
+		trans := b.Translations
 		t := trans[lang]
 
 		// not found? try org default language
@@ -1095,20 +1086,20 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// not found? use broadcast base language
 		if t == nil {
-			t = trans[bcast.BaseLanguage()]
+			t = trans[b.BaseLanguage]
 		}
 
 		if t == nil {
-			logrus.WithField("base_language", bcast.BaseLanguage()).WithField("translations", trans).Error("unable to find translation for broadcast")
+			logrus.WithField("base_language", b.BaseLanguage).WithField("translations", trans).Error("unable to find translation for broadcast")
 			return nil, nil
 		}
 
 		template := ""
 
 		// if this is a legacy template, migrate it forward
-		if bcast.TemplateState() == TemplateStateLegacy {
+		if b.TemplateState == TemplateStateLegacy {
 			template, _ = expressions.MigrateTemplate(t.Text, nil)
-		} else if bcast.TemplateState() == TemplateStateUnevaluated {
+		} else if b.TemplateState == TemplateStateUnevaluated {
 			template = t.Text
 		}
 
@@ -1133,7 +1124,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
+		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, contact, out, time.Now(), b.BroadcastID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
@@ -1187,14 +1178,44 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 	}
 
 	// if the broadcast was a ticket reply, update the ticket
-	if bcast.TicketID() != NilTicketID {
-		err = updateTicketLastActivity(ctx, rt.DB, []TicketID{bcast.TicketID()}, dates.Now())
-		if err != nil {
-			return nil, errors.Wrapf(err, "error updating broadcast ticket")
+	if b.TicketID != NilTicketID {
+		if err := b.updateTicket(ctx, rt.DB, oa); err != nil {
+			return nil, err
 		}
 	}
 
 	return msgs, nil
+}
+
+func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAssets) error {
+	firstReplySeconds, err := TicketRecordReplied(ctx, db, b.TicketID, dates.Now())
+	if err != nil {
+		return err
+	}
+
+	// record reply counts for org, user and team
+	replyCounts := map[string]int{scopeOrg(oa): 1}
+
+	if b.CreatedByID != NilUserID {
+		user := oa.UserByID(b.CreatedByID)
+		if user != nil {
+			replyCounts[scopeUser(oa, user)] = 1
+			if user.Team() != nil {
+				replyCounts[scopeTeam(user.Team())] = 1
+			}
+		}
+	}
+
+	if err := insertTicketDailyCounts(ctx, db, TicketDailyCountReply, oa.Org().Timezone(), replyCounts); err != nil {
+		return err
+	}
+
+	if firstReplySeconds >= 0 {
+		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplySeconds); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 const sqlUpdateMsgForResending = `

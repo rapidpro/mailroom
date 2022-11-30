@@ -192,34 +192,36 @@ func TestBatchStart(t *testing.T) {
 	contactIDs := []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}
 
 	tcs := []struct {
-		Flow          models.FlowID
-		Restart       bool
-		IncludeActive bool
-		Extra         json.RawMessage
-		Msg           string
-		Count         int
-		TotalCount    int
+		Flow                     models.FlowID
+		ExcludeStartedPreviously bool
+		ExcludeInAFlow           bool
+		Extra                    json.RawMessage
+		Msg                      string
+		Count                    int
+		TotalCount               int
 	}{
-		{testdata.SingleMessage.ID, true, true, nil, "Hey, how are you?", 2, 2},
-		{testdata.SingleMessage.ID, false, true, nil, "Hey, how are you?", 0, 2},
-		{testdata.SingleMessage.ID, false, false, nil, "Hey, how are you?", 0, 2},
-		{testdata.SingleMessage.ID, true, false, nil, "Hey, how are you?", 2, 4},
+		{testdata.SingleMessage.ID, false, false, nil, "Hey, how are you?", 2, 2},
+		{testdata.SingleMessage.ID, true, false, nil, "Hey, how are you?", 0, 2},
+		{testdata.SingleMessage.ID, true, true, nil, "Hey, how are you?", 0, 2},
+		{testdata.SingleMessage.ID, false, true, nil, "Hey, how are you?", 2, 4},
 		{
-			Flow:          testdata.IncomingExtraFlow.ID,
-			Restart:       true,
-			IncludeActive: false,
-			Extra:         json.RawMessage([]byte(`{"name":"Fred", "age":33}`)),
-			Msg:           "Great to meet you Fred. Your age is 33.",
-			Count:         2,
-			TotalCount:    2,
+			Flow:                     testdata.IncomingExtraFlow.ID,
+			ExcludeStartedPreviously: false,
+			ExcludeInAFlow:           true,
+			Extra:                    json.RawMessage([]byte(`{"name":"Fred", "age":33}`)),
+			Msg:                      "Great to meet you Fred. Your age is 33.",
+			Count:                    2,
+			TotalCount:               2,
 		},
 	}
 
 	last := time.Now()
 
 	for i, tc := range tcs {
-		start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, tc.Flow, tc.Restart, tc.IncludeActive).
+		start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, tc.Flow).
 			WithContactIDs(contactIDs).
+			WithExcludeInAFlow(tc.ExcludeInAFlow).
+			WithExcludeStartedPreviously(tc.ExcludeStartedPreviously).
 			WithExtra(tc.Extra)
 		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
 
@@ -344,8 +346,8 @@ func TestStartFlowConcurrency(t *testing.T) {
 	}
 
 	options := &runner.StartOptions{
-		ExcludeReruns:  false,
-		ExcludeWaiting: false,
+		ExcludeStartedPreviously: false,
+		ExcludeInAFlow:           false,
 		TriggerBuilder: func(contact *flows.Contact) flows.Trigger {
 			return triggers.NewBuilder(oa.Env(), flowRef, contact).Manual().Build()
 		},

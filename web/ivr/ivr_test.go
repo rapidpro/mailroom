@@ -94,7 +94,7 @@ func TestTwilioIVR(t *testing.T) {
 		}, 
 		"results": {}
 	}`)
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, true, true).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.Bob.ID, testdata.George.ID}).
 		WithParentSummary(parentSummary)
 
@@ -402,7 +402,7 @@ func TestVonageIVR(t *testing.T) {
 
 	// create a flow start for cathy and george
 	extra := json.RawMessage(`{"ref_id":"123"}`)
-	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, true, true).
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID).
 		WithContactIDs([]models.ContactID{testdata.Cathy.ID, testdata.George.ID}).
 		WithExtra(extra)
 	models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})

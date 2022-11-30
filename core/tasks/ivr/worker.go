@@ -41,7 +41,7 @@ func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models
 	exclude := make(map[models.ContactID]bool, 5)
 
 	// filter out anybody who has has a flow run in this flow if appropriate
-	if !batch.RestartParticipants() {
+	if batch.ExcludeStartedPreviously() {
 		// find all participants that have been in this flow
 		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, batch.FlowID(), batch.ContactIDs())
 		if err != nil {
@@ -53,7 +53,7 @@ func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models
 	}
 
 	// filter out our list of contacts to only include those that should be started
-	if !batch.IncludeActive() {
+	if batch.ExcludeInAFlow() {
 		// find all participants active in other sessions
 		active, err := models.FilterByWaitingSession(ctx, rt.DB, batch.ContactIDs())
 		if err != nil {

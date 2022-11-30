@@ -6,16 +6,16 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
-	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/locker"
+	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -33,11 +33,11 @@ var startTypeToOrigin = map[models.StartType]string{
 
 // StartOptions define the various parameters that can be used when starting a flow
 type StartOptions struct {
-	// ExcludeWaiting excludes contacts with waiting sessions which would otherwise have to be interrupted
-	ExcludeWaiting bool
+	// ExcludeInAFlow excludes contacts with waiting sessions which would otherwise have to be interrupted
+	ExcludeInAFlow bool
 
-	// ExcludeReruns excludes contacts who have been in this flow previously (at least as long as we have runs for)
-	ExcludeReruns bool
+	// ExcludeStartedPreviously excludes contacts who have been in this flow previously (at least as long as we have runs for)
+	ExcludeStartedPreviously bool
 
 	// Interrupt should be true if we want to interrupt the flows runs for any contact started in this flow
 	Interrupt bool
@@ -52,9 +52,9 @@ type StartOptions struct {
 // NewStartOptions creates and returns the default start options to be used for flow starts
 func NewStartOptions() *StartOptions {
 	return &StartOptions{
-		ExcludeWaiting: false,
-		ExcludeReruns:  false,
-		Interrupt:      true,
+		ExcludeInAFlow:           false,
+		ExcludeStartedPreviously: false,
+		Interrupt:                true,
 	}
 }
 
@@ -231,8 +231,8 @@ func StartFlowBatch(
 
 	// options for our flow start
 	options := NewStartOptions()
-	options.ExcludeReruns = !batch.RestartParticipants()
-	options.ExcludeWaiting = !batch.IncludeActive()
+	options.ExcludeStartedPreviously = batch.ExcludeStartedPreviously()
+	options.ExcludeInAFlow = batch.ExcludeInAFlow()
 	options.Interrupt = flow.FlowType().Interrupts()
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
@@ -243,8 +243,8 @@ func StartFlowBatch(
 	}
 
 	// log both our total and average
-	librato.Gauge("mr.flow_batch_start_elapsed", float64(time.Since(start))/float64(time.Second))
-	librato.Gauge("mr.flow_batch_start_count", float64(len(sessions)))
+	analytics.Gauge("mr.flow_batch_start_elapsed", float64(time.Since(start))/float64(time.Second))
+	analytics.Gauge("mr.flow_batch_start_count", float64(len(sessions)))
 
 	return sessions, nil
 }
@@ -306,16 +306,16 @@ func FireCampaignEvents(
 	options := NewStartOptions()
 	switch dbEvent.StartMode() {
 	case models.StartModeInterrupt:
-		options.ExcludeWaiting = false
-		options.ExcludeReruns = false
+		options.ExcludeInAFlow = false
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = true
 	case models.StartModePassive:
-		options.ExcludeWaiting = false
-		options.ExcludeReruns = false
+		options.ExcludeInAFlow = false
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = false
 	case models.StartModeSkip:
-		options.ExcludeWaiting = true
-		options.ExcludeReruns = false
+		options.ExcludeInAFlow = true
+		options.ExcludeStartedPreviously = false
 		options.Interrupt = true
 	default:
 		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())
@@ -393,8 +393,8 @@ func FireCampaignEvents(
 	}
 
 	// log both our total and average
-	librato.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
-	librato.Gauge("mr.campaign_event_count", float64(len(sessions)))
+	analytics.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
+	analytics.Gauge("mr.campaign_event_count", float64(len(sessions)))
 
 	// build the list of contacts actually started
 	startedContacts := make([]models.ContactID, len(sessions))
@@ -417,7 +417,7 @@ func StartFlow(
 	exclude := make(map[models.ContactID]bool, 5)
 
 	// filter out anybody who has has a flow run in this flow if appropriate
-	if options.ExcludeReruns {
+	if options.ExcludeStartedPreviously {
 		// find all participants that have been in this flow
 		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, flow.ID(), contactIDs)
 		if err != nil {
@@ -429,7 +429,7 @@ func StartFlow(
 	}
 
 	// filter out our list of contacts to only include those that should be started
-	if options.ExcludeWaiting {
+	if options.ExcludeInAFlow {
 		// find all participants active in any flow
 		active, err := models.FilterByWaitingSession(ctx, rt.DB, contactIDs)
 		if err != nil {
@@ -461,7 +461,7 @@ func StartFlow(
 	start := time.Now()
 
 	// map of locks we've released
-	released := make(map[string]bool)
+	released := make(map[*redisx.Locker]bool)
 
 	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {
 		locked := make([]models.ContactID, 0, len(remaining))
@@ -470,8 +470,9 @@ func StartFlow(
 
 		// try up to a second to get a lock for a contact
 		for _, contactID := range remaining {
-			lockID := models.ContactLock(oa.OrgID(), contactID)
-			lock, err := locker.GrabLock(rt.RP, lockID, time.Minute*5, time.Second)
+			locker := models.GetContactLocker(oa.OrgID(), contactID)
+
+			lock, err := locker.Grab(rt.RP, time.Second)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error attempting to grab lock")
 			}
@@ -484,8 +485,8 @@ func StartFlow(
 
 			// defer unlocking if we exit due to error
 			defer func() {
-				if !released[lockID] {
-					locker.ReleaseLock(rt.RP, lockID, lock)
+				if !released[locker] {
+					locker.Release(rt.RP, lock)
 				}
 			}()
 		}
@@ -517,9 +518,9 @@ func StartFlow(
 
 		// release all our locks
 		for i := range locked {
-			lockID := models.ContactLock(oa.OrgID(), locked[i])
-			locker.ReleaseLock(rt.RP, lockID, locks[i])
-			released[lockID] = true
+			locker := models.GetContactLocker(oa.OrgID(), locked[i])
+			locker.Release(rt.RP, locks[i])
+			released[locker] = true
 		}
 
 		// skipped are now our remaining
@@ -558,7 +559,7 @@ func StartFlowForContacts(
 			continue
 		}
 		log.WithField("elapsed", time.Since(start)).Info("flow engine start")
-		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
+		analytics.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
 
 		sessions = append(sessions, session)
 		sprints = append(sprints, sprint)
@@ -718,7 +719,7 @@ func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	tx, _ := rt.DB.BeginTxx(ctx, nil)
 
 	// create our start
-	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID, true, true).
+	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID).
 		WithContactIDs(contactIDs)
 
 	// insert it

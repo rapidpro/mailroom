@@ -8,21 +8,21 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -61,8 +61,9 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 	}
 
 	// acquire the lock for this contact
-	lockID := models.ContactLock(models.OrgID(task.OrgID), eventTask.ContactID)
-	lock, err := locker.GrabLock(rt.RP, lockID, time.Minute*5, time.Second*10)
+	locker := models.GetContactLocker(models.OrgID(task.OrgID), eventTask.ContactID)
+
+	lock, err := locker.Grab(rt.RP, time.Second*10)
 	if err != nil {
 		return errors.Wrapf(err, "error acquiring lock for contact %d", eventTask.ContactID)
 	}
@@ -81,7 +82,7 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 		}).Info("failed to get lock for contact, requeued and skipping")
 		return nil
 	}
-	defer locker.ReleaseLock(rt.RP, lockID, lock)
+	defer locker.Release(rt.RP, lock)
 
 	// read all the events for this contact, one by one
 	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)
@@ -158,10 +159,10 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 		}
 
 		// log our processing time to librato
-		librato.Gauge(fmt.Sprintf("mr.%s_elapsed", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
+		analytics.Gauge(fmt.Sprintf("mr.%s_elapsed", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
 
 		// and total latency for this task since it was queued
-		librato.Gauge(fmt.Sprintf("mr.%s_latency", contactEvent.Type), float64(time.Since(task.QueuedOn))/float64(time.Second))
+		analytics.Gauge(fmt.Sprintf("mr.%s_latency", contactEvent.Type), float64(time.Since(task.QueuedOn))/float64(time.Second))
 
 		// if we get an error processing an event, requeue it for later and return our error
 		if err != nil {
@@ -208,11 +209,6 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
-	}
-
-	// contact has been deleted or is blocked/stopped/archived, ignore this event
-	if len(contacts) == 0 || contacts[0].Status() != models.ContactStatusActive {
-		return nil
 	}
 
 	modelContact := contacts[0]
@@ -278,7 +274,15 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 
 	_, err = runner.ResumeFlow(ctx, rt, oa, session, modelContact, resume, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error resuming flow for timeout")
+		// if we errored, and it's the wait rejecting the timeout event, it's because it no longer exists on the flow, so clear it
+		// on the session
+		var eerr *engine.Error
+		if errors.As(err, &eerr) && eerr.Code() == engine.ErrorResumeRejectedByWait && resume.Type() == resumes.TypeWaitTimeout {
+			log.WithField("session_id", session.ID()).Info("clearing session timeout which is no longer set in flow")
+			return errors.Wrap(session.ClearWaitTimeout(ctx, rt.DB), "error clearing session timeout")
+		}
+
+		return errors.Wrap(err, "error resuming flow for timeout")
 	}
 
 	log.WithField("elapsed", time.Since(start)).Info("handled timed event")
@@ -510,12 +514,6 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 	}
 
-	// build our flow contact
-	contact, err := modelContact.FlowContact(oa)
-	if err != nil {
-		return errors.Wrapf(err, "error creating flow contact")
-	}
-
 	// if this channel is no longer active or this contact is blocked, ignore this message (mark it as handled)
 	if channel == nil || modelContact.Status() == models.ContactStatusBlocked {
 		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, models.NilFlowID, topupID)
@@ -534,6 +532,12 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		}
 
 		newContact = true
+	}
+
+	// build our flow contact
+	contact, err := modelContact.FlowContact(oa)
+	if err != nil {
+		return errors.Wrapf(err, "error creating flow contact")
 	}
 
 	// if this is a new contact, we need to calculate dynamic groups and campaigns

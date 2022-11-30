@@ -626,41 +626,23 @@ type eligibleContact struct {
 	RelToValue *time.Time `db:"rel_to_value"`
 }
 
-const eligibleContactsForCreatedOnSQL = `
-SELECT 
-	c.id AS contact_id,
-	c.created_on AS rel_to_value
-FROM 
-	contacts_contact c
-INNER JOIN
-    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
-WHERE
-    gc.contactgroup_id = $1 AND c.is_active = TRUE
-`
+const sqlEligibleContactsForCreatedOn = `
+    SELECT c.id AS contact_id, c.created_on AS rel_to_value
+      FROM contacts_contact c
+INNER JOIN contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+     WHERE gc.contactgroup_id = $1 AND c.is_active = TRUE`
 
-const eligibleContactsForLastSeenOnSQL = `
-SELECT 
-	c.id AS contact_id, 
-	c.last_seen_on AS rel_to_value
-FROM 
-	contacts_contact c
-INNER JOIN
-    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
-WHERE
-    gc.contactgroup_id = $1 AND c.is_active = TRUE AND c.last_seen_on IS NOT NULL
-`
+const sqlEligibleContactsForLastSeenOn = `
+    SELECT c.id AS contact_id, c.last_seen_on AS rel_to_value
+      FROM contacts_contact c
+INNER JOIN contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+    WHERE gc.contactgroup_id = $1 AND c.is_active = TRUE AND c.last_seen_on IS NOT NULL`
 
-const eligibleContactsForFieldSQL = `
-SELECT 
-	c.id AS contact_id, 
-	(c.fields->$2->>'datetime')::timestamptz AS rel_to_value
-FROM 
-	contacts_contact c
-INNER JOIN
-    contacts_contactgroup_contacts gc ON gc.contact_id = c.id
-WHERE
-    gc.contactgroup_id = $1 AND c.is_active = TRUE AND ARRAY[$2]::text[] <@ (extract_jsonb_keys(c.fields)) IS NOT NULL
-`
+const sqlEligibleContactsForField = `
+    SELECT c.id AS contact_id, (c.fields->$2->>'datetime')::timestamptz AS rel_to_value
+      FROM contacts_contact c
+INNER JOIN contacts_contactgroup_contacts gc ON gc.contact_id = c.id
+     WHERE gc.contactgroup_id = $1 AND c.is_active = TRUE AND ARRAY[$2]::text[] <@ (extract_jsonb_keys(c.fields)) IS NOT NULL`
 
 func campaignEventEligibleContacts(ctx context.Context, db Queryer, groupID GroupID, field *Field) ([]*eligibleContact, error) {
 	var query string
@@ -668,13 +650,13 @@ func campaignEventEligibleContacts(ctx context.Context, db Queryer, groupID Grou
 
 	switch field.Key() {
 	case CreatedOnKey:
-		query = eligibleContactsForCreatedOnSQL
+		query = sqlEligibleContactsForCreatedOn
 		params = []interface{}{groupID}
 	case LastSeenOnKey:
-		query = eligibleContactsForLastSeenOnSQL
+		query = sqlEligibleContactsForLastSeenOn
 		params = []interface{}{groupID}
 	default:
-		query = eligibleContactsForFieldSQL
+		query = sqlEligibleContactsForField
 		params = []interface{}{groupID, field.UUID()}
 	}
 

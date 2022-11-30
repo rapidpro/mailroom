@@ -7,27 +7,35 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/librato"
 	"github.com/olivere/elastic/v7"
 	"github.com/sirupsen/logrus"
 )
 
 // InitFunction is a function that will be called when mailroom starts
-type InitFunction func(runtime *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
+type InitFunction func(*runtime.Runtime, *sync.WaitGroup, chan bool) error
 
 var initFunctions = make([]InitFunction, 0)
 
-// AddInitFunction adds an init function that will be called on startup
-func AddInitFunction(initFunc InitFunction) {
+func addInitFunction(initFunc InitFunction) {
 	initFunctions = append(initFunctions, initFunc)
+}
+
+// RegisterCron registers a new cron function to run every interval
+func RegisterCron(name string, interval time.Duration, allInstances bool, fn cron.Function) {
+	addInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(rt, wg, name, interval, allInstances, fn, time.Minute*5, quit)
+		return nil
+	})
 }
 
 // TaskFunction is the function that will be called for a type of task
@@ -155,7 +163,7 @@ func (mr *Mailroom) Start() error {
 
 	// warn if we won't be doing FCM syncing
 	if c.FCMKey == "" {
-		logrus.Error("fcm not configured, no syncing of android channels")
+		logrus.Warn("fcm not configured, no syncing of android channels")
 	}
 
 	for _, initFunc := range initFunctions {
@@ -164,9 +172,10 @@ func (mr *Mailroom) Start() error {
 
 	// if we have a librato token, configure it
 	if c.LibratoToken != "" {
-		librato.Configure(c.LibratoUsername, c.LibratoToken, c.InstanceName, time.Second, mr.wg)
-		librato.Start()
+		analytics.RegisterBackend(analytics.NewLibrato(c.LibratoUsername, c.LibratoToken, c.InstanceName, time.Second, mr.wg))
 	}
+
+	analytics.Start()
 
 	// init our foremen and start it
 	mr.batchForeman.Start()
@@ -186,7 +195,7 @@ func (mr *Mailroom) Stop() error {
 	logrus.Info("mailroom stopping")
 	mr.batchForeman.Stop()
 	mr.handlerForeman.Stop()
-	librato.Stop()
+	analytics.Stop()
 	close(mr.quit)
 	mr.cancel()
 

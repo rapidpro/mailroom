@@ -2,31 +2,17 @@ package analytics
 
 import (
 	"context"
-	"sync"
 	"time"
 
-	"github.com/nyaruka/librato"
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	mailroom.AddInitFunction(StartAnalyticsCron)
-}
-
-// StartAnalyticsCron starts our cron job of posting stats every minute
-func StartAnalyticsCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, "stats", time.Second*60, true,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return reportAnalytics(ctx, rt)
-		},
-	)
-	return nil
+	mailroom.RegisterCron("analytics", time.Second*60, true, reportAnalytics)
 }
 
 var (
@@ -74,14 +60,14 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 	redisWaitDuration = redisStats.WaitDuration
 	redisWaitCount = redisStats.WaitCount
 
-	librato.Gauge("mr.db_busy", float64(dbStats.InUse))
-	librato.Gauge("mr.db_idle", float64(dbStats.Idle))
-	librato.Gauge("mr.db_wait_ms", float64(dbWaitDurationInPeriod/time.Millisecond))
-	librato.Gauge("mr.db_wait_count", float64(dbWaitCountInPeriod))
-	librato.Gauge("mr.redis_wait_ms", float64(redisWaitDurationInPeriod/time.Millisecond))
-	librato.Gauge("mr.redis_wait_count", float64(redisWaitCountInPeriod))
-	librato.Gauge("mr.handler_queue", float64(handlerSize))
-	librato.Gauge("mr.batch_queue", float64(batchSize))
+	analytics.Gauge("mr.db_busy", float64(dbStats.InUse))
+	analytics.Gauge("mr.db_idle", float64(dbStats.Idle))
+	analytics.Gauge("mr.db_wait_ms", float64(dbWaitDurationInPeriod/time.Millisecond))
+	analytics.Gauge("mr.db_wait_count", float64(dbWaitCountInPeriod))
+	analytics.Gauge("mr.redis_wait_ms", float64(redisWaitDurationInPeriod/time.Millisecond))
+	analytics.Gauge("mr.redis_wait_count", float64(redisWaitCountInPeriod))
+	analytics.Gauge("mr.handler_queue", float64(handlerSize))
+	analytics.Gauge("mr.batch_queue", float64(batchSize))
 
 	logrus.WithFields(logrus.Fields{
 		"db_busy":          dbStats.InUse,

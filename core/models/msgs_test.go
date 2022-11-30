@@ -32,6 +32,9 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
+	blake := testdata.InsertContact(db, testdata.Org1, "79b94a23-6d13-43f4-95fe-c733ee457857", "Blake", envs.NilLanguage, models.ContactStatusBlocked)
+	blakeURNID := testdata.InsertContactURN(db, testdata.Org1, blake, "tel:++250700000007", 1)
+
 	tcs := []struct {
 		ChannelUUID  assets.ChannelUUID
 		Text         string
@@ -118,7 +121,6 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			URN:                  urns.NilURN,
 			URNID:                models.URNID(0),
 			Flow:                 testdata.Favorites,
-			SuspendedOrg:         false,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedNoDestination,
 			ExpectedMetadata:     map[string]interface{}{},
@@ -129,12 +131,24 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			ChannelUUID:          "",
 			Text:                 "missing Channel",
 			Contact:              testdata.Cathy,
-			URN:                  urns.NilURN,
-			URNID:                models.URNID(0),
+			URN:                  urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
+			URNID:                testdata.Cathy.URNID,
 			Flow:                 testdata.Favorites,
-			SuspendedOrg:         false,
 			ExpectedStatus:       models.MsgStatusFailed,
 			ExpectedFailedReason: models.MsgFailedNoDestination,
+			ExpectedMetadata:     map[string]interface{}{},
+			ExpectedMsgCount:     1,
+			ExpectedPriority:     false,
+		},
+		{
+			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+			Text:                 "blocked contact",
+			Contact:              blake,
+			URN:                  urns.URN(fmt.Sprintf("tel:+250700000007?id=%d", blakeURNID)),
+			URNID:                blakeURNID,
+			Flow:                 testdata.Favorites,
+			ExpectedStatus:       models.MsgStatusFailed,
+			ExpectedFailedReason: models.MsgFailedContact,
 			ExpectedMetadata:     map[string]interface{}{},
 			ExpectedMsgCount:     1,
 			ExpectedPriority:     false,
@@ -152,7 +166,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		channel := oa.ChannelByUUID(tc.ChannelUUID)
 		flow, _ := oa.FlowByID(tc.Flow.ID)
 
-		session := insertTestSession(t, ctx, rt, testdata.Org1, testdata.Cathy, testdata.Favorites)
+		session := insertTestSession(t, ctx, rt, testdata.Org1, tc.Contact, testdata.Favorites)
 		if tc.ResponseTo != models.NilMsgID {
 			session.SetIncomingMsg(flows.MsgID(tc.ResponseTo), null.NullString)
 		}
@@ -188,7 +202,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 	}
 
 	// check nil failed reasons are saved as NULLs
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(3)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE failed_reason IS NOT NULL`).Returns(4)
 
 	// ensure org is unsuspended
 	db.MustExec(`UPDATE orgs_org SET is_suspended = FALSE`)
@@ -253,6 +267,8 @@ func TestMarshalMsg(t *testing.T) {
 	session := insertTestSession(t, ctx, rt, testdata.Org1, testdata.Cathy, testdata.Favorites)
 	msg1, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
 	require.NoError(t, err)
+
+	cathy := session.Contact()
 
 	err = models.InsertMessages(ctx, db, []*models.Msg{msg1})
 	require.NoError(t, err)
@@ -344,7 +360,7 @@ func TestMarshalMsg(t *testing.T) {
 	// try a broadcast message which won't have session and flow fields set
 	bcastID := testdata.InsertBroadcast(db, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
 	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic)
-	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, testdata.Cathy.ID, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), bcastID)
+	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, cathy, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), bcastID)
 	require.NoError(t, err)
 
 	err = models.InsertMessages(ctx, db, []*models.Msg{msg2})
@@ -466,18 +482,21 @@ func TestResendMessages(t *testing.T) {
 }
 
 func TestGetMsgRepetitions(t *testing.T) {
-	_, _, _, rp := testsuite.Get()
+	_, rt, db, rp := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetRedis)
 	defer dates.SetNowSource(dates.DefaultNowSource)
 
 	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 13, 3, 234567, time.UTC)))
 
+	oa := testdata.Org1.Load(rt)
+	_, cathy := testdata.Cathy.Load(db, oa)
+
 	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic)
 	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic)
 
 	assertRepetitions := func(m *flows.MsgOut, expected int) {
-		count, err := models.GetMsgRepetitions(rp, testdata.Cathy.ID, m)
+		count, err := models.GetMsgRepetitions(rp, cathy, m)
 		require.NoError(t, err)
 		assert.Equal(t, expected, count)
 	}
@@ -576,7 +595,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData)
 
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("eng"): {Text: "Hi there"}}
@@ -592,6 +611,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		[]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID},
 		[]models.GroupID{testdata.DoctorsGroup.ID},
 		ticket.ID,
+		models.NilUserID,
 	)
 
 	assert.Equal(t, models.NilBroadcastID, bcast.ID())
@@ -606,18 +626,18 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 
 	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID})
 
-	assert.Equal(t, models.NilBroadcastID, batch.BroadcastID())
-	assert.Equal(t, testdata.Org1.ID, batch.OrgID())
-	assert.Equal(t, envs.Language("eng"), batch.BaseLanguage())
-	assert.Equal(t, translations, batch.Translations())
-	assert.Equal(t, models.TemplateStateUnevaluated, batch.TemplateState())
-	assert.Equal(t, ticket.ID, batch.TicketID())
-	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs())
+	assert.Equal(t, models.NilBroadcastID, batch.BroadcastID)
+	assert.Equal(t, testdata.Org1.ID, batch.OrgID)
+	assert.Equal(t, envs.Language("eng"), batch.BaseLanguage)
+	assert.Equal(t, translations, batch.Translations)
+	assert.Equal(t, models.TemplateStateUnevaluated, batch.TemplateState)
+	assert.Equal(t, ticket.ID, batch.TicketID)
+	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID}, batch.ContactIDs)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch)
+	msgs, err := batch.CreateMessages(ctx, rt, oa)
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, len(msgs))

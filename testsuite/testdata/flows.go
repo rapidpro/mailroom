@@ -71,8 +71,8 @@ func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType mode
 
 	var id models.SessionID
 	must(db.Get(&id,
-		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, responded, created_on, session_type, current_flow_id, connection_id, wait_started_on, wait_expires_on, wait_resume_on_expire) 
-		 VALUES($1, $2, $3, $4, TRUE, NOW(), $5, $6, $7, $8, $9, FALSE) RETURNING id`, uuids.New(), org.ID, contact.ID, status, sessionType, currentFlow.ID, connectionID, waitStartedOn, waitExpiresOn,
+		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, connection_id, wait_started_on, wait_expires_on, wait_resume_on_expire) 
+		 VALUES($1, $2, $3, $4, '{}', TRUE, NOW(), $5, $6, $7, $8, $9, FALSE) RETURNING id`, uuids.New(), org.ID, contact.ID, status, sessionType, currentFlow.ID, connectionID, waitStartedOn, waitExpiresOn,
 	))
 	return id
 }
@@ -81,8 +81,8 @@ func InsertFlowSession(db *sqlx.DB, org *Org, contact *Contact, sessionType mode
 func InsertWaitingSession(db *sqlx.DB, org *Org, contact *Contact, sessionType models.FlowType, currentFlow *Flow, connectionID models.ConnectionID, waitStartedOn, waitExpiresOn time.Time, waitResumeOnExpire bool, waitTimeoutOn *time.Time) models.SessionID {
 	var id models.SessionID
 	must(db.Get(&id,
-		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, responded, created_on, session_type, current_flow_id, connection_id, wait_started_on, wait_expires_on, wait_resume_on_expire, timeout_on) 
-		 VALUES($1, $2, $3, 'W', TRUE, NOW(), $4, $5, $6, $7, $8, $9, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, sessionType, currentFlow.ID, connectionID, waitStartedOn, waitExpiresOn, waitResumeOnExpire, waitTimeoutOn,
+		`INSERT INTO flows_flowsession(uuid, org_id, contact_id, status, output, responded, created_on, session_type, current_flow_id, connection_id, wait_started_on, wait_expires_on, wait_resume_on_expire, timeout_on) 
+		 VALUES($1, $2, $3, 'W', '{"status":"waiting"}', TRUE, NOW(), $4, $5, $6, $7, $8, $9, $10) RETURNING id`, uuids.New(), org.ID, contact.ID, sessionType, currentFlow.ID, connectionID, waitStartedOn, waitExpiresOn, waitResumeOnExpire, waitTimeoutOn,
 	))
 	return id
 }

@@ -86,17 +86,8 @@ ORDER BY
 
 // UnsubscribeResthooks unsubscribles all the resthooks passed in
 func UnsubscribeResthooks(ctx context.Context, tx *sqlx.Tx, unsubs []*ResthookUnsubscribe) error {
-	is := make([]interface{}, len(unsubs))
-	for i := range unsubs {
-		is[i] = unsubs[i]
-	}
-
-	err := BulkQuery(ctx, "unsubscribing resthooks", tx, unsubscribeResthooksSQL, is)
-	if err != nil {
-		return errors.Wrapf(err, "error unsubscribing from resthooks")
-	}
-
-	return nil
+	err := BulkQuery(ctx, "unsubscribing resthooks", tx, sqlUnsubscribeResthooks, unsubs)
+	return errors.Wrapf(err, "error unsubscribing from resthooks")
 }
 
 type ResthookUnsubscribe struct {
@@ -105,24 +96,12 @@ type ResthookUnsubscribe struct {
 	URL   string `db:"url"`
 }
 
-const unsubscribeResthooksSQL = `
-UPDATE 
-	api_resthooksubscriber
-SET 
-	is_active = FALSE, 
-	modified_on = NOW()
-WHERE
-	id = ANY(
-		SELECT 
-			s.id 
-		FROM 
-			api_resthooksubscriber s
-			JOIN api_resthook r ON s.resthook_id = r.id,
-			(VALUES(:org_id, :slug, :url)) AS u(org_id, slug, url)
-		WHERE 
-			s.is_active = TRUE AND
-			r.org_id = u.org_id::int AND
-			r.slug = u.slug AND
-			s.target_url = u.url
-	)
-`
+const sqlUnsubscribeResthooks = `
+UPDATE api_resthooksubscriber
+   SET is_active = FALSE, modified_on = NOW()
+ WHERE id = ANY(
+    SELECT s.id 
+      FROM api_resthooksubscriber s
+      JOIN api_resthook r ON s.resthook_id = r.id, (VALUES(:org_id, :slug, :url)) AS u(org_id, slug, url)
+     WHERE s.is_active = TRUE AND r.org_id = u.org_id::int AND r.slug = u.slug AND s.target_url = u.url
+)`

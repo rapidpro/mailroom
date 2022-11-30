@@ -108,7 +108,6 @@ func (s *Session) WaitStartedOn() *time.Time          { return s.s.WaitStartedOn
 func (s *Session) WaitTimeoutOn() *time.Time          { return s.s.WaitTimeoutOn }
 func (s *Session) WaitExpiresOn() *time.Time          { return s.s.WaitExpiresOn }
 func (s *Session) WaitResumeOnExpire() bool           { return s.s.WaitResumeOnExpire }
-func (s *Session) ClearTimeoutOn()                    { s.s.WaitTimeoutOn = nil }
 func (s *Session) CurrentFlowID() FlowID              { return s.s.CurrentFlowID }
 func (s *Session) ConnectionID() *ConnectionID        { return s.s.ConnectionID }
 func (s *Session) IncomingMsgID() MsgID               { return s.incomingMsgID }
@@ -447,10 +446,7 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		eventsToHandle = append(eventsToHandle, sprint.Events()...)
 	}
 
-	// if contact's current flow has changed, add pseudo event to handle that
-	if s.SessionType().Interrupts() && contact.CurrentFlowID() != s.CurrentFlowID() {
-		eventsToHandle = append(eventsToHandle, NewContactFlowChangedEvent(s.CurrentFlowID()))
-	}
+	eventsToHandle = append(eventsToHandle, NewSprintEndedEvent(contact, true))
 
 	// apply all our events to generate hooks
 	err = HandleEvents(ctx, rt, tx, oa, s.scene, eventsToHandle)
@@ -464,6 +460,19 @@ func (s *Session) Update(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		return errors.Wrapf(err, "error applying pre commit hook: %T", hook)
 	}
 
+	return nil
+}
+
+// ClearWaitTimeout clears the timeout on the wait on this session and is used if the engine tells us
+// that the flow no longer has a timeout on that wait. It can be called without updating the session
+// in the database which is used when handling msg_created events before session is updated anyway.
+func (s *Session) ClearWaitTimeout(ctx context.Context, db *sqlx.DB) error {
+	s.s.WaitTimeoutOn = nil
+
+	if db != nil {
+		_, err := db.ExecContext(ctx, `UPDATE flows_flowsession SET timeout_on = NULL WHERE id = $1`, s.ID())
+		return errors.Wrap(err, "error clearing wait timeout")
+	}
 	return nil
 }
 
@@ -696,10 +705,7 @@ func InsertSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *O
 			eventsToHandle = append(eventsToHandle, sprints[i].Events()...)
 		}
 
-		// if contact's current flow has changed, add pseudo event to handle that
-		if s.SessionType().Interrupts() && contacts[i].CurrentFlowID() != s.CurrentFlowID() {
-			eventsToHandle = append(eventsToHandle, NewContactFlowChangedEvent(s.CurrentFlowID()))
-		}
+		eventsToHandle = append(eventsToHandle, NewSprintEndedEvent(contacts[i], false))
 
 		err = HandleEvents(ctx, rt, tx, oa, s.Scene(), eventsToHandle)
 		if err != nil {
@@ -850,7 +856,7 @@ func ExitSessions(ctx context.Context, db *sqlx.DB, sessionIDs []SessionID, stat
 	}
 
 	// split into batches and exit each batch in a transaction
-	for _, idBatch := range chunkSessionIDs(sessionIDs, 100) {
+	for _, idBatch := range chunkSlice(sessionIDs, 100) {
 		tx, err := db.BeginTxx(ctx, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error starting transaction to exit sessions")
@@ -877,7 +883,7 @@ RETURNING contact_id`
 const sqlExitSessionRuns = `
 UPDATE flows_flowrun
    SET exited_on = $2, status = $3, modified_on = NOW()
- WHERE id = ANY (SELECT id FROM flows_flowrun WHERE session_id = ANY($1) AND status IN ('A', 'W'))`
+ WHERE session_id = ANY($1) AND status IN ('A', 'W')`
 
 const sqlExitSessionContacts = `
  UPDATE contacts_contact 

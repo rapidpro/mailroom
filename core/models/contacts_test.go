@@ -26,9 +26,9 @@ func TestContacts(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Where are my shoes?", "1234", testdata.Agent)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SalesTopic, "Where are my pants?", "2345", nil)
-	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "His name is Bob", "", testdata.Editor)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SupportTopic, "Where are my shoes?", "1234", time.Now(), testdata.Agent)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.SalesTopic, "Where are my pants?", "2345", time.Now(), nil)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "His name is Bob", "", time.Now(), testdata.Editor)
 
 	// delete mailgun ticketer
 	db.MustExec(`UPDATE tickets_ticketer SET is_active = false WHERE id = $1`, testdata.Mailgun.ID)
@@ -507,27 +507,6 @@ func TestUpdateContactLastSeenAndModifiedOn(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, t2.Equal(*cathy.LastSeenOn()))
 	assert.True(t, cathy.ModifiedOn().After(t2))
-}
-
-func TestUpdateContactModifiedBy(t *testing.T) {
-	ctx, _, db, _ := testsuite.Get()
-
-	defer testsuite.Reset(testsuite.ResetAll)
-
-	err := models.UpdateContactModifiedBy(ctx, db, []models.ContactID{}, models.UserID(0))
-	assert.NoError(t, err)
-
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = NULL`, testdata.Cathy.ID).Returns(0)
-
-	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{testdata.Cathy.ID}, models.UserID(0))
-	assert.NoError(t, err)
-
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = NULL`, testdata.Cathy.ID).Returns(0)
-
-	err = models.UpdateContactModifiedBy(ctx, db, []models.ContactID{testdata.Cathy.ID}, models.UserID(1))
-	assert.NoError(t, err)
-
-	assertdb.Query(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND modified_by_id = 1`, testdata.Cathy.ID).Returns(1)
 }
 
 func TestUpdateContactStatus(t *testing.T) {

@@ -57,11 +57,12 @@ func (h *insertStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sq
 			}
 
 			// create our start
-			start := models.NewFlowStart(oa.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID(), true, true).
+			start := models.NewFlowStart(oa.OrgID(), models.StartTypeFlowAction, flow.FlowType(), flow.ID()).
 				WithGroupIDs(groupIDs).
 				WithContactIDs(contactIDs).
 				WithURNs(event.URNs).
 				WithQuery(event.ContactQuery).
+				WithExcludeInAFlow(event.Exclusions.InAFlow).
 				WithCreateContact(event.CreateContact).
 				WithParentSummary(event.RunSummary).
 				WithSessionHistory(historyJSON)

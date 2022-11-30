@@ -1,0 +1,282 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mr/flow/preview_start",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "missing org or flow id",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'org_id' is required, field 'flow_id' is required, field 'sample_size' is required"
+        }
+    },
+    {
+        "label": "no inclusions or exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {},
+            "sample_size": 3
+        },
+        "status": 200,
+        "response": {
+            "query": "",
+            "total": 0,
+            "sample_ids": []
+        }
+    },
+    {
+        "label": "manual inclusions, no exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {
+                "group_uuids": [
+                    "c153e265-f7c9-4539-9dbc-9b358714b638",
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                ],
+                "contact_uuids": [
+                    "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
+                    "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
+                ],
+                "urns": [
+                    "tel:+1234567890",
+                    "facebook:9876543210"
+                ],
+                "query": ""
+            },
+            "sample_size": 3
+        },
+        "status": 200,
+        "response": {
+            "query": "group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\" OR tel = \"+1234567890\" OR facebook = 9876543210",
+            "total": 1,
+            "sample_ids": [
+                10000
+            ],
+            "metadata": {
+                "attributes": [
+                    "group",
+                    "uuid"
+                ],
+                "fields": [],
+                "groups": [
+                    {
+                        "name": "Doctors",
+                        "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                    },
+                    {
+                        "name": "Testers",
+                        "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                    }
+                ],
+                "schemes": [
+                    "facebook",
+                    "tel"
+                ],
+                "allow_as_group": false
+            }
+        }
+    },
+    {
+        "label": "query inclusion, no exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {
+                "group_ids": [],
+                "contact_ids": [],
+                "urns": [],
+                "query": "gender = M"
+            },
+            "sample_size": 3
+        },
+        "status": 200,
+        "response": {
+            "query": "gender = \"M\"",
+            "total": 1,
+            "sample_ids": [
+                10001
+            ],
+            "metadata": {
+                "attributes": [],
+                "fields": [
+                    {
+                        "key": "gender",
+                        "name": "Gender"
+                    }
+                ],
+                "groups": [],
+                "schemes": [],
+                "allow_as_group": true
+            }
+        }
+    },
+    {
+        "label": "manual inclusions, all exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {
+                "group_uuids": [
+                    "c153e265-f7c9-4539-9dbc-9b358714b638",
+                    "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                ],
+                "contact_uuids": [
+                    "5a8345c1-514a-4d1b-aee5-6f39b2f53cfa",
+                    "bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a"
+                ],
+                "urns": [
+                    "tel:+1234567890",
+                    "facebook:9876543210"
+                ],
+                "query": ""
+            },
+            "exclude": {
+                "non_active": true,
+                "in_a_flow": true,
+                "started_previously": true,
+                "not_seen_since_days": 90
+            },
+            "sample_size": 3
+        },
+        "status": 200,
+        "response": {
+            "query": "(group = \"Doctors\" OR group = \"Testers\" OR uuid = \"5a8345c1-514a-4d1b-aee5-6f39b2f53cfa\" OR uuid = \"bd2aab59-5e28-4db4-b6e8-bbdb75fd7a0a\" OR tel = \"+1234567890\" OR facebook = 9876543210) AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
+            "total": 1,
+            "sample_ids": [
+                10002
+            ],
+            "metadata": {
+                "attributes": [
+                    "flow",
+                    "group",
+                    "history",
+                    "last_seen_on",
+                    "status",
+                    "uuid"
+                ],
+                "fields": [],
+                "groups": [
+                    {
+                        "name": "Doctors",
+                        "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                    },
+                    {
+                        "name": "Testers",
+                        "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                    }
+                ],
+                "schemes": [
+                    "facebook",
+                    "tel"
+                ],
+                "allow_as_group": false
+            }
+        }
+    },
+    {
+        "label": "query inclusion, all exclusions",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {
+                "query": "gender = M"
+            },
+            "exclude": {
+                "non_active": true,
+                "in_a_flow": true,
+                "started_previously": true,
+                "not_seen_since_days": 90
+            },
+            "sample_size": 3
+        },
+        "status": 200,
+        "response": {
+            "query": "gender = \"M\" AND status = \"active\" AND flow = \"\" AND history != \"Pick a Number\" AND last_seen_on > \"07-04-2018\"",
+            "total": 1,
+            "sample_ids": [
+                10003
+            ],
+            "metadata": {
+                "attributes": [
+                    "flow",
+                    "history",
+                    "last_seen_on",
+                    "status"
+                ],
+                "fields": [
+                    {
+                        "key": "gender",
+                        "name": "Gender"
+                    }
+                ],
+                "groups": [],
+                "schemes": [],
+                "allow_as_group": false
+            }
+        }
+    },
+    {
+        "label": "invalid query inclusion (bad syntax)",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {
+                "query": "gender ="
+            },
+            "exclude": {},
+            "sample_size": 3
+        },
+        "status": 400,
+        "response": {
+            "code": "unexpected_token",
+            "error": "mismatched input '<EOF>' expecting {TEXT, STRING}",
+            "extra": {
+                "token": "<EOF>"
+            }
+        }
+    },
+    {
+        "label": "invalid query inclusion (missing field)",
+        "method": "POST",
+        "path": "/mr/flow/preview_start",
+        "body": {
+            "org_id": 1,
+            "flow_id": 10001,
+            "include": {
+                "query": "goats > 10"
+            },
+            "exclude": {},
+            "sample_size": 3
+        },
+        "status": 400,
+        "response": {
+            "code": "unknown_property",
+            "error": "can't resolve 'goats' to attribute, scheme or field",
+            "extra": {
+                "property": "goats"
+            }
+        }
+    }
+]

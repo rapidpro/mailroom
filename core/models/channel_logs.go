@@ -35,13 +35,10 @@ type ChannelLog struct {
 // ID returns the id of this channel log
 func (l *ChannelLog) ID() ChannelLogID { return l.l.ID }
 
-const insertChannelLogSQL = `
-INSERT INTO
-	channels_channellog( description, is_error,  url,  method,  request,  response,  response_status,  created_on,  request_time,  channel_id,  connection_id)
-	             VALUES(:description, :is_error, :url, :method, :request, :response, :response_status, :created_on, :request_time, :channel_id, :connection_id)
-RETURNING 
-	id as id
-`
+const sqlInsertChannelLog = `
+INSERT INTO channels_channellog( description, is_error,  url,  method,  request,  response,  response_status,  created_on,  request_time,  channel_id,  connection_id)
+     VALUES(:description, :is_error, :url, :method, :request, :response, :response_status, :created_on, :request_time, :channel_id, :connection_id)
+  RETURNING id as id`
 
 // NewChannelLog creates a new channel log
 func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Channel, conn *ChannelConnection) *ChannelLog {
@@ -87,7 +84,7 @@ func InsertChannelLogs(ctx context.Context, db Queryer, logs []*ChannelLog) erro
 		ls[i] = &logs[i].l
 	}
 
-	err := BulkQuery(ctx, "insert channel log", db, insertChannelLogSQL, ls)
+	err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, ls)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting channel log")
 	}
@@ -117,7 +114,7 @@ func InsertChannelLog(ctx context.Context, db Queryer,
 		l.ConnectionID = conn.ID()
 	}
 
-	err := BulkQuery(ctx, "insert channel log", db, insertChannelLogSQL, []interface{}{l})
+	err := BulkQuery(ctx, "insert channel log", db, sqlInsertChannelLog, []interface{}{l})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting channel log")
 	}

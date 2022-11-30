@@ -15,15 +15,9 @@ import (
 )
 
 func TestAssets(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt, _, _ := testsuite.Get()
 
-	defer testsuite.Reset(testsuite.ResetData)
-
-	// create new flow with same name as an existing flow
-	testdata.InsertFlow(db, testdata.Org1, []byte(`{
-		"uuid": "fd7d16dd-3a38-4351-aea6-7a80acb41dd9",
-		"name": "Pick a Number"
-	}`))
+	defer models.FlushCache()
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -42,7 +36,6 @@ func TestAssets(t *testing.T) {
 
 	flow, err = oa.FlowByName("PICK A NUMBER") // from db
 	assert.NoError(t, err)
-	assert.Equal(t, assets.FlowUUID("fd7d16dd-3a38-4351-aea6-7a80acb41dd9"), flow.UUID()) // new flow as newer saved_on
 	assert.Equal(t, "Pick a Number", flow.Name())
 
 	flow, err = oa.FlowByName("pick a number") // from cache

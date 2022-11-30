@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
+	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/lib/pq"
@@ -120,7 +121,7 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 		if start.Type() == models.StartTypeFlowAction {
 			limit = 1
 		}
-		matches, err := models.GetContactIDsForQuery(ctx, rt.ES, oa, start.Query(), limit)
+		matches, err := search.GetContactIDsForQuery(ctx, rt.ES, oa, start.Query(), limit)
 		if err != nil {
 			return errors.Wrapf(err, "error performing search for start: %d", start.ID())
 		}

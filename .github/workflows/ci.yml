@@ -1,7 +1,7 @@
 name: CI
 on: [push, pull_request]
 env:
-  go-version: "1.17.x"
+  go-version: "1.18.x"
   postgis-version: "3.1"
   redis-version: "5.0.6"
 jobs:
@@ -50,9 +50,9 @@ jobs:
 
       - name: Upload coverage
         if: success()
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v2
         with:
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
   release:
     name: Release

@@ -10,10 +10,12 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+// GroupID is our type for group ids
+type GroupID int
 
 // GroupStatus is the current status of the passed in group
 type GroupStatus string
@@ -24,16 +26,23 @@ const (
 	GroupStatusReady        = GroupStatus("R")
 )
 
-// GroupID is our type for group ids
-type GroupID int
+// GroupType is the the type of a group
+type GroupType string
+
+const (
+	GroupTypeManual = GroupType("M")
+	GroupTypeSmart  = GroupType("Q")
+)
 
 // Group is our mailroom type for contact groups
 type Group struct {
 	g struct {
-		ID    GroupID          `json:"id"`
-		UUID  assets.GroupUUID `json:"uuid"`
-		Name  string           `json:"name"`
-		Query string           `json:"query"`
+		ID     GroupID          `json:"id"`
+		UUID   assets.GroupUUID `json:"uuid"`
+		Name   string           `json:"name"`
+		Query  string           `json:"query"`
+		Status GroupStatus      `json:"status"`
+		Type   GroupType        `json:"group_type"`
 	}
 }
 
@@ -48,6 +57,12 @@ func (g *Group) Name() string { return g.g.Name }
 
 // Query returns the query string (if any) for this group
 func (g *Group) Query() string { return g.g.Query }
+
+// Status returns the status of this group
+func (g *Group) Status() GroupStatus { return g.g.Status }
+
+// Type returns the type of this group
+func (g *Group) Type() GroupType { return g.g.Type }
 
 // LoadGroups loads the groups for the passed in org
 func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, error) {
@@ -76,34 +91,16 @@ func LoadGroups(ctx context.Context, db Queryer, orgID OrgID) ([]assets.Group, e
 }
 
 const selectGroupsSQL = `
-SELECT ROW_TO_JSON(r) FROM (SELECT
-	id, 
-	uuid, 
-	name, 
-	query
-FROM 
-	contacts_contactgroup 
-WHERE 
-	org_id = $1 AND 
-	is_active = TRUE AND
-	group_type = 'U'
-ORDER BY 
-	name ASC
-) r;
-`
+SELECT ROW_TO_JSON(r) FROM (
+    SELECT id, uuid, name, query, status, group_type
+      FROM contacts_contactgroup 
+     WHERE org_id = $1 AND is_active = TRUE
+  ORDER BY name ASC
+) r;`
 
 // RemoveContactsFromGroups fires a bulk SQL query to remove all the contacts in the passed in groups
 func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*GroupRemove) error {
-	if len(removals) == 0 {
-		return nil
-	}
-
-	// convert to list of interfaces
-	is := make([]interface{}, len(removals))
-	for i := range removals {
-		is[i] = removals[i]
-	}
-	return BulkQuery(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, is)
+	return BulkQuery(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, removals)
 }
 
 // GroupRemove is our struct to track group removals
@@ -130,16 +127,7 @@ IN (
 
 // AddContactsToGroups fires a bulk SQL query to remove all the contacts in the passed in groups
 func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) error {
-	if len(adds) == 0 {
-		return nil
-	}
-
-	// convert to list of interfaces
-	is := make([]interface{}, len(adds))
-	for i := range adds {
-		is[i] = adds[i]
-	}
-	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, is)
+	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, adds)
 }
 
 // GroupAdd is our struct to track a final group additions
@@ -330,94 +318,4 @@ func AddContactsToGroupAndCampaigns(ctx context.Context, db *sqlx.DB, oa *OrgAss
 	}
 
 	return nil
-}
-
-// PopulateDynamicGroup calculates which members should be part of a group and populates the contacts
-// for that group by performing the minimum number of inserts / deletes.
-func PopulateDynamicGroup(ctx context.Context, db *sqlx.DB, es *elastic.Client, oa *OrgAssets, groupID GroupID, query string) (int, error) {
-	err := UpdateGroupStatus(ctx, db, groupID, GroupStatusEvaluating)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error marking dynamic group as evaluating")
-	}
-
-	start := time.Now()
-
-	// we have a bit of a race with the indexer process.. we want to make sure that any contacts that changed
-	// before this group was updated but after the last index are included, so if a contact was modified
-	// more recently than 10 seconds ago, we wait that long before starting in populating our group
-	newest, err := GetNewestContactModifiedOn(ctx, db, oa)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error getting most recent contact modified_on for org: %d", oa.OrgID())
-	}
-	if newest != nil {
-		n := *newest
-
-		// if it was more recent than 10 seconds ago, sleep until it has been 10 seconds
-		if n.Add(time.Second * 10).After(start) {
-			sleep := n.Add(time.Second * 10).Sub(start)
-			logrus.WithField("sleep", sleep).Info("sleeping before evaluating dynamic group")
-			time.Sleep(sleep)
-		}
-	}
-
-	// get current set of contacts in our group
-	ids, err := ContactIDsForGroupIDs(ctx, db, []GroupID{groupID})
-	if err != nil {
-		return 0, errors.Wrapf(err, "unable to look up contact ids for group: %d", groupID)
-	}
-	present := make(map[ContactID]bool, len(ids))
-	for _, i := range ids {
-		present[i] = true
-	}
-
-	// calculate new set of ids
-	new, err := GetContactIDsForQuery(ctx, es, oa, query, -1)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error performing query: %s for group: %d", query, groupID)
-	}
-
-	// find which contacts need to be added or removed
-	adds := make([]ContactID, 0, 100)
-	for _, id := range new {
-		if !present[id] {
-			adds = append(adds, id)
-		}
-		delete(present, id)
-	}
-
-	// build our list of removals
-	removals := make([]ContactID, 0, len(present))
-	for id := range present {
-		removals = append(removals, id)
-	}
-
-	// first remove all the contacts
-	err = RemoveContactsFromGroupAndCampaigns(ctx, db, oa, groupID, removals)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error removing contacts from group: %d", groupID)
-	}
-
-	// then add them all
-	err = AddContactsToGroupAndCampaigns(ctx, db, oa, groupID, adds)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error adding contacts to group: %d", groupID)
-	}
-
-	// mark our group as no longer evaluating
-	err = UpdateGroupStatus(ctx, db, groupID, GroupStatusReady)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error marking dynamic group as ready")
-	}
-
-	// finally update modified_on for all affected contacts to ensure these changes are seen by rp-indexer
-	changed := make([]ContactID, 0, len(adds))
-	changed = append(changed, adds...)
-	changed = append(changed, removals...)
-
-	err = UpdateContactModifiedOn(ctx, db, changed)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error updating contact modified_on after group population")
-	}
-
-	return len(new), nil
 }

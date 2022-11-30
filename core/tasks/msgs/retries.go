@@ -2,36 +2,18 @@ package msgs
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	retryMessagesLock = "retry_errored_messages"
-)
-
 func init() {
-	mailroom.AddInitFunction(startCrons)
-}
-
-func startCrons(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.Start(quit, rt, retryMessagesLock, time.Second*60, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return RetryErroredMessages(ctx, rt)
-		},
-	)
-
-	return nil
+	mailroom.RegisterCron("retry_errored_messages", time.Second*60, false, RetryErroredMessages)
 }
 
 func RetryErroredMessages(ctx context.Context, rt *runtime.Runtime) error {

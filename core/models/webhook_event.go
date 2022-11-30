@@ -33,11 +33,10 @@ func NewWebhookEvent(orgID OrgID, resthookID ResthookID, data string, createdOn 
 	return event
 }
 
-const insertWebhookEventsSQL = `
-INSERT INTO	api_webhookevent(data,  resthook_id,  org_id,  created_on, action)
-					  VALUES(:data, :resthook_id, :org_id, :created_on, 'POST')
-RETURNING id
-`
+const sqlInsertWebhookEvents = `
+INSERT INTO api_webhookevent(data, resthook_id, org_id, created_on, action)
+     VALUES(:data, :resthook_id, :org_id, :created_on, 'POST')
+  RETURNING id`
 
 // InsertWebhookEvents inserts the passed in webhook events, assigning them ids
 func InsertWebhookEvents(ctx context.Context, db Queryer, events []*WebhookEvent) error {
@@ -50,5 +49,5 @@ func InsertWebhookEvents(ctx context.Context, db Queryer, events []*WebhookEvent
 		is[i] = &events[i].e
 	}
 
-	return BulkQuery(ctx, "inserted webhook events", db, insertWebhookEventsSQL, is)
+	return BulkQuery(ctx, "inserted webhook events", db, sqlInsertWebhookEvents, is)
 }

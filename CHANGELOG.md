@@ -1,3 +1,114 @@
+v7.4.1
+----------
+ * Update to latest goflow
+
+v7.4.0
+----------
+ * Update README
+
+v7.3.20
+----------
+ * Use proper query construction for preview_start endpoint and return search errors for invalid user queries
+
+v7.3.19
+----------
+ * Update dependencies
+ * Log version at startup
+
+v7.3.18
+----------
+ * Use new orgmembership table to load users
+ * Update to latest goflow
+
+v7.3.17
+----------
+ * Update to latest goflow and simplify code for exiting session runs
+ * Add support for excluding contacts already in a flow in start_session actions
+ * Don't blow up in msg_created handler if flow has been deleted
+ * Use analytics package from gocommon instead of librato directly
+
+v7.3.16
+----------
+ * Update to latest goflow
+
+v7.3.15
+----------
+ * Simplify BroadcastBatch
+ * Record first-reply timings for tickets
+ * Add arm64 as a build target
+
+v7.3.14
+----------
+ * Update to latest goflow which fixes contact query bug
+
+v7.3.13
+----------
+ * Update to latest goflow which fixes contact query simplification
+ * Record ticket daily counts when opening, assigning and replying to tickets
+ * Update to latest gocommon, phonenumbers, jsonparser
+
+v7.3.12
+----------
+ * Update to go 1.18 and use some generics
+
+v7.3.11
+----------
+ * Rework flow/preview_start endpoint to take a number of days since last seen on
+ * Update to latest goflow that has fix for whatsapp template selection
+
+v7.3.10
+----------
+ * Changes to preview_start endpoint - 1) rename count to total to match other search endpoints, 2) add 
+query inspection metadata to preview_start endpoint response 3) switch to UUIDs for contacts and groups
+
+v7.3.9
+----------
+ * Move search into its own package and add more tests
+ * Add endpoint to generate a flow start preview
+
+v7.3.8
+----------
+ * Use new contactfield.name and is_system fields
+
+v7.3.7
+----------
+ * Update to latest goflow and start using httpx.DetectContentType
+
+v7.3.6
+----------
+ * Update modified_on for flow history changes  by handling flow entered and sprint ended 
+events
+
+v7.3.5
+----------
+ * Update to latest goflow which requires mapping groups and flows to ids for ES queries
+
+v7.3.4
+----------
+ * Fix unstopping of contacts who message in
+
+v7.3.3
+----------
+ * ContactGroup.group_type can no longer be 'U'
+ * Clear session timeout if timeout resume rejected by wait
+ * Update golang.org/x/sys
+
+v7.3.2
+----------
+ * Add is_system to contact groups, filter groups by group_type = M|Q|U
+
+v7.3.1
+----------
+ * Simplify cron jobs and add them to the main mailroom waitgroup
+ * Allow expirations and timeouts to resume sessions for stopped, blocked and archived contacts
+ * Messages to stopped, blocked or archived contacts should immediately fail
+
+v7.3.0
+----------
+ * Update to latest goflow
+ * Replace last usages of old locker code
+ * Cleanup some SQL variables
+
 v7.2.6
 ----------
  * Batch calls to delete event fires

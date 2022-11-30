@@ -19,6 +19,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/null"
+	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -195,9 +196,12 @@ func (c *Contact) UpdatePreferredURN(ctx context.Context, db Queryer, oa *OrgAss
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
 func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 	// convert our groups to a list of references
-	groups := make([]*assets.GroupReference, len(c.groups))
-	for i, g := range c.groups {
-		groups[i] = assets.NewGroupReference(g.UUID(), g.Name())
+	groups := make([]*assets.GroupReference, 0, len(c.groups))
+	for _, g := range c.groups {
+		// exclude the db-trigger based status groups for now
+		if g.Type() == GroupTypeManual || g.Type() == GroupTypeSmart {
+			groups = append(groups, assets.NewGroupReference(g.UUID(), g.Name()))
+		}
 	}
 
 	// convert our tickets to flow tickets
@@ -1039,7 +1043,9 @@ func StopContact(ctx context.Context, db Queryer, orgID OrgID, contactID Contact
 
 const sqlDeleteAllContactGroups = `
 DELETE FROM contacts_contactgroup_contacts
-      WHERE contact_id = $2 AND contactgroup_id = ANY(SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type = 'U')`
+      WHERE contact_id = $2 AND contactgroup_id = ANY(
+		  SELECT id from contacts_contactgroup WHERE org_id = $1 and group_type IN ('M', 'Q')
+	  )`
 
 const sqlDeleteAllContactTriggers = `
 DELETE FROM triggers_trigger_contacts
@@ -1130,7 +1136,7 @@ func updateURNChannelPriority(urn urns.URN, channel *Channel, priority int) (urn
 
 // UpdateContactModifiedOn updates modified_on the passed in contacts
 func UpdateContactModifiedOn(ctx context.Context, db Queryer, contactIDs []ContactID) error {
-	for _, idBatch := range chunkContactIDs(contactIDs, 100) {
+	for _, idBatch := range chunkSlice(contactIDs, 100) {
 		_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW() WHERE id = ANY($1)`, pq.Array(idBatch))
 		if err != nil {
 			return errors.Wrap(err, "error updating modified_on for contact batch")
@@ -1341,18 +1347,10 @@ func (i *ContactID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
 }
 
-// ContactLock returns the lock key for a particular contact, used with locker
-func ContactLock(orgID OrgID, contactID ContactID) string {
-	return fmt.Sprintf("c:%d:%d", orgID, contactID)
-}
-
-// UpdateContactModifiedBy updates modified by the passed user id on the passed in contacts
-func UpdateContactModifiedBy(ctx context.Context, db Queryer, contactIDs []ContactID, userID UserID) error {
-	if userID == NilUserID || len(contactIDs) == 0 {
-		return nil
-	}
-	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW(), modified_by_id = $2 WHERE id = ANY($1)`, pq.Array(contactIDs), userID)
-	return err
+// GetContactLocker returns the locker for a particular contact
+func GetContactLocker(orgID OrgID, contactID ContactID) *redisx.Locker {
+	key := fmt.Sprintf("lock:c:%d:%d", orgID, contactID)
+	return redisx.NewLocker(key, time.Minute*5)
 }
 
 // ContactStatusChange struct used for our contact status change

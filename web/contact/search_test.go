@@ -18,26 +18,18 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
 
-	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSearch(t *testing.T) {
+func TestContactSearch(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
 	wg := &sync.WaitGroup{}
 
-	es := testsuite.NewMockElasticServer()
-	defer es.Close()
+	mockES := testsuite.NewMockElasticServer()
+	defer mockES.Close()
 
-	client, err := elastic.NewClient(
-		elastic.SetURL(es.URL()),
-		elastic.SetHealthcheck(false),
-		elastic.SetSniff(false),
-	)
-	assert.NoError(t, err)
-
-	rt.ES = client
+	rt.ES = mockES.Client()
 
 	server := web.NewServer(ctx, rt, wg)
 	server.Start()
@@ -47,39 +39,11 @@ func TestSearch(t *testing.T) {
 
 	defer server.Stop()
 
-	singleESResponse := fmt.Sprintf(`{
-		"_scroll_id": "DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAbgc0WS1hqbHlfb01SM2lLTWJRMnVOSVZDdw==",
-		"took": 2,
-		"timed_out": false,
-		"_shards": {
-		  "total": 1,
-		  "successful": 1,
-		  "skipped": 0,
-		  "failed": 0
-		},
-		"hits": {
-		  "total": 1,
-		  "max_score": null,
-		  "hits": [
-			{
-			  "_index": "contacts",
-			  "_type": "_doc",
-			  "_id": "%d",
-			  "_score": null,
-			  "_routing": "1",
-			  "sort": [
-				15124352
-			  ]
-			}
-		  ]
-		}
-	}`, testdata.Cathy.ID)
-
 	tcs := []struct {
 		method               string
 		url                  string
 		body                 string
-		esResponse           string
+		mockResult           []models.ContactID
 		expectedStatus       int
 		expectedError        string
 		expectedHits         []models.ContactID
@@ -99,22 +63,22 @@ func TestSearch(t *testing.T) {
 		{
 			method:         "POST",
 			url:            "/mr/contact/search",
-			body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
+			body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
 			expectedStatus: 400,
 			expectedError:  "can't resolve 'birthday' to attribute, scheme or field",
 		},
 		{
 			method:         "POST",
 			url:            "/mr/contact/search",
-			body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
+			body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
 			expectedStatus: 400,
 			expectedError:  "can't convert 'tomorrow' to a number",
 		},
 		{
 			method:               "POST",
 			url:                  "/mr/contact/search",
-			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
-			esResponse:           singleESResponse,
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
+			mockResult:           []models.ContactID{testdata.Cathy.ID},
 			expectedStatus:       200,
 			expectedHits:         []models.ContactID{testdata.Cathy.ID},
 			expectedQuery:        `name ~ "Cathy"`,
@@ -126,10 +90,10 @@ func TestSearch(t *testing.T) {
 		{
 			method:               "POST",
 			url:                  "/mr/contact/search",
-			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s", "exclude_ids": [%d, %d]}`, testdata.AllContactsGroup.UUID, testdata.Bob.ID, testdata.George.ID),
-			esResponse:           singleESResponse,
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "Cathy", "group_uuid": "%s", "exclude_ids": [%d, %d]}`, testdata.ActiveGroup.UUID, testdata.Bob.ID, testdata.George.ID),
+			mockResult:           []models.ContactID{testdata.George.ID},
 			expectedStatus:       200,
-			expectedHits:         []models.ContactID{testdata.Cathy.ID},
+			expectedHits:         []models.ContactID{testdata.George.ID},
 			expectedQuery:        `name ~ "Cathy"`,
 			expectedAttributes:   []string{"name"},
 			expectedFields:       []*assets.FieldReference{},
@@ -153,7 +117,7 @@ func TestSearch(t *testing.T) {
 							},
 							{
 								"term": {
-									"groups": "d1ee73f0-bdb5-47ce-99dd-0c95d4ebf008"
+									"group_ids": 1
 								}
 							},
 							{
@@ -188,8 +152,8 @@ func TestSearch(t *testing.T) {
 		{
 			method:             "POST",
 			url:                "/mr/contact/search",
-			body:               fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
-			esResponse:         singleESResponse,
+			body:               fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
+			mockResult:         []models.ContactID{testdata.Cathy.ID},
 			expectedStatus:     200,
 			expectedHits:       []models.ContactID{testdata.Cathy.ID},
 			expectedQuery:      `age = 10 AND gender = "M"`,
@@ -204,8 +168,8 @@ func TestSearch(t *testing.T) {
 		{
 			method:               "POST",
 			url:                  "/mr/contact/search",
-			body:                 fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, testdata.AllContactsGroup.UUID),
-			esResponse:           singleESResponse,
+			body:                 fmt.Sprintf(`{"org_id": 1, "query": "", "group_uuid": "%s"}`, testdata.ActiveGroup.UUID),
+			mockResult:           []models.ContactID{testdata.Cathy.ID},
 			expectedStatus:       200,
 			expectedHits:         []models.ContactID{testdata.Cathy.ID},
 			expectedQuery:        ``,
@@ -217,9 +181,11 @@ func TestSearch(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		var body io.Reader
-		es.NextResponse = tc.esResponse
+		if tc.mockResult != nil {
+			mockES.AddResponse(tc.mockResult...)
+		}
 
+		var body io.Reader
 		if tc.body != "" {
 			body = bytes.NewReader([]byte(tc.body))
 		}
@@ -251,7 +217,7 @@ func TestSearch(t *testing.T) {
 			}
 
 			if tc.expectedESRequest != "" {
-				test.AssertEqualJSON(t, []byte(tc.expectedESRequest), []byte(es.LastRequestBody), "elastic request mismatch")
+				test.AssertEqualJSON(t, []byte(tc.expectedESRequest), []byte(mockES.LastRequestBody), "elastic request mismatch")
 			}
 		} else {
 			r := &web.ErrorResponse{}
