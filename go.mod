@@ -33,7 +33,6 @@ require (
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/antlr/antlr4 v0.0.0-20200701161529-3d9351f61e0f // indirect
 	github.com/Shopify/gomail v0.0.0-20220314142144-6897a5a5ba29 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220527190237-ee62e23da966 // indirect
 	github.com/blevesearch/segment v0.9.0 // indirect
@@ -44,8 +43,8 @@ require (
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
-	github.com/google/go-querystring v1.1.0
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
+	github.com/google/go-querystring v1.1.0
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -67,6 +66,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.17.1-weni
+replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.22.4-weni
 
 replace github.com/gomodule/redigo => github.com/gomodule/redigo v1.8.8
