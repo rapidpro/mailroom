@@ -63,7 +63,7 @@ const (
 type MsgStatus string
 
 const (
-	MsgStatusPending   = MsgStatus("P") // incoming msg created but not yet handled
+	MsgStatusPending   = MsgStatus("P") // incoming msg created but not yet handled, or outgoing message that failed to queue
 	MsgStatusHandled   = MsgStatus("H") // incoming msg handled
 	MsgStatusQueued    = MsgStatus("Q") // outgoing msg created and queued to courier
 	MsgStatusWired     = MsgStatus("W") // outgoing msg requested to be sent via channel
