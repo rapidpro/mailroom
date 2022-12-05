@@ -596,7 +596,7 @@ func TestMarkMessages(t *testing.T) {
 
 	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Howdy", nil, models.MsgStatusQueued, false)
 
-	models.MarkMessagesPending(ctx, db, []*models.Msg{msg1, msg2})
+	models.MarkMessagesForRequeuing(ctx, db, []*models.Msg{msg1, msg2})
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(2)
 
@@ -611,7 +611,7 @@ func TestMarkMessages(t *testing.T) {
 
 	assert.Equal(t, flows.MsgID(3000000000), msg4.ID())
 
-	err = models.MarkMessagesPending(ctx, db, []*models.Msg{msg4})
+	err = models.MarkMessagesForRequeuing(ctx, db, []*models.Msg{msg4})
 	assert.NoError(t, err)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P'`).Returns(3)

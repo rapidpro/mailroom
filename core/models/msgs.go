@@ -519,10 +519,7 @@ INNER JOIN
 INNER JOIN 
 	channels_channel c ON c.id = m.channel_id
 WHERE
-	m.direction = 'O' AND
-	m.status = 'E' AND
-	m.next_attempt <= NOW() AND
-	c.is_active = TRUE
+	m.direction = 'O' AND m.status IN ('P', 'E') AND m.next_attempt <= NOW() AND c.is_active = TRUE
 ORDER BY
     m.next_attempt ASC, m.created_on ASC
 LIMIT 5000`
@@ -647,39 +644,35 @@ func UpdateMessage(ctx context.Context, tx Queryer, msgID MsgID, status MsgStatu
 	return nil
 }
 
-// MarkMessagesPending marks the passed in messages as pending(P)
-func MarkMessagesPending(ctx context.Context, db Queryer, msgs []*Msg) error {
-	return updateMessageStatus(ctx, db, msgs, MsgStatusPending)
+// MarkMessagesForRequeuing marks the passed in messages as pending(P) with a next attempt value
+// so that the retry messages task will pick them up.
+func MarkMessagesForRequeuing(ctx context.Context, db Queryer, msgs []*Msg) error {
+	nextAttempt := time.Now().Add(10 * time.Minute)
+	return updateMessageStatus(ctx, db, msgs, MsgStatusPending, &nextAttempt)
 }
 
 // MarkMessagesQueued marks the passed in messages as queued(Q)
 func MarkMessagesQueued(ctx context.Context, db Queryer, msgs []*Msg) error {
-	return updateMessageStatus(ctx, db, msgs, MsgStatusQueued)
+	return updateMessageStatus(ctx, db, msgs, MsgStatusQueued, nil)
 }
 
-func updateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status MsgStatus) error {
+const sqlUpdateMsgStatus = `
+UPDATE msgs_msg
+   SET status = m.status, next_attempt = m.next_attempt::timestamp with time zone
+  FROM (VALUES(:id, :status, :next_attempt)) AS m(id, status, next_attempt)
+ WHERE msgs_msg.id = m.id::bigint`
+
+func updateMessageStatus(ctx context.Context, db Queryer, msgs []*Msg, status MsgStatus, nextAttempt *time.Time) error {
 	is := make([]interface{}, len(msgs))
 	for i, msg := range msgs {
 		m := &msg.m
 		m.Status = status
+		m.NextAttempt = nextAttempt
 		is[i] = m
 	}
 
-	return BulkQuery(ctx, "updating message status", db, updateMsgStatusSQL, is)
+	return BulkQuery(ctx, "updating message status", db, sqlUpdateMsgStatus, is)
 }
-
-const updateMsgStatusSQL = `
-UPDATE 
-	msgs_msg
-SET
-	status = m.status
-FROM (
-	VALUES(:id, :status)
-) AS
-	m(id, status)
-WHERE
-	msgs_msg.id = m.id::bigint
-`
 
 // BroadcastTranslation is the translation for the passed in language
 type BroadcastTranslation struct {
