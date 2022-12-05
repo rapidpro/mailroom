@@ -1,3 +1,7 @@
+1.4.8-mailroom-7.1.22
+----------
+ * Fix twilio flex messages history #95
+
 1.4.7-mailroom-7.1.22
 ----------
  * Fix twilio flex media creation content-type param #93
