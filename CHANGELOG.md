@@ -1,3 +1,7 @@
+v7.5.35 (2022-12-05)
+-------------------------
+ * Retry messages which fail to queue to courier
+
 v7.5.34 (2022-11-30)
 -------------------------
  * Update deps including new goflow which adds legacy_vars issues
