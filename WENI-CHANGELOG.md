@@ -1,3 +1,7 @@
+1.4.9-mailroom-7.1.22
+----------
+ * add contact urn field to wenichats room creation params #97
+
 1.4.8-mailroom-7.1.22
 ----------
  * Fix twilio flex messages history #95
