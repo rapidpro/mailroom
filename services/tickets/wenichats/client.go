@@ -161,6 +161,7 @@ type Contact struct {
 	Email        string                 `json:"email,omitempty"`
 	Phone        string                 `json:"phone,omitempty"`
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
+	URN          string                 `json:"urn,omitempty"`
 }
 
 type RoomResponse struct {
