@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const fieldTicket = `{"message":"Cookies","priority":"high","subject":"Where are my cookies?","description":"I want to know where is my cookie.","tags": ["TAG_01","TAG_02"],"custom_fields":[{"id":21938362,"value":"hd_3000"}]}`
+const fieldTicket = `{"message":"Cookies","priority":"high","subject":"Where are my cookies?","description":"I want to know where is my cookie.","tags": ["TAG_01","TAG_02"],"custom_fields":[{"id":"21938362","value":"hd_3000"}]}`
 
 func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()

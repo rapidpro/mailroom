@@ -97,12 +97,12 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		msg.Message = body
 	} else {
 		extra := &struct {
-			Message      string      `json:"message"`
-			Priority     string      `json:"priority"`
-			Subject      string      `json:"subject"`
-			Description  string      `json:"description"`
-			CustomFields interface{} `json:"custom_fields"`
-			Tags         []string    `json:"tags"`
+			Message      string       `json:"message"`
+			Priority     string       `json:"priority"`
+			Subject      string       `json:"subject"`
+			Description  string       `json:"description"`
+			CustomFields []FieldValue `json:"custom_fields"`
+			Tags         []string     `json:"tags"`
 		}{}
 
 		err := jsonx.Unmarshal([]byte(body), extra)
@@ -117,7 +117,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 				if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != "" {
 					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
 				} else if fields.Type().Field(i).Tag.Get("json") == "custom_fields" && fields.Field(i).Interface() != nil {
-					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+					for _, cf := range extra.CustomFields {
+						fieldsValue = append(fieldsValue, FieldValue{ID: cf.ID, Value: cf.Value})
+					}
 				} else if fields.Type().Field(i).Tag.Get("json") == "tags" && fields.Field(i).Interface() != nil {
 					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
 				}
