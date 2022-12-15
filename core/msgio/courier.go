@@ -180,8 +180,11 @@ func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channe
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.Config.CourierAuthToken))
 
 	resp, err := httpx.DoTrace(courierHttpClient, req, nil, nil, -1)
-	if err != nil || resp.Response.StatusCode != 200 {
-		return "", "", errors.New("error calling courier endpoint")
+	if err != nil {
+		return "", "", errors.Wrap(err, "error calling courier endpoint")
+	}
+	if resp.Response.StatusCode != 200 {
+		return "", "", errors.Errorf("error calling courier endpoint, got non-200 status: %s", string(resp.ResponseTrace))
 	}
 	fa := &fetchAttachmentResponse{}
 	if err := json.Unmarshal(resp.ResponseBody, fa); err != nil {
