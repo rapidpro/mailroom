@@ -1,9 +1,9 @@
 POST /api/v2/any_channel/push.json HTTP/1.1
 Host: nyaruka.zendesk.com
 User-Agent: Go-http-client/1.1
-Content-Length: 697
+Content-Length: 708
 Authorization: Bearer ****************
 Content-Type: application/json
 Accept-Encoding: gzip
 
-{"instance_push_id":"1234-abcd","request_id":"sesame:1570461696000000000","external_resources":[{"external_id":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","message":"Cookies","thread_id":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","created_at":"2019-10-07T15:21:35Z","author":{"external_id":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis"},"allow_channelback":true,"fields":[{"id":"message","value":"Cookies"},{"id":"priority","value":"high"},{"id":"subject","value":"Where are my cookies?"},{"id":"description","value":"I want to know where is my cookie."},{"id":"custom_fields","value":[{"id":21938362,"value":"hd_3000"}]},{"id":"external_id","value":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c"}]}]}
+{"instance_push_id":"1234-abcd","request_id":"sesame:1570461696000000000","external_resources":[{"external_id":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","message":"Cookies","thread_id":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c","created_at":"2019-10-07T15:21:35Z","author":{"external_id":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis"},"allow_channelback":true,"fields":[{"id":"message","value":"Cookies"},{"id":"priority","value":"high"},{"id":"subject","value":"Where are my cookies?"},{"id":"description","value":"I want to know where is my cookie."},{"id":"21938362","value":"hd_3000"},{"id":"tags","value":["TAG_01","TAG_02"]},{"id":"external_id","value":"59d74b86-3e2f-4a93-aece-b05d2fdcde0c"}]}]}

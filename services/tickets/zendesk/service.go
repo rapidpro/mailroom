@@ -92,19 +92,17 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		AllowChannelback: true,
 	}
 
-	var tags []string
-
 	fieldsValue := []FieldValue{}
 	if !strings.HasPrefix(body, "{") {
 		msg.Message = body
 	} else {
 		extra := &struct {
-			Message      string      `json:"message"`
-			Priority     string      `json:"priority"`
-			Subject      string      `json:"subject"`
-			Description  string      `json:"description"`
-			CustomFields interface{} `json:"custom_fields"`
-			Tags         []string    `json:"tags"`
+			Message      string       `json:"message"`
+			Priority     string       `json:"priority"`
+			Subject      string       `json:"subject"`
+			Description  string       `json:"description"`
+			CustomFields []FieldValue `json:"custom_fields"`
+			Tags         []string     `json:"tags"`
 		}{}
 
 		err := jsonx.Unmarshal([]byte(body), extra)
@@ -119,6 +117,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 				if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != "" {
 					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
 				} else if fields.Type().Field(i).Tag.Get("json") == "custom_fields" && fields.Field(i).Interface() != nil {
+					for _, cf := range extra.CustomFields {
+						fieldsValue = append(fieldsValue, FieldValue{ID: cf.ID, Value: cf.Value})
+					}
+				} else if fields.Type().Field(i).Tag.Get("json") == "tags" && fields.Field(i).Interface() != nil {
 					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
 				}
 			}
@@ -131,32 +133,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		} else {
 			msg.Message = extra.Subject
 		}
-		tags = extra.Tags
 	}
 
 	if err := s.push(msg, logHTTP); err != nil {
 		return nil, err
-	}
-
-	if tags != nil {
-		trace, err := s.restClient.get("tickets?external_id="+string(ticket.UUID()), nil, nil)
-		if err != nil {
-			return nil, err
-		}
-		response := &struct {
-			Tickets []struct {
-				TicketID int `json:"id"`
-			} `json:"tickets"`
-		}{}
-		err = jsonx.Unmarshal(trace.ResponseBody, response)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = s.restClient.put(fmt.Sprint(response.Tickets[0].TicketID)+"/tags.json", tags, nil)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return ticket, nil
