@@ -1,3 +1,7 @@
+1.4.10-mailroom-7.1.22
+----------
+ * Fix submitting tags and custom fields for Zendesk tickets #99
+
 1.4.9-mailroom-7.1.22
 ----------
  * add contact urn field to wenichats room creation params #97
