@@ -398,7 +398,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	}
 
 	// populate metadata if we have any
-	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic {
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" {
 		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
@@ -408,6 +408,9 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		}
 		if out.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(out.Topic())
+		}
+		if out.TextLanguage != "" {
+			metadata["text_language"] = out.TextLanguage
 		}
 		m.Metadata = null.NewMap(metadata)
 	}
