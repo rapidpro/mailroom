@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
@@ -90,6 +92,18 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		channel = oa.ChannelByUUID(event.Msg.Channel().UUID)
 		if channel == nil {
 			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
+		} else {
+			if fmt.Sprint(channel.Type()) == "WAC" || fmt.Sprint(channel.Type()) == "WA" {
+				country := envs.DeriveCountryFromTel("+" + event.Msg.URN().Path())
+				locale := envs.NewLocale(scene.Contact().Language(), country)
+				languageCode := locale.ToBCP47()
+
+				if _, valid := validLanguageCodes[languageCode]; !valid {
+					languageCode = ""
+				}
+
+				event.Msg.TextLanguage = envs.Language(languageCode)
+			}
 		}
 	}
 
@@ -107,4 +121,33 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 	}
 
 	return nil
+}
+
+var validLanguageCodes = map[string]bool{
+	"da-DK": true,
+	"de-DE": true,
+	"en-AU": true,
+	"en-CA": true,
+	"en-GB": true,
+	"en-IN": true,
+	"en-US": true,
+	"ca-ES": true,
+	"es-ES": true,
+	"es-MX": true,
+	"fi-FI": true,
+	"fr-CA": true,
+	"fr-FR": true,
+	"it-IT": true,
+	"ja-JP": true,
+	"ko-KR": true,
+	"nb-NO": true,
+	"nl-NL": true,
+	"pl-PL": true,
+	"pt-BR": true,
+	"ru-RU": true,
+	"sv-SE": true,
+	"zh-CN": true,
+	"zh-HK": true,
+	"zh-TW": true,
+	"ar-JO": true,
 }
