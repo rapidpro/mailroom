@@ -1,3 +1,7 @@
+1.4.11-mailroom-7.1.22
+----------
+ * Add support for sending contact language in messages for WAC and WA #101
+
 1.4.10-mailroom-7.1.22
 ----------
  * Fix submitting tags and custom fields for Zendesk tickets #99
