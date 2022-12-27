@@ -1,3 +1,7 @@
+1.4.12-mailroom-7.1.22
+----------
+ * Fix file endpoint for Zendesk #103
+
 1.4.11-mailroom-7.1.22
 ----------
  * Add support for sending contact language in messages for WAC and WA #101
