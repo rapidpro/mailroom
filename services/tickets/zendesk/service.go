@@ -318,7 +318,7 @@ func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, 
 		path := strings.TrimPrefix(u.Path, prefix)
 		path = strings.TrimPrefix(path, "/")
 
-		fileURLs[i] = "file/" + path
+		fileURLs[i] = "api/v2/file/" + path
 	}
 	return fileURLs, nil
 }
