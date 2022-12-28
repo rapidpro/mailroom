@@ -1,3 +1,7 @@
+1.4.13-mailroom-7.1.22
+----------
+ * Add Domain to File URL for Zendesk #105
+
 1.4.12-mailroom-7.1.22
 ----------
  * Fix file endpoint for Zendesk #103
