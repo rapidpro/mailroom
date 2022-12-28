@@ -318,9 +318,9 @@ func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, 
 		path := strings.TrimPrefix(u.Path, prefix)
 		path = strings.TrimPrefix(path, "/")
 
-		dominio := s.rtConfig.S3MediaPrefixZendesk
+		domain := s.rtConfig.S3MediaPrefixZendesk
 
-		fileURLs[i] = "https://" + dominio + "/api/v2/file/" + path
+		fileURLs[i] = "https://" + domain + "/api/v2/file/" + path
 	}
 	return fileURLs, nil
 }
