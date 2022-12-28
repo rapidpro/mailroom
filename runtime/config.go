@@ -49,14 +49,15 @@ type Config struct {
 	MaxValueLength       int    `help:"the maximum size in characters for contact field values and run result values"`
 	SessionStorage       string `validate:"omitempty,session_storage"         help:"where to store session output (s3|db)"`
 
-	S3Endpoint       string `help:"the S3 endpoint we will write attachments to"`
-	S3Region         string `help:"the S3 region we will write attachments to"`
-	S3MediaBucket    string `help:"the S3 bucket we will write attachments to"`
-	S3MediaPrefix    string `help:"the prefix that will be added to attachment filenames"`
-	S3SessionBucket  string `help:"the S3 bucket we will write attachments to"`
-	S3SessionPrefix  string `help:"the prefix that will be added to attachment filenames"`
-	S3DisableSSL     bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
-	S3ForcePathStyle bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
+	S3Endpoint           string `help:"the S3 endpoint we will write attachments to"`
+	S3Region             string `help:"the S3 region we will write attachments to"`
+	S3MediaBucket        string `help:"the S3 bucket we will write attachments to"`
+	S3MediaPrefix        string `help:"the prefix that will be added to attachment filenames"`
+	S3MediaPrefixZendesk string `help:"the prefix that will be added to file attachment names for Zendesk tickets"`
+	S3SessionBucket      string `help:"the S3 bucket we will write attachments to"`
+	S3SessionPrefix      string `help:"the prefix that will be added to attachment filenames"`
+	S3DisableSSL         bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
+	S3ForcePathStyle     bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
 
 	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
