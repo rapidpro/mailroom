@@ -1,3 +1,8 @@
+v7.5.36 (2023-01-02)
+-------------------------
+ * Update to latest goflow which adds locale field to MsgOut
+ * Improve error reporting when courier call fails
+
 v7.5.35 (2022-12-05)
 -------------------------
  * Retry messages which fail to queue to courier
