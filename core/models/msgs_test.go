@@ -22,7 +22,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/null"
 	"github.com/nyaruka/redisx/assertredis"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -176,7 +175,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			session.SetIncomingMsg(tc.ResponseTo, null.NullString)
 		}
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, tc.Unsendable)
+		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, envs.NilLocale, tc.Unsendable)
 		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg, now)
 
 		assert.NoError(t, err)
@@ -221,7 +220,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 	// check that msg loop detection triggers after 20 repeats of the same text
 	newOutgoing := func(text string) *models.Msg {
-		flowMsg := flows.NewMsgOut(urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)), assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), text, nil, nil, nil, flows.NilMsgTopic, flows.NilUnsendableReason)
+		flowMsg := flows.NewMsgOut(urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)), assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), text, nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
 		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flow, flowMsg, now)
 		require.NoError(t, err)
 		return msg
@@ -266,6 +265,7 @@ func TestMarshalMsg(t *testing.T) {
 		[]string{"yes", "no"},
 		nil,
 		flows.MsgTopicPurchase,
+		envs.NilLocale,
 		flows.NilUnsendableReason,
 	)
 
@@ -324,6 +324,7 @@ func TestMarshalMsg(t *testing.T) {
 		"Hi there",
 		nil, nil, nil,
 		flows.NilMsgTopic,
+		envs.NilLocale,
 		flows.NilUnsendableReason,
 	)
 	in1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
@@ -366,7 +367,7 @@ func TestMarshalMsg(t *testing.T) {
 
 	// try a broadcast message which won't have session and flow fields set
 	bcastID := testdata.InsertBroadcast(db, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Blast"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
-	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic, flows.NilUnsendableReason)
+	bcastMsg1 := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), "Blast", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
 	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, cathy, bcastMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), bcastID)
 	require.NoError(t, err)
 
@@ -526,8 +527,8 @@ func TestGetMsgRepetitions(t *testing.T) {
 	oa := testdata.Org1.Load(rt)
 	_, cathy := testdata.Cathy.Load(db, oa)
 
-	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, flows.NilUnsendableReason)
-	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic, flows.NilUnsendableReason)
+	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
+	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic, envs.NilLocale, flows.NilUnsendableReason)
 
 	assertRepetitions := func(m *flows.MsgOut, expected int) {
 		count, err := models.GetMsgRepetitions(rp, cathy, m)
@@ -694,7 +695,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 
 	createdOn := time.Date(2021, 7, 26, 12, 6, 30, 0, time.UTC)
 
-	flowMsg := flows.NewIVRMsgOut(testdata.Cathy.URN, vonage.ChannelReference(), "Hello", "eng", "http://example.com/hi.mp3")
+	flowMsg := flows.NewIVRMsgOut(testdata.Cathy.URN, vonage.ChannelReference(), "Hello", "http://example.com/hi.mp3", "eng")
 	dbMsg := models.NewOutgoingIVR(rt.Config, testdata.Org1.ID, conn, flowMsg, createdOn)
 
 	assert.Equal(t, flowMsg.UUID(), dbMsg.UUID())

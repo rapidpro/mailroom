@@ -56,11 +56,12 @@ func (t *TemplateTranslation) UnmarshalJSON(data []byte) error { return json.Unm
 func (t *TemplateTranslation) MarshalJSON() ([]byte, error) { return json.Marshal(t.t) }
 
 func (t *TemplateTranslation) Channel() assets.ChannelReference { return t.t.Channel }
-func (t *TemplateTranslation) Language() envs.Language          { return t.t.Language }
-func (t *TemplateTranslation) Country() envs.Country            { return envs.Country(t.t.Country) }
-func (t *TemplateTranslation) Content() string                  { return t.t.Content }
-func (t *TemplateTranslation) Namespace() string                { return t.t.Namespace }
-func (t *TemplateTranslation) VariableCount() int               { return t.t.VariableCount }
+func (t *TemplateTranslation) Locale() envs.Locale {
+	return envs.NewLocale(t.t.Language, envs.Country(t.t.Country))
+}
+func (t *TemplateTranslation) Content() string    { return t.t.Content }
+func (t *TemplateTranslation) Namespace() string  { return t.t.Namespace }
+func (t *TemplateTranslation) VariableCount() int { return t.t.VariableCount }
 
 // loads the templates for the passed in org
 func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Template, error) {

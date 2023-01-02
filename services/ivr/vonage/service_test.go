@@ -81,13 +81,13 @@ func TestResponseForSprint(t *testing.T) {
 		},
 		{
 			[]flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "", "/recordings/foo.wav")),
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "/recordings/foo.wav", "")),
 			},
 			`[{"action":"stream","streamUrl":["/recordings/foo.wav"]}]`,
 		},
 		{
 			[]flows.Event{
-				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "", "https://temba.io/recordings/foo.wav")),
+				events.NewIVRCreated(flows.NewIVRMsgOut(urn, channelRef, "hello world", "https://temba.io/recordings/foo.wav", "")),
 			},
 			`[{"action":"stream","streamUrl":["https://temba.io/recordings/foo.wav"]}]`,
 		},
