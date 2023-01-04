@@ -1,11 +1,10 @@
-# Mailroom
+# TextIt Mailroom
 
 [![Build Status](https://github.com/nyaruka/mailroom/workflows/CI/badge.svg)](https://github.com/nyaruka/mailroom/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/nyaruka/mailroom/branch/main/graph/badge.svg)](https://codecov.io/gh/nyaruka/mailroom)
 
-Service for RapidPro/TextIt which does the heavy lifting of running flow starts, campaigns etc.
-flows. It interacts directly with the database and sends and receives messages with [Courier](https://github.com/nyaruka/courier) 
-for handling via Redis.
+Service for RapidPro which does the heavy lifting of running flow starts, campaigns etc. It interacts directly with the database 
+and sends and receives messages with [Courier](https://github.com/nyaruka/courier) for handling via Redis.
 
 ## Deploying
 
@@ -26,7 +25,7 @@ We recommend running it with no changes to the configuration and no parameters, 
 environment variables to configure it. You can use `% mailroom --help` to see a list of the
 environment variables and parameters and for more details on each option.
 
-For use with RapidPro, you will need to configure these settings:
+For use with TextIt, you will need to configure these settings:
 
 - `MAILROOM_ADDRESS`: the address to bind our web server to (default "localhost")
 - `MAILROOM_DOMAIN`: the domain that mailroom is listening on
