@@ -1,11 +1,10 @@
-# Mailroom
+# RapidPro Mailroom
 
 [![Build Status](https://github.com/rapidpro/mailroom/workflows/CI/badge.svg)](https://github.com/rapidpro/mailroom/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/rapidpro/mailroom/branch/main/graph/badge.svg)](https://codecov.io/gh/rapidpro/mailroom)
 
-Service for RapidPro/TextIt which does the heavy lifting of running flow starts, campaigns etc.
-flows. It interacts directly with the database and sends and receives messages with [Courier](https://github.com/nyaruka/courier) 
-for handling via Redis.
+Service for RapidPro which does the heavy lifting of running flow starts, campaigns etc. It interacts directly with the database 
+and sends and receives messages with [Courier](https://github.com/nyaruka/courier) for handling via Redis.
 
 ## Deploying
 
