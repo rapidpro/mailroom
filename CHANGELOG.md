@@ -1,3 +1,7 @@
+v8.0.0 (2023-01-09)
+-------------------------
+ * Update test database to latest schema
+
 v7.5.36 (2023-01-02)
 -------------------------
  * Update to latest goflow which adds locale field to MsgOut
