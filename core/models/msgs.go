@@ -17,7 +17,6 @@ import (
 	"github.com/nyaruka/goflow/excellent"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
@@ -103,7 +102,6 @@ type TemplateState string
 
 const (
 	TemplateStateEvaluated   = TemplateState("evaluated")
-	TemplateStateLegacy      = TemplateState("legacy")
 	TemplateStateUnevaluated = TemplateState("unevaluated")
 )
 
@@ -1049,11 +1047,7 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 		}
 
 		template := ""
-
-		// if this is a legacy template, migrate it forward
-		if b.TemplateState == TemplateStateLegacy {
-			template, _ = expressions.MigrateTemplate(t.Text, nil)
-		} else if b.TemplateState == TemplateStateUnevaluated {
+		if b.TemplateState == TemplateStateUnevaluated {
 			template = t.Text
 		}
 
