@@ -1,3 +1,8 @@
+v8.1.0 (2023-01-18)
+-------------------------
+ * Update to latest goflow which moves to flow spec version 13.2
+ * Tweak fetching contacts eligible for a new campaign event
+
 v8.0.0 (2023-01-09)
 -------------------------
  * Update test database to latest schema
