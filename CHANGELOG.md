@@ -1,3 +1,8 @@
+v8.1.1 (2023-01-19)
+-------------------------
+ * Write new translations JSONB column when saving child broadcasts
+ * Remove support for legacy expressions in broadcasts
+
 v8.1.0 (2023-01-18)
 -------------------------
  * Update to latest goflow which moves to flow spec version 13.2
