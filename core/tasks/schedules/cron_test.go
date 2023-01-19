@@ -82,8 +82,13 @@ func TestCheckSchedules(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) from flows_flowstart_groups WHERE flowstart_id = 1`).Returns(1)
 
 	// and one broadcast as well
-	assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 AND parent_id = $2 
-		AND text = hstore(ARRAY['eng','Test message', 'fra', 'Un Message']) AND status = 'Q' AND base_language = 'eng'`, testdata.Org1.ID, b1).Returns(1)
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 
+		AND parent_id = $2 
+		AND translations -> 'eng' ->> 'text' = 'Test message'
+		AND translations -> 'fra' ->> 'text' = 'Un Message'
+		AND text = hstore(ARRAY['eng','Test message', 'fra', 'Un Message']) 
+		AND status = 'Q' 
+		AND base_language = 'eng'`, testdata.Org1.ID, b1).Returns(1)
 
 	// with the right count of groups, contacts, urns
 	assertdb.Query(t, db, `SELECT count(*) from msgs_broadcast_urns WHERE broadcast_id = 2`).Returns(1)

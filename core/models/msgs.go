@@ -695,21 +695,38 @@ type BroadcastTranslation struct {
 	QuickReplies []string           `json:"quick_replies,omitempty"`
 }
 
+type BroadcastTranslations map[envs.Language]*BroadcastTranslation
+
+func (t BroadcastTranslations) Scan(val interface{}) error {
+	switch typed := val.(type) {
+	case []byte:
+		return json.Unmarshal(typed, &t)
+	case string:
+		return json.Unmarshal([]byte(typed), &t)
+	default:
+		return errors.Errorf("Can't scan %T as BroadcastTranslations", typed)
+	}
+}
+
+func (t BroadcastTranslations) Value() (driver.Value, error) {
+	return json.Marshal(t)
+}
+
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"  db:"id"`
-		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-		Text          hstore.Hstore                           `                               db:"text"`
-		TemplateState TemplateState                           `json:"template_state"`
-		BaseLanguage  envs.Language                           `json:"base_language"           db:"base_language"`
-		URNs          []urns.URN                              `json:"urns,omitempty"`
-		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
-		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
-		OrgID         OrgID                                   `json:"org_id"                  db:"org_id"`
-		CreatedByID   UserID                                  `json:"created_by_id,omitempty" db:"created_by_id"`
-		ParentID      BroadcastID                             `json:"parent_id,omitempty"     db:"parent_id"`
-		TicketID      TicketID                                `json:"ticket_id,omitempty"     db:"ticket_id"`
+		BroadcastID   BroadcastID           `json:"broadcast_id,omitempty"  db:"id"`
+		Translations  BroadcastTranslations `json:"translations"            db:"translations"`
+		Text          hstore.Hstore         `                               db:"text"` // deprecated
+		TemplateState TemplateState         `json:"template_state"`
+		BaseLanguage  envs.Language         `json:"base_language"           db:"base_language"`
+		URNs          []urns.URN            `json:"urns,omitempty"`
+		ContactIDs    []ContactID           `json:"contact_ids,omitempty"`
+		GroupIDs      []GroupID             `json:"group_ids,omitempty"`
+		OrgID         OrgID                 `json:"org_id"                  db:"org_id"`
+		CreatedByID   UserID                `json:"created_by_id,omitempty" db:"created_by_id"`
+		ParentID      BroadcastID           `json:"parent_id,omitempty"     db:"parent_id"`
+		TicketID      TicketID              `json:"ticket_id,omitempty"     db:"ticket_id"`
 	}
 }
 
@@ -847,29 +864,18 @@ type broadcastGroup struct {
 
 const insertBroadcastSQL = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all, is_active)
-			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE,    TRUE)
-RETURNING
-	id
-`
+	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  translations,  text,  base_language, send_all, is_active)
+			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :translations, :text, :base_language, FALSE,    TRUE)
+RETURNING id`
 
 const insertBroadcastContactsSQL = `
-INSERT INTO
-	msgs_broadcast_contacts( broadcast_id,  contact_id)
-	                 VALUES(:broadcast_id,     :contact_id)
-`
+INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES(:broadcast_id, :contact_id)`
 
 const insertBroadcastGroupsSQL = `
-INSERT INTO
-	msgs_broadcast_groups( broadcast_id,  contactgroup_id)
-	               VALUES(:broadcast_id,     :contactgroup_id)
-`
+INSERT INTO msgs_broadcast_groups(broadcast_id, contactgroup_id) VALUES(:broadcast_id, :contactgroup_id)`
 
 const insertBroadcastURNsSQL = `
-INSERT INTO
-	msgs_broadcast_urns( broadcast_id,  contacturn_id)
-	             VALUES(:broadcast_id, :contacturn_id)
-`
+INSERT INTO msgs_broadcast_urns(broadcast_id, contacturn_id) VALUES(:broadcast_id, :contacturn_id)`
 
 // NewBroadcastFromEvent creates a broadcast object from the passed in broadcast event
 func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event *events.BroadcastCreatedEvent) (*Broadcast, error) {
