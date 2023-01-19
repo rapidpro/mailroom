@@ -132,35 +132,8 @@ func TestBroadcastTask(t *testing.T) {
 	assert.NoError(t, err)
 	eng := envs.Language("eng")
 
-	// insert a broadcast so we can check it is being set to sent
-	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil)
-
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 	modelTicket := ticket.Load(db)
-
-	evaluated := map[envs.Language]*models.BroadcastTranslation{
-		eng: {
-			Text:         "hello world",
-			Attachments:  nil,
-			QuickReplies: nil,
-		},
-	}
-
-	legacy := map[envs.Language]*models.BroadcastTranslation{
-		eng: {
-			Text:         "hi @(PROPER(contact.name)) legacy URN: @contact.tel_e164 Gender: @contact.gender",
-			Attachments:  nil,
-			QuickReplies: nil,
-		},
-	}
-
-	template := map[envs.Language]*models.BroadcastTranslation{
-		eng: {
-			Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
-			Attachments:  nil,
-			QuickReplies: nil,
-		},
-	}
 
 	doctorsOnly := []models.GroupID{testdata.DoctorsGroup.ID}
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}
@@ -185,7 +158,13 @@ func TestBroadcastTask(t *testing.T) {
 	}{
 		{
 			models.NilBroadcastID,
-			evaluated,
+			map[envs.Language]*models.BroadcastTranslation{
+				eng: {
+					Text:         "hello world",
+					Attachments:  nil,
+					QuickReplies: nil,
+				},
+			},
 			models.TemplateStateEvaluated,
 			eng,
 			doctorsOnly,
@@ -199,23 +178,14 @@ func TestBroadcastTask(t *testing.T) {
 			"hello world",
 		},
 		{
-			legacyID,
-			legacy,
-			models.TemplateStateLegacy,
-			eng,
-			nil,
-			cathyOnly,
-			nil,
-			models.NilTicketID,
-			models.NilUserID,
-			queue.HandlerQueue,
-			1,
-			1,
-			"hi Cathy legacy URN: +12065551212 Gender: F",
-		},
-		{
 			models.NilBroadcastID,
-			template,
+			map[envs.Language]*models.BroadcastTranslation{
+				eng: {
+					Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
+					Attachments:  nil,
+					QuickReplies: nil,
+				},
+			},
 			models.TemplateStateUnevaluated,
 			eng,
 			nil,
