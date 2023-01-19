@@ -697,15 +697,12 @@ type BroadcastTranslation struct {
 
 type BroadcastTranslations map[envs.Language]*BroadcastTranslation
 
-func (t BroadcastTranslations) Scan(val interface{}) error {
-	switch typed := val.(type) {
-	case []byte:
-		return json.Unmarshal(typed, &t)
-	case string:
-		return json.Unmarshal([]byte(typed), &t)
-	default:
-		return errors.Errorf("Can't scan %T as BroadcastTranslations", typed)
+func (t *BroadcastTranslations) Scan(v interface{}) error {
+	b, ok := v.([]byte)
+	if !ok {
+		return errors.New("failed type assertion to []byte")
 	}
+	return json.Unmarshal(b, &t)
 }
 
 func (t BroadcastTranslations) Value() (driver.Value, error) {
