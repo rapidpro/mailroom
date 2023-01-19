@@ -723,3 +723,30 @@ func insertTestSession(t *testing.T, ctx context.Context, rt *runtime.Runtime, o
 
 	return session
 }
+
+func TestBroadcastTranslations(t *testing.T) {
+	_, _, db, _ := testsuite.Get()
+
+	defer func() {
+		db.MustExec(`DELETE FROM msgs_broadcast_contacts`)
+		db.MustExec(`DELETE FROM msgs_broadcast`)
+	}()
+
+	bcastID := testdata.InsertBroadcast(db, testdata.Org1, `eng`, map[envs.Language]string{`eng`: "Hello", `spa`: "Hola"}, models.NilScheduleID, []*testdata.Contact{testdata.Cathy}, nil)
+
+	type TestStruct struct {
+		Translations models.BroadcastTranslations `json:"translations"`
+	}
+
+	s := &TestStruct{}
+	err := db.Get(s, `SELECT translations FROM msgs_broadcast WHERE id = $1`, bcastID)
+	require.NoError(t, err)
+
+	assert.Equal(t, models.BroadcastTranslations{"eng": &models.BroadcastTranslation{Text: "Hello"}, "spa": &models.BroadcastTranslation{Text: "Hola"}}, s.Translations)
+
+	s.Translations = models.BroadcastTranslations{"fra": &models.BroadcastTranslation{Text: "Bonjour"}}
+
+	db.MustExec(`UPDATE msgs_broadcast SET translations = $1 WHERE id = $2`, s.Translations, bcastID)
+
+	assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE translations -> 'fra' ->> 'text' = 'Bonjour'`, 1)
+}
