@@ -208,30 +208,16 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 	o.timezone as timezone,
 	(SELECT ROW_TO_JSON(sb) FROM (
 		SELECT
-			b.id as broadcast_id,
-			(SELECT JSON_OBJECT_AGG(ts.key, ts.value) FROM (SELECT key, JSON_BUILD_OBJECT('text', t.value) as value FROM each(b.text) t) ts) as translations,
-			'unevaluated' as template_state,
-			b.base_language as base_language,
-			s.org_id as org_id,
-			(SELECT ARRAY_AGG(bc.contact_id) FROM (
-				SELECT
-					bc.contact_id
-				FROM
-					msgs_broadcast_contacts bc
-				WHERE
-					bc.broadcast_id = b.id
-			) bc) as contact_ids,
-			(SELECT ARRAY_AGG(bg.contactgroup_id) FROM (
-				SELECT
-					bg.contactgroup_id
-				FROM
-					msgs_broadcast_groups bg
-				WHERE
-					bg.broadcast_id = b.id
-			) bg) as group_ids,
+			b.id AS broadcast_id,
+			b.translations,
+			'unevaluated' AS template_state,
+			b.base_language,
+			s.org_id,
+			(SELECT ARRAY_AGG(bc.contact_id) FROM (SELECT bc.contact_id FROM msgs_broadcast_contacts bc WHERE bc.broadcast_id = b.id) bc) as contact_ids,
+			(SELECT ARRAY_AGG(bg.contactgroup_id) FROM (SELECT bg.contactgroup_id FROM msgs_broadcast_groups bg WHERE bg.broadcast_id = b.id) bg) as group_ids,
 			(SELECT ARRAY_AGG(bu.urn) FROM (
 				SELECT
-				    cu.identity || '?id=' || cu.id as urn
+					cu.identity || '?id=' || cu.id as urn
 				FROM
 					msgs_broadcast_urns bus JOIN
 					contacts_contacturn cu ON cu.id = bus.contacturn_id
