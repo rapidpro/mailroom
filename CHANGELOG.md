@@ -1,3 +1,7 @@
+v8.1.2 (2023-01-24)
+-------------------------
+ * Stop reading from Broadcast.text
+
 v8.1.1 (2023-01-19)
 -------------------------
  * Write new translations JSONB column when saving child broadcasts
