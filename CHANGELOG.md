@@ -1,3 +1,8 @@
+v8.1.3 (2023-01-24)
+-------------------------
+ * Update test database
+ * Stop writing msgs_broadcast.text
+
 v8.1.2 (2023-01-24)
 -------------------------
  * Stop reading from Broadcast.text
