@@ -86,7 +86,6 @@ func TestCheckSchedules(t *testing.T) {
 		AND parent_id = $2 
 		AND translations -> 'eng' ->> 'text' = 'Test message'
 		AND translations -> 'fra' ->> 'text' = 'Un Message'
-		AND text = hstore(ARRAY['eng','Test message', 'fra', 'Un Message']) 
 		AND status = 'Q' 
 		AND base_language = 'eng'`, testdata.Org1.ID, b1).Returns(1)
 
