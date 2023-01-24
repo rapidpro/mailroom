@@ -2,12 +2,10 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"time"
 
-	"github.com/lib/pq/hstore"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
@@ -64,7 +62,6 @@ type Broadcast struct {
 	b struct {
 		BroadcastID   BroadcastID           `json:"broadcast_id,omitempty"  db:"id"`
 		Translations  BroadcastTranslations `json:"translations"            db:"translations"`
-		Text          hstore.Hstore         `                               db:"text"` // deprecated
 		TemplateState TemplateState         `json:"template_state"`
 		BaseLanguage  envs.Language         `json:"base_language"           db:"base_language"`
 		URNs          []urns.URN            `json:"urns,omitempty"`
@@ -126,15 +123,6 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.b.CreatedByID,
 	)
 	child.b.ParentID = parent.ID()
-
-	// populate text from our translations
-	child.b.Text.Map = make(map[string]sql.NullString)
-	for lang, t := range child.b.Translations {
-		child.b.Text.Map[string(lang)] = sql.NullString{String: t.Text, Valid: true}
-		if len(t.Attachments) > 0 || len(t.QuickReplies) > 0 {
-			return nil, errors.Errorf("cannot clone broadcast with quick replies or attachments")
-		}
-	}
 
 	// insert our broadcast
 	err := BulkQuery(ctx, "inserting broadcast", db, insertBroadcastSQL, []interface{}{&child.b})
@@ -211,8 +199,8 @@ type broadcastGroup struct {
 
 const insertBroadcastSQL = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  translations,  text,  base_language, send_all, is_active)
-			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :translations, :text, :base_language, FALSE,    TRUE)
+	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  translations,  base_language, send_all, is_active)
+			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :translations, :base_language, FALSE,    TRUE)
 RETURNING id`
 
 const insertBroadcastContactsSQL = `
@@ -483,7 +471,7 @@ func (b *BroadcastBatch) CreateMessages(ctx context.Context, rt *runtime.Runtime
 }
 
 func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAssets) error {
-	firstReplySeconds, err := TicketRecordReplied(ctx, db, b.TicketID, dates.Now())
+	firstReplyTime, err := TicketRecordReplied(ctx, db, b.TicketID, dates.Now())
 	if err != nil {
 		return err
 	}
@@ -505,8 +493,8 @@ func (b *BroadcastBatch) updateTicket(ctx context.Context, db Queryer, oa *OrgAs
 		return err
 	}
 
-	if firstReplySeconds >= 0 {
-		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplySeconds); err != nil {
+	if firstReplyTime >= 0 {
+		if err := insertTicketDailyTiming(ctx, db, TicketDailyTimingFirstReply, oa.Org().Timezone(), scopeOrg(oa), firstReplyTime); err != nil {
 			return err
 		}
 	}
