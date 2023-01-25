@@ -603,5 +603,5 @@ func TestSendHistory(t *testing.T) {
 		restClient,
 		nil,
 	)
-	assert.Equal(t, 3, len(logger.Logs))
+	assert.Equal(t, 1, len(logger.Logs))
 }
