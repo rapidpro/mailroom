@@ -138,6 +138,22 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 	return &File{URL: url, ContentType: contentType, Body: io.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
 }
 
+func FetchFileWithMaxSize(url string, headers map[string]string, maxBodyBytes int) (*File, error) {
+	req, _ := httpx.NewRequest("GET", url, nil, headers)
+
+	trace, err := httpx.DoTrace(http.DefaultClient, req, retries, nil, maxBodyBytes)
+	if err != nil {
+		return nil, err
+	}
+	if trace.Response.StatusCode/10 != 2 {
+		return nil, errors.New("fetch returned no-200 response")
+	}
+
+	contentType, _, _ := mime.ParseMediaType(trace.Response.Header.Get("Content-Type"))
+
+	return &File{URL: url, ContentType: contentType, Body: io.NopCloser(bytes.NewReader(trace.ResponseBody))}, nil
+}
+
 // Close closes the given ticket, and creates and queues a closed event
 func Close(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
 	events, err := models.CloseTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{ticket}, externally, false, l)

@@ -18,6 +18,26 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	mb5   = 5 * 1024 * 1024
+	mb16  = 16 * 1024 * 1024
+	mb100 = 100 * 1024 * 1024
+)
+
+var mediaTypeMaxBodyBytes = map[string]int{
+	"text/plain":                    mb100,
+	"application/pdf":               mb100,
+	"application/vnd.ms-powerpoint": mb100,
+	"application/msword":            mb100,
+	"application/vnd.ms-excel":      mb100,
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document":   mb100,
+	"application/vnd.openxmlformats-officedocument.presentationml.presentation": mb100,
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":         mb100,
+	"audio/aac": mb16, "audio/mp4": mb16, "audio/mpeg": mb16, "audio/amr": mb16,
+	"image/jpeg": mb5, "image/png": mb5,
+	"video/mp4": mb16, "video/3gp": mb16,
+}
+
 func init() {
 	base := "/mr/tickets/types/wenichats"
 	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback/{ticketer:[a-f0-9\\-]+}/{ticket:[a-f0-9\\-]+}", web.WithHTTPLogs(handleEventCallback))
@@ -60,11 +80,25 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 
 		if len(eMsg.Content.Media) > 0 {
 			for _, m := range eMsg.Content.Media {
-				file, err := tickets.FetchFile(m.URL, nil)
+				file, err := tickets.FetchFileWithMaxSize(m.URL, nil, 100*1024*1024)
 				if err != nil {
 					return errors.Wrapf(err, "error fetching ticket file '%s'", m.URL), http.StatusInternalServerError, nil
 				}
 				file.ContentType = m.ContentType
+
+				maxBodyBytes := mediaTypeMaxBodyBytes[file.ContentType]
+				if maxBodyBytes == 0 {
+					maxBodyBytes = mb100
+				}
+				bodyReader := io.LimitReader(file.Body, int64(maxBodyBytes)+1)
+				_, err = io.ReadAll(bodyReader)
+				if err != nil {
+					return err, http.StatusBadRequest, nil
+				}
+				if bodyReader.(*io.LimitedReader).N <= 0 {
+					return errors.Wrapf(err, "unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes), http.StatusBadRequest, nil
+				}
+
 				_, err = tickets.SendReply(ctx, rt, ticket, "", []*tickets.File{file})
 				if err != nil {
 					return errors.Wrapf(err, "error on send ticket reply with media '%s'", m.URL), http.StatusInternalServerError, nil
