@@ -91,6 +91,8 @@ type Msg struct {
 		BroadcastID          BroadcastID        `db:"broadcast_id"    json:"broadcast_id,omitempty"`
 		UUID                 flows.MsgUUID      `db:"uuid"            json:"uuid"`
 		Text                 string             `db:"text"            json:"text"`
+		Attachments          pq.StringArray     `db:"attachments"     json:"attachments,omitempty"`
+		Locale               envs.Locale        `db:"locale"          json:"locale,omitempty"`
 		HighPriority         bool               `db:"high_priority"   json:"high_priority"`
 		CreatedOn            time.Time          `db:"created_on"      json:"created_on"`
 		ModifiedOn           time.Time          `db:"modified_on"     json:"modified_on"`
@@ -106,7 +108,6 @@ type Msg struct {
 		FailedReason         MsgFailedReason    `db:"failed_reason"   json:"-"`
 		ExternalID           null.String        `db:"external_id"     json:"-"`
 		ResponseToExternalID null.String        `                     json:"response_to_external_id,omitempty"`
-		Attachments          pq.StringArray     `db:"attachments"     json:"attachments,omitempty"`
 		Metadata             null.Map           `db:"metadata"        json:"metadata,omitempty"`
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
@@ -138,6 +139,7 @@ func (m *Msg) BroadcastID() BroadcastID         { return m.m.BroadcastID }
 func (m *Msg) UUID() flows.MsgUUID              { return m.m.UUID }
 func (m *Msg) Channel() *Channel                { return m.channel }
 func (m *Msg) Text() string                     { return m.m.Text }
+func (m *Msg) Locale() envs.Locale              { return m.m.Locale }
 func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
 func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
 func (m *Msg) ModifiedOn() time.Time            { return m.m.ModifiedOn }
@@ -244,6 +246,7 @@ func NewOutgoingIVR(cfg *runtime.Config, orgID OrgID, call *Call, out *flows.Msg
 	msg.SetURN(out.URN())
 	m.UUID = out.UUID()
 	m.Text = out.Text()
+	m.Locale = out.Locale()
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusWired
@@ -324,6 +327,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 	m.ContactID = ContactID(contact.ID())
 	m.BroadcastID = broadcastID
 	m.Text = out.Text()
+	m.Locale = out.Locale()
 	m.HighPriority = false
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
@@ -451,6 +455,8 @@ SELECT
 	broadcast_id,
 	uuid,
 	text,
+	attachments,
+	locale,
 	created_on,
 	direction,
 	status,
@@ -461,7 +467,6 @@ SELECT
 	failed_reason,
 	coalesce(high_priority, FALSE) as high_priority,
 	external_id,
-	attachments,
 	metadata,
 	channel_id,
 	contact_id,
@@ -487,6 +492,8 @@ SELECT
 	m.broadcast_id,
 	m.uuid,
 	m.text,
+	m.attachments,
+	m.locale,
 	m.created_on,
 	m.direction,
 	m.status,
@@ -497,7 +504,6 @@ SELECT
 	m.failed_reason,
 	m.high_priority,
 	m.external_id,
-	m.attachments,
 	m.metadata,
 	m.channel_id,
 	m.contact_id,
@@ -602,10 +608,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 
 const insertMsgSQL = `
 INSERT INTO
-msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
+msgs_msg(uuid, text, attachments, locale, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
 		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id)
-  VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
+  VALUES(:uuid, :text, :attachments, :locale, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
 		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id)
 RETURNING 

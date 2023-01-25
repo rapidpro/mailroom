@@ -265,7 +265,7 @@ func TestMarshalMsg(t *testing.T) {
 		[]string{"yes", "no"},
 		nil,
 		flows.MsgTopicPurchase,
-		envs.NilLocale,
+		envs.Locale(`eng-US`),
 		flows.NilUnsendableReason,
 	)
 
@@ -296,6 +296,7 @@ func TestMarshalMsg(t *testing.T) {
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"high_priority": false,
 		"id": %d,
+		"locale": "eng-US",
 		"metadata": {
 			"quick_replies": [
 				"yes",
@@ -637,12 +638,13 @@ func TestNewOutgoingIVR(t *testing.T) {
 
 	createdOn := time.Date(2021, 7, 26, 12, 6, 30, 0, time.UTC)
 
-	flowMsg := flows.NewIVRMsgOut(testdata.Cathy.URN, vonage.ChannelReference(), "Hello", "http://example.com/hi.mp3", "eng")
+	flowMsg := flows.NewIVRMsgOut(testdata.Cathy.URN, vonage.ChannelReference(), "Hello", "http://example.com/hi.mp3", "eng-US")
 	dbMsg := models.NewOutgoingIVR(rt.Config, testdata.Org1.ID, conn, flowMsg, createdOn)
 
 	assert.Equal(t, flowMsg.UUID(), dbMsg.UUID())
 	assert.Equal(t, "Hello", dbMsg.Text())
 	assert.Equal(t, []utils.Attachment{"audio:http://example.com/hi.mp3"}, dbMsg.Attachments())
+	assert.Equal(t, envs.Locale("eng-US"), dbMsg.Locale())
 	assert.Equal(t, createdOn, dbMsg.CreatedOn())
 	assert.Equal(t, &createdOn, dbMsg.SentOn())
 
