@@ -1,3 +1,7 @@
+1.4.15-mailroom-7.1.22
+----------
+ * Send chatbot history on Twilio in just one message #109
+
 1.4.14-mailroom-7.1.22
 ----------
  * Added config for flow start batch timeout
