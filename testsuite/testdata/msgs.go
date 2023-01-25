@@ -1,11 +1,9 @@
 package testdata
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -74,17 +72,14 @@ func insertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 
 func InsertBroadcast(db *sqlx.DB, org *Org, baseLanguage envs.Language, text map[envs.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group) models.BroadcastID {
 	translations := make(models.BroadcastTranslations)
-	textMap := make(map[string]sql.NullString, len(text))
-
 	for lang, t := range text {
 		translations[lang] = &models.BroadcastTranslation{Text: t}
-		textMap[string(lang)] = sql.NullString{String: t, Valid: true}
 	}
 
 	var id models.BroadcastID
 	must(db.Get(&id,
-		`INSERT INTO msgs_broadcast(org_id, base_language, translations, text, schedule_id, status, send_all, created_on, modified_on, created_by_id, modified_by_id, is_active)
-		VALUES($1, $2, $3, $4, $5, 'P', TRUE, NOW(), NOW(), 1, 1, TRUE) RETURNING id`, org.ID, baseLanguage, translations, hstore.Hstore{Map: textMap}, schedID,
+		`INSERT INTO msgs_broadcast(org_id, base_language, translations, schedule_id, status, send_all, created_on, modified_on, created_by_id, modified_by_id, is_active)
+		VALUES($1, $2, $3, $4, 'P', TRUE, NOW(), NOW(), 1, 1, TRUE) RETURNING id`, org.ID, baseLanguage, translations, schedID,
 	))
 
 	for _, contact := range contacts {
