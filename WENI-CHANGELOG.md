@@ -1,10 +1,14 @@
+1.4.16-mailroom-7.1.22
+----------
+ * Added wenichats webhook media body bytes limits #111
+
 1.4.15-mailroom-7.1.22
 ----------
  * Send chatbot history on Twilio in just one message #109
 
 1.4.14-mailroom-7.1.22
 ----------
- * Added config for flow start batch timeout
+ * Added config for flow start batch timeout #107
 
 1.4.13-mailroom-7.1.22
 ----------
