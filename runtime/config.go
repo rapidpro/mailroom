@@ -74,6 +74,8 @@ type Config struct {
 	Version             string `help:"the version of this mailroom install"`
 	TimeoutTime         int    `help:"the amount of time to between every timeout queued"`
 	WenichatsServiceURL string `help:"wenichats external api url for ticketer service integration"`
+
+	FlowStartBatchTimeout int `help:"timeout config for flow start batch"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -126,6 +128,8 @@ func NewDefaultConfig() *Config {
 		Version:             "Dev",
 		TimeoutTime:         15,
 		WenichatsServiceURL: "https://chats-engine.dev.cloud.weni.ai/v1/external",
+
+		FlowStartBatchTimeout: 15,
 	}
 }
 
