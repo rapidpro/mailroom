@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"reflect"
 	"strings"
 
@@ -149,6 +150,14 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	fileURLs, err := s.convertAttachments(attachments)
 	if err != nil {
 		return errors.Wrap(err, "error converting attachments")
+	}
+
+	if text == "" && len(fileURLs) > 0 {
+		parsedURL, err := url.Parse(fileURLs[0])
+		if err != nil {
+			return err
+		}
+		text = path.Base(parsedURL.Path)
 	}
 
 	msg := &ExternalResource{
