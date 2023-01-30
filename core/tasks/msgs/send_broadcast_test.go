@@ -100,7 +100,7 @@ func TestBroadcastEvents(t *testing.T) {
 			}
 
 			count++
-			assert.Equal(t, queue.SendBroadcastBatch, task.Type)
+			assert.Equal(t, "send_broadcast_batch", task.Type)
 			batch := &models.BroadcastBatch{}
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)
@@ -217,7 +217,7 @@ func TestBroadcastTask(t *testing.T) {
 			}
 
 			count++
-			assert.Equal(t, queue.SendBroadcastBatch, task.Type)
+			assert.Equal(t, "send_broadcast_batch", task.Type)
 			batch := &models.BroadcastBatch{}
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)

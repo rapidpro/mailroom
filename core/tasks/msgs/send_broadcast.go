@@ -16,12 +16,18 @@ import (
 )
 
 const (
+	// TypeSendBroadcast is the task type for sending a broadcast
+	TypeSendBroadcast = "send_broadcast"
+
+	// TypeSendBroadcastBatch is the task type for sending a broadcast batch
+	TypeSendBroadcastBatch = "send_broadcast_batch"
+
 	startBatchSize = 100
 )
 
 func init() {
-	mailroom.AddTaskFunction(queue.SendBroadcast, handleSendBroadcast)
-	mailroom.AddTaskFunction(queue.SendBroadcastBatch, handleSendBroadcastBatch)
+	mailroom.AddTaskFunction(TypeSendBroadcast, handleSendBroadcast)
+	mailroom.AddTaskFunction(TypeSendBroadcastBatch, handleSendBroadcastBatch)
 }
 
 // handleSendBroadcast creates all the batches of contacts that need to be sent to
@@ -30,7 +36,7 @@ func handleSendBroadcast(ctx context.Context, rt *runtime.Runtime, task *queue.T
 	defer cancel()
 
 	// decode our task body
-	if task.Type != queue.SendBroadcast {
+	if task.Type != TypeSendBroadcast {
 		return errors.Errorf("unknown event type passed to send worker: %s", task.Type)
 	}
 	broadcast := &models.Broadcast{}
@@ -107,7 +113,7 @@ func CreateBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *mod
 			batch.URNs = urnContacts
 		}
 
-		err = queue.AddTask(rc, q, queue.SendBroadcastBatch, int(bcast.OrgID), batch, queue.DefaultPriority)
+		err = queue.AddTask(rc, q, TypeSendBroadcastBatch, int(bcast.OrgID), batch, queue.DefaultPriority)
 		if err != nil {
 			logrus.WithError(err).Error("error while queuing broadcast batch")
 		}
@@ -134,7 +140,7 @@ func handleSendBroadcastBatch(ctx context.Context, rt *runtime.Runtime, task *qu
 	defer cancel()
 
 	// decode our task body
-	if task.Type != queue.SendBroadcastBatch {
+	if task.Type != TypeSendBroadcastBatch {
 		return errors.Errorf("unknown event type passed to send worker: %s", task.Type)
 	}
 	broadcast := &models.BroadcastBatch{}
