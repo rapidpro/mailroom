@@ -142,7 +142,6 @@ func TestBroadcastTask(t *testing.T) {
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
-		BroadcastID   models.BroadcastID
 		Translations  map[envs.Language]*models.BroadcastTranslation
 		TemplateState models.TemplateState
 		BaseLanguage  envs.Language
@@ -157,7 +156,6 @@ func TestBroadcastTask(t *testing.T) {
 		MsgText       string
 	}{
 		{
-			models.NilBroadcastID,
 			map[envs.Language]*models.BroadcastTranslation{
 				eng: {
 					Text:         "hello world",
@@ -178,7 +176,6 @@ func TestBroadcastTask(t *testing.T) {
 			"hello world",
 		},
 		{
-			models.NilBroadcastID,
 			map[envs.Language]*models.BroadcastTranslation{
 				eng: {
 					Text:         "hi @(title(contact.name)) from @globals.org_name goflow URN: @urns.tel Gender: @fields.gender",
@@ -205,7 +202,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID, tc.CreatedByID)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID, tc.CreatedByID)
 		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
@@ -235,12 +232,6 @@ func TestBroadcastTask(t *testing.T) {
 		// assert our count of total msgs created
 		assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
 			Returns(tc.MsgCount, "%d: unexpected msg count", i)
-
-		// make sure our broadcast is marked as sent
-		if tc.BroadcastID != models.NilBroadcastID {
-			assertdb.Query(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
-				Returns(1, "%d: broadcast not marked as sent", i)
-		}
 
 		// if we had a ticket, make sure its replied_on and last_activity_on were updated
 		if tc.TicketID != models.NilTicketID {

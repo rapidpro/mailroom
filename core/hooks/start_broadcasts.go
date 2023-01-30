@@ -36,7 +36,7 @@ func (h *startBroadcastsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx
 			priority := queue.DefaultPriority
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
-			if len(bcast.GroupIDs()) > 0 {
+			if len(bcast.GroupIDs) > 0 {
 				taskQ = queue.BatchQueue
 				priority = queue.HighPriority
 			}

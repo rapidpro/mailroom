@@ -90,14 +90,14 @@ func TestGetExpired(t *testing.T) {
 	assert.Equal(t, s1, schedules[2].ID())
 	bcast := schedules[2].Broadcast()
 	assert.NotNil(t, bcast)
-	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage())
-	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState())
-	assert.Equal(t, "Test message", bcast.Translations()["eng"].Text)
-	assert.Equal(t, "Un Message", bcast.Translations()["fra"].Text)
-	assert.Equal(t, testdata.Org1.ID, bcast.OrgID())
-	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, bcast.ContactIDs())
-	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs())
-	assert.Equal(t, []urns.URN{urns.URN("tel:+16055741111?id=10000")}, bcast.URNs())
+	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage)
+	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState)
+	assert.Equal(t, "Test message", bcast.Translations["eng"].Text)
+	assert.Equal(t, "Un Message", bcast.Translations["fra"].Text)
+	assert.Equal(t, testdata.Org1.ID, bcast.OrgID)
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, bcast.ContactIDs)
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs)
+	assert.Equal(t, []urns.URN{urns.URN("tel:+16055741111?id=10000")}, bcast.URNs)
 }
 
 func TestNextFire(t *testing.T) {
