@@ -263,7 +263,7 @@ func TestMarshalMsg(t *testing.T) {
 		"Hi there",
 		[]utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
 		[]string{"yes", "no"},
-		nil,
+		flows.NewMsgTemplating(assets.NewTemplateReference("4474d39c-ac2c-486d-bceb-8a774a515299", "tpl"), []string{"name"}, "tpls"),
 		flows.MsgTopicPurchase,
 		envs.Locale(`eng-US`),
 		flows.NilUnsendableReason,
@@ -302,6 +302,11 @@ func TestMarshalMsg(t *testing.T) {
 				"yes",
 				"no"
 			],
+			"templating": {
+				"namespace": "tpls",
+				"template": {"name": "tpl", "uuid": "4474d39c-ac2c-486d-bceb-8a774a515299"},
+				"variables": ["name"]
+			},
 			"topic": "purchase"
 		},
 		"modified_on": %s,

@@ -85,7 +85,7 @@ func TestMsgCreated(t *testing.T) {
 					Args: []interface{}{
 						testdata.Alexandria.ID,
 						`Hi Alexandia, are you still experiencing problems with tooth?`,
-						`{"templating":{"template":{"uuid":"9c22b594-fcab-4b29-9bcb-ce4404894a80","name":"revive_issue"},"language":"eng","country":"US","variables":["Alexandia","tooth"],"namespace":"2d40b45c_25cd_4965_9019_f05d0124c5fa"}}`,
+						`{"templating":{"template":{"uuid":"9c22b594-fcab-4b29-9bcb-ce4404894a80","name":"revive_issue"},"variables":["Alexandia","tooth"],"namespace":"2d40b45c_25cd_4965_9019_f05d0124c5fa"}}`,
 						testdata.TwitterChannel.ID,
 					},
 					Count: 1,
