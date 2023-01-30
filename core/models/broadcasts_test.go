@@ -22,12 +22,11 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Mailgun, testdata.DefaultTopic, "", "", time.Now(), nil)
 	modelTicket := ticket.Load(db)
 
-	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("eng"): {Text: "Hi there"}}
+	translations := models.BroadcastTranslations{envs.Language("eng"): {Text: "Hi there"}}
 
 	// create a broadcast which doesn't actually exist in the DB
 	bcast := models.NewBroadcast(
 		testdata.Org1.ID,
-		models.NilBroadcastID,
 		translations,
 		models.TemplateStateUnevaluated,
 		envs.Language("eng"),
@@ -38,15 +37,15 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		models.NilUserID,
 	)
 
-	assert.Equal(t, models.NilBroadcastID, bcast.ID())
-	assert.Equal(t, testdata.Org1.ID, bcast.OrgID())
-	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage())
-	assert.Equal(t, translations, bcast.Translations())
-	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState())
-	assert.Equal(t, ticket.ID, bcast.TicketID())
-	assert.Equal(t, []urns.URN{"tel:+593979012345"}, bcast.URNs())
-	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID}, bcast.ContactIDs())
-	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs())
+	assert.Equal(t, models.NilBroadcastID, bcast.ID)
+	assert.Equal(t, testdata.Org1.ID, bcast.OrgID)
+	assert.Equal(t, envs.Language("eng"), bcast.BaseLanguage)
+	assert.Equal(t, translations, bcast.Translations)
+	assert.Equal(t, models.TemplateStateUnevaluated, bcast.TemplateState)
+	assert.Equal(t, ticket.ID, bcast.TicketID)
+	assert.Equal(t, []urns.URN{"tel:+593979012345"}, bcast.URNs)
+	assert.Equal(t, []models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID}, bcast.ContactIDs)
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, bcast.GroupIDs)
 
 	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID})
 

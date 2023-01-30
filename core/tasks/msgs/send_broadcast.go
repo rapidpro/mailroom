@@ -46,22 +46,22 @@ func handleSendBroadcast(ctx context.Context, rt *runtime.Runtime, task *queue.T
 func CreateBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *models.Broadcast) error {
 	// we are building a set of contact ids, start with the explicit ones
 	contactIDs := make(map[models.ContactID]bool)
-	for _, id := range bcast.ContactIDs() {
+	for _, id := range bcast.ContactIDs {
 		contactIDs[id] = true
 	}
 
-	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, bcast.GroupIDs())
+	groupContactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, bcast.GroupIDs)
 	for _, id := range groupContactIDs {
 		contactIDs[id] = true
 	}
 
-	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, bcast.OrgID)
 	if err != nil {
 		return errors.Wrapf(err, "error getting org assets")
 	}
 
 	// get the contact ids for our URNs
-	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, bcast.URNs())
+	urnMap, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, bcast.URNs)
 	if err != nil {
 		return errors.Wrapf(err, "error getting contact ids for urns")
 	}
@@ -107,7 +107,7 @@ func CreateBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *mod
 			batch.URNs = urnContacts
 		}
 
-		err = queue.AddTask(rc, q, queue.SendBroadcastBatch, int(bcast.OrgID()), batch, queue.DefaultPriority)
+		err = queue.AddTask(rc, q, queue.SendBroadcastBatch, int(bcast.OrgID), batch, queue.DefaultPriority)
 		if err != nil {
 			logrus.WithError(err).Error("error while queuing broadcast batch")
 		}
