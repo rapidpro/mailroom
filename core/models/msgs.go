@@ -399,23 +399,7 @@ func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
 		metadata["quick_replies"] = m.QuickReplies()
 	}
 	if m.Templating() != nil {
-		mLanguage, mCountry := m.Locale().ToParts()
-
-		// TODO once we're queuing messages with locale and courier is reading that, can just add templating directly
-		// without language and country
-		metadata["templating"] = struct {
-			Template  *assets.TemplateReference `json:"template"`
-			Language  envs.Language             `json:"language"`
-			Country   envs.Country              `json:"country"`
-			Variables []string                  `json:"variables,omitempty"`
-			Namespace string                    `json:"namespace"`
-		}{
-			Template:  m.Templating_.Template(),
-			Language:  mLanguage,
-			Country:   mCountry,
-			Variables: m.Templating().Variables(),
-			Namespace: m.Templating().Namespace(),
-		}
+		metadata["templating"] = m.Templating()
 	}
 	if m.Topic() != flows.NilMsgTopic {
 		metadata["topic"] = string(m.Topic())
