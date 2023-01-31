@@ -145,7 +145,7 @@ func FetchFileWithMaxSize(url string, headers map[string]string, maxBodyBytes in
 	if err != nil {
 		return nil, err
 	}
-	if trace.Response.StatusCode/10 != 2 {
+	if trace.Response.StatusCode/100 != 2 {
 		return nil, errors.New("fetch returned no-200 response")
 	}
 
