@@ -23,6 +23,10 @@ type InterruptChannelTask struct {
 	ChannelID models.ChannelID `json:"channel_id"`
 }
 
+func (t *InterruptChannelTask) Type() string {
+	return TypeInterruptChannel
+}
+
 // Perform implements tasks.Task
 func (t *InterruptChannelTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
 	db := rt.DB

@@ -30,6 +30,10 @@ type PopulateDynamicGroupTask struct {
 	Query   string         `json:"query"`
 }
 
+func (t *PopulateDynamicGroupTask) Type() string {
+	return TypePopulateDynamicGroup
+}
+
 // Timeout is the maximum amount of time the task can run for
 func (t *PopulateDynamicGroupTask) Timeout() time.Duration {
 	return time.Hour

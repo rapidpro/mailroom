@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
@@ -36,11 +37,18 @@ func RegisterType(name string, initFunc func() Task) {
 
 // Task is the common interface for all task types
 type Task interface {
+	Type() string
+
 	// Timeout is the maximum amount of time the task can run for
 	Timeout() time.Duration
 
 	// Perform performs the task
 	Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error
+}
+
+// Queue adds the given task to the named queue
+func Queue(rc redis.Conn, qname string, orgID models.OrgID, task Task, priority queue.Priority) error {
+	return queue.AddTask(rc, qname, task.Type(), int(orgID), task, priority)
 }
 
 //------------------------------------------------------------------------------------------

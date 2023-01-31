@@ -29,6 +29,10 @@ type SendBroadcastTask struct {
 	*models.Broadcast
 }
 
+func (t *SendBroadcastTask) Type() string {
+	return TypeSendBroadcast
+}
+
 // Timeout is the maximum amount of time the task can run for
 func (t *SendBroadcastTask) Timeout() time.Duration {
 	return time.Minute * 60
@@ -99,7 +103,7 @@ func (t *SendBroadcastTask) Perform(ctx context.Context, rt *runtime.Runtime, or
 			batch.URNs = urnContacts
 		}
 
-		err = queue.AddTask(rc, q, TypeSendBroadcastBatch, int(t.Broadcast.OrgID), batch, queue.DefaultPriority)
+		err = tasks.Queue(rc, q, t.Broadcast.OrgID, &SendBroadcastBatchTask{BroadcastBatch: batch}, queue.DefaultPriority)
 		if err != nil {
 			logrus.WithError(err).Error("error while queuing broadcast batch")
 		}
