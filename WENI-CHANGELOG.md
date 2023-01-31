@@ -1,3 +1,9 @@
+1.4.17-mailroom-7.1.22
+----------
+ * Send message attribute to Zendesk on attachment submissions #115
+ * Tweak wenichats integration open room to pass FlowUUID and contact groups #113 & #114
+ * Fix FetchFileWithMaxSize #113
+
 1.4.16-mailroom-7.1.22
 ----------
  * Added wenichats webhook media body bytes limits #111
