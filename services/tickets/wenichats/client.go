@@ -10,6 +10,7 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/pkg/errors"
 )
 
@@ -153,6 +154,8 @@ type RoomRequest struct {
 	CreatedOn    *time.Time             `json:"created_on,omitempty"`
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 	CallbackURL  string                 `json:"callback_url,omitempty"`
+	FlowUUID     assets.FlowUUID        `json:"flow_uuid,omitempty"`
+	Groups       []Group                `json:"groups,omitempty"`
 }
 
 type Contact struct {
@@ -239,6 +242,11 @@ type QueuesResponse struct {
 }
 
 type Queue struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+type Group struct {
 	UUID string `json:"uuid"`
 	Name string `json:"name"`
 }
