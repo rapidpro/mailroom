@@ -24,6 +24,10 @@ type ImportContactBatchTask struct {
 	ContactImportBatchID models.ContactImportBatchID `json:"contact_import_batch_id"`
 }
 
+func (t *ImportContactBatchTask) Type() string {
+	return TypeImportContactBatch
+}
+
 // Timeout is the maximum amount of time the task can run for
 func (t *ImportContactBatchTask) Timeout() time.Duration {
 	return time.Minute * 10

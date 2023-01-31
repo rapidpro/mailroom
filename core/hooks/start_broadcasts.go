@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
@@ -41,9 +42,9 @@ func (h *startBroadcastsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx
 				priority = queue.HighPriority
 			}
 
-			err = queue.AddTask(rc, taskQ, msgs.TypeSendBroadcast, int(oa.OrgID()), bcast, priority)
+			err = tasks.Queue(rc, taskQ, oa.OrgID(), &msgs.SendBroadcastTask{Broadcast: bcast}, priority)
 			if err != nil {
-				return errors.Wrapf(err, "error queuing broadcast")
+				return errors.Wrapf(err, "error queuing broadcast task")
 			}
 		}
 	}

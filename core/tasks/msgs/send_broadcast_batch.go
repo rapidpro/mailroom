@@ -23,6 +23,10 @@ type SendBroadcastBatchTask struct {
 	*models.BroadcastBatch
 }
 
+func (t *SendBroadcastBatchTask) Type() string {
+	return TypeSendBroadcastBatch
+}
+
 // Timeout is the maximum amount of time the task can run for
 func (t *SendBroadcastBatchTask) Timeout() time.Duration {
 	return time.Minute * 60

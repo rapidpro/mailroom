@@ -26,6 +26,10 @@ type ScheduleCampaignEventTask struct {
 	CampaignEventID models.CampaignEventID `json:"campaign_event_id"`
 }
 
+func (t *ScheduleCampaignEventTask) Type() string {
+	return TypeScheduleCampaignEvent
+}
+
 // Timeout is the maximum amount of time the task can run for
 func (t *ScheduleCampaignEventTask) Timeout() time.Duration {
 	return time.Hour

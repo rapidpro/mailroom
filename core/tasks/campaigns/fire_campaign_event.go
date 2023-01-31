@@ -33,6 +33,10 @@ type FireCampaignEventTask struct {
 	CampaignName string          `json:"campaign_name"`
 }
 
+func (t *FireCampaignEventTask) Type() string {
+	return TypeFireCampaignEvent
+}
+
 // Timeout is the maximum amount of time the task can run for
 func (t *FireCampaignEventTask) Timeout() time.Duration {
 	// base of 5 minutes + one minute per fire
