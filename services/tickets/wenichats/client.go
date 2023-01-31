@@ -155,7 +155,6 @@ type RoomRequest struct {
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 	CallbackURL  string                 `json:"callback_url,omitempty"`
 	FlowUUID     assets.FlowUUID        `json:"flow_uuid,omitempty"`
-	Groups       []Group                `json:"groups,omitempty"`
 }
 
 type Contact struct {
@@ -165,6 +164,7 @@ type Contact struct {
 	Phone        string                 `json:"phone,omitempty"`
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 	URN          string                 `json:"urn,omitempty"`
+	Groups       []Group                `json:"groups,omitempty"`
 }
 
 type RoomResponse struct {

@@ -101,7 +101,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	roomData.QueueUUID = string(topic.UUID())
 	roomData.Contact.URN = session.Contact().PreferredURN().URN().String()
 	roomData.FlowUUID = session.Runs()[0].Flow().UUID()
-	roomData.Groups = groups
+	roomData.Contact.Groups = groups
 
 	extra := &struct {
 		CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
