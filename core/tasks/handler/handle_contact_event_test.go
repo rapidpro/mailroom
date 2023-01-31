@@ -14,6 +14,7 @@ import (
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -332,7 +333,7 @@ func TestMsgEvents(t *testing.T) {
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handler.HandleEvent(ctx, rt, task)
+		err = tasks.Perform(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		var expectedFlowID interface{}
@@ -391,7 +392,7 @@ func TestMsgEvents(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NotNil(t, task)
-		err := handler.HandleEvent(ctx, rt, task)
+		err := tasks.Perform(ctx, rt, task)
 		assert.NoError(t, err)
 	}
 
@@ -409,7 +410,7 @@ func TestMsgEvents(t *testing.T) {
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
-	err = handler.HandleEvent(ctx, rt, task)
+	err = tasks.Perform(ctx, rt, task)
 	assert.NoError(t, err)
 
 	// should get our catch all trigger
@@ -423,7 +424,7 @@ func TestMsgEvents(t *testing.T) {
 	task = makeMsgTask(testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start")
 	handler.QueueHandleTask(rc, testdata.Org2Contact.ID, task)
 	task, _ = queue.PopNextTask(rc, queue.HandlerQueue)
-	err = handler.HandleEvent(ctx, rt, task)
+	err = tasks.Perform(ctx, rt, task)
 	assert.NoError(t, err)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
@@ -482,7 +483,7 @@ func TestChannelEvents(t *testing.T) {
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handler.HandleEvent(ctx, rt, task)
+		err = tasks.Perform(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		// if we are meant to have a response
@@ -521,7 +522,7 @@ func TestTicketEvents(t *testing.T) {
 	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
 	require.NoError(t, err)
 
-	err = handler.HandleEvent(ctx, rt, task)
+	err = tasks.Perform(ctx, rt, task)
 	require.NoError(t, err)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text = 'What is your favorite color?'`, testdata.Cathy.ID).Returns(1)
@@ -556,7 +557,7 @@ func TestStopEvent(t *testing.T) {
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err, "error popping next task")
 
-	err = handler.HandleEvent(ctx, rt, task)
+	err = tasks.Perform(ctx, rt, task)
 	assert.NoError(t, err, "error when handling event")
 
 	// check that only george is in our group
@@ -683,7 +684,7 @@ func TestTimedEvents(t *testing.T) {
 		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 		assert.NoError(t, err, "%d: error popping next task", i)
 
-		err = handler.HandleEvent(ctx, rt, task)
+		err = tasks.Perform(ctx, rt, task)
 		assert.NoError(t, err, "%d: error when handling event", i)
 
 		if tc.Response != "" {
@@ -731,6 +732,6 @@ func TestTimedEvents(t *testing.T) {
 	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NoError(t, err)
 
-	err = handler.HandleEvent(ctx, rt, task)
+	err = tasks.Perform(ctx, rt, task)
 	assert.NoError(t, err)
 }

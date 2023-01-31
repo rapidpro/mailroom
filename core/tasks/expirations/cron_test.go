@@ -84,7 +84,7 @@ func TestExpirations(t *testing.T) {
 	assert.NotNil(t, task)
 
 	// check the first task
-	eventTask := &handler.HandleEventTask{}
+	eventTask := &handler.HandleContactEventTask{}
 	jsonx.MustUnmarshal(task.Task, eventTask)
 	assert.Equal(t, testdata.George.ID, eventTask.ContactID)
 
@@ -93,7 +93,7 @@ func TestExpirations(t *testing.T) {
 	assert.NotNil(t, task)
 
 	// check the second task
-	eventTask = &handler.HandleEventTask{}
+	eventTask = &handler.HandleContactEventTask{}
 	jsonx.MustUnmarshal(task.Task, eventTask)
 	assert.Equal(t, blake.ID, eventTask.ContactID)
 

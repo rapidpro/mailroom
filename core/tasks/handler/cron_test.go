@@ -9,6 +9,7 @@ import (
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -49,7 +50,7 @@ func TestRetryMsgs(t *testing.T) {
 	// should have one message requeued
 	task, _ := queue.PopNextTask(rc, queue.HandlerQueue)
 	assert.NotNil(t, task)
-	err = handler.HandleEvent(ctx, rt, task)
+	err = tasks.Perform(ctx, rt, task)
 	assert.NoError(t, err)
 
 	// message should be handled now

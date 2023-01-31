@@ -40,7 +40,7 @@ func TestTimeouts(t *testing.T) {
 	assert.NotNil(t, task)
 
 	// decode the task
-	eventTask := &handler.HandleEventTask{}
+	eventTask := &handler.HandleContactEventTask{}
 	err = json.Unmarshal(task.Task, eventTask)
 	assert.NoError(t, err)
 
