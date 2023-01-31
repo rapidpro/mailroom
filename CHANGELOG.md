@@ -1,3 +1,8 @@
+v8.1.5 (2023-01-31)
+-------------------------
+ * Rework more task types to use tasks package
+ * Stop adding language and country to msg.metadata.templating
+
 v8.1.4 (2023-01-26)
 -------------------------
  * Start writing msgs_msg.locale
