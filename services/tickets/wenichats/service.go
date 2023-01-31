@@ -89,11 +89,19 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		roomData.UserEmail = assignee.Email()
 	}
 
+	var groups []Group
+	for _, group := range contact.Groups().All() {
+		g := Group{UUID: string(group.UUID()), Name: group.Name()}
+		groups = append(groups, g)
+	}
+
 	roomData.Contact.ExternalID = string(contact.UUID())
 	roomData.Contact.Name = contact.Name()
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.UUID())
 	roomData.Contact.URN = session.Contact().PreferredURN().URN().String()
+	roomData.FlowUUID = session.Runs()[0].Flow().UUID()
+	roomData.Groups = groups
 
 	extra := &struct {
 		CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
