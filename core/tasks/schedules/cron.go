@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -79,7 +80,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 
 			// add our task to send this broadcast
 			task = bcast
-			taskName = queue.SendBroadcast
+			taskName = msgs.TypeSendBroadcast
 			broadcasts++
 
 		} else if s.FlowStart() != nil {

@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -109,7 +108,7 @@ func TestCheckSchedules(t *testing.T) {
 	task, err = queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
-	assert.Equal(t, queue.SendBroadcast, task.Type)
+	assert.Equal(t, "send_broadcast", task.Type)
 
 	// nothing more
 	task, err = queue.PopNextTask(rc, queue.BatchQueue)

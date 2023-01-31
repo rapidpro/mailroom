@@ -3,12 +3,12 @@ package hooks
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -41,7 +41,7 @@ func (h *startBroadcastsHook) Apply(ctx context.Context, rt *runtime.Runtime, tx
 				priority = queue.HighPriority
 			}
 
-			err = queue.AddTask(rc, taskQ, queue.SendBroadcast, int(oa.OrgID()), bcast, priority)
+			err = queue.AddTask(rc, taskQ, msgs.TypeSendBroadcast, int(oa.OrgID()), bcast, priority)
 			if err != nil {
 				return errors.Wrapf(err, "error queuing broadcast")
 			}
