@@ -3,13 +3,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/gocommon/analytics"
-	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
@@ -18,7 +15,6 @@ import (
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -40,161 +36,6 @@ const (
 	TimeoutEventType         = "timeout_event"
 	TicketClosedEventType    = "ticket_closed"
 )
-
-func init() {
-	mailroom.AddTaskFunction(queue.HandleContactEvent, HandleEvent)
-}
-
-func HandleEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	return handleContactEvent(ctx, rt, task)
-}
-
-// Called when an event comes in for a contact. To make sure we don't get into a situation of being off by one,
-// this task ingests and handles all the events for a contact, one by one.
-func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
-	defer cancel()
-
-	eventTask := &HandleEventTask{}
-	err := json.Unmarshal(task.Task, eventTask)
-	if err != nil {
-		return errors.Wrapf(err, "error decoding contact event task")
-	}
-
-	// acquire the lock for this contact
-	locker := models.GetContactLocker(models.OrgID(task.OrgID), eventTask.ContactID)
-
-	lock, err := locker.Grab(rt.RP, time.Second*10)
-	if err != nil {
-		return errors.Wrapf(err, "error acquiring lock for contact %d", eventTask.ContactID)
-	}
-
-	// we didn't get the lock within our timeout, skip and requeue for later
-	if lock == "" {
-		rc := rt.RP.Get()
-		defer rc.Close()
-		err = queueContactTask(rc, models.OrgID(task.OrgID), eventTask.ContactID)
-		if err != nil {
-			return errors.Wrapf(err, "error re-adding contact task after failing to get lock")
-		}
-		logrus.WithFields(logrus.Fields{
-			"org_id":     task.OrgID,
-			"contact_id": eventTask.ContactID,
-		}).Info("failed to get lock for contact, requeued and skipping")
-		return nil
-	}
-	defer locker.Release(rt.RP, lock)
-
-	// read all the events for this contact, one by one
-	contactQ := fmt.Sprintf("c:%d:%d", task.OrgID, eventTask.ContactID)
-	for {
-		// pop the next event off this contacts queue
-		rc := rt.RP.Get()
-		event, err := redis.String(rc.Do("lpop", contactQ))
-		rc.Close()
-
-		// out of tasks? that's ok, exit
-		if err == redis.ErrNil {
-			return nil
-		}
-
-		// real error? report
-		if err != nil {
-			return errors.Wrapf(err, "error popping contact event")
-		}
-
-		start := time.Now()
-
-		// decode our event, this is a normal task at its top level
-		contactEvent := &queue.Task{}
-		err = json.Unmarshal([]byte(event), contactEvent)
-		if err != nil {
-			return errors.Wrapf(err, "error unmarshalling contact event: %s", event)
-		}
-
-		// hand off to the appropriate handler
-		switch contactEvent.Type {
-
-		case StopEventType:
-			evt := &StopEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling stop event: %s", event)
-			}
-			err = handleStopEvent(ctx, rt, evt)
-
-		case NewConversationEventType, ReferralEventType, MOMissEventType, WelcomeMessageEventType:
-			evt := &models.ChannelEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling channel event: %s", event)
-			}
-			_, err = HandleChannelEvent(ctx, rt, models.ChannelEventType(contactEvent.Type), evt, nil)
-
-		case MsgEventType:
-			msg := &MsgEvent{}
-			err = json.Unmarshal(contactEvent.Task, msg)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
-			}
-			err = handleMsgEvent(ctx, rt, msg)
-
-		case TicketClosedEventType:
-			evt := &models.TicketEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling ticket event: %s", event)
-			}
-			err = handleTicketEvent(ctx, rt, evt)
-
-		case TimeoutEventType, ExpirationEventType:
-			evt := &TimedEvent{}
-			err = json.Unmarshal(contactEvent.Task, evt)
-			if err != nil {
-				return errors.Wrapf(err, "error unmarshalling timeout event: %s", event)
-			}
-			err = handleTimedEvent(ctx, rt, contactEvent.Type, evt)
-
-		default:
-			return errors.Errorf("unknown contact event type: %s", contactEvent.Type)
-		}
-
-		// log our processing time to librato
-		analytics.Gauge(fmt.Sprintf("mr.%s_elapsed", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
-
-		// and total latency for this task since it was queued
-		analytics.Gauge(fmt.Sprintf("mr.%s_latency", contactEvent.Type), float64(time.Since(task.QueuedOn))/float64(time.Second))
-
-		// if we get an error processing an event, requeue it for later and return our error
-		if err != nil {
-			log := logrus.WithFields(logrus.Fields{
-				"org_id":     task.OrgID,
-				"contact_id": eventTask.ContactID,
-				"event":      event,
-			})
-
-			if qerr := dbutil.AsQueryError(err); qerr != nil {
-				query, params := qerr.Query()
-				log = log.WithFields(logrus.Fields{"sql": query, "sql_params": params})
-			}
-
-			contactEvent.ErrorCount++
-			if contactEvent.ErrorCount < 3 {
-				rc := rt.RP.Get()
-				retryErr := queueHandleTask(rc, eventTask.ContactID, contactEvent, true)
-				if retryErr != nil {
-					logrus.WithError(retryErr).Error("error requeuing errored contact event")
-				}
-				rc.Close()
-
-				log.WithError(err).WithField("error_count", contactEvent.ErrorCount).Error("error handling contact event")
-				return nil
-			}
-			log.WithError(err).Error("error handling contact event, permanent failure")
-			return nil
-		}
-	}
-}
 
 // handleTimedEvent is called for timeout events
 func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string, event *TimedEvent) error {
@@ -796,10 +637,6 @@ func markMsgHandled(ctx context.Context, db models.Queryer, contact *flows.Conta
 	}
 
 	return nil
-}
-
-type HandleEventTask struct {
-	ContactID models.ContactID `json:"contact_id"`
 }
 
 type TimedEvent struct {
