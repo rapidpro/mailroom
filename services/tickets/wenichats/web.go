@@ -1,6 +1,7 @@
 package wenichats
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -91,14 +92,14 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 					maxBodyBytes = mb100
 				}
 				bodyReader := io.LimitReader(file.Body, int64(maxBodyBytes)+1)
-				_, err = io.ReadAll(bodyReader)
+				bodyBytes, err := io.ReadAll(bodyReader)
 				if err != nil {
 					return err, http.StatusBadRequest, nil
 				}
 				if bodyReader.(*io.LimitedReader).N <= 0 {
 					return errors.Wrapf(err, "unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes), http.StatusBadRequest, nil
 				}
-
+				file.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 				_, err = tickets.SendReply(ctx, rt, ticket, "", []*tickets.File{file})
 				if err != nil {
 					return errors.Wrapf(err, "error on send ticket reply with media '%s'", m.URL), http.StatusInternalServerError, nil
