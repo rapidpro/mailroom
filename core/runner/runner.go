@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -180,7 +181,7 @@ func StartFlowBatch(
 	}
 
 	var params *types.XObject
-	if len(batch.Extra()) > 0 {
+	if !batch.Extra().IsNull() {
 		params, err = types.ReadXObject(batch.Extra())
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to read JSON from flow start extra")
@@ -188,7 +189,7 @@ func StartFlowBatch(
 	}
 
 	var history *flows.SessionHistory
-	if len(batch.SessionHistory()) > 0 {
+	if !batch.SessionHistory().IsNull() {
 		history, err = models.ReadSessionHistory(batch.SessionHistory())
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to read JSON from flow start history")
@@ -200,8 +201,8 @@ func StartFlowBatch(
 
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
-		if batch.ParentSummary() != nil {
-			tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).FlowAction(history, batch.ParentSummary())
+		if !batch.ParentSummary().IsNull() {
+			tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).FlowAction(history, json.RawMessage(batch.ParentSummary()))
 			if batchStart {
 				tb = tb.AsBatch()
 			}

@@ -10,7 +10,7 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 )
 

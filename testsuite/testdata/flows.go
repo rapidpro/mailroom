@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/null"
 )
 
 type Flow struct {
@@ -126,7 +125,7 @@ func InsertFlowRun(db *sqlx.DB, org *Org, sessionID models.SessionID, contact *C
 	var id models.FlowRunID
 	must(db.Get(&id,
 		`INSERT INTO flows_flowrun(uuid, org_id, session_id, contact_id, flow_id, status, responded, created_on, modified_on, exited_on) 
-		 VALUES($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW(), $7) RETURNING id`, uuids.New(), org.ID, null.Int(sessionID), contact.ID, flow.ID, status, exitedOn,
+		 VALUES($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW(), $7) RETURNING id`, uuids.New(), org.ID, sessionID, contact.ID, flow.ID, status, exitedOn,
 	))
 	return id
 }

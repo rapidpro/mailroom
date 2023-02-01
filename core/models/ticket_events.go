@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 )
 
 type TicketEventID int

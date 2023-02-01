@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/null/v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,9 +59,9 @@ func TestStarts(t *testing.T) {
 	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs())
 	assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.ExcludeGroupIDs())
 
-	assert.Equal(t, json.RawMessage(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), start.ParentSummary())
-	assert.Equal(t, json.RawMessage(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory())
-	assert.Equal(t, json.RawMessage(`{"foo": "bar"}`), start.Extra())
+	assert.Equal(t, null.JSON(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), start.ParentSummary())
+	assert.Equal(t, null.JSON(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory())
+	assert.Equal(t, null.JSON(`{"foo": "bar"}`), start.Extra())
 
 	err = models.MarkStartStarted(ctx, db, startID, 2, []models.ContactID{testdata.George.ID})
 	require.NoError(t, err)
@@ -79,9 +80,9 @@ func TestStarts(t *testing.T) {
 	assert.False(t, batch.IsLast())
 	assert.Equal(t, 3, batch.TotalContacts())
 
-	assert.Equal(t, json.RawMessage(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), batch.ParentSummary())
-	assert.Equal(t, json.RawMessage(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), batch.SessionHistory())
-	assert.Equal(t, json.RawMessage(`{"foo": "bar"}`), batch.Extra())
+	assert.Equal(t, null.JSON(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), batch.ParentSummary())
+	assert.Equal(t, null.JSON(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), batch.SessionHistory())
+	assert.Equal(t, null.JSON(`{"foo": "bar"}`), batch.Extra())
 
 	history, err := models.ReadSessionHistory(batch.SessionHistory())
 	assert.NoError(t, err)

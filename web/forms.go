@@ -4,9 +4,9 @@ import (
 	"mime"
 	"net/http"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/schema"
 	"github.com/nyaruka/goflow/utils"
-	validator "gopkg.in/go-playground/validator.v9"
 )
 
 var (

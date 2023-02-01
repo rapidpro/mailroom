@@ -10,12 +10,12 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-type TopicID null.Int
+type TopicID int
 
 const NilTopicID = TopicID(0)
 
@@ -86,22 +86,7 @@ func loadTopics(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Top
 	return topics, nil
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i TopicID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *TopicID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i TopicID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *TopicID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *TopicID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i TopicID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *TopicID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i TopicID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }

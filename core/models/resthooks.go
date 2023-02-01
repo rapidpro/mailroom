@@ -4,16 +4,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 // ResthookID is our type for the database id of a resthook
-type ResthookID int64
+type ResthookID int
 
 // Resthook is the mailroom type for resthooks
 type Resthook struct {

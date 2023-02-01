@@ -20,7 +20,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

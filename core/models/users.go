@@ -10,7 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -21,27 +21,12 @@ const (
 )
 
 // UserID is our type for user ids, which can be null
-type UserID null.Int
+type UserID int
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i UserID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *UserID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i UserID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *UserID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *UserID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i UserID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *UserID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i UserID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 type UserRole string
 

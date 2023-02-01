@@ -15,8 +15,7 @@ import (
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/nyaruka/null"
-
+	"github.com/nyaruka/null/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

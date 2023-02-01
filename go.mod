@@ -4,10 +4,11 @@ go 1.19
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/aws/aws-sdk-go v1.44.146
+	github.com/aws/aws-sdk-go v1.44.191
 	github.com/buger/jsonparser v1.1.1
 	github.com/edganiukov/fcm v0.4.0
 	github.com/go-chi/chi v4.1.2+incompatible
+	github.com/go-playground/validator/v10 v10.11.2
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/gomodule/redigo v1.8.9
@@ -15,10 +16,10 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.7
 	github.com/nyaruka/ezconf v0.2.1
-	github.com/nyaruka/gocommon v1.34.0
-	github.com/nyaruka/goflow v0.180.0
+	github.com/nyaruka/gocommon v1.34.1
+	github.com/nyaruka/goflow v0.181.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
-	github.com/nyaruka/null v1.2.0
+	github.com/nyaruka/null/v2 v2.0.2
 	github.com/nyaruka/redisx v0.2.2
 	github.com/olivere/elastic/v7 v7.0.32
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -28,21 +29,20 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
-	gopkg.in/go-playground/validator.v9 v9.31.0
 )
 
 require (
 	github.com/Shopify/gomail v0.0.0-20220729171026-0784ece65e69 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220527190237-ee62e23da966 // indirect
-	github.com/blevesearch/segment v0.9.0 // indirect
+	github.com/blevesearch/segment v0.9.1 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
-	github.com/go-playground/locales v0.14.0 // indirect
-	github.com/go-playground/universal-translator v0.18.0 // indirect
-	github.com/gofrs/uuid v4.3.1+incompatible // indirect
+	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -52,13 +52,14 @@ require (
 	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/naoina/toml v0.1.1 // indirect
 	github.com/nyaruka/librato v1.0.0 // indirect
-	github.com/nyaruka/phonenumbers v1.1.4 // indirect
+	github.com/nyaruka/phonenumbers v1.1.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/sergi/go-diff v1.2.0 // indirect
-	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9 // indirect
-	golang.org/x/net v0.2.0 // indirect
-	golang.org/x/sys v0.2.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
+	github.com/sergi/go-diff v1.3.1 // indirect
+	golang.org/x/crypto v0.5.0 // indirect
+	golang.org/x/exp v0.0.0-20230131160201-f062dba9d201 // indirect
+	golang.org/x/net v0.5.0 // indirect
+	golang.org/x/sys v0.4.0 // indirect
+	golang.org/x/text v0.6.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

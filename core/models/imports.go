@@ -16,20 +16,20 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 )
 
 // ContactImportID is the type for contact import IDs
-type ContactImportID null.Int
+type ContactImportID int
 
-func (i ContactImportID) MarshalJSON() ([]byte, error)  { return null.Int(i).MarshalJSON() }
-func (i *ContactImportID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, (*null.Int)(i)) }
-func (i ContactImportID) Value() (driver.Value, error)  { return null.Int(i).Value() }
-func (i *ContactImportID) Scan(value interface{}) error { return null.ScanInt(value, (*null.Int)(i)) }
+func (i *ContactImportID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i ContactImportID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *ContactImportID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i ContactImportID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 // ContactImportBatchID is the type for contact import batch IDs
-type ContactImportBatchID int64
+type ContactImportBatchID int
 
 // ContactImportStatus is the status of an import
 type ContactImportStatus string
