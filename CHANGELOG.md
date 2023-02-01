@@ -1,3 +1,7 @@
+v8.1.6 (2023-02-01)
+-------------------------
+ * Update to nyaruka/null v2 and validator v10
+
 v8.1.5 (2023-01-31)
 -------------------------
  * Rework more task types to use tasks package
