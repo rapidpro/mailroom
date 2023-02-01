@@ -1,3 +1,7 @@
+v8.1.7 (2023-02-01)
+-------------------------
+ * Don't send machine_detection param to Nexmo if empty
+
 v8.1.6 (2023-02-01)
 -------------------------
  * Update to nyaruka/null v2 and validator v10
