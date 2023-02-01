@@ -18,17 +18,17 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 // URNID is our type for urn ids, which can be null
-type URNID null.Int
+type URNID int
 
 // ContactID is our type for contact ids, which can be null
-type ContactID null.Int
+type ContactID int
 
 // URN priority constants
 const (
@@ -612,7 +612,6 @@ func CreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, userID 
 // * If URNs exist but are orphaned it creates a new contact and assigns those URNs to them.
 // * If URNs exists and belongs to a single contact it returns that contact (other URNs are not assigned to the contact).
 // * If URNs exists and belongs to multiple contacts it will return an error.
-//
 func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN, channelID ChannelID) (*Contact, *flows.Contact, bool, error) {
 	// ensure all URNs are normalized
 	for i, urn := range urnz {
@@ -1307,45 +1306,15 @@ type ContactURNsChanged struct {
 	URNs      []urns.URN
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i URNID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
+func (i *URNID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i URNID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *URNID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i URNID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *URNID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i URNID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *URNID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
-
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i ContactID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *ContactID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i ContactID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *ContactID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *ContactID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i ContactID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *ContactID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i ContactID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 // GetContactLocker returns the locker for a particular contact
 func GetContactLocker(orgID OrgID, contactID ContactID) *redisx.Locker {

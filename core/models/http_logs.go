@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 )
 
 // HTTPLogID is our type for HTTPLog ids
-type HTTPLogID null.Int
+type HTTPLogID int
 
 // HTTPLogType is the type for the type of log this is
 type HTTPLogType string
@@ -108,25 +108,10 @@ func InsertHTTPLogs(ctx context.Context, tx Queryer, logs []*HTTPLog) error {
 	return BulkQuery(ctx, "inserted http logs", tx, insertHTTPLogsSQL, logs)
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i HTTPLogID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *HTTPLogID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i HTTPLogID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *HTTPLogID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *HTTPLogID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i HTTPLogID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *HTTPLogID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i HTTPLogID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 // HTTPLogger is a logger for HTTPLogs
 type HTTPLogger struct {

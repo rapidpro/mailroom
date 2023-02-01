@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 
 	"github.com/pkg/errors"
 )
 
 // ScheduleID is our internal type for schedule IDs
-type ScheduleID null.Int
+type ScheduleID int
 
 // NilScheduleID is our constant for a nil schedule id
 const NilScheduleID = ScheduleID(0)
@@ -302,22 +302,7 @@ func GetUnfiredSchedules(ctx context.Context, db Queryer) ([]*Schedule, error) {
 	return unfired, nil
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i ScheduleID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *ScheduleID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i ScheduleID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *ScheduleID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *ScheduleID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i ScheduleID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *ScheduleID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i ScheduleID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }

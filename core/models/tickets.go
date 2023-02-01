@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/httpx"
@@ -16,40 +18,22 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
-
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-type TicketID null.Int
+type TicketID int
 
 // NilTicketID is our constant for a nil ticket id
 const NilTicketID = TicketID(0)
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i TicketID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
+func (i *TicketID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i TicketID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *TicketID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i TicketID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *TicketID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i TicketID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *TicketID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
-
-type TicketerID null.Int
+type TicketerID int
 type TicketStatus string
 type TicketDailyCountType string
 type TicketDailyTimingType string
@@ -114,7 +98,7 @@ func NewTicket(uuid flows.TicketUUID, orgID OrgID, userID UserID, flowID FlowID,
 	t.t.TopicID = topicID
 	t.t.Body = body
 	t.t.AssigneeID = assigneeID
-	t.t.Config = null.NewMap(config)
+	t.t.Config = null.Map(config)
 	return t
 }
 
@@ -131,7 +115,8 @@ func (t *Ticket) AssigneeID() UserID        { return t.t.AssigneeID }
 func (t *Ticket) RepliedOn() *time.Time     { return t.t.RepliedOn }
 func (t *Ticket) LastActivityOn() time.Time { return t.t.LastActivityOn }
 func (t *Ticket) Config(key string) string {
-	return t.t.Config.GetString(key, "")
+	v, _ := t.t.Config[key].(string)
+	return v
 }
 func (t *Ticket) OpenedByID() UserID { return t.t.OpenedByID }
 
@@ -401,7 +386,7 @@ func UpdateTicketExternalID(ctx context.Context, db Queryer, ticket *Ticket, ext
 func UpdateTicketConfig(ctx context.Context, db Queryer, ticket *Ticket, config map[string]string) error {
 	t := &ticket.t
 	for key, value := range config {
-		t.Config.Map()[key] = value
+		t.Config[key] = value
 	}
 
 	return Exec(ctx, "update ticket config", db, `UPDATE tickets_ticket SET config = $2 WHERE id = $1`, t.ID, t.Config)
@@ -803,7 +788,7 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]
 		dbMap[key] = value
 	}
 
-	return Exec(ctx, "update ticketer config", db, `UPDATE tickets_ticketer SET config = $2 WHERE id = $1`, t.t.ID, null.NewMap(dbMap))
+	return Exec(ctx, "update ticketer config", db, `UPDATE tickets_ticketer SET config = $2 WHERE id = $1`, t.t.ID, null.Map(dbMap))
 }
 
 // TicketService extends the engine's ticket service and adds support for forwarding new incoming messages
@@ -905,25 +890,10 @@ func loadTicketers(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.
 	return ticketers, nil
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i TicketerID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *TicketerID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i TicketerID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *TicketerID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *TicketerID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i TicketerID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *TicketerID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i TicketerID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 func insertTicketDailyCounts(ctx context.Context, tx Queryer, countType TicketDailyCountType, tz *time.Location, scopeCounts map[string]int) error {
 	return insertDailyCounts(ctx, tx, "tickets_ticketdailycount", countType, tz, scopeCounts)

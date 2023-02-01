@@ -20,7 +20,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/nyaruka/redisx/assertredis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -356,7 +356,6 @@ func TestMarshalMsg(t *testing.T) {
 		"response_to_external_id": "EX123",
 		"high_priority": true,
 		"id": %d,
-		"metadata": null,
 		"modified_on": %s,
 		"next_attempt": null,
 		"org_id": 1,
@@ -394,7 +393,6 @@ func TestMarshalMsg(t *testing.T) {
 		"error_count": 0,
 		"high_priority": false,
 		"id": %d,
-		"metadata": null,
 		"modified_on": %s,
 		"next_attempt": null,
 		"org_id": 1,

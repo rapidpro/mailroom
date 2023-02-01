@@ -6,7 +6,7 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 )
 
 type Channel struct {
@@ -21,7 +21,7 @@ func InsertChannel(db *sqlx.DB, org *Org, channelType models.ChannelType, name s
 	var id models.ChannelID
 	must(db.Get(&id,
 		`INSERT INTO channels_channel(uuid, org_id, channel_type, name, schemes, role, config, last_seen, is_system, is_active, created_on, modified_on, created_by_id, modified_by_id) 
-		VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), FALSE, TRUE, NOW(), NOW(), 1, 1) RETURNING id`, uuid, org.ID, channelType, name, pq.Array(schemes), role, null.NewMap(config),
+		VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), FALSE, TRUE, NOW(), NOW(), 1, 1) RETURNING id`, uuid, org.ID, channelType, name, pq.Array(schemes), role, null.Map(config),
 	))
 	return &Channel{ID: id, UUID: uuid, Type: channelType}
 }

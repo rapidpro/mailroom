@@ -2,6 +2,7 @@ package ivr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
@@ -22,10 +25,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
-
-	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -335,7 +335,7 @@ func StartIVRFlow(
 	}
 
 	var params *types.XObject
-	if len(start.Extra()) > 0 {
+	if !start.Extra().IsNull() {
 		params, err = types.ReadXObject(start.Extra())
 		if err != nil {
 			return errors.Wrap(err, "unable to read JSON from flow start extra")
@@ -343,7 +343,7 @@ func StartIVRFlow(
 	}
 
 	var history *flows.SessionHistory
-	if len(start.SessionHistory()) > 0 {
+	if !start.SessionHistory().IsNull() {
 		history, err = models.ReadSessionHistory(start.SessionHistory())
 		if err != nil {
 			return errors.Wrap(err, "unable to read JSON from flow start history")
@@ -354,9 +354,9 @@ func StartIVRFlow(
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 
 	var trigger flows.Trigger
-	if len(start.ParentSummary()) > 0 {
+	if !start.ParentSummary().IsNull() {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
-			FlowAction(history, start.ParentSummary()).
+			FlowAction(history, json.RawMessage(start.ParentSummary())).
 			WithCall(channel.ChannelReference(), urn).
 			Build()
 	} else {

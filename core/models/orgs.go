@@ -24,7 +24,7 @@ import (
 	"github.com/nyaruka/goflow/utils/smtpx"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -141,7 +141,11 @@ func (o *Org) UnmarshalJSON(b []byte) error {
 
 // ConfigValue returns the string value for the passed in config (or default if not found)
 func (o *Org) ConfigValue(key string, def string) string {
-	return o.o.Config.GetString(key, def)
+	v, ok := o.o.Config[key].(string)
+	if ok {
+		return v
+	}
+	return def
 }
 
 // EmailService returns the email service for this org

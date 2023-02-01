@@ -16,13 +16,12 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
-type BroadcastID null.Int
+type BroadcastID int
 
 // NilBroadcastID is our constant for a nil broadcast id
 const NilBroadcastID = BroadcastID(0)
@@ -44,8 +43,8 @@ type BroadcastTranslation struct {
 
 type BroadcastTranslations map[envs.Language]*BroadcastTranslation
 
-func (t *BroadcastTranslations) Scan(v interface{}) error {
-	b, ok := v.([]byte)
+func (t *BroadcastTranslations) Scan(value any) error {
+	b, ok := value.([]byte)
 	if !ok {
 		return errors.New("failed type assertion to []byte")
 	}

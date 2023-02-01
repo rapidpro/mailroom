@@ -18,13 +18,13 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 // MsgID is our internal type for msg ids, which can be null/0
-type MsgID null.Int
+type MsgID int64
 
 // NilMsgID is our constant for a nil msg id
 const NilMsgID = MsgID(0)
@@ -153,7 +153,7 @@ func (m *Msg) ErrorCount() int                  { return m.m.ErrorCount }
 func (m *Msg) NextAttempt() *time.Time          { return m.m.NextAttempt }
 func (m *Msg) FailedReason() MsgFailedReason    { return m.m.FailedReason }
 func (m *Msg) ExternalID() null.String          { return m.m.ExternalID }
-func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata.Map() }
+func (m *Msg) Metadata() map[string]interface{} { return m.m.Metadata }
 func (m *Msg) MsgCount() int                    { return m.m.MsgCount }
 func (m *Msg) ChannelID() ChannelID             { return m.m.ChannelID }
 func (m *Msg) ChannelUUID() assets.ChannelUUID  { return m.m.ChannelUUID }
@@ -335,7 +335,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 	m.MsgType = MsgTypeFlow
 	m.MsgCount = 1
 	m.CreatedOn = createdOn
-	m.Metadata = null.NewMap(buildMsgMetadata(out))
+	m.Metadata = null.Map(buildMsgMetadata(out))
 
 	msg.SetChannel(channel)
 	msg.SetURN(out.URN())
@@ -788,52 +788,15 @@ func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
 
 // NilID implementations
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i MsgID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
+func (i *MsgID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i MsgID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *MsgID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i MsgID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *MsgID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
+func (i *BroadcastID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i BroadcastID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *BroadcastID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i BroadcastID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
-// Value returns the db value, null is returned for 0
-func (i MsgID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *MsgID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
-
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i BroadcastID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *BroadcastID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i BroadcastID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *BroadcastID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for ""
-func (s MsgFailedReason) Value() (driver.Value, error) {
-	return null.String(s).Value()
-}
-
-// Scan scans from the db value. null values become ""
-func (s *MsgFailedReason) Scan(value interface{}) error {
-	return null.ScanString(value, (*null.String)(s))
-}
+func (s MsgFailedReason) Value() (driver.Value, error) { return null.StringValue(s) }
+func (s *MsgFailedReason) Scan(value any) error        { return null.ScanString(value, s) }

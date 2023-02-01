@@ -9,12 +9,12 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/null"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 )
 
 // StartID is our type for flow start idst
-type StartID null.Int
+type StartID int
 
 // NilStartID is our constant for a nil start id
 var NilStartID = StartID(0)
@@ -123,9 +123,9 @@ func (b *FlowStartBatch) ExcludeInAFlow() bool           { return !b.b.IncludeAc
 func (b *FlowStartBatch) IsLast() bool                   { return b.b.IsLast }
 func (b *FlowStartBatch) TotalContacts() int             { return b.b.TotalContacts }
 
-func (b *FlowStartBatch) ParentSummary() json.RawMessage  { return json.RawMessage(b.b.ParentSummary) }
-func (b *FlowStartBatch) SessionHistory() json.RawMessage { return json.RawMessage(b.b.SessionHistory) }
-func (b *FlowStartBatch) Extra() json.RawMessage          { return json.RawMessage(b.b.Extra) }
+func (b *FlowStartBatch) ParentSummary() null.JSON  { return b.b.ParentSummary }
+func (b *FlowStartBatch) SessionHistory() null.JSON { return b.b.SessionHistory }
+func (b *FlowStartBatch) Extra() null.JSON          { return b.b.Extra }
 
 func (b *FlowStartBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -211,19 +211,19 @@ func (s *FlowStart) WithCreateContact(create bool) *FlowStart {
 	return s
 }
 
-func (s *FlowStart) ParentSummary() json.RawMessage { return json.RawMessage(s.s.ParentSummary) }
+func (s *FlowStart) ParentSummary() null.JSON { return s.s.ParentSummary }
 func (s *FlowStart) WithParentSummary(sum json.RawMessage) *FlowStart {
 	s.s.ParentSummary = null.JSON(sum)
 	return s
 }
 
-func (s *FlowStart) SessionHistory() json.RawMessage { return json.RawMessage(s.s.SessionHistory) }
+func (s *FlowStart) SessionHistory() null.JSON { return s.s.SessionHistory }
 func (s *FlowStart) WithSessionHistory(history json.RawMessage) *FlowStart {
 	s.s.SessionHistory = null.JSON(history)
 	return s
 }
 
-func (s *FlowStart) Extra() json.RawMessage { return json.RawMessage(s.s.Extra) }
+func (s *FlowStart) Extra() null.JSON { return s.s.Extra }
 func (s *FlowStart) WithExtra(extra json.RawMessage) *FlowStart {
 	s.s.Extra = null.JSON(extra)
 	return s
@@ -345,34 +345,19 @@ func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts
 	b.b.ContactIDs = contactIDs
 	b.b.RestartParticipants = s.s.RestartParticipants
 	b.b.IncludeActive = s.s.IncludeActive
-	b.b.ParentSummary = null.JSON(s.ParentSummary())
-	b.b.SessionHistory = null.JSON(s.SessionHistory())
-	b.b.Extra = null.JSON(s.Extra())
+	b.b.ParentSummary = s.ParentSummary()
+	b.b.SessionHistory = s.SessionHistory()
+	b.b.Extra = s.Extra()
 	b.b.IsLast = last
 	b.b.TotalContacts = totalContacts
 	b.b.CreatedByID = s.s.CreatedByID
 	return b
 }
 
-// MarshalJSON marshals into JSON. 0 values will become null
-func (i StartID) MarshalJSON() ([]byte, error) {
-	return null.Int(i).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals from JSON. null values become 0
-func (i *StartID) UnmarshalJSON(b []byte) error {
-	return null.UnmarshalInt(b, (*null.Int)(i))
-}
-
-// Value returns the db value, null is returned for 0
-func (i StartID) Value() (driver.Value, error) {
-	return null.Int(i).Value()
-}
-
-// Scan scans from the db value. null values become 0
-func (i *StartID) Scan(value interface{}) error {
-	return null.ScanInt(value, (*null.Int)(i))
-}
+func (i *StartID) Scan(value any) error         { return null.ScanInt(value, i) }
+func (i StartID) Value() (driver.Value, error)  { return null.IntValue(i) }
+func (i *StartID) UnmarshalJSON(b []byte) error { return null.UnmarshalInt(b, i) }
+func (i StartID) MarshalJSON() ([]byte, error)  { return null.MarshalInt(i) }
 
 // ReadSessionHistory reads a session history from the given JSON
 func ReadSessionHistory(data []byte) (*flows.SessionHistory, error) {
