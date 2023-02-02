@@ -92,6 +92,7 @@ type Msg struct {
 		UUID                 flows.MsgUUID      `db:"uuid"            json:"uuid"`
 		Text                 string             `db:"text"            json:"text"`
 		Attachments          pq.StringArray     `db:"attachments"     json:"attachments,omitempty"`
+		QuickReplies         pq.StringArray     `db:"quick_replies"   json:"quick_replies,omitempty"`
 		Locale               envs.Locale        `db:"locale"          json:"locale,omitempty"`
 		HighPriority         bool               `db:"high_priority"   json:"high_priority"`
 		CreatedOn            time.Time          `db:"created_on"      json:"created_on"`
@@ -327,6 +328,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 	m.ContactID = ContactID(contact.ID())
 	m.BroadcastID = broadcastID
 	m.Text = out.Text()
+	m.QuickReplies = out.QuickReplies()
 	m.Locale = out.Locale()
 	m.HighPriority = false
 	m.Direction = DirectionOut
@@ -339,6 +341,13 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 
 	msg.SetChannel(channel)
 	msg.SetURN(out.URN())
+
+	// if we have attachments, add them
+	if len(out.Attachments()) > 0 {
+		for _, a := range out.Attachments() {
+			m.Attachments = append(m.Attachments, string(NormalizeAttachment(rt.Config, a)))
+		}
+	}
 
 	if out.UnsendableReason() != flows.NilUnsendableReason {
 		m.Status = MsgStatusFailed
@@ -375,13 +384,6 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 		// if we're responding to an incoming message, send as high priority
 		if session.IncomingMsgID() != NilMsgID {
 			m.HighPriority = true
-		}
-	}
-
-	// if we have attachments, add them
-	if len(out.Attachments()) > 0 {
-		for _, a := range out.Attachments() {
-			m.Attachments = append(m.Attachments, string(NormalizeAttachment(rt.Config, a)))
 		}
 	}
 
