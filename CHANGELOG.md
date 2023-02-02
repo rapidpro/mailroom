@@ -1,3 +1,7 @@
+v8.1.10 (2023-02-02)
+-------------------------
+ * Fix test
+
 v8.1.9 (2023-02-02)
 -------------------------
  * Update to latest goflow which updates ANTLR
