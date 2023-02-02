@@ -313,6 +313,10 @@ func TestMarshalMsg(t *testing.T) {
 		"next_attempt": null,
 		"org_id": 1,
 		"queued_on": %s,
+		"quick_replies": [
+			"yes",
+			"no"
+		],
 		"sent_on": null,
 		"session_id": %d,
 		"session_status": "W",
