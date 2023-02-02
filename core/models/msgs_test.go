@@ -180,10 +180,17 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 		assert.NoError(t, err)
 
+		expectedAttachments := tc.Attachments
+		if expectedAttachments == nil {
+			expectedAttachments = []utils.Attachment{}
+		}
+
 		err = models.InsertMessages(ctx, db, []*models.Msg{msg})
 		assert.NoError(t, err)
 		assert.Equal(t, oa.OrgID(), msg.OrgID())
 		assert.Equal(t, tc.Text, msg.Text())
+		assert.Equal(t, expectedAttachments, msg.Attachments())
+		assert.Equal(t, tc.QuickReplies, msg.QuickReplies())
 		assert.Equal(t, tc.Contact.ID, msg.ContactID())
 		assert.Equal(t, channel, msg.Channel())
 		assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())

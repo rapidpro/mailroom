@@ -140,6 +140,7 @@ func (m *Msg) BroadcastID() BroadcastID         { return m.m.BroadcastID }
 func (m *Msg) UUID() flows.MsgUUID              { return m.m.UUID }
 func (m *Msg) Channel() *Channel                { return m.channel }
 func (m *Msg) Text() string                     { return m.m.Text }
+func (m *Msg) QuickReplies() []string           { return m.m.QuickReplies }
 func (m *Msg) Locale() envs.Locale              { return m.m.Locale }
 func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
 func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
