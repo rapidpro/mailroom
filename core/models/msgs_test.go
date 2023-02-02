@@ -79,12 +79,9 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			Flow:                 testdata.SingleMessage,
 			ExpectedStatus:       models.MsgStatusQueued,
 			ExpectedFailedReason: models.NilMsgFailedReason,
-			ExpectedMetadata: map[string]interface{}{
-				"quick_replies": []string{"yes", "no"},
-				"topic":         "purchase",
-			},
-			ExpectedMsgCount: 1,
-			ExpectedPriority: false,
+			ExpectedMetadata:     map[string]interface{}{"topic": "purchase"},
+			ExpectedMsgCount:     1,
+			ExpectedPriority:     false,
 		},
 		{
 			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
@@ -305,10 +302,6 @@ func TestMarshalMsg(t *testing.T) {
 		"id": %d,
 		"locale": "eng-US",
 		"metadata": {
-			"quick_replies": [
-				"yes",
-				"no"
-			],
 			"templating": {
 				"namespace": "tpls",
 				"template": {"name": "tpl", "uuid": "4474d39c-ac2c-486d-bceb-8a774a515299"},
