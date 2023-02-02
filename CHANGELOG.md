@@ -1,3 +1,8 @@
+v8.1.9 (2023-02-02)
+-------------------------
+ * Update to latest goflow which updates ANTLR
+ * Ensure quick replies are included with retries and resends
+
 v8.1.8 (2023-02-02)
 -------------------------
  * Start writing Msg.quick_replies as well as writing them to Msg.metadata
