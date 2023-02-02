@@ -1,3 +1,7 @@
+v8.1.11 (2023-02-02)
+-------------------------
+ * Stop writing quick replies to metadata and fix not writing them to the db
+
 v8.1.10 (2023-02-02)
 -------------------------
  * Fix test
