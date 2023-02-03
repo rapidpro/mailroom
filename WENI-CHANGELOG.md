@@ -1,3 +1,8 @@
+1.4.18-mailroom-7.1.22
+----------
+ * Fix wenichats send media #118
+ * Ordering Twilioflex msg history and send each as a separated message #117
+
 1.4.17-mailroom-7.1.22
 ----------
  * Send message attribute to Zendesk on attachment submissions #115
