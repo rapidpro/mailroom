@@ -79,12 +79,9 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			Flow:                 testdata.SingleMessage,
 			ExpectedStatus:       models.MsgStatusQueued,
 			ExpectedFailedReason: models.NilMsgFailedReason,
-			ExpectedMetadata: map[string]interface{}{
-				"quick_replies": []string{"yes", "no"},
-				"topic":         "purchase",
-			},
-			ExpectedMsgCount: 1,
-			ExpectedPriority: false,
+			ExpectedMetadata:     map[string]interface{}{"topic": "purchase"},
+			ExpectedMsgCount:     1,
+			ExpectedPriority:     false,
 		},
 		{
 			ChannelUUID:          "74729f45-7f29-4868-9dc4-90e491e3c7d8",
@@ -180,10 +177,17 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 
 		assert.NoError(t, err)
 
+		expectedAttachments := tc.Attachments
+		if expectedAttachments == nil {
+			expectedAttachments = []utils.Attachment{}
+		}
+
 		err = models.InsertMessages(ctx, db, []*models.Msg{msg})
 		assert.NoError(t, err)
 		assert.Equal(t, oa.OrgID(), msg.OrgID())
 		assert.Equal(t, tc.Text, msg.Text())
+		assert.Equal(t, expectedAttachments, msg.Attachments())
+		assert.Equal(t, tc.QuickReplies, msg.QuickReplies())
 		assert.Equal(t, tc.Contact.ID, msg.ContactID())
 		assert.Equal(t, channel, msg.Channel())
 		assert.Equal(t, tc.ChannelUUID, msg.ChannelUUID())
@@ -298,10 +302,6 @@ func TestMarshalMsg(t *testing.T) {
 		"id": %d,
 		"locale": "eng-US",
 		"metadata": {
-			"quick_replies": [
-				"yes",
-				"no"
-			],
 			"templating": {
 				"namespace": "tpls",
 				"template": {"name": "tpl", "uuid": "4474d39c-ac2c-486d-bceb-8a774a515299"},

@@ -66,8 +66,8 @@ func TestMsgCreated(t *testing.T) {
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND metadata = $2 AND high_priority = TRUE",
-					Args:  []interface{}{testdata.Cathy.ID, `{"quick_replies":["yes","no"]}`},
+					SQL:   `SELECT COUNT(*) FROM msgs_msg WHERE text='Hello World' AND contact_id = $1 AND quick_replies[1] = 'yes' AND quick_replies[2] = 'no' AND high_priority = TRUE`,
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 2,
 				},
 				{

@@ -140,6 +140,7 @@ func (m *Msg) BroadcastID() BroadcastID         { return m.m.BroadcastID }
 func (m *Msg) UUID() flows.MsgUUID              { return m.m.UUID }
 func (m *Msg) Channel() *Channel                { return m.channel }
 func (m *Msg) Text() string                     { return m.m.Text }
+func (m *Msg) QuickReplies() []string           { return m.m.QuickReplies }
 func (m *Msg) Locale() envs.Locale              { return m.m.Locale }
 func (m *Msg) HighPriority() bool               { return m.m.HighPriority }
 func (m *Msg) CreatedOn() time.Time             { return m.m.CreatedOn }
@@ -397,9 +398,6 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *fl
 
 func buildMsgMetadata(m *flows.MsgOut) map[string]interface{} {
 	metadata := make(map[string]interface{})
-	if len(m.QuickReplies()) > 0 {
-		metadata["quick_replies"] = m.QuickReplies()
-	}
 	if m.Templating() != nil {
 		metadata["templating"] = m.Templating()
 	}
@@ -596,10 +594,10 @@ func InsertMessages(ctx context.Context, tx Queryer, msgs []*Msg) error {
 
 const insertMsgSQL = `
 INSERT INTO
-msgs_msg(uuid, text, attachments, locale, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, metadata,
+msgs_msg(uuid, text, attachments, quick_replies, locale, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
 		 contact_id, contact_urn_id, org_id, flow_id, broadcast_id)
-  VALUES(:uuid, :text, :attachments, :locale, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :metadata,
+  VALUES(:uuid, :text, :attachments, :quick_replies, :locale, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
 		 :contact_id, :contact_urn_id, :org_id, :flow_id, :broadcast_id)
 RETURNING 

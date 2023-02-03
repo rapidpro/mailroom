@@ -12,28 +12,23 @@ import (
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStarts(t *testing.T) {
-	ctx, rt, db, rp := testsuite.Get()
-	rc := rp.Get()
-	defer rc.Close()
+	ctx, rt, mocks, close := testsuite.Runtime()
+	defer close()
 
+	rc := rt.RP.Get()
+	defer rc.Close()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	mockES := testsuite.NewMockElasticServer()
-	defer mockES.Close()
-
-	rt.ES = mockES.Client()
-
 	// convert our single message flow to an actual background flow that shouldn't interrupt
-	db.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
+	rt.DB.MustExec(`UPDATE flows_flow SET flow_type = 'B' WHERE id = $1`, testdata.SingleMessage.ID)
 
-	sID := testdata.InsertWaitingSession(db, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
-	testdata.InsertFlowRun(db, testdata.Org1, sID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
+	sID := testdata.InsertWaitingSession(rt.DB, testdata.Org1, testdata.George, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), true, nil)
+	testdata.InsertFlowRun(rt.DB, testdata.Org1, sID, testdata.George, testdata.Favorites, models.RunStatusWaiting)
 
 	tcs := []struct {
 		label                    string
@@ -238,7 +233,7 @@ func TestStarts(t *testing.T) {
 
 	for _, tc := range tcs {
 		if tc.queryResult != nil {
-			mockES.AddResponse(tc.queryResult...)
+			mocks.ES.AddResponse(tc.queryResult...)
 		}
 
 		// handle our start task
@@ -251,7 +246,7 @@ func TestStarts(t *testing.T) {
 			WithExcludeStartedPreviously(tc.excludeStartedPreviously).
 			WithCreateContact(tc.createContact)
 
-		err := models.InsertFlowStarts(ctx, db, []*models.FlowStart{start})
+		err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start})
 		assert.NoError(t, err)
 
 		startJSON, err := json.Marshal(start)
@@ -284,20 +279,20 @@ func TestStarts(t *testing.T) {
 		assert.Equal(t, tc.expectedBatchCount, count, "unexpected batch count in '%s'", tc.label)
 
 		// assert our count of total flow runs created
-		assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1 AND start_id = $2`, tc.flowID, start.ID()).Returns(tc.expectedTotalCount, "unexpected total run count in '%s'", tc.label)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1 AND start_id = $2`, tc.flowID, start.ID()).Returns(tc.expectedTotalCount, "unexpected total run count in '%s'", tc.label)
 
 		// assert final status
-		assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart where status = $2 AND id = $1`, start.ID(), tc.expectedStatus).Returns(1, "status mismatch in '%s'", tc.label)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart where status = $2 AND id = $1`, start.ID(), tc.expectedStatus).Returns(1, "status mismatch in '%s'", tc.label)
 
 		// assert final contact count
 		if tc.expectedStatus != models.StartStatusFailed {
-			assertdb.Query(t, db, `SELECT count(*) FROM flows_flowstart where contact_count = $2 AND id = $1`,
+			assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart where contact_count = $2 AND id = $1`,
 				[]interface{}{start.ID(), tc.expectedContactCount}, 1, "contact count mismatch in '%s'", tc.label)
 		}
 
 		// assert count of active runs by flow
 		for flowID, activeRuns := range tc.expectedActiveRuns {
-			assertdb.Query(t, db, `SELECT count(*) FROM flows_flowrun WHERE status = 'W' AND flow_id = $1`, flowID).Returns(activeRuns, "active runs mismatch for flow #%d in '%s'", flowID, tc.label)
+			assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE status = 'W' AND flow_id = $1`, flowID).Returns(activeRuns, "active runs mismatch for flow #%d in '%s'", flowID, tc.label)
 		}
 	}
 }
