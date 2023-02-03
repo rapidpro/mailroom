@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -283,6 +284,12 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 		logrus.Error(errors.Wrap(err, "failed to get history messages"))
 		return
 	}
+
+	// sort messages by CreatedOn()
+	sort.SliceStable(msgs, func(i, j int) bool {
+		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
+	})
+
 	var trace *httpx.Trace
 	// send history
 	for _, msg := range msgs {
@@ -292,11 +299,6 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 			DateCreated: msg.CreatedOn().Format(time.RFC3339),
 		}
 		if msg.Direction() == "I" {
-<<<<<<< HEAD
-			historyMsg += "👤 (" + msg.CreatedOn().Format("02/01/2006 15:04:05") + "): " + msg.Text() + "\n"
-		} else {
-			historyMsg += "🤖 (" + msg.CreatedOn().Format("02/01/2006 15:04:05") + "): " + msg.Text() + "\n"
-=======
 			m.From = fmt.Sprint(contactID)
 			headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
 			_, trace, err = restClient.CreateMessage(m, headerWebhookEnabled)
@@ -310,7 +312,6 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 		if err != nil {
 			logrus.Error(errors.Wrap(err, "error calling Twilio to send message from history"))
 			return
->>>>>>> 7088fb9d (Return to sending history in separate messages)
 		}
 	}
 }
