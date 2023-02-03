@@ -284,27 +284,33 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 		return
 	}
 	var trace *httpx.Trace
-	historyMsg := ""
 	// send history
 	for _, msg := range msgs {
+		m := &CreateChatMessageParams{
+			Body:        msg.Text(),
+			ChannelSid:  newFlexChannel.Sid,
+			DateCreated: msg.CreatedOn().Format(time.RFC3339),
+		}
 		if msg.Direction() == "I" {
+<<<<<<< HEAD
 			historyMsg += "👤 (" + msg.CreatedOn().Format("02/01/2006 15:04:05") + "): " + msg.Text() + "\n"
 		} else {
 			historyMsg += "🤖 (" + msg.CreatedOn().Format("02/01/2006 15:04:05") + "): " + msg.Text() + "\n"
+=======
+			m.From = fmt.Sprint(contactID)
+			headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
+			_, trace, err = restClient.CreateMessage(m, headerWebhookEnabled)
+		} else {
+			m.From = "Bot"
+			_, trace, err = restClient.CreateMessage(m, nil)
 		}
-	}
-	m := &CreateChatMessageParams{
-		Body:        historyMsg,
-		From:        "Chatbot History",
-		ChannelSid:  newFlexChannel.Sid,
-		DateCreated: time.Now().Format(time.RFC3339),
-	}
-	_, trace, err = restClient.CreateMessage(m, nil)
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
-	}
-	if err != nil {
-		logrus.Error(errors.Wrap(err, "error calling Twilio to send message from history"))
-		return
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
+		}
+		if err != nil {
+			logrus.Error(errors.Wrap(err, "error calling Twilio to send message from history"))
+			return
+>>>>>>> 7088fb9d (Return to sending history in separate messages)
+		}
 	}
 }
