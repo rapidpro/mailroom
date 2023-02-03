@@ -9,17 +9,13 @@ import (
 )
 
 func TestPreviewStart(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt, mocks, close := testsuite.Runtime()
+	defer close()
 
-	mockES := testsuite.NewMockElasticServer()
-	defer mockES.Close()
-
-	rt.ES = mockES.Client()
-
-	mockES.AddResponse(testdata.Cathy.ID)
-	mockES.AddResponse(testdata.Bob.ID)
-	mockES.AddResponse(testdata.George.ID)
-	mockES.AddResponse(testdata.Alexandria.ID)
+	mocks.ES.AddResponse(testdata.Cathy.ID)
+	mocks.ES.AddResponse(testdata.Bob.ID)
+	mocks.ES.AddResponse(testdata.George.ID)
+	mocks.ES.AddResponse(testdata.Alexandria.ID)
 
 	web.RunWebTests(t, ctx, rt, "testdata/preview_start.json", nil)
 }

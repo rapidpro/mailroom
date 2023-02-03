@@ -62,7 +62,32 @@ func Reset(what ResetFlag) {
 	models.FlushCache()
 }
 
-// Get returns the various runtime things a test might need
+type Mocks struct {
+	ES *MockElasticServer
+}
+
+// Runtime returns the various runtime things a test might need
+func Runtime() (context.Context, *runtime.Runtime, *Mocks, func()) {
+	mockES := NewMockElasticServer()
+	close := func() { mockES.Close() }
+
+	db := getDB()
+	rt := &runtime.Runtime{
+		DB:                db,
+		ReadonlyDB:        db,
+		RP:                getRP(),
+		ES:                mockES.Client(),
+		AttachmentStorage: storage.NewFS(AttachmentStorageDir, 0766),
+		SessionStorage:    storage.NewFS(SessionStorageDir, 0766),
+		Config:            runtime.NewDefaultConfig(),
+	}
+
+	logrus.SetLevel(logrus.DebugLevel)
+
+	return context.Background(), rt, &Mocks{ES: mockES}, close
+}
+
+// Get returns the various runtime things a test might need (probably deprecate this in favor of Runtime above)
 func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 	db := getDB()
 	rp := getRP()

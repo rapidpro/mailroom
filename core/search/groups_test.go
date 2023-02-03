@@ -14,35 +14,28 @@ import (
 )
 
 func TestSmartGroups(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
-
+	ctx, rt, mocks, close := testsuite.Runtime()
+	defer close()
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	// insert an event on our campaign
-	newEvent := testdata.InsertCampaignFlowEvent(db, testdata.RemindersCampaign, testdata.Favorites, testdata.JoinedField, 1000, "W")
+	newEvent := testdata.InsertCampaignFlowEvent(rt.DB, testdata.RemindersCampaign, testdata.Favorites, testdata.JoinedField, 1000, "W")
 
 	// clear Cathy's value
-	db.MustExec(
-		`update contacts_contact set fields = fields - $2
-		WHERE id = $1`, testdata.Cathy.ID, testdata.JoinedField.UUID)
+	rt.DB.MustExec(`update contacts_contact set fields = fields - $2 WHERE id = $1`, testdata.Cathy.ID, testdata.JoinedField.UUID)
 
 	// and populate Bob's
-	db.MustExec(
-		fmt.Sprintf(`update contacts_contact set fields = fields ||
-		'{"%s": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb
-		WHERE id = $1`, testdata.JoinedField.UUID), testdata.Bob.ID)
+	rt.DB.MustExec(
+		fmt.Sprintf(`update contacts_contact set fields = fields || '{"%s": { "text": "2029-09-15T12:00:00+00:00", "datetime": "2029-09-15T12:00:00+00:00" }}'::jsonb WHERE id = $1`, testdata.JoinedField.UUID),
+		testdata.Bob.ID,
+	)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
 	assert.NoError(t, err)
 
-	mockES := testsuite.NewMockElasticServer()
-	defer mockES.Close()
-
-	es := mockES.Client()
-
-	mockES.AddResponse(testdata.Cathy.ID)
-	mockES.AddResponse(testdata.Bob.ID)
-	mockES.AddResponse(testdata.Bob.ID)
+	mocks.ES.AddResponse(testdata.Cathy.ID)
+	mocks.ES.AddResponse(testdata.Bob.ID)
+	mocks.ES.AddResponse(testdata.Bob.ID)
 
 	tcs := []struct {
 		Query           string
@@ -67,26 +60,26 @@ func TestSmartGroups(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		err := models.UpdateGroupStatus(ctx, db, testdata.DoctorsGroup.ID, models.GroupStatusInitializing)
+		err := models.UpdateGroupStatus(ctx, rt.DB, testdata.DoctorsGroup.ID, models.GroupStatusInitializing)
 		assert.NoError(t, err)
 
-		count, err := search.PopulateSmartGroup(ctx, db, es, oa, testdata.DoctorsGroup.ID, tc.Query)
+		count, err := search.PopulateSmartGroup(ctx, rt.DB, rt.ES, oa, testdata.DoctorsGroup.ID, tc.Query)
 		assert.NoError(t, err, "error populating smart group for: %s", tc.Query)
 
 		assert.Equal(t, count, len(tc.ContactIDs))
 
 		// assert the current group membership
-		contactIDs, err := models.ContactIDsForGroupIDs(ctx, db, []models.GroupID{testdata.DoctorsGroup.ID})
+		contactIDs, err := models.ContactIDsForGroupIDs(ctx, rt.DB, []models.GroupID{testdata.DoctorsGroup.ID})
 		assert.NoError(t, err)
 		assert.Equal(t, tc.ContactIDs, contactIDs)
 
-		assertdb.Query(t, db, `SELECT count(*) from contacts_contactgroup WHERE id = $1 AND status = 'R'`, testdata.DoctorsGroup.ID).
+		assertdb.Query(t, rt.DB, `SELECT count(*) from contacts_contactgroup WHERE id = $1 AND status = 'R'`, testdata.DoctorsGroup.ID).
 			Returns(1, "wrong number of contacts in group for query: %s", tc.Query)
 
-		assertdb.Query(t, db, `SELECT count(*) from campaigns_eventfire WHERE event_id = $1`, newEvent.ID).
+		assertdb.Query(t, rt.DB, `SELECT count(*) from campaigns_eventfire WHERE event_id = $1`, newEvent.ID).
 			Returns(len(tc.EventContactIDs), "wrong number of contacts with events for query: %s", tc.Query)
 
-		assertdb.Query(t, db, `SELECT count(*) from campaigns_eventfire WHERE event_id = $1 AND contact_id = ANY($2)`, newEvent.ID, pq.Array(tc.EventContactIDs)).
+		assertdb.Query(t, rt.DB, `SELECT count(*) from campaigns_eventfire WHERE event_id = $1 AND contact_id = ANY($2)`, newEvent.ID, pq.Array(tc.EventContactIDs)).
 			Returns(len(tc.EventContactIDs), "wrong contacts with events for query: %s", tc.Query)
 	}
 }
