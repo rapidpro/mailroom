@@ -14,15 +14,11 @@ import (
 )
 
 func TestGetContactIDsForQueryPage(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt, mocks, close := testsuite.Runtime()
+	defer close()
 
-	mockES := testsuite.NewMockElasticServer()
-	defer mockES.Close()
-
-	mockES.AddResponse(testdata.George.ID)
-	mockES.AddResponse(testdata.George.ID)
-
-	es := mockES.Client()
+	mocks.ES.AddResponse(testdata.George.ID)
+	mocks.ES.AddResponse(testdata.George.ID)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -179,7 +175,7 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 	for i, tc := range tcs {
 		group := oa.GroupByID(tc.Group.ID)
 
-		_, ids, total, err := search.GetContactIDsForQueryPage(ctx, es, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
+		_, ids, total, err := search.GetContactIDsForQueryPage(ctx, rt.ES, oa, group, tc.ExcludeIDs, tc.Query, tc.Sort, 0, 50)
 
 		if tc.ExpectedError != "" {
 			assert.EqualError(t, err, tc.ExpectedError)
@@ -188,22 +184,20 @@ func TestGetContactIDsForQueryPage(t *testing.T) {
 			assert.Equal(t, tc.ExpectedContacts, ids, "%d: ids mismatch", i)
 			assert.Equal(t, tc.ExpectedTotal, total, "%d: total mismatch", i)
 
-			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(mockES.LastRequestBody), "%d: ES request mismatch", i)
+			test.AssertEqualJSON(t, []byte(tc.ExpectedESRequest), []byte(mocks.ES.LastRequestBody), "%d: ES request mismatch", i)
 		}
 	}
 }
 
 func TestGetContactIDsForQuery(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt, mocks, close := testsuite.Runtime()
+	defer close()
 
-	mockES := testsuite.NewMockElasticServer()
-	defer mockES.Close()
+	mocks.ES.AddResponse(testdata.George.ID)
+	mocks.ES.AddResponse()
+	mocks.ES.AddResponse(testdata.George.ID)
 
-	mockES.AddResponse(testdata.George.ID)
-	mockES.AddResponse()
-	mockES.AddResponse(testdata.George.ID)
-
-	es, err := elastic.NewClient(elastic.SetURL(mockES.URL()), elastic.SetHealthcheck(false), elastic.SetSniff(false))
+	es, err := elastic.NewClient(elastic.SetURL(mocks.ES.URL()), elastic.SetHealthcheck(false), elastic.SetSniff(false))
 	require.NoError(t, err)
 
 	oa, err := models.GetOrgAssets(ctx, rt, 1)
@@ -348,8 +342,8 @@ func TestGetContactIDsForQuery(t *testing.T) {
 			assert.NoError(t, err, "%d: error encountered performing query", i)
 			assert.Equal(t, tc.expectedContacts, ids, "%d: ids mismatch", i)
 
-			assert.Equal(t, tc.expectedRequestURL, mockES.LastRequestURL, "%d: request URL mismatch", i)
-			test.AssertEqualJSON(t, []byte(tc.expectedRequestBody), []byte(mockES.LastRequestBody), "%d: request body mismatch", i)
+			assert.Equal(t, tc.expectedRequestURL, mocks.ES.LastRequestURL, "%d: request URL mismatch", i)
+			test.AssertEqualJSON(t, []byte(tc.expectedRequestBody), []byte(mocks.ES.LastRequestBody), "%d: request body mismatch", i)
 		}
 	}
 }

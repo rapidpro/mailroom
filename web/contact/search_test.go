@@ -22,14 +22,10 @@ import (
 )
 
 func TestContactSearch(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt, mocks, close := testsuite.Runtime()
+	defer close()
 
 	wg := &sync.WaitGroup{}
-
-	mockES := testsuite.NewMockElasticServer()
-	defer mockES.Close()
-
-	rt.ES = mockES.Client()
 
 	server := web.NewServer(ctx, rt, wg)
 	server.Start()
@@ -182,7 +178,7 @@ func TestContactSearch(t *testing.T) {
 
 	for i, tc := range tcs {
 		if tc.mockResult != nil {
-			mockES.AddResponse(tc.mockResult...)
+			mocks.ES.AddResponse(tc.mockResult...)
 		}
 
 		var body io.Reader
@@ -217,7 +213,7 @@ func TestContactSearch(t *testing.T) {
 			}
 
 			if tc.expectedESRequest != "" {
-				test.AssertEqualJSON(t, []byte(tc.expectedESRequest), []byte(mockES.LastRequestBody), "elastic request mismatch")
+				test.AssertEqualJSON(t, []byte(tc.expectedESRequest), []byte(mocks.ES.LastRequestBody), "elastic request mismatch")
 			}
 		} else {
 			r := &web.ErrorResponse{}
