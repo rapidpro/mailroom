@@ -1,4 +1,4 @@
-package starts
+package starts_test
 
 import (
 	"encoding/json"
@@ -10,10 +10,10 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
+	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStarts(t *testing.T) {
@@ -249,10 +249,8 @@ func TestStarts(t *testing.T) {
 		err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start})
 		assert.NoError(t, err)
 
-		startJSON, err := json.Marshal(start)
-		require.NoError(t, err)
-
-		err = handleFlowStart(ctx, rt, &queue.Task{Type: queue.StartFlow, Task: startJSON})
+		startTask := starts.StartFlowTask{FlowStart: start}
+		err = startTask.Perform(ctx, rt, testdata.Org1.ID)
 		assert.NoError(t, err)
 
 		// pop all our tasks and execute them
@@ -266,7 +264,7 @@ func TestStarts(t *testing.T) {
 			}
 
 			count++
-			assert.Equal(t, queue.StartFlowBatch, task.Type)
+			assert.Equal(t, starts.TypeStartFlowBatch, task.Type)
 			batch := &models.FlowStartBatch{}
 			err = json.Unmarshal(task.Task, batch)
 			assert.NoError(t, err)

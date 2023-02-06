@@ -8,6 +8,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/msgs"
+	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -96,7 +97,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 
 			// add our flow start task
 			task = start
-			taskName = queue.StartFlow
+			taskName = starts.TypeStartFlow
 			triggers++
 		} else {
 			log.Info("schedule found with no associated active broadcast or trigger, ignoring")

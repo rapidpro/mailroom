@@ -2,16 +2,14 @@ package starts
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
-	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/search"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/lib/pq"
@@ -20,32 +18,33 @@ import (
 )
 
 const (
+	TypeStartFlow = "start_flow"
+
 	startBatchSize = 100
 )
 
 func init() {
-	mailroom.AddTaskFunction(queue.StartFlow, handleFlowStart)
-	mailroom.AddTaskFunction(queue.StartFlowBatch, handleFlowStartBatch)
+	tasks.RegisterType(TypeStartFlow, func() tasks.Task { return &StartFlowTask{} })
 }
 
-// handleFlowStart creates all the batches of contacts to start in a flow
-func handleFlowStart(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*60)
-	defer cancel()
+// StartFlowBatchTask is the start flow batch task
+type StartFlowTask struct {
+	*models.FlowStart
+}
 
-	// decode our task body
-	if task.Type != queue.StartFlow {
-		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
-	}
-	startTask := &models.FlowStart{}
-	err := json.Unmarshal(task.Task, startTask)
-	if err != nil {
-		return errors.Wrapf(err, "error unmarshalling flow start task: %s", string(task.Task))
-	}
+func (t *StartFlowTask) Type() string {
+	return TypeStartFlow
+}
 
-	err = CreateFlowBatches(ctx, rt, startTask)
+// Timeout is the maximum amount of time the task can run for
+func (t *StartFlowTask) Timeout() time.Duration {
+	return time.Minute * 60
+}
+
+func (t *StartFlowTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	err := CreateFlowBatches(ctx, rt, t.FlowStart)
 	if err != nil {
-		models.MarkStartFailed(ctx, rt.DB, startTask.ID())
+		models.MarkStartFailed(ctx, rt.DB, t.FlowStart.ID())
 
 		// if error is user created query error.. don't escalate error to sentry
 		isQueryError, _ := contactql.IsQueryError(err)
@@ -174,7 +173,7 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 	}
 
 	// task is different if we are an IVR flow
-	taskType := queue.StartFlowBatch
+	taskType := TypeStartFlowBatch
 	if start.FlowType() == models.FlowTypeVoice {
 		taskType = queue.StartIVRFlowBatch
 	}
@@ -204,28 +203,4 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 	}
 
 	return nil
-}
-
-// HandleFlowStartBatch starts a batch of contacts in a flow
-func handleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*15)
-	defer cancel()
-
-	// decode our task body
-	if task.Type != queue.StartFlowBatch {
-		return errors.Errorf("unknown event type passed to start worker: %s", task.Type)
-	}
-	startBatch := &models.FlowStartBatch{}
-	err := json.Unmarshal(task.Task, startBatch)
-	if err != nil {
-		return errors.Wrapf(err, "error unmarshalling flow start batch: %s", string(task.Task))
-	}
-
-	// start these contacts in our flow
-	_, err = runner.StartFlowBatch(ctx, rt, startBatch)
-	if err != nil {
-		return errors.Wrapf(err, "error starting flow batch: %s", string(task.Task))
-	}
-
-	return err
 }
