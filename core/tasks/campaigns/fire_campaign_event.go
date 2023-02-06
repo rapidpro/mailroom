@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/analytics"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/pkg/errors"
@@ -85,7 +90,7 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 
 	campaign := triggers.NewCampaignReference(triggers.CampaignUUID(t.CampaignUUID), t.CampaignName)
 
-	started, err := runner.FireCampaignEvents(ctx, rt, orgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
+	started, err := FireCampaignEvents(ctx, rt, orgID, fires, t.FlowUUID, campaign, triggers.CampaignEventUUID(t.EventUUID))
 
 	// remove all the contacts that were started
 	for _, contactID := range started {
@@ -109,4 +114,159 @@ func (t *FireCampaignEventTask) Perform(ctx context.Context, rt *runtime.Runtime
 	}
 
 	return nil
+}
+
+// FireCampaignEvents starts the flow for the passed in org, contact and flow
+func FireCampaignEvents(
+	ctx context.Context, rt *runtime.Runtime,
+	orgID models.OrgID, fires []*models.EventFire, flowUUID assets.FlowUUID,
+	campaign *triggers.CampaignReference, eventUUID triggers.CampaignEventUUID) ([]models.ContactID, error) {
+
+	if len(fires) == 0 {
+		return nil, nil
+	}
+
+	start := time.Now()
+
+	contactIDs := make([]models.ContactID, 0, len(fires))
+	fireMap := make(map[models.ContactID]*models.EventFire, len(fires))
+	skippedContacts := make(map[models.ContactID]*models.EventFire, len(fires))
+	for _, f := range fires {
+		contactIDs = append(contactIDs, f.ContactID)
+		fireMap[f.ContactID] = f
+		skippedContacts[f.ContactID] = f
+	}
+
+	// create our org assets
+	oa, err := models.GetOrgAssets(ctx, rt, orgID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating assets for org: %d", orgID)
+	}
+
+	// find our actual event
+	dbEvent := oa.CampaignEventByID(fires[0].EventID)
+
+	// no longer active? delete these event fires and return
+	if dbEvent == nil {
+		err := models.DeleteEventFires(ctx, rt.DB, fires)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error deleting events for already fired events")
+		}
+		return nil, nil
+	}
+
+	// try to load our flow
+	flow, err := oa.FlowByUUID(flowUUID)
+	if err == models.ErrNotFound {
+		err := models.DeleteEventFires(ctx, rt.DB, fires)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error deleting events for archived or inactive flow")
+		}
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading campaign flow: %s", flowUUID)
+	}
+	dbFlow := flow.(*models.Flow)
+
+	// our start options are based on the start mode for our event
+	options := runner.NewStartOptions()
+	switch dbEvent.StartMode() {
+	case models.StartModeInterrupt:
+		options.ExcludeInAFlow = false
+		options.ExcludeStartedPreviously = false
+		options.Interrupt = true
+	case models.StartModePassive:
+		options.ExcludeInAFlow = false
+		options.ExcludeStartedPreviously = false
+		options.Interrupt = false
+	case models.StartModeSkip:
+		options.ExcludeInAFlow = true
+		options.ExcludeStartedPreviously = false
+		options.Interrupt = true
+	default:
+		return nil, errors.Errorf("unknown start mode: %s", dbEvent.StartMode())
+	}
+
+	// if this is an ivr flow, we need to create a task to perform the start there
+	if dbFlow.FlowType() == models.FlowTypeVoice {
+		// Trigger our IVR flow start
+		err := handler.TriggerIVRFlow(ctx, rt, oa.OrgID(), dbFlow.ID(), contactIDs, func(ctx context.Context, tx *sqlx.Tx) error {
+			return models.MarkEventsFired(ctx, tx, fires, time.Now(), models.FireResultFired)
+		})
+		if err != nil {
+			return nil, errors.Wrapf(err, "error triggering ivr flow start")
+		}
+		return contactIDs, nil
+	}
+
+	// our builder for the triggers that will be created for contacts
+	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
+	options.TriggerBuilder = func(contact *flows.Contact) flows.Trigger {
+		delete(skippedContacts, models.ContactID(contact.ID()))
+		return triggers.NewBuilder(oa.Env(), flowRef, contact).Campaign(campaign, eventUUID).Build()
+	}
+
+	// this is our pre commit callback for our sessions, we'll mark the event fires associated
+	// with the passed in sessions as complete in the same transaction
+	fired := time.Now()
+	options.CommitHook = func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
+		// build up our list of event fire ids based on the session contact ids
+		fires := make([]*models.EventFire, 0, len(sessions))
+		for _, s := range sessions {
+			fire, found := fireMap[s.ContactID()]
+			if !found {
+				return errors.Errorf("unable to find associated event fire for contact %d", s.Contact().ID())
+			}
+			fires = append(fires, fire)
+		}
+
+		// mark those events as fired
+		err := models.MarkEventsFired(ctx, tx, fires, fired, models.FireResultFired)
+		if err != nil {
+			return errors.Wrapf(err, "error marking events fired")
+		}
+
+		// now build up our list of skipped contacts (no trigger was built for them)
+		fires = make([]*models.EventFire, 0, len(skippedContacts))
+		for _, e := range skippedContacts {
+			fires = append(fires, e)
+		}
+
+		// and mark those as skipped
+		err = models.MarkEventsFired(ctx, tx, fires, fired, models.FireResultSkipped)
+		if err != nil {
+			return errors.Wrapf(err, "error marking events skipped")
+		}
+
+		// clear those out
+		skippedContacts = make(map[models.ContactID]*models.EventFire)
+		return nil
+	}
+
+	sessions, err := runner.StartFlow(ctx, rt, oa, dbFlow, contactIDs, options)
+	if err != nil {
+		logrus.WithField("contact_ids", contactIDs).WithError(err).Errorf("error starting flow for campaign event: %s", eventUUID)
+	} else {
+		// make sure any skipped contacts are marked as fired this can occur if all fires were skipped
+		fires := make([]*models.EventFire, 0, len(sessions))
+		for _, e := range skippedContacts {
+			fires = append(fires, e)
+		}
+		err = models.MarkEventsFired(ctx, rt.DB, fires, fired, models.FireResultSkipped)
+		if err != nil {
+			logrus.WithField("fire_ids", fires).WithError(err).Errorf("error marking events as skipped: %s", eventUUID)
+		}
+	}
+
+	// log both our total and average
+	analytics.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
+	analytics.Gauge("mr.campaign_event_count", float64(len(sessions)))
+
+	// build the list of contacts actually started
+	startedContacts := make([]models.ContactID, len(sessions))
+	for i := range sessions {
+		startedContacts[i] = sessions[i].ContactID()
+	}
+	return startedContacts, nil
 }

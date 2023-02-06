@@ -40,18 +40,6 @@ const (
 
 	// HandlerQueue is our queue for message handling or other tasks related to just one contact
 	HandlerQueue = "handler"
-
-	// HandleContactEvent is our task for event handling
-	HandleContactEvent = "handle_contact_event"
-
-	// StartFlow is our task type to start a flow
-	StartFlow = "start_flow"
-
-	// StartFlowBatch is our task for starting a flow batch
-	StartFlowBatch = "start_flow_batch"
-
-	// StartIVRFlowBatch is our task for starting an ivr batch
-	StartIVRFlowBatch = "start_ivr_flow_batch"
 )
 
 // Size returns the number of tasks for the passed in queue

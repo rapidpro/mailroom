@@ -93,7 +93,7 @@ func TestQueueEventFires(t *testing.T) {
 	assert.Equal(t, 100, len(tk1.FireIDs))
 	assert.Equal(t, 10, len(tk2.FireIDs))
 }
-func TestFireCampaignEvents(t *testing.T) {
+func TestQueueAndFireEvent(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
@@ -198,7 +198,7 @@ func TestIVRCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
-	assert.Equal(t, task.Type, queue.StartIVRFlowBatch)
+	assert.Equal(t, "start_ivr_flow_batch", task.Type)
 }
 
 func assertFireTasks(t *testing.T, rp *redis.Pool, org *testdata.Org, expected [][]models.FireID) {

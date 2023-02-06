@@ -102,7 +102,7 @@ func TestCheckSchedules(t *testing.T) {
 	// first should be the flow start
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
-	assert.Equal(t, queue.StartFlow, task.Type)
+	assert.Equal(t, "start_flow", task.Type)
 
 	// then the broadacast
 	task, err = queue.PopNextTask(rc, queue.BatchQueue)

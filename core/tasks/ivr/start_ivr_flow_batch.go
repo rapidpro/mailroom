@@ -2,41 +2,42 @@ package ivr
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+const TypeStartIVRFlowBatch = "start_ivr_flow_batch"
+
 func init() {
-	mailroom.AddTaskFunction(queue.StartIVRFlowBatch, handleFlowStartTask)
+	tasks.RegisterType(TypeStartIVRFlowBatch, func() tasks.Task { return &StartIVRFlowBatchTask{} })
 }
 
-func handleFlowStartTask(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	// decode our task body
-	if task.Type != queue.StartIVRFlowBatch {
-		return errors.Errorf("unknown event type passed to ivr worker: %s", task.Type)
-	}
-	batch := &models.FlowStartBatch{}
-	err := json.Unmarshal(task.Task, batch)
-	if err != nil {
-		return errors.Wrapf(err, "error unmarshalling flow start batch: %s", string(task.Task))
-	}
+// StartIVRFlowBatchTask is the start IVR flow batch task
+type StartIVRFlowBatchTask struct {
+	*models.FlowStartBatch
+}
 
-	return HandleFlowStartBatch(ctx, rt, batch)
+func (t *StartIVRFlowBatchTask) Type() string {
+	return TypeStartIVRFlowBatch
+}
+
+// Timeout is the maximum amount of time the task can run for
+func (t *StartIVRFlowBatchTask) Timeout() time.Duration {
+	return time.Minute * 5
+}
+
+func (t *StartIVRFlowBatchTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID) error {
+	return HandleFlowStartBatch(ctx, rt, t.FlowStartBatch)
 }
 
 // HandleFlowStartBatch starts a batch of contacts in an IVR flow
-func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) error {
-	ctx, cancel := context.WithTimeout(bg, time.Minute*5)
-	defer cancel()
-
+func HandleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) error {
 	// contacts we will exclude either because they are in a flow or have already been in this one
 	exclude := make(map[models.ContactID]bool, 5)
 
@@ -88,7 +89,7 @@ func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models
 	for _, contact := range contacts {
 		start := time.Now()
 
-		ctx, cancel := context.WithTimeout(bg, time.Minute)
+		ctx, cancel := context.WithTimeout(ctx, time.Minute)
 		session, err := ivr.RequestCall(ctx, rt, oa, batch, contact)
 		cancel()
 		if err != nil {
@@ -114,7 +115,7 @@ func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models
 
 	// if this is a last batch, mark our start as started
 	if batch.IsLast() {
-		err := models.MarkStartComplete(bg, rt.DB, batch.StartID())
+		err := models.MarkStartComplete(ctx, rt.DB, batch.StartID())
 		if err != nil {
 			return errors.Wrapf(err, "error trying to set batch as complete")
 		}

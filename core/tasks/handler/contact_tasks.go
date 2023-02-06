@@ -19,6 +19,8 @@ import (
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
+	"github.com/nyaruka/mailroom/core/tasks"
+	"github.com/nyaruka/mailroom/core/tasks/ivr"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
@@ -226,7 +228,7 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 
 	// if this is an IVR flow and we don't have a call, trigger that asynchronously
 	if flow.FlowType() == models.FlowTypeVoice && call == nil {
-		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
+		err = TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error while triggering ivr flow")
 		}
@@ -468,7 +470,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
 					return markMsgHandled(ctx, tx, contact, msgIn, flow, attachments, tickets, logUUIDs)
 				}
-				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
+				err = TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
 				if err != nil {
 					return errors.Wrapf(err, "error while triggering ivr flow")
 				}
@@ -567,7 +569,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 
 	// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 	if flow.FlowType() == models.FlowTypeVoice {
-		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
+		err = TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error while triggering ivr flow")
 		}
@@ -697,4 +699,49 @@ func NewTimeoutTask(orgID models.OrgID, contactID models.ContactID, sessionID mo
 // NewExpirationTask creates a new event task for the passed in expiration event
 func NewExpirationTask(orgID models.OrgID, contactID models.ContactID, sessionID models.SessionID, time time.Time) *queue.Task {
 	return newTimedTask(ExpirationEventType, orgID, contactID, sessionID, time)
+}
+
+type DBHook func(ctx context.Context, tx *sqlx.Tx) error
+
+// TriggerIVRFlow will create a new flow start with the passed in flow and set of contacts. This will cause us to
+// request calls to start, which once we get the callback will trigger our actual flow to start.
+func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID, flowID models.FlowID, contactIDs []models.ContactID, hook DBHook) error {
+	tx, _ := rt.DB.BeginTxx(ctx, nil)
+
+	// create and insert our flow start
+	start := models.NewFlowStart(orgID, models.StartTypeTrigger, models.FlowTypeVoice, flowID).WithContactIDs(contactIDs)
+	err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})
+	if err != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error inserting ivr flow start")
+	}
+
+	// call our hook if we have one
+	if hook != nil {
+		err = hook(ctx, tx)
+		if err != nil {
+			tx.Rollback()
+			return errors.Wrapf(err, "error while calling db hook")
+		}
+	}
+
+	// commit our transaction
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return errors.Wrapf(err, "error committing transaction for ivr flow starts")
+	}
+
+	// create our batch of all our contacts
+	task := &ivr.StartIVRFlowBatchTask{FlowStartBatch: start.CreateBatch(contactIDs, true, len(contactIDs))}
+
+	// queue this to our ivr starter, it will take care of creating the calls then calling back in
+	rc := rt.RP.Get()
+	defer rc.Close()
+	err = tasks.Queue(rc, queue.BatchQueue, orgID, task, queue.HighPriority)
+	if err != nil {
+		return errors.Wrapf(err, "error queuing ivr flow start")
+	}
+
+	return nil
 }
