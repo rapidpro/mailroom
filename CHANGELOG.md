@@ -1,3 +1,7 @@
+v8.1.14 (2023-02-06)
+-------------------------
+ * Simplify FlowStartBatch
+
 v8.1.13 (2023-02-06)
 -------------------------
  * Fix unmarshalling start tasks
