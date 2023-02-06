@@ -44,9 +44,9 @@ func HandleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *model
 	// filter out anybody who has has a flow run in this flow if appropriate
 	if batch.ExcludeStartedPreviously() {
 		// find all participants that have been in this flow
-		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, batch.FlowID(), batch.ContactIDs())
+		started, err := models.FindFlowStartedOverlap(ctx, rt.DB, batch.FlowID, batch.ContactIDs)
 		if err != nil {
-			return errors.Wrapf(err, "error finding others started flow: %d", batch.FlowID())
+			return errors.Wrapf(err, "error finding others started flow: %d", batch.FlowID)
 		}
 		for _, c := range started {
 			exclude[c] = true
@@ -56,9 +56,9 @@ func HandleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *model
 	// filter out our list of contacts to only include those that should be started
 	if batch.ExcludeInAFlow() {
 		// find all participants active in other sessions
-		active, err := models.FilterByWaitingSession(ctx, rt.DB, batch.ContactIDs())
+		active, err := models.FilterByWaitingSession(ctx, rt.DB, batch.ContactIDs)
 		if err != nil {
-			return errors.Wrapf(err, "error finding other active sessions: %d", batch.FlowID())
+			return errors.Wrapf(err, "error finding other active sessions: %d", batch.FlowID)
 		}
 		for _, c := range active {
 			exclude[c] = true
@@ -66,17 +66,17 @@ func HandleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *model
 	}
 
 	// filter into our final list of contacts
-	contactIDs := make([]models.ContactID, 0, len(batch.ContactIDs()))
-	for _, c := range batch.ContactIDs() {
+	contactIDs := make([]models.ContactID, 0, len(batch.ContactIDs))
+	for _, c := range batch.ContactIDs {
 		if !exclude[c] {
 			contactIDs = append(contactIDs, c)
 		}
 	}
 
 	// load our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, batch.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, batch.OrgID)
 	if err != nil {
-		return errors.Wrapf(err, "error loading org assets for org: %d", batch.OrgID())
+		return errors.Wrapf(err, "error loading org assets for org: %d", batch.OrgID)
 	}
 
 	// ok, we can initiate calls for the remaining contacts
@@ -93,14 +93,14 @@ func HandleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *model
 		session, err := ivr.RequestCall(ctx, rt, oa, batch, contact)
 		cancel()
 		if err != nil {
-			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID())
+			logrus.WithError(err).Errorf("error starting ivr flow for contact: %d and flow: %d", contact.ID(), batch.FlowID)
 			continue
 		}
 		if session == nil {
 			logrus.WithFields(logrus.Fields{
 				"elapsed":    time.Since(start),
 				"contact_id": contact.ID(),
-				"start_id":   batch.StartID(),
+				"start_id":   batch.StartID,
 			}).Info("call start skipped, no suitable channel")
 			continue
 		}
@@ -108,14 +108,14 @@ func HandleFlowStartBatch(ctx context.Context, rt *runtime.Runtime, batch *model
 			"elapsed":     time.Since(start),
 			"contact_id":  contact.ID(),
 			"status":      session.Status(),
-			"start_id":    batch.StartID(),
+			"start_id":    batch.StartID,
 			"external_id": session.ExternalID(),
 		}).Info("requested call for contact")
 	}
 
 	// if this is a last batch, mark our start as started
-	if batch.IsLast() {
-		err := models.MarkStartComplete(ctx, rt.DB, batch.StartID())
+	if batch.IsLast {
+		err := models.MarkStartComplete(ctx, rt.DB, batch.StartID)
 		if err != nil {
 			return errors.Wrapf(err, "error trying to set batch as complete")
 		}

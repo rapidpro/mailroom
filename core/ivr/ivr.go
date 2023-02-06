@@ -188,7 +188,7 @@ func RequestCall(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 
 	// create our call object
 	conn, err := models.InsertCall(
-		ctx, rt.DB, oa.OrgID(), channel.ID(), start.StartID(), contact.ID(), models.URNID(urnID),
+		ctx, rt.DB, oa.OrgID(), channel.ID(), start.StartID, contact.ID(), models.URNID(urnID),
 		models.CallDirectionOut, models.CallStatusPending, "",
 	)
 	if err != nil {
