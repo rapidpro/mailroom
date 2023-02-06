@@ -1,3 +1,7 @@
+v8.1.12 (2023-02-06)
+-------------------------
+ * Refactor tasks
+
 v8.1.11 (2023-02-02)
 -------------------------
  * Stop writing quick replies to metadata and fix not writing them to the db
