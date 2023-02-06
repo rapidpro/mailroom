@@ -56,7 +56,7 @@ func InsertContact(db *sqlx.DB, org *Org, uuid flows.ContactUUID, name string, l
 }
 
 // InsertContactGroup inserts a contact group
-func InsertContactGroup(db *sqlx.DB, org *Org, uuid assets.GroupUUID, name, query string) *Group {
+func InsertContactGroup(db *sqlx.DB, org *Org, uuid assets.GroupUUID, name, query string, contacts ...*Contact) *Group {
 	groupType := "M"
 	if query != "" {
 		groupType = "Q"
@@ -67,6 +67,11 @@ func InsertContactGroup(db *sqlx.DB, org *Org, uuid assets.GroupUUID, name, quer
 		`INSERT INTO contacts_contactgroup(uuid, org_id, group_type, name, query, status, is_system, is_active, created_by_id, created_on, modified_by_id, modified_on) 
 		 VALUES($1, $2, $3, $4, $5, 'R', FALSE, TRUE, 1, NOW(), 1, NOW()) RETURNING id`, uuid, org.ID, groupType, name, null.String(query),
 	))
+
+	for _, contact := range contacts {
+		db.MustExec(`INSERT INTO contacts_contactgroup_contacts(contactgroup_id, contact_id) VALUES($1, $2)`, id, contact.ID)
+	}
+
 	return &Group{id, uuid}
 }
 
