@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/runtime"
@@ -66,8 +67,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 			continue
 		}
 
-		var task interface{}
-		var taskName string
+		var task tasks.Task
 
 		// if it is a broadcast
 		if s.Broadcast() != nil {
@@ -80,8 +80,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 			}
 
 			// add our task to send this broadcast
-			task = bcast
-			taskName = msgs.TypeSendBroadcast
+			task = &msgs.SendBroadcastTask{Broadcast: bcast}
 			broadcasts++
 
 		} else if s.FlowStart() != nil {
@@ -96,8 +95,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 			}
 
 			// add our flow start task
-			task = start
-			taskName = starts.TypeStartFlow
+			task = &starts.StartFlowTask{FlowStart: start}
 			triggers++
 		} else {
 			log.Info("schedule found with no associated active broadcast or trigger, ignoring")
@@ -122,9 +120,9 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 
 		// add our task if we have one
 		if task != nil {
-			err = queue.AddTask(rc, queue.BatchQueue, taskName, int(s.OrgID()), task, queue.HighPriority)
+			err = tasks.Queue(rc, queue.BatchQueue, s.OrgID(), task, queue.HighPriority)
 			if err != nil {
-				log.WithError(err).Error("error firing task with name: ", taskName)
+				log.WithError(err).Errorf("error queueing %s task from schedule", task.Type())
 			}
 		}
 	}
