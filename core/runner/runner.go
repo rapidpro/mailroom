@@ -144,9 +144,9 @@ func StartFlowBatch(
 	start := time.Now()
 
 	// if this is our last start, no matter what try to set the start as complete as a last step
-	if batch.IsLast() {
+	if batch.IsLast {
 		defer func() {
-			err := models.MarkStartComplete(ctx, rt.DB, batch.StartID())
+			err := models.MarkStartComplete(ctx, rt.DB, batch.StartID)
 			if err != nil {
 				logrus.WithError(err).WithField("start_id", batch.StartID).Error("error marking start as complete")
 			}
@@ -154,53 +154,53 @@ func StartFlowBatch(
 	}
 
 	// create our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, batch.OrgID())
+	oa, err := models.GetOrgAssets(ctx, rt, batch.OrgID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating assets for org: %d", batch.OrgID())
+		return nil, errors.Wrapf(err, "error creating assets for org: %d", batch.OrgID)
 	}
 
 	// try to load our flow
-	flow, err := oa.FlowByID(batch.FlowID())
+	flow, err := oa.FlowByID(batch.FlowID)
 	if err == models.ErrNotFound {
-		logrus.WithField("flow_id", batch.FlowID()).Info("skipping flow start, flow no longer active or archived")
+		logrus.WithField("flow_id", batch.FlowID).Info("skipping flow start, flow no longer active or archived")
 		return nil, nil
 	}
 	if err != nil {
-		return nil, errors.Wrapf(err, "error loading campaign flow: %d", batch.FlowID())
+		return nil, errors.Wrapf(err, "error loading campaign flow: %d", batch.FlowID)
 	}
 
 	// get the user that created this flow start if there was one
 	var flowUser *flows.User
-	if batch.CreatedByID() != models.NilUserID {
-		user := oa.UserByID(batch.CreatedByID())
+	if batch.CreatedByID != models.NilUserID {
+		user := oa.UserByID(batch.CreatedByID)
 		if user != nil {
 			flowUser = oa.SessionAssets().Users().Get(user.Email())
 		}
 	}
 
 	var params *types.XObject
-	if !batch.Extra().IsNull() {
-		params, err = types.ReadXObject(batch.Extra())
+	if !batch.Extra.IsNull() {
+		params, err = types.ReadXObject(batch.Extra)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to read JSON from flow start extra")
 		}
 	}
 
 	var history *flows.SessionHistory
-	if !batch.SessionHistory().IsNull() {
-		history, err = models.ReadSessionHistory(batch.SessionHistory())
+	if !batch.SessionHistory.IsNull() {
+		history, err = models.ReadSessionHistory(batch.SessionHistory)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to read JSON from flow start history")
 		}
 	}
 
 	// whether engine allows some functions is based on whether there is more than one contact being started
-	batchStart := batch.TotalContacts() > 1
+	batchStart := batch.TotalContacts > 1
 
 	// this will build our trigger for each contact started
 	triggerBuilder := func(contact *flows.Contact) flows.Trigger {
-		if !batch.ParentSummary().IsNull() {
-			tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).FlowAction(history, json.RawMessage(batch.ParentSummary()))
+		if !batch.ParentSummary.IsNull() {
+			tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).FlowAction(history, json.RawMessage(batch.ParentSummary))
 			if batchStart {
 				tb = tb.AsBatch()
 			}
@@ -208,13 +208,13 @@ func StartFlowBatch(
 		}
 
 		tb := triggers.NewBuilder(oa.Env(), flow.Reference(), contact).Manual()
-		if batch.Extra() != nil {
+		if batch.Extra != nil {
 			tb = tb.WithParams(params)
 		}
 		if batchStart {
 			tb = tb.AsBatch()
 		}
-		return tb.WithUser(flowUser).WithOrigin(startTypeToOrigin[batch.StartType()]).Build()
+		return tb.WithUser(flowUser).WithOrigin(startTypeToOrigin[batch.StartType]).Build()
 	}
 
 	// before committing our runs we want to set the start they are associated with
@@ -222,7 +222,7 @@ func StartFlowBatch(
 		// for each run in our sessions, set the start id
 		for _, s := range sessions {
 			for _, r := range s.Runs() {
-				r.SetStartID(batch.StartID())
+				r.SetStartID(batch.StartID)
 			}
 		}
 		return nil
@@ -236,7 +236,7 @@ func StartFlowBatch(
 	options.TriggerBuilder = triggerBuilder
 	options.CommitHook = updateStartID
 
-	sessions, err := StartFlow(ctx, rt, oa, flow, batch.ContactIDs(), options)
+	sessions, err := StartFlow(ctx, rt, oa, flow, batch.ContactIDs, options)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting flow batch")
 	}

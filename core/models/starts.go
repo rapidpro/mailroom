@@ -89,46 +89,27 @@ func MarkStartFailed(ctx context.Context, db Queryer, startID StartID) error {
 
 // FlowStartBatch represents a single flow batch that needs to be started
 type FlowStartBatch struct {
-	b struct {
-		StartID     StartID     `json:"start_id"`
-		StartType   StartType   `json:"start_type"`
-		OrgID       OrgID       `json:"org_id"`
-		CreatedByID UserID      `json:"created_by_id"`
-		FlowID      FlowID      `json:"flow_id"`
-		FlowType    FlowType    `json:"flow_type"`
-		ContactIDs  []ContactID `json:"contact_ids"`
+	StartID     StartID     `json:"start_id"`
+	StartType   StartType   `json:"start_type"`
+	OrgID       OrgID       `json:"org_id"`
+	CreatedByID UserID      `json:"created_by_id"`
+	FlowID      FlowID      `json:"flow_id"`
+	FlowType    FlowType    `json:"flow_type"`
+	ContactIDs  []ContactID `json:"contact_ids"`
 
-		ParentSummary  null.JSON `json:"parent_summary,omitempty"`
-		SessionHistory null.JSON `json:"session_history,omitempty"`
-		Extra          null.JSON `json:"extra,omitempty"`
+	ParentSummary  null.JSON `json:"parent_summary,omitempty"`
+	SessionHistory null.JSON `json:"session_history,omitempty"`
+	Extra          null.JSON `json:"extra,omitempty"`
 
-		RestartParticipants bool `json:"restart_participants"`
-		IncludeActive       bool `json:"include_active"`
+	RestartParticipants bool `json:"restart_participants"`
+	IncludeActive       bool `json:"include_active"`
 
-		IsLast        bool `json:"is_last,omitempty"`
-		TotalContacts int  `json:"total_contacts"`
-
-		CreatedBy string `json:"created_by"` // deprecated
-	}
+	IsLast        bool `json:"is_last,omitempty"`
+	TotalContacts int  `json:"total_contacts"`
 }
 
-func (b *FlowStartBatch) StartID() StartID               { return b.b.StartID }
-func (b *FlowStartBatch) StartType() StartType           { return b.b.StartType }
-func (b *FlowStartBatch) OrgID() OrgID                   { return b.b.OrgID }
-func (b *FlowStartBatch) CreatedByID() UserID            { return b.b.CreatedByID }
-func (b *FlowStartBatch) FlowID() FlowID                 { return b.b.FlowID }
-func (b *FlowStartBatch) ContactIDs() []ContactID        { return b.b.ContactIDs }
-func (b *FlowStartBatch) ExcludeStartedPreviously() bool { return !b.b.RestartParticipants }
-func (b *FlowStartBatch) ExcludeInAFlow() bool           { return !b.b.IncludeActive }
-func (b *FlowStartBatch) IsLast() bool                   { return b.b.IsLast }
-func (b *FlowStartBatch) TotalContacts() int             { return b.b.TotalContacts }
-
-func (b *FlowStartBatch) ParentSummary() null.JSON  { return b.b.ParentSummary }
-func (b *FlowStartBatch) SessionHistory() null.JSON { return b.b.SessionHistory }
-func (b *FlowStartBatch) Extra() null.JSON          { return b.b.Extra }
-
-func (b *FlowStartBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
-func (b *FlowStartBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
+func (b *FlowStartBatch) ExcludeStartedPreviously() bool { return !b.RestartParticipants }
+func (b *FlowStartBatch) ExcludeInAFlow() bool           { return !b.IncludeActive }
 
 // FlowStart represents the top level flow start in our system
 type FlowStart struct {
@@ -336,22 +317,22 @@ INSERT INTO flows_flowstart_groups(flowstart_id, contactgroup_id) VALUES(:start_
 
 // CreateBatch creates a batch for this start using the passed in contact ids
 func (s *FlowStart) CreateBatch(contactIDs []ContactID, last bool, totalContacts int) *FlowStartBatch {
-	b := &FlowStartBatch{}
-	b.b.StartID = s.ID()
-	b.b.StartType = s.s.StartType
-	b.b.OrgID = s.OrgID()
-	b.b.FlowID = s.FlowID()
-	b.b.FlowType = s.FlowType()
-	b.b.ContactIDs = contactIDs
-	b.b.RestartParticipants = s.s.RestartParticipants
-	b.b.IncludeActive = s.s.IncludeActive
-	b.b.ParentSummary = s.ParentSummary()
-	b.b.SessionHistory = s.SessionHistory()
-	b.b.Extra = s.Extra()
-	b.b.IsLast = last
-	b.b.TotalContacts = totalContacts
-	b.b.CreatedByID = s.s.CreatedByID
-	return b
+	return &FlowStartBatch{
+		StartID:             s.ID(),
+		StartType:           s.s.StartType,
+		OrgID:               s.OrgID(),
+		FlowID:              s.FlowID(),
+		FlowType:            s.FlowType(),
+		ContactIDs:          contactIDs,
+		RestartParticipants: s.s.RestartParticipants,
+		IncludeActive:       s.s.IncludeActive,
+		ParentSummary:       s.ParentSummary(),
+		SessionHistory:      s.SessionHistory(),
+		Extra:               s.Extra(),
+		IsLast:              last,
+		TotalContacts:       totalContacts,
+		CreatedByID:         s.s.CreatedByID,
+	}
 }
 
 func (i *StartID) Scan(value any) error         { return null.ScanInt(value, i) }
