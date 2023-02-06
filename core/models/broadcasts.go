@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -58,13 +59,14 @@ func (t BroadcastTranslations) Value() (driver.Value, error) {
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	ID            BroadcastID           `json:"broadcast_id,omitempty"  db:"id"`
+	OrgID         OrgID                 `json:"org_id"                  db:"org_id"`
 	Translations  BroadcastTranslations `json:"translations"            db:"translations"`
 	TemplateState TemplateState         `json:"template_state"`
 	BaseLanguage  envs.Language         `json:"base_language"           db:"base_language"`
 	URNs          []urns.URN            `json:"urns,omitempty"`
 	ContactIDs    []ContactID           `json:"contact_ids,omitempty"`
 	GroupIDs      []GroupID             `json:"group_ids,omitempty"`
-	OrgID         OrgID                 `json:"org_id"                  db:"org_id"`
+	Query         null.String           `json:"query,omitempty"         db:"query"`
 	CreatedByID   UserID                `json:"created_by_id,omitempty" db:"created_by_id"`
 	ParentID      BroadcastID           `json:"parent_id,omitempty"     db:"parent_id"`
 	TicketID      TicketID              `json:"ticket_id,omitempty"     db:"ticket_id"`
@@ -72,7 +74,7 @@ type Broadcast struct {
 
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(orgID OrgID, translations map[envs.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID, createdByID UserID) *Broadcast {
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, query string, ticketID TicketID, createdByID UserID) *Broadcast {
 
 	return &Broadcast{
 		OrgID:         orgID,
@@ -97,6 +99,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.URNs,
 		parent.ContactIDs,
 		parent.GroupIDs,
+		string(parent.Query),
 		parent.TicketID,
 		parent.CreatedByID,
 	)
@@ -168,8 +171,8 @@ type broadcastGroup struct {
 
 const sqlInsertBroadcast = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  translations,  base_language, send_all, is_active)
-			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :translations, :base_language, FALSE,    TRUE)
+	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  translations,  base_language,  query, send_all, is_active)
+			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :translations, :base_language, :query, FALSE,    TRUE)
 RETURNING id`
 
 const sqlInsertBroadcastContacts = `INSERT INTO msgs_broadcast_contacts(broadcast_id, contact_id) VALUES(:broadcast_id, :contact_id)`
@@ -203,7 +206,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, oa *OrgAssets, event
 		}
 	}
 
-	return NewBroadcast(oa.OrgID(), translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID, NilUserID), nil
+	return NewBroadcast(oa.OrgID(), translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, event.ContactQuery, NilTicketID, NilUserID), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {

@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -58,93 +57,40 @@ func (t *StartFlowTask) Perform(ctx context.Context, rt *runtime.Runtime, orgID 
 
 // CreateFlowBatches takes our master flow start and creates batches of flow starts for all the unique contacts
 func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.FlowStart) error {
-	contactIDs := make(map[models.ContactID]bool)
-	createdContactIDs := make([]models.ContactID, 0)
-
-	// we are building a set of contact ids, start with the explicit ones
-	for _, id := range start.ContactIDs() {
-		contactIDs[id] = true
-	}
-
 	oa, err := models.GetOrgAssets(ctx, rt, start.OrgID())
 	if err != nil {
-		return errors.Wrapf(err, "error loading org assets")
+		return errors.Wrap(err, "error loading org assets")
 	}
 
-	// look up any contacts by URN
-	if len(start.URNs()) > 0 {
-		urnContactIDs, err := models.GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, start.URNs())
-		if err != nil {
-			return errors.Wrapf(err, "error getting contact ids from urns")
-		}
-		for _, id := range urnContactIDs {
-			if !contactIDs[id] {
-				createdContactIDs = append(createdContactIDs, id)
-			}
-			contactIDs[id] = true
-		}
-	}
+	var contactIDs, createdContactIDs []models.ContactID
 
-	// if we are meant to create a new contact, do so
 	if start.CreateContact() {
+		// if we are meant to create a new contact, do so
 		contact, _, err := models.CreateContact(ctx, rt.DB, oa, models.NilUserID, "", envs.NilLanguage, nil)
 		if err != nil {
 			return errors.Wrapf(err, "error creating new contact")
 		}
-		contactIDs[contact.ID()] = true
-		createdContactIDs = append(createdContactIDs, contact.ID())
-	}
+		contactIDs = []models.ContactID{contact.ID()}
+		createdContactIDs = []models.ContactID{contact.ID()}
+	} else {
+		// otherwise resolve recipients across contacts, groups, urns etc
 
-	// if we have inclusion groups, add all the contact ids from those groups
-	if len(start.GroupIDs()) > 0 {
-		rows, err := rt.DB.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.GroupIDs()))
-		if err != nil {
-			return errors.Wrapf(err, "error querying contacts from inclusion groups")
-		}
-		defer rows.Close()
-
-		var contactID models.ContactID
-		for rows.Next() {
-			err := rows.Scan(&contactID)
-			if err != nil {
-				return errors.Wrapf(err, "error scanning contact id")
-			}
-			contactIDs[contactID] = true
-		}
-	}
-
-	// if we have a query, add the contacts that match that as well
-	if start.Query() != "" {
 		// queries in start_session flow actions only match a single contact
-		limit := -1
+		queryLimit := -1
 		if start.Type() == models.StartTypeFlowAction {
-			limit = 1
+			queryLimit = 1
 		}
-		matches, err := search.GetContactIDsForQuery(ctx, rt.ES, oa, start.Query(), limit)
+
+		contactIDs, createdContactIDs, err = search.ResolveRecipients(ctx, rt, oa, &search.Recipients{
+			ContactIDs:      start.ContactIDs(),
+			GroupIDs:        start.GroupIDs(),
+			URNs:            start.URNs(),
+			Query:           start.Query(),
+			QueryLimit:      queryLimit,
+			ExcludeGroupIDs: start.ExcludeGroupIDs(),
+		})
 		if err != nil {
-			return errors.Wrapf(err, "error performing search for start: %d", start.ID())
-		}
-
-		for _, contactID := range matches {
-			contactIDs[contactID] = true
-		}
-	}
-
-	// finally, if we have exclusion groups, remove all the contact ids from those groups
-	if len(start.ExcludeGroupIDs()) > 0 {
-		rows, err := rt.DB.QueryxContext(ctx, `SELECT contact_id FROM contacts_contactgroup_contacts WHERE contactgroup_id = ANY($1)`, pq.Array(start.ExcludeGroupIDs()))
-		if err != nil {
-			return errors.Wrapf(err, "error querying contacts from exclusion groups")
-		}
-		defer rows.Close()
-
-		var contactID models.ContactID
-		for rows.Next() {
-			err := rows.Scan(&contactID)
-			if err != nil {
-				return errors.Wrapf(err, "error scanning contact id")
-			}
-			delete(contactIDs, contactID)
+			return errors.Wrap(err, "error resolving start recipients")
 		}
 	}
 
@@ -190,7 +136,7 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 	}
 
 	// build up batches of contacts to start
-	for c := range contactIDs {
+	for _, c := range contactIDs {
 		if len(contacts) == startBatchSize {
 			queueBatch(false)
 		}

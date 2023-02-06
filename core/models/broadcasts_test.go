@@ -33,6 +33,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		[]urns.URN{"tel:+593979012345"},
 		[]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID},
 		[]models.GroupID{testdata.DoctorsGroup.ID},
+		"",
 		ticket.ID,
 		models.NilUserID,
 	)
