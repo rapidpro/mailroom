@@ -93,7 +93,7 @@ func TestQueueEventFires(t *testing.T) {
 	assert.Equal(t, 100, len(tk1.FireIDs))
 	assert.Equal(t, 10, len(tk2.FireIDs))
 }
-func TestFireCampaignEvents(t *testing.T) {
+func TestQueueAndFireEvent(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
 	defer rc.Close()
