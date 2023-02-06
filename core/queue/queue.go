@@ -40,9 +40,6 @@ const (
 
 	// HandlerQueue is our queue for message handling or other tasks related to just one contact
 	HandlerQueue = "handler"
-
-	// StartIVRFlowBatch is our task for starting an ivr batch
-	StartIVRFlowBatch = "start_ivr_flow_batch"
 )
 
 // Size returns the number of tasks for the passed in queue

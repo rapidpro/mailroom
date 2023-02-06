@@ -371,7 +371,7 @@ func TestMsgEvents(t *testing.T) {
 	task, err := queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
-	assert.Equal(t, queue.StartIVRFlowBatch, task.Type)
+	assert.Equal(t, "start_ivr_flow_batch", task.Type)
 
 	// check messages queued to courier
 	testsuite.AssertCourierQueues(t, map[string][]int{

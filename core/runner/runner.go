@@ -749,10 +749,11 @@ func TriggerIVRFlow(ctx context.Context, rt *runtime.Runtime, orgID models.OrgID
 	// create our batch of all our contacts
 	task := start.CreateBatch(contactIDs, true, len(contactIDs))
 
+	// TODO resolve circular dependency issue here which prevents this code from directly using ivr task struct
 	// queue this to our ivr starter, it will take care of creating the calls then calling back in
 	rc := rt.RP.Get()
 	defer rc.Close()
-	err = queue.AddTask(rc, queue.BatchQueue, queue.StartIVRFlowBatch, int(orgID), task, queue.HighPriority)
+	err = queue.AddTask(rc, queue.BatchQueue, "start_ivr_flow_batch", int(orgID), task, queue.HighPriority)
 	if err != nil {
 		return errors.Wrapf(err, "error queuing ivr flow start")
 	}

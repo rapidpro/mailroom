@@ -198,7 +198,7 @@ func TestIVRCampaigns(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 
-	assert.Equal(t, task.Type, queue.StartIVRFlowBatch)
+	assert.Equal(t, "start_ivr_flow_batch", task.Type)
 }
 
 func assertFireTasks(t *testing.T, rp *redis.Pool, org *testdata.Org, expected [][]models.FireID) {
