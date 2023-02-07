@@ -1,3 +1,9 @@
+v8.1.15 (2023-02-07)
+-------------------------
+ * Refactor so that web doesn't import testsuite
+ * Test queuing and popping of start flow tasks
+ * Convert FlowStart to basic struct for simpler marshalling etc
+
 v8.1.14 (2023-02-06)
 -------------------------
  * Simplify FlowStartBatch
