@@ -1,4 +1,4 @@
-package contact
+package contact_test
 
 import (
 	"testing"
@@ -9,7 +9,6 @@ import (
 	_ "github.com/nyaruka/mailroom/services/tickets/intern"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/nyaruka/mailroom/web"
 )
 
 func TestCreateContacts(t *testing.T) {
@@ -22,7 +21,7 @@ func TestCreateContacts(t *testing.T) {
 
 	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
 
-	web.RunWebTests(t, ctx, rt, "testdata/create.json", nil)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/create.json", nil)
 }
 
 func TestModifyContacts(t *testing.T) {
@@ -47,7 +46,7 @@ func TestModifyContacts(t *testing.T) {
 	// because we made changes to a group above, need to make sure we don't use stale org assets
 	models.FlushCache()
 
-	web.RunWebTests(t, ctx, rt, "testdata/modify.json", nil)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/modify.json", nil)
 
 	models.FlushCache()
 }
@@ -62,7 +61,7 @@ func TestResolveContacts(t *testing.T) {
 
 	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
 
-	web.RunWebTests(t, ctx, rt, "testdata/resolve.json", nil)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/resolve.json", nil)
 }
 
 func TestInterruptContact(t *testing.T) {
@@ -77,5 +76,5 @@ func TestInterruptContact(t *testing.T) {
 	// give Bob a waiting session
 	testdata.InsertWaitingSession(db, testdata.Org1, testdata.Bob, models.FlowTypeMessaging, testdata.PickANumber, models.NilCallID, time.Now(), time.Now().Add(time.Hour), true, nil)
 
-	web.RunWebTests(t, ctx, rt, "testdata/interrupt.json", nil)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/interrupt.json", nil)
 }

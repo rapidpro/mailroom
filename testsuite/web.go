@@ -1,4 +1,4 @@
-package web
+package testsuite
 
 import (
 	"bytes"
@@ -22,8 +22,7 @@ import (
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/testsuite"
-
+	"github.com/nyaruka/mailroom/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +36,7 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 
-	server := NewServer(ctx, rt, wg)
+	server := web.NewServer(ctx, rt, wg)
 	server.Start()
 	defer server.Stop()
 
@@ -63,7 +62,7 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 		actualResponse []byte
 	}
 	tcs := make([]TestCase, 0, 20)
-	tcJSON := testsuite.ReadFile(truthFile)
+	tcJSON := ReadFile(truthFile)
 
 	for key, value := range substitutions {
 		tcJSON = bytes.ReplaceAll(tcJSON, []byte("$"+key+"$"), []byte(value))
@@ -131,7 +130,7 @@ func RunWebTests(t *testing.T, ctx context.Context, rt *runtime.Runtime, truthFi
 			expectedIsJSON := false
 
 			if tc.ResponseFile != "" {
-				expectedResponse = testsuite.ReadFile(tc.ResponseFile)
+				expectedResponse = ReadFile(tc.ResponseFile)
 
 				expectedIsJSON = strings.HasSuffix(tc.ResponseFile, ".json")
 			} else {

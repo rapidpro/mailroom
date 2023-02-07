@@ -1,4 +1,4 @@
-package contact
+package contact_test
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
-
+	"github.com/nyaruka/mailroom/web/contact"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -199,7 +199,7 @@ func TestContactSearch(t *testing.T) {
 
 		// on 200 responses parse them
 		if resp.StatusCode == 200 {
-			r := &searchResponse{}
+			r := &contact.SearchResponse{}
 			err = json.Unmarshal(content, r)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedHits, r.ContactIDs)
@@ -229,5 +229,5 @@ func TestParseQuery(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	web.RunWebTests(t, ctx, rt, "testdata/parse_query.json", nil)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/parse_query.json", nil)
 }
