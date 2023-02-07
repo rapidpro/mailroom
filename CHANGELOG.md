@@ -1,3 +1,7 @@
+v8.1.16 (2023-02-07)
+-------------------------
+ * Update to latest goflow
+
 v8.1.15 (2023-02-07)
 -------------------------
  * Refactor so that web doesn't import testsuite
