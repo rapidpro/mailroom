@@ -6,11 +6,12 @@ import (
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/interrupts"
 	"github.com/nyaruka/mailroom/core/tasks/msgs"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +20,7 @@ func TestInterruptChannel(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	insertSession := func(org *testdata.Org, contact *testdata.Contact, flow *testdata.Flow, connectionID models.CallID) models.SessionID {
 		sessionID := testdata.InsertWaitingSession(db, org, contact, models.FlowTypeMessaging, flow, connectionID, time.Now(), time.Now(), false, nil)
@@ -53,14 +54,9 @@ func TestInterruptChannel(t *testing.T) {
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.VonageChannel.ID).Returns(1)
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.TwilioChannel.ID).Returns(0)
 
-	// twilio channel task
-	task := &interrupts.InterruptChannelTask{
-		ChannelID: testdata.TwilioChannel.ID,
-	}
-
-	// execute it
-	err := task.Perform(ctx, rt, testdata.Org1.ID)
-	assert.NoError(t, err)
+	// queue and perform a task to interrupt the Twilio channel
+	tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &interrupts.InterruptChannelTask{ChannelID: testdata.TwilioChannel.ID}, queue.DefaultPriority)
+	testsuite.FlushTasks(t, rt)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.VonageChannel.ID).Returns(1)
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and failed_reason = 'R' and channel_id = $1`, testdata.VonageChannel.ID).Returns(0)
@@ -76,7 +72,7 @@ func TestInterruptChannel(t *testing.T) {
 	testdata.InsertErroredOutgoingMsg(db, testdata.Org1, testdata.VonageChannel, testdata.Bob, "Hi", 2, time.Now().Add(-time.Minute), true) // high priority
 
 	// just to create courier queues
-	err = msgs.RetryErroredMessages(ctx, rt)
+	err := msgs.RetryErroredMessages(ctx, rt)
 	require.NoError(t, err)
 
 	testsuite.AssertCourierQueues(t, map[string][]int{
@@ -85,14 +81,9 @@ func TestInterruptChannel(t *testing.T) {
 		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/1": {1}, // vonage, high priority
 	})
 
-	// vonage channel task
-	task = &interrupts.InterruptChannelTask{
-		ChannelID: testdata.VonageChannel.ID,
-	}
-
-	// execute it
-	err = task.Perform(ctx, rt, testdata.Org1.ID)
-	assert.NoError(t, err)
+	// queue and perform a task to interrupt the Vonage channel
+	tasks.Queue(rc, queue.BatchQueue, testdata.Org1.ID, &interrupts.InterruptChannelTask{ChannelID: testdata.VonageChannel.ID}, queue.DefaultPriority)
+	testsuite.FlushTasks(t, rt)
 
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and failed_reason = 'R' and channel_id = $1`, testdata.VonageChannel.ID).Returns(6)
 	assertdb.Query(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'F' and channel_id = $1`, testdata.VonageChannel.ID).Returns(7)

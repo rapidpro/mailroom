@@ -5,17 +5,14 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
-	"github.com/nyaruka/mailroom"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
-	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStartTasks(t *testing.T) {
@@ -254,7 +251,7 @@ func TestStartTasks(t *testing.T) {
 		err = tasks.Queue(rc, tc.queue, testdata.Org1.ID, &starts.StartFlowTask{FlowStart: start}, queue.DefaultPriority)
 		assert.NoError(t, err)
 
-		taskCounts := FlushTasks(t, rt)
+		taskCounts := testsuite.FlushTasks(t, rt)
 
 		// assert our count of batches
 		assert.Equal(t, tc.expectedBatchCount, taskCounts["start_flow_batch"], "unexpected batch count in '%s'", tc.label)
@@ -276,35 +273,4 @@ func TestStartTasks(t *testing.T) {
 			assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE status = 'W' AND flow_id = $1`, flowID).Returns(activeRuns, "active runs mismatch for flow #%d in '%s'", flowID, tc.label)
 		}
 	}
-}
-
-func FlushTasks(t *testing.T, rt *runtime.Runtime) map[string]int {
-	rc := rt.RP.Get()
-	defer rc.Close()
-
-	var task *queue.Task
-	var err error
-	counts := make(map[string]int)
-
-	for {
-		// look for a task on the handler queue
-		task, err = queue.PopNextTask(rc, queue.HandlerQueue)
-		require.NoError(t, err)
-
-		if task == nil {
-			// look for a task on the batch queue
-			task, err = queue.PopNextTask(rc, queue.BatchQueue)
-			require.NoError(t, err)
-		}
-
-		if task == nil { // all done
-			break
-		}
-
-		counts[task.Type]++
-
-		err = mailroom.PerformTask(rt, task)
-		assert.NoError(t, err)
-	}
-	return counts
 }
