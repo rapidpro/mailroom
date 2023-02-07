@@ -45,11 +45,6 @@
                     "expire_after_minutes": 720,
                     "localization": {
                         "spa": {
-                            "8d2e259c-bc3c-464f-8c15-985bc736e212": {
-                                "arguments": [
-                                    "Azul"
-                                ]
-                            },
                             "baf07ebb-8a2a-4e63-aa08-d19aa408cd45": {
                                 "name": [
                                     "Azul"
