@@ -199,7 +199,7 @@ func processChannelEvent(ctx context.Context, rt *runtime.Runtime, event *channe
 			}
 
 			// delete config values that came from adding this account
-			remConfig := utils.StringSet([]string{configPushID, configPushToken, configTargetID, configTriggerID})
+			remConfig := utils.Set([]string{configPushID, configPushToken, configTargetID, configTriggerID})
 			if err := ticketer.UpdateConfig(ctx, rt.DB, nil, remConfig); err != nil {
 				return errors.Wrapf(err, "error updating config for ticketer %s", ticketer.UUID())
 			}

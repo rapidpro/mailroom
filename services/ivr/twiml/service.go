@@ -62,7 +62,7 @@ const (
 )
 
 // https://www.twilio.com/docs/voice/twiml/say
-var supportedSayLanguages = utils.StringSet([]string{
+var supportedSayLanguages = utils.Set([]string{
 	"da-DK",
 	"de-DE",
 	"en-AU",
