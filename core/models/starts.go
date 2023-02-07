@@ -233,13 +233,6 @@ type startGroup struct {
 
 // InsertFlowStarts inserts all the passed in starts
 func InsertFlowStarts(ctx context.Context, db Queryer, starts []*FlowStart) error {
-	// TODO figure out if this is needed
-	for _, s := range starts {
-		if s.UUID == "" {
-			s.UUID = uuids.New()
-		}
-	}
-
 	// insert our starts
 	err := BulkQuery(ctx, "inserting flow start", db, sqlInsertStart, starts)
 	if err != nil {

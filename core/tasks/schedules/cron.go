@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
@@ -85,6 +86,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 
 		} else if s.FlowStart() != nil {
 			start := s.FlowStart()
+			start.UUID = uuids.New()
 
 			// insert our flow start
 			err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})
