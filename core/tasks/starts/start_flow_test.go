@@ -277,15 +277,15 @@ func TestStarts(t *testing.T) {
 		assert.Equal(t, tc.expectedBatchCount, count, "unexpected batch count in '%s'", tc.label)
 
 		// assert our count of total flow runs created
-		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1 AND start_id = $2`, tc.flowID, start.ID()).Returns(tc.expectedTotalCount, "unexpected total run count in '%s'", tc.label)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE flow_id = $1 AND start_id = $2`, tc.flowID, start.ID).Returns(tc.expectedTotalCount, "unexpected total run count in '%s'", tc.label)
 
 		// assert final status
-		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart where status = $2 AND id = $1`, start.ID(), tc.expectedStatus).Returns(1, "status mismatch in '%s'", tc.label)
+		assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart where status = $2 AND id = $1`, start.ID, tc.expectedStatus).Returns(1, "status mismatch in '%s'", tc.label)
 
 		// assert final contact count
 		if tc.expectedStatus != models.StartStatusFailed {
 			assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart where contact_count = $2 AND id = $1`,
-				[]interface{}{start.ID(), tc.expectedContactCount}, 1, "contact count mismatch in '%s'", tc.label)
+				[]interface{}{start.ID, tc.expectedContactCount}, 1, "contact count mismatch in '%s'", tc.label)
 		}
 
 		// assert count of active runs by flow

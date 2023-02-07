@@ -308,7 +308,7 @@ func StartIVRFlow(
 	if err != nil {
 		return errors.Wrapf(err, "unable to load start: %d", startID)
 	}
-	flow, err := oa.FlowByID(start.FlowID())
+	flow, err := oa.FlowByID(start.FlowID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to load flow: %d", startID)
 	}
@@ -335,16 +335,16 @@ func StartIVRFlow(
 	}
 
 	var params *types.XObject
-	if !start.Extra().IsNull() {
-		params, err = types.ReadXObject(start.Extra())
+	if !start.Extra.IsNull() {
+		params, err = types.ReadXObject(start.Extra)
 		if err != nil {
 			return errors.Wrap(err, "unable to read JSON from flow start extra")
 		}
 	}
 
 	var history *flows.SessionHistory
-	if !start.SessionHistory().IsNull() {
-		history, err = models.ReadSessionHistory(start.SessionHistory())
+	if !start.SessionHistory.IsNull() {
+		history, err = models.ReadSessionHistory(start.SessionHistory)
 		if err != nil {
 			return errors.Wrap(err, "unable to read JSON from flow start history")
 		}
@@ -354,9 +354,9 @@ func StartIVRFlow(
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 
 	var trigger flows.Trigger
-	if !start.ParentSummary().IsNull() {
+	if !start.ParentSummary.IsNull() {
 		trigger = triggers.NewBuilder(oa.Env(), flowRef, contact).
-			FlowAction(history, json.RawMessage(start.ParentSummary())).
+			FlowAction(history, json.RawMessage(start.ParentSummary)).
 			WithCall(channel.ChannelReference(), urn).
 			Build()
 	} else {
@@ -614,9 +614,9 @@ func HandleIVRStatus(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAss
 			return errors.Wrapf(err, "unable to load start: %d", call.StartID())
 		}
 
-		flow, err := oa.FlowByID(start.FlowID())
+		flow, err := oa.FlowByID(start.FlowID)
 		if err != nil {
-			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID())
+			return errors.Wrapf(err, "unable to load flow: %d", start.FlowID)
 		}
 
 		call.MarkErrored(ctx, rt.DB, dates.Now(), flow.IVRRetryWait(), errorReason)

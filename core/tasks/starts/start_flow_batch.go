@@ -14,7 +14,7 @@ import (
 const TypeStartFlowBatch = "start_flow_batch"
 
 func init() {
-	tasks.RegisterType(TypeStartFlowBatch, func() tasks.Task { return &StartFlowBatchTask{FlowStartBatch: &models.FlowStartBatch{}} })
+	tasks.RegisterType(TypeStartFlowBatch, func() tasks.Task { return &StartFlowBatchTask{} })
 }
 
 // StartFlowBatchTask is the start flow batch task

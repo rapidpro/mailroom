@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -81,11 +80,11 @@ func TestGetExpired(t *testing.T) {
 	assert.Nil(t, schedules[1].Broadcast())
 	start := schedules[1].FlowStart()
 	assert.NotNil(t, start)
-	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
-	assert.Equal(t, testdata.Favorites.ID, start.FlowID())
-	assert.Equal(t, testdata.Org1.ID, start.OrgID())
-	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, start.ContactIDs())
-	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs())
+	assert.Equal(t, models.FlowTypeMessaging, start.FlowType)
+	assert.Equal(t, testdata.Favorites.ID, start.FlowID)
+	assert.Equal(t, testdata.Org1.ID, start.OrgID)
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.George.ID}, start.ContactIDs)
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs)
 
 	assert.Equal(t, s1, schedules[2].ID())
 	bcast := schedules[2].Broadcast()

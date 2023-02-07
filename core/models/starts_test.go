@@ -14,7 +14,6 @@ import (
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/null/v2"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,21 +46,21 @@ func TestStarts(t *testing.T) {
 	err := json.Unmarshal(startJSON, start)
 
 	require.NoError(t, err)
-	assert.Equal(t, startID, start.ID())
-	assert.Equal(t, testdata.Org1.ID, start.OrgID())
-	assert.Equal(t, testdata.Admin.ID, start.CreatedByID())
-	assert.Equal(t, testdata.SingleMessage.ID, start.FlowID())
-	assert.Equal(t, models.FlowTypeMessaging, start.FlowType())
-	assert.Equal(t, "", start.Query())
+	assert.Equal(t, startID, start.ID)
+	assert.Equal(t, testdata.Org1.ID, start.OrgID)
+	assert.Equal(t, testdata.Admin.ID, start.CreatedByID)
+	assert.Equal(t, testdata.SingleMessage.ID, start.FlowID)
+	assert.Equal(t, models.FlowTypeMessaging, start.FlowType)
+	assert.Equal(t, null.NullString, start.Query)
 	assert.False(t, start.ExcludeStartedPreviously())
 	assert.False(t, start.ExcludeInAFlow())
-	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, start.ContactIDs())
-	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs())
-	assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.ExcludeGroupIDs())
+	assert.Equal(t, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID}, start.ContactIDs)
+	assert.Equal(t, []models.GroupID{testdata.DoctorsGroup.ID}, start.GroupIDs)
+	assert.Equal(t, []models.GroupID{testdata.TestersGroup.ID}, start.ExcludeGroupIDs)
 
-	assert.Equal(t, null.JSON(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), start.ParentSummary())
-	assert.Equal(t, null.JSON(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory())
-	assert.Equal(t, null.JSON(`{"foo": "bar"}`), start.Extra())
+	assert.Equal(t, null.JSON(`{"uuid": "b65b1a22-db6d-4f5a-9b3d-7302368a82e6"}`), start.ParentSummary)
+	assert.Equal(t, null.JSON(`{"parent_uuid": "532a3899-492f-4ffe-aed7-e75ad524efab", "ancestors": 3, "ancestors_since_input": 1}`), start.SessionHistory)
+	assert.Equal(t, null.JSON(`{"foo": "bar"}`), start.Extra)
 
 	err = models.MarkStartStarted(ctx, db, startID, 2, []models.ContactID{testdata.George.ID})
 	require.NoError(t, err)
